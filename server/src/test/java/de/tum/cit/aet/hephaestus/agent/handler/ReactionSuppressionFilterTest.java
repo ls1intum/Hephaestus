@@ -110,9 +110,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(
-            findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))
-        ).thenReturn(List.of());
+        when(findingReactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
+            List.of()
+        );
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -121,7 +121,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void appliedButStillNotObserved_isKeptWithStifferOpener() {
+    void addressedButStillBad_isKeptWithStifferOpener() {
         stubPersistedAndReaction(ReactionAction.ADDRESSED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
@@ -132,7 +132,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void appliedAndNowObserved_isDeliveredPlainNotEscalated() {
+    void addressedAndNowGood_isDeliveredPlainNotEscalated() {
         // ADDRESSED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
         // untouched (escalation is keyed on observation == NOT_OBSERVED, not on the reaction alone).
         stubPersistedAndReaction(ReactionAction.ADDRESSED);
@@ -150,9 +150,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(CK);
         var reaction = reaction(action);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(
-            findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))
-        ).thenReturn(List.of(reaction));
+        when(findingReactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
+            List.of(reaction)
+        );
     }
 
     private static ValidatedFinding vf(String slug, Presence presence) {

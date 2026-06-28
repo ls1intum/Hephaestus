@@ -6,12 +6,12 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Request DTO for submitting reaction on a practice finding.
+ * Request DTO for submitting a reaction to a delivered feedback unit.
  *
  * @param action      the reaction action (required)
  * @param explanation free-text explanation (optional for ADDRESSED/NOT_APPLICABLE, required for DISPUTED)
  */
-@Schema(description = "Submit a reaction to an AI-generated practice finding")
+@Schema(description = "Submit a reaction to a delivered feedback unit")
 public record CreateReactionDTO(
     @NotNull @Schema(description = "The reaction action to record") ReactionAction action,
     @Size(max = 2000)

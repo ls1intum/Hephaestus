@@ -9,12 +9,10 @@ import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReacti
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,29 +113,12 @@ public class ReactionService {
         var currentUser = userRepository.getCurrentUserElseThrow();
         Map<ReactionAction, Long> counts = new EnumMap<>(ReactionAction.class);
         reactionRepository
-            .countByDeveloperAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
+            .countByReactorAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
             .forEach(p -> counts.put(p.getAction(), p.getCount()));
         return new ReactionEngagementDTO(
             counts.getOrDefault(ReactionAction.ADDRESSED, 0L),
             counts.getOrDefault(ReactionAction.DISPUTED, 0L),
             counts.getOrDefault(ReactionAction.NOT_APPLICABLE, 0L)
         );
-    }
-
-    /**
-     * Returns the latest reaction per feedback unit for a given reactor.
-     * Composable API for enriching feedback lists.
-     *
-     * @return map of feedbackId → latest reaction DTO
-     */
-    @Transactional(readOnly = true)
-    public Map<UUID, ReactionDTO> getLatestReactionByFeedbackIds(Collection<UUID> feedbackIds, Long reactorUserId) {
-        if (feedbackIds.isEmpty()) {
-            return Map.of();
-        }
-        return reactionRepository
-            .findLatestByFeedbackIdsAndReactor(feedbackIds, reactorUserId)
-            .stream()
-            .collect(Collectors.toMap(Reaction::getFeedbackId, ReactionDTO::from));
     }
 }

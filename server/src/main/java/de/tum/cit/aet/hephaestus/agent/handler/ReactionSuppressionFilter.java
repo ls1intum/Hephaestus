@@ -25,13 +25,13 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Reaction-aware re-nag suppression (ADR 0021, B2). Runs AFTER the findings are persisted (so each carries
- * its stable {@code finding_fingerprint}) and BEFORE the summary/inline notes are composed: a locus the student
+ * its stable {@code recurrence_key}) and BEFORE the summary/inline notes are composed: a locus the student
  * already DISPUTED / marked NOT_APPLICABLE on an EARLIER run is dropped from this run's delivery (and a
  * SUPPRESSED ledger row is written so an eval sees it was deliberately withheld, not missed). A locus the
- * student marked ADDRESSED ("I fixed it") but that is STILL NOT_OBSERVED this run is kept, with stiffer wording.
+ * student marked ADDRESSED ("I fixed it") but that is STILL assessed BAD this run is kept, with stiffer wording.
  *
  * <p>The reaction is captured against the EPHEMERAL per-run finding id, which differs every run; matching is
- * therefore by {@code finding_fingerprint} (A2 denormalized it onto the reaction). Flag-gated
+ * therefore by {@code recurrence_key} (A2 denormalized it onto the reaction). Flag-gated
  * ({@code hephaestus.practice-review.reaction-suppression}); a no-op when off, when no findings were persisted,
  * or when no reaction matches.
  */
@@ -92,7 +92,7 @@ class ReactionSuppressionFilter {
             }
         }
         Map<String, ReactionAction> actionByKey = new HashMap<>();
-        for (Reaction r : findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(
+        for (Reaction r : findingReactionRepository.findLatestByRecurrenceKeysAndReactor(
             persistedByKey.keySet(),
             aboutUserId
         )) {

@@ -49,7 +49,7 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void rebuildsFromReviewState() {
         String reviewState = """
-            {"findings":[{"practiceSlug":"x","title":"t","observation":"NOT_OBSERVED","severity":"MAJOR",
+            {"findings":[{"practiceSlug":"x","title":"t","presence":"ABSENT","assessment":"BAD","severity":"MAJOR",
             "confidence":0.9,"evidence":{"locations":[],"snippets":[]},"reasoning":"r","guidance":"g",
             "suggestedDiffNotes":[]}]}""";
         var result = parser.parse(
@@ -62,18 +62,18 @@ class PiResultParserTest extends BaseUnitTest {
             )
         );
         String raw = result.output().get("rawOutput").toString();
-        assertThat(raw).contains("\"x\"").contains("\"NOT_OBSERVED\"");
+        assertThat(raw).contains("\"x\"").contains("\"ABSENT\"");
     }
 
     @Test
     void extractsJsonFromMixedText() {
         String mixed =
             "Here:\n```json\n{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"a\"," +
-            "\"observation\":\"NOT_OBSERVED\",\"severity\":\"MAJOR\",\"confidence\":0.8}]}\n```";
+            "\"presence\":\"ABSENT\",\"assessment\":\"BAD\",\"severity\":\"MAJOR\",\"confidence\":0.8}]}\n```";
         var result = parser.parse(
             new SandboxResult(0, Map.of("result.json", mixed.getBytes()), "done", false, Duration.ofSeconds(10))
         );
-        assertThat(result.output().get("rawOutput").toString()).contains("findings").contains("NOT_OBSERVED");
+        assertThat(result.output().get("rawOutput").toString()).contains("findings").contains("ABSENT");
     }
 
     @Test

@@ -30,7 +30,7 @@ import org.springframework.data.domain.Pageable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-class FindingsHistoryAspectProviderTest extends BaseUnitTest {
+class ObservationHistoryAspectProviderTest extends BaseUnitTest {
 
     @Mock
     UserRepository userRepository;
@@ -48,7 +48,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
     CacheManager cacheManager;
 
     @InjectMocks
-    FindingsHistoryAspectProvider provider;
+    ObservationHistoryAspectProvider provider;
 
     @Test
     void emptyDefaults() throws Exception {
@@ -73,7 +73,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
-        assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(0L);
+        assertThat(root.get("summary").get("totalObservations").asLong()).isEqualTo(0L);
         // All presence states present even when count is 0 — keeps the wire shape stable.
         for (Presence v : Presence.values()) {
             assertThat(root.get("summary").get("byPresence").has(v.name())).isTrue();
@@ -81,7 +81,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         for (Severity s : Severity.values()) {
             assertThat(root.get("summary").get("bySeverity").has(s.name())).isTrue();
         }
-        assertThat(root.get("recentFindings").isArray()).isTrue();
+        assertThat(root.get("recentObservations").isArray()).isTrue();
         assertThat(root.get("reviewsReceived").isArray()).isTrue();
     }
 
@@ -115,7 +115,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         assertThat(root.get("summary").get("byPresence").get("ABSENT").asLong()).isEqualTo(1L);
         assertThat(root.get("summary").get("byPresence").get("NOT_APPLICABLE").asLong()).isEqualTo(0L);
         assertThat(root.get("summary").get("bySeverity").get("MAJOR").asLong()).isEqualTo(2L);
-        assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(4L);
+        assertThat(root.get("summary").get("totalObservations").asLong()).isEqualTo(4L);
     }
 
     private static PresenceCount mockObservationCount(Presence v, long c) {

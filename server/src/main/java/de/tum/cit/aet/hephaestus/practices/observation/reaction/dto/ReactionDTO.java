@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Response DTO representing a developer's reaction on a practice finding.
+ * Response DTO representing a developer's reaction to a delivered feedback unit.
  */
 @Schema(description = "Developer reaction to a delivered unit of feedback")
 public record ReactionDTO(

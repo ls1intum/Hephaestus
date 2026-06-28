@@ -2,7 +2,9 @@
 
 > Status: living reference for the `practices` Spring Modulith module (entities under
 > `server/src/main/java/de/tum/cit/aet/hephaestus/practices/**`). Grounded in ADR 0021
-> (`docs/decisions/0021-findings-feedback-synthesis-seam.md`). Uses the **canonical vocabulary**
+> (`docs/decisions/0021-findings-feedback-synthesis-seam.md`) and ADR 0022
+> (`docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md`), which retires
+> "finding" for **observation** (`presence` × `assessment`). Uses the **canonical vocabulary**
 > throughout — *area*, never *goal* — one word per concept across code, schema, API, and UI.
 
 ---

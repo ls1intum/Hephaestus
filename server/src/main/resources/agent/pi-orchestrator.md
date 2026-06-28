@@ -32,8 +32,8 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
 1. **Quote or abstain — but READ FIRST.** Every finding MUST quote the exact evidence string that decides it — a sentence from the description, a commit subject, a label value, a specific added/removed diff line (`+`/`-`), or a precompute count. Abstention (`NOT_APPLICABLE`) is better than an ungrounded finding — but abstention is NOT a substitute for reading. "I did not read the file/hunk" is NEVER a valid basis for `NOT_APPLICABLE`: read it, then decide.
 
 2. **READ-BEFORE-NA gate (MANDATORY for code-level practices).** Before you may emit `NOT_APPLICABLE` on a code-level practice
-   (testing-discipline, code-craftsmanship, robust-error-handling, secure-by-default, decisions-and-documentation,
-   delivery-and-version-control), you MUST have actually examined the change: read `inputs/context/diff.patch` (every changed
+   (testing-discipline, code-craftsmanship, robust-error-handling, secure-by-default-changes, decisions-and-documentation,
+   delivery-and-version-control-discipline), you MUST have actually examined the change: read `inputs/context/diff.patch` (every changed
    *code* file's hunks) — open the underlying file in `inputs/sources/scm/repo` when the hunk alone is ambiguous. `NOT_APPLICABLE` is valid
    ONLY when, having READ the changed code, the practice's subject genuinely does not occur in it (e.g. no error-handling site
    in the diff at all). NA "for insufficient coverage / I have not read the diff" is a BUG — you have a multi-minute budget;
@@ -89,7 +89,7 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
    exactly, keyed off the countable fact you quoted (a line-count bucket, a present/absent token, a regex hit). Identical facts
    MUST yield identical severity every run. Never escalate on a feeling of "how bad" it is.
 6. **Confidence is a delivery gate, not a severity input.** Set confidence high ONLY when a precompute fact or a verbatim
-   quote backs the finding; lower it when the call is interpretive. Do not pad confidence.
+   quote backs the finding; lower it when the call is interpretive. Do not pad confidence. `confidence` is a float in [0.0, 1.0].
 7. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
    `context/` file. A finding whose only location is a context file is out of scope; drop it.
 8. **Never fabricate context — confirm a file exists before you rely on it.** Before you base ANY finding on a context file

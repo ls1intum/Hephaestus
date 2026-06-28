@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Architecture rules pinning the placement of {@link Transactional @Transactional} on the
  * mentor aspect providers ({@code UserAspectProvider}, {@code WorkspaceAspectProvider},
- * {@code PracticeCatalogAspectProvider}, {@code FindingsHistoryAspectProvider}).
+ * {@code PracticeCatalogAspectProvider}, {@code ObservationHistoryAspectProvider}).
  *
  * <p><b>The bug shape this guards against:</b> Spring AOP intercepts {@code @Transactional} via
  * the bean proxy. A class's own {@code this.method(...)} call bypasses the proxy entirely, so an

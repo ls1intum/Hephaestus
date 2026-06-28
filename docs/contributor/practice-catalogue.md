@@ -46,9 +46,9 @@ over-claim its evidence basis:
 **Two deferred slug renames.** Two practices carry a human `name`/`summary` that intentionally differs
 from their slug, to remove a label↔source contradiction: the civility practice (slug reads *"ask rather
 than demand"*) and the injection practice (slug reads *"validate and escape"*). Their **slugs are left
-unchanged** — a slug is a finding fingerprint key (`ObservationFingerprint.compute()` hashes `practiceSlug`),
-so renaming it would orphan every prior finding, reaction, and feedback correlated through it. A slug
-rename needs an explicit **fingerprint-remap migration** so prior findings re-correlate rather than
+unchanged** — a slug is an observation fingerprint key (`ObservationFingerprint.compute()` hashes `practiceSlug`),
+so renaming it would orphan every prior observation, reaction, and feedback correlated through it. A slug
+rename needs an explicit **fingerprint-remap migration** so prior observations re-correlate rather than
 orphan; that remap is the gating step (the SCD-2 `practice_revision` history — see
 `practice-feedback-schema.md` §3.8 — does not by itself remap fingerprints).
 

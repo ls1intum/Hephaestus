@@ -954,7 +954,7 @@ export type ReflectionItem = {
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**
-     * What to do — the delivered feedback for this finding (null if nothing was delivered)
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
     guidance?: string;
     /**
@@ -966,9 +966,9 @@ export type ReflectionItem = {
      */
     observationId: string;
     /**
-     * Impact level
+     * Impact level (null unless assessed BAD)
      */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
      * The headline of the feedback
      */
@@ -1679,7 +1679,7 @@ export type ObservationDetail = {
         [key: string]: unknown;
     };
     /**
-     * What to do — the delivered feedback for this finding (null if nothing was delivered)
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
     guidance?: string;
     /**
@@ -2138,7 +2138,7 @@ export type CreateWorkspaceRequest = {
 };
 
 /**
- * Submit a reaction to an AI-generated practice finding
+ * Submit a reaction to a delivered feedback unit
  */
 export type CreateReaction = {
     /**

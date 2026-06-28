@@ -54,7 +54,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_standing.json";
 
-    /** Look-back horizon — mirrors {@code FindingsHistoryAspectProvider}. */
+    /** Look-back horizon — mirrors {@code ObservationHistoryAspectProvider}. */
     private static final int LOOKBACK_DAYS = 90;
 
     /** Recent-window split for the improving/regressing trajectory signal. */

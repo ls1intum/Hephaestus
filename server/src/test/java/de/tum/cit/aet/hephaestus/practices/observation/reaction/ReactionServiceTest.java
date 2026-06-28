@@ -287,7 +287,7 @@ class ReactionServiceTest extends BaseUnitTest {
                 }
             };
 
-            when(reactionRepository.countByDeveloperAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
+            when(reactionRepository.countByReactorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(appliedProjection, disputedProjection)
             );
 
@@ -302,7 +302,7 @@ class ReactionServiceTest extends BaseUnitTest {
         @DisplayName("returns all zeros when no reaction exists")
         void returnsZerosWhenEmpty() {
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
-            when(reactionRepository.countByDeveloperAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
+            when(reactionRepository.countByReactorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of()
             );
 
@@ -311,54 +311,6 @@ class ReactionServiceTest extends BaseUnitTest {
             assertThat(result.addressed()).isZero();
             assertThat(result.disputed()).isZero();
             assertThat(result.notApplicable()).isZero();
-        }
-    }
-
-    // Get Latest Reaction By Feedback IDs
-
-    @Nested
-    class GetLatestReactionByFeedbackIds {
-
-        @Test
-        void returnsEmptyForEmptyInput() {
-            Map<UUID, ReactionDTO> result = service.getLatestReactionByFeedbackIds(List.of(), CONTRIBUTOR_ID);
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
-        void returnsMappedByFeedbackId() {
-            UUID feedbackId1 = UUID.randomUUID();
-            UUID feedbackId2 = UUID.randomUUID();
-
-            Reaction reaction1 = Reaction.builder()
-                .id(UUID.randomUUID())
-                .feedbackId(feedbackId1)
-                .reactorUserId(CONTRIBUTOR_ID)
-                .action(ReactionAction.ADDRESSED)
-                .createdAt(Instant.now())
-                .build();
-            Reaction reaction2 = Reaction.builder()
-                .id(UUID.randomUUID())
-                .feedbackId(feedbackId2)
-                .reactorUserId(CONTRIBUTOR_ID)
-                .action(ReactionAction.DISPUTED)
-                .explanation("Wrong")
-                .createdAt(Instant.now())
-                .build();
-
-            when(
-                reactionRepository.findLatestByFeedbackIdsAndReactor(List.of(feedbackId1, feedbackId2), CONTRIBUTOR_ID)
-            ).thenReturn(List.of(reaction1, reaction2));
-
-            Map<UUID, ReactionDTO> result = service.getLatestReactionByFeedbackIds(
-                List.of(feedbackId1, feedbackId2),
-                CONTRIBUTOR_ID
-            );
-
-            assertThat(result).hasSize(2);
-            assertThat(result.get(feedbackId1).action()).isEqualTo(ReactionAction.ADDRESSED);
-            assertThat(result.get(feedbackId2).action()).isEqualTo(ReactionAction.DISPUTED);
         }
     }
 }

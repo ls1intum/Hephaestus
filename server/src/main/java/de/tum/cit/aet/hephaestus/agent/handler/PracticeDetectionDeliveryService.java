@@ -114,7 +114,7 @@ public class PracticeDetectionDeliveryService {
         int discardedUnknownSlug = 0;
         int discardedDuplicate = 0;
         boolean hasNegative = false;
-        Instant detectedAt = Instant.now();
+        Instant observedAt = Instant.now();
 
         // The exact correlation key persisted per finding, keyed by finding IDENTITY (not value-equality — two
         // findings can be value-equal yet must each carry their own key). Returned so the handler stamps the
@@ -198,7 +198,7 @@ public class PracticeDetectionDeliveryService {
                 evidenceJson,
                 finding.reasoning(),
                 findingFingerprint,
-                detectedAt
+                observedAt
             );
 
             if (rows == 1) {

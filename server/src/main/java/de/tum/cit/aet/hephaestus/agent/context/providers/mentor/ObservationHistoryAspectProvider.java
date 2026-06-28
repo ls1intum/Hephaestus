@@ -41,7 +41,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 @RequiredArgsConstructor
-public class FindingsHistoryAspectProvider implements ContentProvider {
+public class ObservationHistoryAspectProvider implements ContentProvider {
 
     @Override
     public String connectorId() {
@@ -129,7 +129,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the presence aggregate is the
         // authoritative window total. Use it directly — no need to coalesce.
         long presenceTotal = byPresence.stream().mapToLong(PresenceCount::getCount).sum();
-        summary.put("totalFindings", presenceTotal);
+        summary.put("totalObservations", presenceTotal);
 
         ObjectNode presenceSummary = summary.putObject("byPresence");
         for (Presence v : Presence.values()) {
@@ -147,7 +147,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             severityNode.put(row.getSeverity().name(), row.getCount());
         }
 
-        ArrayNode findingsArr = root.putArray("recentFindings");
+        ArrayNode findingsArr = root.putArray("recentObservations");
         for (Observation f : recent) {
             ObjectNode node = findingsArr.addObject();
             node.put("id", f.getId().toString());
@@ -159,8 +159,8 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             Severity severity = f.getSeverity();
             node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", f.getConfidence());
-            node.put("detectedAt", f.getObservedAt().toString());
-            // The finding-history node carries title + presence + assessment + severity + reasoning only. Advice is NOT on the
+            node.put("observedAt", f.getObservedAt().toString());
+            // The observation-history node carries title + presence + assessment + severity + reasoning only. Advice is NOT on the
             // finding (ADR 0021) — the mentor receives the sanitised delivered feedback body via
             // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
             // raw, unsanitised text DeliveryComposer would never post.

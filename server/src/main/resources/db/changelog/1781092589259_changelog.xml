@@ -63,7 +63,7 @@
         <sql>ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS fk_practice_finding_contributor</sql>
         <addForeignKeyConstraint baseTableName="practice_finding" baseColumnNames="about_user_id"
                                  constraintName="fk_observation_subject"
-                                 referencedTableName="user" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
+                                 referencedTableName="user" referencedColumnNames="id" validate="true"/>
         <rollback>
             <dropForeignKeyConstraint baseTableName="practice_finding" constraintName="fk_observation_subject"/>
             <addForeignKeyConstraint baseTableName="practice_finding" baseColumnNames="about_user_id"
@@ -622,8 +622,8 @@
         <preConditions onFail="MARK_RAN" onFailMessage="sfk_feedback_subject already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_subject"/></not>
         </preConditions>
-        <comment>FK feedback.subject_user_id to user.id (person the feedback is ABOUT). SET NULL on delete.</comment>
-        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="subject_user_id" constraintName="sfk_feedback_subject" referencedTableName="user" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
+        <comment>FK feedback.subject_user_id to user.id (person the feedback is ABOUT). RESTRICT (no onDelete): about_user_id is NOT NULL, so a delete must be blocked, not nulled.</comment>
+        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="subject_user_id" constraintName="sfk_feedback_subject" referencedTableName="user" referencedColumnNames="id" validate="true"/>
         <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_subject"/></rollback>
     </changeSet>
 

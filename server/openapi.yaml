@@ -4560,7 +4560,7 @@ components:
       - triggerEvents
     CreateReaction:
       type: object
-      description: Submit a reaction to an AI-generated practice finding
+      description: Submit a reaction to a delivered feedback unit
       properties:
         action:
           type: string
@@ -5193,7 +5193,7 @@ components:
             ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
         guidance:
           type: string
-          description: What to do — the delivered feedback for this finding (null
+          description: What to do — the delivered feedback for this observation (null
             if nothing was delivered)
         id:
           type: string
@@ -5964,7 +5964,7 @@ components:
           - ISSUE
         guidance:
           type: string
-          description: What to do — the delivered feedback for this finding (null
+          description: What to do — the delivered feedback for this observation (null
             if nothing was delivered)
         locator:
           type: string
@@ -5976,7 +5976,7 @@ components:
           description: Observation id — handle to open the full detail
         severity:
           type: string
-          description: Impact level
+          description: Impact level (null unless assessed BAD)
           enum:
           - CRITICAL
           - MAJOR
@@ -5989,7 +5989,6 @@ components:
       - artifactId
       - artifactType
       - observationId
-      - severity
       - title
     ReflectionPractice:
       type: object

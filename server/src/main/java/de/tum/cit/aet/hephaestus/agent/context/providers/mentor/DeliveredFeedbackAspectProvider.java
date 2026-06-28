@@ -26,7 +26,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/delivered_feedback.json} for a {@link MentorChatRequest}.
  *
- * <p><b>Why this exists (fidelity of the coaching loop).</b> {@link FindingsHistoryAspectProvider} ships the
+ * <p><b>Why this exists (fidelity of the coaching loop).</b> {@link ObservationHistoryAspectProvider} ships the
  * agent's <em>pre-delivery</em> findings (title/reasoning/guidance). But what the student actually SAW on
  * their MR/issue is the composed, student-facing {@link Feedback#getBody() rendered body} — which can
  * differ: all-NA runs are suppressed, some findings aren't postable as diff notes, and summaries are edited /
@@ -50,7 +50,7 @@ public class DeliveredFeedbackAspectProvider implements ContentProvider {
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "delivered_feedback.json";
 
-    /** Look-back horizon — mirrors {@link FindingsHistoryAspectProvider}. */
+    /** Look-back horizon — mirrors {@link ObservationHistoryAspectProvider}. */
     private static final int LOOKBACK_DAYS = 90;
 
     /** Cap on delivered units shipped per turn — enough to ground the conversation, bounded for envelope size. */

@@ -20,9 +20,9 @@ public record ReflectionItemDTO(
     @NonNull @Schema(description = "Observation id — handle to open the full detail") UUID observationId,
     @NonNull @Schema(description = "The headline of the feedback") String title,
     @Nullable
-    @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")
+    @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
-    @NonNull @Schema(description = "Impact level") Severity severity,
+    @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
     @NonNull @Schema(description = "The kind of work this is about (PR / issue)") WorkArtifact artifactType,
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator

@@ -24,27 +24,6 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     Optional<Reaction> findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDesc(UUID feedbackId, Long reactorUserId);
 
     /**
-     * Returns the latest reaction per feedback unit for a given reactor, using PostgreSQL's
-     * {@code DISTINCT ON} for efficient "latest row per group" retrieval.
-     *
-     * <p>Used to enrich feedback lists with the reactor's current reaction state.
-     */
-    @Query(
-        value = """
-        SELECT DISTINCT ON (ff.feedback_id) ff.*
-        FROM reaction ff
-        WHERE ff.feedback_id IN (:feedbackIds)
-          AND ff.reactor_user_id = :reactorUserId
-        ORDER BY ff.feedback_id, ff.created_at DESC
-        """,
-        nativeQuery = true
-    )
-    List<Reaction> findLatestByFeedbackIdsAndReactor(
-        @Param("feedbackIds") Collection<UUID> feedbackIds,
-        @Param("reactorUserId") Long reactorUserId
-    );
-
-    /**
      * Latest reaction per {@code recurrence_key} (stable locus) for the given keys, restricted to one
      * reacting developer (the feedback's recipient — only the recipient may react). Used by B2 to suppress
      * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
@@ -52,16 +31,16 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
      */
     @Query(
         value = """
-        SELECT DISTINCT ON (fr.recurrence_key) fr.*
-        FROM reaction fr
-        WHERE fr.recurrence_key IN (:findingFingerprints)
-          AND fr.reactor_user_id = :reactorUserId
-        ORDER BY fr.recurrence_key, fr.created_at DESC
+        SELECT DISTINCT ON (r.recurrence_key) r.*
+        FROM reaction r
+        WHERE r.recurrence_key IN (:recurrenceKeys)
+          AND r.reactor_user_id = :reactorUserId
+        ORDER BY r.recurrence_key, r.created_at DESC
         """,
         nativeQuery = true
     )
-    List<Reaction> findLatestByObservationFingerprintsAndDeveloper(
-        @Param("findingFingerprints") Collection<String> findingFingerprints,
+    List<Reaction> findLatestByRecurrenceKeysAndReactor(
+        @Param("recurrenceKeys") Collection<String> recurrenceKeys,
         @Param("reactorUserId") Long reactorUserId
     );
 
@@ -73,15 +52,15 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
      */
     @Query(
         """
-        SELECT ff.action AS action, COUNT(ff) AS count
-        FROM Reaction ff
-        JOIN ff.feedback fb
-        WHERE ff.reactorUserId = :reactorUserId
+        SELECT r.action AS action, COUNT(r) AS count
+        FROM Reaction r
+        JOIN r.feedback fb
+        WHERE r.reactorUserId = :reactorUserId
           AND fb.workspaceId = :workspaceId
-        GROUP BY ff.action
+        GROUP BY r.action
         """
     )
-    List<ActionCountProjection> countByDeveloperAndWorkspaceGroupByAction(
+    List<ActionCountProjection> countByReactorAndWorkspaceGroupByAction(
         @Param("reactorUserId") Long reactorUserId,
         @Param("workspaceId") Long workspaceId
     );

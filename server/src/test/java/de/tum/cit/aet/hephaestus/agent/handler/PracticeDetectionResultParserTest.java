@@ -823,7 +823,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("NOT_OBSERVED with INFO severity is raised to MINOR (a gap must carry a band)")
+        @DisplayName("ABSENT with INFO severity is raised to MINOR (a gap must carry a band)")
         void notObservedInfoToMinor() {
             var out = finding(Presence.ABSENT, Severity.INFO).coerceCoherence(false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
@@ -831,7 +831,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("NOT_OBSERVED with a real band is unchanged (identity)")
+        @DisplayName("ABSENT with a real band is unchanged (identity)")
         void notObservedMajorUnchanged() {
             var in = finding(Presence.ABSENT, Severity.MAJOR);
             assertThat(in.coerceCoherence(false)).isSameAs(in);
@@ -846,7 +846,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("defect-detector NOT_OBSERVED defect is preserved with its band")
+        @DisplayName("defect-detector ABSENT defect is preserved with its band")
         void defectDetectorNotObservedPreserved() {
             var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(true);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
@@ -938,7 +938,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         // Advisory ceiling: craft/process critiques may not present as merge-blockers.
 
         @Test
-        @DisplayName("advisory practice: NOT_OBSERVED MAJOR is capped to MINOR (no merge-block)")
+        @DisplayName("advisory practice: ABSENT MAJOR is capped to MINOR (no merge-block)")
         void advisoryMajorCappedToMinor() {
             var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(false, true);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
@@ -946,14 +946,14 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("advisory practice: NOT_OBSERVED CRITICAL is also capped to MINOR")
+        @DisplayName("advisory practice: ABSENT CRITICAL is also capped to MINOR")
         void advisoryCriticalCappedToMinor() {
             var out = finding(Presence.ABSENT, Severity.CRITICAL).coerceCoherence(false, true);
             assertThat(out.severity()).isEqualTo(Severity.MINOR);
         }
 
         @Test
-        @DisplayName("blocking-eligible practice: NOT_OBSERVED MAJOR keeps its band")
+        @DisplayName("blocking-eligible practice: ABSENT MAJOR keeps its band")
         void blockingEligibleMajorPreserved() {
             var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(false, false);
             assertThat(out.severity()).isEqualTo(Severity.MAJOR);

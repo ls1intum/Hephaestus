@@ -39,7 +39,7 @@ public record ObservationDetailDTO(
     Map<String, Object> evidence,
     @Nullable @Schema(description = "AI reasoning behind the observation") String reasoning,
     @Nullable
-    @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")
+    @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
