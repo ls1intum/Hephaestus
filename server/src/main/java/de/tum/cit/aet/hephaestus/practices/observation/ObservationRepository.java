@@ -37,8 +37,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("SELECT f FROM Observation f JOIN f.practice p WHERE f.id = :id AND p.workspace.id = :workspaceId")
     Optional<Observation> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
-    /** All findings a given agent job produced — the source set the feedback ledger recorder binds to. */
-    List<Observation> findByAgentJobId(UUID agentJobId);
+    /**
+     * All findings a given agent job produced — the source set the feedback ledger recorder binds to.
+     * Ordered by id so {@code get(0)} is deterministic across retries (the recorder derives the recipient,
+     * artifact, and thread key from the first row; an unordered read could re-source them differently on
+     * a re-run once multi-subject / multi-artifact jobs ship).
+     */
+    @Query("SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId ORDER BY f.id ASC")
+    List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId);
 
     /**
      * Atomically inserts a practice finding if absent (race-condition safe).

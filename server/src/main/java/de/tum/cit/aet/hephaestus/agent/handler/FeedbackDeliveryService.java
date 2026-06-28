@@ -88,11 +88,11 @@ class FeedbackDeliveryService {
      * already lives on the diff) while a finding whose note failed keeps its full summary line. Bound by the
      * caller over the structured findings it composed from, so this service never sees them directly — the
      * summary recomposition stays in {@link DeliveryComposer} and this service only feeds it the delivered
-     * keys and re-edits in place.
+     * finding fingerprints and re-edits in place.
      */
     @FunctionalInterface
     interface SummaryRecomposer {
-        /** @return the demoted summary body for the given delivered correlation keys, or {@code null} when there is none. */
+        /** @return the demoted summary body for the given delivered finding fingerprints, or {@code null} when there is none. */
         @Nullable
         String recompose(Set<String> deliveredObservationFingerprints);
     }
@@ -112,6 +112,12 @@ class FeedbackDeliveryService {
         if (delivery == null) {
             log.debug("No delivery content, skipping: jobId={}", job.getId());
             return;
+        }
+        // A missing workspace is an integrity failure, not a soft skip: the agent ran (and incurred LLM cost)
+        // but the workspace-scoped lookups below (settings, trend) would NPE and be swallowed as a "non-fatal"
+        // warn, leaving the developer silently with nothing. Fail loud so the job is marked FAILED.
+        if (job.getWorkspace() == null) {
+            throw new JobDeliveryException("Job has no workspace: jobId=" + job.getId());
         }
 
         // Suppression guards
@@ -276,7 +282,7 @@ class FeedbackDeliveryService {
 
     /**
      * Demotes the just-posted summary's inline section in place once the inline-delivery signals are known.
-     * Collects the correlation keys whose inline note actually LANDED — every disposition except
+     * Collects the finding fingerprints whose inline note actually LANDED — every disposition except
      * {@link InlineFindingChannel.Disposition#FAILED} carries a posted comment — asks the recomposer for the
      * demoted body, and edits the live summary comment in place via the B4-safe path. Best-effort and
      * narrowly guarded: a no-op (no recomposer, no posted summary id, no delivered key, an unchanged body, or
@@ -295,7 +301,7 @@ class FeedbackDeliveryService {
         Set<String> deliveredKeys = inlineSignals
             .stream()
             .filter(s -> s.disposition() != InlineFindingChannel.Disposition.FAILED)
-            .map(InlineFindingChannel.DeliveredSignal::findingFingerprint)
+            .map(InlineFindingChannel.DeliveredSignal::recurrenceKey)
             .filter(key -> key != null && !key.isBlank())
             .collect(Collectors.toSet());
         if (deliveredKeys.isEmpty()) {

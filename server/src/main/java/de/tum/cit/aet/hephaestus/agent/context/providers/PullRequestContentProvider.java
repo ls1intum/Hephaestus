@@ -23,6 +23,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +61,9 @@ public class PullRequestContentProvider implements ContentProvider {
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */
     static final int MAX_COMMENTS = 500;
+
+    /** Captures the b-side path of a git diff header — robust against renames and paths containing " b/". */
+    private static final Pattern DIFF_GIT_HEADER = Pattern.compile("^diff --git a/.* b/(.+)$");
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
@@ -288,7 +293,11 @@ public class PullRequestContentProvider implements ContentProvider {
         for (var comment : comments) {
             var commentNode = objectMapper.createObjectNode();
             commentNode.put("path", comment.getPath());
-            commentNode.put("line", comment.getLine());
+            // line is a primitive int; a file-level / general review comment has no anchored line and reports 0.
+            // Omit the key in that case so an absent anchor reads as absent, not as a literal line-0 anchor.
+            if (comment.getLine() > 0) {
+                commentNode.put("line", comment.getLine());
+            }
             commentNode.put("body", comment.getBody());
             if (comment.getCreatedAt() != null) {
                 commentNode.put("created_at", comment.getCreatedAt().toString());
@@ -484,8 +493,8 @@ public class PullRequestContentProvider implements ContentProvider {
                     filePaths.add(currentPath);
                 }
                 currentChunk = new StringBuilder();
-                int bIdx = effectiveLine.lastIndexOf(" b/");
-                currentPath = bIdx > 0 ? effectiveLine.substring(bIdx + 3) : effectiveLine;
+                Matcher m = DIFF_GIT_HEADER.matcher(effectiveLine);
+                currentPath = m.matches() ? m.group(1) : effectiveLine;
             }
             currentChunk.append(line).append('\n');
         }

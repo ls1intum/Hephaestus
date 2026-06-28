@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
  * time via {@code CreateDiffNote} (GitLab has no batch API). For positions outside the
  * diff hunk, falls back to a regular MR comment with {@code file:line} prefix.
  *
- * <p>Reconciles by {@code findingFingerprint} rather than clear-then-post: each finding's stable key is embedded
+ * <p>Reconciles by {@code recurrenceKey} rather than clear-then-post: each finding's stable key is embedded
  * in the note body as a hidden HTML tag, and before posting we read the MR's existing discussions
  * ({@code GetMergeRequestDiscussions}) and index this reviewer's own prior threads by that key. A finding whose
  * key matches a prior, non-human-replied thread is EDITED in place ({@code UpdateNote}) so a stable finding
@@ -146,14 +146,17 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 signals.add(failedSignal(finding));
                 continue;
             }
+            // Register the key as seen BEFORE the blank-body guard: a finding whose key is still present this
+            // run must never be reaped by destroyVanishedThreads, regardless of body content. Otherwise a
+            // valid-key, blank-body finding would silently delete its own still-current prior thread.
+            String key = finding.recurrenceKey();
+            if (key != null) {
+                seenKeys.add(key);
+            }
             if (finding.body() == null || finding.body().isBlank()) {
                 continue;
             }
 
-            String key = finding.findingFingerprint();
-            if (key != null) {
-                seenKeys.add(key);
-            }
             PriorThread prior = key == null ? null : priorByKey.get(key);
 
             // A prior thread a developer engaged with is left exactly as is — neither edited nor deleted.
@@ -390,7 +393,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     private static DeliveredSignal failedSignal(InlineFinding finding) {
-        return new DeliveredSignal(finding.findingFingerprint(), finding.anchor(), Disposition.FAILED, null, null);
+        return new DeliveredSignal(finding.recurrenceKey(), finding.anchor(), Disposition.FAILED, null, null);
     }
 
     @Nullable
@@ -410,11 +413,11 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     /** Appends the hidden per-finding correlation tag; a null key (pre-correlation finding) appends nothing. */
-    private static String appendCorrelationTag(String body, @Nullable String findingFingerprint) {
-        if (findingFingerprint == null || findingFingerprint.isBlank()) {
+    private static String appendCorrelationTag(String body, @Nullable String recurrenceKey) {
+        if (recurrenceKey == null || recurrenceKey.isBlank()) {
             return body;
         }
-        return body + "\n<!-- hephaestus-diff-note-ck=" + findingFingerprint + " -->";
+        return body + "\n<!-- hephaestus-diff-note-ck=" + recurrenceKey + " -->";
     }
 
     /** A prior diff-note thread we posted, matched by its embedded correlation key. */

@@ -497,7 +497,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var issue = new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
             ReflectionTestUtils.setField(issue, "id", 999L);
             issue.setAuthor(testAuthor);
-            when(issueRepository.findByIdWithRepository(999L)).thenReturn(Optional.of(issue));
+            when(issueRepository.findByIdWithAuthor(999L)).thenReturn(Optional.of(issue));
 
             ObjectNode meta = new ObjectMapper().createObjectNode();
             meta.put("artifact_type", "ISSUE");

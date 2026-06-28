@@ -233,7 +233,10 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
-            byte[] historyJson = "[{\"practice\":\"error-handling\",\"negative\":3}]".getBytes(StandardCharsets.UTF_8);
+            byte[] historyJson =
+                "[{\"practice\":\"error-handling\",\"good\":0,\"bad\":3,\"lastSeen\":\"2025-06-01T12:00:00Z\"}]".getBytes(
+                    StandardCharsets.UTF_8
+                );
             when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
 
             Map<String, byte[]> files = new LinkedHashMap<>();

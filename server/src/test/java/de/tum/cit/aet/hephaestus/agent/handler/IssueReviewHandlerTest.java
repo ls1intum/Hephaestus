@@ -146,7 +146,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void closedIssue_isSuppressed_neverPosts() {
-            handler.postIssueNote(issueJob("closed"), note());
+            handler.postIssueNote(issueJob("CLOSED"), note());
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
         }
 

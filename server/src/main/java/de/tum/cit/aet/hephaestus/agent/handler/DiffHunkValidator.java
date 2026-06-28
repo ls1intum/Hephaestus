@@ -88,8 +88,9 @@ class DiffHunkValidator {
     /**
      * Snap window: maximum line delta we'll silently fix before dropping. A diff note at L42 when
      * only L500 is valid is more confusing than no note at all — the student sees an unrelated
-     * comment and has to invert the agent's intent. Notes beyond the window are dropped (and the
-     * caller surfaces them in the MR summary if needed).
+     * comment and has to invert the agent's intent. Notes beyond the window are dropped; the finding's
+     * detail still appears in the server-composed MR summary because only delivered notes demote their
+     * summary section.
      */
     static final int MAX_SNAP_DELTA = 10;
 
@@ -167,7 +168,15 @@ class DiffHunkValidator {
                 int desiredEnd = nearest + originalSpan;
                 // Find nearest valid line that doesn't expand beyond the original span
                 Integer nearestEnd = fileLines.floor(desiredEnd);
-                if (nearestEnd != null && nearestEnd >= nearest) {
+                // The [nearest, nearestEnd] range must be fully contained in the diff's valid lines: a
+                // multi-line range that skips a non-diff interior line (e.g. nearest=10, valid {10,12,13},
+                // nearestEnd=13 crosses line 11) is rejected by GitHub's multi-line suggestion anchor. Collapse
+                // to single-line unless every line in the range is a valid diff line.
+                if (
+                    nearestEnd != null &&
+                    nearestEnd > nearest &&
+                    fileLines.subSet(nearest, true, nearestEnd, true).size() == nearestEnd - nearest + 1
+                ) {
                     correctedEnd = nearestEnd;
                 } else {
                     correctedEnd = nearest; // collapse to single-line

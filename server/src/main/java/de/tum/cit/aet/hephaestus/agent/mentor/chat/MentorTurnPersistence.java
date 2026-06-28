@@ -77,7 +77,11 @@ public class MentorTurnPersistence {
     private static String truncateTitle(String prompt) {
         if (prompt == null) return null;
         String s = prompt.strip().replaceAll("\\s+", " ");
-        return s.length() > 80 ? s.substring(0, 77) + "…" : s;
+        if (s.length() <= 80) return s;
+        // Cut on a code-point boundary so a 77th-char surrogate pair (e.g. an emoji) is not split into a lone
+        // surrogate before the appended ellipsis.
+        int cut = s.offsetByCodePoints(0, Math.min(77, s.codePointCount(0, s.length())));
+        return s.substring(0, cut) + "…";
     }
 
     /**
@@ -235,22 +239,12 @@ public class MentorTurnPersistence {
         if (totalTokens > 0) {
             usageNode.put("totalTokens", totalTokens);
         }
-        // Cost: prefer Pi's own `usage.cost.total` (computed against the provider's price table on
-        // the agent host); fall back to ModelPricingService if Pi didn't ship one. If both are
-        // absent the field is left null — downstream UI tolerates absent cost.
-        Double piCostUsd = extractPiCostUsd(state.observedUsage());
-        if (piCostUsd != null) {
-            meta.put("costUsd", piCostUsd);
-        } else if (usage.model() != null && (usage.inputTokens() > 0 || usage.outputTokens() > 0)) {
-            pricingService
-                .computeCost(
-                    usage.model(),
-                    usage.inputTokens(),
-                    usage.outputTokens(),
-                    usage.cacheReadTokens(),
-                    usage.cacheWriteTokens()
-                )
-                .ifPresent(cost -> meta.put("costUsd", cost.doubleValue()));
+        // Cost: reuse the value already computed for and carried on the wire Finish (augmentFinishWithCost)
+        // so the DB persists exactly what the client saw — single source of truth, no second derivation that
+        // could drift. Only when the Finish carries no cost (cost was uncomputable) do we leave it null.
+        Double wireCostUsd = finish.messageMetadata() != null ? finish.messageMetadata().costUsd() : null;
+        if (wireCostUsd != null) {
+            meta.put("costUsd", wireCostUsd);
         }
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);

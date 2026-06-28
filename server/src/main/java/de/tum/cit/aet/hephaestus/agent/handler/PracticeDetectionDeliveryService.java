@@ -68,8 +68,8 @@ public class PracticeDetectionDeliveryService {
         this.objectMapper = objectMapper;
     }
 
-    /** Resolved delivery target: who the finding is about + the typed (kind, id) reference. */
-    private record Target(WorkArtifact type, Long id, Long developerId) {}
+    /** Resolved delivery target: who the finding is about + the typed (work artifact, id) reference. */
+    private record Target(WorkArtifact type, Long id, Long aboutUserId) {}
 
     /**
      * Persist validated findings and publish completion event.
@@ -100,12 +100,15 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 job.getId()
             );
+            // Empty-catalog discards fold into the discardedUnknownSlug count: with no active practices
+            // every finding's slug is unknown to this workspace, so the per-finding loop would attribute
+            // them identically — this early-return is just the bulk form of the same reason.
             return new DeliveryResult(0, validFindings.size(), 0, false);
         }
 
         // Resolve the typed target + the developer the finding is about, routing on the artifact.
         Target target = resolveTarget(job, metadata);
-        Long developerId = target.developerId();
+        Long aboutUserId = target.aboutUserId();
         WorkArtifact artifactType = target.type();
         Long artifactId = target.id();
 
@@ -156,10 +159,9 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
-            // Whose conduct the finding is filed against — always explicit (never null): the developer for
-            // author-side practices (the whole catalogue today), the reviewer for reviewer-audience practices
-            // once they ship (ADR 0021 C2).
-            Long aboutUserId = developerId;
+            // aboutUserId is whose conduct the finding is filed against — always explicit (never null): the
+            // developer for author-side practices (the whole catalogue today), the reviewer for
+            // reviewer-audience practices once they ship (ADR 0021 C2).
 
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
@@ -230,7 +232,7 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 artifactType,
                 artifactId,
-                developerId,
+                aboutUserId, // the event's developerId field == aboutUserId (author-side subject today)
                 inserted,
                 totalDiscarded,
                 hasNegative
@@ -248,13 +250,15 @@ public class PracticeDetectionDeliveryService {
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String artifactType = metadata.has("artifact_type") ? metadata.get("artifact_type").asString() : "PULL_REQUEST";
         if (WorkArtifact.ISSUE.name().equals(artifactType)) {
-            if (!metadata.has("issue_id")) {
+            JsonNode issueIdNode = metadata.get("issue_id");
+            if (issueIdNode == null || issueIdNode.isNull() || !issueIdNode.isNumber()) {
                 throw new JobDeliveryException("Missing issue_id in job metadata: jobId=" + job.getId());
             }
-            Long issueId = metadata.get("issue_id").asLong();
+            Long issueId = issueIdNode.asLong();
             // TYPE(i)=Issue finder: never resolve a PullRequest under an ISSUE artifact_type (shared table/id space).
+            // findByIdWithAuthor fetches the author in the same query so getAuthor() below is not a lazy round-trip.
             Issue issue = issueRepository
-                .findByIdWithRepository(issueId)
+                .findByIdWithAuthor(issueId)
                 .orElseThrow(() ->
                     new JobDeliveryException("Issue not found: issueId=" + issueId + ", jobId=" + job.getId())
                 );
@@ -263,10 +267,11 @@ public class PracticeDetectionDeliveryService {
             }
             return new Target(WorkArtifact.ISSUE, issueId, issue.getAuthor().getId());
         }
-        if (!metadata.has("pull_request_id")) {
+        JsonNode pullRequestIdNode = metadata.get("pull_request_id");
+        if (pullRequestIdNode == null || pullRequestIdNode.isNull() || !pullRequestIdNode.isNumber()) {
             throw new JobDeliveryException("Missing pull_request_id in job metadata: jobId=" + job.getId());
         }
-        Long pullRequestId = metadata.get("pull_request_id").asLong();
+        Long pullRequestId = pullRequestIdNode.asLong();
         PullRequest pullRequest = pullRequestRepository
             .findByIdWithAuthor(pullRequestId)
             .orElseThrow(() ->

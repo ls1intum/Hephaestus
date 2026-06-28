@@ -992,6 +992,35 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("a defect-detector slug that is NOT blocking-eligible still caps its BAD MAJOR to MINOR")
+        void defectDetectorButAdvisoryCapsBadToMinor() {
+            // A slug can be BOTH a defect-detector (in the set) AND advisory-only (not in BLOCKING_ELIGIBLE).
+            // The defect-detector GOOD->NA coercion does not touch a BAD finding, so the advisory ceiling must
+            // apply independently: (ABSENT, BAD, MAJOR) -> MINOR.
+            var ddAdvisory = new ValidatedFinding(
+                "describe-what-and-why",
+                "t",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MAJOR,
+                0.98f,
+                null,
+                "r",
+                "g",
+                List.of()
+            );
+            var out = PracticeDetectionResultParser.coerceCoherence(
+                List.of(ddAdvisory),
+                Set.of("describe-what-and-why")
+            );
+            assertThat(out.get(0).presence()).isEqualTo(Presence.ABSENT);
+            assertThat(out.get(0).assessment()).isEqualTo(Assessment.BAD);
+            assertThat(out.get(0).severity())
+                .as("advisory cap applies even when the slug is a defect-detector")
+                .isEqualTo(Severity.MINOR);
+        }
+
+        @Test
         @DisplayName("blocking-eligible set is the curated correctness/security/data-integrity consequence class")
         void blockingEligibleSetIsPinned() {
             assertThat(PracticeDetectionResultParser.BLOCKING_ELIGIBLE_PRACTICES).containsExactlyInAnyOrder(

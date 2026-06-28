@@ -269,22 +269,36 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
-        void correctsEndLinePreservesSpan() {
-            TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 11, 12, 15, 20, 25));
-            // Note with range 12-14 (span=2), closest valid start is 12 (exact match)
-            // But let's use 13-16 (span=3) which snaps to 12, endLine should be ≤15
-            DiffNote note = new DiffNote("File.swift", 13, 16, "range note");
+        void correctsEndLinePreservesSpanWhenContiguous() {
+            // Note 8-11 (span 3): invalid start 8 snaps to 9, desiredEnd 12; the range [9,12] is fully valid
+            // (9,10,11,12 all present), so the span-preserving endLine 12 is kept exactly.
+            TreeSet<Integer> lines = new TreeSet<>(List.of(5, 9, 10, 11, 12, 20));
+            DiffNote note = new DiffNote("File.swift", 8, 11, "range note");
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
                 List.of(note),
                 Map.of("File.swift", lines),
                 "job-1"
             );
             assertThat(result).hasSize(1);
-            assertThat(result.getFirst().startLine()).isEqualTo(12);
-            assertThat(result.getFirst().endLine()).isNotNull();
-            // endLine should be ≤ startLine + originalSpan, i.e. ≤ 12 + 3 = 15
-            assertThat(result.getFirst().endLine()).isLessThanOrEqualTo(15);
-            assertThat(result.getFirst().endLine()).isGreaterThanOrEqualTo(12);
+            assertThat(result.getFirst().startLine()).isEqualTo(9);
+            assertThat(result.getFirst().endLine()).isEqualTo(12);
+        }
+
+        @Test
+        void collapsesToSingleLineWhenRangeCrossesNonDiffLine() {
+            // Valid lines {10,12,13}: a note 9-12 has an invalid start (9) → snaps to 10, desiredEnd 13, but the
+            // [10,13] range's interior line 11 is NOT in the diff. GitHub rejects such a multi-line anchor, so
+            // the range must collapse to single-line rather than emit a gap-crossing endLine.
+            TreeSet<Integer> lines = new TreeSet<>(List.of(10, 12, 13));
+            DiffNote note = new DiffNote("File.swift", 9, 12, "gap note");
+            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
+                List.of(note),
+                Map.of("File.swift", lines),
+                "job-1"
+            );
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().startLine()).isEqualTo(10);
+            assertThat(result.getFirst().endLine()).isEqualTo(10);
         }
 
         @Test
