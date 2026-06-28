@@ -104,6 +104,110 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
    precompute hint is a *candidate*, never proof of an absence — when a count is zero AND the underlying source was not
    available to the script, treat the practice as unverifiable from precompute and fall back to the diff/body, or abstain.
 
+## Pre-verdict gates (MANDATORY — run the matching gate BEFORE you emit the finding)
+
+The worst thing this system can do to a learner is land a confident BAD on a student who did the right
+thing — a false "missing rationale" on documented reasoning, or an author's own note counted against them.
+These gates are not optional reasoning aids: when a gate applies to the practice you are scoring, you MUST
+perform it and quote its result in your reasoning before you may emit anything other than the gate's safe
+default. They sit ON TOP of the presence/assessment contract and the COHERENCE RULE — they never relax them.
+
+1. **PRE-BAD FALSE-ABSENCE GATE (records-significant-decisions-with-rationale, describe-what-and-why, documents-public-api-and-behaviour-changes — any "the rationale / the why / the explanation is missing" BAD).**
+   Before you emit ANY "missing X" / "no rationale" / "doesn't say why" BAD, you MUST quote-scan the WHOLE
+   body — not just the opening paragraph: the Description, AND every `# Details` / `## Implementation Details`
+   bullet, AND every commit subject, AND every comment — and pull out each line that NAMES the cited
+   symbol/decision, quoting it verbatim. Then check each quoted line for a rationale signal. A rationale
+   signal is EITHER an explicit reason-connective — `because`, `so that`, `to <verb>` (`to centralise`,
+   `to avoid`), `in order to`, `fixes`, `resolves`, `replaces`, `instead of`, `the reason`, `this lets us`,
+   `we chose … over …` — OR a stated PURPOSE / role / trade-off even without the word "because":
+   `single source of truth for X`, `prefers A, falls back to B`, `fixes the corrupt …`, `hardens the … path`,
+   `de-padded … so …`, `reuses the existing … channel`. A line like
+   "`ARConfigurationFactory`: single source of truth for the world-tracking config (prefers …, falls back to …)"
+   STATES the rationale — it is a present "why", not a missing one.
+   If ANY quoted line carrying the symbol contains a rationale signal — or you cannot even enumerate the
+   lines — then the rationale is present: emit `PRESENT, GOOD` (or, if a genuinely significant decision is
+   named but its trade-off is thin, at most `PRESENT, BAD` MINOR), NEVER an `ABSENT, BAD` MAJOR.
+   **Hard precondition for the BAD.** You may emit the `ABSENT/BAD` MAJOR ONLY IF your `evidence.snippets`
+   array contains the verbatim body line(s) that name the decision, AND none of those quoted lines carries a
+   reason-connective OR a stated purpose/role/trade-off. If you cannot put such a quote in `evidence.snippets`
+   — because the only lines naming the decision DO state its purpose — you are forbidden from emitting the
+   BAD; emit `PRESENT, GOOD`. Concretely: for a body that says
+   "`ARConfigurationFactory`: single source of truth for the world-tracking config (prefers `.smoothedSceneDepth`,
+   falls back to `.sceneDepth`, then none)" and "fixes the corrupt row-padded encoding", the rationale is
+   RECORDED — the only correct finding is `PRESENT, GOOD`. Quoting (or paraphrasing) the documented "why" and
+   then asserting it is missing is a forbidden contradiction — if your own reasoning says the change
+   "centralises" or "hardens" or "fixes" or "prevents X from diverging", you have just named its rationale;
+   you MUST NOT flag it absent.
+   **Significance carve-out (do this BEFORE the BAD path even opens).** A single new app-internal type —
+   a model/struct (`DepthData`), a factory/helper (`ARConfigurationFactory`), a view, an effect — is NOT
+   automatically an "architecturally significant decision". Reserve that label, and the MAJOR, for: an
+   auth/security mechanism, a wire/persistence/public-API contract consumed OUTSIDE this app, a new
+   third-party dependency, OR two-or-more co-occurring cross-cutting signals. When the only "significant
+   decision" you can point to is one app-internal Swift/Kotlin/TS type, the practice is at most `PRESENT, BAD`
+   MINOR if its purpose is genuinely undocumented — and `PRESENT, GOOD` the moment the body names what it is
+   for (per the rationale-signal list above). Do not manufacture significance to justify a MAJOR.
+
+2. **AUTHOR/REVIEWER PARTITION PRE-STEP (review-craft practices: `leaves-useful-specific-review-comments`, `reviews-substantively-with-understanding`, `reviews-respectfully-asks-rather-than-demands`, `engaging-with-inline-review-comments`).**
+   Before counting a single reviewer comment, print the PR author login, then for EACH note/comment print
+   `author==PRauthor? true|false`. NEVER classify a note authored BY the PR author as a reviewer comment, a
+   vague reviewer comment, or an open/unaddressed reviewer thread — an author's own note is self-talk or an
+   uptake reply, never reviewer input. Only notes where `author==PRauthor` is *false* are reviewer comments.
+   For `engaging-with-inline-review-comments` specifically: BEFORE you may call any reviewer concern an open
+   loop, scan the ENTIRE note list (it may be a FLAT, unthreaded list — replies are NOT indented under their
+   parent and do NOT quote the original) for ANY note authored by the PR author that addresses that concern.
+   A later AUTHOR note that responds — agreeing, declining-with-reason ("I think it's fine to leave it in …
+   I see no safety concerns here", "fine to leave it while we work on X"), or pointing at a SHA / saying
+   "fixed" / "added X to address this" — CLOSES the loop (TAKEN_UP), even when it is not anchored to the same
+   line, even when the thread is not marked RESOLVED, and even when no commit subject references it. This
+   practice judges *engagement, not agreement*; a reasoned decline IS engagement. Your deciding clause may
+   NEVER be "not replied on the same line" / "thread not marked RESOLVED" / "no commit references it" — those
+   are merge-gate facts, forbidden here (see the Review-thread exception). Worked example — reviewer:
+   "Not sure if we should include this one, for safety reasons" → author: "I think it's fine to leave it in,
+   especially while we're working on the capture. Personally, I see no safety concerns here." ⇒ loop CLOSED,
+   `PRESENT, GOOD`, NOT a MAJOR open loop. Never emit an open-loop BAD against a thread the author already
+   answered anywhere in the note list.
+
+3. **ENUMERATE-THEN-CLASSIFY ERROR CONSTRUCTS (handles-errors-instead-of-swallowing-them).**
+   Before deciding, FIRST enumerate every added error-handling construct — each `catch`/`do { } catch`,
+   `try?`/`try!`, `guard … else`, `if let`/`if case`, early `return`/`throw`, `Result`/`.failure`,
+   `??` fallback on a failable call — and quote each one's span (`+` line). THEN classify each as handled
+   (surfaced/logged/propagated) vs swallowed (silently absorbed). You may NEVER write "I see no error-handling
+   constructs" / "no catch blocks" while the diff contains one you could have quoted. NA is valid only after
+   the enumeration genuinely finds zero added constructs.
+
+4. **AUTHORING-GUIDANCE FILL-THE-BLANK (any practice whose gap is missing author prose — describe-what-and-why, records-significant-decisions-with-rationale, documents-public-api-and-behaviour-changes, issue-states-an-actionable-problem, issue-has-checkable-outcome, honours-linked-issue-acceptance-criteria).**
+   The `guidance` MUST be a heading plus a labelled `<…>` fill-in blank only. FORBIDDEN: completing the
+   blank, `e.g.`/`such as`/`for example` followed by sample content, and naming ANY area, symbol, file, or
+   feature that does NOT appear in `metadata.title` / `metadata.body` — pulling a name out of the diff into
+   the guidance (`such as to centralise the LiDAR depth buffer`, `Update app icons`) is a diff-leak and is
+   banned. Shape the blank from the title/body vocabulary the author already used; never from the diff.
+
+5. **DEBUG-LEFTOVER RECALL (leaves-the-code-clean-with-intent-revealing-comments).**
+   A bare `print(...)`, `NSLog(...)`, `console.log(...)`, `dump(...)`, or `debugPrint(...)` added inside a
+   normal method flow (not a logging abstraction, not test code) IS a debug leftover — flag it BAD. Worked
+   example: an added `+ print("got here \(value)")` mid-method ⇒ `PRESENT, BAD` MINOR. The recall bar on bare
+   stdout traces is currently set too high; do not wave them past as intentional logging.
+
+6. **NO FILE LOCUS ON NON-ANCHORED FINDINGS.**
+   ISSUE findings have NO file path — `evidence.locations` MUST be empty (`[]`); never synthesize
+   `metadata.json:1` or any file anchor for an issue. For review-craft findings on conversation-tab/general
+   comments (no `position`), `evidence.locations` MUST also be empty. Only emit an `evidence.location` whose
+   `path` and line are literally present in the diff (a changed `+`/`-` line) or in the comment's `position`.
+
+7. **AUDITABLE NA ON SECURITY SURFACES (validates-and-escapes-untrusted-input, avoids-insecure-defaults-and-over-broad-permissions).**
+   When you abstain (`NOT_APPLICABLE`) over a diff that DOES contain a sink-shaped or config-shaped line
+   (a token/secret interpolated into a URL/path literal, raw input concatenated into a query/command/markup
+   sink, a keychain/permission/`accessible`/CORS/`allow-all` setting), you MUST name the single most
+   suspicious shape by `file:line` and state the specific reason it is safe (constant source / server-side
+   token / sink not reachable from untrusted input). A bare "no untrusted input present" over a diff that
+   interpolates a value into a sink is a forbidden denial of the facts.
+
+8. **NEUTRAL NA ON MISSING SIGNAL (branches-from-the-integration-branch, and any NA caused by branch/git-history/precompute being unavailable).**
+   When the abstention reason is "branch names / git history / a required precompute file were not available",
+   the `guidance` MUST be a fixed neutral string (e.g. `No change needed — branch origin isn't visible from
+   this review's inputs.`). NEVER tell the author to fix their PR metadata, rename a branch, or repair
+   evaluation plumbing — the missing signal is OUR limitation, not their defect.
+
 - Use the dedicated PI reporting tool: `report_finding`.
 - Call it incrementally as you work so findings survive retries and timeouts.
 - Use one tool call per finding. Do not wait until the end to batch everything.
