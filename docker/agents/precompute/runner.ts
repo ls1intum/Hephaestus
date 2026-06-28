@@ -243,8 +243,9 @@ await Bun.write(
 // Sentinel file to indicate successful completion
 await Bun.write(`${tmpDir}/.complete`, new Date().toISOString());
 
-// Atomic rename: tmpDir → outputDir (same filesystem, so rename(2) is atomic)
-// Preserve the practices/ subdirectory (contains injected scripts from DB)
+// Replace outputDir, preserving the injected practices/ subdir (contains scripts from DB).
+// Single-writer precompute step; the replace sequence below is NOT concurrency-safe (there is a
+// window after rm where outputDir does not exist). The no-existing-dir branch is a single atomic rename.
 if (existsSync(outputDir)) {
 	// Move practices dir out before replacing, then move back in
 	const practicesBak = `${outputDir}.practices.bak.${process.pid}`;
