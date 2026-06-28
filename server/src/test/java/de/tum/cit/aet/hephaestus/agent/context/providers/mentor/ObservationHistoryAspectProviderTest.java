@@ -116,6 +116,51 @@ class ObservationHistoryAspectProviderTest extends BaseUnitTest {
         assertThat(root.get("summary").get("totalObservations").asLong()).isEqualTo(4L);
     }
 
+    @Test
+    @DisplayName("firewall: raw rubric-voiced reasoning is scrubbed before it reaches the mentor (gap #1)")
+    void rubricVoicedReasoningIsScrubbed() throws Exception {
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+
+        var practice = new de.tum.cit.aet.hephaestus.practices.model.Practice();
+        practice.setSlug("robust-error-handling");
+        // A real student-facing sentence followed by a pure grading-mechanics sentence the detector echoed.
+        String reasoning =
+            "The retry block swallows the IOException without logging it. The assessment is BAD, capped at MINOR.";
+        var observation = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
+            .id(UUID.randomUUID())
+            .title("Swallowed IOException")
+            .practice(practice)
+            .presence(Presence.PRESENT)
+            .assessment(de.tum.cit.aet.hephaestus.practices.model.Assessment.BAD)
+            .severity(Severity.MINOR)
+            .confidence(0.9f)
+            .observedAt(Instant.now())
+            .reasoning(reasoning)
+            .build();
+
+        when(
+            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of(observation));
+        when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
+        when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
+        when(
+            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of());
+
+        Map<String, byte[]> files = new HashMap<>();
+        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/findings_history.json"));
+        String shipped = root.get("recentObservations").get(0).get("reasoning").asString();
+        // The student-facing sentence survives; the rubric mechanics ("assessment is BAD", "capped at MINOR")
+        // do NOT reach the mentor.
+        assertThat(shipped).contains("swallows the IOException");
+        assertThat(shipped).doesNotContain("assessment is BAD");
+        assertThat(shipped).doesNotContain("capped at MINOR");
+    }
+
     private static PresenceCount mockObservationCount(Presence v, long c) {
         return new PresenceCount() {
             @Override

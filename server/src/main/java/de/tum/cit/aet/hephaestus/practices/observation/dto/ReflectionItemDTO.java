@@ -60,10 +60,13 @@ public record ReflectionItemDTO(
         if (path == null || !path.isTextual() || path.asString().isBlank()) {
             return null;
         }
-        String p = path.asString();
+        // Strip the repo-mount prefix FIRST so a genuine repo file under inputs/sources/scm/repo/<file> renders
+        // as an openable repo-relative path — and so the internal-path check below is not fooled by the shared
+        // "inputs/" prefix (C2): the mount lives under inputs/ too, but it is real user code, not plumbing.
+        String p = repoRelative(path.asString());
         // The detector sometimes cites its OWN context/precompute file as the "location" (e.g.
-        // inputs/context/test_presence.json, context/target/review_threads.json, metadata.json). Those are
-        // agent-internal plumbing, never something a developer can open — omit the locator rather than leak it.
+        // inputs/context/test_presence.json, inputs/practices/*, manifest.json). Those are agent-internal
+        // plumbing, never something a developer can open — omit the locator rather than leak it.
         if (isInternalContextPath(p)) {
             return null;
         }
@@ -71,13 +74,33 @@ public record ReflectionItemDTO(
         return (startLine != null && startLine.isNumber()) ? p + ":" + startLine.asInt() : p;
     }
 
+    // Workspace ABI prefixes (ADR 0020), mirrored locally to avoid a practices -> agent module dependency.
+    // The repo checkout mounts at REPO_MOUNT_RELATIVE; the agent-internal artifacts live under context/,
+    // practices/, and the input manifest. WorkspaceAbi is the source of truth for these literals.
+    private static final String REPO_MOUNT_RELATIVE = "inputs/sources/scm/repo/";
+    private static final String CONTEXT_PREFIX = "inputs/context/";
+    private static final String PRACTICES_PREFIX = "inputs/practices/";
+    private static final String MANIFEST_PATH = "inputs/manifest.json";
+
+    /** Strips the integration-namespaced repo-mount prefix ({@code inputs/sources/scm/repo/}, ADR 0020). */
+    private static String repoRelative(String path) {
+        return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
+    }
+
+    /**
+     * True only for genuinely agent-internal artifacts (context / practices / the input manifest), NEVER for
+     * real repo code. The path is already repo-relativized by {@link #locatorOf}, so a real file no longer
+     * carries the {@code inputs/sources/...} mount prefix and is correctly classified as student code.
+     */
     private static boolean isInternalContextPath(String path) {
-        String lower = path.toLowerCase(java.util.Locale.ROOT);
-        if (lower.startsWith("inputs/") || lower.startsWith("context/") || lower.startsWith("/inputs/")) {
+        if (path.startsWith(CONTEXT_PREFIX) || path.startsWith(PRACTICES_PREFIX) || path.equals(MANIFEST_PATH)) {
             return true;
         }
-        // Known agent-context basenames that can appear without the directory prefix.
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        // Known agent-context basenames that can appear without the directory prefix (the agent strips it).
         return (
+            lower.equals("manifest.json") ||
+            lower.endsWith("/manifest.json") ||
             lower.endsWith("metadata.json") ||
             lower.endsWith("test_presence.json") ||
             lower.endsWith("linked_work_items.json") ||

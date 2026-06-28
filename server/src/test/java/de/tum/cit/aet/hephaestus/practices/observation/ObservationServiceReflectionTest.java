@@ -125,8 +125,8 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a single low-confidence BAD does NOT lead the card; a confident lower-severity one does (P4)")
-    void lowConfidenceSingleTargetGapDoesNotHeadline() {
+    @DisplayName("gap #1c: a single low-confidence BAD is FILTERED OUT of the card, not merely sorted last (P4)")
+    void lowConfidenceSingleTargetGapIsNotDisplayed() {
         Practice practice = practice("robust-error-handling");
 
         // CRITICAL but coin-flip confidence on a single target (quarantined) vs MINOR but confident.
@@ -147,9 +147,35 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
 
         assertThat(cards).hasSize(1);
         List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
-        // The confident MINOR leads; the quarantined low-confidence CRITICAL is pushed last (still present).
+        // Only the confident MINOR is shown; the quarantined low-confidence CRITICAL is withheld from the
+        // learner's dashboard entirely (the read-model firewall, not just a sort).
+        assertThat(items).hasSize(1);
         assertThat(items.get(0).observationId()).isEqualTo(confidentMinor.getId());
-        assertThat(items.get(items.size() - 1).observationId()).isEqualTo(lowConfCritical.getId());
+        assertThat(items.stream().map(ReflectionItemDTO::observationId)).doesNotContain(lowConfCritical.getId());
+    }
+
+    @Test
+    @DisplayName("gap #1c: an all-quarantined practice contributes no toWorkOn items (sub-floor BAD never shown)")
+    void allQuarantinedGapsAreFullyWithheld() {
+        Practice practice = practice("robust-error-handling");
+        // Two coin-flip BADs on the SAME single target → both quarantined → nothing to display.
+        Observation q1 = bad(practice, Severity.MAJOR, 0.2f, 42L);
+        Observation q2 = bad(practice, Severity.MINOR, 0.1f, 42L);
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(q1, q2));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        // No toWorkOn items and no strengths → the card is empty and contributes nothing to the dashboard.
+        assertThat(cards).isEmpty();
     }
 
     @Test

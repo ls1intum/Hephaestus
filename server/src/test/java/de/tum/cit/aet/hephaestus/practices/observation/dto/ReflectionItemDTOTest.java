@@ -61,6 +61,34 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("C2: a genuine repo file under the inputs/sources/scm/repo mount is repo-relativized, not suppressed")
+    void repoMountedUserCodeIsRepoRelativeNotInternal() {
+        // Before the fix, startsWith("inputs/") wrongly nulled the locator for real user code mounted under
+        // inputs/sources/scm/repo/. Now the mount prefix is stripped FIRST, so the path renders openable.
+        var item = ReflectionItemDTO.from(
+            finding(
+                "{\"locations\":[{\"path\":\"inputs/sources/scm/repo/client/App/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"
+            ),
+            null
+        );
+        assertThat(item.locator()).isEqualTo("client/App/Services/AR/FrameRecorder.swift:212");
+    }
+
+    @Test
+    @DisplayName("C2: inputs/practices and the input manifest stay suppressed as internal plumbing")
+    void practicesAndManifestStillSuppressed() {
+        assertThat(
+            ReflectionItemDTO.from(
+                finding("{\"locations\":[{\"path\":\"inputs/practices/index.json\",\"startLine\":1}]}"),
+                null
+            ).locator()
+        ).isNull();
+        assertThat(
+            ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"inputs/manifest.json\"}]}"), null).locator()
+        ).isNull();
+    }
+
+    @Test
     @DisplayName("no evidence / no location → no locator (not an error)")
     void noLocation() {
         assertThat(ReflectionItemDTO.from(finding(null), null).locator()).isNull();

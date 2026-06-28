@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
@@ -164,11 +165,13 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
             node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", o.getConfidence());
             node.put("observedAt", o.getObservedAt().toString());
-            node.put("reasoning", o.getReasoning());
-            // The mentor (system.md) pulls an observation's reasoning from here. Advice/guidance is NOT on the
-            // observation (ADR 0021) — the mentor receives the sanitised delivered feedback body via
-            // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
-            // raw, unsanitised text DeliveryComposer would never post.
+            // Scrub the raw model reasoning through the SAME firewall the SCM composer uses before it reaches
+            // the mentor (audit gap #1): the detection model echoes its grading vocabulary (rubric bands,
+            // presence/assessment tuples, bucket arithmetic) into reasoning, and shipping it un-scrubbed lets
+            // the mentor quote rubric mechanics back at the student. Advice/guidance is NOT on the observation
+            // (ADR 0021) — the mentor receives the sanitised delivered feedback body via
+            // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it.
+            node.put("reasoning", StudentTextSanitizer.sanitize(o.getReasoning()));
         }
 
         ArrayNode reviewsArr = root.putArray("reviewsReceived");

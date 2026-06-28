@@ -103,9 +103,9 @@ public class ObservationService {
 
     /**
      * Upstream-quality floor (P4) for the reflective surface, mirroring the live mentor standing path. Below
-     * this confidence a single-target BAD is quarantined from the headline {@code toWorkOn} slot: a coin-flip
-     * detector hunch seen on one artifact must not become the developer's #1 thing-to-work-on. Quarantined
-     * items still surface in the card (capped by {@code MAX_ITEMS_PER_PRACTICE}), just never first.
+     * this confidence a single-target BAD is quarantined and EXCLUDED from {@code toWorkOn} entirely: a coin-flip
+     * detector hunch seen on one artifact must never reach the learner's dashboard (audit gap #1c), not merely
+     * sort last.
      */
     private static final float QUARANTINE_CONFIDENCE = 0.5f;
     /** Distinct targets at which a low-confidence gap is corroborated enough to rank as a normal priority. */
@@ -170,13 +170,14 @@ public class ObservationService {
                 .toList();
             Set<Long> distinctTargets = bad.stream().map(Observation::getArtifactId).collect(Collectors.toSet());
             boolean singleTarget = distinctTargets.size() < CORROBORATION_TARGETS;
+            // P4 firewall on the read model (audit gap #1c): a quarantined BAD (low-confidence AND seen on a
+            // single target) must not just sort last — it must NOT be DISPLAYED at all. Otherwise the dashboard's
+            // bounded MAX_ITEMS list still surfaces a coin-flip detector hunch as something to work on, bypassing
+            // the same floor the mentor standing surface already enforces. Filter first, then rank what survives.
             List<ReflectionItemDTO> toWorkOn = bad
                 .stream()
-                .sorted(
-                    Comparator.comparing((Observation f) -> quarantined(f, singleTarget)).thenComparing(
-                        Comparator.comparingDouble(ObservationService::priorityScore).reversed()
-                    )
-                )
+                .filter(f -> !quarantined(f, singleTarget))
+                .sorted(Comparator.comparingDouble(ObservationService::priorityScore).reversed())
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                 .toList();
@@ -245,9 +246,10 @@ public class ObservationService {
     }
 
     /**
-     * A gap is quarantined from the headline slot when it is low-confidence AND uncorroborated (only seen on a
-     * single target). Returns {@code true} for quarantined items so a stable sort ranks them after every
-     * non-quarantined gap. A confident gap, or one corroborated across ≥2 targets, is never quarantined.
+     * A gap is quarantined when it is low-confidence AND uncorroborated (only seen on a single target). Returns
+     * {@code true} for quarantined items so they are FILTERED OUT of the displayed {@code toWorkOn} list (audit
+     * gap #1c) — a coin-flip detector hunch on one artifact must never reach the learner's dashboard. A confident
+     * gap, or one corroborated across ≥2 targets, is never quarantined.
      */
     private static boolean quarantined(Observation f, boolean singleTarget) {
         float conf = f.getConfidence() == null ? 0f : f.getConfidence();
