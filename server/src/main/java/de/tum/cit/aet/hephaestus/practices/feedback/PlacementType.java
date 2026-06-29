@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 /**
- * Where a {@code FeedbackPlacement} renders a feedback unit on its delivery surface.
+ * The delivery-surface slot a {@code FeedbackPlacement} occupies — the axis of <em>where</em> a
+ * feedback unit renders. Persisted as the NOT NULL {@code placement_type}, value-constrained by
+ * {@code chk_feedback_placement_placement}.
  *
  * <ul>
  *   <li>{@link #SUMMARY} — the PR/MR/issue summary body (one per feedback unit, typically).</li>

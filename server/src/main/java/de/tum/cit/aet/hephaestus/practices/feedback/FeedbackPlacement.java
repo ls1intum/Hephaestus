@@ -34,7 +34,17 @@ import org.hibernate.annotations.OnDeleteAction;
  * <p>Append-only / {@code @Immutable}: posting outcomes that change over time are represented by
  * writing a new placement row rather than mutating an existing one through the ORM. The parent
  * {@link Feedback} lives in the same {@code practices.feedback} module, so a real
- * {@code @ManyToOne} association is used with DB-level {@code ON DELETE CASCADE}.
+ * {@code @ManyToOne} association is used with DB-level {@code ON DELETE CASCADE} — no scalar-FK
+ * cycle workaround is needed. This is the WADM <em>selector</em> edge (where a body of commentary
+ * is anchored), orthogonal to the {@link FeedbackObservation} <em>target</em> edge.
+ *
+ * <p>The diff-anchor columns are a coupled group (changelog {@code 1781092589259}): they are populated
+ * only for {@code INLINE} placements, so all are nullable and NULL means "this surface carries no diff
+ * coordinate" (the normal case for {@code SUMMARY} / {@code CONVERSATION_TURN}). The enum columns are
+ * value-constrained by {@code chk_feedback_placement_placement} (NOT NULL) and the NULL-tolerant
+ * {@code chk_feedback_placement_anchor_kind} / {@code chk_feedback_placement_anchor_side}. Two indexes
+ * exist: {@code idx_feedback_placement_feedback} (a unit's placements + the FK {@code ON DELETE CASCADE})
+ * and {@code idx_feedback_placement_external_ref} (reconcile a posted comment id back to its placement).
  *
  * @see Feedback for the feedback unit being placed
  * @see PlacementType for SUMMARY/INLINE/CONVERSATION_TURN
@@ -91,12 +101,15 @@ public class FeedbackPlacement {
 
     // --- Diff anchor coordinates (all nullable: only INLINE placements anchor to a diff) ---
 
-    /** Granularity of the anchor (LINE / RANGE / FILE / IMAGE). Null for non-inline placements. */
+    /**
+     * Granularity of the anchor: LINE / RANGE / FILE / IMAGE. NULL for non-INLINE placements (the
+     * placement carries no diff coordinate). Constrained by {@code chk_feedback_placement_anchor_kind}.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "anchor_kind", length = 16)
     private PlacementAnchorKind anchorKind;
 
-    /** Path of the anchored file on the head side. */
+    /** Head-side path of the anchored file. NULL when the placement carries no diff coordinate. */
     @Column(name = "anchor_path", columnDefinition = "TEXT")
     private String anchorPath;
 
@@ -118,7 +131,13 @@ public class FeedbackPlacement {
 
     // --- External delivery reconciliation ---
 
-    /** External id of the posted comment/note (1:N — one per placement). */
+    /**
+     * Channel-native id of the posted comment/note for this placement (one per row — a unit's
+     * summary id, its inline note ids, and GitHub place-then-fallback are distinct placements, never
+     * one overloaded scalar). NULL when the placement was not posted to an external surface (a
+     * conversation turn, or a render that produced no postable artifact). Indexed by
+     * {@code idx_feedback_placement_external_ref} for reconciling a posted id back to its placement.
+     */
     @Column(name = "posted_comment_ref", columnDefinition = "TEXT")
     private String postedCommentRef;
 

@@ -29,9 +29,13 @@ import org.hibernate.annotations.OnDeleteAction;
  * <p>Why this exists (reproducibility): admins edit {@code Practice.criteria} over time. If those
  * edits were destructive, no past finding could be reproduced against the rubric that actually fired it.
  * This is Slowly-Changing-Dimension Type 2 over {@code criteria}: each edit appends a revision;
- * {@link Practice#getCriteria()} remains the current projection, so no read path breaks.
- * {@code Observation.practiceRevision} pins each finding to the revision the detector saw
- * (pre-versioning findings pin {@code null} — an honest "pre-versioning" marker).
+ * {@link Practice#getCriteria()} remains the current projection, so no read path breaks. Per-practice
+ * numbering is monotonic and gap-free ({@code uk_practice_revision_practice_number} enforces one row per
+ * {@code (practice, revision_number)}).
+ *
+ * <p>{@code Observation.practiceRevision} pins each finding to the revision the detector saw
+ * ({@code fk_observation_revision} ON DELETE SET NULL); a finding detected before versioning shipped pins
+ * {@code null} — an honest "pre-versioning" marker, not a reproducible snapshot. See ADR 0021 / ADR 0022.
  */
 @Entity
 @Immutable
@@ -65,11 +69,15 @@ public class PracticeRevision {
     @ToString.Exclude
     private Practice practice;
 
-    /** 1-based, monotonic per practice. Revision 1 is created with the practice. */
+    /**
+     * 1-based, monotonic per practice: revision 1 is created with the practice, {@code +1} on each criteria
+     * change. Unique with {@code practice_id} ({@code uk_practice_revision_practice_number}) — the stable
+     * cross-finding identity of a criteria version.
+     */
     @Column(name = "revision_number", nullable = false)
     private int revisionNumber;
 
-    /** The {@code criteria} text exactly as it was at this revision. */
+    /** The {@code criteria} text exactly as it was at this revision (the immutable snapshot this entity exists to keep). */
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude
     private String criteria;
