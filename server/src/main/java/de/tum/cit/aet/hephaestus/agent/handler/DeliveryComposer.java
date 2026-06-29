@@ -44,6 +44,26 @@ import tools.jackson.databind.JsonNode;
  *   <li>Natural, conversational tone — reads like a human code reviewer</li>
  *   <li>No bracket severity labels — emoji conveys urgency</li>
  * </ul>
+ *
+ * <p><b>Authored-text contract (the upstream detector owns these, this renderer prints them verbatim).</b>
+ * The {@code reasoning} and {@code guidance} on a finding are written by the detector, not by this class;
+ * this renderer only sanitises and lays them out. Three quality invariants the authored text must satisfy,
+ * documented here so the rendering layout never works against them:
+ * <ul>
+ *   <li><b>M1 — acknowledge the co-occurring good signal.</b> A single BAD finding fires on one defect, but
+ *       the change often did something right on the same move (a correct {@code Closes #36} link beside a
+ *       thin definition-of-done). The authored {@code reasoning} may open with a one-clause acknowledgement
+ *       of that adjacent good signal before the corrective — the single-finding / max-severity contract is
+ *       NOT licence to structurally censor all praise. This renderer never strips such an opening clause.</li>
+ *   <li><b>M2 — thread-aware, state-neutral guidance.</b> When the disposition comment, rationale, or
+ *       ready-state already exists, the authored {@code guidance} must acknowledge it rather than prescribe
+ *       the already-satisfied action, and avoid gate-like phrasing ("before marking the PR as ready") in
+ *       favour of state-neutral feed-forward.</li>
+ *   <li><b>M3 — no fabricated specifics.</b> The authored text must not invent criteria, tools, roles, or
+ *       deliverables not named in the artifact (use bare {@code <criterion 1>} placeholders or quote only
+ *       phrases that appear in the work), and must not attach generic future-tense advice to a
+ *       PRESENT/GOOD strength.</li>
+ * </ul>
  */
 class DeliveryComposer {
 
