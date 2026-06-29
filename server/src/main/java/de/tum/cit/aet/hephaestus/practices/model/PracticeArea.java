@@ -30,11 +30,13 @@ import lombok.ToString;
  * an area never enters {@code trigger_events}, {@code criteria}, the detector, or the
  * {@link Observation} schema. Areas organise a developer's own findings on their Reflection dashboard.
  *
- * <p><b>Two orthogonal axes — do not conflate:</b> an area (this configurable learning-objective axis)
- * is distinct from the delivery channel. A practice belongs to at most one area
- * (see {@link Practice#getArea()}): the 1:N binding is load-bearing for the per-area acted-on/total
- * progress denominator — do not loosen it to a many-to-many join without also switching progress math
- * to per-(area, practice) rows.
+ * <p>A practice belongs to at most one area (see {@link Practice#getArea()}): the 1:N binding is
+ * load-bearing for the per-area acted-on/total progress denominator — do not loosen it to a many-to-many
+ * join without also switching progress math to per-(area, practice) rows. Deleting an area unbinds its
+ * practices rather than deleting them ({@code fk_practice_area} ON DELETE SET NULL).
+ *
+ * <p>See ADR 0021 / ADR 0022 (PracticeArea is the SARIF-{@code taxon}-style grouping, deliberately
+ * <em>not</em> a "goal" — it is a neutral bucket, not a target state to reach).
  */
 @Entity
 @Table(
@@ -57,6 +59,10 @@ public class PracticeArea {
     @EqualsAndHashCode.Include
     private Long id;
 
+    /**
+     * Owning workspace (tenancy binding). {@code fk_practice_area_workspace} carries no DB cascade: a
+     * workspace purge removes its areas explicitly in application code (mirrors {@code fk_practice_workspace}).
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_practice_area_workspace"))
     @ToString.Exclude

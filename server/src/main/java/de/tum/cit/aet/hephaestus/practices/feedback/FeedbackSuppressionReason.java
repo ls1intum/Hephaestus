@@ -1,8 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 /**
- * Why a {@link Feedback} unit was withheld instead of delivered. Set only when the unit's
- * {@link FeedbackDeliveryState} is {@code SUPPRESSED}; null otherwise.
+ * The withholding-rationale axis of a {@link Feedback} unit: why it was withheld instead of delivered. Set iff the
+ * unit's {@link FeedbackDeliveryState} is {@code SUPPRESSED}; NULL otherwise. Constrained at the DB by
+ * {@code chk_feedback_suppression_reason}.
  */
 public enum FeedbackSuppressionReason {
     /** Reviewer-side observation that the audience policy does not deliver to the author. */
@@ -13,8 +14,8 @@ public enum FeedbackSuppressionReason {
     LOW_CONFIDENCE,
     /** Dropped by a policy floor / rate cap that bounds how much is surfaced at once. */
     POLICY_FLOOR_DROP,
-    /** The subject explicitly DISPUTED this locus on an earlier run; not re-nagged unless evidence changes (B2). */
+    /** The subject explicitly DISPUTED this locus on an earlier run; not re-surfaced unless the underlying evidence changes. */
     REACTED_DISPUTED,
-    /** The subject marked this locus NOT_APPLICABLE on an earlier run; not re-nagged unless evidence changes (B2). */
+    /** The subject marked this locus NOT_APPLICABLE on an earlier run; not re-surfaced unless the underlying evidence changes. */
     REACTED_NOT_APPLICABLE,
 }

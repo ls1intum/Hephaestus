@@ -34,13 +34,25 @@ import org.hibernate.annotations.OnDeleteAction;
  * observation can be reused across feedback units that target different surfaces. The composite primary
  * key {@code (feedback_id, observation_id)} makes the binding idempotent.
  *
- * <p>Append-only: like {@link Observation}, this row is written via an {@code insertIfAbsent}
- * native upsert that bypasses {@code @PrePersist}, so callers supply both halves of the
- * {@link Id} explicitly. The {@code @ManyToOne} navigations are read-only mirrors of the key
- * columns (mapped via {@link MapsId}) so loading the join never desynchronizes the PK.
+ * <p>Append-only: like {@link Observation}, this row is written via the native, race-safe
+ * {@code insertIfAbsent} upsert ({@code FeedbackObservationRepository}) rather than ORM {@code save()} —
+ * the {@code @EmbeddedId}/{@code @MapsId} entity is awkward to build for a plain save, and
+ * {@code ON CONFLICT DO NOTHING} is idempotent on a recorder retry. This entity has no {@code @PrePersist}
+ * and no defaulted column: its composite PK is simply the two endpoint FKs, which callers supply directly.
+ * The {@code @ManyToOne} navigations are read-only mirrors of the key columns (mapped via {@link MapsId})
+ * so loading the join never desynchronizes the PK.
  *
  * <p>Both sides live in the {@code practices} module ({@code feedback} and {@code model}
- * sub-packages), so real {@code @ManyToOne} associations are used rather than raw-UUID FKs.
+ * sub-packages), so real {@code @ManyToOne} associations are used rather than scalar raw-UUID FKs
+ * — there is no Spring-Modulith cycle to dodge here. This is the WADM <em>target</em> edge (which
+ * evidence a body of commentary is about); {@link FeedbackPlacement} is the orthogonal WADM
+ * <em>selector</em> edge (where it is shown).
+ *
+ * <p>Invariants (changelog {@code 1781092589259}): both FKs are {@code ON DELETE CASCADE}, so the
+ * binding never outlives either endpoint; {@code role} is constrained to {@code PRIMARY | SUPPORTING}
+ * by {@code chk_feedback_observation_role}. The PK indexes {@code feedback_id}; the reverse direction
+ * (which units an observation fed) is served by {@code idx_feedback_observation_observation}, which
+ * also backs the observation-side {@code ON DELETE CASCADE}.
  *
  * @see Feedback for the synthesized unit being composed
  * @see Observation for the evidence being bound
@@ -92,13 +104,18 @@ public class FeedbackObservation {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Observation observation;
 
-    /** Whether this observation anchors the unit's headline ({@code PRIMARY}) or reinforces it ({@code SUPPORTING}). */
+    /**
+     * Whether this observation anchors the unit's headline ({@code PRIMARY}) or reinforces it
+     * ({@code SUPPORTING}). PRIMARY is what carries the unit's severity and the F-4 policy floor
+     * (every blocking observation must surface under some PRIMARY row). Constrained to the two
+     * values by {@code chk_feedback_observation_role}.
+     */
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 16, nullable = false)
     private EvidenceRole role;
 
-    /** Stable ordering of findings within the unit (lower = earlier). */
+    /** Stable render order of this observation within its feedback unit (lower = earlier). */
     @NotNull
     @Column(name = "ordinal", nullable = false)
     private Integer ordinal;

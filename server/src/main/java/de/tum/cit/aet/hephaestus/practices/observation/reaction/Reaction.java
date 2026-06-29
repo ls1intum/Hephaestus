@@ -27,14 +27,20 @@ import org.hibernate.annotations.OnDeleteAction;
 /**
  * Immutable record of a developer's reaction to a delivered unit of {@link Feedback}.
  *
- * <p>A student reacts to the feedback they were shown — not to an internal {@code Observation} — so the
- * reaction is anchored to the {@link Feedback} unit (ADR 0022). Append-only for research data integrity: a
- * developer submitting a second reaction creates a new row, preserving the temporal record of when they first
- * saw and then changed their mind about a unit. The latest row per (feedback, reactor) is the "current" state
- * for dashboard display.
+ * <p>A developer reacts to the feedback they were shown — not to an internal {@code Observation} — so the row
+ * anchors on the {@link Feedback} unit (ADR 0022). {@code @Immutable} + append-only: a second reaction to the
+ * same unit inserts a new row rather than mutating the first, so the temporal record of an initial response
+ * and a later change of mind is preserved for research. The latest row per (feedback, reactor) is the
+ * "current" state for dashboard display.
  *
- * <p>Explicitly excluded from agent context (#895) — the AI must not know whether a developer previously
- * disputed feedback, to avoid contaminating accuracy measurement.
+ * <p>Anchoring on the delivered unit is the reviewer-side firewall: a reaction is always about, and submitted
+ * by, the unit's recipient, so this table never holds a judgement about a third party. The about-vs-recipient
+ * distinction lives on {@link Feedback}, not here.
+ *
+ * <p>Excluded from agent context — the detector must not learn whether a developer disputed earlier feedback,
+ * which would contaminate accuracy measurement. The only sanctioned reader is {@code ReactionSuppressionFilter}
+ * (cross-run re-nag suppression), which reads DISPUTED / NOT_APPLICABLE reactions but never feeds reaction
+ * content into the detector prompt.
  *
  * @see Feedback for the delivered feedback unit being reacted to
  * @see ReactionAction for the action taxonomy
@@ -44,9 +50,12 @@ import org.hibernate.annotations.OnDeleteAction;
 @Table(
     name = "reaction",
     indexes = {
+        // Per-developer engagement timeline (most-recent first).
         @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
+        // Resolve the latest reaction for a given (feedback, reactor) — the "current state" lookup.
         @Index(name = "idx_reaction_feedback_reactor", columnList = "feedback_id, reactor_user_id, created_at DESC"),
-        // A2 (ADR 0021): find a reaction by its stable locus across the detector's per-run re-detections.
+        // Cross-run re-nag suppression: locate a prior reaction by its stable locus across per-run re-detections,
+        // since the per-run feedback FK does not recur but the recurrence_key does.
         @Index(name = "idx_reaction_correlation", columnList = "recurrence_key"),
     }
 )
@@ -61,8 +70,9 @@ public class Reaction {
     private UUID id;
 
     /**
-     * The feedback unit this reaction is about. Uses DB-level {@code ON DELETE CASCADE}
-     * so that deleting a feedback unit automatically cleans up its immutable reaction rows.
+     * The delivered {@link Feedback} unit this reaction responds to. DB FK {@code fk_reaction_feedback} with
+     * {@code ON DELETE CASCADE}: a reaction has no meaning without the unit it reacts to, so deleting the unit
+     * removes its immutable reaction rows rather than orphaning them.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -84,38 +94,52 @@ public class Reaction {
     private UUID feedbackId;
 
     /**
-     * Denormalized copy of the reacted feedback's headline {@code Observation.recurrenceKey} (ADR 0021 C2),
-     * captured at reaction-write time. The reacted feedback is per-run; its FK alone cannot locate this
-     * reaction on a later run, but the {@code recurrence_key} is the stable (practice, target, subject, file)
-     * locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE reaction against
-     * a re-detected locus. Nullable: a reaction whose source locus predates C2 (null key) stays null and
-     * simply cannot participate in B2.
+     * Denormalized copy of the reacted feedback's headline {@code Observation.recurrenceKey}, captured at
+     * reaction-write time. Stored, not joined: the reacted feedback unit is per-run, so its FK alone cannot
+     * locate this reaction on a later run, but the {@code recurrence_key} is the stable (practice, target,
+     * subject, file) locus that DOES recur. Re-nag suppression matches on it to find a prior DISPUTED /
+     * NOT_APPLICABLE reaction against a re-detected locus — the cross-run grain, distinct from the per-occurrence
+     * {@code Observation.occurrenceKey}. NULL means the source unit bound no PRIMARY observation carrying a
+     * non-null {@code recurrence_key} ({@code FeedbackRepository.findHeadlineRecurrenceKey} skips null-key PRIMARY
+     * rows and takes the earliest one that has a key), so the reaction cannot participate in cross-run suppression.
      *
      * <p><b>Headline-only by design.</b> A {@link Feedback} unit can fuse several findings (one PRIMARY per
      * problem, ADR 0022), but only the headline locus is captured here. So when a recipient disputes a
-     * multi-finding unit, B2 suppresses only the headline locus on re-run; the non-headline loci bundled into
-     * the same unit recur and may re-nag. Eval/reviewers should treat that as the known suppression grain, not
-     * a miss. Full-unit suppression would require capturing every member recurrence key (e.g. a child
-     * {@code reaction_locus} table keyed off {@code FeedbackObservation}), which is out of scope here.
+     * multi-finding unit, suppression matches only the headline locus on re-run; the non-headline loci bundled
+     * into the same unit recur and may re-nag. This is the known suppression grain, not a defect. Full-unit
+     * suppression would require capturing every member recurrence key (e.g. a child {@code reaction_locus}
+     * table keyed off {@code FeedbackObservation}), which is out of scope.
      */
     @Column(name = "recurrence_key", length = 64)
     private String recurrenceKey;
 
     /**
-     * The user who submitted this reaction — the feedback's recipient (only the recipient may react). Raw
-     * {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns
-     * scalar, matching {@code Observation.aboutUserId}; the DB FK {@code sfk_reaction_reactor} is
-     * Liquibase-managed (RESTRICT — a reaction must survive independently of user lifecycle).
+     * The user who submitted this reaction — always the feedback's recipient, since only the recipient may
+     * react. Scalar {@code Long} FK to {@code user} with no {@code @ManyToOne}, matching the identity columns
+     * elsewhere (e.g. {@code Observation.aboutUserId}): the relationship is declared in Liquibase as the
+     * Hibernate-invisible {@code sfk_reaction_reactor}, keeping the cross-module user reference out of the JPA
+     * graph and off the schema-drift gate. {@code ON DELETE RESTRICT} (the default, no cascade) — a reaction is
+     * research evidence and must not vanish with a user-row deletion.
      */
     @NotNull
     @Column(name = "reactor_user_id", nullable = false)
     private Long reactorUserId;
 
+    /**
+     * What the recipient did with the unit. Persisted as the enum name; the DB CHECK
+     * {@code chk_reaction_action} pins the column to the {@link ReactionAction} value set.
+     */
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "action", nullable = false, length = 16)
     private ReactionAction action;
 
+    /**
+     * The recipient's free-text rationale. NULL means none was given. Coupled to {@link #action} by the DB
+     * CHECK {@code chk_reaction_disputed_explanation}: a {@link ReactionAction#DISPUTED} row must carry a
+     * non-blank explanation (the reasoned rejection IS the evaluative judgement), while {@code ADDRESSED} and
+     * {@code NOT_APPLICABLE} may leave it NULL.
+     */
     @Column(name = "explanation", columnDefinition = "TEXT")
     private String explanation;
 

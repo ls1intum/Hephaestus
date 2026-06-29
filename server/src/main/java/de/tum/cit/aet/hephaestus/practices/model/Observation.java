@@ -28,18 +28,31 @@ import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Immutable record of a practice evaluation for a specific contribution.
+ * The atomic unit of practice detection: one detector's evaluation of one {@link Practice} on one
+ * {@link WorkArtifact} (ADR 0022). It is a <b>presence × assessment</b> record — whether the practice's
+ * target signal was {@link #presence seen, expected-but-absent, or inapplicable} and, when applicable,
+ * whether that is {@link #assessment good or bad} for the developer. The two axes are orthogonal: their
+ * 2×2 distinguishes a strength, a problem-by-commission, a clean avoidance, and a gap-by-omission, a
+ * distinction a single signed verdict cannot express (ADR 0022 §1).
  *
- * <p>Each observation records, for a {@link Practice} on a specific {@link WorkArtifact},
- * whether the practice's target signal was present, expected-but-absent, or not-applicable
- * ({@link #presence}) and, when applicable, whether it was good or bad ({@link #assessment}).
- * Observations are append-only and deduplicated by {@link #occurrenceKey}.
+ * <p><b>Lifecycle:</b> append-only and {@code @Immutable} — an observation is the immutable measurement
+ * a re-detection produces, never edited in place; a later run files a fresh row sharing the same
+ * {@link #recurrenceKey}, so trend/baseline is derived on read across the locus chain and the delivered
+ * {@code Feedback} supersedes rather than re-posts (the row itself is never superseded). The production
+ * write path is the native, race-safe
+ * {@code ObservationRepository.insertIfAbsent} keyed on the per-occurrence {@link #occurrenceKey}; no
+ * caller invokes {@code save()}.
  *
- * <p>Follows the {@code ActivityEvent} pattern: {@code @Immutable}, UUID PK with
- * {@code @PrePersist}, and {@code insertIfAbsent} for race-condition-safe insertion.
+ * <p><b>Place in the model:</b> references a {@link Practice} (the rule) and the {@link PracticeRevision}
+ * snapshot it fired against; targets a {@link WorkArtifact} by {@code (artifactType, artifactId)}; is
+ * filed against the subject {@link #aboutUserId}. A {@code Feedback} unit composes one or more
+ * observations into a delivered message, and a reaction follows the underlying locus across runs by the
+ * shared {@link #recurrenceKey}.
  *
- * @see Practice for the practice definition being evaluated
- * @see Severity for the impact level (orthogonal to observation)
+ * @see Practice the rule being evaluated
+ * @see Presence the measurement axis (seen / absent / inapplicable)
+ * @see Assessment the valence axis (good / bad)
+ * @see Severity the impact band of a {@link Assessment#BAD} observation
  */
 @Entity
 @Immutable
@@ -55,9 +68,9 @@ import tools.jackson.databind.JsonNode;
             name = "idx_observation_target_run",
             columnList = "artifact_type, artifact_id, agent_job_id, observed_at DESC"
         ),
-        // Cross-run identity (ADR 0021 C2): supersession + reaction-history follow one finding across re-detections.
+        // Cross-run locus (ADR 0021 C2): supersession + reaction-history follow one observation across re-detections.
         @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
-        // Reviewer-side findings are filed against the subject, not the developer; index for subject dashboards.
+        // Reviewer-side observations are filed against the subject (about_user_id); index for subject dashboards.
         @Index(name = "idx_observation_subject", columnList = "about_user_id"),
     }
 )
@@ -71,26 +84,33 @@ public class Observation {
     @Column(columnDefinition = "UUID")
     private UUID id;
 
+    /**
+     * Per-occurrence dedup grain: identifies this one detection event so {@code insertIfAbsent} is
+     * idempotent — a re-run of the same job cannot double-insert the same row. Enforced unique by
+     * {@code uk_observation_occurrence}. Distinct from the cross-run {@link #recurrenceKey} locus grain:
+     * occurrence-key dedups a single run's repeats, recurrence-key tracks one underlying problem ACROSS
+     * runs.
+     */
     @NotNull
     @Column(name = "occurrence_key", nullable = false, length = 255)
     private String occurrenceKey;
 
     /**
-     * The agent job that produced this finding. Stored as a raw UUID to avoid a module
-     * cycle between {@code practices} and {@code agent}. The FK constraint
-     * {@code fk_observation_agent_job} is managed by Liquibase at the DB level.
-     *
-     * <p>Primary insert path is {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository#insertIfAbsent}
-     * which bypasses {@code @PrePersist} — callers must supply the UUID explicitly.
+     * The agent job that produced this observation. A raw UUID with no {@code @ManyToOne} and no DB FK:
+     * {@code agent_job} lives in the {@code agent} module, so a referencing FK from {@code practices}
+     * would create a Spring-Modulith module cycle. The column is therefore an unconstrained scalar — the
+     * referential link is by convention, not enforced. The native {@code insertIfAbsent} write path supplies
+     * this UUID (like {@code id}) directly because it bypasses the JPA persist lifecycle entirely, independent
+     * of the FK question — {@code @PrePersist} never populated {@code agent_job_id} on the JPA path either.
      */
     @NotNull
     @Column(name = "agent_job_id", nullable = false, columnDefinition = "UUID")
     private UUID agentJobId;
 
     /**
-     * The practice being evaluated. Uses DB-level {@code ON DELETE CASCADE} so that
-     * deleting a practice automatically cleans up its immutable findings without
-     * requiring Hibernate lifecycle callbacks (which don't fire for bulk/native deletes).
+     * The practice being evaluated. FK {@code fk_observation_practice}, {@code ON DELETE CASCADE}:
+     * deleting a practice removes its immutable observations at the DB level, since the cascade must hold
+     * for bulk/native deletes where Hibernate lifecycle callbacks never fire.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -99,10 +119,11 @@ public class Observation {
     private Practice practice;
 
     /**
-     * The {@link PracticeRevision} (criteria snapshot) the detector evaluated this finding against, pinning
-     * it to the criteria as it was for reproducibility (SCD-2). NULL = the finding predates versioning
-     * (an honest "pre-versioning" marker). Written via the native insert; SET NULL on revision delete so a
-     * finding survives history pruning.
+     * The {@link PracticeRevision} (SCD-2 criteria snapshot) the detector evaluated this observation
+     * against, pinning it to the criteria as they were for reproducibility. NULL means the observation
+     * predates criteria versioning — a "pre-versioning" marker, not a missing reference. FK
+     * {@code fk_observation_revision}, {@code ON DELETE SET NULL}: pruning a revision nulls the pin rather
+     * than deleting the observation, so an immutable observation outlives its criteria history.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_revision_id", foreignKey = @ForeignKey(name = "fk_observation_revision"))
@@ -119,22 +140,31 @@ public class Observation {
     private Long artifactId;
 
     /**
-     * Whose conduct the finding is filed against — ALWAYS populated, the single subject identity: the author
-     * for author-side practices, the reviewer for reviewer-side practices. Raw {@code Long} FK to
-     * {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns scalar; the DB FK
-     * {@code sfk_observation_subject} is Liquibase-managed.
+     * Whose conduct the observation is ABOUT — the single subject identity, ALWAYS populated (ADR 0022 §3):
+     * the author for author-side practices, the reviewer for reviewer-side ones. This is the reviewer-side
+     * firewall axis: visibility and the feedback recipient key off this column, NOT a static user role, so a
+     * reviewer-side observation is filed against the reviewer (its {@code about_user_id}) and feeds
+     * reviewer-facing feedback, never bleeding into the author's delivered feedback — the contrast is
+     * {@code about_user_id} (who the row is ABOUT) versus the delivery's {@code recipient_user_id} (who
+     * feedback is delivered TO), there being no actor/developer column in the actor-free model (ADR 0022 §3).
+     * Raw {@code Long} FK to {@code user} with no {@code @ManyToOne}, keeping the cross-cutting identity column
+     * scalar. DB FK {@code sfk_observation_subject} — the {@code sfk_} prefix marks a deliberate scalar user FK
+     * (no {@code @ManyToOne}) so the Liquibase schema-drift gate ({@code diffExcludeObjects foreignkey:sfk_.*})
+     * treats it as intentional rather than Hibernate drift (sibling: {@code sfk_feedback_subject}). No
+     * {@code ON DELETE} (RESTRICT) because the column is {@code NOT NULL} — a referenced user delete must be
+     * blocked, not silently nulled.
      */
     @NotNull
     @Column(name = "about_user_id", nullable = false)
     private Long aboutUserId;
 
     /**
-     * Stable cross-run identity: a deterministic hash of what the finding is ABOUT (practice + target +
-     * subject + a content anchor), NEVER of when it was produced (no job id, no line number). Lets a
-     * {@code Feedback} supersede rather than re-post, and lets a reaction follow one underlying problem
-     * across re-detections — the primitive the research question's "do practices change over time" depends
-     * on. Computed via {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}.
-     * Nullable.
+     * Cross-run locus grain: a deterministic hash of WHAT the observation is about (practice + target +
+     * subject + a content anchor), never of WHEN it was produced (no job id, no line number), computed by
+     * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}. Lets a {@code Feedback}
+     * supersede rather than re-post and lets a reaction follow one underlying locus across re-detections;
+     * indexed by {@code idx_observation_correlation}. NULL means the observation predates the fingerprint
+     * (backfill-free, populated for new rows only) — distinct from the per-run {@link #occurrenceKey}.
      */
     @Column(name = "recurrence_key", length = 64)
     private String recurrenceKey;
@@ -154,19 +184,28 @@ public class Observation {
 
     /**
      * The good/bad valence of this observation, resolved per observation by the detector (ADR 0022).
-     * NULL iff {@link #presence} is {@link Presence#NOT_APPLICABLE}.
+     * NULL iff {@link #presence} is {@link Presence#NOT_APPLICABLE} — an inapplicable practice has no
+     * valence. This coupling is the 2×2 invariant, enforced in the DB by
+     * {@code chk_observation_presence_assessment} and mirrored on the JPA path by {@link #onCreate}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "assessment", length = 8)
     private Assessment assessment;
 
     /**
-     * Impact band — meaningful only for an {@link Assessment#BAD} observation; NULL otherwise (ADR 0022).
+     * Impact band — meaningful only for an {@link Assessment#BAD} observation; NULL on a GOOD or
+     * NOT_APPLICABLE row (ADR 0022). The "NULL unless BAD" coupling has no DB CHECK: the DB only
+     * allow-lists the values ({@code chk_observation_severity}). Enforcement is the detection parser's
+     * coherence coercion, with {@link #onCreate} as the JPA-path backstop.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "severity", length = 16)
     private Severity severity;
 
+    /**
+     * Detector confidence in {@code [0, 1]}, DB-enforced by CHECK {@code chk_observation_confidence}
+     * ({@code confidence >= 0 AND confidence <= 1}) — the bounded range is not implied by the {@code Float} type.
+     */
     @NotNull
     @Column(name = "confidence", nullable = false)
     private Float confidence;
