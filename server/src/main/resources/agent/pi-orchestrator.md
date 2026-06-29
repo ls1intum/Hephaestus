@@ -159,7 +159,17 @@ default. They sit ON TOP of the presence/assessment contract and the COHERENCE R
    `author==PRauthor? true|false`. NEVER classify a note authored BY the PR author as a reviewer comment, a
    vague reviewer comment, or an open/unaddressed reviewer thread — an author's own note is self-talk or an
    uptake reply, never reviewer input. Only notes where `author==PRauthor` is *false* are reviewer comments.
-   For `engaging-with-inline-review-comments` specifically: BEFORE you may call any reviewer concern an open
+   **AUTHOR-REPLY-PRESENCE PRE-STEP (engaging-with-inline-review-comments — O1, run BEFORE any open-loop BAD).**
+   First, list every note whose author login EQUALS `metadata.author` character-for-character. Bot logins
+   differ only by a trailing hash (e.g. `…_bot_8a494b0d…` vs `…_bot_7fa3f232…`) — compare the FULL string,
+   do NOT eyeball or assume two bot logins are the same identity. A GLOBAL author acknowledgement
+   (`Done` / `Fixed` / `Addressed` / `done!`), posted after the reviewer batch, CLOSES the threads it follows
+   → PRESENT/GOOD, even when it is one note answering several reviewer comments and is not anchored per-line.
+   This practice judges ENGAGEMENT, not agreement: a reasoned decline counts, and a blanket "Done!" after the
+   review counts. (Honest harness caveat: if the mirror has collapsed bot identities so `metadata.author`
+   equals every note's author, author==reviewer cannot be resolved on this fixture — say so and abstain
+   `NOT_APPLICABLE`; that residual is a harness/precompute limit, not an open loop to flag BAD.)
+   BEFORE you may call any reviewer concern an open
    loop, scan the ENTIRE note list (it may be a FLAT, unthreaded list — replies are NOT indented under their
    parent and do NOT quote the original) for ANY note authored by the PR author that addresses that concern.
    A later AUTHOR note that responds — agreeing, declining-with-reason ("I think it's fine to leave it in …
@@ -208,6 +218,19 @@ default. They sit ON TOP of the presence/assessment contract and the COHERENCE R
    suspicious shape by `file:line` and state the specific reason it is safe (constant source / server-side
    token / sink not reachable from untrusted input). A bare "no untrusted input present" over a diff that
    interpolates a value into a sink is a forbidden denial of the facts.
+   **NA-JUSTIFICATION GROUNDING GATE (structural — O2, applies to BOTH security practices and to any
+   security claim you make anywhere).** Any claim that a security setting was added, removed, hardened,
+   tightened, or is otherwise no-longer-a-risk — or that a risk is absent because something *mitigates*
+   it — MUST quote the exact `+`/`-` diff line that adds or removes that setting, verbatim in
+   `evidence.snippets`. If you cannot quote such a line, you MUST DROP the claim entirely; you may not
+   keep it as an exonerating rationale. **Absence of an insecure setting is NOT the same as having
+   removed one** — "the diff does not enable a permissive ATS / does not disable TLS / does not grant a
+   broad scope" is a clean baseline, not a hardening act, and must never be cited as the reason a security
+   practice is NA-GOOD. NEVER NA a security practice with an unquoted exonerating rationale (e.g. "removes
+   a permissive setting", "now uses secure defaults", "the risky path is mitigated") when no `+`/`-` line
+   in the diff backs it: drop the fabricated justification and judge the lines that ARE present. A
+   confident NA whose deciding clause names a setting that does not appear in any changed line is a
+   FORBIDDEN fabrication.
 
 8. **NEUTRAL NA ON MISSING SIGNAL (branches-from-the-integration-branch, and any NA caused by branch/git-history/precompute being unavailable).**
    When the abstention reason is "branch names / git history / a required precompute file were not available",
