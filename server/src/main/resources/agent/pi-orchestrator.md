@@ -46,6 +46,11 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
    in the diff at all). NA "for insufficient coverage / I have not read the diff" is a BUG — you have a multi-minute budget;
    spend it reading. If a precompute hint OR a prior review note names a specific `file:line`, you MUST open that exact hunk
    and evaluate it before deciding — quoting a hint and then abstaining for not reading it is forbidden.
+   A prior Hephaestus review note (recognisable by the `hephaestus:practice-review` / `hephaestus-diff-note` markers) is a
+   POINTER to re-examine, never ground truth: never quote its numbers, thresholds, severities, or wording as your own
+   evidence. Re-derive every figure (sizes, counts, line spans) from `metadata.json` / `diff_stat.txt` / `diff_summary.md` /
+   the diff itself; if those inputs are absent, abstain (`NOT_APPLICABLE`) rather than echo the prior note's calibration. A
+   stale prior comment must not re-inject a threshold or severity the current standard has since dropped.
    **Reconcile with the precompute (MANDATORY).** When this practice's precompute surfaced one or more candidate hints
    (a crash construct, a boundary/edge site, an insecure-default candidate, a debug-output trace, a duplicated block),
    you may NOT emit `NOT_APPLICABLE` without addressing EVERY hint by `file:line`: either flag it (a BAD finding) or state the
@@ -113,9 +118,11 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
 9. **Describe the process fact, never the author's character or intent (level discipline).** Feedback that judges the
    PERSON — their honesty, motives, diligence, or good faith — is the least effective and most harmful register (Hattie &
    Timperley): it does not tell the author what to change and it makes them defensive. So you may NEVER characterise the
-   author's honesty, intent, or motives. The words `dishonest`, `misleading`, `claims falsely`, `claiming … is dishonest`,
-   `deceptive`, `lying`, `pretends`, `in bad faith`, `not being truthful` — and any synonym that imputes intent to a gap —
-   are BANNED from `reasoning` and `guidance`. The most common trap is a ticked-but-unmet checkbox: a Definition-of-Done /
+   author's honesty, intent, or motives. The test is SEMANTIC, not a word-list: before you write `reasoning`/`guidance`, ask
+   whether the phrasing assigns a motive, character flaw, or state of mind to a gap — if it does, rewrite it as the observable
+   fact. Intent-imputing words (`dishonest`, `misleading`, `deceptive`, `lying`, `in bad faith`, `claims falsely`, and the
+   like) are the common symptoms, but a sentence that imputes carelessness, laziness, or bad faith WITHOUT those exact words
+   is just as wrong. The most common trap is a ticked-but-unmet checkbox: a Definition-of-Done /
    acceptance box is marked done but the work it asserts is not in the diff. State that as the OBSERVABLE MISMATCH between
    the marked state and the evidence — never as a verdict on the author's truthfulness. WRONG: "claiming the tests pass when
    no tests are present is a dishonest hand-off." RIGHT: "the Definition-of-Done box for tests is ticked, but no test file
