@@ -119,6 +119,24 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
+    void put_succeedsAfterFanoutDirWasPruned() throws Exception {
+        // Models the put/prune race outcome: a concurrent sweep's pruneEmptyFanoutDirs deletes the {ab}
+        // fan-out dir while a put() is mid-flight. After the dir is gone, put() must still land the blob
+        // (re-create the parent + retry createTempFile) rather than fail with UncheckedIOException.
+        String sha = cas.put("racy".getBytes(StandardCharsets.UTF_8));
+        Path fanout = cas.pathFor(sha).getParent();
+        // Empty the fan-out dir and remove it, exactly as the prune pass would after sweeping its last blob.
+        java.nio.file.Files.delete(cas.pathFor(sha));
+        java.nio.file.Files.delete(fanout);
+        assertThat(fanout).doesNotExist();
+
+        String reput = cas.put("racy".getBytes(StandardCharsets.UTF_8));
+
+        assertThat(reput).isEqualTo(sha);
+        assertThat(cas.exists(sha)).isTrue();
+    }
+
+    @Test
     void pathFor_rejectsNonSha() {
         assertThatThrownBy(() -> cas.pathFor("not-a-sha")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> cas.pathFor("../escape")).isInstanceOf(IllegalArgumentException.class);

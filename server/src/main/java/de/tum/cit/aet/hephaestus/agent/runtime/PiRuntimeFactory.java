@@ -34,10 +34,11 @@ public class PiRuntimeFactory {
     public static final int TIMEOUT_BUFFER_SECONDS = 60;
 
     /**
-     * Floor for the self-watchdog budget (ms). Guards against a non-positive or tiny budget when a spec
-     * sits just above the {@link PiPlanSpec} minimum (timeoutSeconds &gt; {@link #TIMEOUT_BUFFER_SECONDS}).
-     * MUST stay strictly below {@code TIMEOUT_BUFFER_SECONDS * 1000} so the watchdog always fires before
-     * the SPI hard kill — otherwise the floor could exceed the hard-kill deadline and invert the invariant.
+     * Floor for the self-watchdog budget (ms). A spec sitting just above the {@link PiPlanSpec} minimum
+     * (timeoutSeconds &gt; {@link #TIMEOUT_BUFFER_SECONDS}) yields a tiny computed budget once the buffer is
+     * subtracted; this floor keeps the watchdog budget at a sane minimum so it is never effectively zero.
+     * Kept strictly below {@code TIMEOUT_BUFFER_SECONDS * 1000} so the watchdog still fires before the SPI
+     * hard kill.
      */
     static final long MIN_BUDGET_MS = (TIMEOUT_BUFFER_SECONDS - 1) * 1000L;
 

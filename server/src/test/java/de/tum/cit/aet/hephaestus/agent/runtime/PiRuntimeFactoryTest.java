@@ -155,6 +155,31 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("budget floor applies just above the minimum timeout — stays positive and under the hard kill")
+        void budget_floorAppliesAtMinimumTimeout() {
+            // Smallest spec PiPlanSpec accepts (timeoutSeconds > TIMEOUT_BUFFER_SECONDS=60). The computed
+            // budget (1s) is below MIN_BUDGET_MS, so the floor branch fires — this exercises the otherwise
+            // untested Math.max floor. The floor must stay positive AND strictly under the hard-kill deadline.
+            int timeoutSeconds = PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1;
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.PROXY,
+                null,
+                null,
+                null,
+                "job-token-123",
+                false,
+                timeoutSeconds,
+                PRACTICE,
+                Map.of(),
+                ""
+            );
+            long budgetMs = Long.parseLong(factory.build(spec).environment().get("AGENT_BUDGET_MS"));
+            long hardTimeoutMs = (long) timeoutSeconds * 1_000L;
+            assertThat(budgetMs).isEqualTo(PiRuntimeFactory.MIN_BUDGET_MS).isPositive().isLessThan(hardTimeoutMs);
+        }
+
+        @Test
         @DisplayName("HOME / TMPDIR on tmpfs; PI_CODING_AGENT_DIR points into the workspace")
         void writableMounts() {
             var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).environment();

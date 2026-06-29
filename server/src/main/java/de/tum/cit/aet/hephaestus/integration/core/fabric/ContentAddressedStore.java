@@ -68,7 +68,16 @@ public class ContentAddressedStore {
                 return sha;
             }
             Files.createDirectories(blob.getParent());
-            temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
+            try {
+                temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
+            } catch (NoSuchFileException vanished) {
+                // A concurrent sweep()'s pruneEmptyFanoutDirs can delete this just-created-but-still-empty
+                // {ab} fan-out dir in the window between createDirectories above and createTempFile here.
+                // Re-create the parent and retry once; the prune only ever removes EMPTY dirs, so a single
+                // retry is sufficient (our temp file now makes the dir non-empty, ineligible for pruning).
+                Files.createDirectories(blob.getParent());
+                temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
+            }
             Files.write(temp, content);
             moveAtomically(temp, blob);
             temp = null; // moved into place — nothing to clean up
@@ -138,8 +147,10 @@ public class ContentAddressedStore {
                     String candidate = blob.getParent().getFileName() + blob.getFileName().toString();
                     // ONLY a file whose {ab}/{rest} reconstructs to a valid 64-hex sha is a blob eligible
                     // for sweeping. An in-flight `.tmp-*.blob` (or any stray file) reconstructs to a
-                    // non-sha and is left untouched — this is what makes sweep safe to run concurrently
-                    // with a put(), whose temp lives in the same fan-out dir and is not stripe-locked here.
+                    // non-sha and is left untouched, so this blob-delete pass never removes a put()'s temp.
+                    // The subsequent pruneEmptyFanoutDirs pass CAN delete a fan-out dir that a concurrent
+                    // put() created but has not yet populated; put() defends against that by re-creating the
+                    // parent and retrying createTempFile once (neither path is stripe-locked here).
                     if (isShaHex(candidate) && !liveShas.contains(candidate)) {
                         try {
                             Files.delete(blob);
