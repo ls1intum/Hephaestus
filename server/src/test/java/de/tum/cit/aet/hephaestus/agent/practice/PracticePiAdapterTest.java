@@ -97,4 +97,26 @@ class PracticePiAdapterTest extends BaseUnitTest {
         var spec = adapter.buildSandboxSpec(proxyRequest());
         assertThat(spec.inputFiles()).doesNotContainKey(".prompt");
     }
+
+    @Test
+    void proxyWithBaseUrlBuildsWithoutThrowing() {
+        // Regression: PROXY is the DEFAULT credentialMode and a baseUrl is independently settable, so a valid
+        // persisted config legitimately reaches the adapter as PROXY + non-null baseUrl. This must build a
+        // spec (PiPlanSpec normalises the shadowed baseUrl to null), not throw on every job.
+        PracticeAgentRequest request = new PracticeAgentRequest(
+            LlmProvider.OPENAI,
+            CredentialMode.PROXY,
+            null,
+            "gpt-oss-120b",
+            "https://gpu.example.com/v1",
+            "job-token-123",
+            false,
+            600
+        );
+
+        var spec = adapter.buildSandboxSpec(request);
+
+        assertThat(spec.image()).isEqualTo(IMAGE);
+        assertThat(spec.networkPolicy().llmProxyToken()).isEqualTo("job-token-123");
+    }
 }

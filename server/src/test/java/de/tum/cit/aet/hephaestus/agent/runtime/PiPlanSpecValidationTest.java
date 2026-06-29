@@ -197,26 +197,27 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     }
 
     @Test
-    void proxyRejectsBaseUrl() {
-        // Documented "baseUrl trap": PROXY resolves $LLM_PROXY_URL, so a baseUrl is silently shadowed —
-        // the constructor must fail fast on the misconfiguration instead of accepting dead config.
-        assertThatThrownBy(() ->
-            new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.PROXY,
-                null,
-                null,
-                "https://example.test/v1",
-                "job-token",
-                false,
-                600,
-                PROFILE,
-                Map.of(),
-                ""
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("PROXY mode");
+    void proxyNormalizesBaseUrlToNull() {
+        // PROXY + baseUrl is a SUPPORTED, default topology: PROXY is the default credentialMode and llmBaseUrl
+        // is independently settable, so a valid persisted config legitimately reaches here as PROXY + non-null
+        // baseUrl (both the practice path via AgentJobExecutor and the mentor path via MentorPiAdapter). The
+        // baseUrl is genuinely shadowed by the sandbox-injected $LLM_PROXY_URL, so the compact constructor
+        // normalises it to null rather than throwing on every job.
+        PiPlanSpec spec = new PiPlanSpec(
+            LlmProvider.OPENAI,
+            CredentialMode.PROXY,
+            null,
+            null,
+            "https://example.test/v1",
+            "job-token",
+            false,
+            600,
+            PROFILE,
+            Map.of(),
+            ""
+        );
+
+        assertThat(spec.baseUrl()).isNull();
     }
 
     @Test

@@ -61,7 +61,7 @@ class MentorPiAdapterTest extends BaseUnitTest {
         );
     }
 
-    /** API_KEY mode so {@link PiPlanSpec} validates (PROXY would require a jobToken and reject a baseUrl). */
+    /** API_KEY mode so {@link PiPlanSpec} validates (the mentor path passes no jobToken, which PROXY requires). */
     private static MentorLlmConfig llmConfig(String baseUrl) {
         return new MentorLlmConfig(LlmProvider.OPENAI, CredentialMode.API_KEY, "sk-test-key", "gpt-5.4", baseUrl, 120);
     }

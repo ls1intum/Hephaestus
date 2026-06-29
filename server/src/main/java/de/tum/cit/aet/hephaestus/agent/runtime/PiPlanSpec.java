@@ -47,13 +47,12 @@ public record PiPlanSpec(
                 if (jobToken == null || jobToken.isBlank()) {
                     throw new IllegalArgumentException("jobToken is required in PROXY mode");
                 }
-                // PROXY resolves its base URL from the sandbox-injected $LLM_PROXY_URL, so a baseUrl here would
-                // be silently shadowed. Fail fast on the documented trap rather than accepting dead config.
-                if (baseUrl != null && !baseUrl.isBlank()) {
-                    throw new IllegalArgumentException(
-                        "baseUrl is ignored in PROXY mode (proxy resolves $LLM_PROXY_URL); pass it only in API_KEY mode"
-                    );
-                }
+                // PROXY resolves its base URL from the sandbox-injected $LLM_PROXY_URL, so a baseUrl here is
+                // genuinely shadowed (see the record's "baseUrl trap" javadoc). PROXY is the DEFAULT credential
+                // mode and llmBaseUrl is independently settable, so a valid persisted config legitimately
+                // arrives as PROXY + non-null baseUrl. Normalise it away (it is harmless and unused) rather
+                // than throwing on a supported, default topology.
+                baseUrl = null;
             }
             case API_KEY -> {
                 if (credential == null || credential.isBlank()) {
