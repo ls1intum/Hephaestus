@@ -99,14 +99,42 @@ class DeliveryComposer {
     );
 
     /**
-     * Process-level practices whose GOOD strength is a named good ACT (engaging with review, revealing intent),
-     * not a correctness claim — only these may surface as the subordinate reinforcement line alongside
-     * blocking issues, so a correctness positive can never leak into a blocking note.
+     * Co-occurrence pairs (W4): two practices that, when both fire as a gap (BAD), deliver the SAME
+     * underlying fact and so must collapse to ONE finding rather than pile on as two separate blocking
+     * items. Each entry is {@code redundant-slug → preferred-slug}: when BOTH are present, the redundant
+     * one is dropped and the preferred (more-actionable, anchored-on-the-change) one is kept. The set is
+     * deliberately small and explicit so distinct lessons are never merged.
+     *
+     * <ul>
+     *   <li>{@code ready-and-traceable-handoff → ships-tests-with-the-change}: a DoD checkbox claiming "all
+     *       tests pass" when no tests changed is the no-tests fact, which ships-tests owns more actionably
+     *       (it anchors on the missing test, not on a checkbox).</li>
+     * </ul>
      */
-    private static final Set<String> PROCESS_STRENGTH_PRACTICES = Set.of(
-        "engaging-with-inline-review-comments",
-        "acting-on-review-feedback",
-        "intent-revealing-comments"
+    private static final Map<String, String> CO_OCCURRENCE_REDUNDANT_TO_PREFERRED = Map.ofEntries(
+        Map.entry("ready-and-traceable-handoff", "ships-tests-with-the-change")
+    );
+
+    /**
+     * Curated short, task-level strength phrases keyed by practice slug. A GOOD finding whose slug has an
+     * entry here renders as a concrete "Worth keeping: you're <gerund>." line; a GOOD finding without one
+     * falls back to a generic, grammatical acknowledgement (see {@link #composeSubordinatePositive}). Every
+     * phrase names what the WORK does, never grades the author — the no-self-praise / process-not-person
+     * rules still govern the subordinate line.
+     */
+    private static final Map<String, String> SUBORDINATE_STRENGTH_PHRASES = Map.ofEntries(
+        Map.entry("engaging-with-inline-review-comments", "engaging with the review feedback"),
+        Map.entry("acting-on-review-feedback", "acting on the review feedback"),
+        Map.entry("intent-revealing-comments", "leaving intent-revealing comments"),
+        Map.entry("leaves-the-code-clean-with-intent-revealing-comments", "leaving intent-revealing comments"),
+        Map.entry("commit-subjects-explain-each-change", "writing commit subjects that explain each change"),
+        Map.entry("commits-are-atomic-and-cohesive", "keeping each commit atomic and cohesive"),
+        Map.entry("excludes-generated-and-build-artifacts", "keeping generated and build artifacts out of the diff"),
+        Map.entry("ready-and-traceable-handoff", "linking the change to its issue"),
+        Map.entry("describe-what-and-why", "explaining what changed and why"),
+        Map.entry("scope-one-reviewable-change", "keeping the change focused and reviewable"),
+        Map.entry("triages-the-issue-with-labels-and-ownership", "triaging the issue with a clear type label"),
+        Map.entry("breaks-large-work-into-trackable-subtasks", "breaking the work into trackable subtasks")
     );
 
     /**
@@ -252,6 +280,14 @@ class DeliveryComposer {
             negatives = dedupEpicStructure(negatives);
         }
 
+        // Co-occurrence dedup (W4): two findings sometimes deliver the SAME underlying fact as separate
+        // blocking items (most often the no-tests fact: ready-and-traceable-handoff flags a DoD checkbox that
+        // claims "all tests pass" while ships-tests-with-the-change flags the absent tests). A student
+        // shouldn't read one root cause as two stacked MAJORs, so the pair collapses to ONE — the more
+        // actionable member (the one anchored on the change itself). Defined conservatively as an explicit,
+        // small pair set so distinct lessons (e.g. breaks-large-work vs scope) are never merged.
+        negatives = dedupCoOccurringNegatives(negatives);
+
         // PRIORITISE + CAP THE LONG TAIL. Detection legitimately fires many low-value MINOR/INFO nudges;
         // surfacing all of them buries the 1-3 highest-leverage lessons under a pile-on. Keep EVERY
         // blocking (CRITICAL/MAJOR) finding — those must never be silently dropped — then keep only the
@@ -280,7 +316,7 @@ class DeliveryComposer {
                 // all-clear on work that was never actually evaluated.
                 return null;
             }
-            return new DeliveryContent(composeNoIssuesNote(observed), List.of());
+            return new DeliveryContent(composeNoIssuesNote(observed, whyBySlug, emittedWhy), List.of());
         }
 
         // Partition negatives: inlinable (a diff note) vs non-inlinable (expanded in the summary).
@@ -310,7 +346,6 @@ class DeliveryComposer {
             negatives,
             nonInlinable,
             inlinable,
-            artifact,
             improvementOverflow,
             deliveredKeys,
             whyBySlug,
@@ -349,6 +384,31 @@ class DeliveryComposer {
             kept.add(f);
         }
         return kept;
+    }
+
+    /**
+     * Collapses {@link #CO_OCCURRENCE_REDUNDANT_TO_PREFERRED} pairs whose two members deliver the SAME
+     * underlying fact (W4). For each entry, when BOTH the redundant and the preferred slug are present as
+     * gap (BAD) findings, the redundant one is dropped so the student sees the lesson once via the more
+     * actionable preferred finding. Every other finding passes through untouched and in order; a pair with
+     * only one member present is left alone (no over-merge). Order-preserving over the incoming
+     * severity-sorted list.
+     */
+    private static List<ValidatedFinding> dedupCoOccurringNegatives(List<ValidatedFinding> negatives) {
+        Set<String> present = negatives.stream().map(ValidatedFinding::practiceSlug).collect(Collectors.toSet());
+        // Drop a redundant slug only when its preferred partner is also present in THIS delivery.
+        Set<String> toDrop = CO_OCCURRENCE_REDUNDANT_TO_PREFERRED.entrySet()
+            .stream()
+            .filter(e -> present.contains(e.getKey()) && present.contains(e.getValue()))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toSet());
+        if (toDrop.isEmpty()) {
+            return negatives;
+        }
+        return negatives
+            .stream()
+            .filter(f -> !toDrop.contains(f.practiceSlug()))
+            .toList();
     }
 
     /**
@@ -404,8 +464,17 @@ class DeliveryComposer {
      * Compose the note posted when no issues were found — reports what was reviewed and, where the agent
      * recorded reasoning, what it observed against each practice. Carries NO self-level praise: feedback stays
      * at the task/process level, never person-directed.
+     *
+     * <p>W7 — the catalogue-authored transferable principle ({@code whyBySlug}) is surfaced on the all-GOOD
+     * path too, on the lead strength bullet, so an above-bar student hears the standard affirmed rather than
+     * silence. It is the same verbatim "Why this matters" line the critique path uses (the feed-up layer),
+     * and it lands at most once per delivery via the shared {@code emittedWhy} ledger.
      */
-    private static String composeNoIssuesNote(List<ValidatedFinding> observed) {
+    private static String composeNoIssuesNote(
+        List<ValidatedFinding> observed,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
+    ) {
         // Findings whose reasoning lets us cite a concrete observation, ranked most-certain first so the
         // highest-confidence reinforcements survive the cap.
         List<ValidatedFinding> withReasoning = observed
@@ -420,6 +489,7 @@ class DeliveryComposer {
 
         var bullets = new StringBuilder(1024);
         int shown = 0;
+        boolean principleShown = false;
         for (ValidatedFinding f : withReasoning) {
             if (shown >= MAX_STRENGTH_REINFORCEMENTS) break;
             // Whole-sentence budget clamp: never clip a multi-clause observation mid-enumeration.
@@ -441,6 +511,14 @@ class DeliveryComposer {
                 bullets.append(' ').append(forward);
             }
             bullets.append("\n");
+            // W7: feed-up \u2014 append the catalogue "Why this matters" on the lead bullet that has one, once.
+            if (!principleShown) {
+                String why = strengthPrincipleText(f, whyBySlug, emittedWhy);
+                if (!why.isBlank()) {
+                    bullets.append("  ").append(why).append("\n");
+                    principleShown = true;
+                }
+            }
             shown++;
         }
         if (shown == 0) {
@@ -448,6 +526,28 @@ class DeliveryComposer {
         }
         // Build-on framing (mentoring, not audit) \u2014 task/process level, never person-level praise.
         return "What's working well here, and how to keep building on it:\n\n" + bullets + "\n";
+    }
+
+    /**
+     * The catalogue "Why this matters" line for a STRENGTH finding on the all-GOOD path (W7), or {@code ""}
+     * when there is none to surface (no authored principle, or one already emitted this delivery). Unlike
+     * {@link #principleText}, it does NOT skip on INFO severity \u2014 a strength finding carries INFO by
+     * construction, yet the affirmed standard is exactly what an above-bar student should hear. Still deduped
+     * once-per-delivery via the shared {@code emittedWhy} ledger so the same slug never repeats its principle.
+     */
+    private static String strengthPrincipleText(
+        ValidatedFinding f,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
+    ) {
+        String why = whyBySlug.get(f.practiceSlug());
+        if (why == null || why.isBlank()) {
+            return "";
+        }
+        if (!emittedWhy.add(f.practiceSlug())) {
+            return ""; // this practice's principle already surfaced earlier in the same delivery
+        }
+        return "_Why this matters:_ " + sanitizeStudentText(why).strip();
     }
 
     /**
@@ -535,32 +635,40 @@ class DeliveryComposer {
     }
 
     /**
-     * Builds the single subordinate process-positive line allowed alongside blocking issues.
-     * Picks the first GOOD strength whose practice is in {@link #PROCESS_STRENGTH_PRACTICES} (a named good
-     * process act, never code-correctness) and renders it as one short subordinate line. Returns "" when
-     * no eligible process positive exists — keeping the blocking note free of any hollow reinforcement.
+     * Builds the single earned strength line allowed alongside blocking issues (W1). Formative feedback
+     * REQUIRES naming what to keep doing, so even under a blocking finding the note opens its body with ONE
+     * brief, genuine acknowledgement of the run's HIGHEST-CONFIDENCE GOOD finding — any practice, not only
+     * process ones — before the corrective lands. This is NOT a feedback sandwich that buries the critique:
+     * it is a single subordinate line ("Worth keeping: …") rendered after the issue count, and the
+     * no-self-praise / process-not-person rules still govern it (it names what the WORK does).
+     *
+     * <p>A GOOD finding whose slug has a curated phrase renders it concretely; a GOOD finding without one
+     * is acknowledged generically ("Worth keeping: there's solid work here to build on.") rather than (a)
+     * dropped — a real strength then vanishes — or (b) dumped as a raw ungrammatical slug. Returns "" only
+     * when there is genuinely no GOOD finding to surface.
      */
-    static String composeSubordinateProcessPositive(List<ValidatedFinding> positives) {
+    static String composeSubordinatePositive(List<ValidatedFinding> positives) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
+        // Most-certain GOOD finding first, so the single line we are allowed lands on the strongest signal.
         return positives
             .stream()
-            .filter(f -> PROCESS_STRENGTH_PRACTICES.contains(f.practiceSlug()))
-            .map(f -> STRENGTH_PHRASES.getOrDefault(f.practiceSlug(), humanisePracticeSlug(f.practiceSlug())))
-            .filter(p -> p != null && !p.isBlank())
-            .findFirst()
-            .map(p -> "Worth keeping: you're " + p + ".")
+            .filter(DeliveryComposer::isStrength)
+            .max(Comparator.comparingDouble(ValidatedFinding::confidence))
+            .map(DeliveryComposer::subordinateStrengthLine)
             .orElse("");
     }
 
-    /** Fallback strength phrase for a practice not in {@link #STRENGTH_PHRASES}: the slug with dashes as spaces. */
-    @Nullable
-    private static String humanisePracticeSlug(@Nullable String slug) {
-        if (slug == null || slug.isBlank()) {
-            return null;
+    /** Renders one GOOD finding as the subordinate "Worth keeping: …" line (curated phrase or generic fallback). */
+    private static String subordinateStrengthLine(ValidatedFinding f) {
+        String phrase = SUBORDINATE_STRENGTH_PHRASES.get(f.practiceSlug());
+        if (phrase != null && !phrase.isBlank()) {
+            return "Worth keeping: you're " + phrase + ".";
         }
-        return slug.replace('-', ' ');
+        // C2 (subordinate): a real GOOD strength with no curated gerund — acknowledge generically and
+        // grammatically rather than drop it or dump the raw slug into the "you're <gerund>" frame.
+        return "Worth keeping: there's solid work here to build on.";
     }
 
     /**
@@ -645,7 +753,6 @@ class DeliveryComposer {
         List<ValidatedFinding> allNegatives,
         List<ValidatedFinding> nonInlinable,
         List<ValidatedFinding> inlinable,
-        WorkArtifact artifact,
         int improvementOverflow,
         Set<String> deliveredKeys,
         Map<String, String> whyBySlug,
@@ -670,15 +777,16 @@ class DeliveryComposer {
 
         // Opening: evidence-anchored issue summary (no self-level praise). The overflow count is owned
         // here so the student is told honestly that lower-value nudges were collapsed, not hidden.
-        composeOpening(sb, allNegatives, artifact, improvementOverflow);
+        composeOpening(sb, allNegatives, improvementOverflow);
 
-        // When blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
-        // a WARRANTED, specific PROCESS-level positive (a named good act — engaging with review, revealing
-        // intent) should still land. Surface AT MOST ONE, subordinate: a short single line AFTER the issue
-        // count, never a sandwich opener, and only from PROCESS_STRENGTH_PRACTICES so a code-correctness
-        // positive can never leak into a blocking note.
+        // When blocking issues exist the cheerful multi-strength opener is suppressed (anti-feedback-sandwich),
+        // but a single EARNED acknowledgement must still land (W1): formative feedback requires naming what to
+        // keep doing, and the run already detected it. Surface AT MOST ONE, subordinate — a short single line
+        // AFTER the issue count, never a sandwich opener — picking the highest-confidence GOOD finding of the
+        // run (any practice). This is bounded to one line and stays task-level, so the corrective is never
+        // buried and no self-praise leaks in.
         if (hasBlocking) {
-            String reinforcement = composeSubordinateProcessPositive(positives);
+            String reinforcement = composeSubordinatePositive(positives);
             if (!reinforcement.isEmpty()) {
                 sb.append(reinforcement).append("\n\n");
             }
@@ -726,14 +834,14 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(
-        StringBuilder sb,
-        List<ValidatedFinding> negatives,
-        WorkArtifact artifact,
-        int improvementOverflow
-    ) {
-        // PRs are merged → "to fix before merging"; issues are not → "to fix".
-        String blockingCta = artifact == WorkArtifact.PULL_REQUEST ? " to fix before merging" : " to fix";
+    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, int improvementOverflow) {
+        // Hephaestus is a NON-BLOCKING, feedback-first mentor — it never gates a merge. "to fix before
+        // merging" is gatekeeping language that is wrong on every PR (and absurd on an already-merged one),
+        // so the call-to-action is state-neutral feed-forward: name what is worth tightening, not a gate to
+        // clear. Issues are not merged either, so they share the same "to tighten" framing. Merge-state is
+        // not plumbed into the composer; the non-blocking reframe is correct regardless of state, so no
+        // brittle state dependency is added just for this line.
+        String blockingCta = " to tighten";
         long blockingCount = negatives
             .stream()
             .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)

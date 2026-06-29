@@ -170,8 +170,9 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_forIssueArtifact_dropsBeforeMergingFromBlockingCta() {
-        // Issues are not merged: the blocking CTA must read "to fix", never "to fix before merging".
+    void compose_forIssueArtifact_usesNonBlockingTightenCta() {
+        // W3: Hephaestus is non-blocking. The CTA is state-neutral feed-forward ("to tighten"), never the
+        // gatekeeping "to fix before merging" — and that holds for issues (which are never merged) too.
         DeliveryContent result = DeliveryComposer.compose(
             mixedFindings(),
             de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
@@ -179,8 +180,9 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();
-        assertThat(mrNote).contains("2 issues to fix");
+        assertThat(mrNote).contains("2 issues to tighten");
         assertThat(mrNote).doesNotContain("before merging");
+        assertThat(mrNote).doesNotContain("to fix");
         assertThat(mrNote).contains("2 suggestions for improvement");
     }
 
@@ -196,12 +198,15 @@ class DeliveryComposerTest extends BaseUnitTest {
         String mrNote = result.mrNote();
         assertThat(mrNote).isNotNull();
 
-        // Mixed reviews with multiple blocking issues should not front-load praise.
-        assertThat(mrNote).doesNotContain("error state handling");
-        assertThat(mrNote).doesNotContain("view decomposition");
+        // Mixed reviews with multiple blocking issues should not front-load a cheerful multi-strength opener.
+        assertThat(mrNote).doesNotContain("Nice work");
+        // W1: a single earned strength line still lands (the uncurated positives → the generic form), so the
+        // student hears one thing to keep doing even under blocking issues — never a person-level grade.
+        assertThat(mrNote).contains("Worth keeping:");
 
-        // Issue count: split blocking vs improvement (2 CRITICAL/MAJOR + 2 MINOR)
-        assertThat(mrNote).contains("2 issues to fix before merging");
+        // W3: non-blocking CTA, split blocking vs improvement (2 CRITICAL/MAJOR + 2 MINOR).
+        assertThat(mrNote).contains("2 issues to tighten");
+        assertThat(mrNote).doesNotContain("before merging");
         assertThat(mrNote).contains("2 suggestions for improvement");
 
         // Severity emojis (no bracket labels — emoji is sufficient)
@@ -365,7 +370,8 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         // 2 blocking ALWAYS kept; the 5 non-blocking (4 MINOR + 1 INFO) tail is capped to 3, with the
         // remaining 2 disclosed honestly as overflow. The INFO and the lowest MINOR are the ones folded.
-        assertThat(mrNote).contains("2 issues to fix before merging");
+        assertThat(mrNote).contains("2 issues to tighten");
+        assertThat(mrNote).doesNotContain("before merging");
         assertThat(mrNote).contains("3 suggestions for improvement (+2 more minor suggestions):");
 
         // Severity ordering in compact list: CRITICAL first (🔴), then MAJOR (🟠)
@@ -583,7 +589,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_blockingIssue_suppressesAcknowledgement() {
+    void compose_blockingIssue_suppressesOpenerButStillAcknowledgesOneStrength() {
         List<ValidatedFinding> findings = new ArrayList<>();
         findings.add(positiveFinding("scope-one-reviewable-change"));
         findings.add(
@@ -600,9 +606,13 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         String mrNote = DeliveryComposer.compose(findings).mrNote();
 
-        // Front-loading praise ahead of a blocking issue would read as a hollow feedback sandwich.
+        // The cheerful multi-strength opener is still suppressed (no hollow feedback sandwich)...
         assertThat(mrNote).doesNotContain("Nice work");
-        assertThat(mrNote).contains("to fix before merging");
+        // ...but W1 still names ONE earned strength, subordinate, after the issue count — task-level only.
+        assertThat(mrNote).contains("Worth keeping: you're keeping the change focused and reviewable.");
+        assertThat(mrNote.indexOf("to tighten")).isLessThan(mrNote.indexOf("Worth keeping"));
+        // W3: non-blocking CTA.
+        assertThat(mrNote).doesNotContain("before merging");
     }
 
     @Test
@@ -1157,10 +1167,72 @@ class DeliveryComposerTest extends BaseUnitTest {
             .containsExactlyInAnyOrder("a.swift", "b.swift");
     }
 
+    // --- W4: co-occurrence dedup — the same root fact must not deliver as two stacked MAJORs ---
+
+    @Test
+    void compose_coOccurringNoTestsFact_deliveredOnceNotAsTwoMajors() {
+        // The no-tests fact fires twice: ready-and-traceable-handoff flags a DoD checkbox claiming "all tests
+        // pass" (with no tests changed), and ships-tests-with-the-change flags the absent tests. A student
+        // should read one root cause once — via the more actionable ships-tests finding — not two MAJORs.
+        var findings = List.of(
+            negativeFinding(
+                "ready-and-traceable-handoff",
+                "Definition of Done claims all tests pass",
+                Severity.MAJOR,
+                List.of(new LocationSpec("README.md", 3)),
+                null,
+                "The DoD checklist ticks 'all tests pass' but no test files changed.",
+                "Untick it or add the tests."
+            ),
+            negativeFinding(
+                "ships-tests-with-the-change",
+                "Production logic ships without a test",
+                Severity.MAJOR,
+                List.of(new LocationSpec("Sources/Calc.swift", 12)),
+                null,
+                "New logic added with no accompanying test.",
+                "Add a unit test that exercises the new branch."
+            )
+        );
+
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(dc).isNotNull();
+        // ONE blocking issue surfaced, not two — the redundant DoD-honesty finding is folded into ships-tests.
+        assertThat(dc.mrNote()).contains("1 issue to tighten");
+        assertThat(dc.mrNote()).doesNotContain("2 issues");
+        // The kept (more actionable) lesson survives; the redundant sibling is gone.
+        assertThat(dc.mrNote() + dc.diffNotes().get(0).body()).contains("Production logic ships without a test");
+        assertThat(dc.mrNote()).doesNotContain("Definition of Done claims all tests pass");
+        assertThat(dc.diffNotes()).hasSize(1);
+    }
+
+    @Test
+    void compose_coOccurrencePair_keepsHandoffWhenShipsTestsAbsent() {
+        // Guard: the redundant member is only dropped when its preferred partner co-occurs. With ships-tests
+        // NOT present, ready-and-traceable-handoff stands on its own — never silently removed.
+        var findings = List.of(
+            negativeFinding(
+                "ready-and-traceable-handoff",
+                "Definition of Done claims all tests pass",
+                Severity.MAJOR,
+                List.of(new LocationSpec("README.md", 3)),
+                null,
+                "The DoD checklist ticks 'all tests pass' but no test files changed.",
+                "Untick it or add the tests."
+            )
+        );
+
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).contains("1 issue to tighten");
+        assertThat(dc.mrNote() + dc.diffNotes().get(0).body()).contains("Definition of Done claims all tests pass");
+    }
+
     @Test
     void compose_blockingIssue_allowsSingleSubordinateProcessPositive() {
-        // F5: under a blocking issue, suppress the cheerful opener but allow ONE subordinate process
-        // positive — and only a process act, never a code-correctness positive.
+        // W1: under a blocking issue, suppress the cheerful opener but still land ONE subordinate strength.
         var findings = List.of(
             positiveFinding("engaging-with-inline-review-comments"),
             negativeFinding(
@@ -1176,15 +1248,32 @@ class DeliveryComposerTest extends BaseUnitTest {
         var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).doesNotContain("Nice work");
-        assertThat(dc.mrNote()).contains("Worth keeping");
-        assertThat(dc.mrNote().indexOf("to fix before merging")).isLessThan(dc.mrNote().indexOf("Worth keeping"));
+        assertThat(dc.mrNote()).contains("Worth keeping: you're engaging with the review feedback.");
+        // W3: subordinate strength lands AFTER the non-blocking count, never as a sandwich opener.
+        assertThat(dc.mrNote().indexOf("to tighten")).isLessThan(dc.mrNote().indexOf("Worth keeping"));
+        assertThat(dc.mrNote()).doesNotContain("before merging");
     }
 
     @Test
-    void compose_blockingIssue_codeCorrectnessPositiveNeverSurfaces() {
-        // F5 guard: a non-process (code-correctness) positive never leaks into a blocking note.
+    void compose_blockingIssue_acknowledgesAnyHighConfidenceStrengthNotOnlyProcessActs() {
+        // W1: formative feedback requires naming what to keep doing, so the single subordinate line surfaces
+        // the run's highest-confidence GOOD finding of ANY practice — not only the named process acts. Here
+        // the sole strength is a code-craft GOOD (handles-errors...), which previously was censored under a
+        // blocking note; it must now be acknowledged, task-level, once.
+        var strength = new ValidatedFinding(
+            "handles-errors-instead-of-swallowing-them",
+            "Errors are surfaced (positive)",
+            Presence.PRESENT,
+            Assessment.GOOD,
+            Severity.INFO,
+            0.99f,
+            null,
+            null,
+            null,
+            List.of()
+        );
         var findings = List.of(
-            positiveFinding("handles-errors-instead-of-swallowing-them"),
+            strength,
             negativeFinding(
                 "hardcoded-secrets",
                 "Hardcoded secret",
@@ -1197,8 +1286,12 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).doesNotContain("Worth keeping");
         assertThat(dc.mrNote()).doesNotContain("Nice work");
+        // An uncurated GOOD slug is acknowledged generically (grammatical), never dropped or dumped raw.
+        assertThat(dc.mrNote()).contains("Worth keeping:");
+        assertThat(dc.mrNote()).doesNotContain("handles errors instead of swallowing them");
+        // Exactly one earned strength line — bounded, not a multi-strength sandwich.
+        assertThat(dc.mrNote().split("Worth keeping:", -1)).hasSize(2);
     }
 
     // ----- Improvement-tail prioritisation + cap (the proportionality fix) -----
@@ -1255,8 +1348,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         String mrNote = result.mrNote();
         // All 5 blockers kept, MINOR tail capped 4→3, one collapsed.
         assertThat(mrNote).contains(
-            "5 issues to fix before merging, plus 3 suggestions for improvement (+1 more minor suggestion):"
+            "5 issues to tighten, plus 3 suggestions for improvement (+1 more minor suggestion):"
         );
+        assertThat(mrNote).doesNotContain("before merging");
         // 5 blocking + 3 improvements = 8 diff notes (raw was 9).
         assertThat(result.diffNotes()).hasSize(8);
     }
@@ -1881,6 +1975,70 @@ class DeliveryComposerTest extends BaseUnitTest {
         ).mrNote();
 
         assertThat(note.split("_Why this matters:_", -1)).hasSize(3); // 2 occurrences => 3 split parts
+    }
+
+    // --- W7: feed-up on the all-GOOD path — an above-bar student hears the standard affirmed, not silence ---
+
+    private ValidatedFinding positiveWithReasoning(String slug, String reasoning) {
+        return new ValidatedFinding(
+            slug,
+            humanizeTitle(slug) + " (positive)",
+            Presence.PRESENT,
+            Assessment.GOOD,
+            Severity.INFO,
+            0.95f,
+            null,
+            reasoning,
+            null,
+            List.of()
+        );
+    }
+
+    @Test
+    void compose_allGoodPath_rendersTransferablePrinciple() {
+        // The strongest students (no issues) must still receive the feed-up + transferable layer: the
+        // catalogue "Why this matters" line, on the lead strength bullet — not silence.
+        var observed = List.of(
+            positiveWithReasoning("scope-one-reviewable-change", "The change stays focused on a single concern.")
+        );
+
+        String note = DeliveryComposer.compose(
+            observed,
+            WorkArtifact.PULL_REQUEST,
+            Map.of("scope-one-reviewable-change", SCOPE_WHY)
+        ).mrNote();
+
+        assertThat(note).contains("What's working well here");
+        assertThat(note).contains("_Why this matters:_ " + SCOPE_WHY);
+    }
+
+    @Test
+    void compose_allGoodPath_principleRenderedAtMostOnce() {
+        // Two strengths of the same practice on the all-GOOD path carry the principle exactly once.
+        var observed = List.of(
+            positiveWithReasoning("scope-one-reviewable-change", "Focused on one concern."),
+            positiveWithReasoning("scope-one-reviewable-change", "Each commit is scoped.")
+        );
+
+        String note = DeliveryComposer.compose(
+            observed,
+            WorkArtifact.PULL_REQUEST,
+            Map.of("scope-one-reviewable-change", SCOPE_WHY)
+        ).mrNote();
+
+        assertThat(note).containsOnlyOnce("_Why this matters:_");
+    }
+
+    @Test
+    void compose_allGoodPath_noPrincipleWhenNoneAuthored() {
+        // No authored principle for the slug → the all-GOOD note renders the observation but no Why line
+        // (empty whyBySlug is a strict no-op — behaviour identical to before W7).
+        var observed = List.of(positiveWithReasoning("scope-one-reviewable-change", "The change stays focused."));
+
+        String note = DeliveryComposer.compose(observed, WorkArtifact.PULL_REQUEST, Map.of()).mrNote();
+
+        assertThat(note).contains("What's working well here");
+        assertThat(note).doesNotContain("_Why this matters:_");
     }
 
     // ---- M1: server-side grounding guard (drop a hallucinated inline anchor before it lands on a student) ----
