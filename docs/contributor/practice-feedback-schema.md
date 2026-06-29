@@ -178,7 +178,7 @@ composed into the delivered `Feedback` (`body`, §3.5) and the developer-facing 
 | artifactType | WorkArtifact | `artifact_type` | no | PR vs ISSUE the observation targets. | Routes the observation to the correct dashboard/channel. |
 | artifactId | Long | `artifact_id` | no | External id of the target PR/issue. | Links to the specific artifact. |
 | developer | User (`@ManyToOne`) | `developer_id` | no | The contribution author being evaluated; FK `RESTRICT` (no cascade). | Observations outlive users; deleting a user with observations is blocked. |
-| aboutUserId | Long | `about_user_id` | **no (ALWAYS populated)** | Whose conduct the observation is *about*. Raw Long FK `fk_observation_about_user`. | xAPI Actor (the agent a statement is about) is mandatory and unambiguous — [xAPI](https://xapi.com/statements-101/). The former *null⇒developer* fallback was collapsed to an explicit value (§4). |
+| aboutUserId | Long | `about_user_id` | **no (ALWAYS populated)** | Whose conduct the observation is *about*. Raw Long FK `sfk_observation_subject` (the `sfk_` prefix marks a deliberate scalar user FK — no `@ManyToOne` — so the Liquibase schema-drift gate treats it as intentional). | xAPI Actor (the agent a statement is about) is mandatory and unambiguous — [xAPI](https://xapi.com/statements-101/). The former *null⇒developer* fallback was collapsed to an explicit value (§4). |
 | recurrenceKey | String(64) | `recurrence_key` | yes | Deterministic hash of what the observation is **about** (practice + target + subject + content anchor), never of *when* it was produced. | Enables supersession and reaction-continuity across re-detections. SARIF `partialFingerprints` — title excluded because the LLM re-words it every run. Nullable: backfill-free, new observations only. |
 | title | String(255) | `title` | no | Short headline. | SARIF `result.message`. |
 | **presence** | Presence | `presence` | no | Was the signal present: `PRESENT` / `ABSENT` / `NOT_APPLICABLE`. | Measurement axis, free of valence. SARIF `result.kind` with the direction factored out. |
@@ -254,7 +254,7 @@ Both sides live in the `practices` module, so real `@ManyToOne` associations are
 | id | Id (embedded) | `(feedback_id, observation_id)` | no | Composite PK. | Idempotent binding; written via `insertIfAbsent`. |
 | feedback | Feedback (`@ManyToOne`, `@MapsId`) | `feedback_id` | no | Composed unit; DB `ON DELETE CASCADE`. | Read-only mirror of the key. |
 | observation | Observation (`@ManyToOne`, `@MapsId`) | `observation_id` | no | Bound evidence; DB `ON DELETE CASCADE`. | An observation can be reused across units. |
-| **evidenceRole** | EvidenceRole | `evidence_role` | no | `PRIMARY` (anchors the headline) / `SUPPORTING` (corroborates). | One unit can fuse a PRIMARY plus SUPPORTING observations. (Renamed from `display_role`.) |
+| **role** | EvidenceRole | `role` | no | `PRIMARY` (anchors the headline) / `SUPPORTING` (corroborates); DB CHECK `chk_feedback_observation_role`. | One unit can fuse a PRIMARY plus SUPPORTING observations. |
 | ordinal | Integer | `ordinal` | no | Stable ordering within the unit (lower = earlier). | Deterministic narrative order. |
 
 ### 3.7 `FeedbackPlacement` — table `feedback_placement`
