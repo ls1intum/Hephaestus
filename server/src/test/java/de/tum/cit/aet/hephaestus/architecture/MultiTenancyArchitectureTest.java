@@ -40,10 +40,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
      * Package prefixes that are inherently workspace-agnostic.
      *
      * <p>The {@code integration.scm} package is the shared SCM kernel (entities, SPIs,
-     * sync orchestrator). The per-vendor ETL handlers (former {@code integration.scm.<domain>.<kind>})
-     * now live under {@code integration.<kind>}, but they still operate at the external
-     * entity level (GitHub/GitLab IDs) and resolve workspace context through entity
-     * relationships, so they remain workspace-agnostic for the purposes of this rule.
+     * sync orchestrator). The per-vendor ETL handlers under {@code integration.<kind>} operate at
+     * the external entity level (GitHub/GitLab IDs) and resolve workspace context through entity
+     * relationships, so they are workspace-agnostic for the purposes of this rule.
      * Workspace filtering happens at the domain/application layer, not at the
      * integration.scm/integration ETL layer.
      */
@@ -658,8 +657,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             // EventContext carries the originating repository → workspaceId is resolved per-event
             "MentorContextInvalidator",
             // GitHubProjectActivityListener handles GitHubProjectEvent payloads whose EventContext
-            // carries scopeId (the originating workspace) — extracted out of ActivityEventListener
-            // in the SPI-isolation refactor, same payload-carries-context contract applies
+            // carries scopeId (the originating workspace) — same payload-carries-context contract
             "GitHubProjectActivityListener"
         );
 

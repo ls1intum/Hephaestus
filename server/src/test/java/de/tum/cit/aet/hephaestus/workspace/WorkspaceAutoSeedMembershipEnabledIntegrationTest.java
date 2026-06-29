@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * Verifies the dev/e2e auto-seed path (A5): when {@code hephaestus.workspace.auto-seed-membership=true},
+ * Verifies the dev/e2e auto-seed path: when {@code hephaestus.workspace.auto-seed-membership=true},
  * the first authenticated visitor of a zero-membership workspace IS seeded as ADMIN. Production keeps the
  * flag false (see {@link WorkspaceContextFilterIntegrationTest#autoSeedDisabledDoesNotGrantAdminToFirstVisitorOfEmptyMembershipWorkspace}).
  */

@@ -190,9 +190,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Test
     void shippedCatalogCriteria_useRealNewlinesNotLiteralEscapes() {
-        // Regression guard (2026-06-13): 21/32 criteria once shipped with a literal two-char "\n" instead of
-        // a real newline, collapsing every "## Section" of the judge prompt onto one line. The injector
-        // writes criteria verbatim into the judge's context, so this must be caught at the source.
+        // The injector writes criteria verbatim into the judge's context, so a literal two-char "\n" (instead
+        // of a real newline) would collapse every "## Section" of the judge prompt onto one line. Catch it at
+        // the source.
         JsonNode catalog = JsonMapper.builder()
             .build()
             .readTree(getClass().getClassLoader().getResourceAsStream("practices/default-catalog.json"));

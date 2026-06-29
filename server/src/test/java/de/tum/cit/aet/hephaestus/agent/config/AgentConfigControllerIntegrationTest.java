@@ -102,7 +102,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(created.allowInternet()).isFalse();
         assertThat(created.enabled()).isTrue();
 
-        // GET by ID should return the same config
         AgentConfigDTO fetched = webTestClient
             .get()
             .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
@@ -216,7 +215,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         Workspace workspace = setupWorkspace();
         AgentConfigDTO created = createConfig(workspace, "delete-test");
 
-        // Delete
         webTestClient
             .delete()
             .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
@@ -225,7 +223,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             .expectStatus()
             .isNoContent();
 
-        // GET should return 404
         webTestClient
             .get()
             .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
@@ -241,7 +238,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         Workspace workspace = setupWorkspace();
         AgentConfigDTO created = createConfig(workspace, "active-jobs-test");
 
-        // Create an active job linked to this config
         AgentConfig config = agentConfigRepository
             .findByIdAndWorkspaceId(created.id(), workspace.getId())
             .orElseThrow();
@@ -253,7 +249,6 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         job.setConfigSnapshot(new ObjectMapper().valueToTree(Map.of("agent_type", "CLAUDE_CODE")));
         agentJobRepository.save(job);
 
-        // Delete should fail with 409
         ProblemDetail problem = webTestClient
             .delete()
             .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())

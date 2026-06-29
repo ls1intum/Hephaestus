@@ -12,10 +12,10 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guardrail for the workspace ABI rename ({@code .context/} → {@code inputs/context/}).
- * Scans the bundled Pi runtime resources (orchestrator + runner) for any remaining legacy
- * references that would slip past the rolling-deploy contract documented in
- * {@code docs/developer/agent/workspace-abi.mdx}.
+ * Guardrail for the workspace ABI context prefix. Scans the bundled Pi runtime resources
+ * (orchestrator + runner) for any legacy {@code .context/} reference that would violate the
+ * rolling-deploy contract documented in {@code docs/developer/agent/workspace-abi.mdx}; the
+ * canonical prefix is {@code inputs/context/}.
  */
 class WorkspaceAbiPathsTest extends HephaestusArchitectureTest {
 

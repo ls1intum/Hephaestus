@@ -30,7 +30,7 @@ const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
 const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
 const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5));
 
-// Watchdog: hard exit if SDK abort hangs past the budget (pi-mono #2381/#2677/#2119).
+// Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
     console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
     try {
@@ -432,7 +432,7 @@ function loadPracticeSlugs() {
 }
 
 // Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
-// cannot drift between the five sites that previously copy-pasted it.
+// cannot drift between the sites that emit it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
     `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +

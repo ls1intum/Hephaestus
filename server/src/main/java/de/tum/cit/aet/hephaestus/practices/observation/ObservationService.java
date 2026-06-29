@@ -141,7 +141,7 @@ public class ObservationService {
             Pageable.unpaged()
         );
 
-        // Advice now lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
+        // Advice lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
         // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can
         // show what was actually delivered (null when nothing was). One query, not N+1.
         Map<UUID, String> deliveredGuidance = deliveredGuidanceByObservation(

@@ -22,10 +22,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * B7: boot-validation + behavior coverage for the file's only {@code nativeQuery=true}
- * ({@code findFirstUserMessagePartsByThreadIds}). Native SQL is NOT boot-validated like JPQL, and this
- * query silently regressed once (a jsonb type-mapping bug degraded the whole prior-conversation aspect to
- * empty). This test pins the {@code DISTINCT ON} earliest-user-message-per-thread contract, the
+ * Boot-validation + behavior coverage for the file's only {@code nativeQuery=true}
+ * ({@code findFirstUserMessagePartsByThreadIds}). Native SQL is NOT boot-validated like JPQL, so a
+ * jsonb type-mapping regression can degrade the whole prior-conversation aspect to empty undetected.
+ * This test pins the {@code DISTINCT ON} earliest-user-message-per-thread contract, the
  * workspace-scope guard, and the jsonb-to-text projection against a real Postgres container.
  */
 class MentorAspectQueryRepositoryIntegrationTest extends BaseIntegrationTest {

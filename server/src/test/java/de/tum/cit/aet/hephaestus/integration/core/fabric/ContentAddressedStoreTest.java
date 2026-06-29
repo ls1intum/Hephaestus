@@ -86,7 +86,7 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     void get_returnsEmpty_whenBlobVanishedAfterTheExistsCheck() throws Exception {
         // The documented "no longer present" branch: a blob deleted out-of-band (sweep racing a read) must
         // read back as empty, not throw UncheckedIOException(NoSuchFileException). Deleting the file directly
-        // models the post-exists()/pre-read window the old pre-check left open.
+        // models the post-exists()/pre-read TOCTOU window.
         String sha = cas.put("ephemeral".getBytes(StandardCharsets.UTF_8));
         java.nio.file.Files.delete(cas.pathFor(sha));
 

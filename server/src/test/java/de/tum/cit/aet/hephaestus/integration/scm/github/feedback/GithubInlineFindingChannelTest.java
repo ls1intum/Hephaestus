@@ -95,7 +95,7 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
 
     @Test
     void sameAnchorFindingsAreMatchedByCkNotPathLine() {
-        // M12 guard: two findings on the SAME path:line. A path:line index would hand both the same comment id
+        // Two findings on the SAME path:line. A path:line index would hand both the same comment id
         // (corrupting the ledger external_ref). The ck-fingerprint in each returned comment body disambiguates.
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -335,9 +335,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
 
     @Test
     void blankBodyFindingDoesNotReapItsOwnStillCurrentThread() {
-        // SYSTEMIC #4 parity: a finding that is still present this run but has a blank body must NOT have its own
-        // live prior thread minimized. Its key has to register as "seen" BEFORE the blank-body skip, mirroring
-        // GitLab. Otherwise the blank-body finding silently retires its own still-current thread.
+        // A finding that is still present this run but has a blank body must NOT have its own live prior thread
+        // minimized. Its key has to register as "seen" BEFORE the blank-body skip (mirroring GitLab); otherwise
+        // the blank-body finding silently retires its own still-current thread.
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(gitHubProvider.forScope(1L)).thenReturn(client);

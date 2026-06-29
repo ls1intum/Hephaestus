@@ -39,9 +39,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     /**
      * All findings a given agent job produced — the source set the feedback ledger recorder binds to.
-     * Ordered by id so {@code get(0)} is deterministic across retries (the recorder derives the recipient,
-     * artifact, and thread key from the first row; an unordered read could re-source them differently on
-     * a re-run once multi-subject / multi-artifact jobs ship).
+     * Ordered by id so {@code get(0)} is deterministic across retries: the recorder derives the recipient,
+     * artifact, and thread key from the first row, and an unordered read could re-source them differently on
+     * a re-run of a multi-subject / multi-artifact job.
      */
     @Query("SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId ORDER BY f.id ASC")
     List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId);
@@ -146,9 +146,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p><b>Re-review dedup (ADR 0021):</b> a target gets re-detected on every push, and every run writes a
      * fresh {@link Observation} row — so a naive {@code COUNT} over all rows inflates the dashboard by the
-     * re-review multiplier (a target re-reviewed N times shows N× the findings). The dashboard must reflect each target's CURRENT state, so this query keeps only the findings
-     * from each target's LATEST detection run ({@code agent_job_id} with the most recent {@code observed_at}
-     * for that {@code (artifact_type, artifact_id)}). Superseded runs no longer count toward the habit signal.
+     * re-review multiplier (a target re-reviewed N times shows N× the findings). The dashboard reflects each
+     * target's CURRENT state, so this query keeps only the findings from each target's LATEST detection run
+     * ({@code agent_job_id} with the most recent {@code observed_at} for that
+     * {@code (artifact_type, artifact_id)}). Superseded runs do not count toward the habit signal.
      *
      * <p>Native (not JPQL) because the latest-run-per-target selection needs {@code ORDER BY ... LIMIT 1} in a
      * correlated subquery, which JPQL cannot express. Aliases are quoted so the JDBC column labels match the
@@ -278,10 +279,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
      * per finding (bounded by the page size) rather than JOIN-fetched.
      *
-     * <p>{@code NOT_APPLICABLE} is excluded: it dominates the list (the bulk are "no change needed / awaiting review" rows) and spent the page budget on findings the mentor cannot
-     * coach from, burying the actionable {@code BAD} problems and {@code GOOD} strengths. The NA total still
-     * reaches the mentor via the presence-count summary; this is the drill-down list only, and stays
-     * recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
+     * <p>{@code NOT_APPLICABLE} is excluded: it dominates the list (the bulk are "no change needed /
+     * awaiting review" rows) the mentor cannot coach from, and would bury the actionable {@code BAD} problems
+     * and {@code GOOD} strengths within the page budget. The NA total still reaches the mentor via the
+     * presence-count summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by
+     * severity) to preserve its "what happened lately" purpose.
      */
     @Query(
         value = """

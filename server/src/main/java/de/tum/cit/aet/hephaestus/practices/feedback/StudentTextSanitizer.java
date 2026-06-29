@@ -12,9 +12,8 @@ import org.jspecify.annotations.Nullable;
  * itself. This util drops the whole sentence wherever that vocabulary appears, then repairs the JSON-envelope
  * corruption the model occasionally leaks into a guidance value.
  *
- * <p>Extracted from {@code DeliveryComposer} so the read-model surfaces (dashboard / mentor) inherit the SAME
- * firewall the PR comment already has — a finding cannot reach a learner rubric-voiced on any path out
- * (SYSTEMIC firewall, audit gap #1). Idempotent and locale-safe (no naked case folding).
+ * <p>Shared across the read-model surfaces (dashboard / mentor) and the PR comment so a finding cannot
+ * reach a learner rubric-voiced on any path out. Idempotent and locale-safe (no naked case folding).
  */
 public final class StudentTextSanitizer {
 
@@ -41,9 +40,9 @@ public final class StudentTextSanitizer {
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
             "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE|PRESENT|ABSENT|GOOD|BAD)\\b|" +
-            // ADR-0022 presence/assessment rubric vocabulary the model is now prompted on. "the presence is
-            // ABSENT", "the assessment is BAD", or the tuple "(PRESENT, GOOD)" are the grader narrating the
-            // rubric to itself — drop the whole sentence.
+            // Presence/assessment rubric vocabulary: "the presence is ABSENT", "the assessment is BAD",
+            // or the tuple "(PRESENT, GOOD)" are the grader narrating the rubric to itself — drop the
+            // whole sentence.
             "\\b(?:presence|assessment)\\s+is\\s+(?:PRESENT|ABSENT|NOT[_ ]APPLICABLE|GOOD|BAD)\\b|" +
             "\\((?:PRESENT|ABSENT|NOT[_ ]APPLICABLE)\\s*,\\s*(?:GOOD|BAD)\\)|" +
             "\\b(?:DEFECT-DETECTOR|OBSERVED\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +

@@ -260,7 +260,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         long count,
         Instant lastObservedAt
     ) {
-        // Former-GOOD practices: PRESENT -> GOOD (strength), ABSENT -> BAD (problem), NA -> null.
+        // Presence-derived valence: PRESENT -> GOOD (strength), ABSENT -> BAD (problem), NA -> null.
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;

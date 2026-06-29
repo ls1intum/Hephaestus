@@ -6,9 +6,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
  * practice criteria and {@code what_good_looks_like}, so a single practice can emit both
  * {@code GOOD} and {@code BAD} observations.
  *
- * <p>NULL iff {@link Presence#NOT_APPLICABLE} (an inapplicable practice has no valence). Replaces the
- * former {@code PracticeKind} rule-direction indirection: "is this a problem?" is now simply
- * {@code assessment == BAD}, and "is this a strength?" is {@code assessment == GOOD}.
+ * <p>NULL iff {@link Presence#NOT_APPLICABLE} (an inapplicable practice has no valence). "Is this a
+ * problem?" is {@code assessment == BAD}; "is this a strength?" is {@code assessment == GOOD}.
  */
 public enum Assessment {
     /** The observation reflects well on the developer — a strength to acknowledge. */

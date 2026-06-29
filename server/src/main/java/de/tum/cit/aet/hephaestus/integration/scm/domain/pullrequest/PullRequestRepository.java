@@ -17,22 +17,15 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for PullRequest entities.
- *
- * <p>This repository contains only domain-agnostic queries for the integration.scm domain.
- * Scope-filtered queries (those that join with RepositoryToMonitor or other consuming module
- * entities) belong in the consuming packages (leaderboard, profile, practices, etc.)
- * to maintain clean architecture boundaries.
+ * Holds only domain-agnostic queries for the integration.scm domain. Scope-filtered queries (those that
+ * join with RepositoryToMonitor or other consuming-module entities) belong in the consuming packages
+ * (leaderboard, profile, practices, ...) to keep architecture boundaries clean.
  *
  * @see de.tum.cit.aet.hephaestus.profile.ProfilePullRequestQueryRepository
  */
 @Repository
 @WorkspaceAgnostic("Pull requests scoped through repository_id -> repository.workspace_id")
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
-    /**
-     * Finds a PR by repository ID and number for sync operations.
-     * Repository ID inherently has scope through Organization.
-     */
     @Query(
         """
         SELECT p
@@ -147,24 +140,9 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
 
-    /**
-     * Finds all pull requests belonging to a repository.
-     * Repository ID inherently has scope through Organization.
-     *
-     * @param repositoryId the repository ID
-     * @return list of pull requests for the repository
-     */
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
 
-    /**
-     * Finds pull requests belonging to a repository with pagination.
-     * Uses Slice for efficient batching without requiring a count query.
-     * Repository ID inherently has scope through Organization.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable pagination parameters
-     * @return slice of pull requests for the repository
-     */
+    /** Slice (rather than Page) so batching needs no count query. */
     Slice<PullRequest> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
@@ -187,15 +165,9 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     );
 
     /**
-     * Streams all pull requests belonging to a repository.
-     * Repository ID inherently has scope through Organization.
-     * <p>
-     * Must be used within a try-with-resources block to ensure the stream is closed
-     * and the database connection is released. The calling method must be annotated
-     * with @Transactional(readOnly = true) for streaming to work properly.
-     *
-     * @param repositoryId the repository ID
-     * @return stream of pull requests for the repository
+     * Streams all pull requests belonging to a repository. Must be consumed within a try-with-resources
+     * block so the stream closes and releases its connection, and the caller must be annotated
+     * {@code @Transactional(readOnly = true)} for streaming to work.
      */
     @QueryHints(@QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "50"))
     Stream<PullRequest> streamAllByRepository_Id(Long repositoryId);

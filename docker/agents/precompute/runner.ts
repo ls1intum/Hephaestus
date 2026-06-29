@@ -67,8 +67,8 @@ if (values.metadata) {
 	}
 }
 
-// Discover practice scripts — ONLY from the injected directory (from DB precomputeScript).
-// There are no baked-in practice scripts. Scripts are data, stored per-practice in the DB.
+// Practice scripts come ONLY from the injected directory (DB precomputeScript); there are no
+// baked-in scripts. Scripts are data, stored per-practice in the DB.
 const practicesDir = `${outputDir}/practices`;
 const practiceModules: [string, string][] = [];
 
@@ -82,7 +82,7 @@ if (existsSync(practicesDir)) {
 
 if (practiceModules.length === 0) {
 	console.error("No practice scripts found. Exiting.");
-	// Create minimal output so agent knows precompute ran but found nothing
+	// Minimal output so the agent knows precompute ran but found nothing.
 	await mkdir(outputDir, { recursive: true });
 	await Bun.write(
 		`${outputDir}/summary.md`,

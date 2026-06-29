@@ -426,8 +426,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(namingNote.startLine()).isEqualTo(8);
 
         // Header is the canonical emoji-INSIDE-bold form (**<emoji> <title>**): the body opens with "**"
-        // BEFORE the emoji. Pins appendFindingHeader against the old MR-list drift where the emoji sat
-        // outside the bold (`<emoji> **title**`).
+        // BEFORE the emoji. Pins appendFindingHeader against the emoji sitting outside the bold
+        // (`<emoji> **title**`).
         for (DiffNote dn : diffNotes) {
             assertThat(dn.body()).startsWith("**");
         }
@@ -1015,11 +1015,10 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_metadataFinding_dropsYouWroteEchoEntirely() {
-        // A metadata-field finding (location metadata.json) no longer echoes a "You wrote: …" quote at all:
-        // the agent's metadata span was frequently a truncated heading / single token / title==body echo / raw
-        // JSON envelope ("[Feat", "false", "Analysis Object Model (AOM)", "body": "…") that read as broken
-        // output and leaked raw fields to the student. The lesson stands on the
-        // reasoning + guidance instead.
+        // A metadata-field finding (location metadata.json) never echoes a "You wrote: …" quote: the agent's
+        // metadata span is frequently a truncated heading / single token / title==body echo / raw JSON
+        // envelope ("[Feat", "false", "Analysis Object Model (AOM)", "body": "…") that reads as broken output
+        // and leaks raw fields to the student. The lesson stands on the reasoning + guidance instead.
         ValidatedFinding f = negativeFinding(
             "mr-description-quality",
             "PR description lacks clear motivation",
@@ -1324,7 +1323,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void undesirablePracticeObservedObservationIsTreatedAsAProblem() {
-        // The assessment now lives on the finding (ADR 0022): a present bad behaviour (PRESENT, BAD) is a
+        // The assessment lives on the finding (ADR 0022): a present bad behaviour (PRESENT, BAD) is a
         // problem and surfaces an inline diff note, while the same present behaviour read as a strength
         // (PRESENT, GOOD) surfaces none — proving the partition consults assessment, not raw presence.
         JsonNode evidence = buildEvidence(
@@ -1618,8 +1617,8 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void compose_agentSuggestedDiffNote_scrubsGradingMetaFromBody() {
         // The agent's own note body is raw model output; grading-meta in it must be stripped before it reaches
-        // the student, exactly like the synthesized fallback path (regression: this branch previously bypassed
-        // sanitizeStudentText and leaked rubric vocabulary verbatim on the inline note).
+        // the student, exactly like the synthesized fallback path — this branch must not bypass
+        // sanitizeStudentText and leak rubric vocabulary verbatim on the inline note.
         DiffNote suggested = new DiffNote(
             "Views/DashboardView.swift",
             20,

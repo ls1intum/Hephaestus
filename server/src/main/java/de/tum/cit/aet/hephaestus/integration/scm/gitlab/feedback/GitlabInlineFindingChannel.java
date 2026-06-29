@@ -481,7 +481,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         }
     }
 
-    /** Signals the per-finding loop to stop and fail the rest of the batch, mirroring the prior break-on-429. */
+    /** Signals the per-finding loop to stop and fail the rest of the batch on a rate-limit hit. */
     private static final class RateLimitHit extends RuntimeException {}
 
     private static Map<String, Object> buildPosition(FindingAnchor.DiffAnchor diff, MrInfo mrInfo) {
@@ -657,7 +657,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         }
     }
 
-    /** Returns the marker shared by all findings in the batch (they originate from one parser pass). */
+    /** Appends the run-level marker to a note body; a blank marker appends nothing. */
     private static String appendMarker(String body, String marker) {
         if (marker == null || marker.isBlank()) {
             return body;

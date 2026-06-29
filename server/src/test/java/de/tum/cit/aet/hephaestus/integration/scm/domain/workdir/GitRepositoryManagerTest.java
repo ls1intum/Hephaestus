@@ -39,13 +39,11 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
         lockManager = new GitRepositoryLockManager();
 
-        // Create a source repository with some commits
         Files.createDirectories(sourceRepoPath);
     }
 
     @AfterEach
     void tearDown() throws IOException {
-        // Clean up any git repos
         if (Files.exists(storagePath)) {
             Files.walk(storagePath)
                 .sorted(Comparator.reverseOrder())
@@ -64,7 +62,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
     private Git createSourceRepo() throws GitAPIException, IOException {
         Git git = Git.init().setDirectory(sourceRepoPath.toFile()).call();
-        // Create initial commit
         Path file = sourceRepoPath.resolve("README.md");
         Files.writeString(file, "# Test Repository\n");
         git.add().addFilepattern("README.md").call();
@@ -151,10 +148,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         void shouldFetchOnSubsequentCalls() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
-                // First call - clones
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                // Add another commit to source
                 Path file = sourceRepoPath.resolve("file2.txt");
                 Files.writeString(file, "content");
                 sourceGit.add().addFilepattern("file2.txt").call();
@@ -166,11 +161,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                     .call()
                     .getName();
 
-                // Second call - fetches
                 Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
                 assertThat(result).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
-                // Verify the new commit is available
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, null, newSha);
                 assertThat(commits).hasSize(2);
             }
@@ -209,7 +202,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 String firstSha = sourceGit.log().call().iterator().next().getName();
 
-                // Add more commits
                 Path file2 = sourceRepoPath.resolve("file2.txt");
                 Files.writeString(file2, "content2");
                 sourceGit.add().addFilepattern("file2.txt").call();
@@ -234,7 +226,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, firstSha, thirdSha);
 
-                // Should include second and third commits, but not the first
                 assertThat(commits).hasSize(2);
                 assertThat(commits)
                     .extracting(GitRepositoryManager.CommitInfo::message)
@@ -266,7 +257,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 assertThat(commits).hasSize(1);
                 GitRepositoryManager.CommitInfo commit = commits.get(0);
 
-                // Initial commit adds README.md
                 assertThat(commit.fileChanges()).hasSize(1);
                 GitRepositoryManager.FileChange fileChange = commit.fileChanges().get(0);
                 assertThat(fileChange.filename()).isEqualTo("README.md");
@@ -300,7 +290,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 String firstSha = sourceGit.log().call().iterator().next().getName();
 
-                // Modify the file
                 Path readme = sourceRepoPath.resolve("README.md");
                 Files.writeString(readme, "# Updated\nNew content\n");
                 sourceGit.add().addFilepattern("README.md").call();
@@ -328,7 +317,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 String firstSha = sourceGit.log().call().iterator().next().getName();
 
-                // Delete the file
                 Files.delete(sourceRepoPath.resolve("README.md"));
                 sourceGit.rm().addFilepattern("README.md").call();
                 String secondSha = sourceGit
@@ -475,7 +463,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 String firstSha = sourceGit.log().call().iterator().next().getName();
 
-                // Add another file in a second commit
                 Path file2 = sourceRepoPath.resolve("file2.txt");
                 Files.writeString(file2, "second file content");
                 sourceGit.add().addFilepattern("file2.txt").call();
@@ -499,7 +486,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         void shouldRespectMaxTotalBytesLimit() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
-                // Add a file that exceeds a tiny limit
                 Path file = sourceRepoPath.resolve("large.txt");
                 Files.writeString(file, "a".repeat(1000));
                 sourceGit.add().addFilepattern("large.txt").call();
@@ -561,7 +547,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 String baseSha = sourceGit.log().call().iterator().next().getName();
 
-                // Create a branch and add a change
                 sourceGit.branchCreate().setName("feature").call();
                 sourceGit.checkout().setName("feature").call();
 
@@ -577,7 +562,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                // Generate diff between master and feature using commit SHAs
                 String featureSha = sourceGit.log().call().iterator().next().getName();
                 String diff = manager.generateUnifiedDiff(1L, baseSha, featureSha);
 

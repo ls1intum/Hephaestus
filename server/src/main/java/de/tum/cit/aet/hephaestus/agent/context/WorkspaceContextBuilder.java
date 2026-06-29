@@ -47,7 +47,6 @@ public class WorkspaceContextBuilder {
     /** Builds the integration-agnostic context manifest after the providers run; null in unit tests. */
     private final @Nullable ContextManifestBuilder manifestBuilder;
 
-    /** Fixed-size stripe of locks → bounded memory, no map leak as new repos are seen. */
     private final ReentrantLock[] repoLockStripes;
 
     public WorkspaceContextBuilder(

@@ -267,8 +267,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         }
     }
 
-    // Cancel endpoint tests
-
     @Test
     @WithAdminUser
     void cancelQueuedJobReturns200() {

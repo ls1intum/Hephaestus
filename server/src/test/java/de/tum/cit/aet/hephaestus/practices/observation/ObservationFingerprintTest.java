@@ -9,10 +9,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The research question ("do developers' practices change over time?") is unanswerable unless the SAME
- * underlying finding gets the SAME identity across separate detection runs. A live two-run E2E showed a
- * title-anchored key never correlated (0/26 shared) because the LLM re-words every run — so identity is
- * the {@code (practice, artifact, subject, file)} LOCUS, not the prose. These cases lock that grain and
- * what must NEVER perturb it.
+ * underlying finding gets the SAME identity across separate detection runs. A title-anchored key never
+ * correlates because the LLM re-words every run, so identity is the {@code (practice, artifact, subject,
+ * file)} LOCUS, not the prose. These cases lock that grain and what must NEVER perturb it.
  */
 class ObservationFingerprintTest extends BaseUnitTest {
 

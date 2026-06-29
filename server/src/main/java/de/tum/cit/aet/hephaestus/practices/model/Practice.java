@@ -81,8 +81,7 @@ public class Practice {
     /**
      * The artifact this practice applies to (PR vs ISSUE). The discriminator that routes the trigger
      * gate, the case-context builder, the {@code AgentJobType}/handler, and the delivery surface.
-     * NOT NULL; defaults to {@code PULL_REQUEST} for backward compatibility. Column {@code applies_to}
-     * (ADR 0022 rename).
+     * NOT NULL; defaults to {@code PULL_REQUEST}. Maps to column {@code applies_to}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "applies_to", nullable = false, length = 32)

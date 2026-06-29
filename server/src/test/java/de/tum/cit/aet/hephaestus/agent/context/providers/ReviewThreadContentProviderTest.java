@@ -192,7 +192,7 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
 
     @Test
     void contribute_moreDecisionsThanCap_keepsLatestApprove() throws Exception {
-        // A7: the repository now returns decisions newest-first (ORDER BY submittedAt DESC, id DESC). With more
+        // The repository returns decisions newest-first (ORDER BY submittedAt DESC, id DESC). With more
         // than MAX_DECISIONS rows, the consumer's truncation keeps the NEWEST — so a final superseding APPROVE
         // must survive, not be dropped behind older CHANGES_REQUESTED (which would fabricate a false
         // "merged past unresolved request-changes" finding).

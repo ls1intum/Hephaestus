@@ -312,7 +312,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
         @Test
         void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
-            // B4: the diff_summary.md parser is driven directly from an annotated diff.patch (no git needed).
+            // The diff_summary.md parser is driven directly from an annotated diff.patch (no git needed).
             String annotated =
                 "[L1] diff --git a/src/A.java b/src/A.java\n" +
                 "[L1] +line a1\n" +

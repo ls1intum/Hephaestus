@@ -108,7 +108,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             "key-" + id,
             agentJob.getId(),
             practice.getId(),
-            null, // practiceRevisionId — pre-versioning marker
+            null, // practiceRevisionId
             artifactType,
             artifactId,
             user.getId(),
@@ -125,14 +125,14 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         return id;
     }
 
-    /** Former-GOOD practice valence: PRESENT is a strength (GOOD), ABSENT is a problem (BAD). */
+    /** Presence-derived valence: PRESENT is a strength (GOOD), ABSENT is a problem (BAD). */
     private static String assessmentFor(String presence) {
         return "PRESENT".equals(presence) ? "GOOD" : "BAD";
     }
 
     /**
      * Persist a DELIVERED {@link Feedback} unit carrying {@code body} and bind it to {@code findingId}. This is
-     * the developer's advice source post-ADR-0021 (the finding itself carries no advice), so the detail/reflection
+     * the developer's advice source (ADR 0021: the finding itself carries no advice), so the detail/reflection
      * surfaces read guidance from here.
      */
     private void deliverFeedbackFor(UUID findingId, String body, Instant createdAt) {
@@ -489,7 +489,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "key-" + otherFindingId,
                 otherJob.getId(),
                 otherPractice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
@@ -666,7 +666,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 now
             );
             // Advice lives on the delivered Feedback, not the finding (ADR 0021): the detail view sources
-            // `guidance` from here.
+            // guidance from here.
             deliverFeedbackFor(findingId, "Split this PR so each change reviews on its own.", now);
 
             webTestClient
@@ -765,7 +765,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "key-" + findingId,
                 agentJob.getId(),
                 practiceA.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 50L,
                 developer.getId(),
@@ -800,9 +800,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @WithUser
         @DisplayName("returns 200 (not 500) when evidence jsonb is not an object")
         void shouldReturn200WhenEvidenceIsNotAnObject() {
-            // C5 regression: the detail mapper coerces evidence jsonb to a Map; a non-object payload (here a
-            // JSON array) would make convertValue throw -> HTTP 500 on a perfectly valid stored observation.
-            // The endpoint must return 200 with the evidence map simply absent.
+            // The detail mapper coerces evidence jsonb to a Map; a non-object payload (here a JSON array) would
+            // make convertValue throw -> HTTP 500 on a perfectly valid stored observation. The endpoint must
+            // return 200 with the evidence map simply absent.
             UUID findingId = UUID.randomUUID();
             String arrayEvidenceJson = "[{\"file\":\"README.md\",\"line\":42}]";
             observationRepository.insertIfAbsent(
@@ -810,7 +810,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "key-" + findingId,
                 agentJob.getId(),
                 practiceA.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 51L,
                 developer.getId(),
@@ -1047,7 +1047,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "key-" + ws2FindingId,
                 otherJob.getId(),
                 otherPractice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 100L,
                 developer.getId(),

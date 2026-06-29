@@ -117,7 +117,7 @@ class AgentJobServiceTest extends BaseUnitTest {
     private JobSubmission createSubmission() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("pr_number", 42);
-        // Shipped 5-segment grammar: <type>:<nameWithOwner>:<number>:<phase>:<freshness>
+        // 5-segment key grammar: <type>:<nameWithOwner>:<number>:<phase>:<freshness>
         // (PullRequestReviewHandler emits the trigger-event phase before the head SHA).
         return new JobSubmission(metadata, "pr_review:owner/repo:42:authoring:abc123");
     }
@@ -767,7 +767,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void prKeyStripsFreshnessKeepsPhase() {
-            // Shipped 5-segment PR key: <type>:<nameWithOwner>:<number>:<phase>:<sha>. Only the trailing
+            // 5-segment PR key: <type>:<nameWithOwner>:<number>:<phase>:<sha>. Only the trailing
             // SHA is stripped → cooldown scopes per (PR, phase), so an authoring re-trigger is cooled
             // down but a later merge retrospective (different phase) is NOT.
             assertThat(AgentJobService.extractCooldownKeyPrefix("pr_review:owner/repo:42:authoring:abc123")).isEqualTo(
@@ -777,7 +777,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void issueKeyStripsFreshnessKeepsPhase() {
-            // Shipped 5-segment issue key: the trailing segment is the disposable updatedAt version, the
+            // 5-segment issue key: the trailing segment is the disposable updatedAt version, the
             // 4th is the phase. A regression that dropped the freshness segment AND the phase would
             // collapse cooldown back to per-repo; pin that the (issue number, phase) scope survives.
             assertThat(

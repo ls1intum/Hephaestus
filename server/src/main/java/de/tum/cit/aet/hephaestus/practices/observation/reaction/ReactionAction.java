@@ -20,7 +20,7 @@ package de.tum.cit.aet.hephaestus.practices.observation.reaction;
  * </ul>
  *
  * <p>No {@code DISMISSED} (rejection-without-reason) or {@code ACKNOWLEDGED} ("saw it"): neither is a
- * volitional recipience act the current UI elicits, so under the "non-action = no reaction row" design they
+ * volitional recipience act the UI elicits, so under the "non-action = no reaction row" design they
  * would fabricate data rather than measure it. "Seen" belongs to {@code Feedback} delivery telemetry.
  */
 public enum ReactionAction {

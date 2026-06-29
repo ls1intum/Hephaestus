@@ -13,7 +13,7 @@
  * {@code observation.reaction}. The latter two let the {@code agent} delivery layer write the
  * delivered-feedback ledger and read reactions for re-nag suppression; the {@code observation.reaction}
  * boundary is also pinned reaction-blind for the detection context by {@code DetectionReactionFirewallTest}
- * (#895 / ADR 0021 F-9). Internal types (controllers, adapters, request DTOs) remain module-private.
+ * (ADR 0021 F-9). Internal types (controllers, adapters, request DTOs) remain module-private.
  *
  * <p>Distinct bounded context from {@link de.tum.cit.aet.hephaestus.activity} (which
  * gamifies developer actions rather than analyzing code quality).

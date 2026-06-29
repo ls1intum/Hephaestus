@@ -119,23 +119,22 @@ public class Observation {
     private Long artifactId;
 
     /**
-     * Whose conduct the finding is filed against — ALWAYS populated (ADR 0021, C2; ADR 0022 drops the
-     * redundant {@code developer} 3NF transitive dependency, leaving this the single identity): the author
-     * for author-side practices (the whole catalogue today), the reviewer for reviewer-side practices. Raw
-     * {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns
-     * scalar; the DB FK {@code sfk_observation_subject} is Liquibase-managed.
+     * Whose conduct the finding is filed against — ALWAYS populated, the single subject identity: the author
+     * for author-side practices, the reviewer for reviewer-side practices. Raw {@code Long} FK to
+     * {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns scalar; the DB FK
+     * {@code sfk_observation_subject} is Liquibase-managed.
      */
     @NotNull
     @Column(name = "about_user_id", nullable = false)
     private Long aboutUserId;
 
     /**
-     * Stable cross-run identity (ADR 0021, C2): a deterministic hash of what the finding is ABOUT
-     * (practice + target + subject + a content anchor), NEVER of when it was produced (no job id, no line
-     * number). Lets later {@code Feedback} supersede rather than re-post, and lets a reaction follow one
-     * underlying problem across re-detections — the primitive the research question's "do practices change
-     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}.
-     * Nullable: backfill-free, populated on new findings only.
+     * Stable cross-run identity: a deterministic hash of what the finding is ABOUT (practice + target +
+     * subject + a content anchor), NEVER of when it was produced (no job id, no line number). Lets a
+     * {@code Feedback} supersede rather than re-post, and lets a reaction follow one underlying problem
+     * across re-detections — the primitive the research question's "do practices change over time" depends
+     * on. Computed via {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}.
+     * Nullable.
      */
     @Column(name = "recurrence_key", length = 64)
     private String recurrenceKey;

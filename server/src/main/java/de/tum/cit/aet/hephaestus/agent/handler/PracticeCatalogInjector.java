@@ -92,7 +92,7 @@ class PracticeCatalogInjector {
         // ONLY the practices whose triggerEvents include that event — so an authoring practice is not
         // re-litigated on a fixup push (PullRequestSynchronized), a reviewer practice runs only after a
         // review exists, and a retrospective practice runs only at merge/close. A job with no trigger_event
-        // (the gate-bypass dev path / bot command) keeps the full focus set, preserving legacy behaviour.
+        // (the gate-bypass dev path / bot command) keeps the full focus set.
         String triggerEvent = triggerEventOf(job);
         if (triggerEvent != null) {
             List<Practice> matched = practices

@@ -1,7 +1,7 @@
 import { expect, loginAsDevAdmin, test } from "./fixtures";
 
 /**
- * Drives the #1011 workspace practice-detection admin UI end to end over plain http://localhost:
+ * Drives the workspace practice-detection admin UI end to end over plain http://localhost:
  * passwordless dev sign-in → workspace config renders → a policy mutation round-trips (which also
  * proves the CSRF double-submit works over http).
  *

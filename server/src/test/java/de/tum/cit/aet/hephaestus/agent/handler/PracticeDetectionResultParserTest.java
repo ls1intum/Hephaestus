@@ -327,8 +327,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
         @Test
         void legacyObservationVocabularyIsRejected() {
-            // Clean break (ADR 0022): the old OBSERVED/NOT_OBSERVED vocabulary no longer parses — it
-            // is discarded exactly like any other unknown presence.
+            // ADR 0022: the OBSERVED/NOT_OBSERVED vocabulary is not a valid presence — it is discarded
+            // exactly like any other unknown presence.
             for (String legacy : new String[] { "OBSERVED", "NOT_OBSERVED" }) {
                 ObjectNode finding = validFindingNode();
                 finding.put("presence", legacy);
@@ -581,7 +581,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             finding.put("practiceSlug", slug);
             finding.put("title", "Issue found");
             finding.put("presence", presence);
-            // error-handling is a former GOOD practice; an ABSENT gap is a BAD assessment.
+            // An ABSENT gap is a BAD assessment; any other presence here pairs with GOOD.
             finding.put("assessment", "ABSENT".equalsIgnoreCase(presence) ? "BAD" : "GOOD");
             finding.put("severity", severity);
             finding.put("confidence", 0.90);

@@ -8,9 +8,9 @@ import java.util.UUID;
  * Polymorphic request handed to {@link WorkspaceContextBuilder}. Providers narrow on the
  * variant via a sealed switch — no {@code instanceof} chains in the orchestrator.
  *
- * <p>The universal {@code AgentJob job()} accessor that previously lived on this interface
- * was removed because synchronous mentor chat ({@link MentorChatRequest}) has no
- * {@link AgentJob}. Per-variant accessors carry the variant-specific identity.
+ * <p>There is no universal {@code job()} accessor: synchronous mentor chat
+ * ({@link MentorChatRequest}) has no {@link AgentJob}. Per-variant accessors carry the
+ * variant-specific identity instead.
  */
 public sealed interface ContextRequest
     permits ContextRequest.PracticeReviewRequest, ContextRequest.IssueReviewRequest, ContextRequest.MentorChatRequest

@@ -20,7 +20,7 @@ public final class WorkspaceAbi {
     //   inputs/  — EVERYTHING the agent may only read (the path-guard whitelists exactly this subtree)
     //   work/    — scratch the agent + precompute write during the run; NEVER collected
     //   out/     — the ONLY directory collected back into SQL
-    //   .pi/     — the Pi SDK runtime home (vendor dir; left as-is for now)
+    //   .pi/     — the Pi SDK runtime home (vendor dir)
 
     /** Workspace-relative prefix for the read-only input subtree (the only region the path-guard whitelists). */
     public static final String INPUTS_PREFIX = "inputs/";

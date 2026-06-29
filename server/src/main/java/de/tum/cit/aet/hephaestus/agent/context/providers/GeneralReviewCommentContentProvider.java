@@ -31,8 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code IssueComment}). No PR-scoped provider ever surfaced those, so the reviewer-craft practices
  * (reviews-substantively, leaves-useful, engaging, reviews-respectfully) saw an empty inline thread
  * and either abstained or — worse — fired a confident "rubber-stamp" NEGATIVE on an APPROVED MR
- * whose real review lived entirely in the conversation tab. A mentor calling a genuinely substantive
- * review a rubber-stamp in front of a student is worse than silence.
+ * whose real review lived entirely in the conversation tab.
  *
  * <p>This provider reads the MR's general comments by issue/PR id (a {@code PullRequest} IS an
  * {@code Issue}, so its conversation notes are {@code IssueComment} rows keyed by the same id) and

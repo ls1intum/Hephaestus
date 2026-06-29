@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Loads the reviewable SCM artifact (pull request or issue) a job targets, each with the eager-fetch
- * graph its review path needs. Extracted from {@code AgentJobService} so "which artifact is this job
- * about" has one home and the service's dependency surface stays within the god-class budget.
+ * graph its review path needs. Keeping "which artifact is this job about" here gives it one home and
+ * keeps {@code AgentJobService}'s dependency surface within the god-class budget.
  */
 @Component
 class ReviewableArtifactLoader {

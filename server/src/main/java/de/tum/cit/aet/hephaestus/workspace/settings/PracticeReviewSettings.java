@@ -12,8 +12,8 @@ import org.jspecify.annotations.Nullable;
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
  *
  * <p>Every field is <strong>nullable</strong> on purpose: {@code null} means "inherit the fleet
- * default" ({@code hephaestus.practice-review.*}), so the migration is zero-behavior-change. Read
- * via the {@code resolveX(fallback)} accessors, passing the property default as the fallback.
+ * default" ({@code hephaestus.practice-review.*}). Read via the {@code resolveX(fallback)}
+ * accessors, passing the property default as the fallback.
  *
  * <p>PATCH {@code null} means "no change"; to reset a previously-set field back to inherit, name it
  * in the PATCH {@code reset} set (see {@link #reset(java.util.Set)}).
@@ -78,9 +78,9 @@ public class PracticeReviewSettings {
             return;
         }
         for (PracticeReviewField field : fields) {
-            // Switch EXPRESSION (not statement) so the compiler forces a new PracticeReviewField constant to
-            // be handled here — a statement switch would silently no-op the new field. The yielded value is
-            // unused; the exhaustiveness check is the point.
+            // Switch EXPRESSION (not statement) so the compiler forces every PracticeReviewField constant to
+            // be handled here — a statement switch would silently no-op an unhandled field. The yielded value
+            // is unused; the exhaustiveness check is the point.
             boolean ignored = switch (field) {
                 case RUN_FOR_ALL_USERS -> {
                     this.runForAllUsers = null;

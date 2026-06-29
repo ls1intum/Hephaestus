@@ -19,11 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
  * intercepted"</i>). Combined with {@code spring.jpa.open-in-view=false}, the annotation looks
  * load-bearing in the code but actually does nothing.
  *
- * <p>The fix was to move {@code @Transactional(readOnly = true)} from each provider's helper
- * {@code buildPayload(...)} to {@code contribute(...)}, which IS the external entry point
- * {@code WorkspaceContextBuilder} calls through the proxy. These rules pin that fix so a future
- * refactor that moves the annotation back onto the helper fails at architecture-test time
- * instead of at runtime via {@code LazyInitializationException} on the SSE wire.
+ * <p>{@code @Transactional(readOnly = true)} therefore belongs on {@code contribute(...)} — the
+ * external entry point {@code WorkspaceContextBuilder} calls through the proxy — never on the
+ * helper {@code buildPayload(...)}. These rules pin that placement so a refactor that moves the
+ * annotation onto the helper fails at architecture-test time instead of at runtime via
+ * {@code LazyInitializationException} on the SSE wire.
  */
 class MentorAspectProviderArchitectureTest extends HephaestusArchitectureTest {
 

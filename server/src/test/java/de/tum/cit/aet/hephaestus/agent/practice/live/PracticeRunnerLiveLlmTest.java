@@ -39,9 +39,9 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
  *
- * <p>Layer A coverage (per Audit 3): exercises Pi SDK ↔ LLM, the runner's two-attempt loop,
- * watchdog, custom {@code report_finding} tool, and the result schema the runner emits — all
- * without Docker. The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
+ * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
+ * {@code report_finding} tool, and the result schema the runner emits — all without Docker.
+ * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
  * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the {@code tum-openai}
  * extension that bends Pi's built-in {@code openai} provider toward the TUM gateway (Pi does not
@@ -282,8 +282,8 @@ class PracticeRunnerLiveLlmTest {
         // Copy the production runner verbatim — same bytes that ship to the agent container.
         Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.mjs"), StandardCopyOption.REPLACE_EXISTING);
 
-        // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses
-        // now that PI_CODING_AGENT_DIR points inside the workspace.
+        // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses,
+        // with PI_CODING_AGENT_DIR pointed inside the workspace.
         Path piDir = WORKSPACE.resolve(WorkspaceAbi.PI_AGENT_PREFIX);
         Files.createDirectories(piDir);
         Files.copy(

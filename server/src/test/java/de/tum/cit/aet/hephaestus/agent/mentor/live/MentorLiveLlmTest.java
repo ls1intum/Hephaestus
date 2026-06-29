@@ -221,11 +221,9 @@ class MentorLiveLlmTest {
 
         // Persistence snapshot
         // partsSnapshot is what lands in chat_message.parts JSONB — a single text part once the
-        // turn closes. Asserts that closeTextBlock() actually flushed our text into the array.
-        // Note: AI SDK's UIMessage has the text part populated on `text-end`. Pi emits agent_end
-        // but the translator only closes the open block on agent_end. So the snapshot here may
-        // not yet contain the text part if the translator hasn't seen the finishing block-close.
-        // We assert the *intent* (parts is well-formed JSON) and check the buffered text matches.
+        // turn closes. The text part is only populated on the block-close the translator emits at
+        // agent_end, so the snapshot may not yet carry it; assert parts is well-formed JSON and,
+        // when present, that the buffered text matches.
         var partsSnapshot = state.partsSnapshot();
         assertThat(partsSnapshot.isArray()).isTrue();
         // AI SDK reducer pushes one `step-start` per start-step, then content parts. Find the
@@ -290,12 +288,11 @@ class MentorLiveLlmTest {
     @Test
     @DisplayName("5-turn coherence: each follow-up references the prior turn correctly")
     void multiTurn_fiveTurnsCoherent() throws Exception {
-        // High-confidence regression for the multi-turn fragmentation bug the user originally
-        // reported (chat-log screenshot: each follow-up returned a shrinking tail of turn 1).
-        // We drive five sequential turns on the SAME warm runner with a question that REQUIRES
-        // the LLM to integrate turn N-1's answer into turn N's. If agent._state.messages
-        // threading regresses anywhere along the chain, at least one turn's answer becomes
-        // incoherent and the assertion catches it.
+        // Regression guard for multi-turn fragmentation (each follow-up returning a shrinking
+        // tail of turn 1). Drive five sequential turns on the SAME warm runner with a question
+        // that REQUIRES the LLM to integrate turn N-1's answer into turn N's. If
+        // agent._state.messages threading regresses anywhere along the chain, at least one
+        // turn's answer becomes incoherent and the assertion catches it.
         //
         // The chain: build a list one item per turn. Turn 5 asks for the full list. This
         // requires the LLM to have seen every prior assistant message AND its own prior
@@ -577,7 +574,7 @@ class MentorLiveLlmTest {
         );
 
         // Use the REAL production PiRuntimeFactory paths so this test fails the moment the
-        // factory regresses (e.g. C1's provider refactor breaking the env-var contract).
+        // factory regresses (e.g. a provider refactor breaking the env-var contract).
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
         PiPlanSpec spec = new PiPlanSpec(
             LlmProvider.OPENAI,
@@ -678,9 +675,8 @@ class MentorLiveLlmTest {
         Map<String, String> env = pb.environment();
         env.putAll(creds.asProcessEnv()); // OPENAI_API_KEY + OPENAI_BASE_URL (legacy back-compat)
         // The production hephaestus-provider extension reads these env vars; mirror what
-        // LlmProxyAuthShell would set in API_KEY mode with a non-blank baseUrl. If C1 regressed,
-        // the extension throws "needs PI_HEPHAESTUS_BASE_URL" at session start and this test
-        // fails loud.
+        // LlmProxyAuthShell would set in API_KEY mode with a non-blank baseUrl. Without them the
+        // extension throws "needs PI_HEPHAESTUS_BASE_URL" at session start and this test fails loud.
         env.put("PI_HEPHAESTUS_BASE_URL", creds.baseUrl());
         env.put("PI_HEPHAESTUS_API_KEY", creds.apiKey());
         env.put("PI_HEPHAESTUS_MODEL", creds.model());

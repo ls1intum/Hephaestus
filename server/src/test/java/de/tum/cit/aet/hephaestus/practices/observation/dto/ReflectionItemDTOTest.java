@@ -63,8 +63,8 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     @Test
     @DisplayName("C2: a genuine repo file under the inputs/sources/scm/repo mount is repo-relativized, not suppressed")
     void repoMountedUserCodeIsRepoRelativeNotInternal() {
-        // Before the fix, startsWith("inputs/") wrongly nulled the locator for real user code mounted under
-        // inputs/sources/scm/repo/. Now the mount prefix is stripped FIRST, so the path renders openable.
+        // Real user code mounted under inputs/sources/scm/repo/ must have the mount prefix stripped FIRST,
+        // so the path renders openable rather than being misclassified as internal "inputs/" plumbing.
         var item = ReflectionItemDTO.from(
             finding(
                 "{\"locations\":[{\"path\":\"inputs/sources/scm/repo/client/App/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"

@@ -756,10 +756,9 @@ function handleFetchContextResponse(frame) {
             pending.reject(err);
         } else {
             // Pi tool results accept `content: [{type:"text", text: string}]` (verified against
-            // pi-mono SDK tool-result type). When Java returns a JSON object we stringify ONCE;
-            // if it returned a plain string we pass it through untouched. The earlier code
-            // double-stringified strings ("\"foo\"" → "\\\"foo\\\""), which leaked an extra
-            // layer of JSON escaping into the LLM prompt.
+            // pi-mono SDK tool-result type). When Java returns a JSON object we stringify ONCE; a
+            // plain string passes through untouched. Double-stringifying a string ("\"foo\"" →
+            // "\\\"foo\\\"") would leak an extra layer of JSON escaping into the LLM prompt.
             const content = frame.result?.content;
             let text =
                 content == null
@@ -840,8 +839,8 @@ async function runWatchdogRebind(state) {
         // invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
         // If a DIFFERENT thread is currently bound, tear down its subscription first; otherwise
         // the rebind silently steals the runtime and leaks the prior subscription. After a
-        // successful switchSession the runtime is now bound to OUR sessionPath, so update
-        // activeThreadId; the prior code left the invariant stale after a watchdog rebind.
+        // successful switchSession the runtime is bound to OUR sessionPath, so activeThreadId
+        // must be updated to match or the invariant goes stale.
         if (runtime) {
             try {
                 if (activeThreadId && activeThreadId !== state.threadId) {
@@ -1101,10 +1100,10 @@ function start() {
         }
     }
     announceReady();
-    // SDK prewarm is intentionally NOT triggered here — it now fires inside handleHello
-    // after the reply is written. Pi SDK module evaluation is synchronous (~300-400 ms) and
-    // would block hello until it completes. Firing it post-hello lets the reply land
-    // instantly and the load runs while Java orchestrates open_thread.
+    // SDK prewarm is intentionally NOT triggered here — it fires inside handleHello after the
+    // reply is written. Pi SDK module evaluation is synchronous (~300-400 ms) and would block
+    // hello until it completes. Firing it post-hello lets the reply land instantly and the load
+    // runs while Java orchestrates open_thread.
 }
 
 start();

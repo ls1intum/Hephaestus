@@ -1,6 +1,6 @@
-// Unit tests for the version-controlled precompute scripts' classification logic. Converts the
-// validate.ts eyeball harness into a CI gate: stages each real script next to a symlinked lib/
-// (exactly as the runner does), imports it, and asserts on its metrics/directions output.
+// Unit tests for the version-controlled precompute scripts' classification logic. Stages each real
+// script next to a symlinked lib/ (exactly as the runner does), imports it, and asserts on its
+// metrics/directions output.
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -106,7 +106,7 @@ describe("branches-from-the-integration-branch", () => {
 		expect(result.metrics.targetIsIntegration).toBe(1);
 		const text = result.directions.join(" ");
 		expect(text).toContain("conventional integration branch");
-		// The pre-framing phrasing was removed — it must not steer the verdict.
+		// Directions state the bare fact; they must not pre-frame or steer the verdict.
 		expect(text).not.toContain("signal is FALSE");
 		expect(text).not.toContain("Decide the observation");
 	});

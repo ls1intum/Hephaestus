@@ -129,14 +129,12 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        // Create developer
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
         developer = TestUserFactory.createUser(200L, "test-pr-author", provider);
         developer = userRepository.save(developer);
 
-        // Create repository
         Repository repo = new Repository();
         repo.setNativeId(1001L);
         repo.setProvider(provider);
@@ -146,7 +144,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         repo.setDefaultBranch("main");
         repo = repositoryRepository.save(repo);
 
-        // Create PR via upsertCore
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
             5001L,
@@ -183,10 +180,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             null,
             null // mergeCommitSha
         );
-        // Look up the PR ID
         prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 42).orElseThrow().getId();
 
-        // Set metadata on job
         ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
         metadata.put("pull_request_id", prId);
         agentJob.setMetadata(metadata);

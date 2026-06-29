@@ -184,8 +184,7 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         // A DELETED note surfaces as a TOP-LEVEL GraphQL error (the global id resolves to nothing), NOT a
         // mutation-payload error — GitLab returns no `updateNote` object at all. Without this check the
         // deleted-note case falls through to the no-id branch below and is mis-read as TRANSIENT, so an
-        // orphaned summary (e.g. after a mirror re-import wipes the old note) never gets re-posted. Confirmed
-        // live: a re-review tried to edit a 404 note, logged "transient", and silently dropped the summary.
+        // orphaned summary (e.g. after a mirror re-import wipes the old note) never gets re-posted.
         List<String> topLevelErrors = response
             .getErrors()
             .stream()

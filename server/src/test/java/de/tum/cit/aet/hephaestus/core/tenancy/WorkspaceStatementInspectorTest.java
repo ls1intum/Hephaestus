@@ -257,8 +257,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     void pkPredicateDisjoinedWithOrStillEnforced() {
         // The PK-only fast path tolerates extra CONJUNCTIVE predicates, but a DISJUNCTION broadens the
         // result set past the single keyed row — "WHERE id = ? OR is_public = true" returns every public
-        // row regardless of the key. That must NOT bypass enforcement. (This is the SELECT-with-OR
-        // direction that actually leaks; the prior tests only guarded the no-PK and DELETE directions.)
+        // row regardless of the key. That must NOT bypass enforcement.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("practice")).thenReturn(true);
         String sql = "select p1_0.id from practice p1_0 where p1_0.id=? or p1_0.is_public=true";

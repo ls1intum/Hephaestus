@@ -38,10 +38,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <h2>Design</h2>
  *
- * <p>This is <b>DESIGN B</b> from the review item. The backfill in changeSet {@code -60} runs once,
+ * <p>The backfill in changeSet {@code -60} runs once,
  * at boot, against whatever {@code observation} rows already exist — and in a fresh Testcontainers
  * boot there are none, so the live boot exercises the SQL over an empty table. Stopping the
- * composite production changelog mid-stream at an exact changeset (DESIGN A) is fragile: the full
+ * composite production changelog mid-stream at an exact changeset is fragile: the full
  * {@code master.xml} is 600+ changesets across 20 files, the transient {@code practice.polarity}
  * column defaults every row to {@code DESIRABLE} anyway (so an {@code UNDESIRABLE} case would still
  * have to be hand-set), and Liquibase's update-to-count semantics span the whole composite log.

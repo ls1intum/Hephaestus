@@ -202,7 +202,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     }
 
     private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey) {
-        // Former GOOD practice: PRESENT->GOOD (strength), ABSENT->BAD (gap), NA->null.
+        // Assessment mapping: PRESENT->GOOD (strength), ABSENT->BAD (gap), NA->null.
         Assessment assessment =
             presence == Presence.NOT_APPLICABLE
                 ? null

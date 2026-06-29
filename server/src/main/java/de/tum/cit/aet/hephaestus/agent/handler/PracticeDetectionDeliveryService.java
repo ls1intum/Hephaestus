@@ -81,14 +81,12 @@ public class PracticeDetectionDeliveryService {
      */
     @Transactional
     public DeliveryResult deliver(AgentJob job, List<ValidatedFinding> validFindings) {
-        // Extract IDs from job metadata
-        Long workspaceId = job.getWorkspace().getId(); // Safe: Hibernate proxy returns FK without init
+        Long workspaceId = job.getWorkspace().getId(); // Hibernate proxy returns the FK without initialization
         JsonNode metadata = job.getMetadata();
         if (metadata == null) {
             throw new JobDeliveryException("Missing job metadata: jobId=" + job.getId());
         }
 
-        // Load practice catalog for this workspace
         Map<String, Practice> practicesBySlug = practiceRepository
             .findByWorkspaceIdAndActiveTrue(workspaceId)
             .stream()
@@ -112,7 +110,6 @@ public class PracticeDetectionDeliveryService {
         WorkArtifact artifactType = target.type();
         Long artifactId = target.id();
 
-        // Persist findings
         int inserted = 0;
         int discardedUnknownSlug = 0;
         int discardedDuplicate = 0;
@@ -133,7 +130,6 @@ public class PracticeDetectionDeliveryService {
         for (int i = 0; i < validFindings.size(); i++) {
             ValidatedFinding finding = validFindings.get(i);
 
-            // Check slug against workspace practices
             Practice practice = practicesBySlug.get(finding.practiceSlug());
             if (practice == null) {
                 discardedUnknownSlug++;
@@ -145,11 +141,10 @@ public class PracticeDetectionDeliveryService {
                 continue;
             }
 
-            // Build idempotency key — includes index to allow multiple findings per practice
+            // The index disambiguates multiple findings for the same practice on one artifact.
             String idempotencyKey =
                 finding.practiceSlug() + ":" + i + ":" + artifactType.name() + ":" + artifactId + ":" + job.getId();
 
-            // Serialize evidence
             String evidenceJson = null;
             if (finding.evidence() != null) {
                 try {
@@ -175,7 +170,6 @@ public class PracticeDetectionDeliveryService {
             );
             findingFingerprints.put(finding, findingFingerprint);
 
-            // Insert (idempotent)
             Long practiceRevisionId = revisionByPractice.computeIfAbsent(practice.getId(), pid ->
                 practiceRevisionRepository
                     .findFirstByPracticeIdOrderByRevisionNumberDesc(pid)
@@ -214,9 +208,8 @@ public class PracticeDetectionDeliveryService {
             } else {
                 discardedDuplicate++;
             }
-            // Track problem findings based on assessment, not insert result.
-            // Critical for retry delivery: on retry, insertIfAbsent returns 0 for existing
-            // findings, but we still need correct hasNegative for the delivery gate.
+            // Gate on the assessment, not the insert result: a retry's insertIfAbsent returns 0 for an
+            // already-persisted finding, yet hasNegative must still reflect it for the delivery gate.
             if (finding.assessment() == Assessment.BAD) {
                 hasNegative = true;
             }
@@ -231,7 +224,6 @@ public class PracticeDetectionDeliveryService {
             job.getId()
         );
 
-        // Publish completion event
         eventPublisher.publishEvent(
             new PracticeDetectionCompletedEvent(
                 job.getId(),

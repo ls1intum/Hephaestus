@@ -19,8 +19,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // filterByDiffScope
-
     @Nested
     class FilterByDiffScope {
 

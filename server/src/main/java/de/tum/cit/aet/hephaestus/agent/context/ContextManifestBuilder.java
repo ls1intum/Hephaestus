@@ -22,10 +22,8 @@ import tools.jackson.databind.node.ObjectNode;
  * ({@code path}, producing {@code connector}, size, and a content-addressed {@code sha256}) so the agent
  * — and any future connector — sees a single entry point regardless of which integration produced the
  * bytes. Every byte is also written to the {@link ContentAddressedStore}, which deduplicates identical
- * context across jobs and records a content-addressed provenance hash per entry. (A reader that validates
- * agent citations against these hashes — "you cannot cite a source whose sha is absent" — is a follow-up;
- * today the sha is recorded but not yet enforced.) The same manifest is persisted under
- * {@code jobs/{jobId}/} for replay.
+ * context across jobs and records a content-addressed provenance hash per entry. The same manifest is
+ * persisted under {@code jobs/{jobId}/} for replay.
  *
  * <p>Best-effort: a manifest failure is logged, never thrown — context building must not break on it.
  */

@@ -11,8 +11,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * Pins that the dev-trigger carve-out is a SINGLE shared matcher object. Both the authorize
  * {@code permitAll} rule and the {@code requiresCsrf} skip reference {@link SecurityConfig#DEV_TRIGGER_MATCHER},
- * so they cannot drift apart (the divergence risk that motivated replacing raw {@code getServletPath()}
- * string-prefix gating).
+ * so they cannot drift apart.
  */
 class SecurityConfigSharedMatcherTest extends BaseUnitTest {
 

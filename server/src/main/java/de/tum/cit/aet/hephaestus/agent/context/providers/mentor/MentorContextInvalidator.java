@@ -39,8 +39,8 @@ public class MentorContextInvalidator {
         "mentor_workspace_aspect",
         "mentor_findings_aspect",
         "mentor_practice_standing_aspect",
-        // C11: the authored-work aspect (RecentAuthoredWorkAspectProvider) is also keyed per
-        // workspaceId:developerId and goes stale on the same PR/issue/review events — it was missing here.
+        // The authored-work aspect (RecentAuthoredWorkAspectProvider) is keyed per
+        // workspaceId:developerId and goes stale on the same PR/issue/review events.
         "mentor_authored_work_aspect"
     );
 
@@ -126,10 +126,9 @@ public class MentorContextInvalidator {
     }
 
     /**
-     * A completed detection run persisted new observations for this developer (C11): the findings-history and
-     * practice-standing aspects are now stale and would otherwise lie until their TTL. Evict the two
-     * detection-dependent per-user caches for the evaluated developer. The event carries only scalars, so no
-     * transaction is needed.
+     * A completed detection run persists new observations for this developer, staling the findings-history and
+     * practice-standing aspects (they would otherwise lie until their TTL). Evict the two detection-dependent
+     * per-user caches for the evaluated developer. The event carries only scalars, so no transaction is needed.
      */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

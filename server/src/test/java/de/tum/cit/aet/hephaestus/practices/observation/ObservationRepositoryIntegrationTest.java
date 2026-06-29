@@ -104,7 +104,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "key-1",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 42L,
                 aboutUser.getId(),
@@ -143,7 +143,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "dup-key",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 1L,
                 aboutUser.getId(),
@@ -163,7 +163,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "dup-key",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 2L,
                 aboutUser.getId(),
@@ -193,7 +193,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "evidence-key",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 99L,
                 aboutUser.getId(),
@@ -230,7 +230,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "purge-key",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 1L,
                 aboutUser.getId(),
@@ -279,7 +279,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ws-a-key",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 1L,
                 aboutUser.getId(),
@@ -299,7 +299,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ws-b-key",
                 agentJobB.getId(),
                 practiceB.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 2L,
                 aboutUser.getId(),
@@ -345,7 +345,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "cascade-key-1",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 1L,
                 aboutUser.getId(),
@@ -365,7 +365,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "cascade-key-2",
                 agentJob.getId(),
                 otherPractice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 2L,
                 aboutUser.getId(),
@@ -534,7 +534,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "iso-2",
                 otherJob.getId(),
                 otherPractice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 2L,
                 aboutUser.getId(),
@@ -594,7 +594,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "contrib-iso-2",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 2L,
                 otherAboutUser.getId(),
@@ -630,7 +630,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 idempotencyKey,
                 agentJob.getId(),
                 targetPractice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 1L,
                 aboutUser.getId(),
@@ -782,7 +782,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "tt-roundtrip",
                 agentJob.getId(),
                 practice.getId(),
-                null, // practiceRevisionId — pre-versioning marker
+                null, // practiceRevisionId
                 "PULL_REQUEST",
                 1L,
                 aboutUser.getId(),

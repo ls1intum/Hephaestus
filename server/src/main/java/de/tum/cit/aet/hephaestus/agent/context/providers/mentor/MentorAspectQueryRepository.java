@@ -25,8 +25,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
      * Single-round-trip snapshot of every counter {@code UserAspectProvider} needs. The JPQL
      * anchors on {@code User} so the constructor expression evaluates exactly once (one row
      * by PK); each bucket is a {@code COALESCE((SELECT …), 0L)} so the projected longs are
-     * never null. Collapses what used to be nine separate {@code SELECT COUNT(...)}
-     * round-trips (one per metric) into one statement.
+     * never null. The nine metric counts ride in one statement rather than one round trip each.
      */
     @Query(
         """
@@ -163,17 +162,16 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
     // Findings aspect — reviews received in window
 
     /**
-     * Earliest USER-role message per thread for a batch of thread ids. One round trip instead of
-     * the N-trips loop the previous `firstUserMessagePreview(threadId)` did. Native because
-     * Postgres `DISTINCT ON` is the cheapest path; equivalent JPQL would need a correlated
+     * Earliest USER-role message per thread for a batch of thread ids, in one round trip. Native because
+     * Postgres {@code DISTINCT ON} is the cheapest path; equivalent JPQL would need a correlated
      * subquery for every thread anyway. Joins {@code chat_thread} on {@code workspace_id} so the
      * query refuses cross-tenant ids the caller might pass — defence in depth even though the
      * upstream id list is already user-scoped.
      *
      * <p>{@code m.parts::text} casts the {@code jsonb} column to text so the projection element is a plain
      * String the caller parses with {@code readTree}. Selecting the raw {@code jsonb} into an untyped
-     * {@code Object[]} made Hibernate apply its JSON Java-type and throw "JSON deserialize failed for String
-     * … from Array" — which silently degraded the whole prior-conversation aspect to empty.
+     * {@code Object[]} makes Hibernate apply its JSON Java-type and throw "JSON deserialize failed for String
+     * … from Array", silently degrading the prior-conversation aspect to empty.
      *
      * <p><b>Precondition:</b> {@code threadIds} MUST be non-empty. The native {@code IN (:threadIds)}
      * expands to invalid {@code IN ()} SQL (a Postgres syntax error) for an empty list, so callers must

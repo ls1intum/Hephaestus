@@ -27,10 +27,10 @@ export default async function (
 	const isDiscussion =
 		labels.some((l) => /support|question|discussion/.test(l)) || (/\?\s*$/.test(title) && body.length < 120);
 
-	// Empty-or-title-echo gate — the SAME blunt classification fact the well-engineered sibling
-	// (issue-has-checkable-outcome) keys its observation off. When the body carries no content of its own, there is
-	// NO deliverable to scope, so the practice is NOT_APPLICABLE — never a PRESENT, GOOD reading off the title alone. Kept
-	// byte-aligned with the sibling's computation on purpose (precompute scripts ship as standalone DB rows).
+	// Empty-or-title-echo gate — the SAME classification fact issue-has-checkable-outcome keys its observation
+	// off. When the body carries no content of its own, there is NO deliverable to scope, so the practice is
+	// NOT_APPLICABLE — never a PRESENT, GOOD reading off the title alone. Kept byte-aligned with the sibling's
+	// computation on purpose (precompute scripts ship as standalone DB rows).
 	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 	const titleNorm = norm(title);
 	const bodyNorm = norm(body);

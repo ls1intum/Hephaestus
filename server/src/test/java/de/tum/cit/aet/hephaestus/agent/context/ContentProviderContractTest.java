@@ -23,9 +23,9 @@ import org.junit.jupiter.api.Test;
  * pre-renders a observation is, by definition, code in the wrong layer — this test makes that structural.
  *
  * <p>Scope: the SCM-side providers under {@code agent.context.providers} (the mentor aspect providers under
- * {@code providers.mentor} are core-native projections, out of scope). The bright line that motivated this:
- * {@code TestPresenceContentProvider} / {@code BranchGraphContentProvider} computed practice-shaped features
- * from the mounted worktree and were deleted; they must never come back.
+ * {@code providers.mentor} are core-native projections, out of scope). A connector that computes
+ * practice-shaped features from the mounted worktree (as {@code TestPresenceContentProvider} /
+ * {@code BranchGraphContentProvider} would) is the Transform-in-the-wrong-layer this test forbids.
  */
 class ContentProviderContractTest extends BaseUnitTest {
 
@@ -72,9 +72,9 @@ class ContentProviderContractTest extends BaseUnitTest {
     @Test
     @DisplayName("no SCM provider re-introduces a practice-shaped derived aggregate (supersession is the agent's job)")
     void noProviderEmitsADerivedAggregate() throws IOException {
-        // ReviewThreadContentProvider once pre-computed a lossy supersession gate inside an EXTRACT+LOAD
-        // connector (changesRequestedUnaddressed). It was removed in favour of raw rows + submittedAt so the
-        // agent computes supersession. This guards the surviving providers against the aggregate creeping back.
+        // A supersession gate (changesRequestedUnaddressed) is a lossy derived aggregate: an EXTRACT+LOAD
+        // connector must emit raw rows + submittedAt and let the agent compute supersession itself, never
+        // pre-compute the gate. Guards the SCM providers against that aggregate creeping in.
         for (Path provider : scmProviderSources()) {
             String src = Files.readString(provider, StandardCharsets.UTF_8);
             for (String bannedAggregate : List.of("changesRequestedUnaddressed", "countUnaddressedChangesRequested")) {

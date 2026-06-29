@@ -222,7 +222,7 @@ public class MentorChatService {
             // take several seconds and the user otherwise stares at a blank screen. Mark the
             // translator started here so it suppresses the duplicate Start it would otherwise
             // emit on Pi's first message_start; the translator still fires StartStep per
-            // assistant message (translator now decouples the two — see handleMessageStart).
+            // assistant message (the two are decoupled — see handleMessageStart).
             channel.send(new UIMessageChunk.Start(assistantMessageId, null));
             state.markStarted();
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
@@ -533,7 +533,7 @@ public class MentorChatService {
     /**
      * Resolve the LLM config the mentor should use. Prefers the workspace's explicitly bound
      * {@code mentor_config_id}; if it is unset, foreign, or disabled, falls back to the oldest
-     * enabled config (deterministic — replaces the previous nondeterministic {@code findFirst()}).
+     * enabled config (id-ordered, so the fallback is deterministic).
      *
      * <p>Deliberate asymmetry with practice detection ({@code AgentJobService.resolvePracticeConfigs}):
      * a disabled <em>mentor</em> binding FALLS BACK (the mentor must stay answerable mid-conversation),

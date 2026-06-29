@@ -165,12 +165,12 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
             node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", o.getConfidence());
             node.put("observedAt", o.getObservedAt().toString());
-            // Scrub the raw model reasoning through the SAME firewall the SCM composer uses before it reaches
-            // the mentor (audit gap #1): the detection model echoes its grading vocabulary (rubric bands,
-            // presence/assessment tuples, bucket arithmetic) into reasoning, and shipping it un-scrubbed lets
-            // the mentor quote rubric mechanics back at the student. Advice/guidance is NOT on the observation
-            // (ADR 0021) — the mentor receives the sanitised delivered feedback body via
-            // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it.
+            // Scrub the raw model reasoning through the same firewall the SCM composer uses before it reaches
+            // the mentor: the detection model echoes its grading vocabulary (rubric bands, presence/assessment
+            // tuples, bucket arithmetic) into reasoning, and shipping it un-scrubbed lets the mentor quote
+            // rubric mechanics back at the student. Advice/guidance is NOT on the observation (ADR 0021) — the
+            // mentor receives the sanitised delivered feedback body via DeliveredFeedbackAspectProvider, so
+            // re-deriving advice here would duplicate it.
             node.put("reasoning", StudentTextSanitizer.sanitize(o.getReasoning()));
         }
 

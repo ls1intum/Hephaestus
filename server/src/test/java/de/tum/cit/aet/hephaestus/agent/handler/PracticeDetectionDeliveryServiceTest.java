@@ -88,16 +88,13 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             objectMapper
         );
 
-        // Create test workspace
         Workspace workspace = new Workspace();
         ReflectionTestUtils.setField(workspace, "id", 1L);
 
-        // Create test practice
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
 
-        // Create test job
         testJob = new AgentJob();
         ReflectionTestUtils.setField(testJob, "id", UUID.randomUUID());
         testJob.setWorkspace(workspace);
@@ -105,7 +102,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         metadata.put("pull_request_id", 456L);
         testJob.setMetadata(metadata);
 
-        // Create test PR with author
         testAuthor = new User();
         ReflectionTestUtils.setField(testAuthor, "id", 789L);
         testAuthor.setLogin("developer");

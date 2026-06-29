@@ -271,9 +271,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     /**
-     * A2: a mid-batch rate limit must NOT reap still-current threads. The un-processed remainder never
+     * A mid-batch rate limit must NOT reap still-current threads. The un-processed remainder never
      * registered its key in seenKeys, so destroyVanishedThreads would see a still-current finding as
-     * "vanished" and delete its live thread. The fix skips the destroy entirely on a rate-limited run.
+     * "vanished" and delete its live thread; the destroy is skipped entirely on a rate-limited run.
      */
     @Test
     void rateLimitMidBatchDoesNotDeleteStillCurrentThreads() {
@@ -324,11 +324,6 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         verify(destroySpec).variable("noteId", "gid://Note/A");
         verify(destroySpec, never()).variable("noteId", "gid://Note/B");
     }
-
-    /**
-     * A prior bot thread that lives on discussion page 2 must still be matched and edited in place — the read
-     * pages on {@code discussions.pageInfo}. A single-page read would miss it and re-post a duplicate.
-     */
 
     /**
      * Two findings in one batch carrying the SAME non-null recurrenceKey (a fingerprint that escaped upstream

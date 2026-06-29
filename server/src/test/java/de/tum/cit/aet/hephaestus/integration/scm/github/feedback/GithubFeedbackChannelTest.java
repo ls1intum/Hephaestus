@@ -125,7 +125,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummary_editsInPlace_returnsEdited() {
-        // C3: GitHub re-review must edit the persistent summary in place (updateIssueComment) instead of
+        // GitHub re-review must edit the persistent summary in place (updateIssueComment) instead of
         // posting a duplicate. A successful mutation returns EDITED carrying the comment node id.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),

@@ -109,9 +109,8 @@ public class FeedbackPlacement {
     private Integer anchorEndLine;
 
     /**
-     * Diff side of the anchor end / single line (OLD or NEW). Today every writer emits {@code NEW}
-     * (head side), so this is not yet a real OLD/NEW discriminator — the column is kept for future
-     * reviewer-side / binary anchors.
+     * Diff side of the anchor end / single line (OLD or NEW). Writers emit {@code NEW} (head side);
+     * the column carries OLD/NEW to support reviewer-side / binary anchors.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "anchor_side", length = 8)

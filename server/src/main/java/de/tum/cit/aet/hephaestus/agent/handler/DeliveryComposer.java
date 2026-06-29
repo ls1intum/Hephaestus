@@ -59,8 +59,7 @@ class DeliveryComposer {
     /**
      * Author-side process practices whose finding critiques the PR as a whole (its description, its commit
      * series) rather than any single changed line — they have no meaningful diff anchor and must be delivered
-     * in the summary, never as an inline note. Replaces the pre-ADR-0022 phantom slugs
-     * {@code mr-description-quality} / {@code commit-discipline} with the real catalogue slugs.
+     * in the summary, never as an inline note.
      */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of(
         "describe-what-and-why",
@@ -567,7 +566,6 @@ class DeliveryComposer {
 
     /** Truncate text to the first sentence or maxLen chars, whichever is shorter. */
     private static String truncateToFirstSentence(String text, int maxLen) {
-        // Find first sentence-ending punctuation followed by space or end
         int end = -1;
         for (int i = 0; i < Math.min(text.length(), maxLen); i++) {
             char c = text.charAt(i);
@@ -582,7 +580,6 @@ class DeliveryComposer {
         if (text.length() <= maxLen) {
             return text;
         }
-        // Truncate at word boundary
         int space = text.lastIndexOf(' ', maxLen);
         if (space > maxLen / 2) {
             return text.substring(0, space) + "...";
@@ -590,7 +587,6 @@ class DeliveryComposer {
         return text.substring(0, maxLen) + "...";
     }
 
-    /** Capitalize the first character of a string. */
     private static String capitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
@@ -676,9 +672,9 @@ class DeliveryComposer {
             }
         }
 
-        // Inline findings — signal-driven. The label is emitted whenever the list is non-empty: gating it
-        // on nonInlinable left a clean PR (only inline findings) showing an UNLABELED wall of duplicated
-        // headers right after the count opener. A finding whose inline comment LANDED (its correlation key
+        // Inline findings — signal-driven. The label is emitted whenever the list is non-empty (gating it on
+        // nonInlinable would leave a clean PR with only inline findings showing an UNLABELED wall of duplicated
+        // headers right after the count opener). A finding whose inline comment LANDED (its correlation key
         // is in deliveredKeys) is not re-listed here — its full detail already lives on the diff, so the
         // summary only points at it. A finding whose inline note did NOT land keeps its full header line so
         // the lesson still reaches the student in the summary (the delivery-failure fallback). With an empty
@@ -906,8 +902,6 @@ class DeliveryComposer {
         }
         return INTERNAL_PATH_PREFIXES.stream().anyMatch(path::startsWith);
     }
-
-    // Helpers
 
     private static final Map<String, String> EXT_TO_LANG = Map.ofEntries(
         Map.entry("swift", "swift"),

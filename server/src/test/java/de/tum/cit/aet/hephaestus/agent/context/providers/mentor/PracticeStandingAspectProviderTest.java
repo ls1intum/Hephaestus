@@ -71,8 +71,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     }
 
     /**
-     * Legacy 7-arg row: corroborated by construction (2 distinct targets, high confidence) so the existing
-     * floor-agnostic assertions keep passing. New floor tests use the 9-arg overload to set the P4 inputs.
+     * 7-arg row: corroborated by construction (2 distinct targets, high confidence) so the floor-agnostic
+     * assertions pass. Floor tests use the 9-arg overload to set the P4 inputs explicitly.
      */
     private static AreaStandingRow row(
         String slug,
@@ -304,7 +304,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         // Single area with two BAD rows: a well-corroborated MINOR (3 targets, conf 0.9 — clears the floor on
         // its own) and a weak CRITICAL (1 target, conf 0.3 — below the QUARANTINE floor). The worst-severity
         // floor inputs MUST track the CRITICAL row, so the area is uncorroborated and NEVER headlines at
-        // CRITICAL. Before the fix the global Math.max bled the MINOR's 3 targets / 0.9 conf onto the CRITICAL,
+        // CRITICAL. A global Math.max would bleed the MINOR's 3 targets / 0.9 conf onto the CRITICAL,
         // surfacing a coin-flip CRITICAL as the #1 priority and defeating the P4 quarantine floor.
         List<Practice> spine = List.of(practice("mixed-area", "Mixed severity area"));
         List<AreaStandingRow> rows = List.of(

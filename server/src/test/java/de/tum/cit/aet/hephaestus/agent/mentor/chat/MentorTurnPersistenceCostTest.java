@@ -16,10 +16,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * B6: the Pi-cost extraction + sanity-cap path (augmentFinishWithCost / computeFinalCostUsd / extractPiCostUsd
+ * The Pi-cost extraction + sanity-cap path (augmentFinishWithCost / computeFinalCostUsd / extractPiCostUsd
  * / COST_USD_SANITY_CAP) feeds both the {@code chat_message.metadata.costUsd} audit row and the long-lived
  * {@code mentor.turn.cost.usd} histogram. A {@code >}->{@code >=} or dropped-isFinite regression would poison
- * both for the lifetime of the registry, yet it had zero coverage. These unit tests pin the guard.
+ * both for the lifetime of the registry. These unit tests pin the guard.
  */
 class MentorTurnPersistenceCostTest extends BaseUnitTest {
 

@@ -134,8 +134,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         emitter = new RecordingEmitter();
 
         // Package-private constructors on the executor wrappers (see MentorChatExecutorConfig)
-        // let us inject deterministic delegates without reflection — no more brittle final-field
-        // rewrites that break on every minor refactor.
+        // let us inject deterministic delegates without reflection on final fields.
         MentorChatExecutorConfig.MentorTurnExecutor turnExecutorBean = new MentorChatExecutorConfig.MentorTurnExecutor(
             turnExec
         );
@@ -407,7 +406,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
         verify(persistence, never()).finalise(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
-        // Poisoned is a distinct outcome from a generic error — keep the labels separate so
+        // Poisoned is a distinct outcome from a generic error — the labels stay separate.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
@@ -504,7 +503,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         service.start(new MentorChatService.MentorTurnRequest(WORKSPACE_ID, THREAD_ID, "hello mentor", null), emitter);
     }
 
-    /** Direct (synchronous) ExecutorService — the test thread runs every task before returning. */
     /** Minimal {@link ObjectProvider} that always yields the supplied sandbox-service mock. */
     private static ObjectProvider<InteractiveSandboxService> sandboxServiceProvider(InteractiveSandboxService svc) {
         return new ObjectProvider<>() {
@@ -669,8 +667,8 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     /**
      * Reflection set used ONLY for the JPA-entity {@code User.id} (no setter and we don't want a
-     * Spring test slice here). Executor-bean wrappers now take an explicit constructor parameter
-     * so we don't reach for reflection there.
+     * Spring test slice here). The executor-bean wrappers take explicit constructor parameters, so
+     * they need no reflection.
      */
     private static void replaceFinalField(Object target, String name, Object value, boolean searchSuper)
         throws Exception {

@@ -13,10 +13,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for issue entities.
- *
- * <p>All queries filter by repository ID which inherently carries scope
- * through the Repository -> Organization relationship chain.
+ * All queries filter by repository ID, which inherently carries scope
+ * through the repository -> workspace relationship chain.
  */
 @WorkspaceAgnostic("Issues scoped through repository_id -> repository.workspace_id")
 public interface IssueRepository extends JpaRepository<Issue, Long> {
@@ -67,22 +65,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
 
-    /**
-     * Finds all issues belonging to a repository.
-     *
-     * @param repositoryId the repository ID
-     * @return list of issues for the repository
-     */
     List<Issue> findAllByRepository_Id(Long repositoryId);
 
-    /**
-     * Finds issues belonging to a repository with pagination.
-     * Uses Slice for efficient batching without requiring a count query.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable pagination parameters
-     * @return slice of issues for the repository
-     */
+    /** Slice (rather than Page) so batching needs no count query. */
     Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**

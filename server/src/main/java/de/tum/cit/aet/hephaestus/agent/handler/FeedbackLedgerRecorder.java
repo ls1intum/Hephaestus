@@ -164,8 +164,8 @@ public class FeedbackLedgerRecorder {
                 .workspaceId(job.getWorkspace().getId())
                 .artifactType(artifactType)
                 .artifactId(artifactId)
-                // recipient == about for the author-side catalogue today (single source); they diverge only
-                // once reviewer-audience practices ship (ADR 0021 C2).
+                // recipient == about for the author-side catalogue (single source); they diverge only for
+                // reviewer-audience practices (ADR 0021 C2).
                 .recipientUserId(recipientUserId)
                 .aboutUserId(recipientUserId)
                 .channel(FeedbackChannel.IN_CONTEXT)
@@ -436,8 +436,8 @@ public class FeedbackLedgerRecorder {
      * The stable continuity line for a finding: (target, recipient, in-context surface).
      *
      * <p>The recipient arg is intentionally {@code getAboutUserId()}: recipient == about for the author-side
-     * catalogue today. If reviewer-audience practices ever ship (recipient != about, ADR 0021 C2), this MUST
-     * switch to the recipient id, or supersession continuity would key off the subject and mis-thread —
+     * catalogue. For reviewer-audience practices (recipient != about, ADR 0021 C2), this MUST switch to the
+     * recipient id, or supersession continuity would key off the subject and mis-thread —
      * {@link FeedbackThreadKey#compute} documents that arg as the user the unit is delivered to.
      */
     private static String feedbackThreadKeyFor(Observation any) {

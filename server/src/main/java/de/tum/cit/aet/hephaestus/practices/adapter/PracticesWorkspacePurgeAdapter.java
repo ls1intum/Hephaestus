@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  *   <li>Feedback (CASCADE cleans feedback_observation/placement/reaction)</li>
  *   <li>Observations (via native query through practice.workspace_id)</li>
  *   <li>Practice definitions for the workspace</li>
- *   <li>Practice areas (now unreferenced)</li>
+ *   <li>Practice areas (unreferenced once practices are gone)</li>
  * </ul>
  */
 @Component
@@ -52,7 +52,7 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         // Delete practice definitions (CASCADE cleans up any remaining observations); this also clears the
         // practice → practice_area references, so areas can be removed next.
         practiceRepository.deleteAllByWorkspaceId(workspaceId);
-        // Delete practice areas (now unreferenced).
+        // Delete practice areas (unreferenced once practices are gone).
         practiceAreaRepository.deleteAllByWorkspaceId(workspaceId);
 
         log.info("Deleted feedback, observations, practices and areas for workspace: workspaceId={}", workspaceId);

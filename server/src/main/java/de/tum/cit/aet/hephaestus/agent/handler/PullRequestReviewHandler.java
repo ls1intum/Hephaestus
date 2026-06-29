@@ -238,7 +238,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             workspaceContextBuilder.build(new ContextRequest.PracticeReviewRequest(job))
         );
 
-        // Task envelope replaces the legacy /workspace/.prompt file.
         files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
         practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST);

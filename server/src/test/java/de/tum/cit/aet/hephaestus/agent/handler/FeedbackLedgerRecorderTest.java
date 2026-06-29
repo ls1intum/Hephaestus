@@ -76,7 +76,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Test
     void policyFloorOn_bindsEachFindingExactlyOnce_keptToDeliveredDroppedToSuppressed() {
         // 5 MINOR problems with the cap at 3 → 3 kept (DELIVERED), 2 dropped (each its own SUPPRESSED unit).
-        // The bug this guards: record() used to bind the dropped findings to BOTH units (double-count).
+        // Guard: a dropped finding must bind to exactly one unit, never to both DELIVERED and SUPPRESSED.
         List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             findings.add(problem(0.9f - i * 0.1f)); // distinct confidences so the cap is deterministic
@@ -132,7 +132,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     void inlinePlacement_persistsExternalRefFromMatchingSignal() {
         // A3: the INLINE placement must carry the durable vendor handle the channel reported, not a hardcoded
         // null. The note and its DeliveredSignal share a findingFingerprint, so the signal's externalRef lands
-        // on the saved FeedbackPlacement. A no-op (the old hardcoded null) fails this.
+        // on the saved FeedbackPlacement.
         var finding = problem(0.9f);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
@@ -397,7 +397,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         lenient().when(pf.getConfidence()).thenReturn(confidence);
         lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
         lenient().when(pf.getArtifactId()).thenReturn(100L);
-        // about_user_id is the recipient the recorder binds feedback to (formerly the dropped developer, id 7).
+        // about_user_id is the recipient the recorder binds feedback to.
         lenient().when(pf.getAboutUserId()).thenReturn(7L);
         return pf;
     }

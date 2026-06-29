@@ -119,9 +119,8 @@ public class MentorTurnPersistence {
             assistant.setRole(ChatMessage.Role.ASSISTANT);
             assistant.setParentMessage(savedUser);
             assistant.setParts(NODES.arrayNode());
-            // Status is now its own column (migration mentor-1071-add-status-column). The
-            // partial unique index `ux_chat_message_in_flight_v2` keys on this column so a
-            // second concurrent turn raises TurnAlreadyInFlightException as before.
+            // The partial unique index `ux_chat_message_in_flight_v2` keys on the status column,
+            // so a second concurrent turn for the same thread raises TurnAlreadyInFlightException.
             assistant.setStatus(ChatMessage.Status.in_flight);
             assistant.setMetadata(NODES.objectNode());
             chatMessageRepository.save(assistant);

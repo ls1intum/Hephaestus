@@ -1,9 +1,7 @@
-// pi-finding-normalize.spec.mjs — node:test suite proving the report_finding tool boundary
-// normalizes findings exactly the way the Java consumer PracticeDetectionResultParser does.
-//
-// Regression guard for SYSTEMIC #2 (runner<->parser case asymmetry): lowercase enums and
-// underscored / non-canonical slugs that the Java parser up-cases were previously REJECTED at
-// this JS boundary, silently dropping real findings. Run locally with:
+// node:test suite proving the report_finding tool boundary normalizes findings exactly the way
+// the Java consumer PracticeDetectionResultParser does. The JS boundary must up-case enums and
+// canonicalize underscored / non-canonical slugs the same way the Java parser does, or valid
+// findings get dropped at this seam. Run locally with:
 //   node --test server/src/test/resources/agent/pi-finding-normalize.spec.mjs
 
 import test from "node:test";

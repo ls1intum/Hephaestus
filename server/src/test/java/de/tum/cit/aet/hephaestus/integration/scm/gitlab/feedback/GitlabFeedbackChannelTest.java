@@ -333,8 +333,8 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
 
     /**
      * A deleted note has no {@code updateNote} payload at all — GitLab reports it as a TOP-LEVEL GraphQL error
-     * (the global id resolves to nothing). This is the orphaned-summary case observed live after a mirror
-     * re-import; it MUST classify as GONE so the caller re-posts a fresh summary rather than silently dropping it.
+     * (the global id resolves to nothing). This orphaned-summary case MUST classify as GONE so the caller
+     * re-posts a fresh summary rather than silently dropping it.
      */
     @Test
     void updateSummaryReturnsGoneOnTopLevelNotFoundError() {

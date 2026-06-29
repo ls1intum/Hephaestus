@@ -156,8 +156,8 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
 
     @Test
     void bareMentionEndingASentenceWithAPeriodIsResolved() throws Exception {
-        // "This relates to #42." — the trailing period must NOT swallow the reference (the old (?![\w.])
-        // lookahead rejected it). A version like #1.2 (digit after the dot) is still rejected.
+        // "This relates to #42." — the trailing sentence period must NOT swallow the reference, while a
+        // version like #1.2 (digit after the dot) is still rejected.
         PullRequest pr = new PullRequest();
         pr.setBody("This work relates to #42. It also touches the version bump #1.2 which is not an issue.");
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));

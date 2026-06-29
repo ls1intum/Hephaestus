@@ -19,10 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Computes the cross-run {@link TrendDelta} for a review target by diffing the two most-recent review runs
- * at the {@code recurrence_key} locus grain (ADR 0021, A1). This is the READ side of the behavior-change
- * loop — the write side ({@code recurrence_key} on every finding) has existed since C2, but nothing read
- * it back, so "did the practice at this locus resolve, persist, or recur?" had no answer. This service is
- * that answer, and the substrate the delivery layer renders (B1/B3) and the re-review notification (A4)
+ * at the {@code recurrence_key} locus grain (ADR 0021, A1). Answers "did the practice at this locus resolve,
+ * persist, or recur?" — the substrate the delivery layer renders (B1/B3) and the re-review notification (A4)
  * consults.
  *
  * <p>Read-only and side-effect free; safe to call on the delivery hot path.

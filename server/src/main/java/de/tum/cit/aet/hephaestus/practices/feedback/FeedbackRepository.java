@@ -98,7 +98,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * by the {@code chk_feedback_state} CHECK (PREPARED/DELIVERED/SUPERSEDED/SUPPRESSED/FAILED), so a typo
      * fails fast at write time; callers still MUST pass a {@link FeedbackDeliveryState#name()} value.
      *
-     * <p><strong>Concurrency invariant (SYSTEMIC #5):</strong> the supersession is a guarded, idempotent
+     * <p><strong>Concurrency invariant:</strong> the supersession is a guarded, idempotent
      * transition — it flips a row to {@code :state} only while it is still {@code DELIVERED}. Two concurrent
      * re-reviews of the same artifact can both read the same prior DELIVERED row and both attempt to flip it;
      * the {@code AND delivery_state = 'DELIVERED'} predicate makes the second flip a no-op (affected rows = 0)

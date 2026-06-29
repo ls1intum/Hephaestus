@@ -81,13 +81,13 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         verify(workspaceCache).evict(eq("7:9"));
         verify(findingsCache).evict(eq("7:9"));
         verify(standingCache).evict(eq("7:9"));
-        // C11: the authored-work aspect is now in the per-user eviction set.
+        // The authored-work aspect is in the per-user eviction set.
         verify(authoredWorkCache).evict(eq("7:9"));
     }
 
     @Test
     void practiceDetectionCompletedEvictsFindingsAndStandingForDeveloper() {
-        // C11: a completed detection run wrote new observations → the findings + standing aspects must be
+        // A completed detection run wrote new observations → the findings + standing aspects must be
         // evicted for the evaluated developer. SCM-only caches stay untouched (this is not an SCM event).
         invalidator.onPracticeDetectionCompleted(
             new de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent(

@@ -16,11 +16,11 @@ import org.junit.jupiter.api.Test;
 /**
  * Keystone anti-drift guard for the practice catalogue's references to materialised agent context.
  *
- * <p>The live evaluation found the criteria citing a FICTIONAL prefix {@code context/target/} after the
- * sandbox-ABI rename moved provider output to {@code inputs/context/} — so the agent was told to read paths
- * that do not exist and silently returned NOT_APPLICABLE for ships-tests, honours-linked, and the reviewer
- * practices. Criteria prose is not type-checked, so this test is the contract: every context path the
- * catalogue names MUST be a path the providers actually emit, and the dead prefix must never reappear.
+ * <p>Providers materialise their output under {@code inputs/context/}. If the criteria cite a path that
+ * does not exist (e.g. the prefix {@code context/target/}), the agent is told to read files that are not
+ * there and silently returns NOT_APPLICABLE. Criteria prose is not type-checked, so this test is the
+ * contract: every context path the catalogue names MUST be a path the providers actually emit, and the
+ * {@code context/target/} prefix must never appear.
  */
 class CatalogContextPathConsistencyTest extends BaseUnitTest {
 
@@ -38,8 +38,8 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         "review_threads.json", // ReviewThreadContentProvider — review-decision/thread rows
         "general_comments.json", // GeneralReviewCommentContentProvider — conversation-tab (non-inline) MR review notes
         "project_inventory.json" // WorkspaceInventoryContentProvider.OUTPUT_FILE — whole-project issue/PR index
-        // NOTE: test_presence.json + branch_graph.json were deleted (worktree-derived Transform, not content);
-        // acceptance_criteria.json was a phantom (no provider ever emitted it). None may reappear.
+        // These must never appear: test_presence.json + branch_graph.json are worktree-derived Transforms,
+        // not content; acceptance_criteria.json is emitted by no provider.
     );
 
     private static final Pattern CONTEXT_PATH = Pattern.compile("inputs/context/([a-z_]+\\.[a-z]+)");

@@ -264,9 +264,6 @@ class DiffHunkValidator {
         return contiguous ? endLine : startLine;
     }
 
-    /**
-     * Find the nearest value in a sorted set to the target.
-     */
     private static Integer findNearest(TreeSet<Integer> set, int target) {
         Integer floor = set.floor(target);
         Integer ceiling = set.ceiling(target);

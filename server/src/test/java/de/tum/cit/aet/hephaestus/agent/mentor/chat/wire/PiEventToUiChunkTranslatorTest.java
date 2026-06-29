@@ -19,9 +19,9 @@ import tools.jackson.databind.node.ObjectNode;
  * Real-shape coverage for {@link PiEventToUiChunkTranslator}. Every test loads a fixture file from
  * {@code src/test/resources/agent/mentor/pi-events/} that mirrors the on-the-wire JSON Pi emits
  * — verified against {@code @earendil-works/pi-coding-agent} dist .d.ts shapes. We intentionally
- * do NOT shape the fixtures from what the runner's protocol-only stub produces; doing that is
- * the test theater that hid the original bugs (translator read snake_case `delta_type`, real Pi
- * sends camelCase `assistantMessageEvent.type`).
+ * do NOT shape the fixtures from what the runner's protocol-only stub produces: a stub-shaped
+ * fixture cannot catch a wire-format mismatch (e.g. the translator reading snake_case `delta_type`
+ * while real Pi sends camelCase `assistantMessageEvent.type`).
  *
  * <p>If you change a Pi event mapping, change the fixture too. Stub-only shapes (the synthetic
  * {@code pi_error} / {@code turn_watchdog_fired} the runner itself emits) are exercised inline.
@@ -132,9 +132,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         ((ObjectNode) second.get("assistantMessageEvent")).put("delta", "lo");
         List<UIMessageChunk> out = translator.translate(second, state);
 
-        // Just a TextDelta — TextStart already fired on the first delta. This is the second
-        // missing contentIndex → a fresh UUID per
-        // delta → AI SDK reconciler can't merge them.
+        // Just a TextDelta — TextStart already fired on the first delta, and both deltas must
+        // reuse the same block id so the AI SDK reconciler merges them into one part.
         assertThat(out)
             .extracting(c -> c.getClass().getSimpleName())
             .containsExactly("TextDelta");
@@ -444,7 +443,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(event, state);
         assertThat(out).hasSize(1).first().isInstanceOf(UIMessageChunk.Error.class);
         UIMessageChunk.Error err = (UIMessageChunk.Error) out.get(0);
-        // Must be human-readable, not the wire symbol "turn_watchdog_fired" (the pre-fix bug).
+        // Must be human-readable, not the raw wire symbol "turn_watchdog_fired".
         assertThat(err.errorText()).doesNotContain("turn_watchdog_fired").contains("timed out");
     }
 
@@ -500,9 +499,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
             .extracting(c -> c.getClass().getSimpleName())
             .containsExactly("ReasoningEnd");
 
-        // The reasoning text must be drained into the persisted parts array — the pre-fix bug
-        // was that this only happened on turn_end, so a multi-block message with reasoning
-        // followed by text would lose the reasoning content.
+        // The reasoning text must be drained into the persisted parts array on thinking_end, not
+        // only on turn_end — otherwise a multi-block message with reasoning followed by text
+        // would lose the reasoning content.
         assertThat(state.partsSnapshot().toString()).contains("Let me think");
     }
 

@@ -97,7 +97,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             feedbackLedgerRecorder,
             observationTrendService
         );
-        // Inline reconciliation now runs on every OPEN-PR delivery — even with zero diff notes — to clear an
+        // Inline reconciliation runs on every OPEN-PR delivery — even with zero diff notes — to clear an
         // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
         org.mockito.Mockito.lenient()
             .when(

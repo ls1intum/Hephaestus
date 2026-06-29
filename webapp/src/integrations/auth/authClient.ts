@@ -3,7 +3,7 @@ import environment from "@/environment";
 import { safeReturnTo } from "@/integrations/auth/guard";
 
 /**
- * Cookie-session auth client (replaces the former keycloak-js singleton; ADR 0017).
+ * Cookie-session auth client (ADR 0017).
  *
  * The browser holds a `__Host-HEPHAESTUS_AT` HttpOnly cookie minted by the server
  * after the OAuth login dance — the SPA never sees a token. Identity is read from
@@ -33,7 +33,7 @@ export type CurrentUser = Required<
 		| "roles"
 	>;
 
-/** Profile shape preserved for the `useAuth().userProfile` consumers. */
+/** Profile shape consumed by `useAuth().userProfile`. */
 export interface UserProfile {
 	id: string;
 	username: string;
@@ -151,7 +151,7 @@ export const authClient = {
 };
 
 /**
- * Build the preserved `UserProfile` from the server's `CurrentUserView`.
+ * Build the `UserProfile` from the server's `CurrentUserView`.
  *
  * Accepts the raw generated view (every field optional) rather than the narrowed
  * `CurrentUser`, so the TanStack-Query-backed `useAuth()` can feed the query result

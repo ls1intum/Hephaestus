@@ -14,8 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Public discovery of the identity providers a user can sign in with (replaces the former
- * Keycloak {@code /auth/identity-providers}; ADR 0017). The SPA login
+ * Public discovery of the identity providers a user can sign in with. The SPA login
  * page renders one button per entry; each button targets
  * {@code /auth/login?provider={registrationId}}.
  *

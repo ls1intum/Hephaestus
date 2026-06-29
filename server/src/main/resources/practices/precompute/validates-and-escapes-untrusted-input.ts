@@ -3,8 +3,8 @@
 // window — i.e. the taint flow a reviewer is most likely to miss by eye. CANDIDATES only: the LLM traces
 // whether the source actually reaches the sink unvalidated/unescaped and decides. General by design: a
 // per-language SOURCE table + a SINK table keyed off the file extension. Adding a language = adding rows,
-// no engine change. This practice has historically gone unfired because the flow spans lines, so we pair
-// sources to nearby sinks and hand the LLM the exact span to trace.
+// no engine change. The taint flow spans lines, so we pair each source to nearby sinks and hand the LLM
+// the exact span to trace.
 import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
 
 // Sources of untrusted input (request/CLI/env/file/stdin). Cross-language patterns live under "all" and are

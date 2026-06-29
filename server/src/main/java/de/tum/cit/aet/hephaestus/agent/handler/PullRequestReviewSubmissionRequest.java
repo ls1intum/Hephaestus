@@ -10,8 +10,8 @@ import org.jspecify.annotations.Nullable;
  * jobs.
  *
  * <p>Combines the async-safe {@link ScmEventPayload.PullRequestData} snapshot with branch
- * information not present on that DTO. The event listener (issue #746) constructs this
- * from the {@code PullRequest} entity before it detaches.
+ * information not present on that DTO. The event listener constructs this from the
+ * {@code PullRequest} entity before it detaches.
  *
  * @param pullRequest async-safe pull request snapshot (no JPA proxies)
  * @param headRefName source branch name (e.g. {@code "feature/my-feature"})
@@ -43,8 +43,8 @@ public record PullRequestReviewSubmissionRequest(
     }
 
     /**
-     * Back-compat constructor for callers that do not carry a trigger event (the gate-bypass dev path
-     * and the bot-command path); the job then runs the full focus-active practice set as before.
+     * Constructor for callers that do not carry a trigger event (the gate-bypass dev path and the
+     * bot-command path); the job then runs the full focus-active practice set.
      */
     public PullRequestReviewSubmissionRequest(
         ScmEventPayload.PullRequestData pullRequest,

@@ -24,12 +24,11 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/recent_authored_work.json} for a {@link MentorChatRequest}.
  *
- * <p><b>Why this exists (the mentor must know the work, not just findings about it).</b> Practice detection
- * receives the actual PR/issue objects and their diffs; the mentor previously got only aspects ABOUT the
- * work (findings, delivered feedback, counts). So when a developer said "my camera change", the mentor had
- * no concrete inventory of what they'd actually shipped. This aspect gives it that: the developer's own
- * authored PRs and issues — number, title, URL, state, size — drawn from the SAME tables practice detection
- * uses, so the mentor can name and link the real work and recognise what the conversation is about.
+ * <p><b>Why this exists (the mentor must know the work, not just findings about it).</b> The other mentor
+ * aspects describe the work only indirectly (findings, delivered feedback, counts), so a reference like "my
+ * camera change" has no concrete anchor. This aspect supplies the inventory: the developer's own authored PRs
+ * and issues — number, title, URL, state, size — drawn from the SAME tables practice detection uses, so the
+ * mentor can name and link the real work and recognise what the conversation is about.
  *
  * <p>The work itself only (no diffs — those are fetched on demand for a specific artifact, not pre-mounted
  * for every PR). Best-effort like its sibling aspects. Cache key: {@code workspaceId + ":" + developerId}.

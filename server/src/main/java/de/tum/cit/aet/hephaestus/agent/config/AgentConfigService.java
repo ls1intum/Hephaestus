@@ -63,9 +63,9 @@ public class AgentConfigService {
         }
         if (request.llmBaseUrl() != null) {
             // Empty string clears the field; otherwise stores the trimmed value. The request DTO caps
-            // this at @Size(max=512) — deliberately well under the entity column (length=2048) so the
-            // column can never overflow even though trimming runs after validation. The wider column is
-            // headroom, not a target; don't "reconcile" it down to 512 without a changelog.
+            // this at @Size(max=512), deliberately well under the entity column (length=2048) so trimming
+            // after validation can never overflow the column. The wider column is intentional headroom —
+            // narrowing it to 512 requires a changelog.
             config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
         }
         if (request.timeoutSeconds() != null) {

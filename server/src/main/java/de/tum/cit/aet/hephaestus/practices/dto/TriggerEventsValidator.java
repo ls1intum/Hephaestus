@@ -14,10 +14,8 @@ import java.util.stream.Collectors;
  */
 public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerEvents, List<String>> {
 
-    // Single source of truth: TriggerEventCatalog defines every subscribable event (and its own javadoc
-    // says so). This validator only checks membership + de-dups, so it derives its allow-list from the
-    // catalog rather than keeping a second, drift-prone copy (which had gone stale — it rejected the
-    // retrospective PullRequestMerged / PullRequestClosed / IssueClosed triggers that seeded practices use).
+    // Allow-list is derived from TriggerEventCatalog (the single source of truth for subscribable events)
+    // rather than duplicated here, so it cannot drift out of sync with the catalog.
     static final Set<String> VALID_EVENTS = TriggerEventCatalog.allEvents();
 
     @Override
@@ -26,7 +24,6 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
             return true; // @NotNull handles nullability
         }
 
-        // Check for duplicates
         Set<String> seen = new HashSet<>();
         List<String> duplicates = value
             .stream()
@@ -41,7 +38,6 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
             return false;
         }
 
-        // Check for unknown events
         Set<String> unknown = value
             .stream()
             .filter(e -> !VALID_EVENTS.contains(e))

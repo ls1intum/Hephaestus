@@ -398,7 +398,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Presence presence, String path) {
-            // Former-GOOD practice convention: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
+            // Assessment mapping: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
             Assessment assessment = switch (presence) {
                 case PRESENT -> Assessment.GOOD;
                 case ABSENT -> Assessment.BAD;

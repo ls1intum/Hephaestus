@@ -180,10 +180,9 @@ public class WorkspaceContextFilter implements Filter {
             Set<WorkspaceRole> roles = membership.roles();
 
             // Instance super-admin elevation: an APP_ADMIN reaches ANY active workspace as ADMIN even
-            // without an explicit membership or an SCM identity at all (the GitLab admin model; closes
-            // the gap where WorkspaceAccessService elevates APP_ADMIN but this filter blocked them
-            // first). Deliberately ADMIN, never OWNER — ownership is an explicit, member-granted role.
-            // Logged as elevated access; formal AuthEvent elevation-tagging is tracked in issue #1323.
+            // without an explicit membership or an SCM identity at all (the GitLab admin model), matching
+            // WorkspaceAccessService's APP_ADMIN elevation. Deliberately ADMIN, never OWNER — ownership is
+            // an explicit, member-granted role. Logged as elevated access.
             if (roles.isEmpty() && SecurityUtils.isSuperAdmin()) {
                 log.info(
                     "Granted workspace access via instance-admin elevation: accountId={}, workspaceSlug={}",
@@ -205,9 +204,7 @@ public class WorkspaceContextFilter implements Filter {
                 return;
             }
 
-            // Create and set context. installationId is sourced from the active GitHub
-            // App connection (Workspace.installation_id has been retired in favour of the
-            // Connection registry).
+            // installationId comes from the active GitHub App connection in the Connection registry.
             Long installationId = connectionService
                 .findActiveGitHubAppConfig(workspace.getId())
                 .map(ConnectionConfig.GitHubAppConfig::installationId)

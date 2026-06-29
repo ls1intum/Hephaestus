@@ -96,16 +96,10 @@ public record GitLabIssueEventDTO(
         String url
     ) {}
 
-    /**
-     * Returns true if this is a confidential issue event.
-     */
     public boolean isConfidential() {
         return objectAttributes != null && objectAttributes.confidential();
     }
 
-    /**
-     * Parses the action string to a GitLabEventAction enum.
-     */
     public GitLabEventAction actionType() {
         if (objectAttributes == null || objectAttributes.action() == null) {
             return GitLabEventAction.UNKNOWN;

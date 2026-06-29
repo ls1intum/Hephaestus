@@ -6,7 +6,7 @@ import tools.jackson.databind.JsonNode;
  * Strict readers for required agent-job metadata fields, shared by every job handler and content provider
  * that parses {@code job.getMetadata()}. A missing or wrong-typed field is a job-preparation failure, not a
  * silently-defaulted value — so each reader throws {@link JobPreparationException} rather than returning a
- * fallback. Previously these were copy-pasted (and drifted) across two review handlers and a content provider.
+ * fallback.
  */
 public final class JobMetadataReader {
 

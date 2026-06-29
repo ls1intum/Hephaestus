@@ -33,13 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
  *       listeners.</li>
  * </ul>
  *
- * <p><strong>Transaction boundary (SYSTEMIC #5):</strong> {@link AgentJobService#submit} contracts that it
+ * <p><strong>Transaction boundary:</strong> {@link AgentJobService#submit} contracts that it
  * must NOT run inside an outer transaction (each config gets its own transaction for isolation). The
  * session-bound work — loading the artifact, the gate's lazy {@code Workspace.reviewSettings} access, and
  * building the detached request — therefore runs inside an explicit {@link TransactionTemplate} block, and
  * {@link AgentJobService#submitPrepared} (which calls {@code submit}) runs only AFTER that block commits.
- * This replaces the former method-level {@code @Transactional}, which wrapped {@code submit} and silently
- * violated the contract.
  *
  * Usage:
  * <pre>

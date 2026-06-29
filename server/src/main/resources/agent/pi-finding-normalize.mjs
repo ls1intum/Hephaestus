@@ -1,11 +1,11 @@
 // Pure normalization helpers for practice-detection findings.
 //
-// Extracted from pi-runner.mjs so the report_finding tool boundary can be unit-tested in
-// isolation (the runner module itself has top-level side effects — env guards, envelope
-// reads, main() — that make it un-importable). These functions MUST stay in lock-step with
-// the Java consumer PracticeDetectionResultParser: the slug is lower-cased with underscores
-// mapped to hyphens, and presence/assessment/severity are upper-cased BEFORE validation, so
-// the JS boundary accepts exactly what the parser accepts (no silent recall loss).
+// Kept in a side-effect-free module (separate from pi-runner.mjs, whose top-level env guards,
+// envelope reads, and main() make it un-importable) so the report_finding tool boundary can be
+// unit-tested in isolation. These functions MUST stay in lock-step with the Java consumer
+// PracticeDetectionResultParser: the slug is lower-cased with underscores mapped to hyphens, and
+// presence/assessment/severity are upper-cased BEFORE validation, so the JS boundary accepts
+// exactly what the parser accepts (no silent recall loss).
 
 export function normalizeDiffNote(note) {
     if (!note || typeof note !== "object") throw new Error("diff note must be an object");

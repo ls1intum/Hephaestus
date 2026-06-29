@@ -28,7 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
  * {@link HephaestusJwtIssuer#issue}, so the token is {@code issued_jwt}-backed and revocable like any
  * real session), letting local dev and live E2E authenticate without an OAuth IdP. The account has no
  * SCM identity; workspace access for a dev {@code APP_ADMIN} comes from the super-admin elevation in
- * {@code WorkspaceContextFilter}. (Structured {@code AuthEvent} emission is deferred to issue #1323.)
+ * {@code WorkspaceContextFilter}.
  *
  * <h2>Fail-closed in production</h2>
  * Gated by {@code hephaestus.auth.dev-login-enabled} (default {@code false} → the endpoint 404s, invisible).

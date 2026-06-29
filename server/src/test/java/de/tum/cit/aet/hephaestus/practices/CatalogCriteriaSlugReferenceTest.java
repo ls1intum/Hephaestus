@@ -20,13 +20,12 @@ import org.junit.jupiter.api.Test;
  * Anti-drift guard for cross-practice slug references inside the catalogue's {@code criteria} prose.
  *
  * <p>Several practices route a sibling concern to another practice by NAME ("(that is X)", "(deferred to
- * X)", "X owns it"). The live evaluation found criteria naming a slug that is not a real practice — a
- * phantom (e.g. {@code keeps-secrets-out}) or a truncation of a real slug (e.g.
- * {@code validates-inputs-and-edge-cases} for {@code validates-inputs-and-edge-cases-at-the-boundary}).
- * The LLM dutifully routes the finding to a slug that does not exist, so the concern silently vanishes.
- * Criteria prose is not type-checked, so this test is the contract: every slug-shaped reference in the
- * criteria must resolve to a real practice slug (the synthetic {@code hardcoded-secrets} sentinel
- * excepted), and no truncation of a real slug may appear.
+ * X)", "X owns it"). If the criteria name a slug that is not a real practice — a phantom (e.g.
+ * {@code keeps-secrets-out}) or a truncation of a real slug (e.g. {@code validates-inputs-and-edge-cases}
+ * for {@code validates-inputs-and-edge-cases-at-the-boundary}) — the LLM dutifully routes the finding to a
+ * slug that does not exist and the concern silently vanishes. Criteria prose is not type-checked, so this
+ * test is the contract: every slug-shaped reference in the criteria must resolve to a real practice slug
+ * (the synthetic {@code hardcoded-secrets} sentinel excepted), and no truncation of a real slug may appear.
  */
 class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
 
@@ -71,8 +70,8 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
             )
             .isEmpty();
 
-        // Belt-and-braces: the phantom slugs the live evaluation actually mis-routed to must never reappear,
-        // even though they are not prefixes of any real slug (so the truncation check above would miss them).
+        // Belt-and-braces: these known phantom slugs must never appear, even though they are not prefixes
+        // of any real slug (so the truncation check above would miss them).
         // Match them only as whole slug tokens (not followed by another '-' segment) so a real slug that
         // legitimately extends one of them (e.g. avoids-unsafe-panics-and-chosen-crashes) is not flagged.
         String rawCatalogue = readCatalogue();

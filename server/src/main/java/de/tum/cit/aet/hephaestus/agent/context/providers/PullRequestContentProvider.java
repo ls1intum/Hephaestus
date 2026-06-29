@@ -176,7 +176,7 @@ public class PullRequestContentProvider implements ContentProvider {
         // The fetch only actually fires when that source exposes a deterministic clone URL
         // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
         // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
-        // empty serverUrl; its historical fetches go through GithubDataSyncService instead).
+        // empty serverUrl; its fetches go through GithubDataSyncService instead).
         var kind =
             workspace == null
                 ? Optional.<IntegrationKind>empty()

@@ -464,9 +464,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(afterReaper.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
 
         // Stale-snapshot save attempt: Hibernate's UPDATE predicate fails on the version,
-        // surfaces as OptimisticLockingFailureException. A prior read-before-write
-        // `isStillInFlight` check is replaced by this DB-enforced protection — version
-        // mismatch is the single durable signal that another writer touched the row.
+        // surfaces as OptimisticLockingFailureException. The version mismatch is the single
+        // durable signal that another writer touched the row.
         stale.setStatus(ChatMessage.Status.completed);
         assertThatThrownBy(() -> {
             chatMessageRepository.saveAndFlush(stale);

@@ -5,9 +5,9 @@
 // surface) or merely internal/private? An app-only repo with no library product has no public API to document,
 // and a modifier-less Swift declaration is INTERNAL — not public. We surface {hasPublicProduct,
 // changedPublicSymbols, changedInternalSymbols} and let the model decide whether documentation was owed.
-//
-// 18 false assessment=BAD findings came from treating modifier-less Swift as public on an app-only repo. The export-status
-// table is keyed off file extension so adding a language = one row, no engine change.
+// Treating modifier-less Swift as public on an app-only repo yields false assessment=BAD findings, so the
+// export-status table classifies it as internal. The table is keyed off file extension: adding a language =
+// one row, no engine change.
 import { findFiles, readFileLines } from "../lib/grep";
 import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
 
@@ -38,7 +38,7 @@ const MANIFEST_NAMES = ["swift", "json", "xml", "gradle", "kts", "py", "cfg", "t
 
 // ── (2) Per-language export status of a CHANGED declaration ────────────────────────────────────────────────
 // For each language: detect that a line declares a symbol, and whether that symbol is PUBLIC (exported) or not.
-// `isPublic` is only consulted when `decl` matches. Modifier-less Swift is INTERNAL by design (the core bug).
+// `isPublic` is only consulted when `decl` matches. Modifier-less Swift is INTERNAL, not public.
 interface ExportRule {
 	decl: RegExp; // line introduces a named declaration (func/class/type/var/const)
 	isPublic: (line: string) => boolean; // is that declaration part of the public surface?

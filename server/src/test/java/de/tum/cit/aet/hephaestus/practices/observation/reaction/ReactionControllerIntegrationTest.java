@@ -77,14 +77,12 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @BeforeEach
     void setUpTestData() {
-        // Create workspace with an owner
         User owner = persistUser("feedback-owner");
         workspace = createWorkspace("feedback-ws", "Feedback WS", "feedback-org", AccountType.ORG, owner);
 
-        // Ensure the "admin" user (from @WithAdminUser) exists and has workspace membership
+        // The "admin" user (from @WithAdminUser) must exist and hold workspace membership.
         adminUser = ensureAdminMembership(workspace).getUser();
 
-        // Create practice
         Practice practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
@@ -93,14 +91,13 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
 
-        // Create agent job (required FK for practice_finding)
+        // Agent job is a required FK for the observation.
         AgentJob agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        // Create a practice finding with the admin user as subject
         Observation finding = Observation.builder()
             .occurrenceKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
@@ -226,7 +223,6 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             var request1 = new CreateReactionDTO(ReactionAction.ADDRESSED, null);
             var request2 = new CreateReactionDTO(ReactionAction.DISPUTED, "Changed my mind");
 
-            // First feedback
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -237,7 +233,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isCreated();
 
-            // Second feedback — should create new row, not upsert
+            // Append-only: the second submit creates a new row rather than upserting.
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -248,7 +244,6 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isCreated();
 
-            // Verify two rows exist
             assertThat(reactionRepository.findAll()).hasSize(2);
         }
 
@@ -379,7 +374,6 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         @Test
         @WithAdminUser
         void returnsLatestAfterMultipleSubmissions() {
-            // Submit two feedbacks
             var request1 = new CreateReactionDTO(ReactionAction.ADDRESSED, null);
             var request2 = new CreateReactionDTO(ReactionAction.DISPUTED, "Actually wrong");
 
@@ -403,7 +397,6 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isCreated();
 
-            // GET should return the latest (DISPUTED)
             ReactionDTO response = webTestClient
                 .get()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -430,7 +423,6 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         @WithAdminUser
         @DisplayName("engagement does not count feedback from other workspaces")
         void engagementIsScopedToWorkspace() {
-            // Submit feedback in the main workspace
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -441,12 +433,11 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isCreated();
 
-            // Create a second workspace and add the admin user
             User owner2 = persistUser("other-ws-owner");
             Workspace otherWorkspace = createWorkspace("other-ws", "Other WS", "other-org", AccountType.ORG, owner2);
             ensureWorkspaceMembership(otherWorkspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
 
-            // Engagement in the second workspace should be all zeros
+            // Engagement in the second workspace must be all zeros — reactions do not cross workspaces.
             ReactionEngagementDTO response = webTestClient
                 .get()
                 .uri(ENGAGEMENT_URI, otherWorkspace.getWorkspaceSlug())

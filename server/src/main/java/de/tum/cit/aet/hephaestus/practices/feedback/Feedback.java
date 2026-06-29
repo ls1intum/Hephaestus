@@ -107,11 +107,11 @@ public class Feedback {
 
     /**
      * The user this feedback is <em>about</em> — ALWAYS populated (symmetry with
-     * {@code Observation.aboutUserId} and xAPI's mandatory, unambiguous Actor). Today every writer sets this
-     * equal to {@link #recipientUserId} (the author-side catalogue: the developer who receives the feedback is
-     * also its subject); the column is modelled separately, not derived, to leave room for a future reviewer-side
-     * unit whose subject differs from its recipient without a schema change. Readers can trust it without a
-     * fallback; they must NOT assume it always differs from the recipient.
+     * {@code Observation.aboutUserId} and xAPI's mandatory, unambiguous Actor). For author-side feedback it
+     * equals {@link #recipientUserId} (the developer who receives the feedback is also its subject); the column
+     * is modelled separately, not derived, so a reviewer-side unit whose subject differs from its recipient
+     * needs no schema change. Readers can trust it without a fallback, but must NOT assume it always differs
+     * from the recipient.
      */
     @NotNull
     @Column(name = "about_user_id", nullable = false)

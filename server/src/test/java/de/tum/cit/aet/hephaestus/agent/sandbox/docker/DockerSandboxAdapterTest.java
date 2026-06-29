@@ -659,8 +659,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 cancelDone.await(5, TimeUnit.SECONDS);
                 return new SandboxContainerManager.WaitOutcome(137, false);
             });
-            // Note: no getLogs stub needed — cancel throws SandboxCancelledException
-            // before reaching the COLLECT phase or captureLogsOnError()
+            // No getLogs stub needed — cancel throws SandboxCancelledException before reaching
+            // the COLLECT phase or captureLogsOnError().
 
             Thread bg = new Thread(() -> {
                 try {

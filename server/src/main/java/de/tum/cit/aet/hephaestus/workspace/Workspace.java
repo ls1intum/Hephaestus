@@ -253,7 +253,7 @@ public class Workspace {
 
     /**
      * The agent config that powers practice detection. When set, only this config is submitted
-     * for a review (no fan-out); when {@code null}, today's "all enabled configs" fan-out applies.
+     * for a review (no fan-out); when {@code null}, the "all enabled configs" fan-out applies.
      * Scalar FK (not a {@code @ManyToOne AgentConfig}) on purpose — an association would close a
      * {@code workspace → agent} Modulith cycle. {@code ON DELETE SET NULL} at the DB level.
      */

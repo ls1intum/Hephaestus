@@ -64,7 +64,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
         handler = new GitLabIssueMessageHandler(issueProcessor, contextResolver, deserializer, transactionTemplate);
 
-        // Default: context resolver returns a valid context
         lenient()
             .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
             .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
@@ -74,8 +73,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     void key_returnsIssue() {
         assertThat(handler.key().eventType()).isEqualTo("issue");
     }
-
-    // Action Routing
 
     @Nested
     class ActionRouting {
@@ -186,8 +183,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // Confidential Issue Handling
-
     @Nested
     class ConfidentialIssues {
 
@@ -237,8 +232,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             verify(issueProcessor, never()).process(any(), any());
         }
     }
-
-    // Validation
 
     @Nested
     class PayloadValidation {
@@ -308,8 +301,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             verify(issueProcessor, never()).process(any(), any());
         }
     }
-
-    // Context Resolution
 
     @Nested
     class ContextResolution {

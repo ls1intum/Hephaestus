@@ -319,11 +319,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
         }
 
-        // Emit lifecycle events for CLOSED issues on every sync (not just on create).
-        // Bulk GraphQL ingest never produced these before, so deployments that already
-        // ran an earlier sync have no ISSUE_CLOSED activity rows for historical issues.
-        // Firing on re-sync backfills them; the activity_event (workspace_id, event_key)
-        // unique constraint dedupes, so replaying an existing close is a safe no-op.
+        // Emit the close event for CLOSED issues on every sync, not just on create, so a sync backfills
+        // ISSUE_CLOSED activity for issues that were already closed when first ingested. The activity_event
+        // (workspace_id, event_key) unique constraint dedupes, so replaying an existing close is a safe no-op.
         if (issueState == Issue.State.CLOSED) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.IssueClosed(

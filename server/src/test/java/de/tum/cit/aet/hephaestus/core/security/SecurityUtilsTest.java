@@ -16,7 +16,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * Unit coverage for the two authz-load-bearing helpers added on this branch:
+ * Unit coverage for the two authz-load-bearing helpers:
  * {@link SecurityUtils#getCurrentAccountId()} (resolves the {@code sub} → numeric account id that
  * {@code CurrentAccountUsers} keys identity resolution on) and {@link SecurityUtils#isSuperAdmin()}
  * (which {@code WorkspaceAccessService} elevates to workspace-ADMIN on). Both must fail closed on every

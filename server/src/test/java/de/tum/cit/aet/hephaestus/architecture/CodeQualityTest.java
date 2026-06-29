@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
  * </ul>
  *
  * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
- * <p>NOTE: Consolidated from SolidPrinciplesTest.java - unique ISP/DIP tests merged here.
  *
  * @see ArchitectureTestConstants
  */
@@ -338,7 +337,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // INTERFACE SEGREGATION PRINCIPLE (merged from SolidPrinciplesTest)
+    // INTERFACE SEGREGATION PRINCIPLE
 
     @Nested
     class InterfaceSegregationTests {
@@ -469,7 +468,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // DEPENDENCY INVERSION (merged from SolidPrinciplesTest)
+    // DEPENDENCY INVERSION
 
     @Nested
     class DependencyInversionTests {
@@ -527,7 +526,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // LISKOV SUBSTITUTION PRINCIPLE (merged from SolidPrinciplesTest)
+    // LISKOV SUBSTITUTION PRINCIPLE
 
     @Nested
     class LiskovSubstitutionTests {

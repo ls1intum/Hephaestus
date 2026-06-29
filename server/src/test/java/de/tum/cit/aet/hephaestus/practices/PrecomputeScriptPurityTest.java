@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Enforces the precompute contract: scripts surface FACTS / metrics / directions for the LLM to judge — they
  * NEVER emit the observation the agent is supposed to reach independently (telescope, not cage). Presence-laundering
- * (a {@code directions} string that pre-decides POSITIVE / NEGATIVE / NOT_APPLICABLE) silently biases the grader
- * and has regressed twice; this test makes the boundary structural.
+ * (a {@code directions} string that pre-decides POSITIVE / NEGATIVE / NOT_APPLICABLE) silently biases the grader;
+ * this test makes the boundary structural.
  */
 class PrecomputeScriptPurityTest extends BaseUnitTest {
 
