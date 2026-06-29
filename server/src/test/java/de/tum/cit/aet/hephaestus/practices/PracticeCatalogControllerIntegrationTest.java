@@ -46,6 +46,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     @Autowired
     private PracticeRevisionRepository practiceRevisionRepository;
 
+    @Autowired
+    private PracticeService practiceService;
+
     private Workspace workspace;
 
     @BeforeEach
@@ -1403,6 +1406,69 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isOk();
 
             assertThat(revisionsFor("noop-criteria-practice")).hasSize(1);
+        }
+
+        @Test
+        @DisplayName(
+            "two criteria edits racing on the same practice both persist with distinct numbers (no poisoned tx)"
+        )
+        void concurrentCriteriaEditsBothPersistDistinctNumbers() throws Exception {
+            // Drive two concurrent updatePractice calls (each its OWN transaction) with DIFFERENT criteria on
+            // the SAME practice. Both want to append a new revision; without the per-practice row lock they
+            // would compute the same next number and one would die with UnexpectedRollbackException (the
+            // poisoned-transaction bug). With the SELECT ... FOR UPDATE serialisation, the second blocks until
+            // the first commits, reads the now-current max, and appends a distinct, gap-free number.
+            persistPractice("raced-practice", "Raced", true); // revision 1 is created lazily on first criteria edit
+            var ctx = de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext.fromWorkspace(
+                workspace,
+                java.util.Set.of(de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.ADMIN),
+                null
+            );
+
+            // Snapshot revision 1 first (mirrors create) so the race is over revisions 2 and 3.
+            practiceService.updatePractice(
+                ctx,
+                "raced-practice",
+                new UpdatePracticeRequestDTO(null, null, "baseline criteria", null, null, null, null)
+            );
+
+            int threads = 2;
+            var startGate = new java.util.concurrent.CountDownLatch(1);
+            var done = new java.util.concurrent.CountDownLatch(threads);
+            var pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+            var failures = java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
+
+            try {
+                for (int i = 0; i < threads; i++) {
+                    final String criteria = "concurrent edit " + i;
+                    pool.submit(() -> {
+                        try {
+                            startGate.await();
+                            practiceService.updatePractice(
+                                ctx,
+                                "raced-practice",
+                                new UpdatePracticeRequestDTO(null, null, criteria, null, null, null, null)
+                            );
+                        } catch (Throwable t) {
+                            failures.add(t);
+                        } finally {
+                            done.countDown();
+                        }
+                    });
+                }
+                startGate.countDown();
+                assertThat(done.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertThat(failures).as("no concurrent edit should throw UnexpectedRollbackException").isEmpty();
+            List<PracticeRevision> revisions = revisionsFor("raced-practice");
+            // revision 1 (baseline edit) + two concurrent edits = three rows, all distinct and gap-free.
+            assertThat(revisions)
+                .extracting(PracticeRevision::getRevisionNumber)
+                .doesNotHaveDuplicates()
+                .containsExactly(1, 2, 3);
         }
     }
 

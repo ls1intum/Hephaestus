@@ -3,10 +3,12 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -44,6 +46,16 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     /** Practices bound to an area (the per-area dashboard aggregation key). */
     List<Practice> findByWorkspaceIdAndAreaId(Long workspaceId, Long areaId);
+
+    /**
+     * Acquire a row-level write lock on a practice ({@code SELECT ... FOR UPDATE}). Used to serialise
+     * {@link PracticeRevision} appends per practice: holding this lock for the duration of the
+     * read-max-then-insert makes the next revision number race-free, so concurrent criteria edits append
+     * with distinct, gap-free numbers instead of colliding on {@code uk_practice_revision_practice_number}.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Practice p WHERE p.id = :id")
+    Optional<Practice> findByIdForUpdate(@Param("id") Long id);
 
     boolean existsByWorkspaceId(Long workspaceId);
 

@@ -103,23 +103,19 @@ public class PracticeService {
      * create (revision 1) and whenever {@code criteria} changes, so every finding can pin to the criteria
      * version it was detected against (the criteria as it was).
      *
-     * <p>The revision number is read-max-then-insert, guarded at the DB by
-     * {@code uk_practice_revision_practice_number}. Two concurrent criteria edits to the SAME practice can
-     * both compute {@code next=N}; the loser's insert violates the unique constraint. We catch that and
-     * retry once recomputing {@code next}, so the constraint produces a clean append instead of bubbling a
-     * {@link DataIntegrityViolationException} out of {@link #updatePractice} as a raw 500 (mirrors the
-     * create path's slug-conflict safety net).
+     * <p>The revision number is read-max-then-insert. To make it race-free we first take a row-level write
+     * lock on the practice ({@code SELECT ... FOR UPDATE}), so all revision appends for one practice
+     * serialise: a concurrent criteria edit blocks until this append commits, then reads the now-current max
+     * and computes a distinct number. This runs in the caller's create/update transaction (it must, to see
+     * the just-created practice row), and because the number is computed under the lock the insert can never
+     * violate {@code uk_practice_revision_practice_number} — no constraint clash, no poisoned transaction,
+     * no in-transaction retry. The unique constraint remains as a backstop, not the contention path. The
+     * guarantee: under contention every edit persists with a distinct, gap-free revision number.
      */
     private void snapshotRevision(Practice practice) {
-        try {
-            saveRevision(practice);
-        } catch (DataIntegrityViolationException ex) {
-            // A concurrent edit grabbed the same revision number first — recompute and retry once.
-            saveRevision(practice);
-        }
-    }
-
-    private void saveRevision(Practice practice) {
+        // Lock the parent row for the duration of read-max + insert so concurrent appends serialise. The
+        // returned managed entity is the same logical practice; we only need the lock side effect.
+        practiceRepository.findByIdForUpdate(practice.getId());
         practiceRevisionRepository.save(
             new PracticeRevision(practice, nextRevisionNumber(practice), practice.getCriteria())
         );
