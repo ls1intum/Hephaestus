@@ -5,8 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { AreaIcon } from "./AreaBadge";
-import { areaSeed, COLOR_KEYS, ICON_COMPONENTS, ICON_NAMES, PILL } from "./areaVisuals";
+import {
+	areaSeed,
+	COLOR_KEYS,
+	getAreaVisual,
+	ICON_COMPONENTS,
+	ICON_NAMES,
+	PILL,
+} from "./areaVisuals";
 
 interface AreaVisualPickerProps {
 	slug: string;
@@ -39,6 +45,7 @@ export function AreaVisualPicker({
 	const seed = areaSeed(slug, name);
 	const activeIcon = icon ?? seed.icon;
 	const activeColor = color ?? seed.color;
+	const { Icon: EffectiveIcon, pill } = getAreaVisual(slug, name, icon, color);
 	const [query, setQuery] = useState("");
 
 	const q = query.trim().toLowerCase();
@@ -54,7 +61,9 @@ export function AreaVisualPicker({
 						disabled={disabled}
 						aria-label={`Edit icon and colour for ${name}`}
 					>
-						<AreaIcon slug={slug} name={name} icon={icon} color={color} />
+						<span className={cn("flex size-6 items-center justify-center rounded-md", pill)}>
+							<EffectiveIcon className="size-4" aria-hidden="true" />
+						</span>
 					</Button>
 				}
 			/>

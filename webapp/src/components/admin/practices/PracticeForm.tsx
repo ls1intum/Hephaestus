@@ -496,7 +496,8 @@ export function PracticeForm({
 
 						{/* The spine: a practice connects to the observations it produces and the feedback
 						    delivered from them. The admin-facing summary of that activity is not built yet
-						    (no aggregate endpoint), so this is an honest reserved home, not placeholder data. */}
+						    (no aggregate endpoint — tracked in ls1intum/Hephaestus#1339), so this is an honest
+						    reserved home, not placeholder data. */}
 						{mode === "edit" && (
 							<>
 								<Separator />

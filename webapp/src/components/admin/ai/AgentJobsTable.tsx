@@ -158,7 +158,7 @@ export function AgentJobsTable({
 							<Bot />
 						</EmptyMedia>
 						<EmptyTitle>No reviews yet</EmptyTitle>
-						<EmptyDescription>Reviews appear here once practice detection runs.</EmptyDescription>
+						<EmptyDescription>Reviews appear here once a practice review runs.</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			) : (
