@@ -157,7 +157,7 @@ export function PracticeDetectionPolicyCard({
 							<AlertTitle>Selected model is disabled</AlertTitle>
 							<AlertDescription>
 								“{boundConfig?.name}” is turned off — practice reviews won't run until you re-enable
-								it (on the AI models page) or pick a different model.
+								it (on the Models page) or pick a different model.
 							</AlertDescription>
 						</Alert>
 					)}

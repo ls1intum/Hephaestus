@@ -19,7 +19,7 @@ import {
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/settings",
+	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/settings",
 )({
 	component: ReviewSettingsContainer,
 });

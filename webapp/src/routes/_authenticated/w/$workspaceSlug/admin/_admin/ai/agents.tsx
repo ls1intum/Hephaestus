@@ -1,18 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AgentRuntimesPage } from "@/components/admin/ai/AgentRuntimesPage";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Renamed: "AI models" is now the workspace-infrastructure "Models" section at /admin/models.
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/ai/agents")({
-	component: AgentsContainer,
+	beforeLoad: ({ params }) => {
+		throw redirect({
+			to: "/w/$workspaceSlug/admin/models",
+			params: { workspaceSlug: params.workspaceSlug },
+			search: (prev) => prev,
+		});
+	},
 });
-
-function AgentsContainer() {
-	const { workspaceSlug, isLoading } = useActiveWorkspaceSlug();
-
-	if (!workspaceSlug && !isLoading) {
-		return <NoWorkspace />;
-	}
-
-	return <AgentRuntimesPage workspaceSlug={workspaceSlug ?? ""} />;
-}

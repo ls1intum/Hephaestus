@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw, Telescope } from "lucide-react";
 import { useState } from "react";
 import type {
 	CreatePracticeRequest,
@@ -493,6 +493,32 @@ export function PracticeForm({
 								</>
 							)}
 						</section>
+
+						{/* The spine: a practice connects to the observations it produces and the feedback
+						    delivered from them. The admin-facing summary of that activity is not built yet
+						    (no aggregate endpoint), so this is an honest reserved home, not placeholder data. */}
+						{mode === "edit" && (
+							<>
+								<Separator />
+								<section className="space-y-4">
+									<div>
+										<h2 className="text-lg font-semibold">Observations &amp; feedback</h2>
+										<p className="text-sm text-muted-foreground">
+											What this practice has produced across the workspace.
+										</p>
+									</div>
+									<div className="rounded-lg border border-dashed bg-muted/30 px-6 py-10 text-center">
+										<Telescope className="mx-auto mb-3 size-6 text-muted-foreground" />
+										<p className="text-sm font-medium">Activity will surface here</p>
+										<p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+											Once this practice is evaluated, the observations it records — and the
+											feedback delivered from them — will appear on this page, with how often it
+											fires and how developers respond. Feedback itself stays developer-facing.
+										</p>
+									</div>
+								</section>
+							</>
+						)}
 					</div>
 				</div>
 			</div>

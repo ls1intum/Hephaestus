@@ -143,12 +143,7 @@ export function RubricTree({
 				<div className="flex items-center gap-2">
 					<AddAreaButton onCreate={onCreateArea} disabled={isMutating} />
 					<Button
-						render={
-							<Link
-								to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/new"
-								params={{ workspaceSlug }}
-							/>
-						}
+						render={<Link to="/w/$workspaceSlug/admin/practices/new" params={{ workspaceSlug }} />}
 					>
 						<Plus className="mr-1.5 size-4" />
 						New practice
@@ -438,7 +433,7 @@ function SortablePracticeRow({
 				{practice.artifactType === "ISSUE" ? "Issue" : "PR"}
 			</Badge>
 			<Link
-				to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
+				to="/w/$workspaceSlug/admin/practices/$practiceSlug"
 				params={{ workspaceSlug, practiceSlug: practice.slug }}
 				className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			>
@@ -473,7 +468,7 @@ function SortablePracticeRow({
 					<DropdownMenuItem
 						render={
 							<Link
-								to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
+								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
 								params={{ workspaceSlug, practiceSlug: practice.slug }}
 							/>
 						}

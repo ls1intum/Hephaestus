@@ -173,9 +173,9 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	return (
 		<div className="container mx-auto max-w-6xl py-6">
 			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
+				<h1 className="text-3xl font-bold tracking-tight">Models</h1>
 				<p className="text-muted-foreground">
-					Set up the AI models that power practice reviews and the mentor.
+					Set up the models that power practice reviews and the mentor.
 				</p>
 			</div>
 

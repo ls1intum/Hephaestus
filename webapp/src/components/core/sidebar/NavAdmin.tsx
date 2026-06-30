@@ -1,12 +1,12 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import {
-	Activity,
 	BookUser,
 	Bot,
 	ChevronRight,
 	ClipboardCheck,
 	ListChecks,
 	Map as MapIcon,
+	PlayCircle,
 	Settings2,
 	SlidersHorizontal,
 	Trophy,
@@ -31,33 +31,29 @@ export interface NavAdminProps {
 	mentorEnabled?: boolean;
 }
 
-// Workspace administration is one group. Practice detection is the AI-review feature and owns several
-// surfaces (the rubric, its review settings, and the run/activity log), so it nests as a collapsible
-// sub-tree rather than scattering those surfaces as flat siblings — this is where Review settings lives
-// (a sidebar destination, not an in-page tab). "AI models" stays a top-level item because models are
-// shared infrastructure (the mentor uses them too), not specific to practice detection. Individual
-// practices/areas are deliberately NOT sidebar entries — there are dozens; the Rubric tree is their home.
+// Workspace administration is one group. "Practices" is the domain — a workspace curates a catalog of
+// practices and the observations/feedback they produce. It owns several surfaces (the catalog, how
+// reviews run, and the run log), so it nests as a collapsible sub-tree. The model/agent/"AI" plumbing is
+// deliberately NOT the headline: "Models" is a separate workspace-infrastructure item (shared with the
+// mentor). Individual practices/areas are not sidebar entries — there are dozens; the catalog is their
+// home, and a practice drills down to its own detail page.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,
 	practicesEnabled = true,
 	mentorEnabled = false,
 }: NavAdminProps) {
-	const aiVisible = practicesEnabled || mentorEnabled;
+	const modelsVisible = practicesEnabled || mentorEnabled;
 	const matchRoute = useMatchRoute();
 
 	const onSettings = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/ai/practice-detection/settings", fuzzy: true }),
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices/settings", fuzzy: true }),
 	);
-	const onActivity = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/ai/practice-detection/activity", fuzzy: true }),
-	);
-	const onSection = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/ai/practice-detection", fuzzy: true }),
-	);
-	// Rubric is the section's index; the catalog editor drills down under it, so anything in the section
-	// that isn't Settings or Activity counts as Rubric.
-	const onRubric = onSection && !onSettings && !onActivity;
+	const onRuns = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices/runs", fuzzy: true }));
+	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
+	// Catalog is the section's index; a practice's detail page drills down under it, so anything in the
+	// section that isn't Review settings or Runs counts as Catalog.
+	const onCatalog = onSection && !onSettings && !onRuns;
 
 	return (
 		<SidebarGroup>
@@ -122,12 +118,12 @@ export function NavAdmin({
 						<CollapsibleTrigger
 							render={
 								<SidebarMenuButton
-									tooltip="Practice detection"
+									tooltip="Practices"
 									isActive={onSection}
 									className="group/collapsible"
 								>
 									<ClipboardCheck />
-									<span>Practice detection</span>
+									<span>Practices</span>
 									<ChevronRight className="ml-auto transition-transform group-aria-expanded/collapsible:rotate-90" />
 								</SidebarMenuButton>
 							}
@@ -136,16 +132,13 @@ export function NavAdmin({
 							<SidebarMenuSub>
 								<SidebarMenuSubItem>
 									<SidebarMenuSubButton
-										isActive={onRubric}
+										isActive={onCatalog}
 										render={
-											<Link
-												to="/w/$workspaceSlug/admin/ai/practice-detection"
-												params={{ workspaceSlug }}
-											/>
+											<Link to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} />
 										}
 									>
 										<ListChecks />
-										<span>Rubric</span>
+										<span>Catalog</span>
 									</SidebarMenuSubButton>
 								</SidebarMenuSubItem>
 								<SidebarMenuSubItem>
@@ -153,7 +146,7 @@ export function NavAdmin({
 										isActive={onSettings}
 										render={
 											<Link
-												to="/w/$workspaceSlug/admin/ai/practice-detection/settings"
+												to="/w/$workspaceSlug/admin/practices/settings"
 												params={{ workspaceSlug }}
 											/>
 										}
@@ -164,30 +157,30 @@ export function NavAdmin({
 								</SidebarMenuSubItem>
 								<SidebarMenuSubItem>
 									<SidebarMenuSubButton
-										isActive={onActivity}
+										isActive={onRuns}
 										render={
 											<Link
-												to="/w/$workspaceSlug/admin/ai/practice-detection/activity"
+												to="/w/$workspaceSlug/admin/practices/runs"
 												params={{ workspaceSlug }}
 											/>
 										}
 									>
-										<Activity />
-										<span>Activity</span>
+										<PlayCircle />
+										<span>Runs</span>
 									</SidebarMenuSubButton>
 								</SidebarMenuSubItem>
 							</SidebarMenuSub>
 						</CollapsibleContent>
 					</Collapsible>
 				)}
-				{aiVisible && (
+				{modelsVisible && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
-							tooltip="AI models"
-							render={<Link to="/w/$workspaceSlug/admin/ai/agents" params={{ workspaceSlug }} />}
+							tooltip="Models"
+							render={<Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />}
 						>
 							<Bot />
-							<span>AI models</span>
+							<span>Models</span>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}

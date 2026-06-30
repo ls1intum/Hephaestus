@@ -124,8 +124,10 @@ export function AgentActivityPage({ workspaceSlug }: AgentActivityPageProps) {
 	return (
 		<div className="container mx-auto max-w-6xl py-6">
 			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">Activity</h1>
-				<p className="text-muted-foreground">See past reviews, token usage, and delivery status.</p>
+				<h1 className="text-3xl font-bold tracking-tight">Runs</h1>
+				<p className="text-muted-foreground">
+					Every practice review run — its model, token usage, cost, and delivery status.
+				</p>
 			</div>
 
 			<AgentJobsTable
