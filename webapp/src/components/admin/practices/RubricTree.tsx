@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
-import { Code2, GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronDown, Code2, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import {
@@ -304,7 +304,7 @@ function SortableArea({
 			value={area.slug}
 			style={style}
 			className={cn(
-				"rounded-lg border bg-card",
+				"group/area rounded-lg border bg-card",
 				isDragging && "z-10 shadow-lg",
 				!area.active && "opacity-60",
 			)}
@@ -327,7 +327,7 @@ function SortableArea({
 					onChange={(patch) => onSetVisual(area.slug, patch)}
 					disabled={isMutating}
 				/>
-				<AccordionTrigger className="min-w-0 shrink py-2.5 hover:no-underline">
+				<AccordionTrigger className="min-w-0 shrink py-2.5 hover:no-underline [&_[data-slot=accordion-trigger-icon]]:hidden">
 					<span className="flex min-w-0 items-center gap-2">
 						<span className="truncate font-medium">{area.name}</span>
 						<Badge variant="secondary" className="shrink-0">
@@ -336,6 +336,10 @@ function SortableArea({
 					</span>
 				</AccordionTrigger>
 				<div className="ml-auto flex items-center gap-2">
+					<ChevronDown
+						aria-hidden
+						className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[open]/area:rotate-180"
+					/>
 					<Switch
 						checked={area.active}
 						onCheckedChange={(c) => onToggleActive(area.slug, c)}
