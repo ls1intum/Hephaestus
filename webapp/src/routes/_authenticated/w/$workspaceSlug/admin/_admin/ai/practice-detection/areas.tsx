@@ -115,6 +115,9 @@ function PracticeAreasContainer() {
 			onReorder={(orderedSlugs) =>
 				reorderAreas.mutate({ path: { workspaceSlug: slug }, body: { orderedSlugs } })
 			}
+			onSetVisual={(areaSlug, patch) =>
+				updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: patch })
+			}
 		/>
 	);
 }

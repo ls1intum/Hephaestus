@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { AreaVisualPicker } from "./AreaVisualPicker";
 
 interface PracticeAreasPanelProps {
 	areas: PracticeArea[];
@@ -26,6 +27,8 @@ interface PracticeAreasPanelProps {
 	onDelete: (slug: string) => void;
 	/** Persist a new top-to-bottom ordering of all area slugs. */
 	onReorder: (orderedSlugs: string[]) => void;
+	/** Persist a partial icon/colour change for an area. */
+	onSetVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	isMutating: boolean;
 }
 
@@ -42,6 +45,7 @@ export function PracticeAreasPanel({
 	onToggleActive,
 	onDelete,
 	onReorder,
+	onSetVisual,
 	isMutating,
 }: PracticeAreasPanelProps) {
 	const [newName, setNewName] = useState("");
@@ -165,6 +169,14 @@ export function PracticeAreasPanel({
 								</div>
 							) : (
 								<div className="flex items-center gap-2">
+									<AreaVisualPicker
+										slug={area.slug}
+										name={area.name}
+										icon={area.icon}
+										color={area.color}
+										onChange={(patch) => onSetVisual(area.slug, patch)}
+										disabled={isMutating}
+									/>
 									<button
 										type="button"
 										className="font-medium truncate hover:underline"

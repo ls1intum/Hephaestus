@@ -3,6 +3,7 @@ import { ClipboardList } from "lucide-react";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { AreaIcon } from "./AreaBadge";
 import { PracticeCard } from "./PracticeCard";
 
 interface PracticeCardListProps {
@@ -86,6 +87,8 @@ export function PracticeCardList({
 		.map((area) => ({
 			key: area.slug,
 			title: area.name,
+			icon: area.icon ?? null,
+			color: area.color ?? null,
 			items: sortPractices(byArea.get(area.slug) ?? []),
 		}))
 		.filter((section) => section.items.length > 0);
@@ -94,7 +97,7 @@ export function PracticeCardList({
 	const sections = [
 		...areaSections,
 		...(unassigned.length > 0
-			? [{ key: "__unassigned__", title: "Unassigned", items: unassigned }]
+			? [{ key: "__unassigned__", title: "Unassigned", icon: null, color: null, items: unassigned }]
 			: []),
 	];
 
@@ -102,7 +105,13 @@ export function PracticeCardList({
 		<div className="space-y-8">
 			{sections.map((section) => (
 				<section key={section.key} className="space-y-3">
-					<div className="flex items-baseline gap-2 border-b pb-1.5">
+					<div className="flex items-center gap-2 border-b pb-1.5">
+						<AreaIcon
+							slug={section.key}
+							name={section.title}
+							icon={section.icon}
+							color={section.color}
+						/>
 						<h2 className="text-sm font-semibold tracking-tight">{section.title}</h2>
 						<span className="text-xs text-muted-foreground">{section.items.length}</span>
 					</div>

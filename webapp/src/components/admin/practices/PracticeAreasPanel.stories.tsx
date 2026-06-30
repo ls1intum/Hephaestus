@@ -16,6 +16,7 @@ const meta = {
 		onToggleActive: fn(),
 		onDelete: fn(),
 		onReorder: fn(),
+		onSetVisual: fn(),
 	},
 	decorators: [
 		(Story) => (
