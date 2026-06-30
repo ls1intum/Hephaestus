@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
-import { Code2, GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Code2, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { useMemo } from "react";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import {
@@ -132,6 +132,7 @@ export function RubricTree({
 				<ToggleGroup
 					value={[focusFilter]}
 					onValueChange={(v) => v[0] && onFocusFilterChange(v[0] as FocusFilter)}
+					variant="outline"
 					size="sm"
 					aria-label="Filter by artifact"
 				>
@@ -194,16 +195,18 @@ export function RubricTree({
 						<span className="text-sm font-semibold text-muted-foreground">Unassigned</span>
 						<Badge variant="secondary">{unassigned.length}</Badge>
 					</div>
-					<PracticeRows
-						areaSlug={null}
-						practices={unassigned}
-						workspaceSlug={workspaceSlug}
-						togglingPractices={togglingPractices}
-						sensors={sensors}
-						onSetPracticeActive={onSetPracticeActive}
-						onDeletePractice={onDeletePractice}
-						onReorderPractices={onReorderPractices}
-					/>
+					<div className="py-1 pl-3 pr-2">
+						<PracticeRows
+							areaSlug={null}
+							practices={unassigned}
+							workspaceSlug={workspaceSlug}
+							togglingPractices={togglingPractices}
+							sensors={sensors}
+							onSetPracticeActive={onSetPracticeActive}
+							onDeletePractice={onDeletePractice}
+							onReorderPractices={onReorderPractices}
+						/>
+					</div>
 				</div>
 			)}
 
@@ -266,7 +269,7 @@ function SortableArea({
 				!area.active && "opacity-60",
 			)}
 		>
-			<div className="flex items-center gap-1 pr-2">
+			<div className="flex items-center gap-2 px-2">
 				<button
 					type="button"
 					className="flex size-8 shrink-0 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
@@ -284,10 +287,12 @@ function SortableArea({
 					onChange={(patch) => onSetVisual(area.slug, patch)}
 					disabled={isMutating}
 				/>
-				<AccordionTrigger className="flex-1 py-2 hover:no-underline">
-					<span className="flex items-center gap-2">
-						<span className="font-medium">{area.name}</span>
-						<Badge variant="secondary">{practices.length}</Badge>
+				<AccordionTrigger className="min-w-0 flex-1 py-2.5 hover:no-underline">
+					<span className="flex min-w-0 items-center gap-2">
+						<span className="truncate font-medium">{area.name}</span>
+						<Badge variant="secondary" className="shrink-0">
+							{practices.length}
+						</Badge>
 					</span>
 				</AccordionTrigger>
 				<Switch
@@ -313,7 +318,7 @@ function SortableArea({
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
-			<AccordionContent className="px-2 pb-2">
+			<AccordionContent className="pb-2 pl-9 pr-2">
 				{practices.length === 0 ? (
 					<p className="px-2 py-3 text-sm text-muted-foreground">No practices in this area yet.</p>
 				) : (
@@ -376,7 +381,7 @@ function PracticeRows({
 			onDragEnd={onDragEnd}
 		>
 			<SortableContext items={ordered.map((p) => p.slug)} strategy={verticalListSortingStrategy}>
-				<div className="space-y-1">
+				<div className="space-y-0.5">
 					{ordered.map((p) => (
 						<SortablePracticeRow
 							key={p.slug}
@@ -415,8 +420,8 @@ function SortablePracticeRow({
 			ref={setNodeRef}
 			style={style}
 			className={cn(
-				"flex items-center gap-2 rounded-md border bg-background px-2 py-1.5",
-				isDragging && "z-10 shadow-md",
+				"flex items-center gap-2 rounded-md py-1 transition-colors hover:bg-muted/60",
+				isDragging && "z-10 bg-background shadow-md",
 				!practice.active && "opacity-60",
 			)}
 		>
@@ -429,12 +434,16 @@ function SortablePracticeRow({
 			>
 				<GripVertical className="size-4" />
 			</button>
-			<Badge variant="outline" className="shrink-0">
+			<Badge variant="outline" className="w-12 shrink-0 justify-center">
 				{practice.artifactType === "ISSUE" ? "Issue" : "PR"}
 			</Badge>
-			<div className="min-w-0 flex-1">
-				<div className="flex items-center gap-1.5">
-					<span className="truncate text-sm font-medium">{practice.name}</span>
+			<Link
+				to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
+				params={{ workspaceSlug, practiceSlug: practice.slug }}
+				className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				<span className="flex items-center gap-1.5">
+					<span className="truncate text-sm font-medium hover:underline">{practice.name}</span>
 					{practice.precomputeScript && (
 						<Tooltip>
 							<TooltipTrigger
@@ -443,36 +452,40 @@ function SortablePracticeRow({
 							<TooltipContent>Has precompute script</TooltipContent>
 						</Tooltip>
 					)}
-				</div>
-				<p className="truncate text-xs text-muted-foreground">{practice.slug}</p>
-			</div>
+				</span>
+				<span className="block truncate text-xs text-muted-foreground">{practice.slug}</span>
+			</Link>
 			<Switch
 				checked={practice.active}
 				onCheckedChange={(c) => onSetActive(practice.slug, c)}
 				disabled={isToggling}
 				aria-label={`Toggle ${practice.name} active`}
 			/>
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				render={
-					<Link
-						to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
-						params={{ workspaceSlug, practiceSlug: practice.slug }}
-					/>
-				}
-				aria-label={`Edit ${practice.name}`}
-			>
-				<Pencil className="size-4" />
-			</Button>
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				onClick={() => onDelete(practice)}
-				aria-label={`Delete ${practice.name}`}
-			>
-				<Trash2 className="size-4 text-destructive" />
-			</Button>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${practice.name}`}>
+							<MoreHorizontal className="size-4" />
+						</Button>
+					}
+				/>
+				<DropdownMenuContent align="end">
+					<DropdownMenuItem
+						render={
+							<Link
+								to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
+								params={{ workspaceSlug, practiceSlug: practice.slug }}
+							/>
+						}
+					>
+						Edit standard
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem variant="destructive" onClick={() => onDelete(practice)}>
+						Delete practice
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 	);
 }
