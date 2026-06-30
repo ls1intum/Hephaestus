@@ -239,7 +239,7 @@ public class Observation {
     /**
      * JPA-path safety net only. The production write path is the native {@code ObservationRepository.insertIfAbsent}
      * (this entity is {@code @Immutable} and nothing calls {@code save()}), so @PrePersist never fires in prod — the
-     * real guards there are {@link de.tum.cit.aet.hephaestus.practices.detection.PracticeDetectionResultParser}'s
+     * real guards there are {@link de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser}'s
      * coherence coercion plus the DB CHECK constraints. The presence/assessment invariant below HAS a DB backstop
      * ({@code chk_observation_presence_assessment}); the severity invariant does NOT (the DB only allow-lists severity
      * values), so the parser coercion is its sole enforcement. This method keeps both invariants meaningful for any
