@@ -1,20 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AgentActivityPage } from "@/components/admin/ai/AgentActivityPage";
-import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/runs",
 )({
-	component: ActivityContainer,
+	component: RunsContainer,
 });
 
-function ActivityContainer() {
-	const { workspaceSlug, isLoading } = useActiveWorkspaceSlug();
-
-	if (!workspaceSlug && !isLoading) {
-		return <NoWorkspace />;
-	}
-
+function RunsContainer() {
+	const { workspaceSlug } = useActiveWorkspaceSlug();
 	return <AgentActivityPage workspaceSlug={workspaceSlug ?? ""} />;
 }
