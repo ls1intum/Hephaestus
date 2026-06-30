@@ -50,7 +50,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { AreaVisualPicker } from "./AreaVisualPicker";
 
-type FocusFilter = "ALL" | "PULL_REQUEST" | "ISSUE";
+export type FocusFilter = "ALL" | "PULL_REQUEST" | "ISSUE";
 
 export interface RubricTreeProps {
 	workspaceSlug: string;

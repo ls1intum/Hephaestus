@@ -187,14 +187,13 @@ export function PracticeForm({
 		<form onSubmit={handleSubmit} className="flex flex-col h-full">
 			<div className="flex-1 overflow-y-auto pb-24">
 				<div className="container mx-auto max-w-3xl py-6">
-					{/* Header */}
 					<div className="mb-8">
 						<button
 							type="button"
 							onClick={onCancel}
 							className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
 						>
-							<ArrowLeft className="h-4 w-4" />
+							<ArrowLeft className="size-4" />
 							Back to Practices
 						</button>
 						<h1 className="text-3xl font-bold tracking-tight">
@@ -208,7 +207,6 @@ export function PracticeForm({
 					</div>
 
 					<div className="space-y-8">
-						{/* Section: General */}
 						<section className="space-y-4">
 							<div>
 								<h2 className="text-lg font-semibold">General</h2>
@@ -257,7 +255,7 @@ export function PracticeForm({
 												}
 												aria-label="Reset to auto-generated slug"
 											>
-												<RotateCcw className="h-3.5 w-3.5" />
+												<RotateCcw className="size-3.5" />
 											</Button>
 										)}
 									</div>
@@ -347,20 +345,17 @@ export function PracticeForm({
 
 						<Separator />
 
-						{/* Section: Trigger Events */}
 						<section className="space-y-4">
 							<fieldset
 								className="space-y-4"
 								aria-invalid={!!triggerError}
 								aria-describedby={triggerError ? "trigger-error" : undefined}
 							>
-								<div>
-									<legend className="text-lg font-semibold">Run this practice when… *</legend>
-									<p className="text-sm text-muted-foreground">
-										Pick the {form.focusArtifact === "ISSUE" ? "issue" : "pull request"} activity
-										that should trigger an evaluation.
-									</p>
-								</div>
+								<legend className="text-lg font-semibold">Run this practice when… *</legend>
+								<p className="text-sm text-muted-foreground">
+									Pick the {form.focusArtifact === "ISSUE" ? "issue" : "pull request"} activity that
+									should trigger an evaluation.
+								</p>
 								<div className="grid grid-cols-2 gap-3">
 									{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
 										<Label
@@ -389,7 +384,6 @@ export function PracticeForm({
 
 						<Separator />
 
-						{/* Section: Evaluation Criteria */}
 						<section className="space-y-4">
 							<div>
 								<h2 className="text-lg font-semibold">Evaluation Criteria *</h2>
@@ -416,7 +410,6 @@ export function PracticeForm({
 
 						<Separator />
 
-						{/* Section: Learner guidance — developer-facing, never the detection criteria */}
 						<section className="space-y-4">
 							<div>
 								<h2 className="text-lg font-semibold">Learner guidance</h2>
@@ -459,7 +452,6 @@ export function PracticeForm({
 
 						<Separator />
 
-						{/* Section: Advanced — precompute script (optional support; the LLM does the heavy lifting) */}
 						<section className="space-y-4">
 							<button
 								type="button"
@@ -468,9 +460,9 @@ export function PracticeForm({
 								aria-expanded={showAdvanced}
 							>
 								{showAdvanced ? (
-									<ChevronDown className="h-4 w-4" />
+									<ChevronDown className="size-4" />
 								) : (
-									<ChevronRight className="h-4 w-4" />
+									<ChevronRight className="size-4" />
 								)}
 								Advanced
 								<span className="text-sm font-normal text-muted-foreground">
@@ -522,7 +514,6 @@ export function PracticeForm({
 				</div>
 			</div>
 
-			{/* Sticky footer */}
 			<div className="sticky bottom-0 border-t bg-background px-6 py-4 z-10">
 				<div className="container mx-auto max-w-3xl flex justify-between">
 					<Button type="button" variant="outline" onClick={onCancel}>
@@ -531,7 +522,7 @@ export function PracticeForm({
 					<Button type="submit" disabled={isPending}>
 						{isPending ? (
 							<>
-								<Spinner className="mr-2 h-4 w-4" />
+								<Spinner className="mr-2 size-4" />
 								{mode === "create" ? "Creating..." : "Saving..."}
 							</>
 						) : mode === "create" ? (

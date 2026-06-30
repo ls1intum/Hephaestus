@@ -17,7 +17,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice } from "@/api/types.gen";
 import { generateSlug } from "@/components/admin/practices/constants";
-import { RubricTree } from "@/components/admin/practices/RubricTree";
+import { type FocusFilter, RubricTree } from "@/components/admin/practices/RubricTree";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -34,8 +34,6 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/")({
 	component: RubricContainer,
 });
-
-type FocusFilter = "ALL" | "PULL_REQUEST" | "ISSUE";
 
 function RubricContainer() {
 	const queryClient = useQueryClient();

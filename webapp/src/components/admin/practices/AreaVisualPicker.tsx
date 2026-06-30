@@ -11,6 +11,7 @@ import {
 	getAreaVisual,
 	ICON_COMPONENTS,
 	ICON_NAMES,
+	iconSearchText,
 	PILL,
 } from "./areaVisuals";
 
@@ -22,11 +23,6 @@ interface AreaVisualPickerProps {
 	/** Persist a partial change — only the field the admin touched is sent (PATCH semantics). */
 	onChange: (patch: { icon?: string; color?: string }) => void;
 	disabled?: boolean;
-}
-
-/** Split a PascalCase lucide name into lowercase words so "git" matches "GitBranch", etc. */
-function searchable(iconName: string): string {
-	return iconName.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 }
 
 /**
@@ -49,7 +45,7 @@ export function AreaVisualPicker({
 	const [query, setQuery] = useState("");
 
 	const q = query.trim().toLowerCase();
-	const filteredIcons = q ? ICON_NAMES.filter((n) => searchable(n).includes(q)) : ICON_NAMES;
+	const filteredIcons = q ? ICON_NAMES.filter((n) => iconSearchText(n).includes(q)) : ICON_NAMES;
 
 	return (
 		<Popover>

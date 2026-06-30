@@ -1,7 +1,3 @@
-/**
- * Constants and helpers for the practice catalog admin UI.
- */
-
 import type { Practice } from "@/api/types.gen";
 
 /** The work artifact a practice targets (PR or Issue). Mirrors the server's WorkArtifact enum. */
