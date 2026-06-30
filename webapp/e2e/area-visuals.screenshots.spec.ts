@@ -68,4 +68,10 @@ test("capture practices admin", async ({ page }) => {
 	await page.waitForLoadState("networkidle");
 	await page.waitForTimeout(500);
 	await page.screenshot({ path: `${OUT}/runs.png`, fullPage: true });
+
+	// 7) Models — workspace AI infrastructure (shared by the mentor).
+	await page.goto("/w/e2e/admin/models");
+	await page.waitForLoadState("networkidle");
+	await page.waitForTimeout(500);
+	await page.screenshot({ path: `${OUT}/models.png`, fullPage: true });
 });
