@@ -1,4 +1,4 @@
-import { Folder, Rocket } from "lucide-react";
+import { Folder, Package, Rocket } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { areaSeed, getAreaVisual, PILL, SEEDED_AREA_SLUGS } from "./areaVisuals";
 
@@ -59,7 +59,7 @@ describe("areaVisuals", () => {
 			"NotAnIcon",
 			"chartreuse",
 		);
-		expect(visual.Icon).not.toBe(Folder); // falls back to the seeded Package icon
+		expect(visual.Icon).toBe(Package); // the seeded icon for review-ready-work
 		expect(visual.pill).toBe(PILL.sky);
 	});
 

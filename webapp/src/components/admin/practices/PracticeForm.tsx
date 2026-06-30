@@ -494,10 +494,8 @@ export function PracticeForm({
 							)}
 						</section>
 
-						{/* The spine: a practice connects to the observations it produces and the feedback
-						    delivered from them. The admin-facing summary of that activity is not built yet
-						    (no aggregate endpoint — tracked in ls1intum/Hephaestus#1339), so this is an honest
-						    reserved home, not placeholder data. */}
+						{/* Activity summary placeholder — no aggregate observation/feedback endpoint yet
+						    (ls1intum/Hephaestus#1339). */}
 						{mode === "edit" && (
 							<>
 								<Separator />

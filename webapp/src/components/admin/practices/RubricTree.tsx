@@ -18,7 +18,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
 import { Code2, GripVertical, MoreHorizontal, Plus } from "lucide-react";
-import { useMemo } from "react";
+import { useState } from "react";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import {
 	Accordion,
@@ -29,6 +29,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
@@ -36,6 +43,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -91,26 +99,19 @@ export function RubricTree({
 	onDeletePractice,
 	onReorderPractices,
 }: RubricTreeProps) {
-	const sortedAreas = useMemo(
-		() =>
-			[...areas].sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name)),
-		[areas],
+	const [renamingArea, setRenamingArea] = useState<PracticeArea | null>(null);
+	const sortedAreas = [...areas].sort(
+		(a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
 	);
-	const visible = useMemo(
-		() =>
-			focusFilter === "ALL" ? practices : practices.filter((p) => p.artifactType === focusFilter),
-		[practices, focusFilter],
-	);
-	const byArea = useMemo(() => {
-		const map = new Map<string, Practice[]>();
-		for (const p of visible) {
-			const key = p.areaSlug ?? UNASSIGNED;
-			const list = map.get(key);
-			if (list) list.push(p);
-			else map.set(key, [p]);
-		}
-		return map;
-	}, [visible]);
+	const visible =
+		focusFilter === "ALL" ? practices : practices.filter((p) => p.artifactType === focusFilter);
+	const byArea = new Map<string, Practice[]>();
+	for (const p of visible) {
+		const key = p.areaSlug ?? UNASSIGNED;
+		const list = byArea.get(key);
+		if (list) list.push(p);
+		else byArea.set(key, [p]);
+	}
 	const unassigned = byArea.get(UNASSIGNED) ?? [];
 
 	const sensors = useSensors(
@@ -171,7 +172,7 @@ export function RubricTree({
 								togglingPractices={togglingPractices}
 								isMutating={isMutating}
 								sensors={sensors}
-								onRename={onRenameArea}
+								onRequestRename={setRenamingArea}
 								onToggleActive={onToggleAreaActive}
 								onDelete={onDeleteArea}
 								onSetVisual={onSetAreaVisual}
@@ -210,7 +211,56 @@ export function RubricTree({
 					No practice areas yet. Add one to start grouping practices.
 				</p>
 			)}
+
+			<RenameAreaDialog
+				area={renamingArea}
+				onClose={() => setRenamingArea(null)}
+				onRename={onRenameArea}
+			/>
 		</div>
+	);
+}
+
+function RenameAreaDialog({
+	area,
+	onClose,
+	onRename,
+}: {
+	area: PracticeArea | null;
+	onClose: () => void;
+	onRename: (slug: string, name: string) => void;
+}) {
+	return (
+		<Dialog open={area !== null} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="sm:max-w-sm">
+				<DialogHeader>
+					<DialogTitle>Rename area</DialogTitle>
+				</DialogHeader>
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						const input = e.currentTarget.elements.namedItem("areaName") as HTMLInputElement;
+						const name = input.value.trim();
+						if (area && name && name !== area.name) onRename(area.slug, name);
+						onClose();
+					}}
+					className="space-y-4"
+				>
+					<Input
+						name="areaName"
+						defaultValue={area?.name ?? ""}
+						aria-label="Area name"
+						autoComplete="off"
+					/>
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button type="submit">Save</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -221,7 +271,7 @@ function SortableArea({
 	togglingPractices,
 	isMutating,
 	sensors,
-	onRename,
+	onRequestRename,
 	onToggleActive,
 	onDelete,
 	onSetVisual,
@@ -235,7 +285,7 @@ function SortableArea({
 	togglingPractices: Set<string>;
 	isMutating: boolean;
 	sensors: ReturnType<typeof useSensors>;
-	onRename: (slug: string, name: string) => void;
+	onRequestRename: (area: PracticeArea) => void;
 	onToggleActive: (slug: string, active: boolean) => void;
 	onDelete: (slug: string) => void;
 	onSetVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
@@ -247,11 +297,6 @@ function SortableArea({
 		id: area.slug,
 	});
 	const style = { transform: CSS.Transform.toString(transform), transition };
-
-	const rename = () => {
-		const next = window.prompt("Rename practice area", area.name);
-		if (next?.trim() && next.trim() !== area.name) onRename(area.slug, next.trim());
-	};
 
 	return (
 		<AccordionItem
@@ -305,7 +350,7 @@ function SortableArea({
 						}
 					/>
 					<DropdownMenuContent align="end">
-						<DropdownMenuItem onClick={rename}>Rename</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => onRequestRename(area)}>Rename</DropdownMenuItem>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem variant="destructive" onClick={() => onDelete(area.slug)}>
 							Delete area
@@ -352,12 +397,8 @@ function PracticeRows({
 	onDeletePractice: (practice: Practice) => void;
 	onReorderPractices: (areaSlug: string | null, orderedSlugs: string[]) => void;
 }) {
-	const ordered = useMemo(
-		() =>
-			[...practices].sort(
-				(a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
-			),
-		[practices],
+	const ordered = [...practices].sort(
+		(a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
 	);
 	const onDragEnd = (e: DragEndEvent) => {
 		const { active, over } = e;
@@ -493,8 +534,8 @@ function AddAreaButton({
 	disabled?: boolean;
 }) {
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
+		<Popover>
+			<PopoverTrigger
 				render={
 					<Button variant="outline" disabled={disabled}>
 						<Plus className="mr-1.5 size-4" />
@@ -502,7 +543,7 @@ function AddAreaButton({
 					</Button>
 				}
 			/>
-			<DropdownMenuContent align="end" className="w-72 p-2">
+			<PopoverContent align="end" className="w-72">
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
@@ -525,7 +566,7 @@ function AddAreaButton({
 						Add
 					</Button>
 				</form>
-			</DropdownMenuContent>
-		</DropdownMenu>
+			</PopoverContent>
+		</Popover>
 	);
 }

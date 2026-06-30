@@ -123,8 +123,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	const updateMentorConfig = useMutation({
 		...updateMentorConfigMutation(),
 		onSuccess: () => {
-			// Same invalidation as every other runtime mutation — the "Powers mentor" badge derives from
-			// ai-settings, and consistency here keeps this from drifting into a latent stale-cache bug.
+			// The "Powers mentor" badge derives from ai-settings, so invalidate it after a mentor-config change.
 			invalidateAll();
 			toast.success("Mentor model updated");
 		},

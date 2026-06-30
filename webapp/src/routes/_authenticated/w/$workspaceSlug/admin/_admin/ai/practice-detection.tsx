@@ -1,7 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Renamed: the practice-detection admin is now the domain-framed "Practices" section at
-// /admin/practices (catalog / review settings / runs). This redirect keeps old links working.
+// Back-compat redirect: this surface lives at /admin/practices (catalog / review settings / runs).
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection",
 )({

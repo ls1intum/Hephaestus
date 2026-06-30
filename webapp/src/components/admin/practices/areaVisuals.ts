@@ -251,7 +251,7 @@ export const ICON_COMPONENTS: Record<string, LucideIcon> = {
 export const ICON_NAMES = Object.keys(ICON_COMPONENTS);
 
 /** Resolve a stored lucide name to a component, or undefined if unknown/unset. */
-export function resolveIcon(name?: string | null): LucideIcon | undefined {
+function resolveIcon(name?: string | null): LucideIcon | undefined {
 	return name ? ICON_COMPONENTS[name] : undefined;
 }
 

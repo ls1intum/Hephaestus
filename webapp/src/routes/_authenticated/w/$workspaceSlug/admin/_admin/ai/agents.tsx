@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Renamed: "AI models" is now the workspace-infrastructure "Models" section at /admin/models.
+// Back-compat redirect: AI models live at /admin/models.
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/ai/agents")({
 	beforeLoad: ({ params }) => {
 		throw redirect({

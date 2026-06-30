@@ -36,18 +36,6 @@ export function triggerEventsForFocus(focus: WorkArtifact): string[] {
 	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
 }
 
-/** Short labels for inline badge display. */
-export const TRIGGER_EVENT_SHORT_LABELS: Record<string, string> = {
-	PullRequestCreated: "PR opened",
-	PullRequestReady: "PR ready",
-	PullRequestSynchronized: "PR pushed",
-	ReviewSubmitted: "Review",
-	PullRequestMerged: "PR merged",
-	IssueCreated: "Issue opened",
-	IssueLabeled: "Issue labeled",
-	IssueClosed: "Issue closed",
-};
-
 /** The artifact a practice evaluates. Mirrors the server's WorkArtifact enum. */
 export const FOCUS_ARTIFACT_OPTIONS = [
 	{
