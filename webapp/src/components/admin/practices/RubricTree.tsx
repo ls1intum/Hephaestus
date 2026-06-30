@@ -327,7 +327,7 @@ function SortableArea({
 					onChange={(patch) => onSetVisual(area.slug, patch)}
 					disabled={isMutating}
 				/>
-				<AccordionTrigger className="min-w-0 flex-1 py-2.5 hover:no-underline">
+				<AccordionTrigger className="min-w-0 shrink py-2.5 hover:no-underline">
 					<span className="flex min-w-0 items-center gap-2">
 						<span className="truncate font-medium">{area.name}</span>
 						<Badge variant="secondary" className="shrink-0">
@@ -357,6 +357,7 @@ function SortableArea({
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+				<div className="flex-1" />
 			</div>
 			<AccordionContent className="pb-2 pl-9 pr-2">
 				{practices.length === 0 ? (
@@ -476,7 +477,7 @@ function SortablePracticeRow({
 			<Link
 				to="/w/$workspaceSlug/admin/practices/$practiceSlug"
 				params={{ workspaceSlug, practiceSlug: practice.slug }}
-				className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				className="min-w-0 shrink rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			>
 				<span className="flex items-center gap-1.5">
 					<span className="truncate text-sm font-medium hover:underline">{practice.name}</span>
@@ -522,6 +523,7 @@ function SortablePracticeRow({
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
+			<div className="flex-1" />
 		</div>
 	);
 }
