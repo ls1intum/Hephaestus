@@ -335,29 +335,30 @@ function SortableArea({
 						</Badge>
 					</span>
 				</AccordionTrigger>
-				<Switch
-					checked={area.active}
-					onCheckedChange={(c) => onToggleActive(area.slug, c)}
-					disabled={isMutating}
-					aria-label={`Toggle ${area.name} active`}
-				/>
-				<DropdownMenu>
-					<DropdownMenuTrigger
-						render={
-							<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${area.name}`}>
-								<MoreHorizontal className="size-4" />
-							</Button>
-						}
+				<div className="ml-auto flex items-center gap-2">
+					<Switch
+						checked={area.active}
+						onCheckedChange={(c) => onToggleActive(area.slug, c)}
+						disabled={isMutating}
+						aria-label={`Toggle ${area.name} active`}
 					/>
-					<DropdownMenuContent align="end">
-						<DropdownMenuItem onClick={() => onRequestRename(area)}>Rename</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem variant="destructive" onClick={() => onDelete(area.slug)}>
-							Delete area
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-				<div className="flex-1" />
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							render={
+								<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${area.name}`}>
+									<MoreHorizontal className="size-4" />
+								</Button>
+							}
+						/>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem onClick={() => onRequestRename(area)}>Rename</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem variant="destructive" onClick={() => onDelete(area.slug)}>
+								Delete area
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
 			</div>
 			<AccordionContent className="pb-2 pl-9 pr-2">
 				{practices.length === 0 ? (
@@ -492,38 +493,43 @@ function SortablePracticeRow({
 				</span>
 				<span className="block truncate text-xs text-muted-foreground">{practice.slug}</span>
 			</Link>
-			<Switch
-				checked={practice.active}
-				onCheckedChange={(c) => onSetActive(practice.slug, c)}
-				disabled={isToggling}
-				aria-label={`Toggle ${practice.name} active`}
-			/>
-			<DropdownMenu>
-				<DropdownMenuTrigger
-					render={
-						<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${practice.name}`}>
-							<MoreHorizontal className="size-4" />
-						</Button>
-					}
+			<div className="ml-auto flex items-center gap-2">
+				<Switch
+					checked={practice.active}
+					onCheckedChange={(c) => onSetActive(practice.slug, c)}
+					disabled={isToggling}
+					aria-label={`Toggle ${practice.name} active`}
 				/>
-				<DropdownMenuContent align="end">
-					<DropdownMenuItem
+				<DropdownMenu>
+					<DropdownMenuTrigger
 						render={
-							<Link
-								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-								params={{ workspaceSlug, practiceSlug: practice.slug }}
-							/>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={`More actions for ${practice.name}`}
+							>
+								<MoreHorizontal className="size-4" />
+							</Button>
 						}
-					>
-						Edit standard
-					</DropdownMenuItem>
-					<DropdownMenuSeparator />
-					<DropdownMenuItem variant="destructive" onClick={() => onDelete(practice)}>
-						Delete practice
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
-			<div className="flex-1" />
+					/>
+					<DropdownMenuContent align="end">
+						<DropdownMenuItem
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+									params={{ workspaceSlug, practiceSlug: practice.slug }}
+								/>
+							}
+						>
+							Edit standard
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem variant="destructive" onClick={() => onDelete(practice)}>
+							Delete practice
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
 		</div>
 	);
 }
