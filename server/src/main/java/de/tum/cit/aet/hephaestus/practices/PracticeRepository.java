@@ -65,13 +65,13 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Lists practices for a workspace with an optional active filter.
      * Null filter values are ignored (match all).
      */
-    @EntityGraph(attributePaths = "area")
     @Query(
         """
         SELECT p FROM Practice p
+        LEFT JOIN FETCH p.area a
         WHERE p.workspace.id = :workspaceId
         AND (:active IS NULL OR p.active = :active)
-        ORDER BY p.area.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
+        ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """
     )
     List<Practice> findByFilters(@Param("workspaceId") Long workspaceId, @Param("active") Boolean active);
