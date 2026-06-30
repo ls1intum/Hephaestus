@@ -1,11 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { listWorkspacesQueryKey, updateFeaturesMutation } from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
@@ -23,9 +22,6 @@ function PracticeDetectionLayout() {
 		isLoading: featuresLoading,
 		isError: featuresError,
 	} = useWorkspaceFeatures();
-	const navigate = useNavigate();
-	const matchRoute = useMatchRoute();
-
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
 	}
@@ -48,49 +44,10 @@ function PracticeDetectionLayout() {
 		);
 	}
 
-	const isSettings = Boolean(
-		matchRoute({
-			to: "/w/$workspaceSlug/admin/ai/practice-detection/settings",
-			fuzzy: true,
-		}),
-	);
-	// The catalog/* editor routes are a drill-down under the Rubric tab, so Rubric stays selected there.
-	const activeTab = isSettings ? "settings" : "rubric";
-
-	return (
-		<div className="container mx-auto max-w-4xl py-6 space-y-6">
-			<div>
-				<h1 className="text-3xl font-bold tracking-tight">Practice detection</h1>
-				<p className="text-muted-foreground">
-					Configure how automated practice reviews run and which practices are evaluated.
-				</p>
-			</div>
-
-			<Tabs
-				value={activeTab}
-				onValueChange={(value) => {
-					if (value === "settings") {
-						navigate({
-							to: "/w/$workspaceSlug/admin/ai/practice-detection/settings",
-							params: { workspaceSlug },
-						});
-					} else {
-						navigate({
-							to: "/w/$workspaceSlug/admin/ai/practice-detection",
-							params: { workspaceSlug },
-						});
-					}
-				}}
-			>
-				<TabsList>
-					<TabsTrigger value="rubric">Rubric</TabsTrigger>
-					<TabsTrigger value="settings">Review settings</TabsTrigger>
-				</TabsList>
-			</Tabs>
-
-			<Outlet />
-		</div>
-	);
+	// Sub-navigation (Rubric / Review settings / Activity) lives in the sidebar's collapsible
+	// "Practice detection" group, not in an in-page tab strip. Each child route owns its own header
+	// and container, so this layout is just the feature gate plus an outlet.
+	return <Outlet />;
 }
 
 /** Inline empty state for a workspace that hasn't turned practice detection on yet — enable it here. */

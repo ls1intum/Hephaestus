@@ -117,32 +117,42 @@ function ReviewSettingsContainer() {
 	};
 
 	return (
-		<PracticeDetectionPolicyCard
-			settings={aiSettingsQuery.data}
-			configs={configsQuery.data ?? []}
-			autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
-			manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
-			isLoading={
-				aiSettingsQuery.isLoading ||
-				configsQuery.isLoading ||
-				workspaceQuery.isLoading ||
-				!workspaceSlug
-			}
-			isError={aiSettingsQuery.isError || configsQuery.isError || workspaceQuery.isError}
-			isSaving={
-				updatePracticeConfig.isPending ||
-				updatePracticeReviewSettings.isPending ||
-				updateFeatures.isPending
-			}
-			onBindConfig={handleBindConfig}
-			onUpdateReviewSettings={handleUpdateReviewSettings}
-			onUpdateFeatures={handleUpdateFeatures}
-			onResetReviewField={handleResetReviewField}
-			onRetry={() => {
-				aiSettingsQuery.refetch();
-				configsQuery.refetch();
-				workspaceQuery.refetch();
-			}}
-		/>
+		<div className="container mx-auto max-w-3xl space-y-6 py-6">
+			<header>
+				<h1 className="text-3xl font-bold tracking-tight">Review settings</h1>
+				<p className="text-muted-foreground">
+					Bind the model, choose triggers, and set the review policy for automated practice
+					detection in this workspace.
+				</p>
+			</header>
+
+			<PracticeDetectionPolicyCard
+				settings={aiSettingsQuery.data}
+				configs={configsQuery.data ?? []}
+				autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
+				manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
+				isLoading={
+					aiSettingsQuery.isLoading ||
+					configsQuery.isLoading ||
+					workspaceQuery.isLoading ||
+					!workspaceSlug
+				}
+				isError={aiSettingsQuery.isError || configsQuery.isError || workspaceQuery.isError}
+				isSaving={
+					updatePracticeConfig.isPending ||
+					updatePracticeReviewSettings.isPending ||
+					updateFeatures.isPending
+				}
+				onBindConfig={handleBindConfig}
+				onUpdateReviewSettings={handleUpdateReviewSettings}
+				onUpdateFeatures={handleUpdateFeatures}
+				onResetReviewField={handleResetReviewField}
+				onRetry={() => {
+					aiSettingsQuery.refetch();
+					configsQuery.refetch();
+					workspaceQuery.refetch();
+				}}
+			/>
+		</div>
 	);
 }

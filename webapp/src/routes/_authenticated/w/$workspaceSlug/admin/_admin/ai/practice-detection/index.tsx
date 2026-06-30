@@ -149,7 +149,15 @@ function RubricContainer() {
 	};
 
 	return (
-		<>
+		<div className="container mx-auto max-w-5xl space-y-6 py-6">
+			<header>
+				<h1 className="text-3xl font-bold tracking-tight">Rubric</h1>
+				<p className="text-muted-foreground">
+					The practices this workspace evaluates, grouped into areas. Drag to reorder, toggle to
+					enable, or open one to edit its standard.
+				</p>
+			</header>
+
 			<RubricTree
 				workspaceSlug={slug}
 				areas={areasQuery.data ?? []}
@@ -221,6 +229,6 @@ function RubricContainer() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</>
+		</div>
 	);
 }
