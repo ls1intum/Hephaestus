@@ -1197,4 +1197,30 @@
         </rollback>
     </changeSet>
 
+    <!-- Per-area ordering for practices: the admin Rubric tree drag-reorders practices within their area
+         (the area already has display_order; the practice did not). Defaults 0; the reorder endpoint
+         rewrites the whole bucket atomically. Indexed (practice_area_id, display_order) for the ordered
+         catalogue read. -->
+    <changeSet author="hephaestus" id="1781092589259-69">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.display_order already exists">
+            <not>
+                <columnExists tableName="practice" columnName="display_order"/>
+            </not>
+        </preConditions>
+        <comment>Add practice.display_order (per-area position) + idx_practice_area_order for the Rubric tree.</comment>
+        <addColumn tableName="practice">
+            <column name="display_order" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <createIndex tableName="practice" indexName="idx_practice_area_order">
+            <column name="practice_area_id"/>
+            <column name="display_order"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="practice" indexName="idx_practice_area_order"/>
+            <dropColumn tableName="practice" columnName="display_order"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

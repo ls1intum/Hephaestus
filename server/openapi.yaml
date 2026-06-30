@@ -2579,6 +2579,40 @@ paths:
       summary: Get observation detail
       tags:
       - Practice Observations
+  /workspaces/{workspaceSlug}/practices/reorder:
+    patch:
+      description: Sets each practice's display order to its index in the provided
+        slug list (one atomic write)
+      operationId: reorderPractices
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPracticesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practice"
+          description: Practices reordered; the full ordered practice list is returned
+        "400":
+          description: "orderedSlugs is empty, has duplicates, or is not the area's\
+            \ complete set"
+      summary: Reorder the practices within an area
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -5452,6 +5486,10 @@ components:
         criteria:
           type: string
           description: Practice evaluation criteria
+        displayOrder:
+          type: integer
+          format: int32
+          description: Position within its area (lowest first); ties broken by name
         id:
           type: integer
           format: int64
@@ -5486,6 +5524,7 @@ components:
       - artifactType
       - createdAt
       - criteria
+      - displayOrder
       - id
       - name
       - slug
@@ -6066,6 +6105,30 @@ components:
           example:
           - review-ready-work
           - acting-on-review-feedback
+          items:
+            type: string
+          minItems: 1
+      required:
+      - orderedSlugs
+    ReorderPracticesRequest:
+      type: object
+      description: Reorder the practices in one area — displayOrder follows the list
+        index
+      properties:
+        areaSlug:
+          type:
+          - string
+          - "null"
+          description: Slug of the area whose practices are being reordered; null
+            reorders the unassigned bucket
+          example: review-ready-work
+        orderedSlugs:
+          type: array
+          description: Practice slugs in the desired display order — the complete
+            set for the area
+          example:
+          - describe-what-and-why
+          - ready-and-traceable-handoff
           items:
             type: string
           minItems: 1

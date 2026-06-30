@@ -71,7 +71,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         SELECT p FROM Practice p
         WHERE p.workspace.id = :workspaceId
         AND (:active IS NULL OR p.active = :active)
-        ORDER BY p.name ASC
+        ORDER BY p.area.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """
     )
     List<Practice> findByFilters(@Param("workspaceId") Long workspaceId, @Param("active") Boolean active);

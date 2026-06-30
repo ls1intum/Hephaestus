@@ -61,6 +61,8 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
         // Area-scoped reads (the developer's Reflection dashboard) join observation→practice→area; index the FK.
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
+        // Per-area ordered catalogue read (the admin Rubric tree sorts practices within their area).
+        @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
     }
 )
 @Getter
@@ -116,6 +118,16 @@ public class Practice {
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ToString.Exclude
     private PracticeArea area;
+
+    /**
+     * Position of this practice within its area (or within the unassigned bucket), lowest first. Set on
+     * create (appended to the end of the area) and rewritten atomically by the reorder endpoint. Ordering
+     * is per-area: values are only comparable among practices that share an {@link #area} (or are both
+     * unassigned), so the catalogue sorts by (area.displayOrder, practice.displayOrder, name).
+     */
+    @Column(name = "display_order", nullable = false)
+    @ColumnDefault("0")
+    private int displayOrder = 0;
 
     /**
      * The domain events that gate detection for this practice (e.g. {@code PullRequestCreated},

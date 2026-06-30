@@ -9,8 +9,13 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +52,47 @@ public class PracticeService {
     public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
         log.debug("Listing practices for workspace {} (active={})", ctx.slug(), active);
         return practiceRepository.findByFilters(ctx.id(), active);
+    }
+
+    /**
+     * Rewrites the per-area display order of the practices in ONE area (or the unassigned bucket when
+     * {@code areaSlug} is null) to match the given slug list — one atomic write of the whole bucket's
+     * ordering, mirroring {@link PracticeAreaService#reorder}. The list must be that bucket's COMPLETE set
+     * of practice slugs, each unique; a duplicate, partial, or foreign list is rejected up front so the
+     * reassigned 0..n-1 indices stay a total ordering within the bucket.
+     */
+    @Transactional
+    public void reorderPractices(WorkspaceContext ctx, String areaSlug, List<String> orderedSlugs) {
+        if (new HashSet<>(orderedSlugs).size() != orderedSlugs.size()) {
+            throw new IllegalArgumentException("orderedSlugs must not contain duplicate slugs");
+        }
+        List<Practice> bucket = practiceRepository
+            .findByFilters(ctx.id(), null)
+            .stream()
+            .filter(p -> Objects.equals(areaSlug, p.getArea() == null ? null : p.getArea().getSlug()))
+            .toList();
+        Set<String> existing = bucket.stream().map(Practice::getSlug).collect(Collectors.toSet());
+        Set<String> requested = new HashSet<>(orderedSlugs);
+        if (!existing.equals(requested)) {
+            String unknown = requested
+                .stream()
+                .filter(s -> !existing.contains(s))
+                .findFirst()
+                .orElse(null);
+            if (unknown != null) {
+                throw new EntityNotFoundException("Practice", unknown);
+            }
+            throw new IllegalArgumentException(
+                "orderedSlugs must contain every practice in the area (a complete ordering)"
+            );
+        }
+        Map<String, Practice> bySlug = bucket.stream().collect(Collectors.toMap(Practice::getSlug, p -> p));
+        int order = 0;
+        for (String slug : orderedSlugs) {
+            Practice p = bySlug.get(slug);
+            p.setDisplayOrder(order++);
+            practiceRepository.save(p);
+        }
     }
 
     @Transactional(readOnly = true)

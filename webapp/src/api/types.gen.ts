@@ -880,6 +880,20 @@ export type RevokeSessionsResult = {
 };
 
 /**
+ * Reorder the practices in one area — displayOrder follows the list index
+ */
+export type ReorderPracticesRequest = {
+    /**
+     * Slug of the area whose practices are being reordered; null reorders the unassigned bucket
+     */
+    areaSlug?: string | null;
+    /**
+     * Practice slugs in the desired display order — the complete set for the area
+     */
+    orderedSlugs: Array<string>;
+};
+
+/**
  * Reorder practice areas — displayOrder follows the list index
  */
 export type ReorderPracticeAreasRequest = {
@@ -1379,6 +1393,10 @@ export type Practice = {
      * Practice evaluation criteria
      */
     criteria: string;
+    /**
+     * Position within its area (lowest first); ties broken by name
+     */
+    displayOrder: number;
     /**
      * Practice ID
      */
@@ -4773,6 +4791,34 @@ export type GetObservationResponses = {
 };
 
 export type GetObservationResponse = GetObservationResponses[keyof GetObservationResponses];
+
+export type ReorderPracticesData = {
+    body: ReorderPracticesRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reorder';
+};
+
+export type ReorderPracticesErrors = {
+    /**
+     * orderedSlugs is empty, has duplicates, or is not the area's complete set
+     */
+    400: unknown;
+};
+
+export type ReorderPracticesResponses = {
+    /**
+     * Practices reordered; the full ordered practice list is returned
+     */
+    200: Array<Practice>;
+};
+
+export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
 
 export type DeletePracticeData = {
     body?: never;

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -141,6 +142,35 @@ public class PracticeCatalogController {
             .buildAndExpand(practice.getSlug())
             .toUri();
         return ResponseEntity.created(location).body(PracticeDTO.from(practice));
+    }
+
+    @PatchMapping("/reorder")
+    @Operation(
+        summary = "Reorder the practices within an area",
+        description = "Sets each practice's display order to its index in the provided slug list (one atomic write)"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Practices reordered; the full ordered practice list is returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class)))
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "orderedSlugs is empty, has duplicates, or is not the area's complete set",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<List<PracticeDTO>> reorderPractices(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody ReorderPracticesRequestDTO request
+    ) {
+        practiceService.reorderPractices(workspaceContext, request.areaSlug(), request.orderedSlugs());
+        List<PracticeDTO> practices = practiceService
+            .listPractices(workspaceContext, null)
+            .stream()
+            .map(PracticeDTO::from)
+            .toList();
+        return ResponseEntity.ok(practices);
     }
 
     @PatchMapping("/{practiceSlug}")
