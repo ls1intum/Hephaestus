@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { AreaIcon } from "./AreaBadge";
 import { areaSeed, COLOR_KEYS, ICON_COMPONENTS, ICON_NAMES, PILL } from "./areaVisuals";
@@ -45,8 +47,8 @@ export function AreaVisualPicker({
 				}
 			/>
 			<PopoverContent className="w-64 space-y-3">
-				<div>
-					<p className="mb-1.5 text-xs font-medium text-muted-foreground">Colour</p>
+				<div className="space-y-1.5">
+					<Label className="text-xs text-muted-foreground">Colour</Label>
 					<div className="flex flex-wrap gap-1.5">
 						{COLOR_KEYS.map((key) => (
 							<button
@@ -56,7 +58,7 @@ export function AreaVisualPicker({
 								aria-pressed={activeColor === key}
 								onClick={() => onChange({ color: key })}
 								className={cn(
-									"h-6 w-6 rounded-full border border-black/10 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 dark:border-white/15",
+									"size-6 rounded-full border border-black/10 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 dark:border-white/15",
 									PILL[key],
 									activeColor === key && "ring-2 ring-ring ring-offset-1",
 								)}
@@ -64,29 +66,32 @@ export function AreaVisualPicker({
 						))}
 					</div>
 				</div>
-				<div>
-					<p className="mb-1.5 text-xs font-medium text-muted-foreground">Icon</p>
-					<div className="grid grid-cols-6 gap-1">
+				<div className="space-y-1.5">
+					<Label className="text-xs text-muted-foreground">Icon</Label>
+					<ToggleGroup
+						value={[activeIcon]}
+						onValueChange={(value) => {
+							const next = value.length > 0 ? value[value.length - 1] : activeIcon;
+							if (next) onChange({ icon: next });
+						}}
+						spacing={1}
+						size="sm"
+						className="flex-wrap"
+					>
 						{ICON_NAMES.map((iconName) => {
 							const Icon = ICON_COMPONENTS[iconName];
-							const active = activeIcon === iconName;
 							return (
-								<button
+								<ToggleGroupItem
 									key={iconName}
-									type="button"
+									value={iconName}
 									aria-label={iconName}
-									aria-pressed={active}
-									onClick={() => onChange({ icon: iconName })}
-									className={cn(
-										"flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-										active && "bg-accent ring-1 ring-ring",
-									)}
+									className="size-7 p-0"
 								>
-									<Icon className="h-4 w-4" aria-hidden="true" />
-								</button>
+									<Icon className="size-4" aria-hidden="true" />
+								</ToggleGroupItem>
 							);
 						})}
-					</div>
+					</ToggleGroup>
 				</div>
 			</PopoverContent>
 		</Popover>

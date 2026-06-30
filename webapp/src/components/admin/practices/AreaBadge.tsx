@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type AreaVisual, getAreaVisual } from "./areaVisuals";
 
@@ -11,11 +12,15 @@ interface AreaIconProps {
 	className?: string;
 }
 
-/** Just the area's coloured icon, for placing beside an existing heading. Decorative — the adjacent
- * text carries the meaning, so the icon is aria-hidden. */
+/**
+ * Just the area's icon, for placing beside an existing heading. Decorative — the adjacent text
+ * carries the meaning, so the icon is aria-hidden.
+ */
 export function AreaIcon({ slug, name, icon, color, className }: AreaIconProps) {
 	const { Icon }: AreaVisual = getAreaVisual(slug, name ?? "", icon, color);
-	return <Icon className={cn("h-4 w-4 shrink-0", className)} aria-hidden="true" />;
+	return (
+		<Icon className={cn("size-4 shrink-0 text-muted-foreground", className)} aria-hidden="true" />
+	);
 }
 
 interface AreaBadgeProps {
@@ -29,8 +34,10 @@ interface AreaBadgeProps {
 }
 
 /**
- * A chip identifying a practice area: coloured pill + icon + name. The name is the accessible label
- * and the icon is decorative (aria-hidden), so identity never depends on colour alone.
+ * Identity chip for a practice area, built on the shadcn {@link Badge}: coloured pill + icon + name.
+ * The name is the accessible label and the icon is decorative (aria-hidden), so identity never
+ * depends on colour alone. The palette class only recolours the badge; its shape stays consistent
+ * with every other badge in the app.
  */
 export function AreaBadge({
 	slug,
@@ -42,20 +49,14 @@ export function AreaBadge({
 }: AreaBadgeProps) {
 	const { Icon, pill, blocking } = getAreaVisual(slug, name, icon, color);
 	return (
-		<span
-			className={cn(
-				"inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-				pill,
-				className,
-			)}
-		>
-			<Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+		<Badge className={cn("max-w-full border-transparent", pill, className)}>
+			<Icon aria-hidden="true" />
 			<span className="truncate">{name}</span>
 			{showBlocking && blocking && (
-				<span className="ml-0.5 rounded-sm bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/15">
+				<span className="rounded-sm bg-black/10 px-1 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/15">
 					Blocking
 				</span>
 			)}
-		</span>
+		</Badge>
 	);
 }

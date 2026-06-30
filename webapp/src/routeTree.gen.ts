@@ -52,8 +52,7 @@ import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRouteI
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiAgentsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/agents'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiActivityRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/activity'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/index'
-import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/areas'
-import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/index'
+import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/settings'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/new'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/$practiceSlug'
 
@@ -303,20 +302,11 @@ const AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute =
         AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRoute,
     } as any,
   )
-const AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute =
-  AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRouteImport.update(
+const AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute =
+  AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRouteImport.update(
     {
-      id: '/areas',
-      path: '/areas',
-      getParentRoute: () =>
-        AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRoute,
-    } as any,
-  )
-const AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute =
-  AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRouteImport.update(
-    {
-      id: '/catalog/',
-      path: '/catalog/',
+      id: '/settings',
+      path: '/settings',
       getParentRoute: () =>
         AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRoute,
     } as any,
@@ -382,11 +372,10 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesPracticeSlugRoute
   '/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesNewRoute
   '/w/$workspaceSlug/admin/practices/': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesIndexRoute
-  '/w/$workspaceSlug/admin/ai/practice-detection/areas': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute
+  '/w/$workspaceSlug/admin/ai/practice-detection/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute
   '/w/$workspaceSlug/admin/ai/practice-detection/': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute
   '/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute
   '/w/$workspaceSlug/admin/ai/practice-detection/catalog/new': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute
-  '/w/$workspaceSlug/admin/ai/practice-detection/catalog/': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -427,11 +416,10 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesPracticeSlugRoute
   '/w/$workspaceSlug/admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesNewRoute
   '/w/$workspaceSlug/admin/practices': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesIndexRoute
-  '/w/$workspaceSlug/admin/ai/practice-detection/areas': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute
+  '/w/$workspaceSlug/admin/ai/practice-detection/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute
   '/w/$workspaceSlug/admin/ai/practice-detection': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute
   '/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute
   '/w/$workspaceSlug/admin/ai/practice-detection/catalog/new': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute
-  '/w/$workspaceSlug/admin/ai/practice-detection/catalog': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -477,11 +465,10 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/_admin/practices/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesPracticeSlugRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/practices/new': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesNewRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/practices/': typeof AuthenticatedWWorkspaceSlugAdminAdminPracticesIndexRoute
-  '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/areas': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute
+  '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/$practiceSlug': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/new': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute
-  '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/': typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -527,11 +514,10 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices/$practiceSlug'
     | '/w/$workspaceSlug/admin/practices/new'
     | '/w/$workspaceSlug/admin/practices/'
-    | '/w/$workspaceSlug/admin/ai/practice-detection/areas'
+    | '/w/$workspaceSlug/admin/ai/practice-detection/settings'
     | '/w/$workspaceSlug/admin/ai/practice-detection/'
     | '/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug'
     | '/w/$workspaceSlug/admin/ai/practice-detection/catalog/new'
-    | '/w/$workspaceSlug/admin/ai/practice-detection/catalog/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -572,11 +558,10 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices/$practiceSlug'
     | '/w/$workspaceSlug/admin/practices/new'
     | '/w/$workspaceSlug/admin/practices'
-    | '/w/$workspaceSlug/admin/ai/practice-detection/areas'
+    | '/w/$workspaceSlug/admin/ai/practice-detection/settings'
     | '/w/$workspaceSlug/admin/ai/practice-detection'
     | '/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug'
     | '/w/$workspaceSlug/admin/ai/practice-detection/catalog/new'
-    | '/w/$workspaceSlug/admin/ai/practice-detection/catalog'
   id:
     | '__root__'
     | '/'
@@ -621,11 +606,10 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/_admin/practices/$practiceSlug'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/practices/new'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/practices/'
-    | '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/areas'
+    | '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/settings'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/$practiceSlug'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/new'
-    | '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -944,18 +928,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRoute
     }
-    '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/areas': {
-      id: '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/areas'
-      path: '/areas'
-      fullPath: '/w/$workspaceSlug/admin/ai/practice-detection/areas'
-      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRouteImport
-      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRoute
-    }
-    '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/': {
-      id: '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/'
-      path: '/catalog'
-      fullPath: '/w/$workspaceSlug/admin/ai/practice-detection/catalog/'
-      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRouteImport
+    '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/settings': {
+      id: '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/settings'
+      path: '/settings'
+      fullPath: '/w/$workspaceSlug/admin/ai/practice-detection/settings'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRoute
     }
     '/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/catalog/new': {
@@ -1032,25 +1009,22 @@ const AuthenticatedWWorkspaceSlugAdminAdminPracticesRouteWithChildren =
   )
 
 interface AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRouteChildren {
-  AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute
+  AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute
   AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute
   AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute
   AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute
-  AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute
 }
 
 const AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRouteChildren: AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRouteChildren =
   {
-    AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute:
-      AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionAreasRoute,
+    AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute:
+      AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionSettingsRoute,
     AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute:
       AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionIndexRoute,
     AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute:
       AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogPracticeSlugRoute,
     AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute:
       AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogNewRoute,
-    AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute:
-      AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionCatalogIndexRoute,
   }
 
 const AuthenticatedWWorkspaceSlugAdminAdminAiPracticeDetectionRouteWithChildren =

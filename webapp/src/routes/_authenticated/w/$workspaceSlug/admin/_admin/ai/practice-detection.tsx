@@ -48,22 +48,17 @@ function PracticeDetectionLayout() {
 		);
 	}
 
-	const isCatalog = Boolean(
+	const isSettings = Boolean(
 		matchRoute({
-			to: "/w/$workspaceSlug/admin/ai/practice-detection/catalog",
+			to: "/w/$workspaceSlug/admin/ai/practice-detection/settings",
 			fuzzy: true,
 		}),
 	);
-	const isAreas = Boolean(
-		matchRoute({
-			to: "/w/$workspaceSlug/admin/ai/practice-detection/areas",
-			fuzzy: true,
-		}),
-	);
-	const activeTab = isAreas ? "areas" : isCatalog ? "catalog" : "policy";
+	// The catalog/* editor routes are a drill-down under the Rubric tab, so Rubric stays selected there.
+	const activeTab = isSettings ? "settings" : "rubric";
 
 	return (
-		<div className="container mx-auto max-w-3xl py-6 space-y-6">
+		<div className="container mx-auto max-w-4xl py-6 space-y-6">
 			<div>
 				<h1 className="text-3xl font-bold tracking-tight">Practice detection</h1>
 				<p className="text-muted-foreground">
@@ -74,14 +69,9 @@ function PracticeDetectionLayout() {
 			<Tabs
 				value={activeTab}
 				onValueChange={(value) => {
-					if (value === "catalog") {
+					if (value === "settings") {
 						navigate({
-							to: "/w/$workspaceSlug/admin/ai/practice-detection/catalog",
-							params: { workspaceSlug },
-						});
-					} else if (value === "areas") {
-						navigate({
-							to: "/w/$workspaceSlug/admin/ai/practice-detection/areas",
+							to: "/w/$workspaceSlug/admin/ai/practice-detection/settings",
 							params: { workspaceSlug },
 						});
 					} else {
@@ -93,9 +83,8 @@ function PracticeDetectionLayout() {
 				}}
 			>
 				<TabsList>
-					<TabsTrigger value="policy">Policy</TabsTrigger>
-					<TabsTrigger value="areas">Practice Areas</TabsTrigger>
-					<TabsTrigger value="catalog">Catalog</TabsTrigger>
+					<TabsTrigger value="rubric">Rubric</TabsTrigger>
+					<TabsTrigger value="settings">Review settings</TabsTrigger>
 				</TabsList>
 			</Tabs>
 

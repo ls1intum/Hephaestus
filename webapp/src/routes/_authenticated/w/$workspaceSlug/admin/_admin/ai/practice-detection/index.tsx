@@ -1,148 +1,226 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
-	getAiSettingsOptions,
-	getAiSettingsQueryKey,
-	getConfigsOptions,
-	getWorkspaceOptions,
-	listWorkspacesQueryKey,
-	updateFeaturesMutation,
-	updatePracticeConfigMutation,
-	updatePracticeReviewSettingsMutation,
+	createAreaMutation,
+	deleteAreaMutation,
+	deletePracticeMutation,
+	listAreasOptions,
+	listAreasQueryKey,
+	listPracticesOptions,
+	listPracticesQueryKey,
+	reorderAreasMutation,
+	reorderPracticesMutation,
+	setActiveMutation,
+	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { UpdatePracticeReviewSettings, UpdateWorkspaceFeaturesRequest } from "@/api/types.gen";
+import type { Practice } from "@/api/types.gen";
+import { generateSlug } from "@/components/admin/practices/constants";
+import { RubricTree } from "@/components/admin/practices/RubricTree";
 import {
-	PracticeDetectionPolicyCard,
-	type PracticeReviewField,
-} from "@/components/admin/ai/PracticeDetectionPolicyCard";
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/ai/practice-detection/",
 )({
-	component: PolicyContainer,
+	component: RubricContainer,
 });
 
-function PolicyContainer() {
+type FocusFilter = "ALL" | "PULL_REQUEST" | "ISSUE";
+
+function RubricContainer() {
 	const queryClient = useQueryClient();
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 
-	const aiSettingsQuery = useQuery({
-		...getAiSettingsOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
+	const [focusFilter, setFocusFilter] = useState<FocusFilter>("ALL");
+	const [togglingPractices, setTogglingPractices] = useState<Set<string>>(new Set());
+	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
+
+	const areasQuery = useQuery({
+		...listAreasOptions({ path: { workspaceSlug: slug } }),
+		enabled: !!workspaceSlug,
+	});
+	const practicesQuery = useQuery({
+		...listPracticesOptions({ path: { workspaceSlug: slug } }),
+		enabled: !!workspaceSlug,
 	});
 
-	const configsQuery = useQuery({
-		...getConfigsOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-
-	const workspaceQuery = useQuery({
-		...getWorkspaceOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-
-	const invalidateAiSettings = () => {
+	const invalidate = () => {
 		queryClient.invalidateQueries({
-			queryKey: getAiSettingsQueryKey({ path: { workspaceSlug: slug } }),
+			queryKey: listAreasQueryKey({ path: { workspaceSlug: slug } }),
+		});
+		queryClient.invalidateQueries({
+			queryKey: listPracticesQueryKey({ path: { workspaceSlug: slug } }),
 		});
 	};
 
-	const updatePracticeConfig = useMutation({
-		...updatePracticeConfigMutation(),
+	const createArea = useMutation({
+		...createAreaMutation(),
 		onSuccess: () => {
-			invalidateAiSettings();
-			toast.success("Model updated");
+			invalidate();
+			toast.success("Practice area created");
 		},
 		onError: (error) => {
-			toast.error("Failed to update model", {
-				description: error instanceof Error ? error.message : undefined,
+			const status =
+				typeof error === "object" && error !== null && "status" in error
+					? (error as { status: number }).status
+					: undefined;
+			toast.error(
+				status === 409
+					? "A practice area with that name already exists"
+					: "Failed to create practice area",
+			);
+		},
+	});
+	const updateArea = useMutation({
+		...updateAreaMutation(),
+		onSuccess: () => invalidate(),
+		onError: () => toast.error("Failed to update practice area"),
+	});
+	const deleteArea = useMutation({
+		...deleteAreaMutation(),
+		onSuccess: () => {
+			invalidate();
+			toast.success("Practice area deleted");
+		},
+		onError: () => toast.error("Failed to delete practice area"),
+	});
+	const reorderAreas = useMutation({
+		...reorderAreasMutation(),
+		onSuccess: () => invalidate(),
+		onError: () => toast.error("Failed to reorder practice areas"),
+	});
+	const reorderPractices = useMutation({
+		...reorderPracticesMutation(),
+		onSuccess: () => invalidate(),
+		onError: () => toast.error("Failed to reorder practices"),
+	});
+	const deletePractice = useMutation({
+		...deletePracticeMutation(),
+		onSuccess: () => {
+			invalidate();
+			toast.success("Practice deleted");
+		},
+		onError: () => toast.error("Failed to delete practice"),
+	});
+	const setActive = useMutation({
+		...setActiveMutation(),
+		onSuccess: () => invalidate(),
+		onError: (_e, variables) => toast.error(`Failed to toggle "${variables.path.practiceSlug}"`),
+		onSettled: (_d, _e, variables) => {
+			setTogglingPractices((prev) => {
+				const next = new Set(prev);
+				next.delete(variables.path.practiceSlug);
+				return next;
 			});
 		},
 	});
 
-	const updatePracticeReviewSettings = useMutation({
-		...updatePracticeReviewSettingsMutation(),
-		onSuccess: () => {
-			invalidateAiSettings();
-			toast.success("Review policy updated");
-		},
-		onError: (error) => {
-			toast.error("Failed to update review policy", {
-				description: error instanceof Error ? error.message : undefined,
-			});
-		},
-	});
+	if (!workspaceSlug || areasQuery.isLoading || practicesQuery.isLoading) {
+		return (
+			<div className="flex h-64 items-center justify-center">
+				<Spinner className="size-8" />
+			</div>
+		);
+	}
 
-	const updateFeatures = useMutation({
-		...updateFeaturesMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({
-				queryKey: getWorkspaceOptions({ path: { workspaceSlug: slug } }).queryKey,
-			});
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
-			invalidateAiSettings();
-			toast.success("Trigger settings updated");
-		},
-		onError: (error) => {
-			toast.error("Failed to update trigger settings", {
-				description: error instanceof Error ? error.message : undefined,
-			});
-		},
-	});
+	const isMutating =
+		createArea.isPending ||
+		updateArea.isPending ||
+		deleteArea.isPending ||
+		reorderAreas.isPending ||
+		reorderPractices.isPending;
 
-	const handleBindConfig = (configId: number | null) => {
-		if (!workspaceSlug) return;
-		updatePracticeConfig.mutate({
-			path: { workspaceSlug },
-			body: { configId: configId ?? undefined },
-		});
-	};
-
-	const handleUpdateReviewSettings = (settings: UpdatePracticeReviewSettings) => {
-		if (!workspaceSlug) return;
-		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: settings });
-	};
-
-	const handleResetReviewField = (field: PracticeReviewField) => {
-		if (!workspaceSlug) return;
-		updatePracticeReviewSettings.mutate({ path: { workspaceSlug }, body: { reset: [field] } });
-	};
-
-	const handleUpdateFeatures = (features: UpdateWorkspaceFeaturesRequest) => {
-		if (!workspaceSlug) return;
-		updateFeatures.mutate({ path: { workspaceSlug }, body: features });
+	const handleSetPracticeActive = (practiceSlug: string, active: boolean) => {
+		setTogglingPractices((prev) => new Set(prev).add(practiceSlug));
+		setActive.mutate({ path: { workspaceSlug: slug, practiceSlug }, body: { active } });
 	};
 
 	return (
-		<PracticeDetectionPolicyCard
-			settings={aiSettingsQuery.data}
-			configs={configsQuery.data ?? []}
-			autoTriggerEnabled={workspaceQuery.data?.practiceReviewAutoTriggerEnabled ?? true}
-			manualTriggerEnabled={workspaceQuery.data?.practiceReviewManualTriggerEnabled ?? true}
-			isLoading={
-				aiSettingsQuery.isLoading ||
-				configsQuery.isLoading ||
-				workspaceQuery.isLoading ||
-				!workspaceSlug
-			}
-			isError={aiSettingsQuery.isError || configsQuery.isError || workspaceQuery.isError}
-			isSaving={
-				updatePracticeConfig.isPending ||
-				updatePracticeReviewSettings.isPending ||
-				updateFeatures.isPending
-			}
-			onBindConfig={handleBindConfig}
-			onUpdateReviewSettings={handleUpdateReviewSettings}
-			onUpdateFeatures={handleUpdateFeatures}
-			onResetReviewField={handleResetReviewField}
-			onRetry={() => {
-				aiSettingsQuery.refetch();
-				configsQuery.refetch();
-				workspaceQuery.refetch();
-			}}
-		/>
+		<>
+			<RubricTree
+				workspaceSlug={slug}
+				areas={areasQuery.data ?? []}
+				practices={practicesQuery.data ?? []}
+				togglingPractices={togglingPractices}
+				isMutating={isMutating}
+				focusFilter={focusFilter}
+				onFocusFilterChange={setFocusFilter}
+				onCreateArea={(name) =>
+					createArea.mutate({
+						path: { workspaceSlug: slug },
+						body: { slug: generateSlug(name), name },
+					})
+				}
+				onRenameArea={(areaSlug, name) =>
+					updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: { name } })
+				}
+				onToggleAreaActive={(areaSlug, active) =>
+					updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: { active } })
+				}
+				onDeleteArea={(areaSlug) => deleteArea.mutate({ path: { workspaceSlug: slug, areaSlug } })}
+				onReorderAreas={(orderedSlugs) =>
+					reorderAreas.mutate({ path: { workspaceSlug: slug }, body: { orderedSlugs } })
+				}
+				onSetAreaVisual={(areaSlug, patch) =>
+					updateArea.mutate({ path: { workspaceSlug: slug, areaSlug }, body: patch })
+				}
+				onSetPracticeActive={handleSetPracticeActive}
+				onDeletePractice={setDeletingPractice}
+				onReorderPractices={(areaSlug, orderedSlugs) =>
+					reorderPractices.mutate({
+						path: { workspaceSlug: slug },
+						body: { areaSlug, orderedSlugs },
+					})
+				}
+			/>
+
+			<AlertDialog
+				open={deletingPractice !== null}
+				onOpenChange={(open) => {
+					if (!open) setDeletingPractice(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete &ldquo;{deletingPractice?.name}&rdquo;?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This permanently deletes the practice definition and its observations. This cannot be
+							undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => {
+								if (deletingPractice)
+									deletePractice
+										.mutateAsync({
+											path: { workspaceSlug: slug, practiceSlug: deletingPractice.slug },
+										})
+										.then(() => setDeletingPractice(null))
+										.catch(() => {});
+							}}
+							disabled={deletePractice.isPending}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+						>
+							{deletePractice.isPending ? "Deleting…" : "Delete practice"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</>
 	);
 }
