@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -68,6 +69,13 @@ public class WorkspaceContextFilter implements Filter {
     private final ConnectionService connectionService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Gates the empty-membership ADMIN auto-seed. Defaults to {@code false} so production NEVER grants
+     * ADMIN to the first authenticated visitor of an admin-only-seeded / org-sync-churned workspace
+     * (a privilege-escalation path). Enabled only in dev/e2e profiles via {@code application-*.yml}.
+     */
+    private final boolean autoSeedMembership;
+
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
@@ -75,7 +83,10 @@ public class WorkspaceContextFilter implements Filter {
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ConnectionService connectionService,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        @org.springframework.beans.factory.annotation.Value(
+            "${hephaestus.workspace.auto-seed-membership:false}"
+        ) boolean autoSeedMembership
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
@@ -84,6 +95,7 @@ public class WorkspaceContextFilter implements Filter {
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.connectionService = connectionService;
         this.objectMapper = objectMapper;
+        this.autoSeedMembership = autoSeedMembership;
     }
 
     @Override
@@ -162,7 +174,23 @@ public class WorkspaceContextFilter implements Filter {
             // Fetch user roles across ALL of the account's linked identities (ADR 0017), so a member
             // signed in via one provider keeps access to workspaces they belong to under another.
             var currentUsers = currentAccountUsers.resolve();
-            Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUsers);
+            // Resolve membership ONCE here (single DB round-trip) and reuse the matched member ids both for the
+            // role union and for pinning the workspace-provider identity below, instead of querying twice.
+            MembershipResolution membership = fetchUserRoles(workspace, currentUsers);
+            Set<WorkspaceRole> roles = membership.roles();
+
+            // Instance super-admin elevation: an APP_ADMIN reaches ANY active workspace as ADMIN even
+            // without an explicit membership or an SCM identity at all (the GitLab admin model), matching
+            // WorkspaceAccessService's APP_ADMIN elevation. Deliberately ADMIN, never OWNER — ownership is
+            // an explicit, member-granted role. Logged as elevated access.
+            if (roles.isEmpty() && SecurityUtils.isSuperAdmin()) {
+                log.info(
+                    "Granted workspace access via instance-admin elevation: accountId={}, workspaceSlug={}",
+                    SecurityUtils.getCurrentAccountId().orElse(null),
+                    safeSlug
+                );
+                roles = Set.of(WorkspaceRole.ADMIN);
+            }
 
             boolean isPublicRead = Boolean.TRUE.equals(workspace.getIsPubliclyViewable()) && isReadRequest;
 
@@ -176,9 +204,7 @@ public class WorkspaceContextFilter implements Filter {
                 return;
             }
 
-            // Create and set context. installationId is sourced from the active GitHub
-            // App connection (Workspace.installation_id has been retired in favour of the
-            // Connection registry).
+            // installationId comes from the active GitHub App connection in the Connection registry.
             Long installationId = connectionService
                 .findActiveGitHubAppConfig(workspace.getId())
                 .map(ConnectionConfig.GitHubAppConfig::installationId)
@@ -196,7 +222,7 @@ public class WorkspaceContextFilter implements Filter {
             // (the linked identity that is a member here), so getCurrentUserLogin() and everything
             // downstream resolve the provider-correct user — not whichever provider the session logged in
             // with. Absent for a public workspace the account isn't a member of (falls back to the JWT).
-            resolveWorkspaceIdentity(workspace, currentUsers)
+            resolveWorkspaceIdentity(currentUsers, membership.memberUserIds())
                 .map(User::getLogin)
                 .ifPresent(CurrentScmIdentityHolder::set);
 
@@ -217,38 +243,41 @@ public class WorkspaceContextFilter implements Filter {
     }
 
     /**
+     * The resolved membership for the current request: the roles the account holds in this workspace
+     * (unioned across linked identities) and the set of the account's user ids that actually hold a
+     * membership row. Both are computed from a SINGLE membership query so the role union and the
+     * provider-identity pin never re-query.
+     */
+    private record MembershipResolution(Set<WorkspaceRole> roles, Set<Long> memberUserIds) {
+        static final MembershipResolution EMPTY = new MembershipResolution(Set.of(), Set.of());
+    }
+
+    /**
      * The account's SCM user that holds membership in this workspace — i.e. the identity for the
      * workspace's provider. Returns empty when none of the account's identities is a member (e.g. a
      * public workspace viewed by a non-member), leaving the JWT {@code preferred_username} authoritative.
+     *
+     * @param users the account's SCM users (one per linked identity)
+     * @param memberUserIds the user ids that hold a membership row (from the single membership query)
      */
-    private Optional<User> resolveWorkspaceIdentity(Workspace workspace, Collection<User> users) {
-        Set<Long> userIds = users
-            .stream()
-            .filter(u -> u != null && u.getId() != null)
-            .map(User::getId)
-            .collect(Collectors.toSet());
-        if (userIds.isEmpty()) {
+    private Optional<User> resolveWorkspaceIdentity(Collection<User> users, Set<Long> memberUserIds) {
+        if (memberUserIds.isEmpty()) {
             return Optional.empty();
         }
-        Set<Long> memberIds = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds)
-            .stream()
-            .map(membership -> membership.getId().getUserId())
-            .collect(Collectors.toSet());
         return users
             .stream()
-            .filter(u -> memberIds.contains(u.getId()))
+            .filter(u -> u != null && memberUserIds.contains(u.getId()))
             .findFirst();
     }
 
     /**
-     * Fetch workspace roles for the current authenticated user.
+     * Resolve workspace membership for the current authenticated user via a single query.
      *
      * @param workspace Workspace entity
      * @param users the account's SCM users (one per linked identity); roles are unioned across them
-     * @return Set of workspace roles (empty if user has no membership or not authenticated)
+     * @return the roles and matched member user ids (empty if no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(Workspace workspace, Collection<User> users) {
+    private MembershipResolution fetchUserRoles(Workspace workspace, Collection<User> users) {
         try {
             Set<Long> userIds = users
                 .stream()
@@ -257,26 +286,34 @@ public class WorkspaceContextFilter implements Filter {
                 .collect(Collectors.toSet());
             if (userIds.isEmpty()) {
                 log.debug("Skipped role fetch: reason=noAuthenticatedUser");
-                return Set.of();
+                return MembershipResolution.EMPTY;
             }
 
+            // Single membership query, reused for both the role union and the member-id set below.
             // Union the roles the account holds across every linked identity (each identity mirrors a
             // distinct SCM user, but they belong to the SAME account, so unioning never widens access
             // beyond what the account already owns).
-            Set<WorkspaceRole> roles = workspaceMembershipRepository
-                .findByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds)
+            var memberships = workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds);
+            Set<WorkspaceRole> roles = memberships
                 .stream()
                 .map(WorkspaceMembership::getRole)
                 .filter(role -> role != null)
                 .collect(Collectors.toSet());
+            Set<Long> memberUserIds = memberships
+                .stream()
+                .map(membership -> membership.getId().getUserId())
+                .collect(Collectors.toSet());
 
             if (!roles.isEmpty()) {
                 log.debug("Resolved user roles: roles={}", roles);
-                return roles;
+                return new MembershipResolution(roles, memberUserIds);
             }
 
             // Auto-heal only when workspace has zero memberships (fresh dev DB): seed the first identity.
-            if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
+            // Gated behind a non-prod flag — seeding ADMIN to an arbitrary first visitor in production is a
+            // privilege-escalation on org-sync-churned / admin-only-seeded empty-membership state. Disabled by
+            // default (prod); enabled only in dev/e2e via hephaestus.workspace.auto-seed-membership=true.
+            if (autoSeedMembership && workspaceMembershipRepository.countByWorkspace_Id(workspace.getId()) == 0) {
                 User primary = users.iterator().next();
                 try {
                     var created = workspaceMembershipService.createMembership(
@@ -290,7 +327,7 @@ public class WorkspaceContextFilter implements Filter {
                         LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         created.getRole()
                     );
-                    return Set.of(created.getRole());
+                    return new MembershipResolution(Set.of(created.getRole()), Set.of(primary.getId()));
                 } catch (IllegalArgumentException ex) {
                     log.debug(
                         "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
@@ -302,10 +339,10 @@ public class WorkspaceContextFilter implements Filter {
             }
 
             log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
-            return Set.of();
+            return MembershipResolution.EMPTY;
         } catch (Exception e) {
             log.warn("Failed to fetch user roles: workspaceId={}", workspace.getId(), e);
-            return Set.of();
+            return MembershipResolution.EMPTY;
         }
     }
 
@@ -408,7 +445,10 @@ public class WorkspaceContextFilter implements Filter {
         problem.setDetail("Invalid workspace slug: " + slug);
         problem.setProperty(
             "errors",
-            Map.of("workspaceSlug", "Slug must be 3-51 lowercase characters or digits and may include single hyphens")
+            Map.of(
+                "workspaceSlug",
+                "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens"
+            )
         );
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

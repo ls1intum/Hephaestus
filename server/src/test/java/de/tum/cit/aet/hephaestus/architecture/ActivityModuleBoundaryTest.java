@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Note: Code health analysis is in the separate <b>practices</b> module:
  * <ul>
- *   <li><b>practices.model</b> - Practice and PracticeFinding entities</li>
+ *   <li><b>practices.model</b> - Practice and Observation entities</li>
  *   <li><b>practices.spi</b> - Service provider interfaces (UserRoleChecker)</li>
- *   <li><b>practices.finding</b> - Contributor findings, detection events, and finding API</li>
+ *   <li><b>practices.observation</b> - Contributor findings, detection events, and finding API</li>
  *   <li><b>practices.review</b> - Detection and delivery gate decisions</li>
  * </ul>
  *
@@ -201,9 +201,9 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesControllerTests {
 
         /**
-         * Only PracticeCatalogController (CRUD), PracticeFindingController (contributor findings API),
-         * and FindingFeedbackController (contributor feedback) are allowed as REST entry points
-         * in the practices module.
+         * Only PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD + binding),
+         * ObservationController (contributor findings API), and ReactionController
+         * (contributor reactions) are allowed as REST entry points in the practices module.
          */
         @Test
         void practicesHasDedicatedController() {
@@ -215,11 +215,14 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .should()
                 .haveSimpleName("PracticeCatalogController")
                 .orShould()
-                .haveSimpleName("PracticeFindingController")
+                .haveSimpleName("PracticeAreaController")
                 .orShould()
-                .haveSimpleName("FindingFeedbackController")
+                .haveSimpleName("ObservationController")
+                .orShould()
+                .haveSimpleName("ReactionController")
                 .because(
-                    "Only PracticeCatalogController, PracticeFindingController, and FindingFeedbackController are allowed REST entry points"
+                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, and " +
+                        "ReactionController are allowed REST entry points"
                 );
             rule.check(classes);
         }

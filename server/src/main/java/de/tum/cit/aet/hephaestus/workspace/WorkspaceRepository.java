@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -45,6 +47,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
     boolean existsByWorkspaceSlug(String workspaceSlug);
     boolean existsByOrganizationId(Long organizationId);
+
     boolean existsByIdAndOrganizationId(Long id, Long organizationId);
 
     List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
@@ -60,16 +63,29 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
      * Used by mentor-cache invalidation: domain events carry {@code repositoryId} but mentor
      * caches key on {@code workspaceId}.
      *
-     * @return at most one workspace per repository (a monitored repo lives in exactly one
-     *         workspace; {@code Optional.empty()} if the repository is not monitored anywhere)
+     * <p>The join is on {@code nameWithOwner} (no FK from {@code RepositoryToMonitor} to {@code
+     * Repository}), and {@code repository_to_monitor.name_with_owner} has no unique constraint, so two
+     * monitors that share a {@code nameWithOwner} would yield more than one row. Rather than assert a
+     * cardinality the schema does not enforce — which would surface as an uncaught
+     * {@code IncorrectResultSizeDataAccessException} inside the async invalidation listener — this picks
+     * the lowest workspace id deterministically and caps the result to one row.
+     *
+     * @return the resolved workspace id, or {@code Optional.empty()} if the repository is not monitored
+     *         anywhere
      */
+    default Optional<Long> findWorkspaceIdByRepositoryId(Long repositoryId) {
+        List<Long> ids = findWorkspaceIdsByRepositoryId(repositoryId, PageRequest.of(0, 1));
+        return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
+    }
+
     @Query(
         """
         SELECT m.workspace.id
         FROM RepositoryToMonitor m
         JOIN Repository r ON r.nameWithOwner = m.nameWithOwner
         WHERE r.id = :repositoryId
+        ORDER BY m.workspace.id
         """
     )
-    Optional<Long> findWorkspaceIdByRepositoryId(@Param("repositoryId") Long repositoryId);
+    List<Long> findWorkspaceIdsByRepositoryId(@Param("repositoryId") Long repositoryId, Pageable pageable);
 }

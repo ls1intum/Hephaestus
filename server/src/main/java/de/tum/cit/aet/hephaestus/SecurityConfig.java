@@ -49,16 +49,35 @@ public class SecurityConfig {
 
     private final CorsProperties corsProperties;
     private final boolean devTriggerEnabled;
+    private final boolean devLoginEnabled;
+    private final boolean cookieSecure;
     private final String authCookieName;
 
     public SecurityConfig(
         CorsProperties corsProperties,
+        org.springframework.core.env.Environment environment,
         @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
+        @Value("${hephaestus.auth.dev-login-enabled:false}") boolean devLoginEnabled,
+        @Value("${hephaestus.auth.cookie-secure:true}") boolean cookieSecure,
         @Value("${hephaestus.auth.cookie-name:" + AuthProperties.DEFAULT_COOKIE_NAME + "}") String authCookieName
     ) {
+        // Fail-closed: insecure cookies (Secure off, __Host- prefix dropped) are a local-http-E2E-only
+        // affordance and must be impossible in production.
+        if (!cookieSecure && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"))) {
+            throw new IllegalStateException(
+                "hephaestus.auth.cookie-secure must NOT be false under the 'prod' profile (fail-closed)."
+            );
+        }
         this.corsProperties = corsProperties;
         this.devTriggerEnabled = devTriggerEnabled;
+        this.devLoginEnabled = devLoginEnabled;
+        this.cookieSecure = cookieSecure;
         this.authCookieName = authCookieName;
+    }
+
+    /** CSRF cookie name: {@code __Host-}-prefixed in production; the prefix is dropped for local http E2E. */
+    static String csrfCookieName(boolean cookieSecure) {
+        return cookieSecure ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
     }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
@@ -261,11 +280,17 @@ public class SecurityConfig {
             //   - /webhooks/** + /oauth/callback/**  → workerHubSecurityFilterChain (HIGHEST_PRECEDENCE)
             //   - /oauth2/authorization/** + /login/oauth2/code/** + /auth/login|error → AuthSecurityConfig
             // Spring dispatches to the FIRST matching SecurityFilterChain only, so permitAll rules for
-            // those paths here would be dead code (they were — removed). Their controller/handshake-layer
-            // auth (HMAC, shared token, signed state, worker JWT) is unaffected.
+            // those paths here would be dead code. Their controller/handshake-layer auth (HMAC, shared
+            // token, signed state, worker JWT) is unaffected.
             // Dev-only: permit the dev trigger endpoint when explicitly enabled (defaults to false).
             if (devTriggerEnabled) {
                 requests.requestMatchers(DEV_TRIGGER_MATCHER).permitAll();
+            }
+            // Dev-only: permit the passwordless dev sign-in (pre-auth POST) when explicitly enabled
+            // (defaults to false; fail-closed in prod — see DevLoginService). Same canonical matcher as
+            // the CSRF carve-out below so they cannot drift.
+            if (devLoginEnabled) {
+                requests.requestMatchers(DEV_LOGIN_MATCHER).permitAll();
             }
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
@@ -307,10 +332,10 @@ public class SecurityConfig {
      * forged {@code XSRF-TOKEN} cookie onto this host and defeat the double-submit check — matching the
      * un-tossable {@code __Host-} access cookie ({@link AuthProperties#DEFAULT_COOKIE_NAME}).
      */
-    private static CookieCsrfTokenRepository csrfTokenRepository() {
+    private CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        repository.setCookieName("__Host-XSRF-TOKEN");
-        repository.setCookieCustomizer(cookie -> cookie.secure(true).path("/").sameSite("Lax"));
+        repository.setCookieName(csrfCookieName(cookieSecure));
+        repository.setCookieCustomizer(cookie -> cookie.secure(cookieSecure).path("/").sameSite("Lax"));
         return repository;
     }
 
@@ -318,12 +343,21 @@ public class SecurityConfig {
 
     /**
      * Single canonical matcher for the optional dev-trigger surface, shared by the authorize rules and
-     * the CSRF predicate so they cannot diverge. Replaces the previous raw
-     * {@code getServletPath().startsWith("/api/dev/")} string gating. The webhook / OAuth-callback /
-     * {@code /login/oauth2/code/} skips that used to live in {@code requiresCsrf} are gone: those paths
-     * are owned by the higher-precedence worker-hub and oauth2Login chains and never reach this chain.
+     * the CSRF predicate so they cannot diverge. The webhook / OAuth-callback / {@code /login/oauth2/code/}
+     * paths need no CSRF skip here: they are owned by the higher-precedence worker-hub and oauth2Login
+     * chains and never reach this chain.
      */
     static final RequestMatcher DEV_TRIGGER_MATCHER = PathPatternRequestMatcher.withDefaults().matcher("/api/dev/**");
+
+    /**
+     * Single canonical matcher for the optional passwordless dev sign-in, shared by the authorize rule
+     * and the CSRF predicate. The POST is pre-auth (no {@code __Host-} cookie yet), so it is not
+     * CSRF-vulnerable; the carve-out is scoped to exactly this path and only active when the flag is on.
+     */
+    static final RequestMatcher DEV_LOGIN_MATCHER = PathPatternRequestMatcher.withDefaults().matcher(
+        HttpMethod.POST,
+        "/auth/dev-login"
+    );
 
     /**
      * CSRF applies only to cookie-authenticated, state-changing browser requests. Returns
@@ -346,10 +380,15 @@ public class SecurityConfig {
             return false;
         }
         // No path skips for /webhooks/, /oauth/callback/, or /login/oauth2/code/ here: those are owned
-        // by higher-precedence chains (worker-hub, oauth2Login) and never reach this chain, so any skip
-        // here was dead. The only live carve-out is the optional dev trigger, matched by the SAME
+        // by higher-precedence chains (worker-hub, oauth2Login) and never reach this chain, so a skip
+        // here would be dead. The only live carve-out is the optional dev trigger, matched by the SAME
         // PathPatternRequestMatcher the authorize rule uses (DEV_TRIGGER_MATCHER) so the two cannot drift.
         if (devTriggerEnabled && DEV_TRIGGER_MATCHER.matches(request)) {
+            return false;
+        }
+        // The passwordless dev sign-in is a pre-auth POST with no auth cookie → not CSRF-vulnerable.
+        // Scoped to exactly /auth/dev-login and only when the flag is on (same matcher as the permit rule).
+        if (devLoginEnabled && DEV_LOGIN_MATCHER.matches(request)) {
             return false;
         }
         return true;

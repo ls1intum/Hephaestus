@@ -27,7 +27,7 @@ class SandboxSpecTest extends BaseUnitTest {
                     ResourceLimits.DEFAULT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
-                    "/workspace/.output",
+                    "/workspace/out",
                     null
                 )
             )
@@ -47,7 +47,7 @@ class SandboxSpecTest extends BaseUnitTest {
                     ResourceLimits.DEFAULT,
                     SecurityProfile.DEFAULT,
                     Map.of(),
-                    "/workspace/.output",
+                    "/workspace/out",
                     null
                 )
             )
@@ -66,7 +66,7 @@ class SandboxSpecTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             )
         )
@@ -87,7 +87,7 @@ class SandboxSpecTest extends BaseUnitTest {
                     null,
                     SecurityProfile.DEFAULT,
                     Map.of(),
-                    "/workspace/.output",
+                    "/workspace/out",
                     null
                 )
             )
@@ -107,7 +107,7 @@ class SandboxSpecTest extends BaseUnitTest {
             ResourceLimits.DEFAULT,
             null,
             null,
-            "/workspace/.output",
+            "/workspace/out",
             null
         );
         assertThat(spec.jobId()).isNotNull();

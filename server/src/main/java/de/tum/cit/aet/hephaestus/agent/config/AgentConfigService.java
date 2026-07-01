@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,7 +62,10 @@ public class AgentConfigService {
             config.setLlmApiKey(request.llmApiKey());
         }
         if (request.llmBaseUrl() != null) {
-            // Empty string clears the field; otherwise stores the trimmed value.
+            // Empty string clears the field; otherwise stores the trimmed value. The request DTO caps
+            // this at @Size(max=512), deliberately well under the entity column (length=2048) so trimming
+            // after validation can never overflow the column. The wider column is intentional headroom —
+            // narrowing it to 512 requires a changelog.
             config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
         }
         if (request.timeoutSeconds() != null) {
@@ -79,7 +83,17 @@ public class AgentConfigService {
 
         validateCredentialMode(config);
 
-        return agentConfigRepository.save(config);
+        try {
+            return agentConfigRepository.save(config);
+        } catch (DataIntegrityViolationException e) {
+            // The existsByWorkspaceIdAndName fast-path above is racy: two concurrent creates with the
+            // same name both pass the check, and the DB unique constraint uk_agent_config_workspace_name
+            // backstops the loser. Translate that loser's violation into the same 409 the fast path
+            // advertises, instead of leaking a 500.
+            throw new AgentConfigNameConflictException(
+                "An agent config with name '" + request.name() + "' already exists in this workspace."
+            );
+        }
     }
 
     @Transactional
@@ -101,7 +115,10 @@ public class AgentConfigService {
         if (request.modelName() != null) {
             config.setModelName(request.modelName());
         }
-        if (request.llmApiKey() != null) {
+        // Clearing the key wins over a provided value, so an accidental "clear + new key" still clears.
+        if (Boolean.TRUE.equals(request.clearLlmApiKey())) {
+            config.setLlmApiKey(null);
+        } else if (request.llmApiKey() != null) {
             config.setLlmApiKey(request.llmApiKey());
         }
         if (request.llmBaseUrl() != null) {
@@ -142,15 +159,40 @@ public class AgentConfigService {
             );
         }
 
+        // Scope the bound-check to this workspace's own pointers (the config is already proven
+        // in-workspace above) rather than a global cross-tenant query.
+        Workspace workspace = workspaceRepository
+            .findById(workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+        if (
+            config.getId().equals(workspace.getPracticeConfigId()) ||
+            config.getId().equals(workspace.getMentorConfigId())
+        ) {
+            throw new AgentConfigBoundException(
+                "Cannot delete agent config bound to practice detection or the mentor. Unbind it first."
+            );
+        }
+
         agentConfigRepository.delete(config);
     }
 
     /**
-     * Validates that direct credential modes (API_KEY, OAUTH) have internet access enabled.
+     * Validates the direct credential mode (API_KEY): it requires internet access AND a stored
+     * credential, since the container reaches the provider directly. Runs on both create and update;
+     * on update the merged config still carries the existing key, so a kept key passes.
      */
     private void validateCredentialMode(AgentConfig config) {
-        if (config.getCredentialMode() != CredentialMode.PROXY && !config.isAllowInternet()) {
-            throw new AgentConfigCredentialModeException(config.getCredentialMode());
+        if (config.getCredentialMode() == CredentialMode.PROXY) {
+            return;
+        }
+        if (!config.isAllowInternet()) {
+            throw AgentConfigCredentialModeException.requiresInternet(config.getCredentialMode());
+        }
+        // Only an ENABLED runtime must carry a usable key — a disabled one never runs, so a keyless
+        // config can still be renamed or left parked (and, importantly, an already-keyless config can be
+        // disabled) without being forced to supply a key first.
+        if (config.isEnabled() && (config.getLlmApiKey() == null || config.getLlmApiKey().isBlank())) {
+            throw AgentConfigCredentialModeException.missingCredential(config.getCredentialMode());
         }
     }
 }

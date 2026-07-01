@@ -11,7 +11,9 @@ import {
     defineTool,
 } from "@earendil-works/pi-coding-agent";
 
-const OUTPUT = "/workspace/.output";
+import { dedupeKeyForFinding, normalizeFinding } from "./pi-finding-normalize.mjs";
+
+const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
@@ -28,7 +30,7 @@ const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
 const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
 const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5));
 
-// Watchdog: hard exit if SDK abort hangs past the budget (pi-mono #2381/#2677/#2119).
+// Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
     console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
     try {
@@ -59,7 +61,8 @@ const reviewState = {
     findings: [],
     findingKeys: [],
 };
-const verdictSchema = { type: "string", enum: ["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"] };
+const presenceSchema = { type: "string", enum: ["PRESENT", "ABSENT", "NOT_APPLICABLE"] };
+const assessmentSchema = { type: "string", enum: ["GOOD", "BAD"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
 const evidenceSchema = {
     type: "object",
@@ -71,7 +74,9 @@ const evidenceSchema = {
             items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["path", "startLine", "endLine"],
+                // endLine is optional (a single-line note omits it; normalizers + the Java parser treat it as
+                // optional). Keeping it REQUIRED would reject the whole tool call at the SDK boundary.
+                required: ["path", "startLine"],
                 properties: {
                     path: { type: "string", minLength: 1 },
                     startLine: { type: "integer", minimum: 1 },
@@ -85,7 +90,9 @@ const evidenceSchema = {
 const diffNoteSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["filePath", "startLine", "endLine", "body"],
+    // endLine is optional (single-line suggestion); normalizers + the Java parser treat it as optional, so
+    // keeping it REQUIRED would reject an otherwise-valid single-line note at the SDK boundary.
+    required: ["filePath", "startLine", "body"],
     properties: {
         filePath: { type: "string", minLength: 1 },
         startLine: { type: "integer", minimum: 1 },
@@ -93,16 +100,23 @@ const diffNoteSchema = {
         body: { type: "string", minLength: 1 },
     },
 };
+// `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
+// conditional cleanly across all validators the SDK may use, so we keep it out of `required`
+// here and enforce the (presence, assessment) coupling in normalizeFinding().
 const findingSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["practiceSlug", "title", "verdict", "severity", "confidence", "evidence", "reasoning", "guidance"],
+    required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning", "guidance"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
         title: { type: "string", minLength: 1, maxLength: 120 },
-        verdict: verdictSchema,
+        presence: presenceSchema,
+        assessment: assessmentSchema,
         severity: severitySchema,
-        confidence: { type: "number", minimum: 0, maximum: 1 },
+        // Upper bound is 100, not 1, so a model emitting percentage-style confidence (e.g. 85)
+        // is not rejected at the SDK boundary; normalizeFinding rescales (1,100] -> /100 to
+        // mirror the Java consumer PracticeDetectionResultParser.parseConfidence.
+        confidence: { type: "number", minimum: 0, maximum: 100 },
         evidence: evidenceSchema,
         reasoning: { type: "string", minLength: 1 },
         guidance: { type: "string", minLength: 1 },
@@ -138,8 +152,9 @@ function isValidFinding(f) {
     if (!f || typeof f !== "object") return false;
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
     if (typeof f.title !== "string" || !f.title.trim()) return false;
-    if (typeof f.verdict !== "string") return false;
-    if (typeof f.severity !== "string") return false;
+    if (typeof f.presence !== "string") return false;
+    // assessment is required unless presence=NOT_APPLICABLE (which has no valence).
+    if (f.presence !== "NOT_APPLICABLE" && typeof f.assessment !== "string") return false;
     // Number(null) === 0 — reject nullish before isNaN check.
     if (f.confidence == null || f.confidence === "") return false;
     if (Number.isNaN(Number(f.confidence))) return false;
@@ -198,71 +213,6 @@ function hasPersistedReviewState() {
     return reviewState.findings.length > 0;
 }
 
-function normalizeDiffNote(note) {
-    if (!note || typeof note !== "object") throw new Error("diff note must be an object");
-    const filePath = String(note.filePath ?? "").trim();
-    const startLine = Number(note.startLine);
-    const endLine = note.endLine == null ? startLine : Number(note.endLine);
-    const body = String(note.body ?? "").trim();
-    if (!filePath) throw new Error("diff note filePath is required");
-    if (!Number.isInteger(startLine) || startLine <= 0)
-        throw new Error("diff note startLine must be a positive integer");
-    if (!Number.isInteger(endLine) || endLine < startLine) throw new Error("diff note endLine must be >= startLine");
-    if (!body) throw new Error("diff note body is required");
-    return { filePath, startLine, endLine, body };
-}
-
-function normalizeEvidence(evidence) {
-    const locations = Array.isArray(evidence?.locations)
-        ? evidence.locations.map((location) => {
-              const path = String(location?.path ?? "").trim();
-              const startLine = Number(location?.startLine);
-              const endLine = location?.endLine == null ? startLine : Number(location.endLine);
-              if (!path) throw new Error("evidence location path is required");
-              if (!Number.isInteger(startLine) || startLine <= 0)
-                  throw new Error("evidence startLine must be a positive integer");
-              if (!Number.isInteger(endLine) || endLine < startLine)
-                  throw new Error("evidence endLine must be >= startLine");
-              return { path, startLine, endLine };
-          })
-        : [];
-    const snippets = Array.isArray(evidence?.snippets)
-        ? evidence.snippets.map((snippet) => String(snippet ?? "")).filter((snippet) => snippet.trim().length > 0)
-        : [];
-    return { locations, snippets };
-}
-
-function normalizeFinding(finding) {
-    if (!finding || typeof finding !== "object") throw new Error("finding must be an object");
-    const practiceSlug = String(finding.practiceSlug ?? "").trim();
-    const title = String(finding.title ?? "").trim();
-    const verdict = String(finding.verdict ?? "").trim();
-    const severity = String(finding.severity ?? "").trim();
-    const confidence = Number(finding.confidence);
-    const reasoning = String(finding.reasoning ?? "").trim();
-    const guidance = String(finding.guidance ?? "").trim();
-    if (!practiceSlug) throw new Error("practiceSlug is required");
-    if (!title) throw new Error("title is required");
-    if (!["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"].includes(verdict)) throw new Error(`invalid verdict '${verdict}'`);
-    if (!["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(severity)) throw new Error(`invalid severity '${severity}'`);
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
-        throw new Error("confidence must be between 0 and 1");
-    if (!reasoning) throw new Error("reasoning is required");
-    if (!guidance) throw new Error("guidance is required");
-    const evidence = normalizeEvidence(finding.evidence);
-    const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
-        ? finding.suggestedDiffNotes.map(normalizeDiffNote)
-        : [];
-    return { practiceSlug, title, verdict, severity, confidence, evidence, reasoning, guidance, suggestedDiffNotes };
-}
-
-function dedupeKeyForFinding(finding) {
-    // Dedupe key: practice + title + locations.
-    const locs = finding.evidence.locations
-        .map((l) => `${l.path}:${l.startLine}-${l.endLine}`)
-        .join(",");
-    return `${finding.practiceSlug}|${finding.title}|${locs}`;
-}
 
 function appendFindings(findings) {
     let inserted = 0;
@@ -300,7 +250,7 @@ const reportFindingTool = defineTool({
     },
     execute: async (_toolCallId, params) => {
         const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.verdict === "NEGATIVE" ? 1 : 0;
+        const negativeCount = params.finding.assessment === "BAD" ? 1 : 0;
         return {
             content: [
                 {
@@ -381,8 +331,14 @@ function extractLastAssistantText(sessionState) {
     return null;
 }
 
+// Mirror PracticeDetectionResultParser.MAX_RAW_OUTPUT_LENGTH on the Java side: a well-formed agent
+// rawOutput never approaches this, so a larger blob is junk and the brace-scan below would burn the
+// remaining grace window parsing growing slices for nothing.
+const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
+
 function tryParseJsonFromText(text) {
     if (!text) return null;
+    if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
     try {
         const parsed = JSON.parse(text);
         if (isValidFindingsPayload(parsed)) return parsed;
@@ -400,7 +356,12 @@ function tryParseJsonFromText(text) {
     const findingsMatch = text.match(/\{\s*"findings"/);
     if (!findingsMatch || findingsMatch.index === undefined) return null;
     const braceStart = findingsMatch.index;
-    for (let end = text.indexOf("}", braceStart); end >= 0; end = text.indexOf("}", end + 1)) {
+    // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
+    // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
+    // extractJsonFromText, which caps at a small fixed number of attempts).
+    let attempts = 0;
+    for (let end = text.indexOf("}", braceStart); end >= 0 && attempts < 256; end = text.indexOf("}", end + 1)) {
+        attempts++;
         try {
             const candidate = text.slice(braceStart, end + 1);
             const parsed = JSON.parse(candidate);
@@ -429,9 +390,38 @@ function tryRescueFromTextResponse(sessionState) {
 }
 
 
+function chunkArray(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) {
+        out.push(arr.slice(i, i + size));
+    }
+    return out;
+}
+
+// Group practice slugs by their area (from index.json), preserving order. A area forms one coherent,
+// focused evaluation; ungrouped practices fall back to their own one-practice group.
+function loadPracticeGroups() {
+    try {
+        const indexPath = `${CWD}/inputs/practices/index.json`;
+        if (!existsSync(indexPath)) return [];
+        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+        if (!Array.isArray(index)) return [];
+        const byArea = new Map();
+        for (const p of index) {
+            if (!p.slug) continue;
+            const area = p.area || p.slug;
+            if (!byArea.has(area)) byArea.set(area, []);
+            byArea.get(area).push(p.slug);
+        }
+        return [...byArea.entries()].map(([area, slugs]) => ({ area, slugs }));
+    } catch {
+        return [];
+    }
+}
+
 function loadPracticeSlugs() {
     try {
-        const indexPath = `${CWD}/.practices/index.json`;
+        const indexPath = `${CWD}/inputs/practices/index.json`;
         if (!existsSync(indexPath)) return [];
         const index = JSON.parse(readFileSync(indexPath, "utf-8"));
         if (!Array.isArray(index)) return [];
@@ -441,13 +431,22 @@ function loadPracticeSlugs() {
     }
 }
 
+// Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
+// cannot drift between the sites that emit it.
+const PERSIST_DISCIPLINE =
+    `There is no target count and no quota. ` +
+    `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
+    `Only keep GOOD findings that add real review value. ` +
+    `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+    `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
+
 function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
     return (
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
         `Persist every justified finding with report_finding, one finding per call. ` +
         `There is no target count and no quota. ` +
-        `Only report POSITIVE findings that add real review value. ` +
+        `Only report GOOD findings that add real review value. ` +
         `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
     );
 }
@@ -541,6 +540,10 @@ async function main() {
                     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
                     contextWindow: 131072,
                     maxTokens: 4096,
+                    // Opt into Anthropic-style cache_control markers so the large stable prefix (system
+                    // prompt + the diff/context the agent reads once) is cached across the per-area turns.
+                    // A no-op if the gateway ignores the markers; verify via usage.cacheRead before relying on it.
+                    compat: { cacheControlFormat: "anthropic", supportsLongCacheRetention: true },
                 },
             ],
         });
@@ -576,19 +579,14 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft nudge: persist before hard timeout (4/4 success in prod).
+    // Soft nudge: steer the agent to persist findings before the hard timeout aborts.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
         const steerMessage =
             `Stop analyzing and persist output now. ` +
             `Use report_finding immediately for any finding you already have, one finding per call. ` +
-            `There is no target count and no quota. ` +
-            `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
-            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
+            PERSIST_DISCIPLINE;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
 
@@ -619,11 +617,74 @@ async function main() {
     console.error(`[pi-runner] Starting initial analysis`);
     const startMs = Date.now();
 
+    // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
+    // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
+    // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
+    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
+    // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
+    // practice gets a finding. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
+    const allSlugs = loadPracticeSlugs();
+    const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
+    const groups = loadPracticeGroups();
+    const batches = [];
+    if (groups.length > 0) {
+        // One batch per area; sub-chunk a area that exceeds batchSize so context stays bounded.
+        for (const g of groups) {
+            for (const chunk of chunkArray(g.slugs, batchSize)) batches.push(chunk);
+        }
+    } else {
+        batches.push(...(allSlugs.length > batchSize ? chunkArray(allSlugs, batchSize) : [allSlugs]));
+    }
+    console.error(
+        `[pi-runner] Fan-out: ${allSlugs.length} practices in ${groups.length || "?"} areas -> ${batches.length} focused turn(s)`,
+    );
+
     try {
-        try {
-            await session.prompt(prompt);
-        } catch (err) {
-            console.error(`[pi-runner] Initial prompt error: ${err.message}`);
+        for (let bi = 0; bi < batches.length; bi++) {
+            if (hardAborted) {
+                console.error(`[pi-runner] Hard abort fired — stopping turn loop at ${bi}/${batches.length}`);
+                break;
+            }
+            const batch = batches[bi];
+            const readHint = `Read inputs/practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
+            const batchPrompt =
+                bi === 0
+                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`
+                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`;
+            try {
+                await session.prompt(batchPrompt);
+            } catch (err) {
+                console.error(`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${err.message}`);
+                if (hardAborted) break;
+            }
+            console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
+        }
+
+        // Coverage gate: every active practice must get a finding. Re-prompt the ones no turn reported.
+        if (!hardAborted && allSlugs.length > 0) {
+            const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
+            const missing = allSlugs.filter((s) => !covered.has(s));
+            if (missing.length > 0) {
+                console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
+                const gatePrompt =
+                    `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
+                    `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
+                    `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
+                    `— set presence (PRESENT/ABSENT/NOT_APPLICABLE) and, unless NOT_APPLICABLE, assessment (GOOD/BAD).`;
+                try {
+                    await session.prompt(gatePrompt);
+                } catch (err) {
+                    console.error(`[pi-runner] coverage-gate prompt error: ${err.message}`);
+                }
+                const stillMissing = allSlugs.filter(
+                    (s) => !new Set(reviewState.findings.map((f) => f.practiceSlug)).has(s),
+                );
+                console.error(
+                    `[pi-runner] Coverage gate done: ${allSlugs.length - stillMissing.length}/${allSlugs.length} practices covered`,
+                );
+            } else {
+                console.error(`[pi-runner] Coverage gate: all ${allSlugs.length} practices already reported`);
+            }
         }
     } finally {
         clearTimeout(softTimer);
@@ -713,31 +774,19 @@ async function main() {
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Do NOT read more files. ` +
             `Persist every remaining justified finding with report_finding immediately, one finding per call. ` +
-            `There is no target count and no quota. ` +
-            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
+            PERSIST_DISCIPLINE + ` ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
             `Do NOT read any more files. Persist the remaining findings with report_finding NOW, one finding per call. ` +
-            `There is no target count and no quota. ` +
-            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
+            PERSIST_DISCIPLINE + ` ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
-            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call, ` +
-            `with no target count or quota, ` +
-            `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
+            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call. ` +
+            PERSIST_DISCIPLINE + ` ` +
             scaffold;
     }
 
@@ -791,7 +840,7 @@ async function main() {
         process.exit(0);
     }
 
-    console.error(`[pi-runner] FAILED: no complete persisted review output after initial + format retry`);
+    console.error(`[pi-runner] FAILED: no complete persisted review output after initial attempt + recovery retry`);
     process.exit(1);
 }
 

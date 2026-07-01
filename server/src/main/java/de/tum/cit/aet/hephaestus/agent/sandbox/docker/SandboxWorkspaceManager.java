@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -50,6 +51,7 @@ public class SandboxWorkspaceManager {
     private final DockerFileOperations fileOps;
     private final long maxOutputBytes;
     private final long maxSingleFileBytes;
+    private final long maxInputBytes;
     private final long maxDirectoryBytes;
     private final int maxDirectoryEntries;
 
@@ -57,7 +59,7 @@ public class SandboxWorkspaceManager {
         this(fileOps, MAX_OUTPUT_BYTES, MAX_SINGLE_FILE_BYTES, MAX_DIRECTORY_BYTES, MAX_DIRECTORY_ENTRIES);
     }
 
-    /** Package-private constructor for testing with custom limits. */
+    /** Package-private constructor for testing with custom limits (input limit defaults to {@link #MAX_INPUT_BYTES}). */
     SandboxWorkspaceManager(
         DockerFileOperations fileOps,
         long maxOutputBytes,
@@ -65,9 +67,22 @@ public class SandboxWorkspaceManager {
         long maxDirectoryBytes,
         int maxDirectoryEntries
     ) {
+        this(fileOps, maxOutputBytes, maxSingleFileBytes, MAX_INPUT_BYTES, maxDirectoryBytes, maxDirectoryEntries);
+    }
+
+    /** Package-private constructor for testing with custom limits, including the injected-input total. */
+    SandboxWorkspaceManager(
+        DockerFileOperations fileOps,
+        long maxOutputBytes,
+        long maxSingleFileBytes,
+        long maxInputBytes,
+        long maxDirectoryBytes,
+        int maxDirectoryEntries
+    ) {
         this.fileOps = fileOps;
         this.maxOutputBytes = maxOutputBytes;
         this.maxSingleFileBytes = maxSingleFileBytes;
+        this.maxInputBytes = maxInputBytes;
         this.maxDirectoryBytes = maxDirectoryBytes;
         this.maxDirectoryEntries = maxDirectoryEntries;
     }
@@ -214,9 +229,19 @@ public class SandboxWorkspaceManager {
                         fileEntry.setGroupId(1000);
                         tar.putArchiveEntry(fileEntry);
 
-                        // Stream file through fixed buffer — not Files.readAllBytes()
-                        try (InputStream fileIn = Files.newInputStream(path)) {
-                            fileIn.transferTo(tar);
+                        // Stream EXACTLY the declared number of bytes (not transferTo's open-ended copy) so a
+                        // source file mutated between the stat above and this read fails with a clear
+                        // concurrent-modification diagnostic rather than an opaque tar size-mismatch at finish().
+                        long written = copyExactly(path, tar, fileSize);
+                        if (written != fileSize) {
+                            throw new SandboxException(
+                                "Source file changed during injection (declared " +
+                                    fileSize +
+                                    " bytes, read " +
+                                    written +
+                                    "): " +
+                                    path
+                            );
                         }
                         tar.closeArchiveEntry();
                     }
@@ -229,6 +254,30 @@ public class SandboxWorkspaceManager {
 
             tar.finish();
         }
+    }
+
+    /**
+     * Copy at most {@code limit} bytes from {@code source} into {@code out}, returning the number actually
+     * read. Bounding the copy to the declared size means a source file that GREW since it was stat'd is
+     * truncated to the declared length (the tar entry stays valid) and one that SHRANK returns fewer bytes
+     * (the caller raises a clear concurrent-modification error) — never an open-ended {@code transferTo}
+     * that would over- or under-run the entry's declared size.
+     */
+    private static long copyExactly(Path source, OutputStream out, long limit) throws IOException {
+        byte[] buffer = new byte[COPY_BUFFER_SIZE];
+        long total = 0;
+        try (InputStream in = Files.newInputStream(source)) {
+            while (total < limit) {
+                int toRead = (int) Math.min(buffer.length, limit - total);
+                int read = in.read(buffer, 0, toRead);
+                if (read < 0) {
+                    break;
+                }
+                out.write(buffer, 0, read);
+                total += read;
+            }
+        }
+        return total;
     }
 
     /**
@@ -255,8 +304,17 @@ public class SandboxWorkspaceManager {
                         log.warn("Skipping symbolic/hard link in output archive: {}", entry.getName());
                         continue;
                     }
-                    String name = entry.getName();
-                    // Strip leading directory component (docker cp includes the parent dir name)
+                    // Normalize the RAW entry name first so the traversal check is authoritative over the
+                    // name the container actually emitted — stripping the leading component before
+                    // normalizing would silently reinterpret a "../out/x" entry as a benign "out/x".
+                    String rawName = entry.getName();
+                    Path rawNormalized = Path.of(rawName).normalize();
+                    if (rawNormalized.isAbsolute() || rawNormalized.startsWith("..")) {
+                        log.warn("Skipping unsafe path in output archive: {}", rawName);
+                        continue;
+                    }
+                    // Strip the leading directory component (docker cp includes the parent dir name).
+                    String name = rawNormalized.toString();
                     int slashIndex = name.indexOf('/');
                     if (slashIndex >= 0) {
                         name = name.substring(slashIndex + 1);
@@ -264,13 +322,6 @@ public class SandboxWorkspaceManager {
                     if (name.isEmpty()) {
                         continue;
                     }
-                    // Reject traversal paths in collected output
-                    Path normalized = Path.of(name).normalize();
-                    if (normalized.isAbsolute() || normalized.startsWith("..")) {
-                        log.warn("Skipping unsafe path in output archive: {}", name);
-                        continue;
-                    }
-                    name = normalized.toString();
                     // Per-file size guard: reject files with declared size > limit or negative
                     // (a long->int cast on a crafted size > 2GB would produce a negative int).
                     if (entry.getSize() < 0 || entry.getSize() > maxSingleFileBytes) {
@@ -317,11 +368,25 @@ public class SandboxWorkspaceManager {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
 
+            // Writable-region directories must be emitted explicitly as uid-1000 entries. Docker's tar
+            // extractor auto-creates intermediate dirs as root (uid 0), which is correct for the read-only
+            // inputs/ subtree but breaks work/ (ADR 0020): the precompute step does `mkdir -p work/
+            // precompute-out` and the agent uses work/ as scratch, both as uid 1000 — a root-owned work/
+            // would deny those writes. We therefore pre-create every work/* ancestor owned by 1000.
+            for (String dir : writableAncestorDirs(files.keySet())) {
+                TarArchiveEntry dirEntry = new TarArchiveEntry(dir + "/");
+                dirEntry.setModTime(System.currentTimeMillis());
+                dirEntry.setUserId(1000);
+                dirEntry.setGroupId(1000);
+                tar.putArchiveEntry(dirEntry);
+                tar.closeArchiveEntry();
+            }
+
             long totalBytes = 0;
             for (Map.Entry<String, byte[]> entry : files.entrySet()) {
                 totalBytes += entry.getValue().length;
-                if (totalBytes > MAX_INPUT_BYTES) {
-                    throw new SandboxException("Input files exceed maximum size limit (" + MAX_INPUT_BYTES + " bytes)");
+                if (totalBytes > maxInputBytes) {
+                    throw new SandboxException("Input files exceed maximum size limit (" + maxInputBytes + " bytes)");
                 }
                 String safePath = validatePath(entry.getKey());
                 TarArchiveEntry tarEntry = new TarArchiveEntry(safePath);
@@ -340,6 +405,25 @@ public class SandboxWorkspaceManager {
         } catch (IOException e) {
             throw new SandboxException("Failed to create tar archive", e);
         }
+    }
+
+    /**
+     * Every ancestor directory under the writable {@link WorkspaceAbi#WORK_PREFIX work/} region across
+     * all input keys, ordered parents-before-children (a {@link java.util.TreeSet} sorts a parent path
+     * ahead of its children because the parent is a string prefix). The read-only {@code inputs/} subtree
+     * is deliberately excluded — Docker auto-creates those as root, which is exactly the RO guarantee.
+     */
+    private static java.util.SortedSet<String> writableAncestorDirs(java.util.Set<String> keys) {
+        java.util.SortedSet<String> dirs = new java.util.TreeSet<>();
+        for (String key : keys) {
+            if (!key.startsWith(WorkspaceAbi.WORK_PREFIX)) {
+                continue;
+            }
+            for (int slash = key.indexOf('/'); slash >= 0; slash = key.indexOf('/', slash + 1)) {
+                dirs.add(key.substring(0, slash));
+            }
+        }
+        return dirs;
     }
 
     /**

@@ -9,6 +9,19 @@ export interface Hint {
 	flags: Record<string, boolean | number | string>;
 }
 
+/**
+ * A precompute script's default export. Receives the repo checkout, the parsed diff, the artifact
+ * metadata, and (optionally) the materialised context directory so it can read the SAME cross-artifact
+ * context the agent sees (project_inventory.json, linked_work_items.json, …) via lib/context.ts helpers.
+ * The 4th argument is additive — existing 3-arg scripts keep working unchanged.
+ */
+export type PracticeScript = (
+	repoPath: string,
+	diffFiles: Map<string, DiffFile>,
+	metadata: any,
+	contextDir?: string,
+) => PracticeResult | Promise<PracticeResult>;
+
 export interface PracticeResult {
 	practice: string;
 	status: "ok" | "error" | "timeout";

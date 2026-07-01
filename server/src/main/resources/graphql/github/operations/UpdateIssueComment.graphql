@@ -1,0 +1,11 @@
+# Edits an existing issue/PR comment in place (ADR 0021 re-review UX).
+# The agent's summary comment (posted via AddPullRequestComment as an IssueComment on the PR or issue)
+# is updated rather than re-posted, keeping ONE evolving overview comment across re-reviews.
+
+mutation UpdateIssueComment($id: ID!, $body: String!) {
+    updateIssueComment(input: {id: $id, body: $body}) {
+        issueComment {
+            id
+        }
+    }
+}

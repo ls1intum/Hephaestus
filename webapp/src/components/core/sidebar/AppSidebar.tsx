@@ -128,10 +128,11 @@ export function AppSidebar({
 						workspaceSlug={activeWorkspace.workspaceSlug}
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
 						practicesEnabled={activeWorkspace.practicesEnabled}
+						mentorEnabled={activeWorkspace.mentorEnabled}
 					/>
 				)}
-				{/* Instance-admin is intentionally NOT mixed into the per-workspace nav anymore — it lives
-				    in its own /admin shell, reached via the footer entry (workspace-independent). */}
+				{/* Instance-admin lives in its own /admin shell (reached via the footer entry), never in
+				    the per-workspace nav. */}
 			</>
 		);
 	}

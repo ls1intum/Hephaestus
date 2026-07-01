@@ -24,7 +24,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -60,7 +59,10 @@ class AgentJobServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private PullRequestRepository pullRequestRepository;
+    private ReviewableArtifactLoader artifactLoader;
+
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
 
     @Mock
     private JobTypeHandlerRegistry handlerRegistry;
@@ -87,12 +89,13 @@ class AgentJobServiceTest extends BaseUnitTest {
             agentJobRepository,
             agentConfigRepository,
             workspaceRepository,
-            pullRequestRepository,
+            artifactLoader,
+            connectionService,
             handlerRegistry,
             objectMapper,
             eventPublisher,
             transactionTemplate,
-            new PracticeReviewProperties(false, true, false, "", 15),
+            new PracticeReviewProperties(false, true, false, "", 15, false, false, false),
             sandboxManager,
             java.util.Optional.empty()
         );
@@ -114,7 +117,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     private JobSubmission createSubmission() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("pr_number", 42);
-        return new JobSubmission(metadata, "pr_review:owner/repo:42:abc123");
+        // 5-segment key grammar: <type>:<nameWithOwner>:<number>:<phase>:<freshness>
+        // (PullRequestReviewHandler emits the trigger-event phase before the head SHA).
+        return new JobSubmission(metadata, "pr_review:owner/repo:42:authoring:abc123");
     }
 
     @Nested
@@ -137,6 +142,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldReturnEmptyWhenNoEnabledConfig() {
             AgentConfig disabledConfig = new AgentConfig();
             disabledConfig.setEnabled(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(disabledConfig));
 
             Optional<AgentJob> result = service.submit(
@@ -151,6 +157,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenNoConfigs() {
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             Optional<AgentJob> result = service.submit(
@@ -160,6 +167,75 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldSubmitOnlyBoundConfigAndSuppressFanOut() {
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(enabledConfig));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isPresent();
+            // Fan-out is suppressed when a config is bound: the all-enabled lookup is never consulted.
+            verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
+            verify(agentJobRepository).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldSubmitNothingWhenBoundConfigDisabled() {
+            AgentConfig disabled = new AgentConfig();
+            disabled.setId(10L);
+            disabled.setEnabled(false);
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(disabled));
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldSubmitNothingWhenBoundConfigIsForeign() {
+            // Stale/foreign binding: config 10 is not in this workspace. The scoped finder returns
+            // empty — we must pause (no job), NOT silently fall back to fan-out, and never touch the
+            // all-enabled lookup. This pins the tenancy boundary the scalar FK relies on.
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.empty());
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+            verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
         }
 
         @Test
@@ -176,7 +252,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     eq(1L),
-                    eq("pr_review:owner/repo:42:abc123:config:10"),
+                    eq("pr_review:owner/repo:42:authoring:abc123:config:10"),
                     any()
                 )
             ).thenReturn(Optional.of(existingJob));
@@ -223,7 +299,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getWorkspace()).isEqualTo(workspace);
             assertThat(job.getConfig()).isEqualTo(enabledConfig);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123:config:10");
+            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:config:10");
             assertThat(job.getConfigSnapshot()).isNotNull();
 
             // Verify event published
@@ -307,7 +383,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     eq(1L),
-                    eq("pr_review:owner/repo:42:abc123:config:10"),
+                    eq("pr_review:owner/repo:42:authoring:abc123:config:10"),
                     any()
                 )
             ).thenReturn(Optional.empty());
@@ -317,8 +393,8 @@ class AgentJobServiceTest extends BaseUnitTest {
                 new DataIntegrityViolationException("uk_agent_job_idempotency")
             );
 
-            // Production code now catches DataIntegrityViolationException and returns null
-            // from submitForConfig, which results in Optional.empty() from submit()
+            // submitForConfig catches DataIntegrityViolationException and returns null,
+            // which results in Optional.empty() from submit()
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
@@ -358,6 +434,95 @@ class AgentJobServiceTest extends BaseUnitTest {
 
             assertThat(result).isPresent();
             assertThat(result.get().getConfig()).isEqualTo(enabledConfig);
+        }
+
+        @Test
+        void shouldSkipSubmissionWhenCooldownActive() {
+            // Default workspace inherits the property cooldownMinutes=15, so the cooldown branch runs. A
+            // recent job for the same (PR, phase)/config → submission is skipped (no new job persisted).
+            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+
+            AgentJob recent = new AgentJob();
+            recent.prePersist();
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.of(recent));
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        void shouldCreateJobWhenCooldownElapsed() {
+            // Cooldown lookup returns empty (no recent job within the window) → the job is created.
+            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isPresent();
+            verify(agentJobRepository).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldEscapeLikeWildcardsInCooldownPrefix() {
+            // A repo name with a LIKE single-char wildcard ('_') must be escaped, or the cooldown prefix
+            // would spuriously match unrelated keys (e.g. "my_org" matching "myXorg"). Capture the prefix
+            // passed to the LIKE query (ESCAPE '\') and assert the '_' is backslash-escaped.
+            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            ObjectNode metadata = objectMapper.createObjectNode();
+            JobSubmission underscoreKey = new JobSubmission(metadata, "pr_review:my_org/my%repo:42:authoring:abc123");
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(underscoreKey);
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
+
+            service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class));
+
+            ArgumentCaptor<String> prefix = ArgumentCaptor.forClass(String.class);
+            verify(agentJobRepository).findRecentJobByKeyPrefix(eq(1L), prefix.capture(), any());
+            // Phase preserved, freshness stripped, both LIKE metacharacters escaped, config scope appended.
+            assertThat(prefix.getValue()).isEqualTo("pr\\_review:my\\_org/my\\%repo:42:authoring:%:config:10");
         }
     }
 
@@ -594,6 +759,95 @@ class AgentJobServiceTest extends BaseUnitTest {
                 eq(DeliveryStatus.FAILED),
                 eq(completedJob.getDeliveryCommentId())
             );
+        }
+    }
+
+    @Nested
+    class CooldownKeyPrefix {
+
+        @Test
+        void prKeyStripsFreshnessKeepsPhase() {
+            // 5-segment PR key: <type>:<nameWithOwner>:<number>:<phase>:<sha>. Only the trailing
+            // SHA is stripped → cooldown scopes per (PR, phase), so an authoring re-trigger is cooled
+            // down but a later merge retrospective (different phase) is NOT.
+            assertThat(AgentJobService.extractCooldownKeyPrefix("pr_review:owner/repo:42:authoring:abc123")).isEqualTo(
+                "pr_review:owner/repo:42:authoring:"
+            );
+        }
+
+        @Test
+        void issueKeyStripsFreshnessKeepsPhase() {
+            // 5-segment issue key: the trailing segment is the disposable updatedAt version, the
+            // 4th is the phase. A regression that dropped the freshness segment AND the phase would
+            // collapse cooldown back to per-repo; pin that the (issue number, phase) scope survives.
+            assertThat(
+                AgentJobService.extractCooldownKeyPrefix("issue_review:owner/repo:12:IssueOpened:1700000000000")
+            ).isEqualTo("issue_review:owner/repo:12:IssueOpened:");
+        }
+    }
+
+    @Nested
+    class DevTriggerSupport {
+
+        @Test
+        void buildReviewRequestReturnsNullWhenBranchInfoMissing() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            pr.setId(5L);
+            // headRefOid/headRefName/baseRefName all null → nothing to clone or diff.
+            assertThat(service.buildReviewRequest(pr, "PullRequestMerged")).isNull();
+        }
+
+        @Test
+        void buildReviewRequestBuildsDetachedRequestWhenBranchInfoPresent() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            pr.setId(5L);
+            pr.setHeadRefOid("abc123");
+            pr.setHeadRefName("feature/test");
+            pr.setBaseRefName("main");
+            de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository repo =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository();
+            repo.setId(100L);
+            repo.setNameWithOwner("owner/repo");
+            pr.setRepository(repo);
+
+            var request = service.buildReviewRequest(pr, "PullRequestMerged");
+
+            assertThat(request).isNotNull();
+            assertThat(request.headRefOid()).isEqualTo("abc123");
+            assertThat(request.triggerEvent()).isEqualTo("PullRequestMerged");
+        }
+
+        @Test
+        void buildIssueRequestReturnsNullWhenRepositoryMissing() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue issue =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
+            issue.setId(7L);
+            assertThat(service.buildIssueRequest(issue, "IssueClosed")).isNull();
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void submitPreparedRunsSubmitAndRendersNoConfigMessage() {
+            // submitPrepared is invoked by the controller AFTER the prep transaction commits, so submit() runs
+            // outside any outer transaction (SYSTEMIC #5). With no enabled config it renders the no-job message.
+            lenient()
+                .when(transactionTemplate.execute(any()))
+                .thenAnswer(inv -> {
+                    TransactionCallback<?> callback = inv.getArgument(0);
+                    return callback.doInTransaction(mock(TransactionStatus.class));
+                });
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+
+            String result = service.submitPrepared(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEqualTo("No job created (no enabled agent config?)");
         }
     }
 }

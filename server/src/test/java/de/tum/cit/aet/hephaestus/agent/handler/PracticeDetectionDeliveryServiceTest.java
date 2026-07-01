@@ -20,12 +20,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFindingTargetType;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -51,10 +52,16 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
-    private PracticeFindingRepository practiceFindingRepository;
+    private de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository practiceRevisionRepository;
+
+    @Mock
+    private ObservationRepository observationRepository;
 
     @Mock
     private PullRequestRepository pullRequestRepository;
+
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -73,22 +80,21 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     void setUp() {
         service = new PracticeDetectionDeliveryService(
             practiceRepository,
-            practiceFindingRepository,
+            practiceRevisionRepository,
+            observationRepository,
             pullRequestRepository,
+            issueRepository,
             eventPublisher,
             objectMapper
         );
 
-        // Create test workspace
         Workspace workspace = new Workspace();
         ReflectionTestUtils.setField(workspace, "id", 1L);
 
-        // Create test practice
         testPractice = new Practice();
         ReflectionTestUtils.setField(testPractice, "id", 10L);
         testPractice.setSlug("pr-description-quality");
 
-        // Create test job
         testJob = new AgentJob();
         ReflectionTestUtils.setField(testJob, "id", UUID.randomUUID());
         testJob.setWorkspace(workspace);
@@ -96,10 +102,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         metadata.put("pull_request_id", 456L);
         testJob.setMetadata(metadata);
 
-        // Create test PR with author
         testAuthor = new User();
         ReflectionTestUtils.setField(testAuthor, "id", 789L);
-        testAuthor.setLogin("contributor");
+        testAuthor.setLogin("developer");
         testPr = new PullRequest();
         testPr.setAuthor(testAuthor);
 
@@ -108,29 +113,52 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.of(testPr));
         lenient()
             .when(
-                practiceFindingRepository.insertIfAbsent(
+                observationRepository.insertIfAbsent(
                     any(),
                     anyString(),
                     any(),
                     anyLong(),
+                    any(), // practiceRevisionId
                     anyString(),
                     anyLong(),
                     anyLong(),
+                    any(),
                     anyString(),
-                    anyString(),
-                    anyString(),
+                    any(), // assessment — null for NOT_APPLICABLE, so any() (anyString() would not match null)
+                    any(), // severity — null for non-BAD findings (ADR 0022), so any() not anyString()
                     anyFloat(),
                     any(),
                     any(),
-                    any(),
+                    anyString(),
                     any()
                 )
             )
             .thenReturn(1);
     }
 
-    private ValidatedFinding validFinding(String slug, Verdict verdict) {
-        return new ValidatedFinding(slug, "Test finding", verdict, Severity.INFO, 0.9f, null, null, null, List.of());
+    /**
+     * Build a finding whose valence follows the former-GOOD practice convention used across these
+     * fixtures (pr-description-quality, error-handling): PRESENT→GOOD strength, ABSENT→BAD gap,
+     * NOT_APPLICABLE→null. The assessment slot sits right after presence on {@link ValidatedFinding}.
+     */
+    private ValidatedFinding validFinding(String slug, Presence presence) {
+        Assessment assessment = switch (presence) {
+            case PRESENT -> Assessment.GOOD;
+            case ABSENT -> Assessment.BAD;
+            case NOT_APPLICABLE -> null;
+        };
+        return new ValidatedFinding(
+            slug,
+            "Test finding",
+            presence,
+            assessment,
+            Severity.INFO,
+            0.9f,
+            null,
+            null,
+            null,
+            List.of()
+        );
     }
 
     @Nested
@@ -138,7 +166,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void persistsValidFinding() {
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -146,23 +174,33 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(result.discardedUnknownSlug()).isZero();
             assertThat(result.discardedDuplicate()).isZero();
 
-            verify(practiceFindingRepository).insertIfAbsent(
+            ArgumentCaptor<String> fingerprintCaptor = ArgumentCaptor.forClass(String.class);
+            verify(observationRepository).insertIfAbsent(
                 any(UUID.class),
                 eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
                 eq(testJob.getId()),
                 eq(10L),
+                isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("PULL_REQUEST"),
                 eq(456L),
-                eq(789L),
+                eq(789L), // aboutUserId
                 eq("Test finding"),
-                eq("POSITIVE"),
-                eq("INFO"),
+                eq("PRESENT"), // presence (ADR 0022)
+                eq("GOOD"), // assessment (former-GOOD practice, PRESENT → a strength)
+                isNull(), // severity — coerced to null for a non-BAD finding (ADR 0022 invariant)
                 eq(0.9f),
                 isNull(),
                 isNull(),
-                isNull(),
+                fingerprintCaptor.capture(), // findingFingerprint == persisted recurrence_key
                 any()
             );
+
+            // The recurrence_key written to the row MUST equal the fingerprint the result map returns —
+            // they are the single supersession identity, so any drift between them silently breaks re-review.
+            assertThat(fingerprintCaptor.getValue())
+                .as("persisted recurrence_key matches the returned findingFingerprint")
+                .matches("[0-9a-f]{64}")
+                .isEqualTo(result.findingFingerprints().values().iterator().next());
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             PracticeDetectionCompletedEvent event = eventCaptor.getValue();
@@ -179,27 +217,29 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void unknownSlug() {
-            var findings = List.of(validFinding("unknown-practice", Verdict.POSITIVE));
+            var findings = List.of(validFinding("unknown-practice", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isZero();
             assertThat(result.discardedUnknownSlug()).isEqualTo(1);
-            verify(practiceFindingRepository, never()).insertIfAbsent(
+            verify(observationRepository, never()).insertIfAbsent(
                 any(),
                 anyString(),
                 any(),
                 anyLong(),
+                any(), // practiceRevisionId
                 anyString(),
                 anyLong(),
                 anyLong(),
+                any(),
                 anyString(),
                 anyString(),
                 anyString(),
                 anyFloat(),
                 any(),
                 any(),
-                any(),
+                anyString(),
                 any()
             );
         }
@@ -208,7 +248,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("returns 0 inserted when workspace has no practices")
         void emptyPracticeCatalog() {
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(List.of());
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -224,7 +264,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("throws when pull request not found")
         void prNotFound() {
             when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.empty());
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -235,7 +275,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("throws when pull request has no author")
         void prNoAuthor() {
             testPr.setAuthor(null);
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -249,17 +289,17 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void nullMetadata() {
             testJob.setMetadata(null);
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Missing pull_request_id");
+                .hasMessageContaining("Missing job metadata");
         }
 
         @Test
         void missingPullRequestId() {
             testJob.setMetadata(objectMapper.createObjectNode());
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -274,7 +314,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsAllNegativesForPractice() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
+                findings.add(validFinding("pr-description-quality", Presence.ABSENT));
             }
 
             var result = service.deliver(testJob, findings);
@@ -287,7 +327,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsManyPositiveFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.POSITIVE));
+                findings.add(validFinding("pr-description-quality", Presence.PRESENT));
             }
 
             var result = service.deliver(testJob, findings);
@@ -307,8 +347,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 5; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
-                findings.add(validFinding("error-handling", Verdict.NEGATIVE));
+                findings.add(validFinding("pr-description-quality", Presence.ABSENT));
+                findings.add(validFinding("error-handling", Presence.ABSENT));
             }
 
             var result = service.deliver(testJob, findings);
@@ -318,12 +358,12 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    class NotApplicableVerdict {
+    class NotApplicableObservation {
 
         @Test
         @DisplayName("persists NOT_APPLICABLE finding without counting as negative")
         void notApplicablePersisted() {
-            var findings = List.of(validFinding("pr-description-quality", Verdict.NOT_APPLICABLE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.NOT_APPLICABLE));
 
             var result = service.deliver(testJob, findings);
 
@@ -335,7 +375,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsManyNotApplicableFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NOT_APPLICABLE));
+                findings.add(validFinding("pr-description-quality", Presence.NOT_APPLICABLE));
             }
 
             var result = service.deliver(testJob, findings);
@@ -345,31 +385,83 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
+    class SeverityCoherence {
+
+        /** Captures the severity (position 12) the native insert receives for one delivered finding. */
+        private String capturedSeverityFor(ValidatedFinding finding) {
+            service.deliver(testJob, List.of(finding));
+            ArgumentCaptor<String> severityCaptor = ArgumentCaptor.forClass(String.class);
+            verify(observationRepository).insertIfAbsent(
+                any(),
+                anyString(),
+                any(),
+                anyLong(),
+                any(), // practiceRevisionId
+                anyString(),
+                anyLong(),
+                anyLong(),
+                any(),
+                anyString(),
+                any(), // assessment (null for NOT_APPLICABLE)
+                severityCaptor.capture(),
+                anyFloat(),
+                any(),
+                any(),
+                anyString(),
+                any()
+            );
+            return severityCaptor.getValue();
+        }
+
+        @Test
+        @DisplayName("a BAD finding keeps its severity")
+        void badFindingKeepsSeverity() {
+            // ABSENT → BAD with Severity.INFO from the fixture helper.
+            assertThat(capturedSeverityFor(validFinding("pr-description-quality", Presence.ABSENT))).isEqualTo("INFO");
+        }
+
+        @Test
+        @DisplayName("a GOOD finding's severity is coerced to null (ADR 0022: severity is BAD-only)")
+        void goodFindingSeverityCoercedToNull() {
+            // PRESENT → GOOD, yet the fixture helper still carries Severity.INFO; it must not be persisted.
+            assertThat(capturedSeverityFor(validFinding("pr-description-quality", Presence.PRESENT))).isNull();
+        }
+
+        @Test
+        @DisplayName("a NOT_APPLICABLE finding's severity is coerced to null")
+        void notApplicableFindingSeverityCoercedToNull() {
+            assertThat(capturedSeverityFor(validFinding("pr-description-quality", Presence.NOT_APPLICABLE))).isNull();
+        }
+    }
+
+    @Nested
     class Idempotency {
 
         @Test
         void duplicateKey() {
             when(
-                practiceFindingRepository.insertIfAbsent(
+                observationRepository.insertIfAbsent(
                     any(),
                     anyString(),
                     any(),
                     anyLong(),
+                    any(), // practiceRevisionId
                     anyString(),
                     anyLong(),
                     anyLong(),
+                    any(),
                     anyString(),
                     anyString(),
-                    anyString(),
+                    any(), // severity — null for non-BAD findings (ADR 0022), so any() not anyString()
                     anyFloat(),
                     any(),
                     any(),
-                    any(),
+                    anyString(),
                     any()
                 )
             ).thenReturn(0);
 
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -379,27 +471,28 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void keyFormat() {
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             service.deliver(testJob, findings);
 
-            @SuppressWarnings("unchecked")
             ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(practiceFindingRepository).insertIfAbsent(
+            verify(observationRepository).insertIfAbsent(
                 any(),
                 keyCaptor.capture(),
                 any(),
                 anyLong(),
+                any(), // practiceRevisionId
                 anyString(),
                 anyLong(),
                 anyLong(),
+                any(),
                 anyString(),
                 anyString(),
-                anyString(),
+                isNull(), // severity — coerced to null for the PRESENT/GOOD finding (ADR 0022)
                 anyFloat(),
                 any(),
                 any(),
-                any(),
+                anyString(),
                 any()
             );
 
@@ -422,9 +515,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             var findings = List.of(
-                validFinding("pr-description-quality", Verdict.POSITIVE),
-                validFinding("error-handling", Verdict.NEGATIVE),
-                validFinding("unknown-slug", Verdict.POSITIVE)
+                validFinding("pr-description-quality", Presence.PRESENT),
+                validFinding("error-handling", Presence.ABSENT),
+                validFinding("unknown-slug", Presence.PRESENT)
             );
 
             service.deliver(testJob, findings);
@@ -434,9 +527,54 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(event.findingsInserted()).isEqualTo(2);
             assertThat(event.findingsDiscarded()).isEqualTo(1); // unknown slug
             assertThat(event.hasNegative()).isTrue(); // error-handling finding is NEGATIVE
-            assertThat(event.contributorId()).isEqualTo(789L);
-            assertThat(event.targetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
-            assertThat(event.targetId()).isEqualTo(456L);
+            assertThat(event.developerId()).isEqualTo(789L);
+            assertThat(event.artifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(event.artifactId()).isEqualTo(456L);
+        }
+    }
+
+    @Nested
+    class IssueRouting {
+
+        @Test
+        void routesToIssueTargetAndAuthorWhenArtifactTypeIsIssue() {
+            // Job carries artifact_type=ISSUE + issue_id → resolve the Issue (TYPE-filtered) + its author.
+            var issue = new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
+            ReflectionTestUtils.setField(issue, "id", 999L);
+            issue.setAuthor(testAuthor);
+            when(issueRepository.findByIdWithAuthor(999L)).thenReturn(Optional.of(issue));
+
+            ObjectNode meta = new ObjectMapper().createObjectNode();
+            meta.put("artifact_type", "ISSUE");
+            meta.put("issue_id", 999L);
+            testJob.setMetadata(meta);
+
+            var findings = List.of(validFinding("pr-description-quality", Presence.ABSENT));
+            var result = service.deliver(testJob, findings);
+
+            assertThat(result.inserted()).isEqualTo(1);
+            verify(observationRepository).insertIfAbsent(
+                any(),
+                eq("pr-description-quality:0:ISSUE:999:" + testJob.getId()),
+                eq(testJob.getId()),
+                anyLong(),
+                isNull(), // practiceRevisionId — no revision in the mocked repo
+                eq("ISSUE"),
+                eq(999L),
+                eq(789L), // aboutUserId
+                anyString(), // title
+                eq("ABSENT"), // presence (ADR 0022)
+                eq("BAD"), // assessment (former-GOOD practice ABSENT → gap)
+                anyString(), // severity
+                anyFloat(),
+                any(),
+                any(),
+                anyString(),
+                any()
+            );
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().artifactType()).isEqualTo(WorkArtifact.ISSUE);
+            assertThat(eventCaptor.getValue().artifactId()).isEqualTo(999L);
         }
     }
 }

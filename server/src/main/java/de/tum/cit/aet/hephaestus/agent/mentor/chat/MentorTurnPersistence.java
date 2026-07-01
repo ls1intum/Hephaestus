@@ -77,7 +77,11 @@ public class MentorTurnPersistence {
     private static String truncateTitle(String prompt) {
         if (prompt == null) return null;
         String s = prompt.strip().replaceAll("\\s+", " ");
-        return s.length() > 80 ? s.substring(0, 77) + "…" : s;
+        if (s.length() <= 80) return s;
+        // Cut on a code-point boundary so a 77th-char surrogate pair (e.g. an emoji) is not split into a lone
+        // surrogate before the appended ellipsis.
+        int cut = s.offsetByCodePoints(0, Math.min(77, s.codePointCount(0, s.length())));
+        return s.substring(0, cut) + "…";
     }
 
     /**
@@ -115,9 +119,8 @@ public class MentorTurnPersistence {
             assistant.setRole(ChatMessage.Role.ASSISTANT);
             assistant.setParentMessage(savedUser);
             assistant.setParts(NODES.arrayNode());
-            // Status is now its own column (migration mentor-1071-add-status-column). The
-            // partial unique index `ux_chat_message_in_flight_v2` keys on this column so a
-            // second concurrent turn raises TurnAlreadyInFlightException as before.
+            // The partial unique index `ux_chat_message_in_flight_v2` keys on the status column,
+            // so a second concurrent turn for the same thread raises TurnAlreadyInFlightException.
             assistant.setStatus(ChatMessage.Status.in_flight);
             assistant.setMetadata(NODES.objectNode());
             chatMessageRepository.save(assistant);
@@ -193,13 +196,13 @@ public class MentorTurnPersistence {
             doFinalise(cookie, state, finish);
         } catch (OptimisticLockingFailureException stale) {
             // A concurrent writer (typically the in-flight reaper flipping the row to
-            // `interrupted`) bumped the @Version after we loaded the snapshot. Their verdict
+            // `interrupted`) bumped the @Version after we loaded the snapshot. Their observation
             // is the source of truth — we leave the row alone. The wire's Finish chunk was
             // already sent by the orchestrator; the client just sees a row whose persisted
             // status diverges from the streamed terminal state, which the webapp's refresh
             // reconciles.
             log.info(
-                "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior verdict in place",
+                "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
                 cookie.assistantMessageId()
             );
         }
@@ -231,30 +234,28 @@ public class MentorTurnPersistence {
         usageNode.put("output", usage.outputTokens());
         usageNode.put("cacheRead", usage.cacheReadTokens());
         usageNode.put("cacheWrite", usage.cacheWriteTokens());
-        long totalTokens = usage.inputTokens() + usage.outputTokens();
+        // totalTokens: honour the provider-reported value carried on the wire Finish when present (it may
+        // include cache tokens and so legitimately differ from input+output) — single source of truth,
+        // mirroring how costUsd is reused below. Only when the wire carries no total do we derive
+        // input+output as a fallback.
+        Long wireTotalTokens = wireTotalTokens(finish);
+        long totalTokens = wireTotalTokens != null ? wireTotalTokens : usage.inputTokens() + usage.outputTokens();
         if (totalTokens > 0) {
             usageNode.put("totalTokens", totalTokens);
         }
-        // Cost: prefer Pi's own `usage.cost.total` (computed against the provider's price table on
-        // the agent host); fall back to ModelPricingService if Pi didn't ship one. If both are
-        // absent the field is left null — downstream UI tolerates absent cost.
-        Double piCostUsd = extractPiCostUsd(state.observedUsage());
-        if (piCostUsd != null) {
-            meta.put("costUsd", piCostUsd);
-        } else if (usage.model() != null && (usage.inputTokens() > 0 || usage.outputTokens() > 0)) {
-            pricingService
-                .computeCost(
-                    usage.model(),
-                    usage.inputTokens(),
-                    usage.outputTokens(),
-                    usage.cacheReadTokens(),
-                    usage.cacheWriteTokens()
-                )
-                .ifPresent(cost -> meta.put("costUsd", cost.doubleValue()));
+        // Cost: reuse the value already computed for and carried on the wire Finish (augmentFinishWithCost)
+        // so the DB persists exactly what the client saw — single source of truth, no second derivation that
+        // could drift. Only when the Finish carries no cost (cost was uncomputable) do we leave it null.
+        Double wireCostUsd = finish.messageMetadata() != null ? finish.messageMetadata().costUsd() : null;
+        if (wireCostUsd != null) {
+            meta.put("costUsd", wireCostUsd);
         }
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
-        chatMessageRepository.save(assistant);
+        // saveAndFlush (not save): force the optimistic-lock check NOW, inside the try/catch, instead of at the
+        // REQUIRES_NEW commit boundary where an OptimisticLockingFailureException would escape uncaught and turn
+        // a benign reaper race into a logged turn failure.
+        chatMessageRepository.saveAndFlush(assistant);
 
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
@@ -268,10 +269,10 @@ public class MentorTurnPersistence {
             doInterrupt(cookie, state, cause);
         } catch (OptimisticLockingFailureException stale) {
             // Another writer (a successful finalise or reaper sweep) bumped the row's version
-            // after our snapshot. Their verdict wins; we don't downgrade a `completed` row to
+            // after our snapshot. Their observation wins; we don't downgrade a `completed` row to
             // `interrupted` or stomp the reaper's `interrupted`-with-context.
             log.info(
-                "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior verdict in place",
+                "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
                 cookie.assistantMessageId()
             );
         }
@@ -287,7 +288,9 @@ public class MentorTurnPersistence {
                 meta.put("error", cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
                 meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
                 assistant.setMetadata(meta);
-                chatMessageRepository.save(assistant);
+                // saveAndFlush (not save): surface OptimisticLockingFailureException inside the try/catch (the
+                // no-session-bytes interrupt path would otherwise defer the version check to commit, escaping it).
+                chatMessageRepository.saveAndFlush(assistant);
             });
 
         // If the runner shipped session_persisted before the interrupt (e.g. pi_error AFTER a
@@ -297,6 +300,15 @@ public class MentorTurnPersistence {
         if (sessionBytes != null) {
             chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
         }
+    }
+
+    /** The provider-reported {@code totalTokens} carried on the wire Finish, or {@code null} when absent. */
+    @Nullable
+    private static Long wireTotalTokens(UIMessageChunk.Finish finish) {
+        UIMessageChunk.MessageMetadata meta = finish.messageMetadata();
+        UIMessageChunk.MessageMetadata.Usage usage = meta != null ? meta.usage() : null;
+        Integer total = usage != null ? usage.totalTokens() : null;
+        return total != null ? total.longValue() : null;
     }
 
     private static ObjectNode newOrCopyMeta(ChatMessage message) {

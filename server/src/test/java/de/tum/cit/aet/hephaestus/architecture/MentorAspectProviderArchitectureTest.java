@@ -8,9 +8,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Architecture rules pinning the placement of {@link Transactional @Transactional} on the
- * mentor aspect providers ({@code UserAspectProvider}, {@code WorkspaceAspectProvider},
- * {@code PracticeCatalogAspectProvider}, {@code FindingsHistoryAspectProvider}).
+ * Architecture rules pinning the placement of {@link Transactional @Transactional} on every
+ * {@code *AspectProvider} in {@code ..agent.context.providers.mentor..} (matched by name pattern,
+ * so the rule cannot drift as providers are added).
  *
  * <p><b>The bug shape this guards against:</b> Spring AOP intercepts {@code @Transactional} via
  * the bean proxy. A class's own {@code this.method(...)} call bypasses the proxy entirely, so an
@@ -19,11 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
  * intercepted"</i>). Combined with {@code spring.jpa.open-in-view=false}, the annotation looks
  * load-bearing in the code but actually does nothing.
  *
- * <p>The fix was to move {@code @Transactional(readOnly = true)} from each provider's helper
- * {@code buildPayload(...)} to {@code contribute(...)}, which IS the external entry point
- * {@code WorkspaceContextBuilder} calls through the proxy. These rules pin that fix so a future
- * refactor that moves the annotation back onto the helper fails at architecture-test time
- * instead of at runtime via {@code LazyInitializationException} on the SSE wire.
+ * <p>{@code @Transactional(readOnly = true)} therefore belongs on {@code contribute(...)} — the
+ * external entry point {@code WorkspaceContextBuilder} calls through the proxy — never on the
+ * helper {@code buildPayload(...)}. These rules pin that placement so a refactor that moves the
+ * annotation onto the helper fails at architecture-test time instead of at runtime via
+ * {@code LazyInitializationException} on the SSE wire.
  */
 class MentorAspectProviderArchitectureTest extends HephaestusArchitectureTest {
 
@@ -47,7 +47,11 @@ class MentorAspectProviderArchitectureTest extends HephaestusArchitectureTest {
                     "Spring proxy. Removing @Transactional from here OR moving it to a helper would " +
                     "silently drop the tx (self-invocation bypasses the proxy) and re-introduce a " +
                     "LazyInitializationException risk on the SSE wire."
-            );
+            )
+            // Fail loudly if the providers package/method is renamed away from contribute(): the package
+            // is populated, so zero matches means the rule stopped guarding the providers, not that the
+            // condition is vacuously satisfied.
+            .allowEmptyShould(false);
         rule.check(classes);
     }
 

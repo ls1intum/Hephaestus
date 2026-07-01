@@ -39,6 +39,9 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     @Mock
     private FeedbackDeliveryService feedbackService;
 
+    @Mock
+    private PullRequestCommentPoster commentPoster;
+
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private JobTypeHandler prReviewHandler() {
@@ -47,14 +50,36 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         return new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            practiceRepository,
+            new PracticeCatalogInjector(objectMapper, practiceRepository),
             workspaceContextBuilder,
             envelopeWriter,
             gitDiffOperations,
             parser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            new SecretDiffScanner(),
+            org.mockito.Mockito.mock(ReactionSuppressionFilter.class)
         );
+    }
+
+    private JobTypeHandler issueReviewHandler() {
+        var parser = new PracticeDetectionResultParser(objectMapper);
+        var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
+        return new IssueReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            envelopeWriter,
+            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            parser,
+            deliveryService,
+            commentPoster,
+            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+        );
+    }
+
+    /** A registry with the full handler set (every {@link AgentJobType} mapped). */
+    private JobTypeHandlerRegistry fullRegistry() {
+        return new JobTypeHandlerRegistry(List.of(prReviewHandler(), issueReviewHandler()));
     }
 
     @Nested
@@ -62,10 +87,12 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
         @Test
         void shouldIndexHandlersByJobType() {
-            var handler = prReviewHandler();
-            var registry = new JobTypeHandlerRegistry(List.of(handler));
+            var pr = prReviewHandler();
+            var issue = issueReviewHandler();
+            var registry = new JobTypeHandlerRegistry(List.of(pr, issue));
 
-            assertThat(registry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).isSameAs(handler);
+            assertThat(registry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).isSameAs(pr);
+            assertThat(registry.getHandler(AgentJobType.ISSUE_REVIEW)).isSameAs(issue);
         }
 
         @Test
@@ -93,7 +120,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
         @Test
         void shouldRejectNullJobType() {
-            var registry = new JobTypeHandlerRegistry(List.of(prReviewHandler()));
+            var registry = fullRegistry();
             assertThatThrownBy(() -> registry.getHandler(null)).isInstanceOf(NullPointerException.class);
         }
     }

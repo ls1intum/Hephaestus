@@ -23,12 +23,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcess
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -126,6 +126,41 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             issue = issueRepository.save(issue);
         }
 
+        return issue;
+    }
+
+    /**
+     * Handles an {@code action=update} issue event. Persists the issue via {@link #process} (which
+     * overwrites the label set to the new state), then emits one {@link ScmDomainEvent.IssueLabeled}
+     * per newly-added label — GitLab has no native "labeled" action, so this is how the IssueLabeled
+     * trigger reaches parity with GitHub. The added-label delta is read from the webhook's
+     * {@code changes.labels} diff, so a plain title/description edit emits nothing.
+     *
+     * <p>{@code @Transactional} so the whole update runs in one transaction: the self-invoked
+     * {@link #process} bypasses its own proxy (Spring AOP self-invocation), so without this its writes
+     * would run with no active transaction.
+     */
+    @Transactional
+    @Nullable
+    public Issue processUpdated(GitLabIssueEventDTO event, ProcessingContext context) {
+        // Capture the delta from the payload (independent of the entity's label set, which process() rewrites).
+        List<GitLabWebhookLabel> addedLabels = event.addedLabels();
+        Issue issue = process(event, context);
+        if (issue == null || addedLabels.isEmpty()) {
+            return issue;
+        }
+        for (GitLabWebhookLabel labelDto : addedLabels) {
+            Label label = findOrCreateLabel(labelDto, context.repository());
+            if (label != null) {
+                eventPublisher.publishEvent(
+                    new ScmDomainEvent.IssueLabeled(
+                        ScmEventPayload.IssueData.from(issue),
+                        ScmEventPayload.LabelData.from(label),
+                        EventContext.from(context)
+                    )
+                );
+            }
+        }
         return issue;
     }
 
@@ -284,11 +319,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
         }
 
-        // Emit lifecycle events for CLOSED issues on every sync (not just on create).
-        // Bulk GraphQL ingest never produced these before, so deployments that already
-        // ran an earlier sync have no ISSUE_CLOSED activity rows for historical issues.
-        // Firing on re-sync backfills them; the activity_event (workspace_id, event_key)
-        // unique constraint dedupes, so replaying an existing close is a safe no-op.
+        // Emit the close event for CLOSED issues on every sync, not just on create, so a sync backfills
+        // ISSUE_CLOSED activity for issues that were already closed when first ingested. The activity_event
+        // (workspace_id, event_key) unique constraint dedupes, so replaying an existing close is a safe no-op.
         if (issueState == Issue.State.CLOSED) {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.IssueClosed(

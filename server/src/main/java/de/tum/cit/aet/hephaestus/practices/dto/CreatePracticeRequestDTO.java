@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Request DTO for creating a new practice definition.
@@ -27,10 +29,6 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
-    @Size(max = 64, message = "Category must be at most 64 characters")
-    @Schema(description = "Practice category", example = "code-quality")
-    String category,
-
     @NotNull(message = "Trigger events are required")
     @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
     @ValidTriggerEvents
@@ -47,5 +45,22 @@ public record CreatePracticeRequestDTO(
 
     @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
-    String precomputeScript
+    String precomputeScript,
+
+    @Schema(
+        description = "Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.",
+        example = "PULL_REQUEST"
+    )
+    @Nullable
+    WorkArtifact artifactType,
+
+    @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
+    @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")
+    @Nullable
+    String whyItMatters,
+
+    @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
+    @Schema(description = "Developer-facing exemplar (learner layer); a concrete instance, not the rubric")
+    @Nullable
+    String whatGoodLooksLike
 ) {}

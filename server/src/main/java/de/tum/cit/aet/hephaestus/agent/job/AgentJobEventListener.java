@@ -95,6 +95,46 @@ public class AgentJobEventListener {
         handleReviewEvent(event.review(), event.context());
     }
 
+    /**
+     * RETROSPECTIVE trigger: the PR landed. Unlike the create/ready/sync handlers, this one runs
+     * <em>because</em> the PR is merged — MERGED is its expected terminal state, so it routes through the
+     * gate via {@link #handleRetrospectivePullRequestEvent} instead of {@code handlePullRequestEvent}
+     * (which short-circuits on closed/merged). A merged PR keeps its stored head/base refs and head SHA,
+     * and the handler resolves the diff from the merge commit's parent, so cloning still works post-merge.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPullRequestMerged(ScmDomainEvent.PullRequestMerged event) {
+        handleRetrospectivePullRequestEvent(
+            event.pullRequest(),
+            event.context(),
+            TriggerEventNames.PULL_REQUEST_MERGED
+        );
+    }
+
+    /**
+     * RETROSPECTIVE trigger: the PR was closed. On a MERGE the processors publish BOTH
+     * {@code PullRequestClosed(wasMerged=true)} AND {@code PullRequestMerged}; the merge path is owned by
+     * {@link #onPullRequestMerged}, so this handler returns early when {@code wasMerged} is true to avoid
+     * double-firing the gate for the same landing. It routes only the abandoned-close case
+     * ({@code wasMerged=false}) under {@code PULL_REQUEST_CLOSED}.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPullRequestClosed(ScmDomainEvent.PullRequestClosed event) {
+        if (event.wasMerged()) {
+            // The merge is handled by onPullRequestMerged; closing-as-merged here would duplicate the job.
+            return;
+        }
+        handleRetrospectivePullRequestEvent(
+            event.pullRequest(),
+            event.context(),
+            TriggerEventNames.PULL_REQUEST_CLOSED
+        );
+    }
+
     // PR event handling
 
     private void handlePullRequestEvent(
@@ -139,6 +179,62 @@ public class AgentJobEventListener {
         } catch (Exception e) {
             log.error(
                 "Failed to process PR event: prNumber={}, repoName={}, event={}",
+                prData.number(),
+                prData.repository().nameWithOwner(),
+                triggerEventName,
+                e
+            );
+        }
+    }
+
+    // Retrospective PR event handling (merged / closed-without-merge)
+
+    /**
+     * Routes a terminal-state PR event through the same gate as the live handlers, but WITHOUT the
+     * closed/merged short-circuit — closed/merged IS the expected state here. Sync events are still
+     * skipped: a sync replays history en masse and would fire a retrospective review for every PR the
+     * repository ever merged, so retrospective detection is for real-time terminal transitions only.
+     */
+    private void handleRetrospectivePullRequestEvent(
+        ScmEventPayload.PullRequestData prData,
+        EventContext context,
+        String triggerEventName
+    ) {
+        // 1. Skip sync events — a sync would replay EVERY historical merge as a fresh retrospective review.
+        if (context.isSync()) {
+            return;
+        }
+
+        // NOTE: intentionally NO closed/merged skip — the terminal state is this trigger's reason to run.
+
+        try {
+            PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
+            if (pr == null) {
+                log.warn("Cannot submit retrospective agent job: PR not found, prId={}", prData.id());
+                return;
+            }
+
+            // A merged PR retains its stored head/base refs + head SHA; the handler resolves the diff from
+            // the merge commit's parent, so the clone target (head SHA, reachable via the merge commit) is
+            // still valid. We keep the branch-info guard: if those fields were never captured, there is
+            // nothing to clone or diff against.
+            if (!hasBranchInfo(pr, prData.id())) {
+                return;
+            }
+
+            switch (practiceReviewDetectionGate.evaluate(pr, triggerEventName, TriggerMode.AUTO)) {
+                case GateDecision.Skip skip -> log.debug(
+                    "Retrospective agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
+                    prData.number(),
+                    prData.repository().nameWithOwner(),
+                    triggerEventName,
+                    skip.reason()
+                );
+                case GateDecision.Detect detect -> submitJob(prData, pr, detect, triggerEventName);
+            }
+        } catch (Exception e) {
+            log.error(
+                "Failed to process retrospective PR event: prNumber={}, repoName={}, event={}",
                 prData.number(),
                 prData.repository().nameWithOwner(),
                 triggerEventName,
@@ -227,7 +323,8 @@ public class AgentJobEventListener {
             prData,
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
-            pr.getBaseRefName()
+            pr.getBaseRefName(),
+            triggerEventName
         );
 
         try {

@@ -90,8 +90,10 @@ jobs:
           FMT_OK=true; RUNNER_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
-          node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
-            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi mentor runner smoke test failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs"); }
+          node --test \
+            server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
+            server/src/test/resources/agent/pi-finding-normalize.spec.mjs \
+            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi runner test(s) failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs server/src/test/resources/agent/pi-finding-normalize.spec.mjs"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY

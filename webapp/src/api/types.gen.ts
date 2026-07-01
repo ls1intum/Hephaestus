@@ -517,13 +517,39 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
+ * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
+ */
+export type UpdatePracticeReviewSettings = {
+    /**
+     * Minimum minutes between reviews for the same PR; 0 disables the cooldown
+     */
+    cooldownMinutes?: number;
+    /**
+     * Deliver feedback to already-merged PRs/MRs
+     */
+    deliverToMerged?: boolean;
+    /**
+     * Fields to reset to the inherited fleet default
+     */
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES'>;
+    /**
+     * Run practice review for all developers (vs only the run_practice_review role)
+     */
+    runForAllUsers?: boolean;
+    /**
+     * Skip practice review for draft PRs/MRs
+     */
+    skipDrafts?: boolean;
+};
+
+/**
  * Request to update an existing practice definition (PATCH — only non-null fields applied)
  */
 export type UpdatePracticeRequest = {
     /**
-     * Practice category
+     * Artifact this practice evaluates
      */
-    category?: string;
+    artifactType?: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Practice evaluation criteria
      */
@@ -540,6 +566,44 @@ export type UpdatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents?: Array<string>;
+    /**
+     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * Request to update an existing practice area (PATCH — only non-null fields applied)
+ */
+export type UpdatePracticeAreaRequest = {
+    /**
+     * Whether this area is active
+     */
+    active?: boolean;
+    /**
+     * Optional palette colour key for the area's chip
+     */
+    color?: string;
+    /**
+     * What this area develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace
+     */
+    displayOrder?: number;
+    /**
+     * Optional lucide icon name giving the area a glanceable identity
+     */
+    icon?: string;
+    /**
+     * Human-readable name
+     */
+    name?: string;
 };
 
 /**
@@ -613,9 +677,13 @@ export type UpdateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     * Set true to remove the stored API key (takes precedence over llmApiKey)
      */
-    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    clearLlmApiKey?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -644,6 +712,16 @@ export type UpdateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
+};
+
+/**
+ * Bind an agent config to a workspace purpose; null unbinds
+ */
+export type UpdateAgentBindingRequest = {
+    /**
+     * Agent config id to bind, or null to unbind
+     */
+    configId?: number;
 };
 
 export type UpdateAccountRequest = {
@@ -802,6 +880,30 @@ export type RevokeSessionsResult = {
 };
 
 /**
+ * Reorder the practices in one area — displayOrder follows the list index
+ */
+export type ReorderPracticesRequest = {
+    /**
+     * Slug of the area whose practices are being reordered; null reorders the unassigned bucket
+     */
+    areaSlug?: string | null;
+    /**
+     * Practice slugs in the desired display order — the complete set for the area
+     */
+    orderedSlugs: Array<string>;
+};
+
+/**
+ * Reorder practice areas — displayOrder follows the list index
+ */
+export type ReorderPracticeAreasRequest = {
+    /**
+     * Area slugs in the desired display order
+     */
+    orderedSlugs: Array<string>;
+};
+
+/**
  * Request to rename a workspace's URL slug
  */
 export type RenameWorkspaceSlugRequest = {
@@ -809,6 +911,126 @@ export type RenameWorkspaceSlugRequest = {
      * New URL-friendly identifier for the workspace
      */
     newSlug: string;
+};
+
+/**
+ * A developer's readable feedback for one practice
+ */
+export type ReflectionPractice = {
+    /**
+     * Area name this practice belongs to, if any
+     */
+    areaName?: string;
+    /**
+     * Area slug this practice belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice
+     */
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
+    /**
+     * What the developer already does well here
+     */
+    strengths: Array<ReflectionItem>;
+    /**
+     * Specific feedback to act on (highest-impact first)
+     */
+    toWorkOn: Array<ReflectionItem>;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * A single piece of practice feedback to read and act on
+ */
+export type ReflectionItem = {
+    /**
+     * Id of the PR / issue this is about
+     */
+    artifactId: number;
+    /**
+     * The kind of work this is about (PR / issue)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
+     */
+    guidance?: string;
+    /**
+     * Where in the work, e.g. "FrameRecorder.swift:212", when known
+     */
+    locator?: string;
+    /**
+     * Observation id — handle to open the full detail
+     */
+    observationId: string;
+    /**
+     * Impact level (null unless assessed BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The headline of the feedback
+     */
+    title: string;
+};
+
+/**
+ * Reaction engagement for a developer, split into the response (uptake) and validity axes
+ */
+export type ReactionEngagement = {
+    /**
+     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
+     */
+    addressed: number;
+    /**
+     * RESPONSE: findings the developer rejected with a reasoned explanation
+     */
+    disputed: number;
+    /**
+     * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
+     */
+    notApplicable: number;
+};
+
+/**
+ * Developer reaction to a delivered unit of feedback
+ */
+export type Reaction = {
+    /**
+     * The reaction action taken
+     */
+    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * When the reaction was submitted
+     */
+    createdAt: Date;
+    /**
+     * Optional explanation for the reaction
+     */
+    explanation?: string;
+    /**
+     * ID of the feedback unit this reaction is about
+     */
+    feedbackId: string;
+    /**
+     * Unique reaction ID
+     */
+    id: string;
 };
 
 /**
@@ -1102,117 +1324,49 @@ export type Profile = {
 };
 
 /**
- * Practice finding summary for list views
+ * A practice area grouping related practices into a learning objective
  */
-export type PracticeFindingList = {
+export type PracticeArea = {
     /**
-     * Practice category
+     * Whether this area is active
      */
-    category?: string;
+    active: boolean;
     /**
-     * AI confidence score (0.0–1.0)
+     * Optional palette colour key for the area's chip
      */
-    confidence: number;
+    color?: string;
     /**
-     * When the finding was detected
+     * Timestamp when the area was created
      */
-    detectedAt: Date;
+    createdAt: Date;
     /**
-     * Finding ID
+     * What this area develops
      */
-    id: string;
+    description?: string;
     /**
-     * Practice name
+     * Sort order within the workspace
      */
-    practiceName: string;
+    displayOrder: number;
     /**
-     * Practice slug
+     * Optional lucide icon name for the area's chip
      */
-    practiceSlug: string;
+    icon?: string;
     /**
-     * Severity level
+     * Area ID
      */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    id: number;
     /**
-     * Target entity ID
+     * Human-readable name
      */
-    targetId: number;
+    name: string;
     /**
-     * Target type (e.g. PULL_REQUEST)
+     * URL-safe identifier unique within the workspace
      */
-    targetType: 'PULL_REQUEST';
+    slug: string;
     /**
-     * Finding title
+     * Timestamp when the area was last updated
      */
-    title: string;
-    /**
-     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
-     */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
-};
-
-/**
- * Full practice finding detail including guidance and evidence
- */
-export type PracticeFindingDetail = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
-     */
-    evidence?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Actionable guidance for the contributor
-     */
-    guidance?: string;
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * AI reasoning behind the verdict
-     */
-    reasoning?: string;
-    /**
-     * Severity level
-     */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Target entity ID
-     */
-    targetId: number;
-    /**
-     * Target type (e.g. PULL_REQUEST)
-     */
-    targetType: 'PULL_REQUEST';
-    /**
-     * Finding title
-     */
-    title: string;
-    /**
-     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
-     */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
+    updatedAt?: Date;
 };
 
 /**
@@ -1224,9 +1378,13 @@ export type Practice = {
      */
     active: boolean;
     /**
-     * Practice category
+     * Slug of the practice area this practice is bound to, if any
      */
-    category?: string;
+    areaSlug?: string;
+    /**
+     * Artifact this practice evaluates
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Timestamp when the practice was created
      */
@@ -1235,6 +1393,10 @@ export type Practice = {
      * Practice evaluation criteria
      */
     criteria: string;
+    /**
+     * Position within its area (lowest first); ties broken by name
+     */
+    displayOrder: number;
     /**
      * Practice ID
      */
@@ -1259,6 +1421,14 @@ export type Practice = {
      * Timestamp when the practice was last updated
      */
     updatedAt: Date;
+    /**
+     * Developer-facing exemplar (learner layer)
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Developer-facing rationale (learner layer)
+     */
+    whyItMatters?: string;
 };
 
 export type PageableObject = {
@@ -1270,8 +1440,8 @@ export type PageableObject = {
     unpaged?: boolean;
 };
 
-export type PagePracticeFindingList = {
-    content?: Array<PracticeFindingList>;
+export type PageObservationList = {
+    content?: Array<ObservationList>;
     empty?: boolean;
     first?: boolean;
     last?: boolean;
@@ -1282,6 +1452,56 @@ export type PagePracticeFindingList = {
     sort?: SortObject;
     totalElements?: number;
     totalPages?: number;
+};
+
+/**
+ * Practice observation summary for list views
+ */
+export type ObservationList = {
+    /**
+     * Artifact entity ID
+     */
+    artifactId: number;
+    /**
+     * Artifact type (e.g. PULL_REQUEST)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * Observation ID
+     */
+    id: string;
+    /**
+     * When the observation was made
+     */
+    observedAt: Date;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     */
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Severity level (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Observation title
+     */
+    title: string;
 };
 
 export type PageAuthEventView = {
@@ -1349,6 +1569,14 @@ export type AgentJob = {
      */
     completedAt?: Date;
     /**
+     * ID of the agent config that ran this job (from the frozen snapshot)
+     */
+    configId?: number;
+    /**
+     * Name of the agent config that ran this job (from the frozen snapshot)
+     */
+    configName?: string;
+    /**
      * Frozen agent config at submit time
      */
     configSnapshot: unknown;
@@ -1383,7 +1611,7 @@ export type AgentJob = {
     /**
      * Job type
      */
-    jobType: 'PULL_REQUEST_REVIEW';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW';
     /**
      * Tokens read from prompt cache
      */
@@ -1443,6 +1671,70 @@ export type AgentJob = {
 };
 
 /**
+ * Full practice observation detail including guidance and evidence
+ */
+export type ObservationDetail = {
+    /**
+     * Artifact entity ID
+     */
+    artifactId: number;
+    /**
+     * Artifact type (e.g. PULL_REQUEST)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
+     */
+    evidence?: {
+        [key: string]: unknown;
+    };
+    /**
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
+     */
+    guidance?: string;
+    /**
+     * Observation ID
+     */
+    id: string;
+    /**
+     * When the observation was made
+     */
+    observedAt: Date;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     */
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * AI reasoning behind the observation
+     */
+    reasoning?: string;
+    /**
+     * Severity level (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Observation title
+     */
+    title: string;
+};
+
+/**
  * Admin view of a login provider. The client secret is never included.
  */
 export type LoginProviderView = {
@@ -1483,6 +1775,32 @@ export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
  */
 export type AchievementProgress = {
     type: string;
+};
+
+/**
+ * Learner-facing view of a practice — criteria absent by construction
+ */
+export type LearnerPractice = {
+    /**
+     * Slug of the practice area this belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier
+     */
+    slug: string;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
 };
 
 export type LeagueChange = {
@@ -1620,7 +1938,14 @@ export type IdentityView = {
 
 /**
  * One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
- * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
+ * the OAuth instance origin (scheme + host[:port]) of the authorization endpoint, so the
+ * workspace-creation wizard can match a target instance to its login.
+ *
+ * <p><b>baseUrl is the OAuth origin, not the SCM API origin.</b> It is only meaningful for GitLab rows,
+ * where the OAuth origin and the API origin coincide (e.g. <code>https://gitlab.example.com</code>). For a
+ * GitHub row it is <code>https://github.com</code> (the OAuth host), NOT <code>https://api.github.com</code>; the
+ * sole consumer (the workspace wizard) matches GitLab self-hosted origins and never relies on the GitHub
+ * value, so the discrepancy is harmless. Do not treat this as an SCM API base URL.
  */
 export type IdentityProviderView = {
     baseUrl?: string;
@@ -1700,50 +2025,6 @@ export type GitLabGroup = {
 };
 
 /**
- * Feedback engagement statistics for a contributor in a workspace
- */
-export type FindingFeedbackEngagement = {
-    /**
-     * Number of findings marked as applied/fixed
-     */
-    applied: number;
-    /**
-     * Number of findings disputed as incorrect
-     */
-    disputed: number;
-    /**
-     * Number of findings marked as not applicable
-     */
-    notApplicable: number;
-};
-
-/**
- * Contributor feedback on an AI-generated practice finding
- */
-export type FindingFeedback = {
-    /**
-     * The feedback action taken
-     */
-    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * When the feedback was submitted
-     */
-    createdAt: Date;
-    /**
-     * Optional explanation for the feedback
-     */
-    explanation?: string;
-    /**
-     * ID of the finding this feedback is about
-     */
-    findingId: string;
-    /**
-     * Unique feedback ID
-     */
-    id: string;
-};
-
-/**
  * Feature flags evaluated for the current user
  */
 export type FeatureFlags = {
@@ -1790,6 +2071,36 @@ export type ExportStatus = {
 export type ExportCreated = {
     id?: number;
     status?: string;
+};
+
+/**
+ * Per-practice observation summary for a developer
+ */
+export type DeveloperPracticeSummary = {
+    /**
+     * Number of BAD (problem) observations
+     */
+    badCount: number;
+    /**
+     * Number of GOOD (strength) observations
+     */
+    goodCount: number;
+    /**
+     * Timestamp of most recent observation
+     */
+    lastObservedAt?: Date;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Total number of observations
+     */
+    totalObservations: number;
 };
 
 export type CurrentUserView = {
@@ -1852,13 +2163,27 @@ export type CreateWorkspaceRequest = {
 };
 
 /**
+ * Submit a reaction to a delivered feedback unit
+ */
+export type CreateReaction = {
+    /**
+     * The reaction action to record
+     */
+    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * Explanation for the reaction. Required when action is DISPUTED.
+     */
+    explanation?: string;
+};
+
+/**
  * Request to create a new practice definition
  */
 export type CreatePracticeRequest = {
     /**
-     * Practice category
+     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
      */
-    category?: string;
+    artifactType?: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Practice evaluation criteria
      */
@@ -1879,6 +2204,44 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+    /**
+     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * Request to create a new practice area
+ */
+export type CreatePracticeAreaRequest = {
+    /**
+     * Optional palette colour key for the area's chip
+     */
+    color?: string;
+    /**
+     * What this area develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace. Defaults to 0 when omitted.
+     */
+    displayOrder?: number;
+    /**
+     * Optional lucide icon name giving the area a glanceable identity
+     */
+    icon?: string;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
 };
 
 export type CreateLoginProviderRequest = {
@@ -1907,20 +2270,6 @@ export type CreateLoginProviderRequest = {
 };
 
 /**
- * Submit feedback on an AI-generated practice finding
- */
-export type CreateFindingFeedback = {
-    /**
-     * The feedback action to record
-     */
-    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * Explanation for the feedback. Required when action is DISPUTED.
-     */
-    explanation?: string;
-};
-
-/**
  * Request to create a new agent configuration for a workspace
  */
 export type CreateAgentConfigRequest = {
@@ -1929,9 +2278,9 @@ export type CreateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
      */
-    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode?: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -1964,40 +2313,6 @@ export type CreateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
-};
-
-/**
- * Per-practice finding summary for a contributor
- */
-export type ContributorPracticeSummary = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * Timestamp of most recent finding
-     */
-    lastFindingAt?: Date;
-    /**
-     * Number of NEGATIVE findings
-     */
-    negativeCount: number;
-    /**
-     * Number of POSITIVE findings
-     */
-    positiveCount: number;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Total number of findings
-     */
-    totalFindings: number;
 };
 
 /**
@@ -2149,6 +2464,16 @@ export type ChatMessageVote = {
 };
 
 /**
+ * Request to bind a practice to an area, or unbind it when areaSlug is null
+ */
+export type BindPracticeAreaRequest = {
+    /**
+     * Slug of the area to bind to, or null to unbind
+     */
+    areaSlug?: string;
+};
+
+/**
  * Binary progress indicating unlocked state
  */
 export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -2171,6 +2496,60 @@ export type AssignRoleRequest = {
 };
 
 /**
+ * Aggregate workspace AI settings: runtime bindings + effective + raw-override practice-review policy
+ */
+export type AiSettingsView = {
+    /**
+     * Effective: minimum minutes between reviews for the same PR
+     */
+    cooldownMinutes: number;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    cooldownMinutesOverride?: number;
+    /**
+     * Effective: deliver feedback to merged PRs/MRs
+     */
+    deliverToMerged: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    deliverToMergedOverride?: boolean;
+    /**
+     * Config bound to power the mentor (null = oldest enabled config)
+     */
+    mentorConfigId?: number;
+    /**
+     * Whether the mentor feature is enabled for this workspace
+     */
+    mentorEnabled: boolean;
+    /**
+     * Config bound to power practice detection (null = fan-out to all enabled configs)
+     */
+    practiceConfigId?: number;
+    /**
+     * Whether the practices feature is enabled for this workspace
+     */
+    practicesEnabled: boolean;
+    /**
+     * Effective: run practice review for all developers
+     */
+    runForAllUsers: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    runForAllUsersOverride?: boolean;
+    /**
+     * Effective: skip draft PRs/MRs
+     */
+    skipDrafts: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    skipDraftsOverride?: boolean;
+};
+
+/**
  * Agent configuration for a workspace (API key redacted)
  */
 export type AgentConfig = {
@@ -2185,7 +2564,7 @@ export type AgentConfig = {
     /**
      * Authentication mode
      */
-    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -3269,6 +3648,104 @@ export type RetryDeliveryResponses = {
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
 
+export type GetAiSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings';
+};
+
+export type GetAiSettingsResponses = {
+    /**
+     * AI settings returned
+     */
+    200: AiSettingsView;
+};
+
+export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
+
+export type UpdateMentorConfigData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config';
+};
+
+export type UpdateMentorConfigErrors = {
+    /**
+     * Config not found in this workspace
+     */
+    404: unknown;
+};
+
+export type UpdateMentorConfigResponses = {
+    /**
+     * Binding updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdateMentorConfigResponse = UpdateMentorConfigResponses[keyof UpdateMentorConfigResponses];
+
+export type UpdatePracticeConfigData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config';
+};
+
+export type UpdatePracticeConfigErrors = {
+    /**
+     * Config not found in this workspace
+     */
+    404: unknown;
+};
+
+export type UpdatePracticeConfigResponses = {
+    /**
+     * Binding updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdatePracticeConfigResponse = UpdatePracticeConfigResponses[keyof UpdatePracticeConfigResponses];
+
+export type UpdatePracticeReviewSettingsData = {
+    body: UpdatePracticeReviewSettings;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review';
+};
+
+export type UpdatePracticeReviewSettingsResponses = {
+    /**
+     * Policy updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+
 export type ListData = {
     body?: never;
     path: {
@@ -3851,7 +4328,7 @@ export type UpdateNotificationsResponses = {
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
 
-export type ListPracticesData = {
+export type ListAreasData = {
     body?: never;
     path: {
         /**
@@ -3861,9 +4338,178 @@ export type ListPracticesData = {
     };
     query?: {
         /**
-         * Filter by practice category
+         * Return only active areas
          */
-        category?: string;
+        activeOnly?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-areas';
+};
+
+export type ListAreasResponses = {
+    /**
+     * Areas returned
+     */
+    200: Array<PracticeArea>;
+};
+
+export type ListAreasResponse = ListAreasResponses[keyof ListAreasResponses];
+
+export type CreateAreaData = {
+    body: CreatePracticeAreaRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas';
+};
+
+export type CreateAreaErrors = {
+    /**
+     * Area slug already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateAreaResponses = {
+    /**
+     * Area created
+     */
+    201: PracticeArea;
+};
+
+export type CreateAreaResponse = CreateAreaResponses[keyof CreateAreaResponses];
+
+export type ReorderAreasData = {
+    body: ReorderPracticeAreasRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/reorder';
+};
+
+export type ReorderAreasErrors = {
+    /**
+     * orderedSlugs is empty or contains duplicates
+     */
+    400: unknown;
+    /**
+     * A slug is unknown
+     */
+    404: unknown;
+};
+
+export type ReorderAreasResponses = {
+    /**
+     * Areas reordered; the full ordered list is returned
+     */
+    200: Array<PracticeArea>;
+};
+
+export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
+
+export type DeleteAreaData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        areaSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
+};
+
+export type DeleteAreaErrors = {
+    /**
+     * Area not found
+     */
+    404: unknown;
+};
+
+export type DeleteAreaResponses = {
+    /**
+     * Area deleted
+     */
+    204: void;
+};
+
+export type DeleteAreaResponse = DeleteAreaResponses[keyof DeleteAreaResponses];
+
+export type GetAreaData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        areaSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
+};
+
+export type GetAreaErrors = {
+    /**
+     * Area not found
+     */
+    404: unknown;
+};
+
+export type GetAreaResponses = {
+    /**
+     * Area returned
+     */
+    200: PracticeArea;
+};
+
+export type GetAreaResponse = GetAreaResponses[keyof GetAreaResponses];
+
+export type UpdateAreaData = {
+    body: UpdatePracticeAreaRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        areaSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
+};
+
+export type UpdateAreaErrors = {
+    /**
+     * Area not found
+     */
+    404: unknown;
+};
+
+export type UpdateAreaResponses = {
+    /**
+     * Area updated
+     */
+    200: PracticeArea;
+};
+
+export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
+
+export type ListPracticesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
         /**
          * Filter by active state
          */
@@ -3909,7 +4555,119 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
-export type ListFindingsData = {
+export type GetEngagementData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/engagement';
+};
+
+export type GetEngagementResponses = {
+    /**
+     * Engagement statistics returned
+     */
+    200: ReactionEngagement;
+};
+
+export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
+
+export type GetLatestReactionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
+};
+
+export type GetLatestReactionErrors = {
+    /**
+     * Feedback not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetLatestReactionResponses = {
+    /**
+     * Latest reaction returned
+     */
+    200: Reaction;
+    /**
+     * No reaction exists for this feedback unit
+     */
+    204: void;
+};
+
+export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
+
+export type SubmitReactionData = {
+    body: CreateReaction;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
+};
+
+export type SubmitReactionErrors = {
+    /**
+     * Invalid request (e.g., DISPUTED without explanation)
+     */
+    400: unknown;
+    /**
+     * Current user is not the feedback's recipient
+     */
+    403: unknown;
+    /**
+     * Feedback not found in this workspace
+     */
+    404: unknown;
+};
+
+export type SubmitReactionResponses = {
+    /**
+     * Reaction recorded
+     */
+    201: Reaction;
+};
+
+export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
+
+export type ListLearnerPracticesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/learner';
+};
+
+export type ListLearnerPracticesResponses = {
+    /**
+     * Learner practices returned
+     */
+    200: Array<LearnerPractice>;
+};
+
+export type ListLearnerPracticesResponse = ListLearnerPracticesResponses[keyof ListLearnerPracticesResponses];
+
+export type ListObservationsData = {
     body?: never;
     path: {
         /**
@@ -3923,46 +4681,25 @@ export type ListFindingsData = {
          */
         practiceSlug?: string;
         /**
-         * Filter by verdict
+         * Filter by presence
          */
-        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
+        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
         page?: number;
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/practices/findings';
+    url: '/workspaces/{workspaceSlug}/practices/observations';
 };
 
-export type ListFindingsResponses = {
+export type ListObservationsResponses = {
     /**
-     * Paginated findings returned
+     * Paginated observations returned
      */
-    200: PagePracticeFindingList;
+    200: PageObservationList;
 };
 
-export type ListFindingsResponse = ListFindingsResponses[keyof ListFindingsResponses];
+export type ListObservationsResponse = ListObservationsResponses[keyof ListObservationsResponses];
 
-export type GetEngagementData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/engagement';
-};
-
-export type GetEngagementResponses = {
-    /**
-     * Engagement statistics returned
-     */
-    200: FindingFeedbackEngagement;
-};
-
-export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
-
-export type GetFindingsForPullRequestData = {
+export type GetObservationsForPullRequestData = {
     body?: never;
     path: {
         /**
@@ -3972,17 +4709,38 @@ export type GetFindingsForPullRequestData = {
         prId: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}';
+    url: '/workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}';
 };
 
-export type GetFindingsForPullRequestResponses = {
+export type GetObservationsForPullRequestResponses = {
     /**
-     * PR findings returned
+     * PR observations returned
      */
-    200: Array<PracticeFindingList>;
+    200: Array<ObservationList>;
 };
 
-export type GetFindingsForPullRequestResponse = GetFindingsForPullRequestResponses[keyof GetFindingsForPullRequestResponses];
+export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
+
+export type GetReflectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/observations/reflection';
+};
+
+export type GetReflectionResponses = {
+    /**
+     * Per-practice reflection cards returned
+     */
+    200: Array<ReflectionPractice>;
+};
+
+export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
 
 export type GetSummaryData = {
     body?: never;
@@ -3993,116 +4751,74 @@ export type GetSummaryData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/summary';
+    url: '/workspaces/{workspaceSlug}/practices/observations/summary';
 };
 
 export type GetSummaryResponses = {
     /**
      * Practice summaries returned
      */
-    200: Array<ContributorPracticeSummary>;
+    200: Array<DeveloperPracticeSummary>;
 };
 
 export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
 
-export type GetFindingData = {
+export type GetObservationData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        findingId: string;
+        observationId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}';
+    url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}';
 };
 
-export type GetFindingErrors = {
+export type GetObservationErrors = {
     /**
-     * Finding not found or not owned by current user
+     * Observation not found or not owned by current user
      */
     404: unknown;
 };
 
-export type GetFindingResponses = {
+export type GetObservationResponses = {
     /**
-     * Finding detail returned
+     * Observation detail returned
      */
-    200: PracticeFindingDetail;
+    200: ObservationDetail;
 };
 
-export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
+export type GetObservationResponse = GetObservationResponses[keyof GetObservationResponses];
 
-export type GetLatestFeedbackData = {
-    body?: never;
+export type ReorderPracticesData = {
+    body: ReorderPracticesRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        findingId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices/reorder';
 };
 
-export type GetLatestFeedbackErrors = {
+export type ReorderPracticesErrors = {
     /**
-     * Finding not found in this workspace
-     */
-    404: unknown;
-};
-
-export type GetLatestFeedbackResponses = {
-    /**
-     * Latest feedback returned
-     */
-    200: FindingFeedback;
-    /**
-     * No feedback exists for this finding
-     */
-    204: void;
-};
-
-export type GetLatestFeedbackResponse = GetLatestFeedbackResponses[keyof GetLatestFeedbackResponses];
-
-export type SubmitFeedbackData = {
-    body: CreateFindingFeedback;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        findingId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
-};
-
-export type SubmitFeedbackErrors = {
-    /**
-     * Invalid request (e.g., DISPUTED without explanation)
+     * orderedSlugs is empty, has duplicates, or is not the area's complete set
      */
     400: unknown;
-    /**
-     * Current user is not the finding's contributor
-     */
-    403: unknown;
-    /**
-     * Finding not found in this workspace
-     */
-    404: unknown;
 };
 
-export type SubmitFeedbackResponses = {
+export type ReorderPracticesResponses = {
     /**
-     * Feedback recorded
+     * Practices reordered; the full ordered practice list is returned
      */
-    201: FindingFeedback;
+    200: Array<Practice>;
 };
 
-export type SubmitFeedbackResponse = SubmitFeedbackResponses[keyof SubmitFeedbackResponses];
+export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
 
 export type DeletePracticeData = {
     body?: never;
@@ -4219,6 +4935,35 @@ export type SetActiveResponses = {
 };
 
 export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
+
+export type BindAreaData = {
+    body: BindPracticeAreaRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/area';
+};
+
+export type BindAreaErrors = {
+    /**
+     * Practice or area not found
+     */
+    404: unknown;
+};
+
+export type BindAreaResponses = {
+    /**
+     * Binding updated
+     */
+    200: Practice;
+};
+
+export type BindAreaResponse = BindAreaResponses[keyof BindAreaResponses];
 
 export type GetUserProfileData = {
     body?: never;

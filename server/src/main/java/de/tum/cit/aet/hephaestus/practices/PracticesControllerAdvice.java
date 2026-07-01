@@ -22,6 +22,11 @@ public class PracticesControllerAdvice {
         return problem(HttpStatus.CONFLICT, "Practice slug conflict", exception.getMessage());
     }
 
+    @ExceptionHandler(PracticeAreaSlugConflictException.class)
+    ProblemDetail handleAreaSlugConflict(PracticeAreaSlugConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Practice area slug conflict", exception.getMessage());
+    }
+
     private ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatus(status);
         problem.setTitle(title);

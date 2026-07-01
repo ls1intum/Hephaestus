@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -39,6 +40,13 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     List<Long> findDeletingPastCooldown(@Param("cutoff") Instant cutoff, Pageable pageable);
 
     /**
+     * Resolve an account by {@code primary_email} — dev-login only ({@code DevLoginService}, for
+     * idempotent repeat logins). The production login path NEVER resolves by email (nOAuth defence —
+     * email is forensic-only).
+     */
+    Optional<Account> findByPrimaryEmail(String primaryEmail);
+
+    /**
      * Usable (ACTIVE) accounts in the given role, write-locked for the surrounding transaction. Backs
      * the last-admin guard. Selects the entity (not a scalar) so Hibernate emits {@code FOR UPDATE} —
      * as {@code findActiveByAccountIdForUpdate} does — letting concurrent demotions serialize rather
@@ -58,6 +66,14 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      * {@code APP_ADMIN} exists — so it self-disables the instant a real admin appears (the
      * {@code NOT EXISTS} is the gate). Returns the number of rows updated: {@code 1} on success,
      * {@code 0} if an admin already exists or the account is already {@code APP_ADMIN}.
+     *
+     * <p><b>Concurrency:</b> the single statement removes the read-modify-write count TOCTOU within a
+     * node, but under READ COMMITTED the {@code NOT EXISTS} subquery takes no predicate lock on the
+     * (empty) admin set, so two concurrent break-glass calls promoting DIFFERENT accounts can both see
+     * {@code NOT EXISTS} as true and each promote one — yielding two simultaneous first-admins. That is
+     * acceptable for this one-time operator-gated path (the demotion guard at
+     * {@link #findByAppRoleAndStatusForUpdate} still serialises with {@code FOR UPDATE}); it is NOT a
+     * hard single-winner gate.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(

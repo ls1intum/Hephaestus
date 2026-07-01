@@ -1,24 +1,46 @@
+import type { Practice } from "@/api/types.gen";
+
+/** The work artifact a practice targets (PR or Issue). Mirrors the server's WorkArtifact enum. */
+export type WorkArtifact = NonNullable<Practice["artifactType"]>;
+
 /**
- * Constants and helpers for the practice catalog admin UI.
+ * Trigger events a practice can fire on, grouped by the focus artifact they belong to. Mirrors the
+ * server's TriggerEventCatalog: a practice may only subscribe to events for its own focus (a PR
+ * practice can't listen for issue events — the detection gate routes by entity type). Labels are
+ * plain-language so the admin reads "fires when…", not a raw event name.
  */
-
-/** All domain events that can trigger practice detection. */
-export const TRIGGER_EVENT_OPTIONS = [
-	{ value: "PullRequestCreated", label: "Pull Request Created" },
-	{ value: "PullRequestReady", label: "Pull Request Ready" },
-	{ value: "PullRequestSynchronized", label: "Pull Request Synchronized" },
-	{ value: "ReviewSubmitted", label: "Review Submitted" },
-] as const;
-
-type TriggerEventValue = (typeof TRIGGER_EVENT_OPTIONS)[number]["value"];
-
-/** Short labels for inline badge display. */
-export const TRIGGER_EVENT_SHORT_LABELS: Record<TriggerEventValue, string> = {
-	PullRequestCreated: "PR Created",
-	PullRequestReady: "PR Ready",
-	PullRequestSynchronized: "PR Synced",
-	ReviewSubmitted: "Review",
+export const TRIGGER_EVENTS_BY_FOCUS: Record<
+	WorkArtifact,
+	ReadonlyArray<{ value: string; label: string }>
+> = {
+	PULL_REQUEST: [
+		{ value: "PullRequestCreated", label: "Pull request is opened" },
+		{ value: "PullRequestReady", label: "Marked ready for review" },
+		{ value: "PullRequestSynchronized", label: "New commits are pushed" },
+		{ value: "ReviewSubmitted", label: "A review is submitted" },
+		{ value: "PullRequestMerged", label: "Pull request is merged" },
+	],
+	ISSUE: [
+		{ value: "IssueCreated", label: "Issue is opened" },
+		{ value: "IssueLabeled", label: "Issue is labeled" },
+		{ value: "IssueClosed", label: "Issue is closed" },
+	],
 };
+
+/** The set of event values valid for a given focus (used to prune incompatible selections). */
+export function triggerEventsForFocus(focus: WorkArtifact): string[] {
+	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
+}
+
+/** The artifact a practice evaluates. Mirrors the server's WorkArtifact enum. */
+export const FOCUS_ARTIFACT_OPTIONS = [
+	{
+		value: "PULL_REQUEST",
+		label: "Pull request",
+		hint: "Evaluates the diff, commits, and review thread",
+	},
+	{ value: "ISSUE", label: "Issue", hint: "Evaluates the issue title, body, labels, and comments" },
+] as const;
 
 /** Generate a URL-safe slug from a human-readable name. */
 export function generateSlug(name: string): string {

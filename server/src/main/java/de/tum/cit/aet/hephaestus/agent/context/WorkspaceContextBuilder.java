@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.util.ArrayList;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -17,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Orchestrates {@link ContentProvider}s to materialise the AI-readable workspace context under
- * {@code context/target/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
+ * {@code inputs/context/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
  * ({@code @Order} / {@code Ordered}); a per-repository {@link ReentrantLock} serialises
  * concurrent builds against the same on-disk git working tree.
  *
@@ -41,14 +43,22 @@ public class WorkspaceContextBuilder {
 
     private final List<ContentProvider> providers;
     private final MeterRegistry meterRegistry;
-    /** Fixed-size stripe of locks → bounded memory, no map leak as new repos are seen. */
+
+    /** Builds the integration-agnostic context manifest after the providers run; null in unit tests. */
+    private final @Nullable ContextManifestBuilder manifestBuilder;
+
     private final ReentrantLock[] repoLockStripes;
 
-    public WorkspaceContextBuilder(List<ContentProvider> providers, MeterRegistry meterRegistry) {
+    public WorkspaceContextBuilder(
+        List<ContentProvider> providers,
+        MeterRegistry meterRegistry,
+        @Nullable ContextManifestBuilder manifestBuilder
+    ) {
         List<ContentProvider> sorted = new ArrayList<>(providers);
         AnnotationAwareOrderComparator.sort(sorted);
         this.providers = List.copyOf(sorted);
         this.meterRegistry = meterRegistry;
+        this.manifestBuilder = manifestBuilder;
         this.repoLockStripes = new ReentrantLock[LOCK_STRIPES];
         for (int i = 0; i < LOCK_STRIPES; i++) {
             repoLockStripes[i] = new ReentrantLock();
@@ -92,6 +102,7 @@ public class WorkspaceContextBuilder {
     private Map<String, byte[]> buildLocked(ContextRequest request) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         Map<String, String> keyOwner = new java.util.HashMap<>();
+        Map<String, String> keyConnector = new java.util.HashMap<>();
         int contributed = 0;
         for (ContentProvider provider : providers) {
             if (!provider.supports(request)) {
@@ -122,10 +133,11 @@ public class WorkspaceContextBuilder {
             }
             for (String key : files.keySet()) {
                 if (beforeKeys.contains(key)) {
-                    // Pre-existing key — only an overwrite is a wiring bug. Reference-equality
-                    // on the array is enough because providers must publish fresh byte[]s; a
-                    // mutated-in-place array from an earlier provider would also fail here
-                    // (which is the safer default).
+                    // Pre-existing key — only a re-put is a wiring bug. Reference inequality
+                    // identifies a fresh put(key, newArray); the SPI mandates providers publish a
+                    // NEW byte[] for any change, so this is sufficient. Note: an in-place mutation
+                    // of an earlier provider's array keeps the same reference and is NOT detected —
+                    // the contract relies on providers treating earlier outputs as immutable.
                     if (beforeValues.get(key) != files.get(key)) {
                         String existingOwner = keyOwner.get(key);
                         throw new IllegalStateException(
@@ -144,27 +156,54 @@ public class WorkspaceContextBuilder {
                         providerName + " wrote file outside " + ContentProvider.OUTPUT_PREFIX + ": " + key
                     );
                 }
-                String existingOwner = keyOwner.get(key);
-                if (existingOwner != null) {
-                    throw new IllegalStateException(
-                        "Duplicate workspace key " + key + ": written by both " + existingOwner + " and " + providerName
-                    );
-                }
+                // Invariant: a brand-new key (absent from beforeKeys) cannot already be owned —
+                // keyOwner only holds keys that were added to `files`, and every such key is in
+                // beforeKeys on subsequent iterations. The re-put guard above is the real
+                // cross-provider duplicate detector.
+                assert keyOwner.get(key) == null : "brand-new key already owned: " + key;
                 keyOwner.put(key, providerName);
+                keyConnector.put(key, provider.connectorId());
             }
             contributed++;
+        }
+        // Telescope (ADR 0020): index every projected file with its connector + a content-addressed sha,
+        // and store each blob in the CAS. Built for the agent-review flows (PR/Issue); the mentor chat
+        // flow has its own context surface. Best-effort — the manifest builder never throws.
+        if (manifestBuilder != null) {
+            AgentJob job = reviewJob(request);
+            if (job != null) {
+                Long workspaceId = job.getWorkspace() != null ? job.getWorkspace().getId() : null;
+                manifestBuilder.augment(files, keyConnector, String.valueOf(job.getId()), workspaceId);
+            }
         }
         log.debug("Workspace context built: {} files from {} provider(s)", files.size(), contributed);
         return files;
     }
 
-    /** Repository id for single-flight locking, or {@code null} for requests that don't touch git. */
-    private static Long repoKey(ContextRequest request) {
+    /** The job behind a PR/Issue review request, or {@code null} for the mentor-chat flow. */
+    private static @Nullable AgentJob reviewJob(ContextRequest request) {
         if (request instanceof ContextRequest.PracticeReviewRequest pr) {
-            JsonNode meta = pr.job().getMetadata();
-            if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
-                return meta.get("repository_id").asLong();
-            }
+            return pr.job();
+        }
+        if (request instanceof ContextRequest.IssueReviewRequest ir) {
+            return ir.job();
+        }
+        return null;
+    }
+
+    /**
+     * Repository id for single-flight locking, or {@code null} for requests that don't touch git.
+     * Both PR- and issue-review jobs carry {@code repository_id} in metadata; reading it for both
+     * spreads concurrent issue builds across the stripes by repo instead of all colliding on stripe 0.
+     */
+    private static Long repoKey(ContextRequest request) {
+        AgentJob job = reviewJob(request);
+        if (job == null) {
+            return null;
+        }
+        JsonNode meta = job.getMetadata();
+        if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
+            return meta.get("repository_id").asLong();
         }
         return null;
     }

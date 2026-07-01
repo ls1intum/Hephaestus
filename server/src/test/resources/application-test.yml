@@ -76,6 +76,9 @@ hephaestus:
         # Tests exercise creation mechanics as a regular user; the ADMIN_ONLY gate is covered
         # explicitly by WorkspaceCreationPolicyIntegrationTest via a property override.
         creation-policy: SELF_SERVICE
+        # A5: keep the empty-membership ADMIN auto-seed OFF by default in tests (mirrors prod), so the
+        # disabled-case test is deterministic. The enabled path is covered by a @TestPropertySource override.
+        auto-seed-membership: false
     # OAuth state HMAC secret + webhook secret — required by HmacOAuthStateService
     # at boot. Without these the integration framework can't construct.
     integration:

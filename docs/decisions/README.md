@@ -24,5 +24,11 @@ New ADRs use the next available number and link from this index.
 | [0014](0014-per-row-aes-gcm-aad-binding.md) | Per-row AES-GCM AAD binding for credential storage | Accepted |
 | [0015](0015-unified-integration-framework.md) | Unified integration framework — single SPI for SCM/messaging vendors | Accepted (amended 2026-05-27 for Phase 1-4 restructure) |
 | [0016](0016-unified-identity-keycloak-as-truth.md) | Unified identity — Keycloak `sub` as the authoritative join key | Accepted |
+| [0017](0017-replace-keycloak-with-spring-native-auth.md) | Replace Keycloak with Spring-native auth (BFF cookie-JWT + `Connection`-backed workspace IdPs) | Accepted |
+| [0018](0018-pg-partman-for-auth-event-partitioning.md) | `pg_partman` for `auth_event` partitioning | Accepted |
+| [0019](0019-workspace-membership-keyed-on-account.md) | Workspace membership is keyed on `Account`, not the SCM `User` | Proposed |
+| [0020](0020-context-fabric-everything-is-an-integration.md) | Context Fabric: everything is an integration | Proposed |
+| [0021](0021-findings-feedback-synthesis-seam.md) | Findings vs feedback — detection produces evidence and in-context feedback; cross-channel synthesis is separate | Accepted |
+| [0022](0022-observation-presence-assessment-and-schema-cleanup.md) | Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup | Accepted |
 
 Template: [0000-template.md](0000-template.md).

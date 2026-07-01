@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Shared {@link AuthProperties} builder for unit tests, so the 12-arg record construction lives in one
- * place. Values are the production defaults; vary only the component under test.
+ * Shared {@link AuthProperties} builder for unit tests, so the record construction lives in one place.
+ * Values are the production defaults; vary only the component under test.
  */
 public final class AuthPropertiesFixture {
 
@@ -41,7 +41,9 @@ public final class AuthPropertiesFixture {
             List.of(),
             "",
             Duration.ofHours(1),
-            Duration.ofHours(12)
+            Duration.ofHours(12),
+            false,
+            true
         );
     }
 }

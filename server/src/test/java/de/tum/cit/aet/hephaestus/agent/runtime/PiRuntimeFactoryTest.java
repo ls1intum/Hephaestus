@@ -108,12 +108,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 true,
                 600,
                 PRACTICE,
-                Map.of(WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json", payload),
+                Map.of(WorkspaceAbi.CONTEXT_PREFIX + "metadata.json", payload),
                 ""
             );
-            assertThat(factory.build(spec).inputFiles()).containsKey(
-                WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json"
-            );
+            assertThat(factory.build(spec).inputFiles()).containsKey(WorkspaceAbi.CONTEXT_PREFIX + "metadata.json");
         }
     }
 
@@ -123,7 +121,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @ParameterizedTest(name = "{0} → defaultProvider {1}")
         @CsvSource({ "AZURE_OPENAI, azure-openai-responses", "OPENAI, openai", "ANTHROPIC, anthropic" })
         void mapsProvider(LlmProvider provider, String expected) throws Exception {
-            byte[] json = factory.buildPiSettingsJson(provider, "some-model");
+            byte[] json = factory.buildPiSettingsJson(provider, "some-model", false);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.path("defaultProvider").asString()).isEqualTo(expected);
             assertThat(root.path("defaultModel").asString()).isEqualTo("some-model");
@@ -132,7 +130,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void omitsModelAndIncludesCompaction() throws Exception {
-            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null);
+            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null, false);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.has("defaultModel")).isFalse();
             assertThat(root.path("compaction").path("enabled").asBoolean()).isTrue();
@@ -154,6 +152,31 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 .as("Pi's self-watchdog must fire strictly before the SPI hard kill — leaves grace")
                 .isLessThan(hardTimeoutMs)
                 .isPositive();
+        }
+
+        @Test
+        @DisplayName("budget floor applies just above the minimum timeout — stays positive and under the hard kill")
+        void budget_floorAppliesAtMinimumTimeout() {
+            // Smallest spec PiPlanSpec accepts (timeoutSeconds > TIMEOUT_BUFFER_SECONDS=60). The computed
+            // budget (1s) is below MIN_BUDGET_MS, so the floor branch fires — this exercises the otherwise
+            // untested Math.max floor. The floor must stay positive AND strictly under the hard-kill deadline.
+            int timeoutSeconds = PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1;
+            PiPlanSpec spec = new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.PROXY,
+                null,
+                null,
+                null,
+                "job-token-123",
+                false,
+                timeoutSeconds,
+                PRACTICE,
+                Map.of(),
+                ""
+            );
+            long budgetMs = Long.parseLong(factory.build(spec).environment().get("AGENT_BUDGET_MS"));
+            long hardTimeoutMs = (long) timeoutSeconds * 1_000L;
+            assertThat(budgetMs).isEqualTo(PiRuntimeFactory.MIN_BUDGET_MS).isPositive().isLessThan(hardTimeoutMs);
         }
 
         @Test
@@ -210,26 +233,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 .containsEntry("PI_HEPHAESTUS_API_KEY", "sk-test")
                 .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-x")
                 .doesNotContainKey("OPENAI_BASE_URL");
-        }
-
-        @Test
-        void baseUrlIgnoredInProxyMode() {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.PROXY,
-                null,
-                null,
-                "https://gpu.example.com/api",
-                "job-token-123",
-                false,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            assertThat(factory.build(spec).environment())
-                .doesNotContainKey("OPENAI_BASE_URL")
-                .doesNotContainKey("PI_HEPHAESTUS_BASE_URL");
         }
     }
 

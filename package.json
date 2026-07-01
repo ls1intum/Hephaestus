@@ -52,6 +52,7 @@
 		"dev:compose:down": "cd server && docker compose down",
 		"dev:reset": "cd server && docker compose down -v && node -e \"import('node:fs/promises').then(fs => fs.rm('postgres-data', {recursive: true, force: true}))\" && docker compose up -d --wait",
 		"dev:server": "pnpm dev:compose && cd server && ./mvnw spring-boot:run",
+		"dev:server:e2e": "pnpm dev:compose && cd server && ./mvnw spring-boot:run -Dapp.profiles=local,e2e",
 		"dev:webapp": "pnpm --filter webapp run dev",
 		"dev": "mprocs"
 	},

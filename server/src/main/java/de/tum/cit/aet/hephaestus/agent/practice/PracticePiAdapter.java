@@ -61,14 +61,14 @@ public class PracticePiAdapter {
 
     /**
      * Run precompute scripts via Bun before the agent. Failure is non-fatal. Paths reference the
-     * workspace ABI ({@link WorkspaceAbi#CONTEXT_TARGET_PREFIX}).
+     * workspace ABI ({@link WorkspaceAbi#CONTEXT_PREFIX}).
      *
      * <p><b>Trust boundary:</b> the returned string is interpolated verbatim into the container's
      * {@code sh -c} command line. Do not derive any part of this output from untrusted input.
      */
     static String buildPrecomputeStep() {
         String root = WorkspaceAbi.WORKSPACE_ROOT;
-        String contextTarget = root + "/" + WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+        String contextTarget = root + "/" + WorkspaceAbi.CONTEXT_PREFIX;
         String precomputeIn = root + "/" + WorkspaceAbi.PRECOMPUTE_PREFIX + "practices";
         String precomputeOut = root + "/" + WorkspaceAbi.PRECOMPUTE_OUT_PREFIX.replaceFirst("/$", "");
         return (
@@ -83,15 +83,26 @@ public class PracticePiAdapter {
             " && ln -sf /opt/precompute/lib " +
             precomputeOut +
             "/lib" +
-            " && bun run /opt/precompute/runner.ts" +
+            // diff.patch is the AGENT-facing view: every line carries a [L<n>] line-number annotation. The
+            // precompute diff parser expects a RAW unified diff, so strip the annotation into a clean copy the
+            // runner parses (the raw diff is the right input for static analysis; the annotation is the agent's).
+            " && sed 's/^\\[L[0-9]*\\] //' " +
+            contextTarget +
+            "diff.patch > " +
+            precomputeOut +
+            "/diff_clean.patch 2>/dev/null ; bun run /opt/precompute/runner.ts" +
             " --repo " +
             WorkspaceAbi.REPO_MOUNT +
             " --diff " +
-            contextTarget +
-            "diff.patch" +
+            precomputeOut +
+            "/diff_clean.patch" +
             " --metadata " +
             contextTarget +
             "metadata.json" +
+            // Give scripts the materialised context dir so they can read the SAME cross-artifact context the
+            // agent sees (project_inventory.json, linked_work_items.json, …) and point the LLM at neighbours.
+            " --context " +
+            contextTarget +
             " --output " +
             precomputeOut +
             " > /tmp/precompute-runner.log 2>&1" +

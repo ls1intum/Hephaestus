@@ -276,23 +276,43 @@ erDiagram
         BIGINT label_id PK,FK
     }
 
-    FeedbackPost {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(256) subject_external_id UK "NOT NULL"
-        VARCHAR(48) subject_class "NOT NULL"
-        VARCHAR(48) post_kind UK "NOT NULL"
-        VARCHAR(256) external_post_id UK "NOT NULL"
-        JSONB vendor_metadata "NOT NULL"
+    Feedback {
+        UUID id PK
+        UUID agent_job_id FK,UK "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(32) artifact_type
+        BIGINT artifact_id
+        BIGINT recipient_user_id FK "NOT NULL"
+        BIGINT about_user_id FK "NOT NULL"
+        VARCHAR(32) channel "NOT NULL"
+        INTEGER position UK "NOT NULL"
+        VARCHAR(16) delivery_state "NOT NULL"
+        VARCHAR(32) suppression_reason
+        TEXT body
+        VARCHAR(16) source "NOT NULL"
+        UUID replaces_id FK
+        VARCHAR(64) thread_key
         TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ delivered_at
     }
 
-    FindingFeedback {
+    FeedbackObservation {
+        UUID feedback_id PK,FK
+        UUID observation_id PK,FK
+        VARCHAR(16) role "NOT NULL"
+        INTEGER ordinal "NOT NULL"
+    }
+
+    FeedbackPlacement {
         UUID id PK
-        UUID finding_id FK "NOT NULL"
-        BIGINT contributor_id FK "NOT NULL"
-        VARCHAR(16) action "NOT NULL"
-        TEXT explanation
+        UUID feedback_id FK "NOT NULL"
+        VARCHAR(32) placement_type "NOT NULL"
+        VARCHAR(16) anchor_kind
+        TEXT anchor_path
+        INTEGER anchor_start_line
+        INTEGER anchor_end_line
+        VARCHAR(8) anchor_side
+        TEXT posted_comment_ref
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
@@ -520,6 +540,26 @@ erDiagram
         TIMESTAMPTZ consumed_at
     }
 
+    Observation {
+        UUID id PK
+        VARCHAR(255) occurrence_key UK "NOT NULL"
+        UUID agent_job_id "NOT NULL"
+        BIGINT practice_id FK "NOT NULL"
+        VARCHAR(32) artifact_type "NOT NULL"
+        BIGINT artifact_id "NOT NULL"
+        BIGINT about_user_id FK "NOT NULL"
+        VARCHAR(255) title "NOT NULL"
+        VARCHAR(16) presence "NOT NULL"
+        VARCHAR(16) severity
+        REAL confidence "NOT NULL"
+        JSONB evidence
+        TEXT reasoning
+        TIMESTAMPTZ observed_at "NOT NULL"
+        VARCHAR(64) recurrence_key
+        BIGINT practice_revision_id FK
+        VARCHAR(8) assessment
+    }
+
     Organization {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -544,31 +584,39 @@ erDiagram
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
-        VARCHAR(64) category
         JSONB trigger_events "NOT NULL"
         TEXT criteria "NOT NULL"
         BOOLEAN is_active "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
+        BIGINT practice_area_id FK
+        VARCHAR(32) applies_to "NOT NULL"
+        TEXT why_it_matters
+        TEXT what_good_looks_like
+        INTEGER display_order "NOT NULL"
     }
 
-    PracticeFinding {
-        UUID id PK
-        VARCHAR(255) idempotency_key UK "NOT NULL"
-        UUID agent_job_id "NOT NULL"
-        BIGINT practice_id FK "NOT NULL"
-        VARCHAR(32) target_type "NOT NULL"
-        BIGINT target_id "NOT NULL"
-        BIGINT contributor_id FK "NOT NULL"
-        VARCHAR(255) title "NOT NULL"
-        VARCHAR(16) verdict "NOT NULL"
-        VARCHAR(16) severity "NOT NULL"
-        REAL confidence "NOT NULL"
-        JSONB evidence
-        TEXT reasoning
-        TEXT guidance
-        TIMESTAMPTZ detected_at "NOT NULL"
+    PracticeArea {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) name "NOT NULL"
+        TEXT description
+        BOOLEAN is_active "NOT NULL"
+        INTEGER display_order "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+        VARCHAR(64) icon
+        VARCHAR(32) color
+    }
+
+    PracticeRevision {
+        BIGINT id PK
+        BIGINT practice_id FK,UK "NOT NULL"
+        INTEGER revision_number UK "NOT NULL"
+        TEXT criteria "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Project {
@@ -723,6 +771,16 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
         VARCHAR(64) commit_sha
         VARCHAR(64) original_commit_sha
+    }
+
+    Reaction {
+        UUID id PK
+        BIGINT reactor_user_id FK "NOT NULL"
+        VARCHAR(16) action "NOT NULL"
+        TEXT explanation
+        TIMESTAMPTZ created_at "NOT NULL"
+        UUID feedback_id FK "NOT NULL"
+        VARCHAR(64) recurrence_key
     }
 
     Repository {
@@ -880,6 +938,12 @@ erDiagram
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
         TIMESTAMPTZ leaderboard_league_cycle_at
+        BIGINT practice_config_id FK
+        BIGINT mentor_config_id FK
+        BOOLEAN practice_run_for_all_users
+        BOOLEAN practice_skip_drafts
+        BOOLEAN practice_deliver_to_merged
+        INTEGER practice_cooldown_minutes
     }
 
     WorkspaceMembership {
@@ -932,7 +996,7 @@ erDiagram
     GitProvider ||--|| Discussion : references
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
-    Connection ||--|| FeedbackPost : has
+    AgentJob ||--|| Feedback : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
     GitProvider ||--|| Issue : references
@@ -943,6 +1007,8 @@ erDiagram
     GitProvider ||--|| Milestone : references
     GitProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
+    Workspace ||--|| PracticeArea : has
+    Practice ||--|| PracticeRevision : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectItem ||--|| ProjectFieldValue : has
@@ -987,8 +1053,11 @@ erDiagram
     Discussion ||--o{ DiscussionComment : commented_on
     User ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    PracticeFinding ||--o{ FindingFeedback : has
-    User ||--o{ FindingFeedback : references
+    Workspace ||--o{ Feedback : has
+    User ||--o{ Feedback : recipient_user_id
+    User ||--o{ Feedback : about_user_id
+    Feedback ||--o{ Feedback : references
+    Feedback ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     Account ||--o{ IdentityLink : has
@@ -1003,8 +1072,10 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
-    Practice ||--o{ PracticeFinding : has
-    User ||--o{ PracticeFinding : references
+    Practice ||--o{ Observation : has
+    User ||--o{ Observation : has
+    PracticeRevision ||--o{ Observation : has
+    PracticeArea ||--o{ Practice : has
     User ||--o{ Project : created_by
     Issue ||--o{ ProjectItem : has
     User ||--o{ ProjectItem : created_by
@@ -1019,8 +1090,12 @@ erDiagram
     PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
+    User ||--o{ Reaction : has
+    Feedback ||--o{ Reaction : has
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
+    AgentConfig ||--o{ Workspace : practice_config_id
+    AgentConfig ||--o{ Workspace : mentor_config_id
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
@@ -1028,6 +1103,8 @@ erDiagram
     Issue }o--o{ CommitPullRequest : references
     Discussion }o--o{ DiscussionLabel : labeled
     Label }o--o{ DiscussionLabel : labeled
+    Feedback }o--o{ FeedbackObservation : has
+    Observation }o--o{ FeedbackObservation : has
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : blocked_issue_id

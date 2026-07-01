@@ -190,7 +190,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo(
-                "pr_review:org/submit-repo:10:abc123:config:" + agentConfig.getId()
+                // per-phase key: a manual/dev submission carries the "manual" phase segment
+                "pr_review:org/submit-repo:10:manual:abc123:config:" + agentConfig.getId()
             );
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
@@ -278,7 +279,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             existing.setConfig(agentConfig);
             existing.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
             existing.setIdempotencyKey(
-                "pr_review:" + repo.getNameWithOwner() + ":10:race123:config:" + agentConfig.getId()
+                // per-phase key: must carry the "manual" phase to dedup against a manual submission
+                "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:config:" + agentConfig.getId()
             );
             existing.setMetadata(OBJECT_MAPPER.createObjectNode());
             existing.setConfigSnapshot(OBJECT_MAPPER.createObjectNode());

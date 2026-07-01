@@ -30,10 +30,17 @@ public class PiRuntimeFactory {
 
     private static final Logger log = LoggerFactory.getLogger(PiRuntimeFactory.class);
 
-    public static final String OUTPUT_PATH = WorkspaceAbi.OUTPUT_PATH;
-
     /** Grace window before the sandbox hard-kills the runner — must fire before that deadline. */
     public static final int TIMEOUT_BUFFER_SECONDS = 60;
+
+    /**
+     * Floor for the self-watchdog budget (ms). A spec sitting just above the {@link PiPlanSpec} minimum
+     * (timeoutSeconds &gt; {@link #TIMEOUT_BUFFER_SECONDS}) yields a tiny computed budget once the buffer is
+     * subtracted; this floor keeps the watchdog budget at a sane minimum so it is never effectively zero.
+     * Kept strictly below {@code TIMEOUT_BUFFER_SECONDS * 1000} so the watchdog still fires before the SPI
+     * hard kill.
+     */
+    static final long MIN_BUDGET_MS = (TIMEOUT_BUFFER_SECONDS - 1) * 1000L;
 
     static final String AGENT_RESOURCE_PREFIX = "agent/";
 
@@ -69,7 +76,7 @@ public class PiRuntimeFactory {
         inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerProfile().runnerScript()));
         inputFiles.putAll(spec.extraInputs());
 
-        long agentTimeoutMs = Math.max(60_000L, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
+        long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
         env.put("AGENT_BUDGET_MS", Long.toString(agentTimeoutMs));
 
         env.put("HOME", "/home/agent");
@@ -156,11 +163,6 @@ public class PiRuntimeFactory {
         };
     }
 
-    /** Two-arg overload for tests that don't exercise custom-provider routing. */
-    byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName) {
-        return buildPiSettingsJson(provider, modelName, false);
-    }
-
     /**
      * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
      * {@code defaultProvider} resolves to the {@code hephaestus} provider that the runner script
@@ -189,19 +191,23 @@ public class PiRuntimeFactory {
         try {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(settings);
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize Pi practice settings", e);
+            throw new IllegalStateException("Failed to serialize Pi settings", e);
         }
     }
 
     /**
      * True when the spec routes the LLM through the {@code hephaestus} custom provider that the
-     * runner script registers directly on the ModelRegistry: non-Azure providers in
-     * API_KEY/OAUTH mode with a non-blank {@code baseUrl}. PROXY mode and Azure both have their
-     * own routing primitives (proxy URL injected at runtime; Azure deployment-name map).
+     * runner script registers directly on the ModelRegistry: OpenAI over the proxy (Pi's native
+     * {@code openai-completions} wire format), or a non-Azure provider in direct API_KEY mode with
+     * a gateway {@code baseUrl}. Azure always uses its own deployment-name routing; Anthropic over
+     * the proxy keeps its native Messages API.
      */
     static boolean useHephaestusProvider(PiPlanSpec spec) {
-        if (spec.credentialMode() == CredentialMode.PROXY) return false;
         if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
+        // OpenAI rides the proxy via Pi's native openai-completions provider (universal /chat/completions);
+        // Anthropic keeps its Messages API.
+        if (spec.credentialMode() == CredentialMode.PROXY) return spec.provider() == LlmProvider.OPENAI;
+        // Direct (operator/worker) mode: custom provider only when a gateway base URL is set.
         return spec.baseUrl() != null && !spec.baseUrl().isBlank();
     }
 

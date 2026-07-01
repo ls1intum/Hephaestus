@@ -25,8 +25,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
      * Single-round-trip snapshot of every counter {@code UserAspectProvider} needs. The JPQL
      * anchors on {@code User} so the constructor expression evaluates exactly once (one row
      * by PK); each bucket is a {@code COALESCE((SELECT …), 0L)} so the projected longs are
-     * never null. Collapses what used to be nine separate {@code SELECT COUNT(...)}
-     * round-trips (one per metric) into one statement.
+     * never null. The nine metric counts ride in one statement rather than one round trip each.
      */
     @Query(
         """
@@ -79,7 +78,8 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
                 JOIN RepositoryToMonitor rtmr3 ON rtmr3.nameWithOwner = r3.pullRequest.repository.nameWithOwner
                 WHERE r3.pullRequest.author.id = :userId
                   AND rtmr3.workspace.id = :workspaceId
-                  AND r3.submittedAt > :weekAgo), 0L),
+                  AND r3.submittedAt > :weekAgo
+                  AND r3.submittedAt <= :now), 0L),
             COALESCE((SELECT COUNT(prr)
                 FROM PullRequest prr
                 JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = prr.repository.nameWithOwner
@@ -162,16 +162,24 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
     // Findings aspect — reviews received in window
 
     /**
-     * Earliest USER-role message per thread for a batch of thread ids. One round trip instead of
-     * the N-trips loop the previous `firstUserMessagePreview(threadId)` did. Native because
-     * Postgres `DISTINCT ON` is the cheapest path; equivalent JPQL would need a correlated
+     * Earliest USER-role message per thread for a batch of thread ids, in one round trip. Native because
+     * Postgres {@code DISTINCT ON} is the cheapest path; equivalent JPQL would need a correlated
      * subquery for every thread anyway. Joins {@code chat_thread} on {@code workspace_id} so the
      * query refuses cross-tenant ids the caller might pass — defence in depth even though the
      * upstream id list is already user-scoped.
+     *
+     * <p>{@code m.parts::text} casts the {@code jsonb} column to text so the projection element is a plain
+     * String the caller parses with {@code readTree}. Selecting the raw {@code jsonb} into an untyped
+     * {@code Object[]} makes Hibernate apply its JSON Java-type and throw "JSON deserialize failed for String
+     * … from Array", silently degrading the prior-conversation aspect to empty.
+     *
+     * <p><b>Precondition:</b> {@code threadIds} MUST be non-empty. The native {@code IN (:threadIds)}
+     * expands to invalid {@code IN ()} SQL (a Postgres syntax error) for an empty list, so callers must
+     * short-circuit beforehand (as {@code WorkspaceAspectProvider.loadFirstUserMessages} does).
      */
     @Query(
         value = """
-        SELECT DISTINCT ON (m.thread_id) m.thread_id, m.parts
+        SELECT DISTINCT ON (m.thread_id) m.thread_id, m.parts::text
           FROM chat_message m
           JOIN chat_thread t ON t.id = m.thread_id
          WHERE m.thread_id IN (:threadIds)
@@ -208,6 +216,49 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
         @Param("since") Instant since,
+        org.springframework.data.domain.Pageable page
+    );
+
+    /**
+     * The developer's own authored PULL REQUESTS in the workspace, newest first — the work itself (not
+     * findings about it), so the mentor has a concrete, linkable inventory of what they shipped. Same
+     * author + RepositoryToMonitor scoping as {@link #findReviewsReceivedSince}. {@code FROM PullRequest}
+     * narrows to the PR discriminator (single-table inheritance), so issues never leak in.
+     */
+    @Query(
+        """
+        SELECT p
+        FROM PullRequest p
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
+        WHERE p.author.id = :userId
+          AND rtm.workspace.id = :workspaceId
+        ORDER BY p.createdAt DESC
+        """
+    )
+    List<PullRequest> findRecentAuthoredPullRequests(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        org.springframework.data.domain.Pageable page
+    );
+
+    /**
+     * The developer's own authored ISSUES (excluding PRs via {@code TYPE(i) = Issue}) in the workspace,
+     * newest first. Companion to {@link #findRecentAuthoredPullRequests}.
+     */
+    @Query(
+        """
+        SELECT i
+        FROM Issue i
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
+        WHERE i.author.id = :userId
+          AND rtm.workspace.id = :workspaceId
+          AND TYPE(i) = Issue
+        ORDER BY i.createdAt DESC
+        """
+    )
+    List<Issue> findRecentAuthoredIssues(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
         org.springframework.data.domain.Pageable page
     );
 }

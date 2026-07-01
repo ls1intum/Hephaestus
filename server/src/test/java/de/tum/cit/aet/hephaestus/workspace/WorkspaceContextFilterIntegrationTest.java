@@ -82,11 +82,18 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     @Test
-    @WithAdminUser
-    void adminWithoutMembershipIsAlsoForbidden() {
-        persistUser("admin");
-        User workspaceOwner = persistUser("admin-workspace-owner");
-        Workspace workspace = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, workspaceOwner);
+    @WithMentorUser
+    void autoSeedDisabledDoesNotGrantAdminToFirstVisitorOfEmptyMembershipWorkspace() {
+        // SECURITY (A5): with auto-seed disabled (the production default), the first authenticated
+        // visitor of a zero-membership workspace must NOT be silently seeded as ADMIN. A non-member,
+        // non-super-admin visitor is forbidden, and no membership row is created.
+        User visitor = persistUser("mentor");
+        User workspaceOwner = persistUser("empty-membership-owner");
+        Workspace workspace = createWorkspace("empty-seed", "Empty", "emptyseed", AccountType.ORG, workspaceOwner);
+        // createWorkspace seeds an OWNER membership; strip it so the workspace is genuinely
+        // zero-membership — the exact org-sync-churn / admin-only-seeded state A5 guards against.
+        workspaceMembershipRepository.deleteAll(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()));
+        assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId())).isEmpty();
 
         webTestClient
             .get()
@@ -95,6 +102,51 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
             .exchange()
             .expectStatus()
             .isForbidden();
+
+        assertThat(
+            workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(
+                workspace.getId(),
+                java.util.Set.of(visitor.getId())
+            )
+        )
+            .as("auto-seed disabled must not create a membership")
+            .isEmpty();
+    }
+
+    @Test
+    @WithAdminUser
+    void instanceSuperAdminWithoutMembershipIsElevatedToAdmin() {
+        // An instance super-admin (APP_ADMIN, app_admin authority) reaches ANY workspace as ADMIN even
+        // without an explicit membership — the GitLab admin model (WorkspaceContextFilter elevation).
+        // Deliberately ADMIN, never OWNER (ownership is member-granted).
+        persistUser("admin");
+        User workspaceOwner = persistUser("admin-workspace-owner");
+        Workspace workspace = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, workspaceOwner);
+
+        WorkspaceEchoControllers.WorkspaceContextSnapshot response = requestContextEcho(workspace.getWorkspaceSlug());
+
+        assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
+        assertThat(response.roles()).containsExactly("ADMIN");
+    }
+
+    @Test
+    @WithAdminUser
+    void superAdminElevationDoesNotResurrectSuspendedWorkspace() {
+        // The ACTIVE-status gate runs BEFORE the elevation, so a super-admin (no membership) is still
+        // 404'd on a suspended workspace's scoped routes — elevation never widens access to non-active tenants.
+        persistUser("admin");
+        User owner = persistUser("suspended-elev-owner");
+        Workspace workspace = createWorkspace("suspended-elev", "Suspended", "suspendedelev", AccountType.ORG, owner);
+        workspace.setStatus(WorkspaceStatus.SUSPENDED);
+        workspaceRepository.save(workspace);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
     }
 
     @Test

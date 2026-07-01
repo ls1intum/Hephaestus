@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
+import de.tum.cit.aet.hephaestus.practices.observation.DeveloperHistoryProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +48,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     private PullRequestReviewCommentRepository reviewCommentRepository;
 
     @Mock
-    private ContributorHistoryProvider contributorHistoryProvider;
+    private DeveloperHistoryProvider developerHistoryProvider;
 
     @Mock
     private GitDiffOperations gitDiffOperations;
@@ -67,7 +67,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             gitRepositoryManager,
             pullRequestRepository,
             reviewCommentRepository,
-            contributorHistoryProvider,
+            developerHistoryProvider,
             gitDiffOperations,
             connectionService,
             List.of()
@@ -129,8 +129,8 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files).containsKey("context/target/metadata.json");
-            JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
+            assertThat(files).containsKey("inputs/context/metadata.json");
+            JsonNode metadataJson = objectMapper.readTree(files.get("inputs/context/metadata.json"));
             assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadataJson.get("enriched").asBoolean()).isFalse();
@@ -154,7 +154,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
+            JsonNode metadataJson = objectMapper.readTree(files.get("inputs/context/metadata.json"));
             assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
             assertThat(metadataJson.get("title").asString()).isEqualTo("Fix authentication bug");
             assertThat(metadataJson.get("author").asString()).isEqualTo("testuser");
@@ -186,7 +186,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            JsonNode comments = objectMapper.readTree(files.get("context/target/comments.json"));
+            JsonNode comments = objectMapper.readTree(files.get("inputs/context/comments.json"));
             assertThat(comments).hasSize(2);
             assertThat(comments.get(0).get("created_at").asString()).isEqualTo("2025-06-01T12:00:00Z");
             assertThat(comments.get(0).get("author").asString()).isEqualTo("reviewer");
@@ -211,17 +211,17 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            JsonNode commentsJson = objectMapper.readTree(files.get("context/target/comments.json"));
+            JsonNode commentsJson = objectMapper.readTree(files.get("inputs/context/comments.json"));
             assertThat(commentsJson).hasSize(PullRequestContentProvider.MAX_COMMENTS);
             assertThat(commentsJson.get(0).get("body").asString()).isEqualTo("Comment 100");
         }
     }
 
     @Nested
-    class ContributorHistory {
+    class DeveloperHistory {
 
         @Test
-        void includesContributorHistory() {
+        void includesDeveloperHistory() {
             PullRequest pr = new PullRequest();
             pr.setTitle("Fix bug");
             User author = new User();
@@ -233,13 +233,16 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
-            byte[] historyJson = "[{\"practice\":\"error-handling\",\"negative\":3}]".getBytes(StandardCharsets.UTF_8);
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
+            byte[] historyJson =
+                "[{\"practice\":\"error-handling\",\"good\":0,\"bad\":3,\"lastSeen\":\"2025-06-01T12:00:00Z\"}]".getBytes(
+                    StandardCharsets.UTF_8
+                );
+            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files.get("context/target/contributor_history.json")).isEqualTo(historyJson);
+            assertThat(files.get("inputs/context/contributor_history.json")).isEqualTo(historyJson);
         }
 
         @Test
@@ -254,12 +257,12 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
+            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files).doesNotContainKey("context/target/contributor_history.json");
+            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
         }
 
         @Test
@@ -274,15 +277,15 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
+            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
                 new RuntimeException("DB connection timeout")
             );
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files).doesNotContainKey("context/target/contributor_history.json");
-            assertThat(files).containsKey("context/target/metadata.json");
+            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
+            assertThat(files).containsKey("inputs/context/metadata.json");
         }
 
         @Test
@@ -297,8 +300,106 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            verifyNoInteractions(contributorHistoryProvider);
-            assertThat(files).doesNotContainKey("context/target/contributor_history.json");
+            verifyNoInteractions(developerHistoryProvider);
+            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
+        }
+    }
+
+    @Nested
+    class DiffPrecompute {
+
+        private final String repoPath = "/tmp/hephaestus-git-repos/123";
+
+        @Test
+        void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
+            // The diff_summary.md parser is driven directly from an annotated diff.patch (no git needed).
+            String annotated =
+                "[L1] diff --git a/src/A.java b/src/A.java\n" +
+                "[L1] +line a1\n" +
+                "[L2] +line a2\n" +
+                "[L1] diff --git a/src/B.java b/src/B.java\n" +
+                "[L1] +line b1\n";
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            files.put("inputs/context/diff.patch", annotated.getBytes(StandardCharsets.UTF_8));
+
+            provider.computeAndStoreDiffSummary(files);
+
+            assertThat(files).containsKey("inputs/context/diff_summary.md");
+            String summary = new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8);
+            assertThat(summary).contains("**2 files changed**");
+            assertThat(summary).contains("`src/A.java`");
+            assertThat(summary).contains("`src/B.java`");
+        }
+
+        @Test
+        void computeAndStoreDiffSummary_emptyDiffPatch_writesNothing() {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.computeAndStoreDiffSummary(files); // no diff.patch present at all
+            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
+
+            files.put("inputs/context/diff.patch", new byte[0]); // present but empty
+            provider.computeAndStoreDiffSummary(files);
+            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
+        }
+
+        @Test
+        void emptyDiff_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            // A resolvable range but a blank diff → "Empty diff: no changed files…".
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(new String[] { "main", "abc123def456" });
+            when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456")).thenReturn("");
+            when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenReturn("   ");
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("Empty diff");
+        }
+
+        @Test
+        void headVerifiedButRangeUnresolvable_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            // headVerified = true (commit present) but every range-resolution strategy fails → hard abort.
+            when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(null);
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("all resolution strategies failed");
+        }
+
+        @Test
+        void realDiff_writesAnnotatedPatchAndSummary() throws Exception {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(new String[] { "main", "abc123def456" });
+            when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456")).thenReturn("1 file changed");
+            when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenReturn(
+                "diff --git a/src/A.java b/src/A.java\n@@ -1,1 +1,2 @@\n context\n+added\n"
+            );
+
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.contribute(request(sampleMetadata()), files);
+
+            assertThat(files).containsKey("inputs/context/diff.patch");
+            assertThat(files).containsKey("inputs/context/diff_stat.txt");
+            assertThat(files).containsKey("inputs/context/diff_summary.md");
+            String patch = new String(files.get("inputs/context/diff.patch"), StandardCharsets.UTF_8);
+            assertThat(patch).contains("[L2] +added");
         }
     }
 

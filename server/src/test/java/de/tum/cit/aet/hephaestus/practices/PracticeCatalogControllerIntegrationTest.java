@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -17,11 +18,14 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -39,6 +43,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     @Autowired
     private PracticeRepository practiceRepository;
 
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
+
+    @Autowired
+    private PracticeService practiceService;
+
     private Workspace workspace;
 
     @BeforeEach
@@ -47,12 +57,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         workspace = createWorkspace("catalog-ws", "Catalog WS", "catalog-org", AccountType.ORG, owner);
     }
 
-    private Practice persistPractice(String slug, String name, String category, boolean active) {
+    private Practice persistPractice(String slug, String name, boolean active) {
         Practice practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
-        practice.setCategory(category);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice.setCriteria("Detect prompt for " + slug);
         practice.setActive(active);
@@ -63,9 +72,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return new CreatePracticeRequestDTO(
             slug,
             "Practice " + slug,
-            "test-category",
             List.of("PullRequestCreated", "ReviewSubmitted"),
             "Detect if the PR follows best practices",
+            null,
+            null,
+            null,
             null
         );
     }
@@ -96,8 +107,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturnAllPractices() {
             ensureAdminMembership(workspace);
-            persistPractice("alpha", "Alpha", "cat-a", true);
-            persistPractice("beta", "Beta", "cat-b", false);
+            persistPractice("alpha", "Alpha", true);
+            persistPractice("beta", "Beta", false);
 
             webTestClient
                 .get()
@@ -115,9 +126,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturnOrderedByName() {
             ensureAdminMembership(workspace);
-            persistPractice("z-slug", "Zebra", "cat", true);
-            persistPractice("a-slug", "Alpha", "cat", true);
-            persistPractice("m-slug", "Middle", "cat", true);
+            persistPractice("z-slug", "Zebra", true);
+            persistPractice("a-slug", "Alpha", true);
+            persistPractice("m-slug", "Middle", true);
 
             webTestClient
                 .get()
@@ -139,31 +150,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void shouldFilterByCategory() {
-            ensureAdminMembership(workspace);
-            persistPractice("alpha", "Alpha", "cat-a", true);
-            persistPractice("beta", "Beta", "cat-b", true);
-
-            webTestClient
-                .get()
-                .uri(BASE_URI + "?category=cat-a", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].slug")
-                .isEqualTo("alpha");
-        }
-
-        @Test
-        @WithAdminUser
         void shouldFilterByActive() {
             ensureAdminMembership(workspace);
-            persistPractice("active-one", "Active", "cat", true);
-            persistPractice("inactive-one", "Inactive", "cat", false);
+            persistPractice("active-one", "Active", true);
+            persistPractice("inactive-one", "Inactive", false);
 
             webTestClient
                 .get()
@@ -180,33 +170,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        @WithAdminUser
-        void shouldFilterByCategoryAndActive() {
-            ensureAdminMembership(workspace);
-            persistPractice("a-active", "A Active", "cat-a", true);
-            persistPractice("a-inactive", "A Inactive", "cat-a", false);
-            persistPractice("b-active", "B Active", "cat-b", true);
-
-            webTestClient
-                .get()
-                .uri(BASE_URI + "?category=cat-a&active=true", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(1)
-                .jsonPath("$[0].slug")
-                .isEqualTo("a-active");
-        }
-
-        @Test
         @WithMentorUser
         void shouldAllowMemberToList() {
             User member = persistUser("mentor");
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
-            persistPractice("member-visible", "Visible", "cat", true);
+            persistPractice("member-visible", "Visible", true);
 
             webTestClient
                 .get()
@@ -237,7 +205,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @DisplayName("returns practice by slug with all fields")
         void shouldReturnPractice() {
             ensureAdminMembership(workspace);
-            persistPractice("target-practice", "Target Practice", "cat", true);
+            persistPractice("target-practice", "Target Practice", true);
 
             PracticeDTO result = webTestClient
                 .get()
@@ -253,7 +221,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("target-practice");
             assertThat(result.name()).isEqualTo("Target Practice");
-            assertThat(result.category()).isEqualTo("cat");
             assertThat(result.active()).isTrue();
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
             assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
@@ -266,7 +233,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldAllowMemberToGet() {
             User member = persistUser("mentor");
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
-            persistPractice("member-get", "Member Get", "cat", true);
+            persistPractice("member-get", "Member Get", true);
 
             webTestClient
                 .get()
@@ -343,7 +310,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("new-practice");
             assertThat(result.name()).isEqualTo("Practice new-practice");
-            assertThat(result.category()).isEqualTo("test-category");
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated", "ReviewSubmitted");
             assertThat(result.criteria()).isEqualTo("Detect if the PR follows best practices");
             assertThat(result.active()).isTrue();
@@ -358,7 +324,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("Practice new-practice");
-            assertThat(persisted.get().getCategory()).isEqualTo("test-category");
             assertThat(persisted.get().isActive()).isTrue();
         }
 
@@ -370,9 +335,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "minimal-practice",
                 "Minimal Practice",
-                null,
                 List.of("PullRequestCreated"),
                 "Minimal criteria",
+                null,
+                null,
+                null,
                 null
             );
 
@@ -391,7 +358,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
-            assertThat(result.category()).isNull();
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
             assertThat(result.active()).isTrue();
         }
@@ -439,7 +405,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturn409ForDuplicateSlug() {
             ensureAdminMembership(workspace);
-            persistPractice("taken-slug", "Existing", "cat", true);
+            persistPractice("taken-slug", "Existing", true);
 
             ProblemDetail problem = webTestClient
                 .post()
@@ -459,16 +425,19 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getDetail()).contains("taken-slug");
         }
 
-        @Test
+        @ParameterizedTest(name = "rejects invalid slug \"{0}\"")
+        @MethodSource("invalidSlugs")
         @WithAdminUser
-        void shouldReturn400ForUppercaseSlug() {
+        void shouldReturn400ForInvalidSlug(String badSlug) {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
-                "INVALID_SLUG",
+                badSlug,
                 "Name",
-                null,
                 List.of("PullRequestCreated"),
+                null,
+                null,
+                null,
                 null,
                 null
             );
@@ -493,79 +462,15 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .containsKey("slug");
         }
 
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForTrailingHyphen() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "bad-slug-",
-                "Name",
-                null,
-                List.of("PullRequestCreated"),
-                null,
-                null
+        static Stream<String> invalidSlugs() {
+            return Stream.of(
+                "INVALID_SLUG", // uppercase + underscore
+                "bad-slug-", // trailing hyphen
+                "bad--slug", // consecutive hyphens
+                "-bad-slug", // leading hyphen
+                "ab", // too short (< 3 chars)
+                "a".repeat(65) // too long (> 64 chars)
             );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForConsecutiveHyphens() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "bad--slug",
-                "Name",
-                null,
-                List.of("PullRequestCreated"),
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForLeadingHyphen() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "-bad-slug",
-                "Name",
-                null,
-                List.of("PullRequestCreated"),
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
         }
 
         @Test
@@ -576,8 +481,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "valid-slug",
                 "Name",
-                null,
                 List.of("NonExistentEvent"),
+                null,
+                null,
+                null,
                 null,
                 null
             );
@@ -610,8 +517,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "dup-events",
                 "Name",
-                null,
                 List.of("PullRequestCreated", "PullRequestCreated"),
+                null,
+                null,
+                null,
                 null,
                 null
             );
@@ -632,7 +541,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForBlankFields() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO("", "", null, List.of(), null, null);
+            var request = new CreatePracticeRequestDTO("", "", List.of(), null, null, null, null, null);
 
             ProblemDetail problem = webTestClient
                 .post()
@@ -656,57 +565,16 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void shouldReturn400ForSlugTooShort() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO("ab", "Name", null, List.of("PullRequestCreated"), null, null);
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForSlugTooLong() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "a".repeat(65),
-                "Name",
-                null,
-                List.of("PullRequestCreated"),
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
         void shouldReturn400ForNameTooShort() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
                 "valid-slug",
                 "AB",
-                null,
                 List.of("PullRequestCreated"),
+                null,
+                null,
+                null,
                 null,
                 null
             );
@@ -727,7 +595,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForEmptyTriggerEvents() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO("no-events", "Name", null, List.of(), null, null);
+            var request = new CreatePracticeRequestDTO("no-events", "Name", List.of(), null, null, null, null, null);
 
             webTestClient
                 .post()
@@ -784,9 +652,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @DisplayName("partially updates practice (only name)")
         void shouldPartiallyUpdate() {
             ensureAdminMembership(workspace);
-            persistPractice("update-me", "Original Name", "original-cat", true);
+            persistPractice("update-me", "Original Name", true);
 
-            var request = new UpdatePracticeRequestDTO("Updated Name", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Updated Name", null, null, null, null, null, null);
 
             PracticeDTO result = webTestClient
                 .patch()
@@ -804,7 +672,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("Updated Name");
             // Verify unchanged fields remain intact
-            assertThat(result.category()).isEqualTo("original-cat");
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
             assertThat(result.active()).isTrue();
@@ -815,13 +682,15 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @DisplayName("fully updates all mutable fields")
         void shouldFullyUpdate() {
             ensureAdminMembership(workspace);
-            persistPractice("full-update", "Old Name", "old-cat", true);
+            persistPractice("full-update", "Old Name", true);
 
             var request = new UpdatePracticeRequestDTO(
                 "New Name",
-                "new-cat",
                 List.of("ReviewSubmitted"),
                 "New prompt",
+                null,
+                null,
+                null,
                 null
             );
 
@@ -840,7 +709,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("New Name");
-            assertThat(result.category()).isEqualTo("new-cat");
             assertThat(result.triggerEvents()).containsExactly("ReviewSubmitted");
             assertThat(result.criteria()).isEqualTo("New prompt");
 
@@ -851,7 +719,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("New Name");
-            assertThat(persisted.get().getCategory()).isEqualTo("new-cat");
             assertThat(persisted.get().getCriteria()).isEqualTo("New prompt");
         }
 
@@ -861,7 +728,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn404() {
             ensureAdminMembership(workspace);
 
-            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null, null, null);
 
             webTestClient
                 .patch()
@@ -878,9 +745,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturn400ForNameTooShort() {
             ensureAdminMembership(workspace);
-            persistPractice("bad-update", "Name", "cat", true);
+            persistPractice("bad-update", "Name", true);
 
-            var request = new UpdatePracticeRequestDTO("AB", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("AB", null, null, null, null, null, null);
 
             ProblemDetail problem = webTestClient
                 .patch()
@@ -906,9 +773,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturn400ForWhitespaceOnlyName() {
             ensureAdminMembership(workspace);
-            persistPractice("ws-name", "Name", "cat", true);
+            persistPractice("ws-name", "Name", true);
 
-            var request = new UpdatePracticeRequestDTO("   ", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("   ", null, null, null, null, null, null);
 
             ProblemDetail problem = webTestClient
                 .patch()
@@ -934,9 +801,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturn400ForWhitespaceOnlyCriteria() {
             ensureAdminMembership(workspace);
-            persistPractice("ws-criteria", "Name", "cat", true);
+            persistPractice("ws-criteria", "Name", true);
 
-            var request = new UpdatePracticeRequestDTO(null, null, null, "   ", null);
+            var request = new UpdatePracticeRequestDTO(null, null, "   ", null, null, null, null);
 
             ProblemDetail problem = webTestClient
                 .patch()
@@ -962,9 +829,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturn400ForInvalidTriggerEventsInUpdate() {
             ensureAdminMembership(workspace);
-            persistPractice("update-events", "Name", "cat", true);
+            persistPractice("update-events", "Name", true);
 
-            var request = new UpdatePracticeRequestDTO(null, null, List.of("FakeEvent"), null, null);
+            var request = new UpdatePracticeRequestDTO(null, List.of("FakeEvent"), null, null, null, null, null);
 
             webTestClient
                 .patch()
@@ -982,9 +849,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
-            persistPractice("forbidden-update", "Name", "cat", true);
+            persistPractice("forbidden-update", "Name", true);
 
-            var request = new UpdatePracticeRequestDTO("New Name", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("New Name", null, null, null, null, null, null);
 
             webTestClient
                 .patch()
@@ -1000,7 +867,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Name", null, null, null, null, null, null);
 
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
@@ -1026,7 +893,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldSetActiveToFalse() {
             ensureAdminMembership(workspace);
-            persistPractice("deactivate-me", "Name", "cat", true);
+            persistPractice("deactivate-me", "Name", true);
 
             PracticeDTO result = webTestClient
                 .patch()
@@ -1057,7 +924,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldSetActiveToTrue() {
             ensureAdminMembership(workspace);
-            persistPractice("activate-me", "Name", "cat", false);
+            persistPractice("activate-me", "Name", false);
 
             PracticeDTO result = webTestClient
                 .patch()
@@ -1081,7 +948,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @DisplayName("is idempotent — setting active=true when already true")
         void shouldBeIdempotent() {
             ensureAdminMembership(workspace);
-            persistPractice("already-active", "Name", "cat", true);
+            persistPractice("already-active", "Name", true);
 
             PracticeDTO result = webTestClient
                 .patch()
@@ -1122,7 +989,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
-            persistPractice("forbidden-toggle", "Name", "cat", true);
+            persistPractice("forbidden-toggle", "Name", true);
 
             webTestClient
                 .patch()
@@ -1139,7 +1006,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void shouldReturn400ForNullActive() {
             ensureAdminMembership(workspace);
-            persistPractice("null-active", "Name", "cat", true);
+            persistPractice("null-active", "Name", true);
 
             // Send JSON with null active field
             webTestClient
@@ -1180,7 +1047,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @DisplayName("deletes a practice and verifies removal from database")
         void shouldDeletePractice() {
             ensureAdminMembership(workspace);
-            persistPractice("to-delete", "Delete Me", "cat", true);
+            persistPractice("to-delete", "Delete Me", true);
 
             webTestClient
                 .delete()
@@ -1215,7 +1082,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn403ForNonAdmin() {
             User memberUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
-            persistPractice("forbidden-delete", "Name", "cat", true);
+            persistPractice("forbidden-delete", "Name", true);
 
             webTestClient
                 .delete()
@@ -1368,7 +1235,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             practiceRepository.save(practice);
 
-            var request = new UpdatePracticeRequestDTO("Hacked Name", null, null, null, null);
+            var request = new UpdatePracticeRequestDTO("Hacked Name", null, null, null, null, null, null);
 
             webTestClient
                 .patch()
@@ -1379,6 +1246,543 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange()
                 .expectStatus()
                 .isNotFound();
+        }
+    }
+
+    // PRACTICE VERSIONING (SCD-2)
+
+    @Nested
+    @DisplayName("Practice criteria versioning (SCD-2)")
+    class CriteriaVersioning {
+
+        private List<PracticeRevision> revisionsFor(String slug) {
+            Long practiceId = practiceRepository
+                .findByWorkspaceIdAndSlug(workspace.getId(), slug)
+                .orElseThrow()
+                .getId();
+            return practiceRevisionRepository
+                .findAll()
+                .stream()
+                .filter(r -> r.getPractice().getId().equals(practiceId))
+                .sorted((a, b) -> Integer.compare(a.getRevisionNumber(), b.getRevisionNumber()))
+                .toList();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create appends revision 1 snapshotting the criteria")
+        void createAppendsRevisionOne() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validCreateRequest("versioned-practice"))
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            List<PracticeRevision> revisions = revisionsFor("versioned-practice");
+            assertThat(revisions).hasSize(1);
+            assertThat(revisions.get(0).getRevisionNumber()).isEqualTo(1);
+            assertThat(revisions.get(0).getCriteria()).isEqualTo("Detect if the PR follows best practices");
+            assertThat(revisions.get(0).getCreatedAt()).isNotNull();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("update with CHANGED criteria appends revision 2")
+        void changedCriteriaAppendsRevisionTwo() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validCreateRequest("evolving-practice"))
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            var request = new UpdatePracticeRequestDTO(
+                null,
+                null,
+                "A revised detection rubric",
+                null,
+                null,
+                null,
+                null
+            );
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "evolving-practice")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            List<PracticeRevision> revisions = revisionsFor("evolving-practice");
+            assertThat(revisions).hasSize(2);
+            assertThat(revisions).extracting(PracticeRevision::getRevisionNumber).containsExactly(1, 2);
+            assertThat(revisions.get(0).getCriteria()).isEqualTo("Detect if the PR follows best practices");
+            assertThat(revisions.get(1).getCriteria()).isEqualTo("A revised detection rubric");
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("update that does NOT change criteria appends no new revision")
+        void unchangedCriteriaAppendsNoRevision() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validCreateRequest("stable-practice"))
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            // Patch only the name — criteria is untouched (null in the PATCH body).
+            var request = new UpdatePracticeRequestDTO("Renamed Practice", null, null, null, null, null, null);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "stable-practice")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            List<PracticeRevision> revisions = revisionsFor("stable-practice");
+            assertThat(revisions).hasSize(1);
+            assertThat(revisions.get(0).getRevisionNumber()).isEqualTo(1);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("update sending the SAME criteria value appends no new revision")
+        void identicalCriteriaValueAppendsNoRevision() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validCreateRequest("noop-criteria-practice"))
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            // Resend the exact same criteria text — the service compares values, so this is a no-op revision-wise.
+            var request = new UpdatePracticeRequestDTO(
+                null,
+                null,
+                "Detect if the PR follows best practices",
+                null,
+                null,
+                null,
+                null
+            );
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "noop-criteria-practice")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            assertThat(revisionsFor("noop-criteria-practice")).hasSize(1);
+        }
+
+        @Test
+        @DisplayName(
+            "two criteria edits racing on the same practice both persist with distinct numbers (no poisoned tx)"
+        )
+        void concurrentCriteriaEditsBothPersistDistinctNumbers() throws Exception {
+            // Drive two concurrent updatePractice calls (each its OWN transaction) with DIFFERENT criteria on
+            // the SAME practice. Both want to append a new revision; without the per-practice row lock they
+            // would compute the same next number and one would die with UnexpectedRollbackException (the
+            // poisoned-transaction bug). With the SELECT ... FOR UPDATE serialisation, the second blocks until
+            // the first commits, reads the now-current max, and appends a distinct, gap-free number.
+            persistPractice("raced-practice", "Raced", true); // revision 1 is created lazily on first criteria edit
+            var ctx = de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext.fromWorkspace(
+                workspace,
+                java.util.Set.of(de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.ADMIN),
+                null
+            );
+
+            // Snapshot revision 1 first (mirrors create) so the race is over revisions 2 and 3.
+            practiceService.updatePractice(
+                ctx,
+                "raced-practice",
+                new UpdatePracticeRequestDTO(null, null, "baseline criteria", null, null, null, null)
+            );
+
+            int threads = 2;
+            var startGate = new java.util.concurrent.CountDownLatch(1);
+            var done = new java.util.concurrent.CountDownLatch(threads);
+            var pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+            var failures = java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
+
+            try {
+                for (int i = 0; i < threads; i++) {
+                    final String criteria = "concurrent edit " + i;
+                    pool.submit(() -> {
+                        try {
+                            startGate.await();
+                            practiceService.updatePractice(
+                                ctx,
+                                "raced-practice",
+                                new UpdatePracticeRequestDTO(null, null, criteria, null, null, null, null)
+                            );
+                        } catch (Throwable t) {
+                            failures.add(t);
+                        } finally {
+                            done.countDown();
+                        }
+                    });
+                }
+                startGate.countDown();
+                assertThat(done.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            } finally {
+                pool.shutdownNow();
+            }
+
+            assertThat(failures).as("no concurrent edit should throw UnexpectedRollbackException").isEmpty();
+            List<PracticeRevision> revisions = revisionsFor("raced-practice");
+            // revision 1 (baseline edit) + two concurrent edits = three rows, all distinct and gap-free.
+            assertThat(revisions)
+                .extracting(PracticeRevision::getRevisionNumber)
+                .doesNotHaveDuplicates()
+                .containsExactly(1, 2, 3);
+        }
+    }
+
+    // TRIGGER-EVENT / FOCUS COMPATIBILITY (validated against the MERGED state)
+
+    @Nested
+    @DisplayName("Trigger events must be compatible with the practice focus")
+    class TriggerFocusCompatibility {
+
+        @Test
+        @WithAdminUser
+        @DisplayName("PATCH artifactType=ISSUE on a PR practice with PR-only triggers → 400 (merged-state check)")
+        void changingFocusToIssueWithStalePrTriggersIsRejected() {
+            // The PR practice keeps its previously-saved PR-only trigger; flipping the focus to ISSUE without
+            // also changing the triggers leaves a config that can never fire. The check reads the MERGED state
+            // (existing triggerEvents + new artifactType) and must reject — this pins that ordering.
+            ensureAdminMembership(workspace);
+            persistPractice("focus-flip", "Focus Flip", true); // saved with PR trigger PullRequestCreated
+
+            var request = new UpdatePracticeRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE,
+                null,
+                null
+            );
+
+            ProblemDetail problem = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "focus-flip")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getStatus()).isEqualTo(400);
+            assertThat(problem.getDetail()).contains("PullRequestCreated").contains("not valid for a ISSUE");
+            // The stale PR trigger blocked the focus change — nothing was persisted.
+            assertThat(
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
+                    .orElseThrow()
+                    .getArtifactType()
+            ).isEqualTo(de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create an ISSUE practice with a PR-only trigger event → 400")
+        void creatingIssuePracticeWithPrTriggerIsRejected() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "issue-with-pr-trigger",
+                "Issue With PR Trigger",
+                List.of("ReviewSubmitted"), // a PR-only event, invalid for an ISSUE focus
+                "Detect something",
+                null,
+                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE,
+                null,
+                null
+            );
+
+            ProblemDetail problem = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getStatus()).isEqualTo(400);
+            assertThat(problem.getDetail()).contains("ReviewSubmitted").contains("not valid for a ISSUE");
+            assertThat(
+                practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "issue-with-pr-trigger")
+            ).isEmpty();
+        }
+    }
+
+    // LEARNER ANTI-LEAK PROJECTION
+
+    @Nested
+    @DisplayName("GET /practices/learner — anti-leak projection")
+    class LearnerProjection {
+
+        @Test
+        @WithAdminUser
+        @DisplayName("raw JSON omits criteria but carries why-it-matters and what-good-looks-like")
+        void learnerViewHidesCriteriaExposesRationale() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "learner-practice",
+                "Learner Practice",
+                List.of("PullRequestCreated"),
+                "INTERNAL detection rubric — must never reach a learner",
+                null,
+                null,
+                "Small, focused PRs are easier to review.",
+                "A PR that changes one thing and explains why in the description."
+            );
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            String rawJson = webTestClient
+                .get()
+                .uri(BASE_URI + "/learner", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(rawJson).isNotNull();
+            // Anti-leak invariant: the detection rubric must be physically absent from the learner payload.
+            assertThat(rawJson).doesNotContain("\"criteria\"");
+            assertThat(rawJson).doesNotContain("INTERNAL detection rubric");
+            // The learner-facing rationale + exemplar ARE present with their exact values.
+            assertThat(rawJson).contains("whyItMatters");
+            assertThat(rawJson).contains("whatGoodLooksLike");
+            assertThat(rawJson).contains("Small, focused PRs are easier to review.");
+            assertThat(rawJson).contains("A PR that changes one thing and explains why in the description.");
+        }
+    }
+
+    // AUTHORING GUARD — detector vocabulary must not leak into learner-facing copy
+
+    @Nested
+    @DisplayName("Authoring guard on whatGoodLooksLike")
+    class AuthoringGuard {
+
+        private CreatePracticeRequestDTO createWithExemplar(String slug, String whatGoodLooksLike) {
+            return new CreatePracticeRequestDTO(
+                slug,
+                "Guard Practice",
+                List.of("PullRequestCreated"),
+                "Detect prompt",
+                null,
+                null,
+                "Why it matters.",
+                whatGoodLooksLike
+            );
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create with PRESENT in whatGoodLooksLike → 400")
+        void rejectsPresentTokenOnCreate() {
+            ensureAdminMembership(workspace);
+
+            ProblemDetail problem = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createWithExemplar("guard-present", "The error handler is PRESENT in every case."))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            // The guard's IllegalArgumentException is mapped to 400 by the workspace-scoped advice.
+            assertThat(problem.getStatus()).isEqualTo(400);
+            assertThat(problem.getTitle()).isEqualTo("Invalid workspace request");
+            // Nothing persisted.
+            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "guard-present")).isEmpty();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create with GOOD/BAD/ABSENT in whatGoodLooksLike → 400")
+        void rejectsAssessmentTokensOnCreate() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createWithExemplar("guard-assessment", "Flagged GOOD, BAD, or ABSENT by the detector."))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create with detector vocab in whyItMatters → 400 (whyItMatters is also learner-facing)")
+        void rejectsVocabInWhyItMatters() {
+            ensureAdminMembership(workspace);
+
+            var dto = new CreatePracticeRequestDTO(
+                "guard-why",
+                "Guard Practice",
+                List.of("PullRequestCreated"),
+                "Detect prompt",
+                null,
+                null,
+                "The error handler is PRESENT in every case.", // whyItMatters leaks detector vocab
+                "A clean exemplar." // whatGoodLooksLike is clean
+            );
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "guard-why")).isEmpty();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create with NOT_APPLICABLE in whatGoodLooksLike → 400")
+        void rejectsNotApplicableTokenOnCreate() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(createWithExemplar("guard-not-applicable", "Marked NOT_APPLICABLE here."))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("update that introduces PRESENT into whatGoodLooksLike → 400")
+        void rejectsPresentTokenOnUpdate() {
+            ensureAdminMembership(workspace);
+            persistPractice("guard-update", "Guard Update", true);
+
+            var request = new UpdatePracticeRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "This behaviour is PRESENT."
+            );
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "guard-update")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("clean whatGoodLooksLike succeeds")
+        void acceptsCleanExemplar() {
+            ensureAdminMembership(workspace);
+
+            PracticeDTO result = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(
+                    createWithExemplar(
+                        "guard-clean",
+                        // Ordinary lowercase prose using "good" and "bad" as English words must NOT be rejected —
+                        // the guard matches only standalone ALL-CAPS enum tokens.
+                        "A good PR description states the problem, the change, and how it was verified, so a bad surprise is avoided."
+                    )
+                )
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.slug()).isEqualTo("guard-clean");
         }
     }
 }

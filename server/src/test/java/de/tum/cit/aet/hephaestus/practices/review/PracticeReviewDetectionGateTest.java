@@ -64,7 +64,16 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, "", 15);
+        PracticeReviewProperties properties = new PracticeReviewProperties(
+            false,
+            true,
+            false,
+            "",
+            15,
+            false,
+            false,
+            false
+        );
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
@@ -146,7 +155,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private Workspace setupThroughPracticeMatching(PullRequest pr, Practice... practices) {
         Workspace workspace = createWorkspace();
         when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-        when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
+        when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
         return workspace;
     }
@@ -160,6 +169,11 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void skipDraftPr() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
+            // The draft gate runs after workspace resolution so it can read the per-workspace
+            // skipDrafts override (which inherits the property default of true here).
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(
+                Optional.of(createWorkspace())
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -169,7 +183,16 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
         @Test
         void continueWhenSkipDraftsDisabled() {
-            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, "", 15);
+            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(
+                false,
+                false,
+                false,
+                "",
+                15,
+                false,
+                false,
+                false
+            );
             PracticeReviewDetectionGate noSkipGate = new PracticeReviewDetectionGate(
                 noSkipProps,
                 userRoleChecker,
@@ -191,13 +214,19 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        void draftSkipPreventsDbCalls() {
+        void draftSkipShortCircuitsBeforeExpensiveChecks() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
+            // The draft gate runs after (cheap) workspace resolution but before the expensive
+            // agent-config / practice / role checks — assert those are never touched.
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(
+                Optional.of(createWorkspace())
+            );
 
-            gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
-            verifyNoInteractions(workspaceResolver, agentConfigChecker, practiceRepository, userRoleChecker);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("draft PR");
+            verifyNoInteractions(agentConfigChecker, practiceRepository, userRoleChecker);
         }
     }
 
@@ -302,12 +331,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
+            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.MANUAL);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no enabled agent config");
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no runnable practice config");
         }
 
         @Test
@@ -316,12 +345,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
+            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no enabled agent config");
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no runnable practice config");
         }
     }
 
@@ -333,12 +362,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
+            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no enabled agent config");
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no runnable practice config");
         }
     }
 
@@ -362,7 +391,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
+            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
 
             Practice practice = new Practice();
             practice.setTriggerEvents(null);
@@ -382,7 +411,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice nonMatching = createPractice("ReviewSubmitted");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
+            when(agentConfigChecker.hasRunnablePracticeConfig(WORKSPACE_ID, null)).thenReturn(true);
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
                 List.of(matching1, matching2, nonMatching)
             );
@@ -408,7 +437,16 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
         @Test
         void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "", 15);
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(
+                true,
+                true,
+                false,
+                "",
+                15,
+                false,
+                false,
+                false
+            );
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,
@@ -580,6 +618,50 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
                 "no assignee with role: " + PRACTICE_REVIEW_ROLE
             );
+        }
+
+        @Test
+        void skipWhenAssigneeHalfSyncedNoProvider() {
+            // Fail-safe guard: an assignee whose provider didn't sync has no resolvable identity, so the
+            // gate must skip it WITHOUT a role lookup (a null subject would otherwise be passed to hasRole).
+            PullRequest pr = createPullRequest();
+            Practice practice = createPractice(TRIGGER_EVENT);
+            setupThroughPracticeMatching(pr, practice);
+
+            User assignee = createUser("half-synced");
+            assignee.setProvider(null);
+            pr.setAssignees(Set.of(assignee));
+            when(userRoleChecker.isHealthy()).thenReturn(true);
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
+                "no assignee with role: " + PRACTICE_REVIEW_ROLE
+            );
+            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
+        }
+
+        @Test
+        void skipWhenAssigneeHalfSyncedNoNativeId() {
+            // Same fail-safe guard for the other half of the (provider, subject) identity: a missing
+            // native id also short-circuits before any role lookup.
+            PullRequest pr = createPullRequest();
+            Practice practice = createPractice(TRIGGER_EVENT);
+            setupThroughPracticeMatching(pr, practice);
+
+            User assignee = createUser("half-synced");
+            assignee.setNativeId(null);
+            pr.setAssignees(Set.of(assignee));
+            when(userRoleChecker.isHealthy()).thenReturn(true);
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
+                "no assignee with role: " + PRACTICE_REVIEW_ROLE
+            );
+            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
         }
 
         @Test

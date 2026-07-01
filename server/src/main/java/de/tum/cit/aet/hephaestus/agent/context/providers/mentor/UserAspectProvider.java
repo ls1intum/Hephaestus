@@ -22,19 +22,22 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/user.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/user.json} for {@link MentorChatRequest}.
  *
- * <p>Replaces the legacy intelligence-service {@code activity-summary} tool: same
- * fields, same heuristics for {@code insights} and {@code suggestedReflectionTopics}. The
- * provider does NOT decide whether a piece of data is relevant — the agent does, given the
+ * <p>The provider does NOT decide whether a piece of data is relevant — the agent does, given the
  * full week/last-week numbers and a small set of pre-generated insight strings.
  *
- * <p>Cache key: {@code workspaceId + ":" + contributorId} (1-D as specified by the plan; the
+ * <p>Cache key: {@code workspaceId + ":" + developerId} (1-D as specified by the plan; the
  * data is per-user per-workspace).
  */
 @Component
 @RequiredArgsConstructor
 public class UserAspectProvider implements ContentProvider {
+
+    @Override
+    public String connectorId() {
+        return "core";
+    }
 
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "user.json";
@@ -66,32 +69,35 @@ public class UserAspectProvider implements ContentProvider {
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
-        String key = req.workspaceId() + ":" + req.contributorId();
+        String key = req.workspaceId() + ":" + req.developerId();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent — closes the get/build/put race: an invalidation event
         // landing between a separate get-miss and put would otherwise repopulate the cache with
         // stale data for the full TTL. Caffeine's loader is key-locked.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
-            : buildPayload(req.workspaceId(), req.contributorId());
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+            : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
+            // An ObjectNode of longs/strings is effectively always serializable, so this is defensive only.
+            // Note: because required()==false, WorkspaceContextBuilder catches this and logs-and-continues
+            // rather than aborting the turn — it does NOT hard-fail the job despite the throw shape here.
             throw new IllegalStateException("Failed to serialize user aspect", e);
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
-    public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
+    /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
+    public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(contributorId)
-            .orElseThrow(() -> new EntityNotFoundException("User", contributorId.toString()));
+            .findById(developerId)
+            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
 
         Instant now = Instant.now();
         Instant weekAgo = now.minus(7, ChronoUnit.DAYS);
         Instant twoWeeksAgo = now.minus(14, ChronoUnit.DAYS);
 
-        MentorUserCounts c = queryRepository.fetchUserCounts(workspaceId, contributorId, twoWeeksAgo, weekAgo, now);
+        MentorUserCounts c = queryRepository.fetchUserCounts(workspaceId, developerId, twoWeeksAgo, weekAgo, now);
         long openPRs = c.openPRs();
         long mergedThisWeek = c.mergedThisWeek();
         long mergedLastWeek = c.mergedLastWeek();
@@ -139,8 +145,7 @@ public class UserAspectProvider implements ContentProvider {
     }
 
     /**
-     * Pure function turning the raw counts into a small set of hand-crafted nudges. Mirrors
-     * {@code generateActivityInsights} in {@code activity-summary.tool.ts}. Heuristics live
+     * Pure function turning the raw counts into a small set of hand-crafted nudges. Heuristics live
      * here (not in the agent) so the wire payload is identical across deployments.
      */
     static ActivityInsights generateInsights(

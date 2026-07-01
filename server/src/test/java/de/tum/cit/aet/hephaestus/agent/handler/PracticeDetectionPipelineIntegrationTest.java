@@ -27,11 +27,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -69,7 +69,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Autowired
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -127,13 +127,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         config.setTimeoutSeconds(300);
         config = agentConfigRepository.save(config);
 
-        // Git entities
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
 
-        User contributor = TestUserFactory.createUser(500L, "pipeline-author", provider);
-        contributor = userRepository.save(contributor);
+        User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
+        developer = userRepository.save(developer);
 
         Repository repo = new Repository();
         repo.setNativeId(4001L);
@@ -160,7 +159,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             now,
             now,
             now,
-            contributor.getId(),
+            developer.getId(),
             repo.getId(),
             null,
             null,
@@ -182,7 +181,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         );
         prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 50).orElseThrow().getId();
 
-        // Create agent job with metadata
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
         agentJob.setConfig(config);
@@ -212,7 +210,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
-        p.setCategory("test");
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
@@ -232,14 +229,16 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 {
                   "practiceSlug": "pr-description-quality",
                   "title": "Good PR description",
-                  "verdict": "POSITIVE",
+                  "presence": "PRESENT",
+                  "assessment": "GOOD",
                   "severity": "INFO",
                   "confidence": 0.95
                 },
                 {
                   "practiceSlug": "error-handling",
                   "title": "Missing null check",
-                  "verdict": "NEGATIVE",
+                  "presence": "ABSENT",
+                  "assessment": "BAD",
                   "severity": "MAJOR",
                   "confidence": 0.85,
                   "reasoning": "The method does not check for null input.",
@@ -260,18 +259,18 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
-            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
+            );
 
             handler.deliver(agentJob);
 
-            // Verify findings persisted
-            List<PracticeFinding> findings = practiceFindingRepository.findAll();
+            List<Observation> findings = observationRepository.findAll();
             assertThat(findings).hasSize(2);
             assertThat(findings)
-                .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.NEGATIVE);
+                .extracting(Observation::getPresence)
+                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
 
-            // Verify completion event
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
@@ -279,16 +278,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             assertThat(events.get(0).findingsInserted()).isEqualTo(2);
             assertThat(events.get(0).hasNegative()).isTrue();
 
-            // Verify comment poster called with mrNote
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
+            verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), any());
 
-            // Verify diff notes posted (has negative findings + first analysis)
-            verify(diffNotePoster).postDiffNotes(eq(agentJob), any());
-
-            // Verify delivery status set on in-memory object
-            // (DB persistence happens in AgentJobExecutor, not in handler.deliver())
+            // DeliveryStatus and DB persistence happen in AgentJobExecutor.persistDeliveryStatus(), not in
+            // handler.deliver() — so on the in-memory object the commentId is set but the status stays null.
             assertThat(agentJob.getDeliveryCommentId()).isEqualTo("comment-123");
-            // DeliveryStatus is set by AgentJobExecutor.persistDeliveryStatus(), not by handler.deliver()
             assertThat(agentJob.getDeliveryStatus()).isNull();
         }
 
@@ -300,29 +295,33 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "verdict": "POSITIVE",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Proper error handling",
-                      "verdict": "POSITIVE",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     }
                   ]
                 }""";
             setJobOutput(output);
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-approval");
 
             handler.deliver(agentJob);
 
-            // Findings still persisted
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Approval comment posted (no negatives → approval summary), no diff notes
+            // Approval comment posted (no negatives → approval summary). Inline notes are reconciled
+            // unconditionally on an OPEN PR with an EMPTY list — clearing any prior run's stale
+            // line-numbered notes while posting no new ones.
             verify(commentPoster).postFormattedBody(any(), any());
-            verify(diffNotePoster, never()).postDiffNotes(any(), any());
+            verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
     }
 
@@ -337,7 +336,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No valid findings");
 
-            assertThat(practiceFindingRepository.findAll()).isEmpty();
+            assertThat(observationRepository.findAll()).isEmpty();
             verify(commentPoster, never()).postFormattedBody(any(), any());
         }
 
@@ -349,21 +348,24 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "verdict": "POSITIVE",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
                       "title": "Unknown practice",
-                      "verdict": "POSITIVE",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Good handling",
-                      "verdict": "NEGATIVE",
+                      "presence": "ABSENT",
+                      "assessment": "BAD",
                       "severity": "MINOR",
                       "confidence": 0.8
                     }
@@ -375,7 +377,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // 2 persisted (known slugs), 1 discarded (unknown)
-            List<PracticeFinding> findings = practiceFindingRepository.findAll();
+            List<Observation> findings = observationRepository.findAll();
             assertThat(findings).hasSize(2);
 
             List<PracticeDetectionCompletedEvent> events = applicationEvents
@@ -388,7 +390,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void closedPrSkipsDelivery() {
-            // Update PR state to CLOSED
             var pr = pullRequestRepository.findById(prId).orElseThrow();
             pullRequestRepository.upsertCore(
                 8001L,
@@ -431,11 +432,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // Findings ARE persisted (deliver() persists first, then posts)
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
             // Comment NOT posted (FeedbackDeliveryService skips closed PRs)
             verify(commentPoster, never()).postFormattedBody(any(), any());
-            verify(diffNotePoster, never()).postDiffNotes(any(), any());
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
 
             // Delivery status not set (feedback was skipped)
             assertThat(agentJob.getDeliveryCommentId()).isNull();
@@ -451,19 +452,18 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
-            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
+            );
 
-            // First delivery
             handler.deliver(agentJob);
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Second delivery — same job, same output
+            // Re-delivering the same job inserts no duplicates (ON CONFLICT DO NOTHING).
             handler.deliver(agentJob);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
-            // Still only 2 findings (ON CONFLICT DO NOTHING)
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
-
-            // Event published twice (once per deliver() call)
+            // Event published once per deliver() call.
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();

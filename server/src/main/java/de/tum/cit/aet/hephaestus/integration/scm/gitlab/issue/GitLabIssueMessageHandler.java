@@ -22,7 +22,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Processes both {@code event_type: "issue"} and {@code event_type: "confidential_issue"} payloads.
  * Both arrive on the same NATS subject ({@code object_kind: "issue"}).
  * <p>
- * Confidential issues are skipped entirely — they are never stored in the database.
+ * Confidential issue events are not ingested — an event whose current {@code confidential} flag is set
+ * is skipped here. This scopes the guarantee to ingestion: a row already stored while non-confidential is
+ * not purged by this handler when a later {@code update} flips {@code confidential=true} (that
+ * purge/redaction would live in {@link GitLabIssueProcessor}, not in this router).
  * <p>
  * Routes to {@link GitLabIssueProcessor} based on the action:
  * <ul>
@@ -96,7 +99,9 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
         }
 
         switch (action) {
-            case OPEN, UPDATE -> issueProcessor.process(event, context);
+            case OPEN -> issueProcessor.process(event, context);
+            // UPDATE carries the changes.labels diff — processUpdated also emits IssueLabeled per added label.
+            case UPDATE -> issueProcessor.processUpdated(event, context);
             case CLOSE -> issueProcessor.processClosed(event, context);
             case REOPEN -> issueProcessor.processReopened(event, context);
             default -> log.debug("Unhandled issue action: projectPath={}, action={}", safeProjectPath, action);

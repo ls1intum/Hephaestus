@@ -12,14 +12,14 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guardrail for the workspace ABI rename ({@code .context/} → {@code context/target/}).
- * Scans the bundled Pi runtime resources (orchestrator + runner) for any remaining legacy
- * references that would slip past the rolling-deploy contract documented in
- * {@code docs/contributor/agent/workspace-abi.mdx}.
+ * Guardrail for the workspace ABI context prefix. Scans the bundled Pi runtime resources
+ * (orchestrator + runner) for any legacy {@code .context/} reference that would violate the
+ * rolling-deploy contract documented in {@code docs/developer/agent/workspace-abi.mdx}; the
+ * canonical prefix is {@code inputs/context/}.
  */
 class WorkspaceAbiPathsTest extends HephaestusArchitectureTest {
 
-    /** Matches references to the legacy {@code .context/} prefix that are NOT {@code context/target/}. */
+    /** Matches references to the legacy {@code .context/} prefix that are NOT {@code inputs/context/}. */
     private static final Pattern LEGACY_CONTEXT_PREFIX = Pattern.compile("(?<![A-Za-z0-9_/.])\\.context/");
 
     @Test

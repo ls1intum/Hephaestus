@@ -1,0 +1,42 @@
+# Reads a pull request's review threads for correlation-key reconciliation.
+# Used by GithubInlineFindingChannel to index this reviewer's prior threads (matched
+# by the correlation key embedded in the first comment's body) before posting, and to
+# detect bot threads that the current run no longer emits so they can be minimized.
+# Only the first comment per thread is needed — the bot's own anchor comment carries the
+# correlation-key tag; a thread without that tag is not ours and is left untouched.
+
+query GetPullRequestReviewThreads(
+    $owner: String!,
+    $name: String!,
+    $number: Int!,
+    $first: Int!,
+    $after: String
+) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+            reviewThreads(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    isResolved
+                    isOutdated
+                    comments(first: 1) {
+                        nodes {
+                            id
+                            body
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

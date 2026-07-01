@@ -1,12 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
  *     {
  *       "practiceSlug": "pr-description-quality",
  *       "title": "Good PR description",
- *       "verdict": "POSITIVE",
+ *       "presence": "PRESENT",
+ *       "assessment": "GOOD",
  *       "severity": "INFO",
  *       "confidence": 0.95,
  *       "evidence": { ... },
@@ -53,11 +56,55 @@ public class PracticeDetectionResultParser {
     private static final int MAX_GUIDANCE_LENGTH = 5_000;
     private static final int MAX_EVIDENCE_BYTES = 64 * 1024;
 
+    /** Upper bound on the raw agent output we will materialize/sanitize/parse in memory. */
+    private static final int MAX_RAW_OUTPUT_LENGTH = 1_000_000;
+
+    /**
+     * Workspace-relative prefix of the collected-output dir, derived from the ABI's absolute {@code OUTPUT_PATH}
+     * so the firewall below tracks a rename of the output dir instead of hardcoding {@code "out/"}.
+     * {@code OUTPUT_PATH} = {@code WORKSPACE_ROOT + "/out"}, so strip the root and the leading slash, then append one.
+     */
+    private static final String OUTPUT_RELATIVE_PREFIX =
+        de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.OUTPUT_PATH.substring(
+            de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.WORKSPACE_ROOT.length() + 1
+        ) +
+        "/";
+
     /** Maximum length for the pre-rendered MR/PR summary note (matches PullRequestCommentPoster.MAX_BODY_LENGTH). */
     static final int MAX_MR_NOTE_LENGTH = 60_000;
 
     /** Maximum length for a single diff note body. */
     static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
+
+    /**
+     * The practices whose {@code BAD} finding may legitimately present as a merge-blocker
+     * ({@code CRITICAL}/{@code MAJOR}, "fix before merging") — i.e. a problem here can break CORRECTNESS,
+     * SECURITY, or DATA INTEGRITY. Every other (craft / process / authoring) practice is ADVISORY: the
+     * advisory ceiling in {@link ValidatedFinding#coerceCoherence(boolean, boolean)} caps its band to
+     * {@code MINOR} so it lands as a suggestion, never a merge-block.
+     *
+     * <p>This is a consequence-class delivery policy, general across project kinds (no language/project
+     * coupling), co-located with the other delivery-shaping rules. A confidence gate cannot separate
+     * advisory from blocking gaps — a craft critique and a real defect are emitted at the same high
+     * confidence — so the consequence class, not confidence, is the discriminator that keeps the
+     * "fix before merging" signal meaningful. Pinned by {@code PracticeDetectionResultParserTest}.
+     */
+    static final Set<String> BLOCKING_ELIGIBLE_PRACTICES = Set.of(
+        // Correctness: a swallowed error, an unguarded boundary, or a chosen crash on uncontrolled input
+        // is a real defect a reviewer should be able to block on.
+        "handles-errors-instead-of-swallowing-them",
+        "validates-inputs-and-edge-cases-at-the-boundary",
+        "avoids-unsafe-panics-and-chosen-crashes",
+        // Security / data integrity.
+        "validates-and-escapes-untrusted-input",
+        "avoids-insecure-defaults-and-over-broad-permissions",
+        // A hard-coded credential / secret is a security defect a reviewer must be able to block on; the
+        // synthetic secret finding is injected at CRITICAL/MAJOR and must keep that band through coercion.
+        "hardcoded-secrets",
+        // A dishonest test (always-green, asserting nothing, disabled) actively HIDES correctness defects —
+        // worse than a missing test, because it manufactures false safety — so it keeps blocking weight.
+        "keeps-the-test-suite-honest"
+    );
 
     /** Maximum number of inline delivery notes per job. This bounds comment API fan-out, not finding detection. */
     static final int MAX_DELIVERY_DIFF_NOTES = 30;
@@ -89,6 +136,12 @@ public class PracticeDetectionResultParser {
         String rawOutputText = rawOutputNode.asString();
         if (rawOutputText.isBlank()) {
             return ParseResult.empty("rawOutput is blank");
+        }
+        // Bound the whole pipeline (readTree AND sanitizeJsonEscapes both walk the full string), not just the
+        // fallback extractor — a runaway/oversized sandbox output must not be fully materialized in memory.
+        if (rawOutputText.length() > MAX_RAW_OUTPUT_LENGTH) {
+            log.warn("parse: rawOutput too large ({} chars), skipping", rawOutputText.length());
+            return ParseResult.empty("rawOutput too large");
         }
 
         // rawOutput is JSON but LLMs sometimes emit Swift-style \(var) interpolation that strict
@@ -175,12 +228,12 @@ public class PracticeDetectionResultParser {
         }
         String filePath = filePathNode.asString();
 
-        // Reject internal workspace paths — agent sometimes hallucinates context/target/ or .analysis/ paths
+        // Reject internal workspace paths — agent sometimes hallucinates inputs/context/ or work/analysis/ paths
         if (
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX) ||
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX) ||
-            filePath.startsWith(".output/") ||
+            filePath.startsWith(OUTPUT_RELATIVE_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX)
         ) {
@@ -264,11 +317,19 @@ public class PracticeDetectionResultParser {
             title = title.substring(0, MAX_TITLE_LENGTH - 3) + "...";
         }
 
-        // Required: verdict
-        Verdict verdict = parseEnum(entry, "verdict", Verdict.class);
+        // Required: presence
+        Presence presence = parseEnum(entry, "presence", Presence.class);
 
-        // Required: severity
-        Severity severity = parseEnum(entry, "severity", Severity.class);
+        // Required (unless NOT_APPLICABLE): assessment. The detector decides GOOD/BAD per observation by
+        // reading the criteria + what_good_looks_like. NOT_APPLICABLE has no valence (forced null); any other
+        // presence with a missing/blank assessment is genuinely malformed and the entry is discarded.
+        Assessment assessment = parseAssessment(entry, presence);
+
+        // Optional: severity. Severity is a coaching band only for a BAD finding (coerceCoherence forces null
+        // otherwise), and the model routinely omits it elsewhere. A missing/null severity defaults to INFO
+        // rather than discarding an otherwise-valid finding; coerceCoherence then re-derives the final band
+        // (e.g. a BAD with no severity floors to MINOR, and a non-BAD finding's severity is nulled out).
+        Severity severity = parseSeverityOrDefault(entry);
 
         // Required: confidence
         float confidence = parseConfidence(entry);
@@ -319,7 +380,8 @@ public class PracticeDetectionResultParser {
         return new ValidatedFinding(
             practiceSlug,
             title,
-            verdict,
+            presence,
+            assessment,
             severity,
             confidence,
             evidence,
@@ -327,6 +389,19 @@ public class PracticeDetectionResultParser {
             guidance,
             suggestedDiffNotes
         );
+    }
+
+    /**
+     * Parses the {@code assessment} valence. NULL iff presence is {@link Presence#NOT_APPLICABLE} (an
+     * inapplicable practice has no valence — any assessment supplied there is ignored). For any other
+     * presence the detector must supply a recognised {@code GOOD}/{@code BAD}; a missing or unrecognised
+     * value discards the entry (genuinely malformed output worth surfacing).
+     */
+    private static Assessment parseAssessment(JsonNode entry, Presence presence) {
+        if (presence == Presence.NOT_APPLICABLE) {
+            return null;
+        }
+        return parseEnum(entry, "assessment", Assessment.class);
     }
 
     private static String textField(JsonNode entry, String field) {
@@ -344,6 +419,21 @@ public class PracticeDetectionResultParser {
         }
         String text = node.asString();
         return text.isBlank() ? null : text;
+    }
+
+    /**
+     * Parses the optional {@code severity}. A missing, null, or non-text value defaults to
+     * {@link Severity#INFO} — the model commonly omits severity on non-BAD findings, and
+     * {@link ValidatedFinding#coerceCoherence(boolean, boolean)} re-derives the final band regardless (nulling it
+     * out unless {@code assessment == BAD}), so discarding such a finding would silently drop valid
+     * coaching. A present but unrecognised value still fails the entry (genuinely malformed output).
+     */
+    private static Severity parseSeverityOrDefault(JsonNode entry) {
+        JsonNode node = entry.get("severity");
+        if (node == null || node.isNull() || !node.isString()) {
+            return Severity.INFO;
+        }
+        return parseEnum(entry, "severity", Severity.class);
     }
 
     private static <E extends Enum<E>> E parseEnum(JsonNode entry, String field, Class<E> enumType) {
@@ -426,8 +516,8 @@ public class PracticeDetectionResultParser {
      */
     @Nullable
     private JsonNode extractJsonFromText(String text) {
-        // Guard: skip absurdly large inputs (agent rawOutput shouldn't exceed 1MB)
-        if (text.length() > 1_000_000) {
+        // Guard: skip absurdly large inputs (agent rawOutput shouldn't exceed MAX_RAW_OUTPUT_LENGTH)
+        if (text.length() > MAX_RAW_OUTPUT_LENGTH) {
             log.warn("extractJsonFromText: input too large ({} chars), skipping", text.length());
             return null;
         }
@@ -472,17 +562,153 @@ public class PracticeDetectionResultParser {
         }
     }
 
+    /**
+     * @param recurrenceKey the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}
+     *     identity, stamped by {@code PullRequestReviewHandler} from the value
+     *     {@code PracticeDetectionDeliveryService.deliver} already computed (never recomputed downstream, so it
+     *     cannot drift from the persisted finding). {@code null} until stamped — the parser leaves it unset.
+     */
     public record ValidatedFinding(
         String practiceSlug,
         String title,
-        Verdict verdict,
-        Severity severity,
+        Presence presence,
+        @Nullable Assessment assessment,
+        @Nullable Severity severity,
         float confidence,
         JsonNode evidence,
         String reasoning,
         String guidance,
-        List<DiffNote> suggestedDiffNotes
-    ) {}
+        List<DiffNote> suggestedDiffNotes,
+        @Nullable String recurrenceKey
+    ) {
+        /** Pre-correlation compatibility shape: a finding with no correlation key yet (the parser's output). */
+        public ValidatedFinding(
+            String practiceSlug,
+            String title,
+            Presence presence,
+            @Nullable Assessment assessment,
+            @Nullable Severity severity,
+            float confidence,
+            JsonNode evidence,
+            String reasoning,
+            String guidance,
+            List<DiffNote> suggestedDiffNotes
+        ) {
+            this(
+                practiceSlug,
+                title,
+                presence,
+                assessment,
+                severity,
+                confidence,
+                evidence,
+                reasoning,
+                guidance,
+                suggestedDiffNotes,
+                null
+            );
+        }
+
+        /** Returns a copy stamped with {@code key}; all other components are preserved by reference. */
+        public ValidatedFinding withRecurrenceKey(@Nullable String key) {
+            return new ValidatedFinding(
+                practiceSlug,
+                title,
+                presence,
+                assessment,
+                severity,
+                confidence,
+                evidence,
+                reasoning,
+                guidance,
+                suggestedDiffNotes,
+                key
+            );
+        }
+
+        /**
+         * Returns a copy with {@code (presence, assessment, severity)} coerced to the system's coherence
+         * invariants, independent of what the (weak) model emitted:
+         * <ol>
+         *   <li><b>Defect-detector has no clean bill of health.</b> A practice declaring {@code DEFECT-DETECTOR
+         *       DISCIPLINE} either flags a defect ({@code PRESENT, BAD}) or abstains ({@code NOT_APPLICABLE}); a
+         *       model-emitted {@code PRESENT, GOOD} there is a clean bill of health that would ship as a false
+         *       strength — coerce it to {@code NOT_APPLICABLE} (assessment null).</li>
+         *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a {@code BAD} finding; it is
+         *       forced null otherwise, and a {@code BAD} that arrived as {@code INFO} (a defect with no band)
+         *       is raised to {@code MINOR}.</li>
+         *   <li><b>Advisory ceiling.</b> When {@code advisoryOnly} (the practice is craft/process/authoring, not
+         *       in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a {@code BAD} finding may never present as a
+         *       merge-blocker, so its {@code CRITICAL}/{@code MAJOR} band is capped to {@code MINOR}. This lands
+         *       the lesson as a suggestion rather than a "fix before merging" — reserving the blocking signal for
+         *       correctness/security/data-integrity practices so the rare real blocker is not drowned out by the
+         *       many high-confidence craft critiques. The coerced band is carried by the returned finding and is
+         *       what persists (and delivers).</li>
+         * </ol>
+         * Idempotent: a no-op coercion returns {@code this}. The list helper
+         * {@link PracticeDetectionResultParser#coerceCoherence(List, Set)} is the sole production entry point.
+         */
+        public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
+            Presence p = presence;
+            Assessment a = assessment;
+            String r = reasoning;
+            if (isDefectDetector && a == Assessment.GOOD) {
+                // A defect-detector practice only ever emits a problem (PRESENT, BAD) or NOT_APPLICABLE; it has
+                // no clean-bill-of-health strength. Any GOOD it emits — at either presence — is off-contract
+                // model noise, so downgrade to NOT_APPLICABLE rather than ship a false strength to the student.
+                p = Presence.NOT_APPLICABLE;
+                a = null;
+                r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
+            }
+            // For a normal practice, (ABSENT, GOOD) is a legitimate strength per ADR 0022 §1 — "bad behaviour
+            // avoided → clean" — and is preserved, NOT collapsed to NOT_APPLICABLE.
+            // assessment must be null exactly when presence is NOT_APPLICABLE.
+            if (p == Presence.NOT_APPLICABLE) {
+                a = null;
+            }
+            Severity s =
+                a == Assessment.BAD
+                    ? (severity == null || severity == Severity.INFO ? Severity.MINOR : severity)
+                    : null;
+            if (advisoryOnly && a == Assessment.BAD && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
+                s = Severity.MINOR;
+            }
+            if (p == presence && a == assessment && s == severity) {
+                return this;
+            }
+            return new ValidatedFinding(
+                practiceSlug,
+                title,
+                p,
+                a,
+                s,
+                confidence,
+                evidence,
+                r,
+                guidance,
+                suggestedDiffNotes,
+                recurrenceKey
+            );
+        }
+    }
+
+    /**
+     * Apply {@link ValidatedFinding#coerceCoherence(boolean, boolean)} to every finding, passing the per-finding
+     * defect-detector flag from {@code defectDetectorSlugs}. Returns a fresh mutable list (call sites mutate
+     * it downstream for fingerprint stamping). Shared by the PR and Issue handlers so the rule lives in one
+     * place and cannot drift between them.
+     */
+    public static List<ValidatedFinding> coerceCoherence(
+        List<ValidatedFinding> findings,
+        Set<String> defectDetectorSlugs
+    ) {
+        List<ValidatedFinding> out = new ArrayList<>(findings.size());
+        for (ValidatedFinding f : findings) {
+            boolean advisoryOnly = !BLOCKING_ELIGIBLE_PRACTICES.contains(f.practiceSlug());
+            out.add(f.coerceCoherence(defectDetectorSlugs.contains(f.practiceSlug()), advisoryOnly));
+        }
+        return out;
+    }
 
     public record DiscardedEntry(int index, String reason) {}
 
@@ -502,6 +728,25 @@ public class PracticeDetectionResultParser {
      * @param startLine first line number (1-based, must be positive)
      * @param endLine   optional last line number for multi-line (GitHub only; GitLab ignores)
      * @param body      markdown comment body (sanitized before posting)
+     * @param recurrenceKey the stable cross-run identity inherited from the finding this note belongs to, so a
+     *     posted placement can be matched back across re-runs; {@code null} until {@link DeliveryComposer}
+     *     carries it over from the stamped finding (the parser leaves it unset).
      */
-    public record DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {}
+    public record DiffNote(
+        String filePath,
+        int startLine,
+        @Nullable Integer endLine,
+        String body,
+        @Nullable String recurrenceKey
+    ) {
+        /** Pre-correlation compatibility shape: a note with no correlation key yet (the parser's output). */
+        public DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {
+            this(filePath, startLine, endLine, body, null);
+        }
+
+        /** Returns a copy stamped with {@code key}; all other components are preserved. */
+        public DiffNote withRecurrenceKey(@Nullable String key) {
+            return new DiffNote(filePath, startLine, endLine, body, key);
+        }
+    }
 }

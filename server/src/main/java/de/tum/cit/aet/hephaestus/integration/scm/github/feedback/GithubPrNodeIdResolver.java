@@ -30,9 +30,31 @@ class GithubPrNodeIdResolver {
     }
 
     String resolve(long scopeId, String owner, String name, int number) {
+        return resolveNodeId(scopeId, owner, name, number, "GetPullRequestNodeId", "repository.pullRequest.id", "PR");
+    }
+
+    /**
+     * Resolves a GitHub issue's node ID via {@code GetIssueNodeId}. Needed because GitHub addresses PRs
+     * and issues identically as {@code owner/repo#N}, so the PR resolver's {@code repository.pullRequest}
+     * field is null for a real issue — the issue must be resolved through {@code repository.issue} instead.
+     */
+    String resolveIssue(long scopeId, String owner, String name, int number) {
+        return resolveNodeId(scopeId, owner, name, number, "GetIssueNodeId", "repository.issue.id", "Issue");
+    }
+
+    private String resolveNodeId(
+        long scopeId,
+        String owner,
+        String name,
+        int number,
+        String documentName,
+        String idField,
+        String kind
+    ) {
+        String ref = owner + "/" + name + "#" + number;
         ClientGraphQlResponse response = gitHubProvider
             .forScope(scopeId)
-            .documentName("GetPullRequestNodeId")
+            .documentName(documentName)
             .variable("owner", owner)
             .variable("name", name)
             .variable("number", number)
@@ -40,23 +62,15 @@ class GithubPrNodeIdResolver {
             .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
-            throw new FeedbackDeliveryException(
-                "Null response resolving PR node ID: " + owner + "/" + name + "#" + number
-            );
+            throw new FeedbackDeliveryException("Null response resolving " + kind + " node ID: " + ref);
         }
         gitHubProvider.trackRateLimit(scopeId, response);
 
-        String nodeId = response.field("repository.pullRequest.id").getValue();
+        String nodeId = response.field(idField).getValue();
         if (nodeId == null) {
             List<?> errors = response.getErrors();
             throw new FeedbackDeliveryException(
-                "PR not found via GraphQL: " +
-                    owner +
-                    "/" +
-                    name +
-                    "#" +
-                    number +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
+                kind + " not found via GraphQL: " + ref + (errors.isEmpty() ? "" : ", errors=" + errors)
             );
         }
         return nodeId;

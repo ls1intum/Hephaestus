@@ -1,0 +1,267 @@
+package de.tum.cit.aet.hephaestus.agent.handler;
+
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireInt;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
+
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.task.Task;
+import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+/**
+ * Handler for {@link AgentJobType#ISSUE_REVIEW} jobs — the issue counterpart of
+ * {@link PullRequestReviewHandler}. Issues have NO diff: the case context is the issue body, the
+ * comment thread, and the lifecycle metadata, materialised by {@code IssueContentProvider} under
+ * {@code inputs/context/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
+ *
+ * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE),
+ * composes the student-facing feedback, and posts it as an issue comment via
+ * {@link PullRequestCommentPoster#postIssueFormattedBody} (best-effort, suppressed on closed issues).
+ */
+public class IssueReviewHandler implements JobTypeHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(IssueReviewHandler.class);
+
+    private final JsonMapper objectMapper;
+    private final WorkspaceContextBuilder workspaceContextBuilder;
+    private final TaskEnvelopeWriter taskEnvelopeWriter;
+    private final PracticeCatalogInjector practiceCatalogInjector;
+    private final PracticeDetectionResultParser resultParser;
+    private final PracticeDetectionDeliveryService deliveryService;
+    private final PullRequestCommentPoster commentPoster;
+    private final FeedbackLedgerRecorder feedbackLedgerRecorder;
+
+    IssueReviewHandler(
+        JsonMapper objectMapper,
+        WorkspaceContextBuilder workspaceContextBuilder,
+        TaskEnvelopeWriter taskEnvelopeWriter,
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService,
+        PullRequestCommentPoster commentPoster,
+        FeedbackLedgerRecorder feedbackLedgerRecorder
+    ) {
+        this.objectMapper = objectMapper;
+        this.workspaceContextBuilder = workspaceContextBuilder;
+        this.taskEnvelopeWriter = taskEnvelopeWriter;
+        this.practiceCatalogInjector = practiceCatalogInjector;
+        this.resultParser = resultParser;
+        this.deliveryService = deliveryService;
+        this.commentPoster = commentPoster;
+        this.feedbackLedgerRecorder = feedbackLedgerRecorder;
+    }
+
+    @Override
+    public AgentJobType jobType() {
+        return AgentJobType.ISSUE_REVIEW;
+    }
+
+    @Override
+    public JobSubmission createSubmission(JobSubmissionRequest request) {
+        if (!(request instanceof IssueReviewSubmissionRequest r)) {
+            throw new IllegalArgumentException(
+                "Expected IssueReviewSubmissionRequest, got: " + request.getClass().getSimpleName()
+            );
+        }
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("artifact_type", "ISSUE");
+        metadata.put("repository_id", r.repositoryId());
+        metadata.put("repository_full_name", r.repositoryFullName());
+        metadata.put("issue_id", r.issueId());
+        metadata.put("issue_number", r.issueNumber());
+        metadata.put("title", r.title());
+        metadata.put("body", r.body());
+        metadata.put("state", r.state());
+        // Lifecycle event that triggered this job; the injector materialises only the matching practices
+        // (e.g. IssueClosed runs the retrospective set). Null = full focus set (gate-bypass dev path).
+        if (r.triggerEvent() != null) {
+            metadata.put("trigger_event", r.triggerEvent());
+        }
+
+        // Trailing freshness segment (mirrors the PR head-SHA slot): an edited issue gets a new key
+        // and re-reviews, while extractCooldownKeyPrefix strips it so cooldown scopes per-issue — NOT
+        // per-repo. Without a 4th segment the prefix would collapse to "issue_review:repo:" and block
+        // every other issue in the repo.
+        String version = r.updatedAt() != null ? String.valueOf(r.updatedAt().toEpochMilli()) : "0";
+        // Phase before the version segment: an authoring pass (IssueCreated/Labeled) and a retrospective
+        // (IssueClosed) of the same issue are different reviews and must not dedup against each other.
+        String phase = r.triggerEvent() != null ? r.triggerEvent() : "manual";
+        String idempotencyKey =
+            "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + phase + ":" + version;
+        return new JobSubmission(metadata, idempotencyKey);
+    }
+
+    @Override
+    public Map<String, byte[]> prepareInputFiles(AgentJob job) {
+        JsonNode metadata = job.getMetadata();
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
+        }
+        Map<String, byte[]> files = new LinkedHashMap<>(
+            workspaceContextBuilder.build(new ContextRequest.IssueReviewRequest(job))
+        );
+        files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
+        practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE);
+        log.info(
+            "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
+            files.size(),
+            metadata.path("issue_number").asInt(),
+            job.getId()
+        );
+        return files;
+    }
+
+    private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        int issueNumber = requireInt(metadata, "issue_number");
+        String repoName = requireText(metadata, "repository_full_name");
+        // Reuse the PracticeReview task kind — the agent is artifact-agnostic; the prompt + the
+        // issue context files (inputs/context/issue_summary.md, metadata.json, comments.json) drive it.
+        Task task = new Task.PracticeReview(buildPrompt(issueNumber, repoName, job), issueNumber, repoName);
+        return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
+    }
+
+    private String buildPrompt(int issueNumber, String repoName, AgentJob job) {
+        String prompt =
+            "Review issue #" +
+            issueNumber +
+            " in " +
+            repoName +
+            ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files " +
+            "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json, and " +
+            "inputs/context/project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then " +
+            "evaluate each practice in inputs/practices/ against the issue and persist every justified finding via the " +
+            "report_finding tool. Evidence locations should reference the issue thread/metadata, not source files. " +
+            "Follow " +
+            WorkspaceAbi.ORCHESTRATOR_PATH +
+            " for the finding schema and rules.";
+        log.info("Built issue orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
+        return prompt;
+    }
+
+    @Override
+    public void deliver(AgentJob job) {
+        var parsed = resultParser.parse(job.getOutput());
+        if (!parsed.discarded().isEmpty()) {
+            log.info("Discarded {} findings during parsing: jobId={}", parsed.discarded().size(), job.getId());
+        }
+        if (parsed.validFindings().isEmpty()) {
+            throw new JobDeliveryException(
+                "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
+            );
+        }
+        // No diff-scope filtering: issue findings reference the thread/metadata, not diff files.
+        // Coherence coercion: defect-detector GOOD assessment -> NOT_APPLICABLE, severity sentinel.
+        // Applied once so the SAME coerced list reaches both deliver() (DB) and compose() (posted note).
+        Set<String> defectDetectorSlugs =
+            job.getWorkspace() == null
+                ? Set.of()
+                : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.ISSUE);
+        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
+            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
+        PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
+        log.info(
+            "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+            result.inserted(),
+            result.discardedUnknownSlug(),
+            result.discardedDuplicate(),
+            job.getId()
+        );
+
+        Map<String, String> whyBySlug =
+            job.getWorkspace() == null
+                ? Map.of()
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.ISSUE);
+        PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
+            coercedFindings,
+            WorkArtifact.ISSUE,
+            whyBySlug
+        );
+        postIssueNote(job, delivery);
+    }
+
+    /**
+     * Posts the composed student-facing note as a comment on the issue (via the integration-resolved
+     * FeedbackChannel). Best-effort: a posting failure is logged, not thrown, so a transient delivery error
+     * never marks an otherwise-successful
+     * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
+     * already persisted above, so the formative loop is intact even if the comment does not land.
+     */
+    // Package-private for direct testing of the suppression + soft-failure contract (mirrors how
+    // FeedbackDeliveryService.deliverFeedback is tested), without driving the real result parser.
+    void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+        if (delivery == null || delivery.mrNote() == null) {
+            return;
+        }
+        JsonNode metadata = job.getMetadata();
+        if (metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""))) {
+            log.info("Issue delivery suppressed: issue closed, jobId={}", job.getId());
+            return;
+        }
+        String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
+        if (sanitized.isBlank()) {
+            log.debug("Issue note empty after sanitization, skipping post: jobId={}", job.getId());
+            return;
+        }
+        boolean posted = false;
+        try {
+            String formatted = FeedbackDeliveryService.formatPracticeNote(sanitized, job);
+            String commentId = commentPoster.postIssueFormattedBody(job, formatted);
+            if (commentId != null) {
+                job.setDeliveryCommentId(commentId);
+                posted = true;
+                log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
+            } else {
+                // Best-effort issue post returned no comment id (vendor returned nothing without raising).
+                // Issue delivery is intentionally best-effort, so this is not fatal — but log it for diagnosis.
+                log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
+            }
+        } catch (JobDeliveryException e) {
+            // A genuine delivery failure (the agent ran, but the student saw nothing) must NOT be reported
+            // as DELIVERED — re-throw so the job is recorded as failed, matching the PR path.
+            throw e;
+        } catch (RuntimeException e) {
+            log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
+        }
+
+        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed. A null /
+        // swallowed post means the student saw nothing — recording a DELIVERED unit (and superseding the real
+        // prior) would corrupt the ledger exactly like the PR TRANSIENT no-op (A3). Best-effort, REQUIRES_NEW +
+        // try/catch so it can never affect the issue note the developer already received. Issues have no inline
+        // placements.
+        if (!posted) {
+            return;
+        }
+        try {
+            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE, List.of());
+        } catch (RuntimeException e) {
+            log.warn(
+                "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+        }
+    }
+}

@@ -21,16 +21,30 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/practice_catalog.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/practice_catalog.json} for {@link MentorChatRequest}.
  *
  * <p>Lists workspace practices with criteria so the mentor agent can talk about specific
- * coding standards that apply to the user's contributions. Independent of {@code contributorId}
+ * coding standards that apply to the user's contributions. Independent of {@code developerId}
  * — every member of a workspace sees the same practice catalog, so the cache key is just
  * the workspace.
+ *
+ * <p><b>Freshness is TTL-bounded only.</b> The {@code mentor_practice_aspect} cache has no
+ * event-driven invalidation: there is no Practice-change domain event to hang an eviction off,
+ * and {@link MentorContextInvalidator} only evicts per-user SCM/detection-driven caches. So an
+ * admin edit to a practice (criteria text, activate/deactivate, rename, area reassignment) is
+ * picked up only after the entry expires (MENTOR_ASPECT_TTL, see {@code CacheConfig}). This is an
+ * accepted limit — the catalog is low-churn admin data and a few minutes of staleness in mentor
+ * chat is harmless — not an oversight; wire a Practice-change event into the invalidator if that
+ * window ever needs to close.
  */
 @Component
 @RequiredArgsConstructor
 public class PracticeCatalogAspectProvider implements ContentProvider {
+
+    @Override
+    public String connectorId() {
+        return "core";
+    }
 
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";

@@ -1,0 +1,15 @@
+# Resolves an issue's node ID so agent feedback can be posted on it via the
+# generic addComment mutation (AddPullRequestComment also works for issues).
+query GetIssueNodeId($owner: String!, $name: String!, $number: Int!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issue(number: $number) {
+            id
+        }
+    }
+}

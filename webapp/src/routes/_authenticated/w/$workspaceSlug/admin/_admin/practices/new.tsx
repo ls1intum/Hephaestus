@@ -1,7 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { createPracticeMutation, listPracticesQueryKey } from "@/api/@tanstack/react-query.gen";
+import {
+	bindAreaMutation,
+	createPracticeMutation,
+	listAreasOptions,
+	listPracticesQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -17,34 +22,44 @@ function CreatePracticeContainer() {
 	const queryClient = useQueryClient();
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 
-	const createPractice = useMutation({
-		...createPracticeMutation(),
-		onSuccess: () => {
+	const areasQuery = useQuery({
+		...listAreasOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+			query: { activeOnly: true },
+		}),
+		enabled: !!workspaceSlug,
+	});
+
+	const createPractice = useMutation(createPracticeMutation());
+	const bindArea = useMutation(bindAreaMutation());
+
+	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
+		if (!workspaceSlug) return;
+		try {
+			await createPractice.mutateAsync({ path: { workspaceSlug }, body: data });
+			// Area binding is a separate endpoint, so it runs after the practice exists.
+			if (areaSlug) {
+				await bindArea.mutateAsync({
+					path: { workspaceSlug, practiceSlug: data.slug },
+					body: { areaSlug },
+				});
+			}
 			queryClient.invalidateQueries({
-				queryKey: listPracticesQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
 			});
 			toast.success("Practice created successfully");
 			navigate({ to: ".." });
-		},
-		onError: (error) => {
+		} catch (error) {
 			const status =
 				typeof error === "object" && error !== null && "status" in error
 					? (error as { status: number }).status
 					: undefined;
-			if (status === 409) {
-				toast.error("A practice with this slug already exists in this workspace");
-			} else {
-				toast.error("Failed to create practice");
-			}
-		},
-	});
-
-	const handleSubmit = (data: CreatePracticeRequest) => {
-		if (!workspaceSlug) return;
-		createPractice.mutate({
-			path: { workspaceSlug },
-			body: data,
-		});
+			toast.error(
+				status === 409
+					? "A practice with this slug already exists in this workspace"
+					: "Failed to create practice",
+			);
+		}
 	};
 
 	const handleCancel = () => {
@@ -54,9 +69,10 @@ function CreatePracticeContainer() {
 	return (
 		<PracticeForm
 			mode="create"
+			areas={areasQuery.data ?? []}
 			onSubmit={handleSubmit}
 			onCancel={handleCancel}
-			isPending={createPractice.isPending}
+			isPending={createPractice.isPending || bindArea.isPending}
 		/>
 	);
 }

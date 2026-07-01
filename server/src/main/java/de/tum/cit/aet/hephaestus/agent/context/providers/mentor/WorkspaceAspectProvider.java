@@ -19,12 +19,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -32,18 +34,25 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/workspace.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/workspace.json} for {@link MentorChatRequest}.
  *
  * <p>Port of {@code session.tool.ts} (recent threads + first message preview) plus
  * {@code assigned-work.tool.ts} (open assigned issues + pending review requests with
  * {@code waitingDays}). The workspace-shape lives in this single aspect so the agent has
  * the per-tenant context it needs in one read.
  *
- * <p>Cache key: {@code workspaceId + ":" + contributorId} — the data is per-user per-workspace.
+ * <p>Cache key: {@code workspaceId + ":" + developerId} — the data is per-user per-workspace.
  */
 @Component
 @RequiredArgsConstructor
 public class WorkspaceAspectProvider implements ContentProvider {
+
+    @Override
+    public String connectorId() {
+        return "core";
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceAspectProvider.class);
 
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "workspace.json";
@@ -75,12 +84,12 @@ public class WorkspaceAspectProvider implements ContentProvider {
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
-        String key = req.workspaceId() + ":" + req.contributorId();
+        String key = req.workspaceId() + ":" + req.developerId();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
-            : buildPayload(req.workspaceId(), req.contributorId());
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+            : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -88,11 +97,11 @@ public class WorkspaceAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
-    public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
+    /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
+    public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(contributorId)
-            .orElseThrow(() -> new EntityNotFoundException("User", contributorId.toString()));
+            .findById(developerId)
+            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
@@ -104,22 +113,65 @@ public class WorkspaceAspectProvider implements ContentProvider {
         workspaceNode.put("slug", workspace.getWorkspaceSlug());
         workspaceNode.put("displayName", workspace.getDisplayName());
 
-        addRecentSessions(root, workspaceId, contributorId);
-        List<PullRequest> reviewPrs = queryRepository.findPendingReviewRequestPrs(workspaceId, contributorId);
-        List<Issue> assigned = queryRepository.findAssignedOpenIssues(workspaceId, contributorId);
-        addAssignedIssues(root, assigned);
-        addPendingReviewRequests(root, reviewPrs);
-        addFocusSuggestions(root, assigned, reviewPrs);
+        // Each sub-aspect is independent and best-effort: a failing query degrades only its own
+        // section to an empty array, never blanking the whole workspace aspect. The real cause is
+        // logged here so it is not swallowed by the cache loader's generic wrapper.
+        guarded(
+            "recentSessions",
+            () -> addRecentSessions(root, workspaceId, developerId),
+            () -> root.putArray("recentSessions")
+        );
+        List<PullRequest> reviewPrs = guardedQuery("pendingReviewRequests", () ->
+            queryRepository.findPendingReviewRequestPrs(workspaceId, developerId)
+        );
+        List<Issue> assigned = guardedQuery("assignedIssues", () ->
+            queryRepository.findAssignedOpenIssues(workspaceId, developerId)
+        );
+        guarded("assignedIssues", () -> addAssignedIssues(root, assigned), () -> root.putArray("assignedIssues"));
+        guarded(
+            "pendingReviewRequests",
+            () -> addPendingReviewRequests(root, reviewPrs),
+            () -> root.putArray("pendingReviewRequests")
+        );
+        guarded(
+            "focusSuggestions",
+            () -> addFocusSuggestions(root, assigned, reviewPrs),
+            () -> root.putArray("focusSuggestions")
+        );
 
         return root;
     }
 
-    private void addRecentSessions(ObjectNode root, Long workspaceId, Long contributorId) {
-        // DB-side LIMIT via Pageable: previously the query returned every thread the user had
-        // ever opened (power users hit 100s) and we trimmed in-memory; ship the cap as SQL.
+    /** Run a best-effort aspect step; on failure log the real cause and apply the empty-fallback. */
+    private void guarded(String aspect, Runnable step, Runnable fallback) {
+        try {
+            step.run();
+        } catch (RuntimeException e) {
+            log.warn("Mentor workspace sub-aspect '{}' failed, degrading to empty: {}", aspect, e.toString(), e);
+            try {
+                fallback.run();
+            } catch (RuntimeException ignored) {
+                // fallback is a pure putArray; nothing further to do
+            }
+        }
+    }
+
+    /** Best-effort query; on failure log the real cause and return an empty list. */
+    private <T> List<T> guardedQuery(String aspect, Supplier<List<T>> query) {
+        try {
+            return query.get();
+        } catch (RuntimeException e) {
+            log.warn("Mentor workspace query '{}' failed, degrading to empty: {}", aspect, e.toString(), e);
+            return List.of();
+        }
+    }
+
+    private void addRecentSessions(ObjectNode root, Long workspaceId, Long developerId) {
+        // DB-side LIMIT via Pageable: the cap ships as SQL so a power user with hundreds of threads
+        // returns at most MAX_RECENT_SESSIONS rows rather than being trimmed in-memory.
         List<ChatThread> threads = queryRepository.findRecentChatThreads(
             workspaceId,
-            contributorId,
+            developerId,
             org.springframework.data.domain.PageRequest.of(0, MAX_RECENT_SESSIONS)
         );
         ArrayNode arr = root.putArray("recentSessions");
@@ -139,8 +191,8 @@ public class WorkspaceAspectProvider implements ContentProvider {
     }
 
     /**
-     * Single round-trip: pull the earliest user message for every capped thread in one query.
-     * Replaces the prior per-thread {@code findByThreadIdOrderByCreatedAtAsc} loop (N+1).
+     * Single round-trip: pull the earliest user message for every capped thread in one query,
+     * keyed by thread id — avoids an N+1 per-thread fetch.
      */
     private Map<UUID, String> loadFirstUserMessages(Long workspaceId, List<ChatThread> threads) {
         List<UUID> ids = new ArrayList<>(threads.size());
@@ -161,7 +213,16 @@ public class WorkspaceAspectProvider implements ContentProvider {
             JsonNode parts = objectMapper.readTree(partsJson);
             String text = extractText(parts);
             if (text == null) return "";
-            return text.length() > MESSAGE_PREVIEW_LENGTH ? text.substring(0, MESSAGE_PREVIEW_LENGTH) : text;
+            if (text.length() <= MESSAGE_PREVIEW_LENGTH) {
+                return text;
+            }
+            // Don't split a surrogate pair (e.g. an emoji straddling the cut): a lone high surrogate
+            // would serialise as an isolated U+D8xx — malformed for downstream consumers. Trim it off.
+            int end = MESSAGE_PREVIEW_LENGTH;
+            if (Character.isHighSurrogate(text.charAt(end - 1))) {
+                end--;
+            }
+            return text.substring(0, end);
         } catch (JacksonException e) {
             // Malformed parts JSON: degrade silently rather than poison the aspect.
             return "";

@@ -35,6 +35,8 @@ interface LoginCardProps {
 	error?: string;
 	/** Called with the chosen provider's registration id. */
 	onSignIn: (registrationId: string) => void;
+	/** Destination after a successful dev sign-in (only used when the server advertises the dev provider). */
+	devReturnTo?: string;
 }
 
 /**
@@ -43,7 +45,7 @@ interface LoginCardProps {
  * cleanly and never duplicates the header's sign-in buttons. Shows branded provider buttons and an
  * accessible `aria-live` error alert.
  */
-export function LoginCard({ title, description, error, onSignIn }: LoginCardProps) {
+export function LoginCard({ title, description, error, onSignIn, devReturnTo }: LoginCardProps) {
 	const errorCopy = error ? describeError(error) : undefined;
 
 	return (
@@ -72,7 +74,7 @@ export function LoginCard({ title, description, error, onSignIn }: LoginCardProp
 							</Alert>
 						) : null}
 					</div>
-					<SignInButtons onSignIn={onSignIn} />
+					<SignInButtons onSignIn={onSignIn} devReturnTo={devReturnTo} />
 				</CardContent>
 			</Card>
 

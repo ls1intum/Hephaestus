@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.auth.dev.DevLoginService;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,8 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Public discovery of the identity providers a user can sign in with (replaces the former
- * Keycloak {@code /auth/identity-providers}; ADR 0017). The SPA login
+ * Public discovery of the identity providers a user can sign in with. The SPA login
  * page renders one button per entry; each button targets
  * {@code /auth/login?provider={registrationId}}.
  *
@@ -26,15 +26,31 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Auth discovery", description = "Identity provider discovery (public)")
 public class IdentityProviderDiscoveryController {
 
-    private final IdentityProviderCatalog identityProviderCatalog;
+    /** Synthetic registration id + provider type for the optional passwordless dev sign-in row. */
+    private static final String DEV_REGISTRATION_ID = "dev";
+    private static final String DEV_PROVIDER_TYPE = "DEV";
 
-    public IdentityProviderDiscoveryController(IdentityProviderCatalog identityProviderCatalog) {
+    private final IdentityProviderCatalog identityProviderCatalog;
+    private final DevLoginService devLoginService;
+
+    public IdentityProviderDiscoveryController(
+        IdentityProviderCatalog identityProviderCatalog,
+        DevLoginService devLoginService
+    ) {
         this.identityProviderCatalog = identityProviderCatalog;
+        this.devLoginService = devLoginService;
     }
 
     /**
      * One row per sign-in option. {@code providerType} drives the SPA's icon choice; {@code baseUrl} is
-     * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
+     * the OAuth instance origin (scheme + host[:port]) of the authorization endpoint, so the
+     * workspace-creation wizard can match a target instance to its login.
+     *
+     * <p><b>baseUrl is the OAuth origin, not the SCM API origin.</b> It is only meaningful for GitLab rows,
+     * where the OAuth origin and the API origin coincide (e.g. {@code https://gitlab.example.com}). For a
+     * GitHub row it is {@code https://github.com} (the OAuth host), NOT {@code https://api.github.com}; the
+     * sole consumer (the workspace wizard) matches GitLab self-hosted origins and never relies on the GitHub
+     * value, so the discrepancy is harmless. Do not treat this as an SCM API base URL.
      */
     public record IdentityProviderViewDTO(
         String registrationId,
@@ -58,6 +74,12 @@ public class IdentityProviderDiscoveryController {
                 )
             );
         }
+        // Optional passwordless dev sign-in. Advertised ONLY when enabled (never in prod), so the SPA
+        // login page renders a "Dev sign-in" affordance (username field → POST /auth/dev-login) instead
+        // of an OAuth redirect. The SPA routes on providerType === "DEV" / registrationId === "dev".
+        if (devLoginService.isEnabled()) {
+            views.add(new IdentityProviderViewDTO(DEV_REGISTRATION_ID, "Dev sign-in", DEV_PROVIDER_TYPE, ""));
+        }
         return ResponseEntity.ok(views);
     }
 
@@ -66,14 +88,14 @@ public class IdentityProviderDiscoveryController {
      * (the only GitHub login target is github.com; everything else is a GitLab instance), so it works
      * for any admin-registered self-hosted GitLab without relying on the registration-id naming.
      */
-    private static String providerTypeOf(ClientRegistration reg) {
+    static String providerTypeOf(ClientRegistration reg) {
         // Match on the parsed HOST, not a substring of the whole URI — "github.com" appearing in a
         // path/query of a GitLab instance (or a look-alike host) must not be misclassified as GitHub.
         return "github.com".equals(hostOf(reg)) ? "GITHUB" : "GITLAB";
     }
 
     /** Host of the authorization endpoint, or {@code null} if absent/malformed. */
-    private static String hostOf(ClientRegistration reg) {
+    static String hostOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
         if (authorizationUri == null) {
             return null;
@@ -85,8 +107,8 @@ public class IdentityProviderDiscoveryController {
         }
     }
 
-    /** The SCM instance origin (scheme + host[:port]) derived from the authorization endpoint. */
-    private static String baseUrlOf(ClientRegistration reg) {
+    /** The OAuth instance origin (scheme + host[:port]) derived from the authorization endpoint. */
+    static String baseUrlOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
         if (authorizationUri == null) {
             return "";

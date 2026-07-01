@@ -97,12 +97,15 @@ const TURN_GRACE_MS = (() => {
 // callback even leaves the runner. This is a defence-in-depth check; the authoritative
 // whitelist lives Java-side in MentorAspects.ALLOWED_OUTPUT_KEYS (full-key match against
 // the aspect providers' OUTPUT_KEY constants). Keep this set aligned with the
-// {User,Workspace,PracticeCatalog,FindingsHistory}AspectProvider basenames.
+// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding,DeliveredFeedback,RecentAuthoredWork}AspectProvider basenames.
 const FETCH_CONTEXT_ALLOWED = new Set([
     "workspace.json",
     "user.json",
     "practice_catalog.json",
     "findings_history.json",
+    "practice_standing.json",
+    "delivered_feedback.json",
+    "recent_authored_work.json",
 ]);
 
 // JSON-RPC error codes
@@ -320,9 +323,9 @@ async function ensureRuntime() {
                   })
                 : new DefaultResourceLoader({ cwd, agentDir: agentDir });
             await loader.reload();
-            // Built-in read/bash/grep let the mentor explore the read-only repo checkout
-            // at /workspace/repo/ (git log, diffs, file contents). edit/write are denied —
-            // the mentor is an observer, not a code author.
+            // Built-in read/bash/grep let the mentor inspect the read-only aspect JSON
+            // under inputs/context/*.json (there is no repo checkout in the mentor sandbox).
+            // edit/write are denied — the mentor is an observer, not a code author.
             const result = await createAgentSessionFromServices({
                 services,
                 sessionManager,
@@ -367,9 +370,11 @@ function defineFetchContextTool() {
         name: "fetch_context",
         label: "Fetch Context",
         description:
-            "Fetch a Hephaestus context aspect (workspace state, user activity, practice catalog, finding history) " +
-            "from the server. Returns JSON content. Allowed paths: workspace.json, user.json, " +
-            "practice_catalog.json, findings_history.json. Names match the aspect provider OUTPUT_KEY constants.",
+            "Fetch a Hephaestus context aspect (workspace state, user activity, practice catalog, finding history, " +
+            "prepared practice standing, delivered feedback, recent authored work) from the server. Returns JSON content. " +
+            "Allowed paths: " +
+            [...FETCH_CONTEXT_ALLOWED].join(", ") +
+            ". Names match the aspect provider OUTPUT_KEY constants.",
         parameters: {
             type: "object",
             additionalProperties: false,
@@ -468,8 +473,16 @@ async function handleHello(id /*, params */) {
 // security primitive and happily resolves `..` / absolute paths out of the base.
 const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+// Canonicalise the thread id the SAME way for open AND every later lookup. open_thread stores
+// state under this key, so a caller sending an uppercase UUID (the dev-bridge / mis-routed
+// threat model THREAD_ID_PATTERN guards) must be normalised identically on prompt/steer/abort/
+// close or `threads.get()` misses and returns a spurious THREAD_NOT_OPEN.
+function normalizeThreadId(params) {
+    return String(params?.threadId ?? "").trim().toLowerCase();
+}
+
 async function handleOpenThread(id, params) {
-    const threadId = String(params?.threadId ?? "").trim().toLowerCase();
+    const threadId = normalizeThreadId(params);
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
     }
@@ -587,7 +600,7 @@ function maybePostTurnGc() {
 }
 
 async function handlePrompt(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     const text = String(params?.text ?? "");
     if (!threadId || !text) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId and text are required");
@@ -633,7 +646,7 @@ async function handlePrompt(id, params) {
 }
 
 async function handleSteer(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     const text = String(params?.text ?? "");
     if (!threadId || !text) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId and text are required");
@@ -652,7 +665,7 @@ async function handleSteer(id, params) {
 }
 
 async function handleAbort(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
     }
@@ -674,7 +687,7 @@ async function handleAbort(id, params) {
 }
 
 async function handleCloseThread(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
     }
@@ -743,10 +756,9 @@ function handleFetchContextResponse(frame) {
             pending.reject(err);
         } else {
             // Pi tool results accept `content: [{type:"text", text: string}]` (verified against
-            // pi-mono SDK tool-result type). When Java returns a JSON object we stringify ONCE;
-            // if it returned a plain string we pass it through untouched. The earlier code
-            // double-stringified strings ("\"foo\"" → "\\\"foo\\\""), which leaked an extra
-            // layer of JSON escaping into the LLM prompt.
+            // pi-mono SDK tool-result type). When Java returns a JSON object we stringify ONCE; a
+            // plain string passes through untouched. Double-stringifying a string ("\"foo\"" →
+            // "\\\"foo\\\"") would leak an extra layer of JSON escaping into the LLM prompt.
             const content = frame.result?.content;
             let text =
                 content == null
@@ -827,8 +839,8 @@ async function runWatchdogRebind(state) {
         // invalidates captured extension ctx; listeners are session-scoped per Pi SDK).
         // If a DIFFERENT thread is currently bound, tear down its subscription first; otherwise
         // the rebind silently steals the runtime and leaks the prior subscription. After a
-        // successful switchSession the runtime is now bound to OUR sessionPath, so update
-        // activeThreadId; the prior code left the invariant stale after a watchdog rebind.
+        // successful switchSession the runtime is bound to OUR sessionPath, so activeThreadId
+        // must be updated to match or the invariant goes stale.
         if (runtime) {
             try {
                 if (activeThreadId && activeThreadId !== state.threadId) {
@@ -851,8 +863,14 @@ async function runWatchdogRebind(state) {
             }
         }
     } finally {
-        sendEvent(state.threadId, { type: "agent_end", messages: [] });
-        state.inFlight = false;
+        // The abort() above can emit a real terminal agent_end through the still-active
+        // subscription (torn down only afterwards), which flows through forwardEvent and clears
+        // inFlight. Guard the synthetic emit on inFlight — mirroring handlePrompt's catch — so the
+        // translator never sees a SECOND agent_end and double-finalises the turn.
+        if (state.inFlight) {
+            sendEvent(state.threadId, { type: "agent_end", messages: [] });
+            state.inFlight = false;
+        }
     }
 }
 
@@ -1082,10 +1100,10 @@ function start() {
         }
     }
     announceReady();
-    // SDK prewarm is intentionally NOT triggered here — it now fires inside handleHello
-    // after the reply is written. Pi SDK module evaluation is synchronous (~300-400 ms) and
-    // would block hello until it completes. Firing it post-hello lets the reply land
-    // instantly and the load runs while Java orchestrates open_thread.
+    // SDK prewarm is intentionally NOT triggered here — it fires inside handleHello after the
+    // reply is written. Pi SDK module evaluation is synchronous (~300-400 ms) and would block
+    // hello until it completes. Firing it post-hello lets the reply land instantly and the load
+    // runs while Java orchestrates open_thread.
 }
 
 start();

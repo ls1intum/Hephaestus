@@ -39,9 +39,9 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
  *
- * <p>Layer A coverage (per Audit 3): exercises Pi SDK ↔ LLM, the runner's two-attempt loop,
- * watchdog, custom {@code report_finding} tool, and the result schema the runner emits — all
- * without Docker. The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
+ * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
+ * {@code report_finding} tool, and the result schema the runner emits — all without Docker.
+ * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
  * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the {@code tum-openai}
  * extension that bends Pi's built-in {@code openai} provider toward the TUM gateway (Pi does not
@@ -213,9 +213,13 @@ class PracticeRunnerLiveLlmTest {
             assertThat(finding.path("practiceSlug").asString())
                 .as(tag + ".practiceSlug")
                 .isEqualTo("hardcoded-secrets");
-            assertThat(finding.path("verdict").asString())
-                .as(tag + ".verdict")
-                .isIn("POSITIVE", "NEGATIVE", "NOT_APPLICABLE");
+            assertThat(finding.path("presence").asString())
+                .as(tag + ".presence")
+                .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE");
+            // assessment is null/absent only when presence is NOT_APPLICABLE
+            if (!"NOT_APPLICABLE".equals(finding.path("presence").asString())) {
+                assertThat(finding.path("assessment").asString()).as(tag + ".assessment").isIn("GOOD", "BAD");
+            }
             assertThat(finding.path("severity").asString())
                 .as(tag + ".severity")
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
@@ -226,21 +230,23 @@ class PracticeRunnerLiveLlmTest {
                 .isTrue();
         }
 
-        // Planted-violation detection. gpt-oss-120b has 100% hit rate for this practice in audits;
-        // if it misses, the prompt or fixture is broken — not the LLM.
-        boolean foundNegative = false;
+        // Planted-violation detection: this practice must be detected when the violation is present.
+        // if it misses, the prompt or fixture is broken — not the LLM. A planted secret is a (PRESENT, BAD)
+        // observation: the bad signal IS present and that is a violation.
+        boolean foundViolation = false;
         for (JsonNode finding : findings) {
             if (
                 "hardcoded-secrets".equals(finding.path("practiceSlug").asString()) &&
-                "NEGATIVE".equals(finding.path("verdict").asString())
+                "PRESENT".equals(finding.path("presence").asString()) &&
+                "BAD".equals(finding.path("assessment").asString())
             ) {
-                foundNegative = true;
+                foundViolation = true;
                 break;
             }
         }
-        assertThat(foundNegative)
+        assertThat(foundViolation)
             .as(
-                "at least one NEGATIVE hardcoded-secrets finding for the planted apiKey/dbPassword. " +
+                "at least one (PRESENT, BAD) hardcoded-secrets finding for the planted apiKey/dbPassword. " +
                     "Findings payload: " +
                     rawOutput
             )
@@ -259,7 +265,7 @@ class PracticeRunnerLiveLlmTest {
                 usage.costUsd()
             );
         }
-        System.out.printf("[practice-live] %d finding(s); negative=%s%n", findings.size(), foundNegative);
+        System.out.printf("[practice-live] %d finding(s); violation=%s%n", findings.size(), foundViolation);
     }
 
     // Workspace staging
@@ -276,8 +282,8 @@ class PracticeRunnerLiveLlmTest {
         // Copy the production runner verbatim — same bytes that ship to the agent container.
         Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.mjs"), StandardCopyOption.REPLACE_EXISTING);
 
-        // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses
-        // now that PI_CODING_AGENT_DIR points inside the workspace.
+        // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses,
+        // with PI_CODING_AGENT_DIR pointed inside the workspace.
         Path piDir = WORKSPACE.resolve(WorkspaceAbi.PI_AGENT_PREFIX);
         Files.createDirectories(piDir);
         Files.copy(
@@ -297,7 +303,7 @@ class PracticeRunnerLiveLlmTest {
         Files.write(piHome.resolve("settings.json"), buildSettingsJson(creds.model()));
         Files.write(piHome.resolve("models.json"), buildModelsJson(creds));
 
-        // Practice catalog under /workspace/.practices/ — the agent reads index.json (slug list)
+        // Practice catalog under /workspace/inputs/practices/ — the agent reads index.json (slug list)
         // and all-criteria.md (per-practice rules) per the orchestrator instructions.
         Path practicesDir = WORKSPACE.resolve(WorkspaceAbi.PRACTICES_PREFIX);
         Files.createDirectories(practicesDir);
@@ -307,7 +313,7 @@ class PracticeRunnerLiveLlmTest {
 
         // Context fixture — diff, metadata, comments, diff_summary. Mirrors what
         // PullRequestContentProvider materialises in production.
-        Path contextDir = WORKSPACE.resolve(WorkspaceAbi.CONTEXT_TARGET_PREFIX);
+        Path contextDir = WORKSPACE.resolve(WorkspaceAbi.CONTEXT_PREFIX);
         Files.createDirectories(contextDir);
         copyFixture("diff.patch", contextDir.resolve("diff.patch"));
         copyFixture("metadata.json", contextDir.resolve("metadata.json"));
@@ -329,9 +335,9 @@ class PracticeRunnerLiveLlmTest {
             UUID.randomUUID(),
             1L,
             new Task.PracticeReview(
-                "Review merge request #1 in test/fixture. Read context/target/diff_summary.md, " +
-                    ".practices/all-criteria.md, .practices/index.json, and context/target/metadata.json. " +
-                    "Apply the hardcoded-secrets practice to context/target/diff.patch. Persist each " +
+                "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, " +
+                    "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
+                    "Apply the hardcoded-secrets practice to inputs/context/diff.patch. Persist each " +
                     "justified finding via report_finding (one tool call per finding). Follow " +
                     WorkspaceAbi.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
@@ -440,13 +446,13 @@ class PracticeRunnerLiveLlmTest {
     }
 
     /**
-     * Build a {@link SandboxResult} from the on-disk {@code .output/} directory. Mirrors what
+     * Build a {@link SandboxResult} from the on-disk {@code out/} directory. Mirrors what
      * {@code DockerSandboxAdapter} does after a container exit so we feed the production parser
      * the exact map shape it expects.
      */
     private static SandboxResult buildSandboxResult(int exitCode) throws IOException {
         Map<String, byte[]> outputFiles = new LinkedHashMap<>();
-        Path outputDir = WORKSPACE.resolve(".output");
+        Path outputDir = WORKSPACE.resolve("out");
         if (Files.isDirectory(outputDir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(outputDir)) {
                 for (Path entry : stream) {

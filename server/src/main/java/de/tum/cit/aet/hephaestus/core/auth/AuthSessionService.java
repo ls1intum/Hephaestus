@@ -26,8 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Owns the access-token cookie lifecycle: logout, refresh, and the low-level
- * set/clear of the {@code __Host-} cookie. Extracted from {@code AuthLifecycleController}
- * so the controller stays thin (≤5 deps) and the cookie/JWT mechanics live in one place.
+ * set/clear of the {@code __Host-} cookie. Keeps the cookie/JWT mechanics in one place so
+ * {@code AuthLifecycleController} stays thin (≤5 deps).
  */
 @ConditionalOnServerRole
 @Service
@@ -175,7 +175,7 @@ public class AuthSessionService {
         long maxAge = token.expiresAt().getEpochSecond() - clock.instant().getEpochSecond();
         Cookie cookie = new Cookie(properties.cookieName(), token.value());
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(properties.cookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge((int) Math.max(0, maxAge));
         cookie.setAttribute("SameSite", "Lax");
@@ -222,7 +222,7 @@ public class AuthSessionService {
     public void clearCookie(HttpServletResponse response) {
         Cookie cookie = new Cookie(properties.cookieName(), "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(properties.cookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(0);
         cookie.setAttribute("SameSite", "Lax");

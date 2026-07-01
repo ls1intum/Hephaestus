@@ -11,11 +11,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Repository for PullRequestReview entities.
- *
- * <p>This repository contains domain-agnostic queries for the integration.scm domain.
- * Scope-filtered queries (those that join with host application entities)
- * belong in the host application to maintain clean architecture boundaries.
+ * Holds domain-agnostic queries for the integration.scm domain. Scope-filtered queries (those that join
+ * with host-application entities) belong in the host application to keep architecture boundaries clean.
  *
  * <p>Workspace-agnostic by design: reviews are scoped through
  * {@code pull_request_id -> pull_request.repository_id -> repository.workspace_id}.
@@ -27,15 +24,33 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Reviews scoped through pull_request_id -> repository.workspace_id")
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
-    /**
-     * Find a review by its provider-scoped native ID.
-     */
     Optional<PullRequestReview> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
-    /**
-     * Find all reviews for a pull request from a specific provider.
-     */
     List<PullRequestReview> findAllByPullRequestIdAndProviderId(Long pullRequestId, Long providerId);
+
+    /**
+     * All review DECISIONS for a pull request, with the review author eagerly fetched.
+     *
+     * <p>Used by the cross-context {@code ReviewThreadContentProvider} to surface review-decision
+     * state (CHANGES_REQUESTED / APPROVED) — the signal a "merged past unresolved request-changes"
+     * lesson is grounded in, which neither inline comments nor the diff carry. Read-only context
+     * materialisation; the caller establishes workspace scope.
+     *
+     * <p>Ordered most-recent-first ({@code submittedAt DESC, id DESC}) so the consumer's
+     * {@code MAX_DECISIONS} truncation keeps the LATEST decisions: on a heavily-reviewed PR a
+     * superseding final APPROVE must not be dropped, which would manufacture a false "merged past
+     * unresolved request-changes" finding. {@code id} breaks ties on equal/null timestamps.
+     */
+    @Query(
+        """
+        SELECT prr
+        FROM PullRequestReview prr
+        LEFT JOIN FETCH prr.author
+        WHERE prr.pullRequest.id = :pullRequestId
+        ORDER BY prr.submittedAt DESC, prr.id DESC
+        """
+    )
+    List<PullRequestReview> findAllByPullRequestIdWithAuthor(@Param("pullRequestId") Long pullRequestId);
 
     /**
      * Batch fetch reviews by IDs with all related entities eagerly loaded.

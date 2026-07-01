@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetFindingData, GetFindingErrors, GetFindingResponses, GetFindingsForPullRequestData, GetFindingsForPullRequestResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestFeedbackData, GetLatestFeedbackErrors, GetLatestFeedbackResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListData, ListFindingsData, ListFindingsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitFeedbackData, SubmitFeedbackErrors, SubmitFeedbackResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAiSettingsData, GetAiSettingsResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListAreasData, ListAreasResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateMentorConfigData, UpdateMentorConfigErrors, UpdateMentorConfigResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeConfigData, UpdatePracticeConfigErrors, UpdatePracticeConfigResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -486,6 +486,54 @@ export const retryDelivery = <ThrowOnError extends boolean = false>(options: Opt
     ...options
 });
 
+/**
+ * Get aggregate workspace AI settings
+ */
+export const getAiSettings = <ThrowOnError extends boolean = false>(options: Options<GetAiSettingsData, ThrowOnError>) => (options.client ?? client).get<GetAiSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/ai-settings',
+    ...options
+});
+
+/**
+ * Bind (or unbind) the agent config that powers the mentor
+ */
+export const updateMentorConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateMentorConfigData, ThrowOnError>) => (options.client ?? client).put<UpdateMentorConfigResponses, UpdateMentorConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Bind (or unbind) the agent config that powers practice detection
+ */
+export const updatePracticeConfig = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeConfigData, ThrowOnError>) => (options.client ?? client).put<UpdatePracticeConfigResponses, UpdatePracticeConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Update per-workspace practice-review policy
+ */
+export const updatePracticeReviewSettings = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeReviewSettingsData, ThrowOnError>) => (options.client ?? client).patch<UpdatePracticeReviewSettingsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
 export const list = <ThrowOnError extends boolean = false>(options: Options<ListData, ThrowOnError>) => (options.client ?? client).get<ListResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections',
@@ -731,9 +779,73 @@ export const updateNotifications = <ThrowOnError extends boolean = false>(option
 });
 
 /**
+ * List practice areas
+ *
+ * Returns the workspace's practice areas
+ */
+export const listAreas = <ThrowOnError extends boolean = false>(options: Options<ListAreasData, ThrowOnError>) => (options.client ?? client).get<ListAreasResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practice-areas', ...options });
+
+/**
+ * Create a new practice area
+ */
+export const createArea = <ThrowOnError extends boolean = false>(options: Options<CreateAreaData, ThrowOnError>) => (options.client ?? client).post<CreateAreaResponses, CreateAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practice-areas',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Reorder practice areas
+ *
+ * Sets each area's display order to its index in the provided slug list (one atomic write)
+ */
+export const reorderAreas = <ThrowOnError extends boolean = false>(options: Options<ReorderAreasData, ThrowOnError>) => (options.client ?? client).patch<ReorderAreasResponses, ReorderAreasErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practice-areas/reorder',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a practice area
+ *
+ * Bound practices are unbound (their area link is cleared), not deleted
+ */
+export const deleteArea = <ThrowOnError extends boolean = false>(options: Options<DeleteAreaData, ThrowOnError>) => (options.client ?? client).delete<DeleteAreaResponses, DeleteAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}',
+    ...options
+});
+
+/**
+ * Get a practice area
+ */
+export const getArea = <ThrowOnError extends boolean = false>(options: Options<GetAreaData, ThrowOnError>) => (options.client ?? client).get<GetAreaResponses, GetAreaErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}', ...options });
+
+/**
+ * Update a practice area
+ */
+export const updateArea = <ThrowOnError extends boolean = false>(options: Options<UpdateAreaData, ThrowOnError>) => (options.client ?? client).patch<UpdateAreaResponses, UpdateAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List practice definitions
  *
- * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
+ * Returns all practice definitions for the workspace, optionally filtered by active state
  */
 export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices', ...options });
 
@@ -751,61 +863,90 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * List findings for current user
- *
- * Paginated findings for the authenticated contributor with optional filters
- */
-export const listFindings = <ThrowOnError extends boolean = false>(options: Options<ListFindingsData, ThrowOnError>) => (options.client ?? client).get<ListFindingsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings', ...options });
-
-/**
  * Get engagement statistics
  *
- * Returns the current user's feedback action counts across all findings in this workspace.
+ * Returns the current user's reaction action counts across all feedback they received in this workspace.
  */
 export const getEngagement = <ThrowOnError extends boolean = false>(options: Options<GetEngagementData, ThrowOnError>) => (options.client ?? client).get<GetEngagementResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/findings/engagement',
+    url: '/workspaces/{workspaceSlug}/practices/feedback/engagement',
     ...options
 });
 
 /**
- * List findings for a pull request
+ * Get the latest reaction to a feedback unit
  *
- * All findings for a specific pull request within the workspace
+ * Returns the current user's most recent reaction to the specified feedback unit, or 204 if none exists.
  */
-export const getFindingsForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetFindingsForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetFindingsForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}', ...options });
+export const getLatestReaction = <ThrowOnError extends boolean = false>(options: Options<GetLatestReactionData, ThrowOnError>) => (options.client ?? client).get<GetLatestReactionResponses, GetLatestReactionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions',
+    ...options
+});
+
+/**
+ * Submit a reaction to a feedback unit
+ *
+ * Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to a delivered feedback unit. Append-only: submitting again creates a new record, preserving temporal history.
+ */
+export const submitReaction = <ThrowOnError extends boolean = false>(options: Options<SubmitReactionData, ThrowOnError>) => (options.client ?? client).post<SubmitReactionResponses, SubmitReactionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List active practices, learner-facing
+ *
+ * Active practices projected for a developer: name, area, why-it-matters, what-good-looks-like. The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO has no such field).
+ */
+export const listLearnerPractices = <ThrowOnError extends boolean = false>(options: Options<ListLearnerPracticesData, ThrowOnError>) => (options.client ?? client).get<ListLearnerPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/learner', ...options });
+
+/**
+ * List observations for current user
+ *
+ * Paginated observations for the authenticated developer with optional filters
+ */
+export const listObservations = <ThrowOnError extends boolean = false>(options: Options<ListObservationsData, ThrowOnError>) => (options.client ?? client).get<ListObservationsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations', ...options });
+
+/**
+ * List observations for a pull request
+ *
+ * All observations for a specific pull request within the workspace
+ */
+export const getObservationsForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetObservationsForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetObservationsForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}', ...options });
+
+/**
+ * Reflective dashboard feedback for the current developer
+ *
+ * Per-practice cards a developer can READ — why the practice matters, what good looks like, where they stand, the specific feedback to act on, and what they already do well. The third feedback channel alongside in-context SCM notes and the conversational mentor; the same findings reorganised by practice for self-paced reflection, not a scoreboard of counts.
+ */
+export const getReflection = <ThrowOnError extends boolean = false>(options: Options<GetReflectionData, ThrowOnError>) => (options.client ?? client).get<GetReflectionResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/reflection', ...options });
 
 /**
  * Per-practice summary for current user
  *
- * Aggregated verdict counts per practice for dashboard cards
+ * Aggregated observation counts per practice for dashboard cards
  */
-export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/summary', ...options });
+export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/summary', ...options });
 
 /**
- * Get finding detail
+ * Get observation detail
  */
-export const getFinding = <ThrowOnError extends boolean = false>(options: Options<GetFindingData, ThrowOnError>) => (options.client ?? client).get<GetFindingResponses, GetFindingErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}', ...options });
+export const getObservation = <ThrowOnError extends boolean = false>(options: Options<GetObservationData, ThrowOnError>) => (options.client ?? client).get<GetObservationResponses, GetObservationErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}', ...options });
 
 /**
- * Get latest feedback for a finding
+ * Reorder the practices within an area
  *
- * Returns the current user's most recent feedback on the specified finding, or 204 if none exists.
+ * Sets each practice's display order to its index in the provided slug list (one atomic write)
  */
-export const getLatestFeedback = <ThrowOnError extends boolean = false>(options: Options<GetLatestFeedbackData, ThrowOnError>) => (options.client ?? client).get<GetLatestFeedbackResponses, GetLatestFeedbackErrors, ThrowOnError>({
+export const reorderPractices = <ThrowOnError extends boolean = false>(options: Options<ReorderPracticesData, ThrowOnError>) => (options.client ?? client).patch<ReorderPracticesResponses, ReorderPracticesErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback',
-    ...options
-});
-
-/**
- * Submit feedback on a practice finding
- *
- * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
- */
-export const submitFeedback = <ThrowOnError extends boolean = false>(options: Options<SubmitFeedbackData, ThrowOnError>) => (options.client ?? client).post<SubmitFeedbackResponses, SubmitFeedbackErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback',
+    url: '/workspaces/{workspaceSlug}/practices/reorder',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -846,6 +987,21 @@ export const updatePractice = <ThrowOnError extends boolean = false>(options: Op
 export const setActive = <ThrowOnError extends boolean = false>(options: Options<SetActiveData, ThrowOnError>) => (options.client ?? client).patch<SetActiveResponses, SetActiveErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Bind a practice to an area
+ *
+ * Binds the practice to the area named by areaSlug, or unbinds it when areaSlug is null
+ */
+export const bindArea = <ThrowOnError extends boolean = false>(options: Options<BindAreaData, ThrowOnError>) => (options.client ?? client).put<BindAreaResponses, BindAreaErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/area',
     ...options,
     headers: {
         'Content-Type': 'application/json',

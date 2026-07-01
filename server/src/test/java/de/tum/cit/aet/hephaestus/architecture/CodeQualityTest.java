@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test;
  * </ul>
  *
  * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
- * <p>NOTE: Consolidated from SolidPrinciplesTest.java - unique ISP/DIP tests merged here.
  *
  * @see ArchitectureTestConstants
  */
@@ -160,7 +159,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "CommitRepository.updateEnrichmentMetadata",
                 "DiscussionCategoryRepository.upsertCategory",
                 "DiscussionRepository.upsertCore",
-                "PracticeFindingRepository.insertIfAbsent",
+                "ObservationRepository.insertIfAbsent",
                 // JPQL admin-audit query: each nullable filter needs its own @Param for the
                 // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
                 "AuthEventRepository.findForAdmin"
@@ -338,7 +337,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // INTERFACE SEGREGATION PRINCIPLE (merged from SolidPrinciplesTest)
+    // INTERFACE SEGREGATION PRINCIPLE
 
     @Nested
     class InterfaceSegregationTests {
@@ -358,6 +357,20 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     // Skip Spring Data repositories - they have many default methods
                     if (javaClass.isAssignableTo(org.springframework.data.repository.Repository.class)) {
+                        return;
+                    }
+
+                    // Skip Spring Data query-projection interfaces (interfaces nested inside a repository):
+                    // these are data carriers shaped by a query's SELECT list, not behavioural interfaces, so the
+                    // ISP "small interface" rule does not apply (same rationale as the generated-model exclusion).
+                    if (
+                        javaClass
+                            .getEnclosingClass()
+                            .map(enclosing ->
+                                enclosing.isAssignableTo(org.springframework.data.repository.Repository.class)
+                            )
+                            .orElse(false)
+                    ) {
                         return;
                     }
 
@@ -455,7 +468,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // DEPENDENCY INVERSION (merged from SolidPrinciplesTest)
+    // DEPENDENCY INVERSION
 
     @Nested
     class DependencyInversionTests {
@@ -513,7 +526,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // LISKOV SUBSTITUTION PRINCIPLE (merged from SolidPrinciplesTest)
+    // LISKOV SUBSTITUTION PRINCIPLE
 
     @Nested
     class LiskovSubstitutionTests {

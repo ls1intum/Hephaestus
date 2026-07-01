@@ -55,6 +55,46 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("emits work/ ancestor dirs as uid-1000 (writable) and leaves inputs/ to root auto-create")
+        void shouldMakeWorkRegionWritableButNotInputs() throws IOException {
+            // ADR 0020: read-only vs writable by LOCATION. The agent + precompute write under work/ as the
+            // container uid (1000); a root-owned work/ (Docker's default for auto-created intermediate dirs)
+            // would deny `mkdir -p work/precompute-out` and scratch writes. inputs/ must stay root (RO).
+            Map<String, byte[]> files = new HashMap<>();
+            files.put("inputs/context/diff.patch", "d".getBytes());
+            files.put("work/analysis/practices/.gitkeep", new byte[0]);
+            files.put("work/precompute/practices/foo.ts", "x".getBytes());
+
+            manager.injectFiles(CONTAINER_ID, files);
+
+            org.mockito.ArgumentCaptor<InputStream> tar = org.mockito.ArgumentCaptor.forClass(InputStream.class);
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), tar.capture());
+
+            Map<String, Long> dirUid = new HashMap<>();
+            try (var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(tar.getValue())) {
+                TarArchiveEntry e;
+                while ((e = tis.getNextEntry()) != null) {
+                    if (e.isDirectory()) {
+                        dirUid.put(e.getName(), e.getLongUserId());
+                    }
+                }
+            }
+
+            // Every work/ ancestor is pre-created and owned by the container uid.
+            assertThat(dirUid).containsKeys(
+                "work/",
+                "work/analysis/",
+                "work/analysis/practices/",
+                "work/precompute/",
+                "work/precompute/practices/"
+            );
+            assertThat(dirUid.values()).allMatch(uid -> uid == 1000L);
+            // inputs/ dirs are deliberately NOT emitted — Docker auto-creates them as root, which IS the
+            // read-only guarantee (uid 1000 cannot create files in a root-owned directory).
+            assertThat(dirUid).doesNotContainKey("inputs/").doesNotContainKey("inputs/context/");
+        }
+
+        @Test
         void shouldSkipWhenEmpty() {
             manager.injectFiles(CONTAINER_ID, Map.of());
 
@@ -88,10 +128,19 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldRejectOversizedInput() {
-            byte[] largeFile = new byte[(int) (SandboxWorkspaceManager.MAX_INPUT_BYTES + 1)];
+            // Use a tiny input limit (1 KB) to avoid allocating ~50 MB in CI, mirroring the other size tests.
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                SandboxWorkspaceManager.MAX_OUTPUT_BYTES,
+                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
+                1024,
+                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
+            byte[] largeFile = new byte[1025]; // 1 byte over the 1 KB input limit
             Map<String, byte[]> files = Map.of("huge.bin", largeFile);
 
-            assertThatThrownBy(() -> manager.injectFiles(CONTAINER_ID, files))
+            assertThatThrownBy(() -> limitedManager.injectFiles(CONTAINER_ID, files))
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("maximum size limit");
         }
@@ -102,12 +151,12 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldExtractFiles() throws Exception {
-            byte[] tarBytes = createTestTar(Map.of(".output/result.json", "{\"status\":\"ok\"}".getBytes()));
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            byte[] tarBytes = createTestTar(Map.of("out/result.json", "{\"status\":\"ok\"}".getBytes()));
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             assertThat(output).containsKey("result.json");
             assertThat(new String(output.get("result.json"))).isEqualTo("{\"status\":\"ok\"}");
@@ -116,11 +165,11 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         @DisplayName("should return empty map when docker cp fails")
         void shouldReturnEmptyOnFailure() {
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenThrow(
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenThrow(
                 new SandboxException("No such path")
             );
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             assertThat(output).isEmpty();
         }
@@ -139,14 +188,12 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             byte[] largeContent = new byte[800]; // 800 bytes
             byte[] secondContent = new byte[500]; // 500 bytes — total 1300 > 1024
 
-            byte[] tarBytes = createTestTar(
-                Map.of(".output/first.bin", largeContent, ".output/second.bin", secondContent)
-            );
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            byte[] tarBytes = createTestTar(Map.of("out/first.bin", largeContent, "out/second.bin", secondContent));
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             // Only one file should be collected — the second pushes past the limit
             assertThat(output).hasSize(1);
@@ -155,18 +202,13 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         void shouldSkipTraversalPathsInOutput() throws Exception {
             byte[] tarBytes = createTestTar(
-                Map.of(
-                    ".output/../../../etc/passwd",
-                    "malicious".getBytes(),
-                    ".output/safe.txt",
-                    "safe content".getBytes()
-                )
+                Map.of("out/../../../etc/passwd", "malicious".getBytes(), "out/safe.txt", "safe content".getBytes())
             );
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             // Only the safe file should be collected; the traversal path should be skipped
             assertThat(output).hasSize(1);
@@ -177,24 +219,24 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         @DisplayName("should skip symbolic links in output archive")
         void shouldSkipSymlinks() throws Exception {
-            byte[] tarBytes = createTestTarWithSymlink(".output/evil", "/etc/shadow");
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            byte[] tarBytes = createTestTarWithSymlink("out/evil", "/etc/shadow");
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             assertThat(output).isEmpty();
         }
 
         @Test
         void shouldSkipHardLinks() throws Exception {
-            byte[] tarBytes = createTestTarWithHardLink(".output/link", ".output/target");
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            byte[] tarBytes = createTestTarWithHardLink("out/link", "out/target");
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             assertThat(output).isEmpty();
         }
@@ -213,14 +255,12 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             byte[] smallContent = "small".getBytes(); // 5 bytes — under limit
             byte[] oversizedContent = "this is way too big".getBytes(); // 19 bytes — over 10-byte limit
 
-            byte[] tarBytes = createTestTar(
-                Map.of(".output/small.txt", smallContent, ".output/toobig.txt", oversizedContent)
-            );
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            byte[] tarBytes = createTestTar(Map.of("out/small.txt", smallContent, "out/toobig.txt", oversizedContent));
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             // Only the small file should be collected — the oversized one is skipped
             assertThat(output).containsKey("small.txt");
@@ -231,11 +271,11 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @DisplayName("should skip directory entries in tar")
         void shouldSkipDirectories() throws Exception {
             byte[] tarBytes = createTestTarWithDir("result.json", "{}".getBytes());
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
                 new ByteArrayInputStream(tarBytes)
             );
 
-            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/.output");
+            Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
             assertThat(output).containsKey("result.json");
             assertThat(output).hasSize(1);
@@ -248,7 +288,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @TempDir
         Path tempDir;
 
-        // Size limit tests (from this PR)
+        // Size limit tests
 
         @Test
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
@@ -490,12 +530,12 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
 
             // Add directory entry
-            TarArchiveEntry dirEntry = new TarArchiveEntry(".output/");
+            TarArchiveEntry dirEntry = new TarArchiveEntry("out/");
             tar.putArchiveEntry(dirEntry);
             tar.closeArchiveEntry();
 
             // Add file entry
-            TarArchiveEntry fileEntry = new TarArchiveEntry(".output/" + fileName);
+            TarArchiveEntry fileEntry = new TarArchiveEntry("out/" + fileName);
             fileEntry.setSize(content.length);
             tar.putArchiveEntry(fileEntry);
             tar.write(content);

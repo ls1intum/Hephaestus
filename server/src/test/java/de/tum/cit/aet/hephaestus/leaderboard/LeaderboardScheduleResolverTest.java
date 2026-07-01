@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.DayOfWeek;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.support.CronExpression;
 
@@ -47,6 +50,23 @@ class LeaderboardScheduleResolverTest extends BaseUnitTest {
         Workspace w = workspace(3, "8");
         assertThat(resolver.cron(w)).isEqualTo("0 0 8 ? * 3");
         assertThat(CronExpression.isValidExpression(resolver.cron(w))).isTrue();
+    }
+
+    @Test
+    void sundayBoundaryIsConsistentAcrossCronAndWindow() {
+        // The one place two numbering schemes meet: cron() emits the ISO day verbatim into Spring's cron
+        // day-of-week field, while previousCycleWindow() feeds the same value to DayOfWeek.of(day). At the
+        // Sunday edge ISO-7 must equal both Spring-cron-7 (a valid Sunday) AND DayOfWeek.SUNDAY, or the
+        // scheduler would fire on a different day than the points/digest window covers.
+        Workspace w = workspace(7, "09:00");
+        assertThat(resolver.cron(w)).isEqualTo("0 00 09 ? * 7");
+        assertThat(CronExpression.isValidExpression(resolver.cron(w))).isTrue();
+
+        LeaderboardScheduleResolver.CycleWindow window = resolver.previousCycleWindow(w);
+        ZonedDateTime before = ZonedDateTime.ofInstant(window.before(), ZoneId.systemDefault());
+        assertThat(before.getDayOfWeek()).isEqualTo(DayOfWeek.SUNDAY);
+        assertThat(before.getHour()).isEqualTo(9);
+        assertThat(before.getMinute()).isZero();
     }
 
     @Test

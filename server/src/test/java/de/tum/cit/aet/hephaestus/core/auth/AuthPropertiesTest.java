@@ -18,6 +18,7 @@ class AuthPropertiesTest extends BaseUnitTest {
         value = {
             "/api | /api",
             "api | /api",
+            "//api | /api",
             "/api/ | /api",
             "/api/v2/ | /api/v2",
             "'' | ''",

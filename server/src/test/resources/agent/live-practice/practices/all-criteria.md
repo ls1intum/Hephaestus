@@ -17,8 +17,8 @@ that are checked into source code as constants.
 
 ## Verdict rules
 
-- **NEGATIVE** when any such literal is present in added (`+`) lines.
-- **POSITIVE** when secrets are referenced via env vars / a config service / a vault.
+- **NOT_OBSERVED** when any such literal is present in added (`+`) lines.
+- **OBSERVED** when secrets are referenced via env vars / a config service / a vault.
 - **NOT_APPLICABLE** when the diff contains no secret-shaped material at all.
 
 ## Severity

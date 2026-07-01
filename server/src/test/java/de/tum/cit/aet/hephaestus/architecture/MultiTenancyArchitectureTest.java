@@ -40,10 +40,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
      * Package prefixes that are inherently workspace-agnostic.
      *
      * <p>The {@code integration.scm} package is the shared SCM kernel (entities, SPIs,
-     * sync orchestrator). The per-vendor ETL handlers (former {@code integration.scm.<domain>.<kind>})
-     * now live under {@code integration.<kind>}, but they still operate at the external
-     * entity level (GitHub/GitLab IDs) and resolve workspace context through entity
-     * relationships, so they remain workspace-agnostic for the purposes of this rule.
+     * sync orchestrator). The per-vendor ETL handlers under {@code integration.<kind>} operate at
+     * the external entity level (GitHub/GitLab IDs) and resolve workspace context through entity
+     * relationships, so they are workspace-agnostic for the purposes of this rule.
      * Workspace filtering happens at the domain/application layer, not at the
      * integration.scm/integration ETL layer.
      */
@@ -587,6 +586,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Project", // Through organization.workspaceId
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
                                 "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
+                                "PracticeDetectionCompletedEvent", // carries workspaceId directly (mentor cache eviction)
                                 "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
                                 "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
                                 "WorkspaceCreatedEvent", // Carries workspaceId + kind
@@ -650,12 +650,14 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             "AgentJobSubmitter",
             // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
             "AgentJobEventListener",
+            // IssueAgentJobEventListener handles ScmDomainEvent.Issue{Created,Labeled} whose EventContext
+            // carries the originating repository → workspaceId is resolved per-event (mirrors the PR listener)
+            "IssueAgentJobEventListener",
             // MentorContextInvalidator handles ScmDomainEvent.{PullRequest,Issue,Review}* whose
             // EventContext carries the originating repository → workspaceId is resolved per-event
             "MentorContextInvalidator",
             // GitHubProjectActivityListener handles GitHubProjectEvent payloads whose EventContext
-            // carries scopeId (the originating workspace) — extracted out of ActivityEventListener
-            // in the SPI-isolation refactor, same payload-carries-context contract applies
+            // carries scopeId (the originating workspace) — same payload-carries-context contract
             "GitHubProjectActivityListener"
         );
 
@@ -969,14 +971,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                     a.getRawType().getSimpleName().contains("Workspace") ||
                                     a.getRawType().getSimpleName().contains("Ensure")
                             );
-
-                    // Check for path variable that includes workspace (e.g., /api/{workspaceSlug}/...)
-                    boolean hasWorkspacePathVariable = method
-                        .getRawParameterTypes()
-                        .stream()
-                        .anyMatch(
-                            p -> p.getSimpleName().equals("String") // Could be workspaceSlug
-                        );
 
                     if (!hasWorkspaceContext && !hasWorkspaceSecurityAnnotation) {
                         events.add(

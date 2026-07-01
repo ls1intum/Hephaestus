@@ -394,9 +394,11 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void throwsWhenIntegrationKindMissing() {
             AgentJob job = createTestJob(null);
 
+            // Integrity failure (not an NPE): the agent ran but the job has no provider to deliver
+            // against. Surfaces as JobDeliveryException so the executor marks the job FAILED loudly.
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("AgentJob.integrationKind must not be null");
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("integrationKind is null");
         }
 
         @Test
@@ -424,6 +426,32 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             AgentJob job = createTestJob(IntegrationKind.GITHUB);
             String commentId = poster.postComment(job, "LGTM", "Summary");
             assertThat(commentId).isNull();
+        }
+
+        @Test
+        void postIssueFormattedBody_throwsWhenIntegrationKindMissing() {
+            AgentJob job = createTestJob(null);
+            ((ObjectNode) job.getMetadata()).put("issue_number", 7);
+
+            assertThatThrownBy(() -> poster.postIssueFormattedBody(job, "Formatted issue note"))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("integrationKind is null");
+        }
+
+        @Test
+        void postIssueFormattedBody_resolvesIssueSubjectAndPosts() {
+            AgentJob job = createTestJob(IntegrationKind.GITLAB);
+            ((ObjectNode) job.getMetadata()).put("issue_number", 7);
+            when(gitlabChannel.formatIssueSubjectId("owner/repo", 7)).thenReturn("owner/repo#7");
+            when(gitlabChannel.postSummary(any(), any())).thenReturn(
+                new FeedbackChannel.SummaryHandle("gid://gitlab/Note/77")
+            );
+
+            String commentId = poster.postIssueFormattedBody(job, "Formatted issue note");
+
+            assertThat(commentId).isEqualTo("gid://gitlab/Note/77");
+            verify(gitlabChannel).formatIssueSubjectId("owner/repo", 7);
+            verify(gitlabChannel).postSummary(any(), any());
         }
 
         @Test

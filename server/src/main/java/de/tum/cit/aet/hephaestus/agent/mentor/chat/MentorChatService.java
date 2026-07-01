@@ -23,6 +23,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.List;
@@ -62,6 +64,7 @@ public class MentorChatService {
     private final UserRepository userRepository;
     private final ChatThreadRepository chatThreadRepository;
     private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceRepository workspaceRepository;
     private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final MentorPiAdapter mentorPiAdapter;
@@ -219,7 +222,7 @@ public class MentorChatService {
             // take several seconds and the user otherwise stares at a blank screen. Mark the
             // translator started here so it suppresses the duplicate Start it would otherwise
             // emit on Pi's first message_start; the translator still fires StartStep per
-            // assistant message (translator now decouples the two — see handleMessageStart).
+            // assistant message (the two are decoupled — see handleMessageStart).
             channel.send(new UIMessageChunk.Start(assistantMessageId, null));
             state.markStarted();
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
@@ -262,9 +265,13 @@ public class MentorChatService {
             clientHolder.set(client);
             client.start();
             // SSE lifecycle may have flipped the channel between bindLifecycle and clientHolder.set.
-            // Re-fire the abort if so.
+            // Re-fire the abort AND short-circuit: without the throw, execution falls through into the
+            // 20s hello + 195s prompt deadline while still holding the per-thread lock — the exact cost
+            // the pre-attach guard at isClientGone() above was added to avoid. The outer
+            // ClientDisconnectedException catch takes the cheap drain-with-20s-timeout path instead.
             if (channel.isClientGone()) {
                 abortRunnerOnDisconnect(client, request.threadId());
+                throw new ClientDisconnectedException("Client disconnected after runner start");
             }
 
             JsonNode hello = client.hello().get(20, TimeUnit.SECONDS);
@@ -524,15 +531,28 @@ public class MentorChatService {
     }
 
     /**
-     * Resolve the LLM config mentor should use: first enabled workspace-scoped
-     * {@link AgentConfig}. A single source of truth — no instance-level override path.
+     * Resolve the LLM config the mentor should use. Prefers the workspace's explicitly bound
+     * {@code mentor_config_id}; if it is unset, foreign, or disabled, falls back to the oldest
+     * enabled config (id-ordered, so the fallback is deterministic).
+     *
+     * <p>Deliberate asymmetry with practice detection ({@code AgentJobService.resolvePracticeConfigs}):
+     * a disabled <em>mentor</em> binding FALLS BACK (the mentor must stay answerable mid-conversation),
+     * whereas a disabled <em>practice</em> binding PAUSES detection (opt-in automation — silence is safe).
+     *
+     * <p>The bound id is always loaded via the workspace-scoped finder — never a bare
+     * {@code findById} — because prod tenancy enforcement is advisory ({@code log}), so the
+     * scoped query is the only real cross-tenant guard.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
+        Long boundConfigId = workspaceRepository.findById(workspaceId).map(Workspace::getMentorConfigId).orElse(null);
+        if (boundConfigId != null) {
+            Optional<AgentConfig> bound = agentConfigRepository.findByIdAndWorkspaceId(boundConfigId, workspaceId);
+            if (bound.isPresent() && bound.get().isEnabled()) {
+                return MentorLlmConfig.fromAgentConfig(bound.get());
+            }
+        }
         return agentConfigRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .filter(AgentConfig::isEnabled)
-            .findFirst()
+            .findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(workspaceId)
             .map(MentorLlmConfig::fromAgentConfig)
             .orElseThrow(() ->
                 new IllegalStateException(

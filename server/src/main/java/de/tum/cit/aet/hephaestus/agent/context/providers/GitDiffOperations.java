@@ -90,15 +90,20 @@ public class GitDiffOperations {
 
             ObjectId branchBase = repo.resolve("refs/remotes/origin/" + targetBranch);
             ObjectId branchHead = repo.resolve("refs/remotes/origin/" + sourceBranch);
-            if (branchBase != null && branchHead != null) {
-                if (branchHead.equals(head)) {
-                    return new String[] { branchBase.getName(), branchHead.getName() };
-                }
-                log.warn(
-                    "Stale branch ref: branch=origin/{}, expected={}, actual={}",
+            // Do NOT short-circuit to [targetBranchTip, head] when the source ref matches head: that is a
+            // 2-dot range (git diff target..head) which, once the target branch has advanced past the
+            // fork point, surfaces files the target changed as phantom diffs — the developer never
+            // touched them. Always fall through to the merge-base so the range is 3-dot
+            // (git diff target...head = only what THIS branch added since it diverged).
+            if (branchBase != null && branchHead != null && !branchHead.equals(head) && log.isDebugEnabled()) {
+                // Informational only: the source tip is never used as a range endpoint (we always use the
+                // merge-base for a 3-dot range), so a source ref that differs from head is the normal expected
+                // condition, not an actionable problem.
+                log.debug(
+                    "source ref origin/{} resolves to {} not head {}, using merge-base range",
                     sourceBranch,
-                    headSha,
-                    branchHead.getName()
+                    branchHead.getName(),
+                    headSha
                 );
             }
 
@@ -129,6 +134,8 @@ public class GitDiffOperations {
                 }
             }
 
+            // No usable 3-dot base: the source is already an ancestor of the target (merged → a 3-dot
+            // diff is legitimately empty) or the histories are disjoint. Both legitimately resolve to null.
             return null;
         });
     }
@@ -159,8 +166,7 @@ public class GitDiffOperations {
     /**
      * Per-file diff statistics shaped like {@code git diff --stat}: {@code  path | N} for text
      * files, {@code  path | Bin} for binaries, renamed files as {@code old => new}. No summary
-     * footer; {@link de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler#parseDiffStatPaths}
-     * tolerates either shape.
+     * footer — emitted verbatim as {@code diff_stat.txt} for the agent to read.
      */
     @Nullable
     public String diffStat(Path repoPath, String baseRef, String headRef) {
@@ -302,6 +308,15 @@ public class GitDiffOperations {
         Integer newLineNum = null;
 
         for (String line : lines) {
+            // A new file's header resets the counter: without this, the metadata + first lines of the SECOND
+            // file in a multi-file diff inherit the FIRST file's trailing line number until that file's first
+            // hunk header is reached, mis-stamping every [L<n>] marker. Emit the header verbatim.
+            if (line.startsWith("diff --git")) {
+                newLineNum = null;
+                out.append(line).append('\n');
+                continue;
+            }
+
             Matcher m = HUNK_HEADER.matcher(line);
             if (m.find()) {
                 newLineNum = Integer.parseInt(m.group(1));
@@ -310,6 +325,22 @@ public class GitDiffOperations {
             }
 
             if (newLineNum == null) {
+                out.append(line).append('\n');
+                continue;
+            }
+
+            // The trailing element of split("\n", -1) is "" because the JGit diff ends with '\n'. When the diff
+            // ended inside a hunk (newLineNum non-null) that empty element would otherwise hit the context branch
+            // below and emit a spurious "[L<n>] " line the model reads as a real (empty) source line. An in-hunk
+            // blank context line is a single space, never empty, so skipping the empty element is safe.
+            if (line.isEmpty()) {
+                out.append('\n');
+                continue;
+            }
+
+            // The "\ No newline at end of file" marker is diff metadata, not source content — emit it verbatim
+            // and do NOT advance the line counter (it does not correspond to a new-side source line).
+            if (line.startsWith("\\")) {
                 out.append(line).append('\n');
                 continue;
             }

@@ -1,5 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireInt;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireLong;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
+
 import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -11,7 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
+import de.tum.cit.aet.hephaestus.practices.observation.DeveloperHistoryProvider;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,6 +23,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +36,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises the PR-review workspace context under {@code context/target/}:
+ * Materialises the PR-review workspace context under {@code inputs/context/}:
  * <ul>
  *   <li>{@code metadata.json} — PR metadata, enriched from DB, plus commit log</li>
  *   <li>{@code comments.json} — review comments (most recent 500)</li>
@@ -46,16 +52,24 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class PullRequestContentProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "scm";
+    }
+
     private static final Logger log = LoggerFactory.getLogger(PullRequestContentProvider.class);
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */
     static final int MAX_COMMENTS = 500;
 
+    /** Captures the b-side path of a git diff header — robust against renames and paths containing " b/". */
+    private static final Pattern DIFF_GIT_HEADER = Pattern.compile("^diff --git a/.* b/(.+)$");
+
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
-    private final ContributorHistoryProvider contributorHistoryProvider;
+    private final DeveloperHistoryProvider developerHistoryProvider;
     private final GitDiffOperations gitDiffOperations;
     private final ConnectionService connectionService;
 
@@ -76,7 +90,7 @@ public class PullRequestContentProvider implements ContentProvider {
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
-        ContributorHistoryProvider contributorHistoryProvider,
+        DeveloperHistoryProvider developerHistoryProvider,
         GitDiffOperations gitDiffOperations,
         ConnectionService connectionService,
         List<ScmTokenSource> tokenSourceList
@@ -85,7 +99,7 @@ public class PullRequestContentProvider implements ContentProvider {
         this.gitRepositoryManager = gitRepositoryManager;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewCommentRepository = reviewCommentRepository;
-        this.contributorHistoryProvider = contributorHistoryProvider;
+        this.developerHistoryProvider = developerHistoryProvider;
         this.gitDiffOperations = gitDiffOperations;
         this.connectionService = connectionService;
         Map<IntegrationKind, ScmTokenSource> map = new EnumMap<>(IntegrationKind.class);
@@ -121,9 +135,17 @@ public class PullRequestContentProvider implements ContentProvider {
 
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
+        // Refresh the clone ONCE, up-front, before anything reads refs from it. The commit log
+        // (addCommitLog) and the diff (computeAndStoreDiff) both resolve a range against the local
+        // clone; doing the fetch here guarantees they see the same, freshest ref state. Otherwise a
+        // fresh-push / stale-clone run would skip the commit log (head not yet local) while the diff,
+        // computed after a later fetch, succeeds — an inconsistent context.
+        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
+        boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
+
         storeMetadataAndComments(files, pullRequest, pullRequestId, metadata);
-        storeContributorHistory(files, pullRequest, job);
-        computeAndStoreDiff(files, repositoryId, metadata, job);
+        storeDeveloperHistory(files, pullRequest, job);
+        computeAndStoreDiff(files, repositoryId, metadata, headVerified);
         computeAndStoreDiffSummary(files);
     }
 
@@ -148,23 +170,25 @@ public class PullRequestContentProvider implements ContentProvider {
             return false;
         }
 
+        var workspace = job.getWorkspace();
+        // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
+        // kind from the connection (never hardcode a vendor) and look up its token source.
+        // The fetch only actually fires when that source exposes a deterministic clone URL
+        // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
+        // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
+        // empty serverUrl; its fetches go through GithubDataSyncService instead).
+        var kind =
+            workspace == null
+                ? Optional.<IntegrationKind>empty()
+                : connectionService.findActiveProviderKind(workspace.getId());
+        ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
+
         boolean fetched = false;
+        String serverUrl = null;
         try {
-            var workspace = job.getWorkspace();
-            // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
-            // kind from the connection (never hardcode a vendor) and look up its token source.
-            // The fetch only actually fires when that source exposes a deterministic clone URL
-            // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
-            // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
-            // empty serverUrl; its historical fetches go through GithubDataSyncService instead).
-            var kind =
-                workspace == null
-                    ? Optional.<IntegrationKind>empty()
-                    : connectionService.findActiveProviderKind(workspace.getId());
-            ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
             if (source != null) {
                 Long scopeId = workspace.getId();
-                String serverUrl = source.serverUrl(scopeId).orElse(null);
+                serverUrl = source.serverUrl(scopeId).orElse(null);
                 String token = source.accessToken(scopeId).orElse(null);
                 JsonNode metadata = job.getMetadata();
                 String repoFullName =
@@ -179,7 +203,16 @@ public class PullRequestContentProvider implements ContentProvider {
                 }
             }
         } catch (Exception e) {
-            log.warn("Pre-diff fetch failed: repoId={}, error={}", repositoryId, e.getMessage());
+            // Log the full exception (class + stack), not just the message: an auth/credential failure here
+            // is usually systemic (it will hit every job in the workspace) and the class is what makes it
+            // diagnosable. Include kind/serverUrl for triage — never the token.
+            log.warn(
+                "Pre-diff fetch failed: repoId={}, kind={}, serverUrl={}",
+                repositoryId,
+                kind.orElse(null),
+                serverUrl,
+                e
+            );
         }
 
         if (headSha != null && !headSha.isBlank()) {
@@ -279,7 +312,11 @@ public class PullRequestContentProvider implements ContentProvider {
         for (var comment : comments) {
             var commentNode = objectMapper.createObjectNode();
             commentNode.put("path", comment.getPath());
-            commentNode.put("line", comment.getLine());
+            // line is a primitive int; a file-level / general review comment has no anchored line and reports 0.
+            // Omit the key in that case so an absent anchor reads as absent, not as a literal line-0 anchor.
+            if (comment.getLine() > 0) {
+                commentNode.put("line", comment.getLine());
+            }
             commentNode.put("body", comment.getBody());
             if (comment.getCreatedAt() != null) {
                 commentNode.put("created_at", comment.getCreatedAt().toString());
@@ -330,33 +367,33 @@ public class PullRequestContentProvider implements ContentProvider {
         }
     }
 
-    // Contributor history
+    // Developer history
 
-    private void storeContributorHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
+    private void storeDeveloperHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
         if (pullRequest == null || pullRequest.getAuthor() == null || job.getWorkspace() == null) {
             if (pullRequest != null && pullRequest.getAuthor() == null) {
-                log.debug("Skipping contributor history: PR has no author, pullRequestId={}", pullRequest.getId());
+                log.debug("Skipping developer history: PR has no author, pullRequestId={}", pullRequest.getId());
             }
             return;
         }
-        Long contributorId = pullRequest.getAuthor().getId();
+        Long developerId = pullRequest.getAuthor().getId();
         Long workspaceId = job.getWorkspace().getId();
 
         try {
-            Optional<byte[]> historyJson = contributorHistoryProvider.buildHistoryJson(contributorId, workspaceId);
+            Optional<byte[]> historyJson = developerHistoryProvider.buildHistoryJson(developerId, workspaceId);
             historyJson.ifPresent(json -> {
                 files.put(OUTPUT_PREFIX + "contributor_history.json", json);
                 log.info(
-                    "Injected contributor history: {} bytes, contributorId={}, workspaceId={}",
+                    "Injected developer history: {} bytes, developerId={}, workspaceId={}",
                     json.length,
-                    contributorId,
+                    developerId,
                     workspaceId
                 );
             });
         } catch (Exception e) {
             log.warn(
-                "Failed to build contributor history, continuing without it: contributorId={}, workspaceId={}",
-                contributorId,
+                "Failed to build developer history, continuing without it: developerId={}, workspaceId={}",
+                developerId,
                 workspaceId,
                 e
             );
@@ -365,7 +402,12 @@ public class PullRequestContentProvider implements ContentProvider {
 
     // Diff
 
-    private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata, AgentJob job) {
+    private void computeAndStoreDiff(
+        Map<String, byte[]> files,
+        long repositoryId,
+        JsonNode metadata,
+        boolean headVerified
+    ) {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
@@ -374,8 +416,6 @@ public class PullRequestContentProvider implements ContentProvider {
             return;
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-
-        boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
 
         try {
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
@@ -475,8 +515,11 @@ public class PullRequestContentProvider implements ContentProvider {
                     filePaths.add(currentPath);
                 }
                 currentChunk = new StringBuilder();
-                int bIdx = effectiveLine.lastIndexOf(" b/");
-                currentPath = bIdx > 0 ? effectiveLine.substring(bIdx + 3) : effectiveLine;
+                Matcher m = DIFF_GIT_HEADER.matcher(effectiveLine);
+                // On a malformed/unusual header the captured path is unavailable; fall back to the raw
+                // header line, but sanitize it first — it is rendered verbatim into a markdown table cell
+                // and a section heading, so a stray pipe/backtick would corrupt the table the agent reads.
+                currentPath = m.matches() ? m.group(1) : sanitizePathCell(effectiveLine);
             }
             currentChunk.append(line).append('\n');
         }
@@ -513,6 +556,16 @@ public class PullRequestContentProvider implements ContentProvider {
         log.info("Diff summary: {} files, {} bytes", filePaths.size(), summaryBytes.length);
     }
 
+    /**
+     * Sanitizes a fallback (unparseable) diff-header path before it is placed into the markdown summary's
+     * table cell and section heading: strips the {@code diff --git } prefix and removes pipe/backtick
+     * characters that would break the markdown table the agent consumes.
+     */
+    private static String sanitizePathCell(String rawHeader) {
+        String stripped = rawHeader.startsWith("diff --git ") ? rawHeader.substring("diff --git ".length()) : rawHeader;
+        return stripped.replace("|", "").replace("`", "").trim();
+    }
+
     private static int countAddedLines(String fileDiff) {
         int count = 0;
         for (String line : fileDiff.split("\n", -1)) {
@@ -521,41 +574,5 @@ public class PullRequestContentProvider implements ContentProvider {
             }
         }
         return count;
-    }
-
-    // Metadata field helpers (mirrored from former PullRequestReviewHandler helpers)
-
-    private static String requireText(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asString().isBlank()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        return node.asString();
-    }
-
-    private static int requireInt(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        if (!node.isNumber()) {
-            throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
-        }
-        return node.asInt();
-    }
-
-    private static long requireLong(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        if (!node.isNumber()) {
-            throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
-        }
-        return node.asLong();
     }
 }

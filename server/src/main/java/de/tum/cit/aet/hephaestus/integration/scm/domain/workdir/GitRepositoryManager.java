@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -53,21 +54,28 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
+    /** Connector namespace for SCM checkouts in the fabric {@code sources/} tree (one among future slack/, outline/). */
+    private static final String SCM_CONNECTOR = "scm";
+
     private final GitRepositoryProperties properties;
     private final GitRepositoryLockManager lockManager;
-    private final Path baseStoragePath;
+    private final FabricLayout fabricLayout;
 
-    public GitRepositoryManager(GitRepositoryProperties properties, GitRepositoryLockManager lockManager) {
+    public GitRepositoryManager(
+        GitRepositoryProperties properties,
+        GitRepositoryLockManager lockManager,
+        FabricLayout fabricLayout
+    ) {
         this.properties = properties;
         this.lockManager = lockManager;
-        this.baseStoragePath = Path.of(properties.storagePath());
+        this.fabricLayout = fabricLayout;
 
         if (properties.enabled()) {
             try {
-                Files.createDirectories(baseStoragePath);
-                log.info("Git repository storage initialized at: {}", baseStoragePath);
+                Files.createDirectories(fabricLayout.root());
+                log.info("Git repository storage initialized under fabric root: {}", fabricLayout.root());
             } catch (IOException e) {
-                log.error("Failed to create git storage directory: {}", baseStoragePath, e);
+                log.error("Failed to create fabric storage root: {}", fabricLayout.root(), e);
                 throw new IllegalStateException("Cannot initialize git storage", e);
             }
         }
@@ -81,11 +89,13 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Get the local path for a repository clone.
-     * Path format: {baseStoragePath}/{repositoryId}
+     * Get the local path for a repository clone — the SCM connector's bulk artifact in the Context
+     * Fabric (ADR 0020). Path format: {@code {fabric.root}/sources/scm/{repositoryId}}. A clone is a
+     * rebuildable cache, so the move from the legacy {@code {root}/{repositoryId}} layout needs no
+     * data migration: a stale-or-absent clone is simply re-fetched at this path on first use.
      */
     public Path getRepositoryPath(Long repositoryId) {
-        return baseStoragePath.resolve(repositoryId.toString());
+        return fabricLayout.source(SCM_CONNECTOR, repositoryId.toString());
     }
 
     /**
@@ -118,13 +128,34 @@ public class GitRepositoryManager {
                     deleteRecursively(repoPath);
                     log.info("Deleted local git clone: repoId={}, path={}", repositoryId, repoPath);
                 } catch (IOException e) {
-                    log.error(
-                        "Failed to delete local git clone: repoId={}, path={}, error={}",
+                    // A partial delete that leaves .git/HEAD behind would let isRepositoryCloned() keep
+                    // reporting true, so a later ensureRepository() would fetch into a half-deleted tree
+                    // forever. Fall back to JGit's forced recursive delete (same as cloneRepository's
+                    // stale-checkout cleanup); if even that fails, surface the failure so the purge caller
+                    // can react instead of silently leaving a corrupt clone in place.
+                    log.warn(
+                        "Recursive delete failed, retrying with forced delete: repoId={}, path={}, error={}",
                         repositoryId,
                         repoPath,
-                        e.getMessage(),
-                        e
+                        e.getMessage()
                     );
+                    try {
+                        FileUtils.delete(repoPath.toFile(), FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
+                        log.info(
+                            "Deleted local git clone via forced delete: repoId={}, path={}",
+                            repositoryId,
+                            repoPath
+                        );
+                    } catch (IOException forced) {
+                        log.error(
+                            "Failed to delete local git clone: repoId={}, path={}, error={}",
+                            repositoryId,
+                            repoPath,
+                            forced.getMessage(),
+                            forced
+                        );
+                        throw new GitOperationException("Failed to delete local git clone: " + repositoryId, forced);
+                    }
                 }
             }
         });
@@ -443,7 +474,9 @@ public class GitRepositoryManager {
                 );
                 if (remoteRefs.isEmpty()) {
                     log.warn("No remote branches found for multi-branch walk: repoId={}", repositoryId);
-                    return List.of();
+                    // Return a mutable empty list, matching the normal-path return below, so callers see one
+                    // consistent contract (GitLabCommitBackfillService calls subList on the result).
+                    return new ArrayList<>();
                 }
 
                 ObjectId fromId = fromSha != null ? repo.resolve(fromSha) : null;
@@ -847,11 +880,16 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Sanitize URL for logging (remove tokens).
+     * Sanitize URL for logging (remove credentials).
+     *
+     * <p>Redacts the ENTIRE userinfo segment ({@code //user:secret@host} → {@code //***@host}), not just
+     * the {@code x-access-token:} shape: GitLab auto-registration commonly carries credentials as
+     * {@code gitlab-ci-token:<token>@} or {@code oauth2:<token>@}, so a token-specific redaction would leak
+     * those forms in clear text.
      */
     private String sanitizeUrl(String url) {
         if (url == null) return null;
-        return url.replaceAll("x-access-token:[^@]+@", "x-access-token:***@");
+        return url.replaceAll("//[^/@]+@", "//***@");
     }
 
     /**

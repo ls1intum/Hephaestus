@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -41,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -77,6 +79,15 @@ class MentorChatServiceTest extends BaseUnitTest {
     private static final long USER_ID = 99L;
     private static final UUID THREAD_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
+    /**
+     * Number of synchronous orchestrator preamble sends that precede the runner event stream:
+     * {@code Start} (1), {@code DataMentorStatus} (2), then the translator's {@code Start} + {@code StartStep}
+     * from Pi's first {@code message_start} (3, 4). A disconnect scheduled at this index lands on the FIRST
+     * mid-stream text chunk (the event-handler thread). Named so the intent survives a preamble refactor —
+     * a raw literal silently moves which frame throws.
+     */
+    private static final int PREAMBLE_SEND_COUNT = 4;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Mock
@@ -87,6 +98,9 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     @Mock
     AgentConfigRepository agentConfigRepository;
+
+    @Mock
+    WorkspaceRepository workspaceRepository;
 
     @Mock
     WorkspaceContextBuilder workspaceContextBuilder;
@@ -120,8 +134,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         emitter = new RecordingEmitter();
 
         // Package-private constructors on the executor wrappers (see MentorChatExecutorConfig)
-        // let us inject deterministic delegates without reflection — no more brittle final-field
-        // rewrites that break on every minor refactor.
+        // let us inject deterministic delegates without reflection on final fields.
         MentorChatExecutorConfig.MentorTurnExecutor turnExecutorBean = new MentorChatExecutorConfig.MentorTurnExecutor(
             turnExec
         );
@@ -134,6 +147,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             userRepository,
             chatThreadRepository,
             agentConfigRepository,
+            workspaceRepository,
             mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
@@ -160,7 +174,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         agentConfig.setLlmApiKey("test-key");
         agentConfig.setModelName("test-model");
         agentConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findByWorkspaceId(eq(WORKSPACE_ID))).thenReturn(List.of(agentConfig));
+        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+            Optional.of(agentConfig)
+        );
 
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
@@ -234,16 +250,86 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
     }
 
+    // 1b. Mentor runtime resolution — a bound + enabled config is preferred and the workspace-scoped
+    // finder (the only real cross-tenant guard) is used; the fan-out fallback is NOT consulted.
+
+    @Test
+    void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
+        Workspace boundWs = new Workspace();
+        boundWs.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
+        AgentConfig boundConfig = new AgentConfig();
+        boundConfig.setEnabled(true);
+        boundConfig.setLlmProvider(LlmProvider.OPENAI);
+        boundConfig.setCredentialMode(CredentialMode.API_KEY);
+        boundConfig.setLlmApiKey("bound-key");
+        boundConfig.setModelName("bound-model");
+        boundConfig.setTimeoutSeconds(600);
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(boundConfig));
+
+        scheduleHappyPathResponses(sandbox).run();
+        runTurnSync();
+
+        verify(agentConfigRepository).findByIdAndWorkspaceId(99L, WORKSPACE_ID);
+        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+    }
+
+    // 1c. The deliberate asymmetry vs practice detection: a bound-but-DISABLED mentor config does NOT
+    // pause the mentor (which would block chat) — it falls back to the oldest enabled config.
+
+    @Test
+    void runTurn_fallsBackToOldestEnabled_whenBoundMentorConfigDisabled() throws Exception {
+        Workspace boundWs = new Workspace();
+        boundWs.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
+        AgentConfig disabled = new AgentConfig();
+        disabled.setEnabled(false);
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
+
+        scheduleHappyPathResponses(sandbox).run();
+        runTurnSync();
+
+        verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+    }
+
+    // 1d. No enabled AgentConfig for the workspace → resolveLlmConfig.orElseThrow. This is the only
+    // un-covered exit of the documented cross-tenant guard, and it fires BEFORE the sandbox attaches —
+    // a distinct early-failure ordering (no runner, lock still released, ERROR outcome).
+
+    @Test
+    void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
+        // Neither a bound config (findById → empty by default) nor the fallback finder yields a config.
+        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+            Optional.empty()
+        );
+
+        runTurnSync();
+
+        // Error surfaced on the wire (resolveLlmConfig threw before any runner work).
+        assertThat(emitter.recordedTypes()).contains("error");
+        // Sandbox never attached — the failure precedes the cold-start attach.
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        // No runner persistence side effects past the in-flight row; neither finalise nor a sandbox close.
+        verify(persistence, never()).finalise(any(), any(), any());
+        // Lock released cleanly and the ERROR outcome recorded.
+        assertThat(turnLock.activeKeys()).isZero();
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
     // 2. Client disconnect: runner draining, abort sent, finalise still runs
 
     @Test
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // 4 sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
-        // message_start), 5th throws IOException. By call 5 the runner client is live, so the
+        // The preamble sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
+        // message_start); the next send throws IOException. By then the runner client is live, so the
         // abort hook fires. The runner keeps streaming to Finish; persistence.finalise still
         // runs from inside handleEvent — disconnects must NOT be reclassified as turn failures.
-        emitter.disconnectAfterCalls = 4;
+        emitter.disconnectAfterCalls = PREAMBLE_SEND_COUNT;
 
         runTurnSync();
 
@@ -262,6 +348,26 @@ class MentorChatServiceTest extends BaseUnitTest {
         // hook fired (verified above). CLIENT_DISCONNECT outcome is reserved for the rare
         // case where the orchestrator's *synchronous* sends fail before the runner attaches —
         // tested separately below.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+    }
+
+    @Test
+    void runTurn_clientDisconnectBeforeEventStream_stillAbortsAndFinalises() throws Exception {
+        scheduleHappyPathResponses(sandbox).run();
+        // Disconnect lands on call #3 — the translator's FIRST chunk from Pi's message_start — i.e. before
+        // any text delta has streamed. This proves the abort hook + persistence.finalise still run when the
+        // disconnect precedes the bulk of the event stream, not only on a mid-text chunk. Decoupled from the
+        // exact preamble length so it survives a preamble refactor.
+        emitter.disconnectAfterCalls = 2;
+
+        runTurnSync();
+
+        // Abort fired and the runner drained to its terminal Finish despite the gone wire.
+        assertThat(sandbox.methodsSent()).contains("abort");
+        verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        verify(persistence, never()).interrupt(any(), any(), any());
+        assertThat(turnLock.activeKeys()).isZero();
+        // Same as the mid-stream case: a disconnect swallowed inside handleEvent completes as SUCCESS.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 
@@ -300,7 +406,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
         verify(persistence, never()).finalise(any(), any(), any());
         assertThat(turnLock.activeKeys()).isZero();
-        // Poisoned is a distinct outcome from a generic error — keep the labels separate so
+        // Poisoned is a distinct outcome from a generic error — the labels stay separate.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
@@ -397,7 +503,6 @@ class MentorChatServiceTest extends BaseUnitTest {
         service.start(new MentorChatService.MentorTurnRequest(WORKSPACE_ID, THREAD_ID, "hello mentor", null), emitter);
     }
 
-    /** Direct (synchronous) ExecutorService — the test thread runs every task before returning. */
     /** Minimal {@link ObjectProvider} that always yields the supplied sandbox-service mock. */
     private static ObjectProvider<InteractiveSandboxService> sandboxServiceProvider(InteractiveSandboxService svc) {
         return new ObjectProvider<>() {
@@ -562,8 +667,8 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     /**
      * Reflection set used ONLY for the JPA-entity {@code User.id} (no setter and we don't want a
-     * Spring test slice here). Executor-bean wrappers now take an explicit constructor parameter
-     * so we don't reach for reflection there.
+     * Spring test slice here). The executor-bean wrappers take explicit constructor parameters, so
+     * they need no reflection.
      */
     private static void replaceFinalField(Object target, String name, Object value, boolean searchSuper)
         throws Exception {

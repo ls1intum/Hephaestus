@@ -64,7 +64,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
         handler = new GitLabIssueMessageHandler(issueProcessor, contextResolver, deserializer, transactionTemplate);
 
-        // Default: context resolver returns a valid context
         lenient()
             .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
             .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
@@ -74,8 +73,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     void key_returnsIssue() {
         assertThat(handler.key().eventType()).isEqualTo("issue");
     }
-
-    // Action Routing
 
     @Nested
     class ActionRouting {
@@ -94,14 +91,18 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void updateAction_routesToProcess() throws IOException {
+        void updateAction_routesToProcessUpdated() throws IOException {
+            // GitLab has no native "labeled" action — a label add arrives as action=update with a
+            // changes.labels diff. UPDATE therefore routes to processUpdated (which derives the added
+            // labels and publishes IssueLabeled), not the plain process() path.
             GitLabIssueEventDTO event = createEvent("update", "closed", false);
             setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
 
-            verify(issueProcessor).process(eq(event), any(ProcessingContext.class));
+            verify(issueProcessor).processUpdated(eq(event), any(ProcessingContext.class));
+            verify(issueProcessor, never()).process(any(), any());
         }
 
         @Test
@@ -140,9 +141,47 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             verify(issueProcessor, never()).processClosed(any(), any());
             verify(issueProcessor, never()).processReopened(any(), any());
         }
-    }
 
-    // Confidential Issue Handling
+        @Test
+        void nullAction_skipsProcessing() throws IOException {
+            // A genuinely malformed payload omits object_attributes.action entirely (null), not a bogus
+            // string. actionType() guards null → UNKNOWN → the default/skip branch, so no processor runs.
+            var attrs = new GitLabIssueEventDTO.ObjectAttributes(
+                422296L,
+                5,
+                "Title",
+                "desc",
+                "opened",
+                null,
+                false,
+                18024L,
+                null,
+                null,
+                "2026-01-31 19:03:35 +0100",
+                "2026-01-31 19:03:35 +0100",
+                null,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
+            );
+            GitLabIssueEventDTO event = new GitLabIssueEventDTO(
+                "issue",
+                "issue",
+                createUser(),
+                createProject(),
+                attrs,
+                List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+                null,
+                null
+            );
+
+            Message msg = mockMessage(event);
+            handler.onMessage(msg);
+
+            verify(issueProcessor, never()).process(any(), any());
+            verify(issueProcessor, never()).processUpdated(any(), any());
+            verify(issueProcessor, never()).processClosed(any(), any());
+            verify(issueProcessor, never()).processReopened(any(), any());
+        }
+    }
 
     @Nested
     class ConfidentialIssues {
@@ -183,6 +222,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
                 createProject(),
                 attrs,
                 null,
+                null,
                 null
             );
 
@@ -192,8 +232,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             verify(issueProcessor, never()).process(any(), any());
         }
     }
-
-    // Validation
 
     @Nested
     class PayloadValidation {
@@ -205,6 +243,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
                 "issue",
                 createUser(),
                 createProject(),
+                null,
                 null,
                 null,
                 null
@@ -241,6 +280,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
                 null,
                 attrs,
                 null,
+                null,
                 null
             );
 
@@ -261,8 +301,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             verify(issueProcessor, never()).process(any(), any());
         }
     }
-
-    // Context Resolution
 
     @Nested
     class ContextResolution {
@@ -312,6 +350,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             createProject(),
             attrs,
             List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+            null,
             null
         );
     }

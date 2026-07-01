@@ -51,12 +51,29 @@ class DiffHunkValidator {
             }
 
             if (effectiveLine.startsWith("diff --git")) {
-                int bIdx = effectiveLine.lastIndexOf(" b/");
-                if (bIdx > 0) {
-                    currentFile = effectiveLine.substring(bIdx + 3);
+                // Best-effort path from the `diff --git a/.. b/..` line. git quotes paths containing spaces
+                // (`diff --git "a/x y" "b/x y"`), which mangles this heuristic, so it is only a fallback — the
+                // canonical new-path is the `+++ b/` line parsed below, which always precedes the file's hunks.
+                currentFile = parseGitHeaderPath(effectiveLine);
+                if (currentFile != null) {
                     result.putIfAbsent(currentFile, new TreeSet<>());
                 }
                 newLineNum = 0;
+                continue;
+            }
+
+            // A `+++ b/path` header only appears between `diff --git` and the first hunk (newLineNum still 0);
+            // inside a hunk newLineNum is non-zero, so a real added source line like `+++ foo` is never
+            // misread as a file header.
+            if (newLineNum == 0 && effectiveLine.startsWith("+++ ")) {
+                // Canonical new-side path for this file. Overrides the `diff --git` heuristic so a quoted /
+                // space-containing path is matched reliably (it is unquoted-stripped here). /dev/null (deletes)
+                // yields no usable path and is ignored.
+                String plusPath = parsePlusPath(effectiveLine);
+                if (plusPath != null) {
+                    currentFile = plusPath;
+                    result.putIfAbsent(currentFile, new TreeSet<>());
+                }
                 continue;
             }
 
@@ -88,8 +105,9 @@ class DiffHunkValidator {
     /**
      * Snap window: maximum line delta we'll silently fix before dropping. A diff note at L42 when
      * only L500 is valid is more confusing than no note at all — the student sees an unrelated
-     * comment and has to invert the agent's intent. Notes beyond the window are dropped (and the
-     * caller surfaces them in the MR summary if needed).
+     * comment and has to invert the agent's intent. Notes beyond the window are dropped; the finding's
+     * detail still appears in the server-composed MR summary because only delivered notes demote their
+     * summary section.
      */
     static final int MAX_SNAP_DELTA = 10;
 
@@ -124,8 +142,18 @@ class DiffHunkValidator {
             }
 
             if (fileLines.contains(note.startLine())) {
-                // Line is valid — keep as-is
-                corrected.add(note);
+                // startLine is valid, but a model may still emit an out-of-range or gap-crossing endLine that
+                // GitHub rejects at the multi-line suggestion anchor — the exact failure this validator prevents.
+                // Apply the same span-containment guard used on the snap path: collapse endLine to startLine
+                // unless every line in [startLine, endLine] is a valid diff line.
+                Integer validatedEnd = containedEnd(fileLines, note.startLine(), note.endLine());
+                if (java.util.Objects.equals(validatedEnd, note.endLine())) {
+                    corrected.add(note);
+                } else {
+                    corrected.add(
+                        new DiffNote(note.filePath(), note.startLine(), validatedEnd, note.body(), note.recurrenceKey())
+                    );
+                }
                 continue;
             }
 
@@ -165,16 +193,14 @@ class DiffHunkValidator {
             if (correctedEnd != null) {
                 int originalSpan = Math.max(0, note.endLine() - note.startLine());
                 int desiredEnd = nearest + originalSpan;
-                // Find nearest valid line that doesn't expand beyond the original span
+                // Find nearest valid line that doesn't expand beyond the original span, then enforce contiguity.
                 Integer nearestEnd = fileLines.floor(desiredEnd);
-                if (nearestEnd != null && nearestEnd >= nearest) {
-                    correctedEnd = nearestEnd;
-                } else {
-                    correctedEnd = nearest; // collapse to single-line
-                }
+                correctedEnd = containedEnd(fileLines, nearest, nearestEnd);
             }
 
-            corrected.add(new DiffNote(note.filePath(), nearest, correctedEnd, note.body()));
+            // Only the position changes — preserve the finding's correlation key so the snapped note still
+            // maps back to its persisted finding (ADR 0021 C2).
+            corrected.add(new DiffNote(note.filePath(), nearest, correctedEnd, note.body(), note.recurrenceKey()));
         }
 
         if (corrections > 0 || dropped > 0) {
@@ -185,8 +211,59 @@ class DiffHunkValidator {
     }
 
     /**
-     * Find the nearest value in a sorted set to the target.
+     * Fallback file path from a {@code diff --git a/.. b/..} header via the last {@code  b/} segment, with
+     * surrounding quotes stripped (git quotes paths containing spaces). Returns null when no {@code  b/}
+     * segment is present.
      */
+    private static String parseGitHeaderPath(String header) {
+        int bIdx = header.lastIndexOf(" b/");
+        if (bIdx <= 0) {
+            return null;
+        }
+        return stripQuotes(header.substring(bIdx + 3));
+    }
+
+    /**
+     * Canonical new-side path from a {@code +++ b/path} (or {@code +++ path}) header: strip the trailing
+     * tab-and-metadata, surrounding quotes, and the {@code b/} prefix. Returns null for {@code /dev/null}
+     * (a delete has no new-side path).
+     */
+    private static String parsePlusPath(String header) {
+        String p = header.substring(4).trim();
+        int tab = p.indexOf('\t');
+        if (tab >= 0) {
+            p = p.substring(0, tab);
+        }
+        p = stripQuotes(p);
+        if (p.startsWith("b/")) {
+            p = p.substring(2);
+        }
+        return p.equals("/dev/null") ? null : p;
+    }
+
+    /** Strip a single pair of surrounding double quotes (git quotes paths with spaces). */
+    private static String stripQuotes(String s) {
+        if (s.length() >= 2 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+            return s.substring(1, s.length() - 1);
+        }
+        return s;
+    }
+
+    /**
+     * Validate a multi-line suggestion anchor's end line against the diff's valid lines. The
+     * {@code [startLine, endLine]} range must be fully contained — a range that skips a non-diff interior
+     * line (e.g. startLine=10, valid {10,12,13}, endLine=13 crosses line 11) is rejected by GitHub's
+     * multi-line suggestion anchor. Returns {@code endLine} when the whole span is contiguous and valid,
+     * otherwise collapses to single-line ({@code startLine}). A null {@code endLine} stays null.
+     */
+    private static Integer containedEnd(TreeSet<Integer> fileLines, int startLine, Integer endLine) {
+        if (endLine == null || endLine <= startLine) {
+            return endLine;
+        }
+        boolean contiguous = fileLines.subSet(startLine, true, endLine, true).size() == endLine - startLine + 1;
+        return contiguous ? endLine : startLine;
+    }
+
     private static Integer findNearest(TreeSet<Integer> set, int target) {
         Integer floor = set.floor(target);
         Integer ceiling = set.ceiling(target);

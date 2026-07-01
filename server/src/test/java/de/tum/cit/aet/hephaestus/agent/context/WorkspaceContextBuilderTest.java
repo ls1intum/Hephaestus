@@ -30,14 +30,14 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     private static WorkspaceContextBuilder builderOf(ContentProvider... providers) {
-        return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry());
+        return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry(), null);
     }
 
     private static SimpleMeterRegistry sharedRegistry;
 
     private static WorkspaceContextBuilder builderWithSharedRegistry(ContentProvider... providers) {
         sharedRegistry = new SimpleMeterRegistry();
-        return new WorkspaceContextBuilder(List.of(providers), sharedRegistry);
+        return new WorkspaceContextBuilder(List.of(providers), sharedRegistry, null);
     }
 
     /** Helper to construct a stub provider inline. */
@@ -48,6 +48,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         boolean throwError
     ) {
         return new ContentProvider() {
+            @Override
+            public String connectorId() {
+                return "test";
+            }
+
             @Override
             public boolean supports(ContextRequest request) {
                 return true;
@@ -107,8 +112,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Map<String, byte[]> files = builderOf(a, b).build(reviewRequest());
 
             assertThat(files).hasSize(2);
-            assertThat(files.get("context/target/a.txt")).asString(StandardCharsets.UTF_8).isEqualTo("A");
-            assertThat(files.get("context/target/b.txt")).asString(StandardCharsets.UTF_8).isEqualTo("B");
+            assertThat(files.get("inputs/context/a.txt")).asString(StandardCharsets.UTF_8).isEqualTo("A");
+            assertThat(files.get("inputs/context/b.txt")).asString(StandardCharsets.UTF_8).isEqualTo("B");
         }
 
         @Test
@@ -123,17 +128,22 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var supports = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
             var skips = new ContentProvider() {
                 @Override
+                public String connectorId() {
+                    return "test";
+                }
+
+                @Override
                 public boolean supports(ContextRequest request) {
                     return false;
                 }
 
                 @Override
                 public void contribute(ContextRequest request, Map<String, byte[]> files) {
-                    files.put("context/target/should-not-appear.txt", new byte[0]);
+                    files.put("inputs/context/should-not-appear.txt", new byte[0]);
                 }
             };
             Map<String, byte[]> files = builderOf(skips, supports).build(reviewRequest());
-            assertThat(files).containsOnlyKeys("context/target/a.txt");
+            assertThat(files).containsOnlyKeys("inputs/context/a.txt");
         }
     }
 
@@ -153,13 +163,18 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var bad = stubProvider(false, "x.txt", new byte[0], true);
             var good = stubProvider(true, "y.txt", "Y".getBytes(StandardCharsets.UTF_8), false);
             Map<String, byte[]> files = builderOf(bad, good).build(reviewRequest());
-            assertThat(files).containsOnlyKeys("context/target/y.txt");
+            assertThat(files).containsOnlyKeys("inputs/context/y.txt");
         }
 
         @Test
         @DisplayName("re-raises JobPreparationException without re-wrapping")
         void jpePassThrough() {
             var bad = new ContentProvider() {
+                @Override
+                public String connectorId() {
+                    return "test";
+                }
+
                 @Override
                 public boolean supports(ContextRequest request) {
                     return true;
@@ -193,6 +208,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         private final class ProviderA implements ContentProvider {
 
             @Override
+            public String connectorId() {
+                return "test";
+            }
+
+            @Override
             public boolean supports(ContextRequest request) {
                 return true;
             }
@@ -204,6 +224,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         private final class ProviderB implements ContentProvider {
+
+            @Override
+            public String connectorId() {
+                return "test";
+            }
 
             @Override
             public boolean supports(ContextRequest request) {
@@ -221,9 +246,14 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     class PrefixEnforcement {
 
         @Test
-        @DisplayName("rejects providers that write outside context/target/")
+        @DisplayName("rejects providers that write outside inputs/context/")
         void rejectsBadPrefix() {
             var wrong = new ContentProvider() {
+                @Override
+                public String connectorId() {
+                    return "test";
+                }
+
                 @Override
                 public boolean supports(ContextRequest request) {
                     return true;
@@ -251,8 +281,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             // Inject in reverse — sort should pick {first, second}.
             Map<String, byte[]> files = builderOf(second, first).build(reviewRequest());
             var iter = files.keySet().iterator();
-            assertThat(iter.next()).isEqualTo("context/target/first.txt");
-            assertThat(iter.next()).isEqualTo("context/target/second.txt");
+            assertThat(iter.next()).isEqualTo("inputs/context/first.txt");
+            assertThat(iter.next()).isEqualTo("inputs/context/second.txt");
         }
     }
 
@@ -267,7 +297,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
             ContentProvider unboundedSecond = new LatchedProvider(null, null);
             // Two distinct concrete provider classes → injection-order semantics, not dedup.
-            var builder = new WorkspaceContextBuilder(List.of(gatedFirst, unboundedSecond), new SimpleMeterRegistry());
+            var builder = new WorkspaceContextBuilder(
+                List.of(gatedFirst, unboundedSecond),
+                new SimpleMeterRegistry(),
+                null
+            );
 
             ObjectMapper mapper = new ObjectMapper();
             AgentJob jobA = new AgentJob();
@@ -288,6 +322,47 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             // latch is null, so if t2 ran ahead it would already be past the latch — but it
             // can't, because gatedFirst still holds the stripe lock. We assert t2 reaches a
             // wait/block state without a fixed sleep.
+            awaitState(
+                t2,
+                java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
+                2_000
+            );
+            firstMayFinish.countDown();
+            t1.join(2_000);
+            t2.join(2_000);
+            assertThat(t1.isAlive()).isFalse();
+            assertThat(t2.isAlive()).isFalse();
+        }
+
+        @Test
+        @DisplayName("null repoKey requests (e.g. issue reviews) all collide on stripe 0 and serialise")
+        void serialisesOnNullRepoKey() throws Exception {
+            java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
+            ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
+            ContentProvider unboundedSecond = new LatchedProvider(null, null);
+            var builder = new WorkspaceContextBuilder(
+                List.of(gatedFirst, unboundedSecond),
+                new SimpleMeterRegistry(),
+                null
+            );
+
+            // IssueReviewRequest jobs WITHOUT repository_id metadata → repoKey() is null → stripe 0.
+            // A regression returning distinct stripes for null keys would let these de-serialise.
+            AgentJob jobA = new AgentJob();
+            jobA.setId(UUID.randomUUID());
+            AgentJob jobB = new AgentJob();
+            jobB.setId(UUID.randomUUID());
+
+            Thread t1 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobA)), "t1-null");
+            Thread t2 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobB)), "t2-null");
+            t1.start();
+            assertThat(firstInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                .as("t1 should enter the critical section quickly")
+                .isTrue();
+            t2.start();
+            // t2 must park on the same stripe-0 lock while t1 holds it — its `entered` latch is null,
+            // so reaching a wait/block state proves it could not run ahead.
             awaitState(
                 t2,
                 java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
@@ -323,6 +398,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
      */
     private static final class LatchedProvider implements ContentProvider {
 
+        @Override
+        public String connectorId() {
+            return "test";
+        }
+
         private final java.util.concurrent.CountDownLatch entered;
         private final java.util.concurrent.CountDownLatch mayFinish;
 
@@ -354,6 +434,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
     /** Ordered provider: writes a single file; reports a fixed precedence. */
     private static final class OrderedStubProvider implements ContentProvider, Ordered {
+
+        @Override
+        public String connectorId() {
+            return "test";
+        }
 
         private final int order;
         private final String pathSuffix;

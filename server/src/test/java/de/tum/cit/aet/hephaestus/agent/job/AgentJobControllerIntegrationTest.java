@@ -57,8 +57,21 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         job.setConfig(config);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
+        // Include configId/configName so the DTO's snapshotLong/snapshotString extractors (AgentJobDTO.from)
+        // are exercised on their present-value branch end-to-end, not just the absent-field null path.
         job.setConfigSnapshot(
-            OBJECT_MAPPER.valueToTree(Map.of("agent_type", "CLAUDE_CODE", "model", "claude-sonnet-4-20250514"))
+            OBJECT_MAPPER.valueToTree(
+                Map.of(
+                    "agent_type",
+                    "CLAUDE_CODE",
+                    "model",
+                    "claude-sonnet-4-20250514",
+                    "configId",
+                    99,
+                    "configName",
+                    "frozen-config"
+                )
+            )
         );
         return agentJobRepository.save(job);
     }
@@ -187,6 +200,9 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(result.id()).isEqualTo(job.getId());
         assertThat(result.status()).isEqualTo(AgentJobStatus.COMPLETED);
         assertThat(result.jobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
+        // The configId/configName are projected out of the JSONB configSnapshot by AgentJobDTO.from.
+        assertThat(result.configId()).isEqualTo(99L);
+        assertThat(result.configName()).isEqualTo("frozen-config");
     }
 
     @Test
@@ -250,8 +266,6 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(responseBody).doesNotContain(freshJob.getJobToken());
         }
     }
-
-    // Cancel endpoint tests
 
     @Test
     @WithAdminUser

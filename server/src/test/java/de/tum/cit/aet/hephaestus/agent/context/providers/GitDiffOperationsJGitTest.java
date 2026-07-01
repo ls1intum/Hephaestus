@@ -144,6 +144,25 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
+    void resolveDiffRangeUsesMergeBaseWhenTargetAdvancedPastForkPoint() throws GitAPIException, IOException {
+        // The feature diverged at baseSha; then the TARGET branch advanced with its own change.
+        // A 2-dot range [origin/main tip, head] would surface main's later change as a
+        // phantom diff the developer never made. The range base MUST be the merge-base (baseSha), so the
+        // diff is exactly what THIS branch added (3-dot), never what the target branch changed afterwards.
+        git.checkout().setName("main").call();
+        write("target-only.txt", "added on the target branch after the fork\n");
+        String advancedMain = commit("target advances past the fork point");
+        git.checkout().setName("feature").call();
+
+        String[] range = ops.resolveDiffRange(repoDir, "main", "feature", headSha);
+
+        assertThat(range).isNotNull().containsExactly(baseSha, headSha);
+        assertThat(range[0]).as("base must be the merge-base, not the advanced target tip").isNotEqualTo(advancedMain);
+        // And the resulting diff must NOT contain the target-only file.
+        assertThat(ops.diffNameOnly(repoDir, range[0], range[1])).doesNotContain("target-only.txt").contains("a.txt");
+    }
+
+    @Test
     void resolveDiffRangeStrategyTwoMergeCommit() throws GitAPIException, IOException {
         // Diverge main with a commit, then merge feature into main (no-ff) so a real merge commit
         // exists. Use an unresolvable source-branch name in the call so Strategy 1 is skipped and
@@ -193,6 +212,17 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     void resolveDiffRangeNullForBlankHead() {
         assertThat(ops.resolveDiffRange(repoDir, "main", "feature", "")).isNull();
         assertThat(ops.resolveDiffRange(repoDir, "main", "feature", null)).isNull();
+    }
+
+    @Test
+    void resolveDiffRangeNullWhenSourceAlreadyMergedIntoTarget() throws GitAPIException, IOException {
+        // Fast-forward main up to feature's head so feature is an ancestor of main: the merge-base equals
+        // head, so a 3-dot diff is legitimately empty and the range must be null (not a phantom 2-dot range).
+        git.checkout().setName("main").call();
+        git.merge().include(repo.resolve("feature")).call();
+        repo.updateRef("refs/remotes/origin/main").link("refs/heads/main");
+
+        assertThat(ops.resolveDiffRange(repoDir, "main", "feature", headSha)).isNull();
     }
 
     private void write(String name, String content) throws IOException {

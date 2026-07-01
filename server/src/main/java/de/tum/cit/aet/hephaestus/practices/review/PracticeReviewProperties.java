@@ -18,6 +18,11 @@ import org.springframework.validation.annotation.Validated;
  * @param appBaseUrl          base URL of the Hephaestus application (for preferences footer link);
  *                            empty string disables the footer link
  * @param cooldownMinutes     minimum minutes between reviews for the same PR. 0 disables cooldown.
+ * @param progressFooter      append the cross-run progress-delta footer (B1/B3) and post the re-review
+ *                            notifying reply (A4). Off by default; needs ≥2 runs on a target to render.
+ * @param reactionSuppression drop re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE
+ *                            (B2). Off by default; inert until a reaction exists for a recurring locus.
+ * @param policyFloor         apply the per-run volume cap (C3). Off by default; behaviour-preserving when off.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -28,5 +33,8 @@ public record PracticeReviewProperties(
     @Pattern(regexp = "^$|^https?://.*", message = "appBaseUrl must be empty or a valid http(s) URL")
     @DefaultValue("")
     String appBaseUrl,
-    @Min(0) @DefaultValue("15") int cooldownMinutes
+    @Min(0) @DefaultValue("15") int cooldownMinutes,
+    @DefaultValue("false") boolean progressFooter,
+    @DefaultValue("false") boolean reactionSuppression,
+    @DefaultValue("false") boolean policyFloor
 ) {}

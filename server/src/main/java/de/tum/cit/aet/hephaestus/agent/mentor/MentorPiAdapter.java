@@ -19,14 +19,15 @@ import org.springframework.stereotype.Service;
 /**
  * Mentor adapter: builds an {@link InteractiveSandboxSpec} for a long-lived stdin/stdout JSONL
  * session, symmetric to {@code PracticePiAdapter}'s one-shot {@code task.json} build.
- * Single-flight is enforced by the sandbox registry's {@code (userId, workspaceId)} keying.
+ * Single-flight is enforced by the sandbox registry's {@code (userId, workspaceId)} keying, where the
+ * mentee's {@code developerId} is carried in the spec's {@code userId} slot.
  */
 @Service
 @RequiredArgsConstructor
 public class MentorPiAdapter {
 
     public static final String SYSTEM_PROMPT_PATH = WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH;
-    public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+    public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_PREFIX;
     public static final String SESSIONS_DIR_PREFIX = WorkspaceAbi.SESSIONS_DIR_PREFIX;
 
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
@@ -37,7 +38,7 @@ public class MentorPiAdapter {
 
     /**
      * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
-     * {@code (contributorId, workspaceId)}; concurrent attaches reuse the live handle.
+     * {@code (developerId, workspaceId)}; concurrent attaches reuse the live handle.
      * When {@code sessionRestore} is non-null, the prior turn's JSONL is injected at
      * {@code .sessions/<threadId>.jsonl} so Pi's {@code switchSession} restores byte-identical
      * state for prompt-cache continuity.
@@ -59,7 +60,20 @@ public class MentorPiAdapter {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
         }
 
-        String baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
+        // Honor the bound mentor config's base URL first (per-workspace LLM gateway, e.g. a TUM GPU
+        // endpoint that activates the hephaestus provider); fall back to the global mentor property.
+        String baseUrl;
+        if (llmConfig.llmBaseUrl() != null && !llmConfig.llmBaseUrl().isBlank()) {
+            baseUrl = llmConfig.llmBaseUrl();
+        } else {
+            baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
+        }
+
+        // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
+        // floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s config would
+        // otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream. Clamp up to the
+        // minimum buildable budget so any valid config always yields a mentor sandbox.
+        int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
 
         PiPlanSpec planSpec = new PiPlanSpec(
             llmConfig.llmProvider(),
@@ -69,7 +83,7 @@ public class MentorPiAdapter {
             baseUrl,
             null,
             true,
-            llmConfig.timeoutSeconds(),
+            timeoutSeconds,
             PROFILE,
             extraInputs,
             ""
@@ -79,7 +93,7 @@ public class MentorPiAdapter {
 
         return new InteractiveSandboxSpec(
             UUID.randomUUID(),
-            Long.toString(request.contributorId()),
+            Long.toString(request.developerId()),
             Long.toString(request.workspaceId()),
             imageProperties.reference(),
             plan.command(),
@@ -93,11 +107,17 @@ public class MentorPiAdapter {
     }
 
     private static void validateAspectInputs(Map<String, byte[]> aspectInputs) {
-        for (String key : aspectInputs.keySet()) {
+        for (Map.Entry<String, byte[]> entry : aspectInputs.entrySet()) {
+            String key = entry.getKey();
             if (key == null || !key.startsWith(ASPECT_INPUT_PREFIX)) {
                 throw new IllegalArgumentException(
                     "aspectInputs key must begin with '" + ASPECT_INPUT_PREFIX + "', got: " + key
                 );
+            }
+            // Reject null bytes here so the failure names the offending key, rather than surfacing as an
+            // opaque NPE deep inside PiPlanSpec's Map.copyOf(extraInputs), which rejects null values.
+            if (entry.getValue() == null) {
+                throw new IllegalArgumentException("aspectInputs value for '" + key + "' must not be null");
             }
         }
     }

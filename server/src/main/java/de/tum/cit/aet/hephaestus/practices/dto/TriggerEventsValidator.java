@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
+import de.tum.cit.aet.hephaestus.practices.TriggerEventCatalog;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.HashSet;
@@ -14,12 +14,9 @@ import java.util.stream.Collectors;
  */
 public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerEvents, List<String>> {
 
-    static final Set<String> VALID_EVENTS = Set.of(
-        TriggerEventNames.PULL_REQUEST_CREATED,
-        TriggerEventNames.PULL_REQUEST_READY,
-        TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-        TriggerEventNames.REVIEW_SUBMITTED
-    );
+    // Allow-list is derived from TriggerEventCatalog (the single source of truth for subscribable events)
+    // rather than duplicated here, so it cannot drift out of sync with the catalog.
+    static final Set<String> VALID_EVENTS = TriggerEventCatalog.allEvents();
 
     @Override
     public boolean isValid(List<String> value, ConstraintValidatorContext context) {
@@ -27,7 +24,6 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
             return true; // @NotNull handles nullability
         }
 
-        // Check for duplicates
         Set<String> seen = new HashSet<>();
         List<String> duplicates = value
             .stream()
@@ -42,7 +38,6 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
             return false;
         }
 
-        // Check for unknown events
         Set<String> unknown = value
             .stream()
             .filter(e -> !VALID_EVENTS.contains(e))

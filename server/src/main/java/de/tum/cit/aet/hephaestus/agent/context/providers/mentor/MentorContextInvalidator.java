@@ -37,7 +37,23 @@ public class MentorContextInvalidator {
     private static final List<String> PER_USER_CACHES = List.of(
         "mentor_user_aspect",
         "mentor_workspace_aspect",
-        "mentor_findings_aspect"
+        "mentor_findings_aspect",
+        "mentor_practice_standing_aspect",
+        // The authored-work aspect (RecentAuthoredWorkAspectProvider) is keyed per
+        // workspaceId:developerId and goes stale on the same PR/issue/review events.
+        "mentor_authored_work_aspect"
+    );
+
+    /**
+     * Caches that depend on the developer's PERSISTED practice observations (findings + standing). They go
+     * stale the moment a detection run writes new observations, independent of any SCM event — so they are
+     * evicted on {@link PracticeDetectionCompletedEvent}, not on PR/issue/review updates. Delivered-feedback
+     * eviction is deliberately NOT wired: there is no delivery event, and the delivered body is immutable
+     * once posted (ADR 0021), so its cache cannot drift.
+     */
+    private static final List<String> DETECTION_DEPENDENT_CACHES = List.of(
+        "mentor_findings_aspect",
+        "mentor_practice_standing_aspect"
     );
 
     private final CacheManager cacheManager;
@@ -109,6 +125,22 @@ public class MentorContextInvalidator {
         evictForReview(event.context(), event.review());
     }
 
+    /**
+     * A completed detection run persists new observations for this developer, staling the findings-history and
+     * practice-standing aspects (they would otherwise lie until their TTL). Evict the two detection-dependent
+     * per-user caches for the evaluated developer. The event carries only scalars, so no transaction is needed.
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onPracticeDetectionCompleted(
+        de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent event
+    ) {
+        if (event == null || event.workspaceId() == null || event.developerId() == null) {
+            return;
+        }
+        evictPerUser(event.workspaceId(), event.developerId(), DETECTION_DEPENDENT_CACHES);
+    }
+
     private void evictForReview(
         de.tum.cit.aet.hephaestus.integration.core.events.EventContext context,
         de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload.ReviewData review
@@ -137,9 +169,13 @@ public class MentorContextInvalidator {
     }
 
     private void evictPerUser(Long workspaceId, Long userId) {
+        evictPerUser(workspaceId, userId, PER_USER_CACHES);
+    }
+
+    private void evictPerUser(Long workspaceId, Long userId, List<String> cacheNames) {
         if (workspaceId == null || userId == null) return;
         String key = workspaceId + ":" + userId;
-        for (String cacheName : PER_USER_CACHES) {
+        for (String cacheName : cacheNames) {
             Cache cache = cacheManager.getCache(cacheName);
             if (cache != null) {
                 cache.evict(key);

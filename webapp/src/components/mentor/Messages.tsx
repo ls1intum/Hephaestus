@@ -85,8 +85,14 @@ export function Messages({
 	};
 
 	return (
-		<ScrollArea className="flex flex-col w-full flex-1 min-h-0" ref={containerRef}>
+		<ScrollArea className="flex flex-col w-full flex-1 min-h-0" viewportRef={containerRef}>
 			<div
+				// Announce streamed assistant replies to screen readers: a polite live region so the answer
+				// is read as it arrives, with aria-busy while the model is still producing it.
+				role="log"
+				aria-live="polite"
+				aria-relevant="additions text"
+				aria-busy={status === "streaming" || status === "submitted"}
 				className={cn(
 					"flex flex-col w-full pb-16",
 					{

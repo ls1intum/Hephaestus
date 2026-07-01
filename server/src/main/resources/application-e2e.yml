@@ -1,0 +1,37 @@
+# Opt-in authentic-E2E profile. Activate ALONGSIDE `local` (which auto-starts Postgres + NATS):
+#   ./mvnw -f server spring-boot:run -Dapp.profiles=local,e2e        (or `pnpm dev:server:e2e`)
+#   SPRING_PROFILES_ACTIVE=local,e2e                                  (jar / container)
+#
+# Everything here is a local convenience that is FAIL-CLOSED or absent under the `prod` profile, so it
+# can never leak to production:
+#   - dev-login-enabled / cookie-secure=false → startup FAILS under `prod` (see DevLoginService / SecurityConfig)
+#   - creation-policy / the GitLab feature flag are operator toggles, set only in this profile
+#
+# Together they remove the manual setup that used to block UI-driven E2E:
+#   - passwordless dev sign-in (no OAuth IdP)
+#   - plain http://localhost cookies (no proxy / TLS — see docs/contributor/e2e-testing.md)
+#   - self-service GitLab/GitHub workspace creation through the real UI/API
+#   - the dev review trigger (POST /api/dev/trigger-review)
+hephaestus:
+  # A fixed 32-char dev key so integration Connection credentials (PAT/OAuth) can be persisted locally —
+  # the CredentialBundleConverter REQUIRES a key (it does not fall back to plaintext). Local-only; prod
+  # supplies its own via HEPHAESTUS_SECURITY_ENCRYPTION_KEY.
+  security:
+    encryption-key: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:hephaestusLocalDevEncryptKey0123}
+  auth:
+    dev-login-enabled: true
+    cookie-secure: false
+    cookie-name: HEPHAESTUS_AT
+  workspace:
+    creation-policy: SELF_SERVICE
+    # E2E runs against fresh DBs with admin-only seeding; auto-seed the first visitor as ADMIN.
+    auto-seed-membership: true
+  features:
+    flags:
+      gitlab-workspace-creation: true
+  dev:
+    trigger-enabled: true
+  # Enable the GitLab integration so a connected workspace actually syncs MRs/commits for review.
+  integration:
+    gitlab:
+      enabled: true

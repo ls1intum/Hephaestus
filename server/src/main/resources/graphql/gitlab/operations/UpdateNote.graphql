@@ -1,0 +1,12 @@
+# Updates the body of an existing note (comment) on a merge request or issue.
+# Used by agent feedback delivery to EDIT THE PERSISTENT SUMMARY IN PLACE across re-reviews,
+# so a re-reviewed MR keeps ONE evolving overview comment instead of accumulating one per run.
+
+mutation UpdateNote($id: NoteID!, $body: String!) {
+    updateNote(input: {id: $id, body: $body}) {
+        note {
+            id
+        }
+        errors
+    }
+}

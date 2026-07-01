@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
@@ -247,6 +248,41 @@ public class Workspace {
     @Embedded
     @Valid
     private WorkspaceFeatures features = new WorkspaceFeatures();
+
+    // AI configuration
+
+    /**
+     * The agent config that powers practice detection. When set, only this config is submitted
+     * for a review (no fan-out); when {@code null}, the "all enabled configs" fan-out applies.
+     * Scalar FK (not a {@code @ManyToOne AgentConfig}) on purpose — an association would close a
+     * {@code workspace → agent} Modulith cycle. {@code ON DELETE SET NULL} at the DB level.
+     */
+    @Column(name = "practice_config_id")
+    private Long practiceConfigId;
+
+    /**
+     * The agent config that powers the mentor. When {@code null} or disabled, the mentor falls
+     * back to the oldest enabled config. Scalar FK for the same cycle-avoidance reason.
+     */
+    @Column(name = "mentor_config_id")
+    private Long mentorConfigId;
+
+    /**
+     * Per-workspace practice-review trigger/delivery overrides; read via {@link #getReviewSettings()}.
+     *
+     * @see PracticeReviewSettings
+     */
+    @Embedded
+    @Valid
+    private PracticeReviewSettings reviewSettings = new PracticeReviewSettings();
+
+    /** Null-safe accessor: Hibernate sets the embeddable to {@code null} when every column is null. */
+    public PracticeReviewSettings getReviewSettings() {
+        if (reviewSettings == null) {
+            reviewSettings = new PracticeReviewSettings();
+        }
+        return reviewSettings;
+    }
 
     @PrePersist
     public void prePersist() {

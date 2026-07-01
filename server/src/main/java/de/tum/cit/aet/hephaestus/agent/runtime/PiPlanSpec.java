@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * constructor; callers construct positionally.
  *
  * <p><b>baseUrl trap:</b> exported as {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in
- * API_KEY/OAUTH modes — PROXY mode resolves its base URL from the sandbox-injected
+ * API_KEY modes — PROXY mode resolves its base URL from the sandbox-injected
  * {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
  */
 public record PiPlanSpec(
@@ -47,14 +47,31 @@ public record PiPlanSpec(
                 if (jobToken == null || jobToken.isBlank()) {
                     throw new IllegalArgumentException("jobToken is required in PROXY mode");
                 }
+                // PROXY resolves its base URL from the sandbox-injected $LLM_PROXY_URL, so a baseUrl here is
+                // genuinely shadowed (see the record's "baseUrl trap" javadoc). PROXY is the DEFAULT credential
+                // mode and llmBaseUrl is independently settable, so a valid persisted config legitimately
+                // arrives as PROXY + non-null baseUrl. Normalise it away (it is harmless and unused) rather
+                // than throwing on a supported, default topology.
+                baseUrl = null;
             }
-            case API_KEY, OAUTH -> {
+            case API_KEY -> {
                 if (credential == null || credential.isBlank()) {
                     throw new IllegalArgumentException("credential is required in " + credentialMode + " mode");
                 }
             }
         }
-        extraInputs = extraInputs != null ? Map.copyOf(extraInputs) : Map.of();
+        // Map.copyOf freezes the MAP, but byte[] values stay caller-mutable shared references — a caller could
+        // mutate file contents after validation passed. Clone each value too so the record is genuinely
+        // immutable (the keySet allowlist check below then runs over the defensive copy).
+        extraInputs =
+            extraInputs != null
+                ? extraInputs
+                      .entrySet()
+                      .stream()
+                      .collect(
+                          java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().clone())
+                      )
+                : Map.of();
         for (String path : extraInputs.keySet()) {
             boolean ok =
                 WorkspaceAbi.allowedExtraInputPaths().contains(path) ||

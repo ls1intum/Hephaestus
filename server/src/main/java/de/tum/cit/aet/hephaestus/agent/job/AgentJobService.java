@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -13,9 +14,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -46,7 +48,8 @@ public class AgentJobService {
     private final AgentJobRepository agentJobRepository;
     private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final PullRequestRepository pullRequestRepository;
+    private final ReviewableArtifactLoader artifactLoader;
+    private final ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -59,7 +62,8 @@ public class AgentJobService {
         AgentJobRepository agentJobRepository,
         AgentConfigRepository agentConfigRepository,
         WorkspaceRepository workspaceRepository,
-        PullRequestRepository pullRequestRepository,
+        ReviewableArtifactLoader artifactLoader,
+        ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
@@ -71,7 +75,8 @@ public class AgentJobService {
         this.agentJobRepository = agentJobRepository;
         this.agentConfigRepository = agentConfigRepository;
         this.workspaceRepository = workspaceRepository;
-        this.pullRequestRepository = pullRequestRepository;
+        this.artifactLoader = artifactLoader;
+        this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
@@ -107,33 +112,59 @@ public class AgentJobService {
     // Submit
 
     /**
-     * Lookup a PR by ID, build a review submission request, and submit a job.
-     * Used by the dev trigger endpoint to bypass NATS.
-     *
-     * @param workspaceId workspace ID
-     * @param prId        the pull request's DB id
-     * @return description of result (job ID or error message)
+     * Build a detached PR review submission request from an already-loaded entity. Reads the PR's lazy
+     * associations (repository/author via {@link ScmEventPayload.PullRequestData#from}), so it MUST be called
+     * inside the caller's open session/transaction. Returns {@code null} when the branch refs needed to
+     * clone/diff are absent (a merged PR retains them). Used by the dev-trigger path, where the controller
+     * keeps load + gate + this build inside one {@link TransactionTemplate} and then submits OUTSIDE it via
+     * {@link #submitPrepared} — because {@link #submit} forbids an outer transaction (SYSTEMIC #5).
      */
-    public String submitReviewForPullRequest(Long workspaceId, Long prId) {
-        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prId).orElse(null);
-        if (pr == null) {
-            return "PR not found: " + prId;
-        }
+    @Nullable
+    PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable String triggerEvent) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-            return "PR missing branch info: prId=" + prId;
+            return null;
         }
-
-        ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
-        PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
-            prData,
+        log.info("Dev trigger: building review request for PR {} ({})", pr.getId(), pr.getHtmlUrl());
+        return new PullRequestReviewSubmissionRequest(
+            ScmEventPayload.PullRequestData.from(pr),
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
-            pr.getBaseRefName()
+            pr.getBaseRefName(),
+            triggerEvent
         );
+    }
 
-        log.info("Dev trigger: submitting review for PR {} ({})", prId, pr.getHtmlUrl());
+    /**
+     * Build a detached issue-detection submission request from an already-loaded entity. Reads the issue's
+     * lazy repository, so it MUST be called inside the caller's open session/transaction. Returns
+     * {@code null} when the issue has no repository. Companion to {@link #buildReviewRequest}.
+     */
+    @Nullable
+    IssueReviewSubmissionRequest buildIssueRequest(Issue issue, @Nullable String triggerEvent) {
+        if (issue.getRepository() == null) {
+            return null;
+        }
+        log.info("Dev trigger: building issue request for issue {} ({})", issue.getId(), issue.getHtmlUrl());
+        return new IssueReviewSubmissionRequest(
+            issue.getId(),
+            issue.getNumber(),
+            issue.getRepository().getId(),
+            issue.getRepository().getNameWithOwner(),
+            issue.getTitle(),
+            issue.getBody() != null ? issue.getBody() : "",
+            issue.getState() != null ? issue.getState().name() : "OPEN",
+            issue.getUpdatedAt(),
+            triggerEvent
+        );
+    }
 
-        Optional<AgentJob> job = submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
+    /**
+     * Submit a prepared dev request and render the result message. Invoked by the dev-trigger controller
+     * AFTER the load/gate/build transaction has committed, so {@link #submit}'s no-outer-transaction contract
+     * (SYSTEMIC #5) is honoured.
+     */
+    public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
+        Optional<AgentJob> job = submit(workspaceId, jobType, request);
         return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
     }
 
@@ -156,14 +187,14 @@ public class AgentJobService {
      * @return the first created (or existing deduplicated) job, or empty if no enabled config found
      */
     public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
-        // 1. Find ALL enabled configs for workspace
-        List<AgentConfig> enabledConfigs = agentConfigRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .filter(AgentConfig::isEnabled)
-            .toList();
-        if (enabledConfigs.isEmpty()) {
-            log.debug("No enabled agent config for workspace: workspaceId={}", workspaceId);
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+
+        // 1. Resolve which config(s) run (see resolvePracticeConfigs).
+        List<AgentConfig> configs = resolvePracticeConfigs(workspace);
+        if (configs.isEmpty()) {
+            log.debug("No agent config to run practice detection: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
@@ -171,13 +202,9 @@ public class AgentJobService {
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
-
-        // 3. Submit a job for EACH enabled config (each in its own transaction)
+        // 3. Submit a job for each resolved config (each in its own transaction)
         AgentJob firstJob = null;
-        for (AgentConfig config : enabledConfigs) {
+        for (AgentConfig config : configs) {
             AgentJob job = submitForConfig(workspace, config, jobType, submission);
             if (job != null && firstJob == null) {
                 firstJob = job;
@@ -185,6 +212,33 @@ public class AgentJobService {
         }
 
         return Optional.ofNullable(firstJob);
+    }
+
+    /**
+     * Resolve the configs to submit for practice detection. If the workspace has an explicit
+     * {@code practiceConfigId} binding, return only that config when it exists and is enabled
+     * (bound-but-disabled = <strong>paused, returns empty</strong>); otherwise fan out to all enabled
+     * configs. The bound id is loaded via the workspace-scoped finder for tenancy safety.
+     *
+     * <p>Note the deliberate asymmetry with the mentor ({@code MentorChatService.resolveLlmConfig}): a
+     * disabled <em>practice</em> binding PAUSES detection (it is opt-in automation — silence is the safe
+     * outcome), whereas a disabled <em>mentor</em> binding FALLS BACK to the oldest enabled config (the
+     * mentor must stay answerable to a user who is mid-conversation).
+     */
+    private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
+        Long boundConfigId = workspace.getPracticeConfigId();
+        if (boundConfigId != null) {
+            return agentConfigRepository
+                .findByIdAndWorkspaceId(boundConfigId, workspace.getId())
+                .filter(AgentConfig::isEnabled)
+                .map(List::of)
+                .orElseGet(List::of);
+        }
+        return agentConfigRepository
+            .findByWorkspaceId(workspace.getId())
+            .stream()
+            .filter(AgentConfig::isEnabled)
+            .toList();
     }
 
     private @Nullable AgentJob submitForConfig(
@@ -211,9 +265,9 @@ public class AgentJobService {
                 return existing.get();
             }
 
-            // Cooldown check — prevent rapid re-triggering for the same PR/config.
-            // Strips the commit-SHA segment from the idempotency key to match any SHA.
-            int cooldown = reviewProperties.cooldownMinutes();
+            // Cooldown check — prevent rapid re-triggering for the same (PR, phase)/config.
+            // Strips the trailing freshness segment (commit SHA / updatedAt) to match any freshness.
+            int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
                 // Escape SQL LIKE wildcards in the prefix to prevent unintended pattern matching
@@ -244,10 +298,26 @@ public class AgentJobService {
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
             job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
+            // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
+            // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
+            // a null integrationKind made the comment poster NPE and silently drop delivery. We log
+            // loudly when it can't be resolved: the job will still run (LLM cost) but delivery will
+            // fail at the poster, so surfacing it here makes the misconfiguration diagnosable up front.
+            var resolvedKind = connectionService.findActiveProviderKind(workspace.getId());
+            if (resolvedKind.isPresent()) {
+                job.setIntegrationKind(resolvedKind.get());
+            } else {
+                log.warn(
+                    "No active SCM connection for workspace {} — agent job will run but feedback delivery " +
+                        "will fail (no integrationKind). Configure a provider connection to enable delivery. jobType={}",
+                    workspace.getId(),
+                    jobType
+                );
+            }
 
             // Copy LLM API key — needed for all credential modes:
             // PROXY mode: proxy controller reads it to forward to upstream provider
-            // API_KEY/OAUTH mode: adapter injects it as env var into the container
+            // API_KEY mode: adapter injects it as env var into the container
             if (config.getLlmApiKey() != null) {
                 job.setLlmApiKey(config.getLlmApiKey());
             }
@@ -280,11 +350,17 @@ public class AgentJobService {
     // Retry delivery
 
     /**
-     * Retry delivery for a completed agent job whose delivery failed or was never attempted.
+     * Retry delivery for a completed agent job whose delivery previously FAILED.
      *
-     * <p>Validates the job is COMPLETED and delivery is FAILED or PENDING, then re-runs
-     * the handler's deliver() method. This is the same delivery path used by
-     * {@link AgentJobExecutor#completeJob} after sandbox execution.
+     * <p>Atomically CASes delivery {@code FAILED → PENDING} then re-runs the handler's {@code deliver()}
+     * method — the same delivery path used by {@link AgentJobExecutor} after sandbox execution. Only
+     * {@code FAILED} is accepted as the CAS source: admitting {@code PENDING} would let two concurrent
+     * retries both succeed (a {@code PENDING → PENDING} no-op returns {@code updated=1}).
+     *
+     * <p><strong>PENDING is therefore not recoverable through this API.</strong> A job stuck in
+     * {@code PENDING} (executor crashed between marking PENDING and finishing delivery, or this method
+     * crashed after the {@code FAILED → PENDING} CAS committed) requires operator intervention to demote
+     * it back to {@code FAILED} before it can be retried here.
      *
      * @param workspaceId workspace ID
      * @param jobId       job UUID
@@ -436,13 +512,15 @@ public class AgentJobService {
     // Cooldown helpers
 
     /**
-     * Extract the PR-scoped prefix from an idempotency key by stripping the commit-SHA segment.
-     * Input: {@code "pr_review:owner/repo:42:abc123"} → Output: {@code "pr_review:owner/repo:42:"}
-     * This allows LIKE-matching against any SHA for the same PR.
+     * Extract the (PR, phase)-scoped prefix from an idempotency key by stripping the trailing freshness
+     * segment (the commit SHA for PRs, the updatedAt version for issues).
+     * Input: {@code "pr_review:owner/repo:42:authoring:abc123"} → Output: {@code "pr_review:owner/repo:42:authoring:"}
+     * This allows LIKE-matching against any freshness for the same (PR, phase).
      */
     static String extractCooldownKeyPrefix(String idempotencyKey) {
-        // The key format is "pr_review:{nameWithOwner}:{prNumber}:{sha}"
-        // We want everything up to and including the last ':' before the SHA.
+        // The key format is "<type>:{nameWithOwner}:{number}:{phase}:{freshness}" — only the trailing
+        // freshness segment is stripped, so the (number, phase) scope is preserved.
+        // We want everything up to and including the last ':' before the freshness.
         int lastColon = idempotencyKey.lastIndexOf(':');
         if (lastColon > 0) {
             return idempotencyKey.substring(0, lastColon + 1);

@@ -320,6 +320,10 @@ hephaestus:
     # validation live on WorkspaceProperties (IDE-surfaced via spring-configuration-processor).
     workspace:
         init-default: true
+        # Dev-only convenience: seed ADMIN membership to the first authenticated visitor of a
+        # zero-membership workspace (fresh dev DB). MUST stay false in production (prod overrides
+        # it) — otherwise it is a privilege-escalation on org-sync-churned empty-membership state.
+        auto-seed-membership: true
         slug:
             # TTL (days) for slug redirects; 0 disables redirects while preserving history.
             redirect:
@@ -438,6 +442,13 @@ hephaestus:
             max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
             fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
             heartbeat-interval: 25s
+        # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
+        default-config:
+            enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}
+            name: ${AGENT_DEFAULT_CONFIG_NAME:Default model}
+            provider: ${AGENT_DEFAULT_CONFIG_PROVIDER:ANTHROPIC}
+            model-name: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:}
+            api-key: ${AGENT_DEFAULT_CONFIG_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION

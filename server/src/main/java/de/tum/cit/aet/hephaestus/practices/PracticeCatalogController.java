@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -46,11 +50,12 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeCatalogController {
 
     private final PracticeService practiceService;
+    private final PracticeAreaService areaService;
 
     @GetMapping
     @Operation(
         summary = "List practice definitions",
-        description = "Returns all practice definitions for the workspace, optionally filtered by category and/or active state"
+        description = "Returns all practice definitions for the workspace, optionally filtered by active state"
     )
     @ApiResponse(
         responseCode = "200",
@@ -60,15 +65,35 @@ public class PracticeCatalogController {
     @SecurityRequirements
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
-        @RequestParam(required = false) @Parameter(description = "Filter by practice category") String category,
         @RequestParam(name = "active", required = false) @Parameter(
             description = "Filter by active state"
         ) Boolean active
     ) {
         List<PracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, category, active)
+            .listPractices(workspaceContext, active)
             .stream()
             .map(PracticeDTO::from)
+            .toList();
+        return ResponseEntity.ok(practices);
+    }
+
+    @GetMapping("/learner")
+    @Operation(
+        summary = "List active practices, learner-facing",
+        description = "Active practices projected for a developer: name, area, why-it-matters, what-good-looks-like." +
+            " The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO has no such field)."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Learner practices returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = LearnerPracticeDTO.class)))
+    )
+    @SecurityRequirements
+    public ResponseEntity<List<LearnerPracticeDTO>> listLearnerPractices(WorkspaceContext workspaceContext) {
+        List<LearnerPracticeDTO> practices = practiceService
+            .listPractices(workspaceContext, true)
+            .stream()
+            .map(LearnerPracticeDTO::from)
             .toList();
         return ResponseEntity.ok(practices);
     }
@@ -119,6 +144,35 @@ public class PracticeCatalogController {
         return ResponseEntity.created(location).body(PracticeDTO.from(practice));
     }
 
+    @PatchMapping("/reorder")
+    @Operation(
+        summary = "Reorder the practices within an area",
+        description = "Sets each practice's display order to its index in the provided slug list (one atomic write)"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Practices reordered; the full ordered practice list is returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class)))
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "orderedSlugs is empty, has duplicates, or is not the area's complete set",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<List<PracticeDTO>> reorderPractices(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody ReorderPracticesRequestDTO request
+    ) {
+        practiceService.reorderPractices(workspaceContext, request.areaSlug(), request.orderedSlugs());
+        List<PracticeDTO> practices = practiceService
+            .listPractices(workspaceContext, null)
+            .stream()
+            .map(PracticeDTO::from)
+            .toList();
+        return ResponseEntity.ok(practices);
+    }
+
     @PatchMapping("/{practiceSlug}")
     @Operation(summary = "Update a practice definition")
     @ApiResponse(
@@ -160,6 +214,31 @@ public class PracticeCatalogController {
         @Valid @RequestBody UpdatePracticeActiveRequestDTO request
     ) {
         Practice practice = practiceService.setActive(workspaceContext, practiceSlug, request.active());
+        return ResponseEntity.ok(PracticeDTO.from(practice));
+    }
+
+    @PutMapping("/{practiceSlug}/area")
+    @Operation(
+        summary = "Bind a practice to an area",
+        description = "Binds the practice to the area named by areaSlug, or unbinds it when areaSlug is null"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Binding updated",
+        content = @Content(schema = @Schema(implementation = PracticeDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Practice or area not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<PracticeDTO> bindArea(
+        WorkspaceContext workspaceContext,
+        @PathVariable String practiceSlug,
+        @Valid @RequestBody BindPracticeAreaRequestDTO request
+    ) {
+        Practice practice = areaService.bindPractice(workspaceContext, practiceSlug, request.areaSlug());
         return ResponseEntity.ok(PracticeDTO.from(practice));
     }
 

@@ -25,9 +25,10 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -81,13 +82,32 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         handler = new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            practiceRepository,
+            new PracticeCatalogInjector(objectMapper, practiceRepository),
             workspaceContextBuilder,
             taskEnvelopeWriter,
             gitDiffOperations,
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            new SecretDiffScanner(),
+            // Real flag-OFF filter: evaluate() returns the findings unchanged without touching the repos.
+            new ReactionSuppressionFilter(
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                org.mockito.Mockito.mock(
+                    de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.class
+                ),
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
+                    false,
+                    true,
+                    false,
+                    "",
+                    15,
+                    false,
+                    false,
+                    false
+                )
+            )
         );
     }
 
@@ -160,9 +180,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         lenient()
             .when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class)))
             .thenReturn(
-                new LinkedHashMap<>(Map.of("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
+                new LinkedHashMap<>(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
             );
-        lenient().when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+        lenient()
+            .when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                )
+            )
+            .thenReturn(samplePractices());
     }
 
     @Nested
@@ -186,7 +213,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123def456");
-            assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123def456");
+            // The MR title + description are the only inputs for the process practices
+            // (describe-what-and-why, commit-subjects-explain-each-change); a regression here makes them
+            // silently un-evaluable.
+            assertThat(metadata.get("title").asString()).isEqualTo("Fix authentication bug");
+            assertThat(metadata.get("body").asString()).isEqualTo("This PR fixes the login issue");
+            // No triggerEvent in sampleRequest() → phase segment is "manual"; head SHA stays the trailing
+            // freshness slot so extractCooldownKeyPrefix scopes cooldown per (pr, phase), not per push.
+            assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:manual:abc123def456");
         }
 
         @Test
@@ -218,13 +252,18 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void mergesProviderFiles() {
             byte[] metadataBytes = "{\"pr_number\":42}".getBytes(StandardCharsets.UTF_8);
             when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class))).thenReturn(
-                new LinkedHashMap<>(Map.of("context/target/metadata.json", metadataBytes))
+                new LinkedHashMap<>(Map.of("inputs/context/metadata.json", metadataBytes))
             );
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                )
+            ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            assertThat(files.get("context/target/metadata.json")).isEqualTo(metadataBytes);
+            assertThat(files.get("inputs/context/metadata.json")).isEqualTo(metadataBytes);
         }
 
         @Test
@@ -248,11 +287,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             stubDefaults();
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            assertThat(files).containsKey(".practices/index.json");
-            assertThat(files).containsKey(".practices/all-criteria.md");
-            assertThat(files).containsKey(".practices/pr-description-quality.md");
-            assertThat(files).containsKey(".practices/error-handling.md");
-            assertThat(files).containsKey(".analysis/practices/.gitkeep");
+            assertThat(files).containsKey("inputs/practices/index.json");
+            assertThat(files).containsKey("inputs/practices/all-criteria.md");
+            assertThat(files).containsKey("inputs/practices/pr-description-quality.md");
+            assertThat(files).containsKey("inputs/practices/error-handling.md");
+            assertThat(files).containsKey("work/analysis/practices/.gitkeep");
         }
 
         @Test
@@ -265,9 +304,12 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsMalformedSlug() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
-                List.of(createPractice("../etc/passwd", "bad", "c"))
-            );
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                )
+            ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
@@ -277,11 +319,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenNoActivePractices() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of());
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                )
+            ).thenReturn(List.of());
 
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active practices");
+                .hasMessageContaining("No active PULL_REQUEST practices");
         }
 
         @Test
@@ -296,19 +343,24 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void preservesProviderOrder() {
             var providerFiles = new LinkedHashMap<String, byte[]>();
-            providerFiles.put("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
-            providerFiles.put("context/target/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
-            providerFiles.put("context/target/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.build(any())).thenReturn(providerFiles);
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                )
+            ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
             // First three entries must be the provider files in their original order
             var keys = files.keySet().iterator();
-            assertThat(keys.next()).isEqualTo("context/target/metadata.json");
-            assertThat(keys.next()).isEqualTo("context/target/diff.patch");
-            assertThat(keys.next()).isEqualTo("context/target/comments.json");
+            assertThat(keys.next()).isEqualTo("inputs/context/metadata.json");
+            assertThat(keys.next()).isEqualTo("inputs/context/diff.patch");
+            assertThat(keys.next()).isEqualTo("inputs/context/comments.json");
         }
     }
 
@@ -317,37 +369,46 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingInDiff() {
-            var finding = finding("fatal-error-crash", Verdict.NEGATIVE, "Sources/View.swift");
+            var finding = finding("fatal-error-crash", Presence.ABSENT, "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Verdict.NEGATIVE, "context/target/metadata.json");
+            var finding = finding("describe-what-and-why", Presence.ABSENT, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
         void filtersFindingBackedByNonWhitelistedInternal() {
-            var finding = finding("review-noise", Verdict.NEGATIVE, "context/target/comments.json");
+            // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
+            // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
+            var finding = finding("review-noise", Presence.ABSENT, "inputs/context/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         @Test
         void filtersFindingOutsideDiff() {
-            var finding = finding("view-logic-separation", Verdict.NEGATIVE, "Sources/Other.swift");
+            var finding = finding("view-logic-separation", Presence.ABSENT, "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Verdict verdict, String path) {
+        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Presence presence, String path) {
+            // Assessment mapping: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
+            Assessment assessment = switch (presence) {
+                case PRESENT -> Assessment.GOOD;
+                case ABSENT -> Assessment.BAD;
+                case NOT_APPLICABLE -> null;
+            };
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "title",
-                verdict,
+                presence,
+                assessment,
                 Severity.MINOR,
                 0.8f,
                 objectMapper
@@ -403,7 +464,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                   "findings": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Good PR description",
-                    "verdict": "POSITIVE",
+                    "presence": "PRESENT",
+                    "assessment": "GOOD",
                     "severity": "INFO",
                     "confidence": 0.95
                   }]
@@ -415,7 +477,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             handler.deliver(job);
 
             verify(deliveryService).deliver(eq(job), any());
-            verify(feedbackService).deliverFeedback(eq(job), any());
+            verify(feedbackService).deliverFeedback(eq(job), any(), any());
         }
 
         @Test
@@ -424,6 +486,224 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThatThrownBy(() -> handler.deliver(job))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No valid findings");
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void hardcodedSecretCriticalSurvivesCoercion() {
+            // M1 guard: hardcoded-secrets is blocking-eligible, so a CRITICAL secret finding must NOT be capped
+            // to MINOR by the advisory ceiling in coerceCoherence. The band the handler hands to deliver() is
+            // what persists + delivers, so assert it there.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "hardcoded-secrets",
+                    "title": "Hard-coded credential",
+                    "presence": "PRESENT",
+                    "assessment": "BAD",
+                    "severity": "CRITICAL",
+                    "confidence": 0.99,
+                    "reasoning": "A live API key is committed.",
+                    "evidence": { "locations": [{ "path": "Sources/Config.swift", "startLine": 3 }] }
+                  }]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
+
+            handler.deliver(job);
+
+            List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
+            var secret = delivered
+                .stream()
+                .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
+                .findFirst()
+                .orElseThrow();
+            assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
+        }
+
+        /**
+         * Wire the delivery-phase diff helpers so {@code computeUnifiedDiff} / {@code computeDiffStatFiles}
+         * return a real two-ref diff instead of {@code null}. Without this every existing Deliver test runs
+         * with an empty diff (the secret pre-pass and stale-diff guard are no-ops). {@code diff} carries the
+         * unified body; {@code nameOnly} the changed-file list.
+         */
+        private void stubDiff(String diff, String nameOnly) {
+            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
+            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(java.nio.file.Path.of("/tmp/repo-123"));
+            when(
+                gitDiffOperations.resolveDiffRange(any(), eq("main"), eq("feature/auth-fix"), eq("abc123def456"))
+            ).thenReturn(new String[] { "base", "head" });
+            when(gitDiffOperations.diff(any(), eq("base"), eq("head"))).thenReturn(diff);
+            when(gitDiffOperations.diffNameOnly(any(), eq("base"), eq("head"))).thenReturn(nameOnly);
+        }
+
+        @Test
+        void throwsWhenAllNotApplicableButDiffHasFiles() {
+            // Stale/empty-diff refuse-to-deliver: every finding is NOT_APPLICABLE yet the diff lists changed
+            // files — the agent was handed a stale diff. Refusing here stops a misleading "nothing applies"
+            // post over an artifact that did change.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "pr-description-quality",
+                    "title": "Not applicable here",
+                    "presence": "NOT_APPLICABLE",
+                    "assessment": "GOOD",
+                    "severity": "INFO",
+                    "confidence": 0.9
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            stubDiff(
+                "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n+++ b/Sources/Auth.swift\n@@ -1 +1 @@\n+changed\n",
+                "Sources/Auth.swift\n"
+            );
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("stale/empty diff");
+            verifyNoInteractions(deliveryService);
+        }
+
+        @Test
+        void throwsWhenAllFindingsFilteredByDiffScope() {
+            // The only finding cites a file that is NOT in the diff — the diff-scope filter drops it, leaving
+            // nothing to deliver. That is a refuse-to-deliver, not a silent empty post.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "error-handling",
+                    "title": "Unhandled error path",
+                    "presence": "ABSENT",
+                    "assessment": "BAD",
+                    "severity": "MAJOR",
+                    "confidence": 0.9,
+                    "reasoning": "The error branch is swallowed.",
+                    "guidance": "Surface the error.",
+                    "evidence": { "locations": [{ "path": "Sources/NotInDiff.swift", "startLine": 3 }] }
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            // Diff touches a DIFFERENT file, so the finding's location is out of scope.
+            stubDiff(
+                "diff --git a/Sources/Other.swift b/Sources/Other.swift\n+++ b/Sources/Other.swift\n@@ -1 +1 @@\n+x\n",
+                "Sources/Other.swift\n"
+            );
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("filtered by diff scope");
+            verifyNoInteractions(deliveryService);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void injectsSecretFindingWhenModelAbstainsButDiffCommitsCredential() {
+            // Deterministic secret pre-pass: the model emitted a single benign strength and never flagged the
+            // committed AWS key on the changed line. The handler must INJECT a synthetic hardcoded-secrets
+            // PRESENT/BAD finding so the credential still reaches deliver()/compose() — the green→red flip the
+            // weak model missed.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "pr-description-quality",
+                    "title": "Clear description",
+                    "presence": "PRESENT",
+                    "assessment": "GOOD",
+                    "severity": "INFO",
+                    "confidence": 0.9
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            // A committed AWS access key on an added line of a file that is in the diff.
+            stubDiff(
+                "diff --git a/Sources/Config.swift b/Sources/Config.swift\n" +
+                    "+++ b/Sources/Config.swift\n" +
+                    "@@ -1 +1,2 @@\n" +
+                    "+let key = \"AKIA1234567890ABCDEF\"\n",
+                "Sources/Config.swift\n"
+            );
+
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
+
+            handler.deliver(job);
+
+            List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
+            var secret = delivered
+                .stream()
+                .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
+                .findFirst()
+                .orElseThrow();
+            assertThat(secret.presence()).isEqualTo(Presence.PRESENT);
+            assertThat(secret.assessment()).isEqualTo(Assessment.BAD);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void stampsDeliveryObservationFingerprintOntoComposedDiffNote() {
+            // An ABSENT/BAD (gap) finding with a code location synthesizes an inline diff note. The key deliver()
+            // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the
+            // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "error-handling",
+                    "title": "Unhandled error path",
+                    "presence": "ABSENT",
+                    "assessment": "BAD",
+                    "severity": "MAJOR",
+                    "confidence": 0.9,
+                    "reasoning": "The error branch is swallowed.",
+                    "guidance": "Surface the error to the caller.",
+                    "evidence": { "locations": [{ "path": "Sources/Auth.swift", "startLine": 12 }] }
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+
+            // Stub deliver() to return the SAME identity-keyed map the real service would: key every finding
+            // it received with a deterministic correlation key derived from the instance the handler passed.
+            when(deliveryService.deliver(eq(job), any())).thenAnswer(invocation -> {
+                List<PracticeDetectionResultParser.ValidatedFinding> received = invocation.getArgument(1);
+                Map<PracticeDetectionResultParser.ValidatedFinding, String> keys = new java.util.IdentityHashMap<>();
+                for (var f : received) {
+                    keys.put(f, "corr-" + f.practiceSlug());
+                }
+                return new DeliveryResult(received.size(), 0, 0, true, keys);
+            });
+
+            handler.deliver(job);
+
+            ArgumentCaptor<PracticeDetectionResultParser.DeliveryContent> captor = ArgumentCaptor.forClass(
+                PracticeDetectionResultParser.DeliveryContent.class
+            );
+            verify(feedbackService).deliverFeedback(eq(job), captor.capture(), any());
+            PracticeDetectionResultParser.DeliveryContent delivered = captor.getValue();
+            assertThat(delivered).isNotNull();
+            assertThat(delivered.diffNotes()).hasSize(1);
+            assertThat(delivered.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-error-handling");
         }
     }
 }

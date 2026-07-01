@@ -3,11 +3,15 @@ import { Loader2 } from "lucide-react";
 import type { ComponentPropsWithoutRef, SVGAttributes } from "react";
 import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProviderView } from "@/api/types.gen";
+import { DevSignInForm } from "@/components/auth/DevSignInForm";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
+
+/** Synthetic provider type the server emits for the optional passwordless dev sign-in. */
+const DEV_PROVIDER_TYPE = "DEV";
 
 interface SignInButtonsProps {
 	onSignIn: (idpHint: string) => void;
@@ -16,6 +20,8 @@ interface SignInButtonsProps {
 	className?: string;
 	/** Header mode: compact buttons (icon + short name on desktop, icon-only on mobile). */
 	header?: boolean;
+	/** Destination after a successful dev sign-in (full mode only). Defaults to home. */
+	devReturnTo?: string;
 }
 
 /** GitHub mark SVG. Sized by the Button's `[&_svg]` rule; kept monochrome (currentColor). */
@@ -113,7 +119,14 @@ function HeaderProviderButton({
  * - Default: full-width buttons stacked vertically (the login card).
  * - `header`: compact buttons (icon + short name on desktop, icon-only on mobile).
  */
-export function SignInButtons({ onSignIn, disabled, size, className, header }: SignInButtonsProps) {
+export function SignInButtons({
+	onSignIn,
+	disabled,
+	size,
+	className,
+	header,
+	devReturnTo,
+}: SignInButtonsProps) {
 	const {
 		data: providers,
 		isLoading,
@@ -159,10 +172,19 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 		);
 	}
 
+	// The dev sign-in needs a username field, so it renders as a small form (full mode only), never as
+	// an OAuth-style button — and it is excluded from the compact header entirely.
+	const oauthProviders = providers.filter(
+		(provider) => provider.providerType?.toUpperCase() !== DEV_PROVIDER_TYPE,
+	);
+	const hasDevSignIn = providers.some(
+		(provider) => provider.providerType?.toUpperCase() === DEV_PROVIDER_TYPE,
+	);
+
 	if (header) {
 		return (
 			<div className="flex items-center gap-2">
-				{providers.map((provider) => (
+				{oauthProviders.map((provider) => (
 					<HeaderProviderButton
 						key={provider.registrationId ?? provider.displayName}
 						provider={provider}
@@ -176,7 +198,7 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 
 	return (
 		<div className="flex flex-col gap-2">
-			{providers.map((provider) => (
+			{oauthProviders.map((provider) => (
 				<ProviderButton
 					key={provider.registrationId ?? provider.displayName}
 					provider={provider}
@@ -186,6 +208,7 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 					className={className}
 				/>
 			))}
+			{hasDevSignIn ? <DevSignInForm returnTo={devReturnTo} /> : null}
 		</div>
 	);
 }

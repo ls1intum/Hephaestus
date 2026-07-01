@@ -15,7 +15,7 @@ import java.util.Map;
  * @param model     model id passed to the runner (forwarded as {@code defaultModel})
  */
 public record LiveLlmCredentials(String baseUrl, String apiKey, String model) {
-    private static final String DEFAULT_BASE_URL = "https://gpu.ase.cit.tum.de/api";
+    private static final String DEFAULT_BASE_URL = "https://llm-gateway.example/api";
     private static final String DEFAULT_MODEL = "openai/gpt-oss-120b";
 
     /**

@@ -13,10 +13,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for issue entities.
- *
- * <p>All queries filter by repository ID which inherently carries scope
- * through the Repository -> Organization relationship chain.
+ * All queries filter by repository ID, which inherently carries scope
+ * through the repository -> workspace relationship chain.
  */
 @WorkspaceAgnostic("Issues scoped through repository_id -> repository.workspace_id")
 public interface IssueRepository extends JpaRepository<Issue, Long> {
@@ -44,23 +42,49 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Optional<Issue> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
 
-    /**
-     * Finds all issues belonging to a repository.
-     *
-     * @param repositoryId the repository ID
-     * @return list of issues for the repository
-     */
-    List<Issue> findAllByRepository_Id(Long repositoryId);
+    /** Fetches an issue with its repository eagerly — used to build an issue-detection job submission. */
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
+    Optional<Issue> findByIdWithRepository(@Param("id") long id);
 
     /**
-     * Finds issues belonging to a repository with pagination.
-     * Uses Slice for efficient batching without requiring a count query.
+     * Fetches an issue with its author eagerly — used by the practice-detection delivery path to resolve
+     * the about-user in the same query (mirrors {@code PullRequestRepository.findByIdWithAuthor}, avoiding
+     * a lazy-load round-trip on {@code issue.getAuthor()}). Restricted to {@code TYPE(i) = Issue}.
+     */
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author WHERE TYPE(i) = Issue AND i.id = :id")
+    Optional<Issue> findByIdWithAuthor(@Param("id") long id);
+
+    /**
+     * Fetches an issue with the associations {@code PracticeReviewDetectionGate.evaluateIssue} needs:
+     * repository (workspace resolution) and assignees (role check). Restricted to {@code TYPE(i) = Issue}
+     * so a pull-request row never enters the issue-detection path.
+     */
+    @Query(
+        "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.assignees " +
+            "WHERE TYPE(i) = Issue AND i.id = :id"
+    )
+    Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
+
+    List<Issue> findAllByRepository_Id(Long repositoryId);
+
+    /** Slice (rather than Page) so batching needs no count query. */
+    Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
+
+    /**
+     * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
+     * newest-first by number, for the cross-artifact project-context telescope. The author is fetched
+     * up front to avoid a per-row lazy load; labels/comments/bodies are intentionally NOT fetched — the
+     * inventory is a compact "what else exists in this project" index, not a full body.
      *
      * @param repositoryId the repository ID
-     * @param pageable pagination parameters
-     * @return slice of issues for the repository
+     * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
+     * @return newest-first issues for the repository
      */
-    Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
+    @Query(
+        "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone " +
+            "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId ORDER BY i.number DESC"
+    )
+    List<Issue> findIssueInventoryByRepositoryId(@Param("repositoryId") long repositoryId, Pageable pageable);
 
     /**
      * Nullifies milestone references on all issues that reference the given milestone.

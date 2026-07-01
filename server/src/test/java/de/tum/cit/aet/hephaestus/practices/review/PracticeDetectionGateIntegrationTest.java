@@ -138,7 +138,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
-        p.setCategory("test");
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(triggerEvents));
         p.setActive(active);
@@ -261,7 +260,8 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("agent config");
+            // No runnable practice config → gate skips before detection.
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
         }
 
         @Test

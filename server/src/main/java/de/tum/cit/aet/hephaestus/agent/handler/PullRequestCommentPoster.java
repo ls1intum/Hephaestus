@@ -14,7 +14,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -40,7 +39,7 @@ class PullRequestCommentPoster {
     /** Maximum summary length in the collapsible header (prevents total comment from exceeding provider limits). */
     static final int MAX_SUMMARY_LENGTH = 200;
 
-    /** Marker appended to summary posts so {@code FeedbackPostService} can locate and edit them. */
+    /** Marker appended to summary posts so a re-review can locate and edit the prior summary in place. */
     static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus-agent-feedback:";
 
     // Sanitization patterns
@@ -198,10 +197,15 @@ class PullRequestCommentPoster {
     @Nullable
     String postFormattedBody(AgentJob job, String formattedBody) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = Objects.requireNonNull(
-            job.getIntegrationKind(),
-            "AgentJob.integrationKind must not be null"
-        );
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            // Integrity failure, not a cosmetic one: the agent ran (LLM cost incurred) but the job
+            // was never given a provider to deliver against. Fail LOUD so the executor marks the job
+            // FAILED instead of silently reporting "DELIVERED" with nothing posted.
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
         FeedbackChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
@@ -211,6 +215,126 @@ class PullRequestCommentPoster {
             );
             log.info(
                 "Posted feedback comment: jobId={}, kind={}, commentId={}",
+                job.getId(),
+                kind,
+                handle.externalId()
+            );
+            return handle.externalId();
+        } catch (FeedbackDeliveryException e) {
+            throw new JobDeliveryException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Edits an already-posted summary comment IN PLACE (ADR 0021 re-review UX): reuses the prior comment id
+     * so the PR/MR keeps a single, evolving overview thread across re-reviews rather than accumulating one
+     * comment per run. Returns the external id on success, or {@code null} when the edit cannot land — the
+     * channel is append-only or the prior comment is confirmed gone. The {@link UpdateResult} tells the caller
+     * which: {@code EDITED} (success), {@code GONE}/{@code UNSUPPORTED} (re-post), {@code TRANSIENT} (keep the
+     * prior summary, do NOT re-post — a flaky update must not double-post). A blank-id data bug still throws.
+     *
+     * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
+     */
+    UpdateResult updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
+        long workspaceId = job.getWorkspace().getId();
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
+        FeedbackChannel channel = requireChannel(kind);
+        FeedbackTarget target = buildTarget(job, kind, workspaceId);
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+            target,
+            externalRef,
+            new FeedbackContent(formattedBody, summaryMarkerFor(job))
+        );
+        return switch (outcome.kind()) {
+            case EDITED -> {
+                log.info(
+                    "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
+                    job.getId(),
+                    kind,
+                    outcome.handle().externalId()
+                );
+                yield new UpdateResult(UpdateResult.Kind.EDITED, outcome.handle().externalId());
+            }
+            case GONE -> {
+                log.info(
+                    "Summary edit found the prior comment gone; will post anew: jobId={}, reason={}",
+                    job.getId(),
+                    outcome.reason()
+                );
+                yield new UpdateResult(UpdateResult.Kind.GONE, null);
+            }
+            case TRANSIENT -> {
+                log.warn(
+                    "Summary edit hit a transient error; keeping the prior summary, not re-posting: jobId={}, reason={}",
+                    job.getId(),
+                    outcome.reason()
+                );
+                yield new UpdateResult(UpdateResult.Kind.TRANSIENT, null);
+            }
+            case UNSUPPORTED -> {
+                log.debug(
+                    "Channel {} cannot edit a summary in place; caller will post anew: jobId={}",
+                    kind,
+                    job.getId()
+                );
+                yield new UpdateResult(UpdateResult.Kind.UNSUPPORTED, null);
+            }
+        };
+    }
+
+    /** Agent-layer mirror of {@link FeedbackChannel.UpdateOutcome}, carrying only the external id the caller needs. */
+    record UpdateResult(Kind kind, @Nullable String externalId) {
+        enum Kind {
+            EDITED,
+            GONE,
+            TRANSIENT,
+            UNSUPPORTED,
+        }
+    }
+
+    /**
+     * Posts an already-formatted body as a comment on the job's ISSUE (vs the MR path above). Reuses the
+     * same {@link FeedbackChannel#postSummary} call — only the subject is an issue ({@code path#iid})
+     * rather than a merge request. Returns the external comment id, or throws {@link JobDeliveryException}
+     * on an integrity failure (no channel / no id) so an undelivered issue review is not reported as
+     * "DELIVERED".
+     */
+    @Nullable
+    String postIssueFormattedBody(AgentJob job, String formattedBody) {
+        long workspaceId = job.getWorkspace().getId();
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
+        FeedbackChannel channel = requireChannel(kind);
+        JsonNode metadata = job.getMetadata();
+        String repoFullName = requireMetadataText(metadata, "repository_full_name");
+        int issueNumber = requireMetadataInt(metadata, "issue_number");
+        String subjectExternalId;
+        try {
+            subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.getMessage());
+        }
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(kind, workspaceId, /* instanceKey */ null),
+            subjectExternalId,
+            /* resourceUrl */ null
+        );
+        try {
+            SummaryHandle handle = channel.postSummary(
+                target,
+                new FeedbackContent(formattedBody, summaryMarkerFor(job))
+            );
+            log.info(
+                "Posted issue feedback comment: jobId={}, kind={}, commentId={}",
                 job.getId(),
                 kind,
                 handle.externalId()
@@ -258,6 +382,10 @@ class PullRequestCommentPoster {
         return new FeedbackTarget(ref, subjectExternalId, resourceUrl);
     }
 
+    // The dedup marker that actually lands is the one formatComment embeds in the comment BODY
+    // (SUMMARY_MARKER_PREFIX). The FeedbackContent.marker() component passed below is NOT read by any
+    // summary channel today (GithubFeedbackChannel / GitlabFeedbackChannel use only content.body()); it is
+    // populated for parity so a future channel that wants out-of-band marker dedup has it available.
     private static String summaryMarkerFor(AgentJob job) {
         return SUMMARY_MARKER_PREFIX + job.getId() + " -->";
     }
@@ -367,10 +495,12 @@ class PullRequestCommentPoster {
         // Collapsible review body (cap summary to prevent total comment exceeding provider limits)
         String summaryText;
         if (sanitizedSummary != null && !sanitizedSummary.isBlank()) {
+            // sanitize() preserves newlines, but summaryText is embedded in the single-line <summary> element;
+            // collapse newlines to spaces first so a multi-line agent summary cannot break out of the header
+            // (everything after the first \n would otherwise render outside the collapsible block).
+            String oneLine = sanitizedSummary.replace('\n', ' ').strip();
             summaryText =
-                sanitizedSummary.length() > MAX_SUMMARY_LENGTH
-                    ? sanitizedSummary.substring(0, MAX_SUMMARY_LENGTH) + "…"
-                    : sanitizedSummary;
+                oneLine.length() > MAX_SUMMARY_LENGTH ? oneLine.substring(0, MAX_SUMMARY_LENGTH) + "…" : oneLine;
         } else {
             summaryText = "Review details";
         }

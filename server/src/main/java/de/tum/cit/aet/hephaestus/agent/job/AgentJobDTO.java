@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import tools.jackson.databind.JsonNode;
 
 @Schema(description = "Agent job execution record (job_token intentionally omitted)")
 public record AgentJobDTO(
@@ -14,6 +15,8 @@ public record AgentJobDTO(
     @Schema(description = "Job metadata (routing/display info)") Object metadata,
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull @Schema(description = "Frozen agent config at submit time") Object configSnapshot,
+    @Schema(description = "ID of the agent config that ran this job (from the frozen snapshot)") Long configId,
+    @Schema(description = "Name of the agent config that ran this job (from the frozen snapshot)") String configName,
     @Schema(description = "Docker container ID") String containerId,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
@@ -37,13 +40,16 @@ public record AgentJobDTO(
     @Schema(description = "Estimated cost in USD (agent-reported)") Double llmCostUsd
 ) {
     public static AgentJobDTO from(AgentJob job) {
+        JsonNode snapshot = job.getConfigSnapshot();
         return new AgentJobDTO(
             job.getId(),
             job.getJobType(),
             job.getStatus(),
             job.getMetadata(),
             job.getOutput(),
-            job.getConfigSnapshot(),
+            snapshot,
+            snapshotLong(snapshot, "configId"),
+            snapshotString(snapshot, "configName"),
             job.getContainerId(),
             job.getExitCode(),
             job.getErrorMessage(),
@@ -63,5 +69,19 @@ public record AgentJobDTO(
             job.getLlmCacheWriteTokens(),
             job.getLlmCostUsd()
         );
+    }
+
+    private static Long snapshotLong(JsonNode snapshot, String field) {
+        if (snapshot == null || !snapshot.has(field) || snapshot.get(field).isNull()) {
+            return null;
+        }
+        return snapshot.get(field).asLong();
+    }
+
+    private static String snapshotString(JsonNode snapshot, String field) {
+        if (snapshot == null || !snapshot.has(field) || snapshot.get(field).isNull()) {
+            return null;
+        }
+        return snapshot.get(field).asString();
     }
 }

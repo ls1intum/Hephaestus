@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -33,23 +34,26 @@ public class JobTypeHandlerConfiguration {
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
+    private final ReactionSuppressionFilter reactionSuppressionFilter;
 
     JobTypeHandlerConfiguration(
         JsonMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
-        TaskEnvelopeWriter taskEnvelopeWriter
+        TaskEnvelopeWriter taskEnvelopeWriter,
+        ReactionSuppressionFilter reactionSuppressionFilter
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.reviewProperties = reviewProperties;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
+        this.reactionSuppressionFilter = reactionSuppressionFilter;
     }
 
     @Bean
-    public PracticeDetectionResultParser practiceDetectionResultParser() {
+    PracticeDetectionResultParser practiceDetectionResultParser() {
         return new PracticeDetectionResultParser(objectMapper);
     }
 
@@ -71,40 +75,79 @@ public class JobTypeHandlerConfiguration {
         PullRequestCommentPoster commentPoster,
         DiffNotePoster diffNotePoster,
         UserPreferencesRepository userPreferencesRepository,
-        PullRequestRepository pullRequestRepository
+        PullRequestRepository pullRequestRepository,
+        WorkspaceRepository workspaceRepository,
+        FeedbackLedgerRecorder feedbackLedgerRecorder,
+        ObservationTrendService observationTrendService
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,
             userPreferencesRepository,
             pullRequestRepository,
-            reviewProperties
+            workspaceRepository,
+            reviewProperties,
+            feedbackLedgerRecorder,
+            observationTrendService
         );
     }
 
     @Bean
-    public JobTypeHandler pullRequestReviewHandler(
-        PracticeRepository practiceRepository,
+    PracticeCatalogInjector practiceCatalogInjector(PracticeRepository practiceRepository) {
+        return new PracticeCatalogInjector(objectMapper, practiceRepository);
+    }
+
+    @Bean
+    SecretDiffScanner secretDiffScanner() {
+        return new SecretDiffScanner();
+    }
+
+    @Bean
+    JobTypeHandler pullRequestReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
         GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService
+        FeedbackDeliveryService feedbackService,
+        SecretDiffScanner secretDiffScanner
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            practiceRepository,
+            practiceCatalogInjector,
             workspaceContextBuilder,
             taskEnvelopeWriter,
             gitDiffOperations,
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            secretDiffScanner,
+            reactionSuppressionFilter
         );
     }
 
     @Bean
-    public JobTypeHandlerRegistry jobTypeHandlerRegistry(List<JobTypeHandler> handlers) {
+    JobTypeHandler issueReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService,
+        PullRequestCommentPoster commentPoster,
+        FeedbackLedgerRecorder feedbackLedgerRecorder
+    ) {
+        return new IssueReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            practiceCatalogInjector,
+            resultParser,
+            deliveryService,
+            commentPoster,
+            feedbackLedgerRecorder
+        );
+    }
+
+    @Bean
+    JobTypeHandlerRegistry jobTypeHandlerRegistry(List<JobTypeHandler> handlers) {
         return new JobTypeHandlerRegistry(handlers);
     }
 }

@@ -12,43 +12,57 @@ lands (#1071) and beyond.
 
 ## Layout
 
+The workspace is partitioned by **lifecycle, expressed as location** (ADR 0020): read-only
+vs writable is decided by *where* a file lives, not by convention. Three top-level regions —
+`inputs/` (read-only; the path-guard whitelists exactly this subtree), `work/` (agent +
+precompute scratch; never collected), and `out/` (the only directory collected back into SQL).
+
 ```
 /workspace/
-├── repo/                  # Bind-mounted git working tree — READ-ONLY. The real cloned repo.
-├── context/
-│   ├── target/            # System-written, AI-readable. Populated by ContentProvider SPI.
-│   │                      # Files: metadata.json, comments.json, diff.patch, diff_stat.txt,
-│   │                      # diff_summary.md, contributor_history.json
-│   └── user/              # RESERVED (#1071). Mentor-pinned content — user uploads / pins
-│                          # surfaced from the chat. AI-readable; mentor-writable.
-├── scratch/               # RESERVED (#1071). AI-writable scratch area. Survives Pi turns,
-│                          # ephemeral across runs. Never read by the server.
-├── task.json              # TaskEnvelope<…> — runtime contract between handler and runner.
-├── .pi/                   # Pi SDK agent dir — $PI_CODING_AGENT_DIR resolves here.
-│   ├── AGENTS.md          #   Orchestrator instructions
-│   ├── settings.json      #   Pi SDK config (provider, model, compaction)
-│   └── extensions/        #   Custom provider extensions (auto-discovered)
-├── .run-pi.mjs            # Runner script entry point.
-├── .practices/            # Practice catalog (index.json, {slug}.md, all-criteria.md).
-├── .precompute/           # Per-practice precompute scripts injected by the server.
-├── .precompute-out/       # Precompute runtime output (logs, structured hints).
-├── .analysis/             # Per-practice analysis output (.gitkeep markers).
-└── .output/               # Sandbox output area — result.json, review-state.json, usage.json,
-                           # runner-debug.json, watchdog-killed.json
+├── inputs/                          # READ-ONLY. The path-guard whitelists exactly this subtree.
+│   ├── manifest.json                #   Telescope: the integration-agnostic index (path/connector/
+│   │                                #   sha256 per file). Sits above the per-connector context it indexes.
+│   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020). One namespace
+│   │   └── scm/repo/                #   per connector — the SCM git working tree (READ-ONLY mount) lives
+│   │                                #   here; a future export would be sources/slack/…, sources/outline/…
+│   ├── context/                     #   System-written, AI-readable. Populated by the ContentProvider SPI.
+│   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
+│   │                                #   contributor_history.json, linked_work_items.json, …
+│   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
+├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
+│   ├── precompute/                  #   Per-practice precompute scripts injected by the server.
+│   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
+│   └── analysis/                    #   Per-practice analysis output (.gitkeep markers).
+├── out/                             # THE ONLY collected directory — result.json, review-state.json,
+│                                    #   usage.json, runner-debug.json, watchdog-killed.json
+├── task.json                        # TaskEnvelope<…> — runtime contract between handler and runner.
+├── .pi/                             # Pi SDK agent dir — $PI_CODING_AGENT_DIR resolves here.
+│   ├── AGENTS.md                    #   Orchestrator instructions
+│   ├── settings.json                #   Pi SDK config (provider, model, compaction)
+│   └── extensions/                  #   Custom provider extensions (auto-discovered)
+└── .run-pi.mjs                      # Runner script entry point.
 ```
+
+The long-lived **mentor interactive sandbox** (#1071) is a *separate* runtime with its own
+layout (`context/target/`, `context/user/`, `scratch/`) driven by
+`DockerInteractiveSandboxAdapter`, not by this ABI. It is documented there, not here.
 
 ## Path conventions
 
-* **`context/target/`** — written by `ContentProvider` implementations under
+* **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
+  subtree; an agent write attempt anywhere under `inputs/` is rejected.
+* **`inputs/context/`** — written by `ContentProvider` implementations under
   `agent.context.providers.*`. Path prefix is enforced by `WorkspaceContextBuilder`.
-* **`context/user/`** *(reserved, #1071)* — mentor-pinned content scoped to a `(userId,
-  workspaceId)` session. Distinct from `context/target/` because lifecycle differs:
-  `target/` is rebuilt every job, `user/` survives across turns.
-* **`scratch/`** *(reserved, #1071)* — mentor's working area. The Pi agent may use Pi's
-  `edit` / `write` tools here. The server does not read this directory.
+* **`inputs/manifest.json`** — the telescope index, written by `ContextManifestBuilder` *above*
+  `inputs/context/` (it indexes the context files but is not itself one of them).
+* **`inputs/sources/scm/repo/`** — the read-only SCM checkout, bind-mounted from the host
+  Context Fabric (`{fabric.root}/sources/scm/{repositoryId}`).
+* **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
+  collects it.
+* **`out/`** — the *only* directory the sandbox collects after the run.
 * **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
   `schemaVersion` and `task.kind`, exiting `42` on mismatch (envelope/image drift signal).
-* **`.pi*`** / **`.practices/`** / **`.precompute*`** / **`.analysis/`** / **`.output/`**
+* **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`
   — internal control surfaces. AI-readable as configured by the orchestrator, but
   *not* part of the public agent ABI; subject to change without a `schemaVersion` bump.
 

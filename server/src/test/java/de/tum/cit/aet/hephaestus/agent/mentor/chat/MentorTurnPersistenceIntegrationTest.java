@@ -301,6 +301,44 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void finalise_persistsProviderTotalTokensWhenItDivergesFromInputPlusOutput() {
+        // A provider-reported totalTokens that includes cache tokens legitimately exceeds input+output. The
+        // persisted block must round-trip the WIRE total unchanged (single source of truth), NOT re-derive
+        // it as input+output — otherwise a rehydrated thread renders a different token count than the stream.
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hi");
+        UUID assistantId = UUID.randomUUID();
+        MentorTurnPersistence.TurnPersistenceCookie cookie = persistence.persistInFlight(
+            thread,
+            "hi",
+            assistantId,
+            null
+        );
+
+        TranslatorState state = new TranslatorState(assistantId);
+        state.observeModel("openai/gpt-oss-120b");
+        ObjectNode usage = NODES.objectNode();
+        usage.put("input", 100).put("output", 50);
+        state.observeUsage(usage);
+        state.openTextBlock("text-0");
+        state.appendText("ok");
+        state.closeTextBlock();
+
+        // Wire total = 200 ≠ input+output (150): provider counted 50 cache tokens on top.
+        UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
+            "openai/gpt-oss-120b",
+            new UIMessageChunk.MessageMetadata.Usage(100, 50, 50, null, 200),
+            /* costUsd */ null
+        );
+        persistence.finalise(cookie, state, new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, finishMeta));
+
+        JsonNode meta = chatMessageRepository.findById(assistantId).orElseThrow().getMetadata();
+        assertThat(meta.path("usage").path("input").asLong()).isEqualTo(100);
+        assertThat(meta.path("usage").path("output").asLong()).isEqualTo(50);
+        // The wire's 200 survives — not the 150 a naive input+output derivation would write.
+        assertThat(meta.path("usage").path("totalTokens").asLong()).isEqualTo(200);
+    }
+
+    @Test
     void finalise_storesSessionJsonlByteIdentically() {
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "hello");
@@ -409,7 +447,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // writer that loaded the entity at version=N can no longer overwrite a row the
         // reaper bumped to N+1. Hibernate detects the version mismatch on the SQL UPDATE
         // predicate (`WHERE id = ? AND version = ?`) and throws — the persistence service
-        // catches and skips, so the reaper's verdict survives.
+        // catches and skips, so the reaper's observation survives.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
         persistence.persistInFlight(thread, "hello", assistantId, null);
@@ -426,15 +464,14 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(afterReaper.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
 
         // Stale-snapshot save attempt: Hibernate's UPDATE predicate fails on the version,
-        // surfaces as OptimisticLockingFailureException. A prior read-before-write
-        // `isStillInFlight` check is replaced by this DB-enforced protection — version
-        // mismatch is the single durable signal that another writer touched the row.
+        // surfaces as OptimisticLockingFailureException. The version mismatch is the single
+        // durable signal that another writer touched the row.
         stale.setStatus(ChatMessage.Status.completed);
         assertThatThrownBy(() -> {
             chatMessageRepository.saveAndFlush(stale);
         }).isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
 
-        // After the failed save attempt, the row in the DB still reflects the reaper's verdict.
+        // After the failed save attempt, the row in the DB still reflects the reaper's observation.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(finalState.getMetadata().path("error").asString()).isEqualTo("server restart");

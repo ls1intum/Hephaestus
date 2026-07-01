@@ -1,0 +1,118 @@
+# ADR 0022: Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup
+
+**Status:** Accepted
+**Date:** 2026-06-24
+**Authors:** Felix T.J. Dietrich
+**Supersedes (in part):** [ADR 0021](0021-findings-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
+
+## Context
+
+ADR 0021 F-6 modelled an evaluation as two columns: a sign-neutral `PracticeFinding.observation`
+(`OBSERVED` / `NOT_OBSERVED` / `NOT_APPLICABLE`) times a direction `Practice.kind`
+(`GOOD_PRACTICE` / `BAD_PRACTICE` / `CONTEXTUAL`), reconciled by `PracticeKind.isProblem(...)`.
+
+Two problems surfaced. First, the direction-on-the-rule indirection is non-standard: SARIF — the dominant
+cross-tool result format — carries the good/bad outcome on the *result* (`result.kind` = `pass`/`fail`),
+not on the rule; there is no rule-direction property. Second, and more important, a single resolved enum
+conflates **two genuinely different questions**:
+
+1. **presence** — did the detector see the target signal?
+2. **assessment** — is that good or bad for the developer?
+
+Collapsing them loses the distinction between a gap by **omission** (a good behaviour is missing) and a
+problem by **commission** (a bad behaviour is present) — a pedagogically real difference — and it cannot
+represent a practice with both good and bad aspects.
+
+## Decision
+
+### 1. Split the evaluation into two orthogonal columns on the observation; drop `Practice.kind`
+
+| Column | Values |
+| --- | --- |
+| `presence` | `PRESENT` · `ABSENT` · `NOT_APPLICABLE` |
+| `assessment` | `GOOD` · `BAD` (NULL iff `presence = NOT_APPLICABLE`) |
+| `severity` | unchanged; NULL unless `assessment = BAD` |
+
+The 2×2 reads directly:
+
+| | `assessment = GOOD` | `assessment = BAD` |
+| --- | --- | --- |
+| `presence = PRESENT` | good behaviour present → strength | bad behaviour present → problem |
+| `presence = ABSENT` | bad behaviour avoided → clean | good behaviour missing → gap |
+
+`assessment` is resolved **per observation** by the detector, so one practice can emit both `GOOD` and
+`BAD` observations (the matrix lives across a practice's observations, one cell per row). Direction is no
+longer a rule column — it lives in `criteria` + `what_good_looks_like`. `Practice.kind`,
+`CONTEXTUAL`, and `PracticeKind.isProblem`/`isStrength` are removed; readers recompute "is this a
+problem?" as `assessment = BAD`.
+
+### 2. The reaction anchors on feedback only
+
+`FindingReaction` → `reaction`, anchored on `feedback_id` (NOT NULL). `finding_id` and its mirror are
+removed entirely — no backward compatibility. A developer reacts to the *delivered feedback*, never to a
+private observation. The action stays a closed enum (`ADDRESSED` / `DISPUTED` / `NOT_APPLICABLE`); an open
+verb / event log is rejected (no second producer; it turns the uptake metric into free-text). `DISPUTED`
+requires an explanation. The cross-run `recurrence_key` (former `finding_fingerprint`) is **kept on the
+reaction**: re-nag suppression matches on it, and `thread_key` exists only on *delivered* units, so a
+withheld-but-recurring locus has no other cross-run key.
+
+### 3. Identity collapses to the minimal correct set
+
+- Observation keeps `about_user_id` only; `developer` (a 3NF transitive dependency on the contribution's
+  author) is dropped. The feedback recipient is re-sourced from `about_user_id`, so dropping `developer`
+  does not reopen the reviewer-side firewall.
+- Feedback keeps `about_user_id` (who it is about) **and** `recipient_user_id` (who it is delivered to);
+  equal today, but the split is the firewall and `recipient_user_id` is read by the thread-key derivation.
+- Reaction keeps one identity, `reactor_user_id`.
+
+### 4. Cut columns with no reader (ruthless, evidence-bound)
+
+Drop `observer` (always `SYSTEM`, zero readers); feedback `idempotency_key` (duplicate of the
+`(agent_job_id, position)` unique), `model_id`, `composer_version` (write-only), `synthesis_prompt_version`
+(dead); placement `anchor_old_path` / `anchor_start_side` / `anchor_quote` / `pinned_commit_sha`
+(never written), `posted_state` / `thread_external_ref` (written, no reader), `resolved*` (dead).
+Keep the observation `occurrence_key` (per-occurrence dedup grain, distinct from the `recurrence_key`
+locus grain). `replaces_id` and `thread_key` are kept: the supersession chain backs the thread-key
+derivation and the on-read `baseline_state`.
+
+### 5. Human-readable names + entity renames
+
+`PracticeFinding` → `Observation` (table `observation`); `FeedbackFinding` → `FeedbackObservation`;
+`FindingReaction` → `reaction`. Column renames for clarity: `observation`→`presence`+`assessment`,
+`finding_fingerprint`→`recurrence_key`, `idempotency_key`→`occurrence_key`, `subject_user_id`→
+`about_user_id`, `rendered_body`→`body`, `surface`→`channel` (and `REFLECTION_DASHBOARD`→`PROFILE`),
+`provenance`→`source`, `unit_ordinal`→`position`, `supersedes_id`→`replaces_id`,
+`feedback_thread_key`→`thread_key`, `slot`→`placement_type`, `external_ref`→`posted_comment_ref`,
+`evidence_role`→`role`, `detected_at`→`observed_at`.
+
+`Practice.kind` and the observation `observer` column are transient migration scaffolding — intermediate columns that never ship in the final schema; direction is recomputed from `assessment` and the observer was always `SYSTEM`.
+
+## Consequences
+
+- The schema speaks plainly and stops conflating measurement with evaluation: omission vs commission is
+  recoverable from `(presence, assessment)`, and mixed-aspect practices are expressible.
+- Direction is no longer a rule column; every former reader of `Practice.kind` recomputes "is this a
+  problem?" as `assessment = BAD`.
+- A developer reacts to delivered feedback, never to a private observation: authorization derives the
+  recipient through `feedback`, and re-nag suppression matches on the `recurrence_key` kept on the reaction.
+
+## Evidence
+
+- SARIF v2.1.0 — `result.kind` carries the pass/fail outcome; `result.level` is severity and is absent
+  unless `kind = fail`; no rule-direction property exists.
+  <https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html>
+- Single-point / criterion-referenced rubric — valence lives in the met/not-met of one criterion, never a
+  separate good/bad attribute. <https://www.wested.org/blog/strengths-based-assessment-rubrics/> ·
+  <https://www.cultofpedagogy.com/single-point-rubric/>
+- Reaction targets the delivered artifact (xAPI Object as a StatementRef); audience ≠ actor (W3C Activity
+  Streams `audience`/`to` distinct from `actor`).
+  <https://github.com/adlnet/xAPI-Spec/blob/master/xAPI-Data.md> · <https://www.w3.org/TR/activitystreams-vocabulary/>
+- Closed reaction enum maps to the recipience literature's validity vs next-step responses (Lui & Andrade
+  2022; Carless & Boud 2018), not an open verb vocabulary.
+  <https://www.frontiersin.org/journals/education/articles/10.3389/feduc.2022.751549/full> ·
+  <https://eric.ed.gov/?id=EJ1193233>
+- `developer` is a textbook 3NF transitive dependency; reference other aggregates by identity (Vernon, IDDD).
+  <https://en.wikipedia.org/wiki/Third_normal_form> ·
+  <https://www.informit.com/articles/article.aspx?p=2020371&seqNum=4>
+- Keep a single time axis; derive the trajectory, do not store it; avoid bitemporal (Fowler).
+  <https://martinfowler.com/articles/bitemporal-history.html>

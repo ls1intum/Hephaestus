@@ -11,6 +11,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
  */
 public final class SecurityUtils {
 
+    /**
+     * The instance-admin authority string minted by {@code JwtPrincipalFactory} for
+     * {@code Account.AppRole.APP_ADMIN} accounts and gated on here by {@link #isSuperAdmin()}. It is a
+     * security contract shared between that producer and this consumer — keep the two in agreement.
+     */
+    public static final String APP_ADMIN_AUTHORITY = "app_admin";
+
     private SecurityUtils() {}
 
     /**
@@ -90,9 +97,10 @@ public final class SecurityUtils {
 
     /**
      * Check if the current user is an instance super-admin (Account.AppRole APP_ADMIN).
-     * Such users can be elevated to workspace-admin level by the authorization layer, but only for
-     * workspaces where they are members. This method itself only checks for the presence of the
-     * authority. The instance-admin authority is the namespaced {@code app_admin} the issuer mints
+     * Such users are elevated to workspace-ADMIN (never OWNER) on any active workspace by
+     * {@code WorkspaceContextFilter} — including workspaces where they hold no membership. This method
+     * itself only checks for the presence of the authority. The instance-admin authority is the
+     * namespaced {@code app_admin} the issuer mints
      * for APP_ADMIN accounts (see {@code JwtPrincipalFactory}) — deliberately distinct from the
      * per-workspace {@code admin} role, which is membership-derived and never appears in the JWT.
      *
@@ -106,6 +114,6 @@ public final class SecurityUtils {
 
         // Flat `roles` claim on the Hephaestus-issued JWT (ADR 0017).
         var rolesObj = jwt.getClaims().get("roles");
-        return rolesObj instanceof List<?> roles && roles.contains("app_admin");
+        return rolesObj instanceof List<?> roles && roles.contains(APP_ADMIN_AUTHORITY);
     }
 }
