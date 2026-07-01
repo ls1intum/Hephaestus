@@ -60,6 +60,7 @@ import org.hibernate.annotations.Immutable;
         @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
         @Index(name = "idx_feedback_target", columnList = "artifact_type, artifact_id"),
         @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
+        @Index(name = "idx_feedback_replaces", columnList = "replaces_id"),
     }
 )
 @Getter
