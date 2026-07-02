@@ -48,10 +48,10 @@ async function loadSdk() {
 
 // PROTOCOL_ONLY tests / CI smoke-test invocations run the runner as a plain Node process where
 // /workspace is unwritable; MENTOR_RUNNER_* env overrides let callers point at a tmpdir without
-// forking the runner code. The workspace literals below are pinned by `WorkspaceAbiSyncTest` —
+// forking the runner code. The workspace literals below are pinned by `SandboxLayoutSyncTest` —
 // keep them quoted strings, not template expressions, so the grep stays exact.
 const WORKSPACE_ROOT = "/workspace";
-const MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md"; // WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH
+const MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md"; // SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH
 const CWD = process.env.MENTOR_RUNNER_CWD ?? WORKSPACE_ROOT;
 const SESSIONS_DIR = process.env.MENTOR_RUNNER_SESSIONS_DIR ?? `${WORKSPACE_ROOT}/.sessions`;
 const SYSTEM_PROMPT_PATH = process.env.MENTOR_RUNNER_SYSTEM_PROMPT_PATH ?? `${WORKSPACE_ROOT}/${MENTOR_SYSTEM_PROMPT_PATH}`;
@@ -60,7 +60,7 @@ const SYSTEM_PROMPT_PATH = process.env.MENTOR_RUNNER_SYSTEM_PROMPT_PATH ?? `${WO
 const AGENT_DIR_OVERRIDE = process.env.PI_CODING_AGENT_DIR ?? null;
 const PROTOCOL_VERSION = 1;
 
-// WorkspaceAbi.EXIT_ENVELOPE_MISMATCH — exit code on protocol-version / image / config drift
+// SandboxLayout.EXIT_ENVELOPE_MISMATCH — exit code on protocol-version / image / config drift
 // that makes this runner incompatible with the calling Java side. Java's launcher distinguishes
 // this exit from a generic crash so deploy regressions surface as a structured failure.
 const ENVELOPE_MISMATCH_EXIT = 42;
@@ -93,11 +93,11 @@ const TURN_GRACE_MS = (() => {
     return Number.isFinite(raw) && raw > 0 ? raw : 30_000;
 })();
 
-// Aspect-name whitelist for the fetch_context tool. Any other path is rejected before the
+// Context-key whitelist for the fetch_context tool. Any other path is rejected before the
 // callback even leaves the runner. This is a defence-in-depth check; the authoritative
-// whitelist lives Java-side in MentorAspects.ALLOWED_OUTPUT_KEYS (full-key match against
-// the aspect providers' OUTPUT_KEY constants). Keep this set aligned with the
-// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding,DeliveredFeedback,RecentAuthoredWork}AspectProvider basenames.
+// whitelist lives Java-side in MentorContextKeys.ALLOWED_OUTPUT_KEYS (full-key match against
+// the content sources' OUTPUT_KEY constants). Keep this set aligned with the
+// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding,DeliveredFeedback,RecentAuthoredWork}ContentSource basenames.
 const FETCH_CONTEXT_ALLOWED = new Set([
     "workspace.json",
     "user.json",
@@ -106,6 +106,7 @@ const FETCH_CONTEXT_ALLOWED = new Set([
     "practice_standing.json",
     "delivered_feedback.json",
     "recent_authored_work.json",
+    "slack_conversations.json",
 ]);
 
 // JSON-RPC error codes
@@ -132,7 +133,7 @@ function log(...args) {
 // rolling our own keeps the framing rule trivially auditable and shared with the test fixture.
 function createLineSplitter(onLine) {
     let buffer = Buffer.alloc(0);
-    const MAX_LINE_BYTES = 8 * 1024 * 1024; // 8 MiB hard cap; aspects are tiny but be safe
+    const MAX_LINE_BYTES = 8 * 1024 * 1024; // 8 MiB hard cap; context JSONs are tiny but be safe
     return (chunk) => {
         buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);
         while (true) {
@@ -323,7 +324,7 @@ async function ensureRuntime() {
                   })
                 : new DefaultResourceLoader({ cwd, agentDir: agentDir });
             await loader.reload();
-            // Built-in read/bash/grep let the mentor inspect the read-only aspect JSON
+            // Built-in read/bash/grep let the mentor inspect the read-only context JSON
             // under inputs/context/*.json (there is no repo checkout in the mentor sandbox).
             // edit/write are denied — the mentor is an observer, not a code author.
             const result = await createAgentSessionFromServices({
@@ -370,11 +371,11 @@ function defineFetchContextTool() {
         name: "fetch_context",
         label: "Fetch Context",
         description:
-            "Fetch a Hephaestus context aspect (workspace state, user activity, practice catalog, finding history, " +
+            "Fetch a Hephaestus context resource (workspace state, user activity, practice catalog, finding history, " +
             "prepared practice standing, delivered feedback, recent authored work) from the server. Returns JSON content. " +
             "Allowed paths: " +
             [...FETCH_CONTEXT_ALLOWED].join(", ") +
-            ". Names match the aspect provider OUTPUT_KEY constants.",
+            ". Names match the content source OUTPUT_KEY constants.",
         parameters: {
             type: "object",
             additionalProperties: false,
@@ -386,11 +387,11 @@ function defineFetchContextTool() {
         execute: async (_toolCallId, params) => {
             // NOT `path` — that's the imported `node:path` module; shadowing it here is a
             // future footgun if anyone adds `path.join(...)`.
-            const aspect = String(params?.path ?? "").trim();
+            const contextKey = String(params?.path ?? "").trim();
             // Pi treats THROWN errors as the tool's failure signal — a returned `isError:true`
             // is ignored by the runtime, so throw to flag the call as failed.
-            if (!FETCH_CONTEXT_ALLOWED.has(aspect)) {
-                throw new Error(`fetch_context: path "${aspect}" is not in the allow-list`);
+            if (!FETCH_CONTEXT_ALLOWED.has(contextKey)) {
+                throw new Error(`fetch_context: path "${contextKey}" is not in the allow-list`);
             }
             if (!activeThreadId) {
                 throw new Error("fetch_context: no active thread bound to the runtime");
@@ -403,8 +404,8 @@ function defineFetchContextTool() {
             const { promise, resolve, reject } = Promise.withResolvers();
             const timer = setTimeout(() => {
                 if (state.pendingFetchContexts.delete(callbackId)) {
-                    log(`fetch_context timed out: thread=${activeThreadId} path=${aspect} id=${callbackId}`);
-                    reject(new Error(`fetch_context(${aspect}) timed out after ${FETCH_CONTEXT_TIMEOUT_MS}ms`));
+                    log(`fetch_context timed out: thread=${activeThreadId} path=${contextKey} id=${callbackId}`);
+                    reject(new Error(`fetch_context(${contextKey}) timed out after ${FETCH_CONTEXT_TIMEOUT_MS}ms`));
                 }
             }, FETCH_CONTEXT_TIMEOUT_MS);
             state.pendingFetchContexts.set(callbackId, { resolve, reject, timer });
@@ -413,7 +414,7 @@ function defineFetchContextTool() {
                 jsonrpc: "2.0",
                 id: callbackId,
                 method: "fetch_context",
-                params: { threadId: activeThreadId, path: aspect },
+                params: { threadId: activeThreadId, path: contextKey },
             });
             return promise;
         },
@@ -458,7 +459,7 @@ async function handleHello(id /*, params */) {
     // shipping the latter on hello lets Java fail-closed if MENTOR_RUNNER_PROTOCOL_ONLY=1
     // leaks into a real deploy, instead of every user receiving stubbed answers.
     sendResult(id, { protocolVersion: PROTOCOL_VERSION, protocolOnly: PROTOCOL_ONLY });
-    // Prewarm the SDK in the background while Java orchestrates DB load + aspect build.
+    // Prewarm the SDK in the background while Java orchestrates DB load + context build.
     // Fired AFTER the hello reply because SDK module evaluation is synchronous.
     if (!PROTOCOL_ONLY) {
         setImmediate(() => {
@@ -725,11 +726,11 @@ async function handleShutdown(id) {
     });
 }
 
-// Max characters of context surfaced to the LLM per fetch_context call. Aspect JSONs
+// Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
 // occasionally balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single
 // tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
 // comfortably below gpt-oss-120b's 128 K window. Counted in JS string length (UTF-16 code
-// units), not bytes; aspects are ASCII-dominant so the variance is small.
+// units), not bytes; context JSONs are ASCII-dominant so the variance is small.
 const FETCH_CONTEXT_MAX_CHARS = 200_000;
 
 // fetch_context responses (Java → runner)

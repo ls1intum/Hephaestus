@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * accepted and contaminate the accuracy measurement the thesis depends on — so a finding must be
  * emitted blind to how earlier findings were received. Today the firewall holds only by omission (no
  * context provider happens to query reactions); a future refactor could silently breach it. This test
- * makes the firewall load-bearing: the {@code ContentProvider}s that materialise the detection
+ * makes the firewall load-bearing: the {@code ContentSource}s that materialise the detection
  * sandbox ({@code inputs/...}) may not depend on the reaction package.
  *
  * <p>Scope note: this guards the <em>detection context</em> only. Reaction-aware <em>delivery</em>
@@ -24,9 +24,9 @@ import org.junit.jupiter.api.Test;
 class DetectionReactionFirewallTest extends HephaestusArchitectureTest {
 
     private static final String CONTEXT_PROVIDERS = "..agent.context.providers..";
-    // The mentor sub-package holds the delivery/coaching aspect providers (DeliveredFeedbackAspectProvider
+    // The mentor sub-package holds the delivery/coaching content sources (DeliveredFeedbackContentSource
     // etc.) which are reaction-aware BY DESIGN — the javadoc scope-note exempts them. The firewall covers
-    // only the detection-sandbox ContentProviders that materialise inputs/..., so it must NOT match here.
+    // only the detection-sandbox ContentSources that materialise inputs/..., so it must NOT match here.
     private static final String MENTOR_PROVIDERS = "..agent.context.providers.mentor..";
     private static final String REACTION_PACKAGE = "..practices.observation.reaction..";
 

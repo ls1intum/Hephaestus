@@ -7,8 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -33,15 +33,15 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     private GitLabProjectProcessor processor;
-    private GitProvider gitLabProvider;
+    private IdentityProvider gitLabProvider;
 
     @BeforeEach
     void setUp() {
         processor = new GitLabProjectProcessor(repositoryRepository);
 
-        gitLabProvider = new GitProvider();
+        gitLabProvider = new IdentityProvider();
         gitLabProvider.setId(PROVIDER_ID);
-        gitLabProvider.setType(GitProviderType.GITLAB);
+        gitLabProvider.setType(IdentityProviderType.GITLAB);
         gitLabProvider.setServerUrl("https://gitlab.com");
     }
 

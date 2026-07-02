@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.identity.connect;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import org.springframework.stereotype.Component;
@@ -14,8 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Integration-side implementation of the {@link GitProviderRegistry} auth SPI: upserts the
  * {@code git_provider} row for a login provider so {@code core.auth}'s account provisioning can key
  * the {@code IdentityLink} by {@code (git_provider_id, subject)} without importing the
- * {@link GitProvider} entity. {@code core.auth} passes the provider's {@code (type, baseUrl)} (read
- * from its own {@code login_provider} store); this side owns the {@code GitProvider} row and
+ * {@link IdentityProvider} entity. {@code core.auth} passes the provider's {@code (type, baseUrl)} (read
+ * from its own {@code login_provider} store); this side owns the {@code IdentityProvider} row and
  * canonicalizes {@code baseUrl} to the server-url origin.
  */
 @Component
@@ -23,9 +23,9 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
 
     private static final String UNKNOWN = "UNKNOWN";
 
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
-    public RegistrationToGitProviderResolver(GitProviderRepository gitProviderRepository) {
+    public RegistrationToGitProviderResolver(IdentityProviderRepository gitProviderRepository) {
         this.gitProviderRepository = gitProviderRepository;
     }
 
@@ -43,11 +43,11 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long resolveProviderId(String providerTypeName, String baseUrl) {
-        GitProviderType type = GitProviderType.valueOf(providerTypeName);
+        IdentityProviderType type = IdentityProviderType.valueOf(providerTypeName);
         String origin = originOf(baseUrl);
         return gitProviderRepository
             .findByTypeAndServerUrl(type, origin)
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(type, origin)))
+            .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
             .getId();
     }
 
@@ -69,7 +69,7 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
         if (gitProviderId == null) {
             return null;
         }
-        return gitProviderRepository.findById(gitProviderId).map(GitProvider::getServerUrl).orElse(null);
+        return gitProviderRepository.findById(gitProviderId).map(IdentityProvider::getServerUrl).orElse(null);
     }
 
     /**

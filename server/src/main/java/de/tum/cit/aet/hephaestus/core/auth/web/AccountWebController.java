@@ -91,8 +91,8 @@ public class AccountWebController {
             .stream()
             .map(il ->
                 new LinkedProviderDTO(
-                    gitProviderRegistry.providerTypeName(il.getGitProviderId()),
-                    gitProviderRegistry.providerServerUrl(il.getGitProviderId())
+                    gitProviderRegistry.providerTypeName(il.getProviderId()),
+                    gitProviderRegistry.providerServerUrl(il.getProviderId())
                 )
             )
             .distinct()
@@ -110,7 +110,7 @@ public class AccountWebController {
                 primary != null ? primary.getUsernameAtSignup() : account.getDisplayName(),
                 primary != null ? primary.getAvatarUrl() : null,
                 primary != null ? primary.getProfileUrl() : null,
-                primary != null ? gitProviderRegistry.providerTypeName(primary.getGitProviderId()) : null,
+                primary != null ? gitProviderRegistry.providerTypeName(primary.getProviderId()) : null,
                 primary != null ? primary.getSubject() : null,
                 hasGitLab,
                 linkedProviders,
@@ -165,7 +165,7 @@ public class AccountWebController {
     }
 
     private IdentityViewDTO toView(IdentityLink il) {
-        String providerType = gitProviderRegistry.providerTypeName(il.getGitProviderId());
+        String providerType = gitProviderRegistry.providerTypeName(il.getProviderId());
         return new IdentityViewDTO(
             il.getId(),
             providerType,

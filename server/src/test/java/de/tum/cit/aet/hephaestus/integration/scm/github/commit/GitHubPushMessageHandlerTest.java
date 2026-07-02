@@ -11,7 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -159,7 +159,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     private Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
         Repository repo = TestEntities.repository(id, nameWithOwner, defaultBranch);
         repo.setOrganization(null);
-        repo.setProvider(TestEntities.gitProvider(1L, GitProviderType.GITHUB));
+        repo.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITHUB));
         return repo;
     }
 

@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -42,7 +42,7 @@ public class GitLabProjectSyncService {
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProperties gitLabProperties;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
     public GitLabProjectSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
@@ -50,7 +50,7 @@ public class GitLabProjectSyncService {
         GitLabProjectProcessor projectProcessor,
         GitLabGroupProcessor groupProcessor,
         GitLabProperties gitLabProperties,
-        GitProviderRepository gitProviderRepository
+        IdentityProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
@@ -66,12 +66,12 @@ public class GitLabProjectSyncService {
      * @return the GitLab provider
      * @throws IllegalStateException if no GitLab provider is found
      */
-    private GitProvider resolveProvider() {
+    private IdentityProvider resolveProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
                 )
             );
     }
@@ -94,7 +94,7 @@ public class GitLabProjectSyncService {
         String safeProjectPath = sanitizeForLog(projectFullPath);
 
         try {
-            GitProvider provider = resolveProvider();
+            IdentityProvider provider = resolveProvider();
             Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);

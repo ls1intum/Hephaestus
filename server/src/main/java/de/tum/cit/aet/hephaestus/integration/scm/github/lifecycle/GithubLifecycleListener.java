@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -78,7 +78,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
     private final UserRepository userRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceMembershipService workspaceMembershipService;
@@ -98,7 +98,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         UserRepository userRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceMembershipService workspaceMembershipService,
         ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
@@ -401,8 +401,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         // This ensures repositories created during provisioning have organization_id set
         if (accountKind == AccountKind.ORGANIZATION && accountId != null) {
             Long providerId = gitProviderRepository
-                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-                .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"))
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"))
                 .getId();
             Organization org = organizationService.upsertIdentity(accountId, accountLogin, providerId);
             workspace.setOrganization(org);
@@ -692,9 +692,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             String typeStr =
                 accountKind == AccountKind.ORGANIZATION ? User.Type.ORGANIZATION.name() : User.Type.USER.name();
 
-            GitProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-                .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"));
+            IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
             Long providerId = provider.getId();
 
             userRepository.acquireLoginLock(accountLogin, providerId);

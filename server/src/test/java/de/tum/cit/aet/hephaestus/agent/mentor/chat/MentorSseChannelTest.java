@@ -192,7 +192,7 @@ class MentorSseChannelTest extends BaseUnitTest {
         // chunk and corrupt the SSE stream. This test starts a tight 5ms-tick heartbeat and
         // 200 chunk sends; every recorded data frame must remain a complete JSON object AND
         // every recorded comment frame must be intact.
-        channel.startHeartbeat();
+        channel.startKeepAlive();
         // Drive lastSendNanos far in the past so EVERY tick attempts a write.
         java.lang.reflect.Field lastSendField = MentorSseChannel.class.getDeclaredField("lastSendNanos");
         lastSendField.setAccessible(true);

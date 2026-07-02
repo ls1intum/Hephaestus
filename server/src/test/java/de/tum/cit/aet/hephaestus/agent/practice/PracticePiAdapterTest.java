@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -54,10 +54,10 @@ class PracticePiAdapterTest extends BaseUnitTest {
     void precomputeReferencesContextTarget() {
         String step = PracticePiAdapter.buildPrecomputeStep();
         assertThat(step)
-            .contains("/workspace/" + WorkspaceAbi.CONTEXT_PREFIX + "diff.patch")
-            .contains("/workspace/" + WorkspaceAbi.CONTEXT_PREFIX + "metadata.json")
+            .contains("/workspace/" + SandboxLayout.CONTEXT_PREFIX + "diff.patch")
+            .contains("/workspace/" + SandboxLayout.CONTEXT_PREFIX + "metadata.json")
             // scripts receive the materialised context dir so they can read project_inventory.json etc.
-            .contains("--context /workspace/" + WorkspaceAbi.CONTEXT_PREFIX)
+            .contains("--context /workspace/" + SandboxLayout.CONTEXT_PREFIX)
             .doesNotContain("/workspace/.context/");
     }
 
@@ -74,7 +74,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
             // '*.ts' / failed cp still lets the runner start.
             .contains("2>/dev/null ; bun run")
             // The runner gets the repo mount, the cleaned diff, and writes into the precompute-out dir.
-            .contains("--repo " + WorkspaceAbi.REPO_MOUNT)
+            .contains("--repo " + SandboxLayout.REPO_MOUNT)
             .contains("/diff_clean.patch")
             .contains("--output /workspace/work/precompute-out")
             // The agent-facing [L<n>] line annotations are stripped to a raw diff for the static parser.
@@ -89,7 +89,7 @@ class PracticePiAdapterTest extends BaseUnitTest {
 
     @Test
     void outputPath() {
-        assertThat(adapter.buildSandboxSpec(proxyRequest()).outputPath()).isEqualTo(WorkspaceAbi.OUTPUT_PATH);
+        assertThat(adapter.buildSandboxSpec(proxyRequest()).outputPath()).isEqualTo(SandboxLayout.OUTPUT_PATH);
     }
 
     @Test

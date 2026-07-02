@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.spi;
 
 import java.util.List;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,6 +30,19 @@ public interface AccountIdentityQuery {
     List<IdentityLinkView> activeLinksForAccount(Long accountId);
 
     /**
+     * Resolve the {@code Account} id backing an active federated identity, keyed by the immutable
+     * {@code (provider, subject, team)} triple — the same nOAuth-safe lookup used at login. Lets a
+     * non-auth module (e.g. the Slack DM mentor) turn a provider-native subject into a Hephaestus
+     * principal without importing the {@code IdentityLink} domain entity.
+     *
+     * @param providerId the {@code identity_provider} row id (from the consumer's own registry)
+     * @param subject    the IdP-stable subject (Slack {@code U…}, GitHub/GitLab numeric id)
+     * @param teamId     the multi-instance tenant id (Slack {@code T…}); {@code null} for single-tenant IdPs
+     * @return the account id of the active link, or empty when no active link matches
+     */
+    Optional<Long> resolveAccountId(Long providerId, String subject, @Nullable String teamId);
+
+    /**
      * Point an {@code IdentityLink} at its git-provider actor mirror. Idempotent: a no-op when the
      * link already references {@code externalActorId} (or the link no longer exists). Closes the
      * {@code IdentityLink → ExternalActor} gap so profile surfaces can render "your activity" without
@@ -41,7 +55,7 @@ public interface AccountIdentityQuery {
 
     /**
      * Vendor-neutral projection of an {@code IdentityLink}. Carries the scalar {@code gitProviderId}
-     * (not a {@code GitProvider} entity) so {@code core.auth} stays free of integration imports.
+     * (not a {@code IdentityProvider} entity) so {@code core.auth} stays free of integration imports.
      *
      * @param identityLinkId  the link row id (needed to call {@link #linkExternalActor})
      * @param gitProviderId   FK into the integration-owned {@code git_provider} row

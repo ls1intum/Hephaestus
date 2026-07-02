@@ -36,12 +36,12 @@ public sealed interface ContextRequest
     }
 
     /**
-     * Build the materialised mentor-chat context: user activity, workspace aspect, practice
+     * Build the materialised mentor-chat context: user activity, workspace context, practice
      * catalog, findings history. There is no {@link AgentJob} — mentor chat is synchronous
      * and runs against a long-lived interactive sandbox keyed by {@code (workspaceId, developerId)}.
      *
-     * @param workspaceId   workspace scoping for every aspect provider's queries
-     * @param developerId the active user (sometimes called {@code userId}) the aspects describe
+     * @param workspaceId   workspace scoping for every content source's queries
+     * @param developerId the active user (sometimes called {@code userId}) the content sources describe
      * @param threadId      conversation thread the request originated from (used by providers
      *                      that need per-thread cache keys)
      */

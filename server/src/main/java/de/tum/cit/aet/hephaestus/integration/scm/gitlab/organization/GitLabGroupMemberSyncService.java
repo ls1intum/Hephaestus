@@ -6,9 +6,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.extractNumericId;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -71,7 +71,7 @@ public class GitLabGroupMemberSyncService {
     private final GitLabGraphQlResponseHandler responseHandler;
     private final OrganizationMembershipRepository organizationMembershipRepository;
     private final UserRepository userRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
     private final OrganizationMembershipListener organizationMembershipListener;
     private final TransactionTemplate requiresNewTransaction;
@@ -81,7 +81,7 @@ public class GitLabGroupMemberSyncService {
         GitLabGraphQlResponseHandler responseHandler,
         OrganizationMembershipRepository organizationMembershipRepository,
         UserRepository userRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         @Nullable OrganizationMembershipListener organizationMembershipListener,
         TransactionTemplate transactionTemplate
@@ -124,7 +124,7 @@ public class GitLabGroupMemberSyncService {
         }
 
         String safeGroupPath = sanitizeForLog(groupFullPath);
-        GitProvider provider = resolveProvider();
+        IdentityProvider provider = resolveProvider();
         Long providerId = provider.getId();
 
         Set<Long> syncedUserIds = new HashSet<>();
@@ -350,12 +350,12 @@ public class GitLabGroupMemberSyncService {
      * @return the GitLab provider
      * @throws IllegalStateException if no GitLab provider is found
      */
-    private GitProvider resolveProvider() {
+    private IdentityProvider resolveProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
                 )
             );
     }

@@ -25,7 +25,7 @@ export async function readContextJson<T = any>(
 	}
 }
 
-/** Shape of `project_inventory.json` (see WorkspaceInventoryContentProvider). All fields best-effort. */
+/** Shape of `project_inventory.json` (see WorkspaceInventoryContentSource). All fields best-effort. */
 export interface ProjectInventory {
 	repository?: string;
 	focal?: { type?: string; number?: number };

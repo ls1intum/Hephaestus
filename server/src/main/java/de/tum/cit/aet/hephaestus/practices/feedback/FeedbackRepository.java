@@ -51,7 +51,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /**
      * The feedback a developer actually RECEIVED in a workspace — only units that reached a surface
-     * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback aspect so the coach
+     * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback content source so the coach
      * references the exact words the student saw ({@link Feedback#getBody()}) instead of
      * reconstructing from raw pre-delivery findings (which may have been suppressed, superseded, or never
      * postable). Bounded by the caller's {@code Pageable}.

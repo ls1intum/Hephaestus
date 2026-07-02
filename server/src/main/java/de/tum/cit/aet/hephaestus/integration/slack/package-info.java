@@ -35,6 +35,16 @@
         "integration.scm",
         // Runtime-role gate (@ConditionalOnServerRole) on the connection-OAuth strategy.
         "core::runtime",
+        // Shared core infra: @WorkspaceAgnostic on the inbound Slack-events controller (this path resolves the
+        // workspace from the payload's team_id, not the URL).
+        "core",
+        // SlackMentorIdentityResolver resolves a Slack (team, user) to the workspace developer login through the
+        // auth SPI ports only (GitProviderRegistry + AccountIdentityQuery + AccountWorkspaceMembershipQuery) —
+        // never core.auth domain types.
+        "core::auth-spi",
+        // The Slack mentor adapter (integration.slack.mentor) runs a turn via the narrow MentorTurnRunner
+        // port and streams through MentorChannel (propagate pulls in UIMessageChunk + MentorTurnRequest).
+        "agent::mentor-chat",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.slack;

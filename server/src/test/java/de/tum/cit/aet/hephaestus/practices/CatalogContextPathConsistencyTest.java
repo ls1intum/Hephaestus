@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  */
 class CatalogContextPathConsistencyTest extends BaseUnitTest {
 
-    /** Workspace-relative files the ContentProviders actually write under {@code inputs/context/}. */
+    /** Workspace-relative files the ContentSources actually write under {@code inputs/context/}. */
     private static final Set<String> REAL_CONTEXT_FILES = Set.of(
         "metadata.json",
         "comments.json",
@@ -34,10 +34,10 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         "contributor_history.json",
         "issue_summary.md",
         // The two raw SQL-only graph projections (the agent cannot get these from the mounted worktree):
-        "linked_work_items.json", // LinkedWorkItemContentProvider.OUTPUT_FILE — resolved linked-issue rows
-        "review_threads.json", // ReviewThreadContentProvider — review-decision/thread rows
-        "general_comments.json", // GeneralReviewCommentContentProvider — conversation-tab (non-inline) MR review notes
-        "project_inventory.json" // WorkspaceInventoryContentProvider.OUTPUT_FILE — whole-project issue/PR index
+        "linked_work_items.json", // LinkedWorkItemContentSource.OUTPUT_FILE — resolved linked-issue rows
+        "review_threads.json", // ReviewThreadContentSource — review-decision/thread rows
+        "general_comments.json", // GeneralReviewCommentContentSource — conversation-tab (non-inline) MR review notes
+        "project_inventory.json" // WorkspaceInventoryContentSource.OUTPUT_FILE — whole-project issue/PR index
         // These must never appear: test_presence.json + branch_graph.json are worktree-derived Transforms,
         // not content; acceptance_criteria.json is emitted by no provider.
     );
@@ -61,7 +61,7 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         assertThat(cited).as("catalogue should cite at least the enrichment context files").isNotEmpty();
         assertThat(REAL_CONTEXT_FILES)
             .as(
-                "every inputs/context/<file> the catalogue cites must be a file a ContentProvider emits — cited=%s",
+                "every inputs/context/<file> the catalogue cites must be a file a ContentSource emits — cited=%s",
                 cited
             )
             .containsAll(cited);

@@ -1,0 +1,238 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ONE consolidated branch changelog (Slack integration P1: conversational feedback).
+
+        Activates the already-modeled-but-unbuilt conversational-feedback path
+        (FeedbackChannel.CONVERSATION / FeedbackDeliveryState.PREPARED / PlacementType.CONVERSATION_TURN):
+          -1  chat_thread.surface discriminant (WEB | SLACK_DM) so a Slack DM maps to its own thread.
+          -2  feedback_placement.chat_message_id — typed link for a CONVERSATION_TURN placement to the
+              mentor assistant message that actually delivered the prepared feedback.
+          -3  widen chk_feedback_suppression_reason with CONVERSATION_EXPIRED (age-out of never-raised
+              PREPARED conversation feedback).
+
+        See .ai/notes/slack-integration-design.md §3. Slack-surface tables (mentor_slack_thread,
+        slack_monitored_channel, slack_thread, slack_message) and the git_provider→identity_provider
+        rename + SLACK provider seed (D9) follow below as changesets -4..-10.
+    -->
+
+    <changeSet author="hephaestus-slack" id="1782980500800-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_thread.surface already present">
+            <not>
+                <columnExists tableName="chat_thread" columnName="surface"/>
+            </not>
+        </preConditions>
+        <comment>chat_thread surface discriminant: WEB (default, backfills existing rows) | SLACK_DM.</comment>
+        <addColumn tableName="chat_thread">
+            <column name="surface" type="VARCHAR(16)" defaultValue="WEB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>ALTER TABLE chat_thread ADD CONSTRAINT chk_chat_thread_surface CHECK (surface IN ('WEB', 'SLACK_DM'));</sql>
+        <rollback>
+            <sql>ALTER TABLE chat_thread DROP CONSTRAINT IF EXISTS chk_chat_thread_surface;</sql>
+            <dropColumn tableName="chat_thread" columnName="surface"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement.chat_message_id already present">
+            <not>
+                <columnExists tableName="feedback_placement" columnName="chat_message_id"/>
+            </not>
+        </preConditions>
+        <comment>Typed link from a CONVERSATION_TURN placement to the mentor assistant chat_message that delivered it (SET NULL if the message is deleted; the feedback row survives for the temporal record).</comment>
+        <addColumn tableName="feedback_placement">
+            <column name="chat_message_id" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint
+            baseTableName="feedback_placement"
+            baseColumnNames="chat_message_id"
+            constraintName="fk_feedback_placement_chat_message"
+            referencedTableName="chat_message"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="feedback_placement" constraintName="fk_feedback_placement_chat_message"/>
+            <dropColumn tableName="feedback_placement" columnName="chat_message_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_suppression_reason not present to widen">
+            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_suppression_reason'</sqlCheck>
+        </preConditions>
+        <comment>Add CONVERSATION_EXPIRED: a PREPARED conversation feedback that was never raised in a mentor turn and aged out.</comment>
+        <sql>
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE', 'CONVERSATION_EXPIRED'));
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Identity provider rename (D9). git_provider → identity_provider so the one provider registry keys BOTH
+        the SCM actor mirror FKs (unchanged, follow the table rename) AND the identity_link federated-login
+        subject — including SLACK. identity_link.git_provider_id → provider_id (the dependent unique indexes and
+        the FK constraint follow the Postgres RENAME automatically). A SLACK provider row is seeded so Slack DM
+        identity resolves through identity_link (SLACK, U…, team). No dedicated slack_identity table.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="git_provider already renamed to identity_provider">
+            <tableExists tableName="git_provider"/>
+        </preConditions>
+        <comment>Rename git_provider → identity_provider (+ its PK and unique-constraint names). SCM entity FKs reference the table by OID and follow the rename without change.</comment>
+        <renameTable oldTableName="git_provider" newTableName="identity_provider"/>
+        <sql>
+            ALTER TABLE identity_provider RENAME CONSTRAINT pk_git_provider TO pk_identity_provider;
+            ALTER TABLE identity_provider RENAME CONSTRAINT uq_git_provider_type_server_url TO uq_identity_provider_type_server_url;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE identity_provider RENAME CONSTRAINT uq_identity_provider_type_server_url TO uq_git_provider_type_server_url;
+                ALTER TABLE identity_provider RENAME CONSTRAINT pk_identity_provider TO pk_git_provider;
+            </sql>
+            <renameTable oldTableName="identity_provider" newTableName="git_provider"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-9">
+        <preConditions onFail="MARK_RAN" onFailMessage="SLACK identity_provider already seeded">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM identity_provider WHERE type = 'SLACK' AND server_url = 'https://slack.com'</sqlCheck>
+        </preConditions>
+        <comment>Seed the SLACK identity provider so Slack federated-login / DM identity keys onto a real provider row.</comment>
+        <sql>
+            INSERT INTO identity_provider (type, server_url) VALUES ('SLACK', 'https://slack.com')
+                ON CONFLICT (type, server_url) DO NOTHING;
+        </sql>
+        <rollback>
+            <sql>DELETE FROM identity_provider WHERE type = 'SLACK' AND server_url = 'https://slack.com';</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-10">
+        <preConditions onFail="MARK_RAN" onFailMessage="identity_link.git_provider_id already renamed to provider_id">
+            <columnExists tableName="identity_link" columnName="git_provider_id"/>
+        </preConditions>
+        <comment>Rename identity_link.git_provider_id → provider_id and its FK to identity_provider. The unique indexes uq_identity_link_provider_subject_team / uq_identity_link_active_per_provider reference the column and follow the RENAME automatically.</comment>
+        <renameColumn tableName="identity_link" oldColumnName="git_provider_id" newColumnName="provider_id" columnDataType="BIGINT"/>
+        <sql>
+            ALTER TABLE identity_link RENAME CONSTRAINT sfk_identity_link_git_provider TO sfk_identity_link_provider;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE identity_link RENAME CONSTRAINT sfk_identity_link_provider TO sfk_identity_link_git_provider;
+            </sql>
+            <renameColumn tableName="identity_link" oldColumnName="provider_id" newColumnName="git_provider_id" columnDataType="BIGINT"/>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Slack surface (P2 mentor DM + P3 conversation ingestion). Every table is workspace-scoped (carries
+        workspace_id, absent from WorkspaceScopedTables.GLOBAL_TABLES) → a tenancy predicate rides every query.
+        See .ai/notes/slack-integration-design.md §3/§4 (D8/D10). Slack identity resolves through the existing
+        identity_link table (renamed provider column above), so there is no dedicated slack_identity table here.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="mentor_slack_thread already present">
+            <not><tableExists tableName="mentor_slack_thread"/></not>
+        </preConditions>
+        <comment>Maps a Slack DM to the mentor chat_thread it drives (P2). chat_thread_id is a scalar cross-module reference with a DB-level FK — no JPA association crosses the module boundary.</comment>
+        <sql>
+            CREATE TABLE mentor_slack_thread (
+                id UUID PRIMARY KEY,
+                workspace_id BIGINT NOT NULL,
+                chat_thread_id UUID NOT NULL REFERENCES chat_thread(id) ON DELETE CASCADE,
+                slack_team_id VARCHAR(32) NOT NULL,
+                slack_channel_id VARCHAR(32) NOT NULL,
+                slack_thread_ts VARCHAR(32),
+                slack_user_id VARCHAR(32) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                CONSTRAINT uk_mentor_slack_thread UNIQUE (workspace_id, slack_channel_id)
+            );
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS mentor_slack_thread;</sql></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_monitored_channel already present">
+            <not><tableExists tableName="slack_monitored_channel"/></not>
+        </preConditions>
+        <comment>Allow-listed + consent-gated Slack channel the workspace monitors (P3). Folds the per-channel backfill job into a state column instead of a separate slack_channel_backfill_job table.</comment>
+        <sql>
+            CREATE TABLE slack_monitored_channel (
+                id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                workspace_id BIGINT NOT NULL,
+                slack_team_id VARCHAR(32) NOT NULL,
+                slack_channel_id VARCHAR(32) NOT NULL,
+                channel_name VARCHAR(256),
+                consent_state VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+                consent_announced_at TIMESTAMP WITH TIME ZONE,
+                backfill_state VARCHAR(16) NOT NULL DEFAULT 'NONE',
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                CONSTRAINT uk_slack_monitored_channel UNIQUE (workspace_id, slack_channel_id),
+                CONSTRAINT chk_slack_monitored_channel_consent CHECK (consent_state IN ('PENDING', 'ANNOUNCED', 'ACTIVE', 'PAUSED', 'REVOKED')),
+                CONSTRAINT chk_slack_monitored_channel_backfill CHECK (backfill_state IN ('NONE', 'IN_PROGRESS', 'COMPLETE', 'FAILED'))
+            );
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS slack_monitored_channel;</sql></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-6">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_thread already present">
+            <not><tableExists tableName="slack_thread"/></not>
+        </preConditions>
+        <comment>A Slack thread aggregate (root message + replies) keyed by its thread_ts (P3 content surface).</comment>
+        <sql>
+            CREATE TABLE slack_thread (
+                id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                workspace_id BIGINT NOT NULL,
+                slack_channel_id VARCHAR(32) NOT NULL,
+                slack_thread_ts VARCHAR(32) NOT NULL,
+                first_ts VARCHAR(32),
+                last_ts VARCHAR(32),
+                message_count INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                CONSTRAINT uk_slack_thread UNIQUE (workspace_id, slack_channel_id, slack_thread_ts)
+            );
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS slack_thread;</sql></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-7">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_message already present">
+            <not><tableExists tableName="slack_message"/></not>
+        </preConditions>
+        <comment>Ingested Slack message (rendered text only; data minimization) — the P3 content surface. edited_at/deleted_at carry Slack message_changed/message_deleted tombstones (GDPR Art. 17); idx_slack_message_ingest drives the bounded-retention sweep.</comment>
+        <sql>
+            CREATE TABLE slack_message (
+                id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                workspace_id BIGINT NOT NULL,
+                slack_team_id VARCHAR(32) NOT NULL,
+                slack_channel_id VARCHAR(32) NOT NULL,
+                slack_ts VARCHAR(32) NOT NULL,
+                slack_thread_ts VARCHAR(32),
+                author_slack_user_id VARCHAR(32),
+                author_display_name VARCHAR(256),
+                text TEXT,
+                edited_at TIMESTAMP WITH TIME ZONE,
+                deleted_at TIMESTAMP WITH TIME ZONE,
+                ingested_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                CONSTRAINT uk_slack_message UNIQUE (workspace_id, slack_channel_id, slack_ts)
+            );
+            CREATE INDEX idx_slack_message_ingest ON slack_message (workspace_id, ingested_at);
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS slack_message;</sql></rollback>
+    </changeSet>
+
+</databaseChangeLog>

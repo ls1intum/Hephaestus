@@ -16,9 +16,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -73,7 +73,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Mock
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Mock
     private OrganizationMembershipListener organizationMembershipListener;
@@ -91,9 +91,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        GitProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, GitProviderType.GITLAB);
+        IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com"))
+            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
             .thenReturn(Optional.of(gitLabProvider));
 
         // TransactionTemplate that executes callbacks directly (no real transactions needed)
@@ -167,13 +167,13 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
         @Test
         void providerNotFound_throwsIllegalState() {
-            when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")).thenReturn(
-                Optional.empty()
-            );
+            when(
+                gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+            ).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("GitProvider not found");
+                .hasMessageContaining("IdentityProvider not found");
         }
     }
 

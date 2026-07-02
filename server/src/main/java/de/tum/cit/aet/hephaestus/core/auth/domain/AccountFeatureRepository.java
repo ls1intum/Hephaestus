@@ -32,7 +32,7 @@ public interface AccountFeatureRepository extends JpaRepository<AccountFeature, 
           FROM AccountFeature f, IdentityLink il
          WHERE il.account.id = f.id.accountId
            AND il.disabledAt IS NULL
-           AND il.gitProviderId = :gitProviderId
+           AND il.providerId = :gitProviderId
            AND il.subject = :subject
            AND f.id.flag = :flag
         """

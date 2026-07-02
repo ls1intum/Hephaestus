@@ -500,7 +500,16 @@ class MentorChatServiceTest extends BaseUnitTest {
 
     /** Run a turn on the same thread as the test (deterministic) and block until the emitter completes. */
     private void runTurnSync() {
-        service.start(new MentorChatService.MentorTurnRequest(WORKSPACE_ID, THREAD_ID, "hello mentor", null), emitter);
+        service.start(
+            new MentorTurnRequest(
+                WORKSPACE_ID,
+                THREAD_ID,
+                "hello mentor",
+                null,
+                de.tum.cit.aet.hephaestus.mentor.ThreadSurface.WEB
+            ),
+            emitter
+        );
     }
 
     /** Minimal {@link ObjectProvider} that always yields the supplied sandbox-service mock. */

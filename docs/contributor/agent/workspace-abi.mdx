@@ -25,7 +25,7 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 │   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020). One namespace
 │   │   └── scm/repo/                #   per connector — the SCM git working tree (READ-ONLY mount) lives
 │   │                                #   here; a future export would be sources/slack/…, sources/outline/…
-│   ├── context/                     #   System-written, AI-readable. Populated by the ContentProvider SPI.
+│   ├── context/                     #   System-written, AI-readable. Populated by the ContentSource SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
 │   │                                #   contributor_history.json, linked_work_items.json, …
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
@@ -51,7 +51,7 @@ layout (`context/target/`, `context/user/`, `scratch/`) driven by
 
 * **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
   subtree; an agent write attempt anywhere under `inputs/` is rejected.
-* **`inputs/context/`** — written by `ContentProvider` implementations under
+* **`inputs/context/`** — written by `ContentSource` implementations under
   `agent.context.providers.*`. Path prefix is enforced by `WorkspaceContextBuilder`.
 * **`inputs/manifest.json`** — the telescope index, written by `ContextManifestBuilder` *above*
   `inputs/context/` (it indexes the context files but is not itself one of them).

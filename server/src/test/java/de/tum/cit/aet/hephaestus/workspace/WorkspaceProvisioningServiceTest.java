@@ -11,9 +11,9 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -45,7 +45,7 @@ class WorkspaceProvisioningServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Mock
     private WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -111,10 +111,10 @@ class WorkspaceProvisioningServiceTest {
         admin.setHtmlUrl("https://example.com/admin");
         admin.setType(User.Type.USER);
 
-        GitProvider githubProvider = TestEntities.gitProvider(100L, GitProviderType.GITHUB);
-        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
-            Optional.of(githubProvider)
-        );
+        IdentityProvider githubProvider = TestEntities.gitProvider(100L, IdentityProviderType.GITHUB);
+        when(
+            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+        ).thenReturn(Optional.of(githubProvider));
 
         when(workspaceRepository.count()).thenReturn(0L);
         when(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(1L, admin.getId())).thenReturn(
@@ -165,10 +165,10 @@ class WorkspaceProvisioningServiceTest {
         owner.setHtmlUrl("https://example.com");
         owner.setType(User.Type.USER);
 
-        GitProvider githubProvider = TestEntities.gitProvider(100L, GitProviderType.GITHUB);
-        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
-            Optional.of(githubProvider)
-        );
+        IdentityProvider githubProvider = TestEntities.gitProvider(100L, IdentityProviderType.GITHUB);
+        when(
+            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+        ).thenReturn(Optional.of(githubProvider));
 
         when(workspaceRepository.count()).thenReturn(0L);
         when(

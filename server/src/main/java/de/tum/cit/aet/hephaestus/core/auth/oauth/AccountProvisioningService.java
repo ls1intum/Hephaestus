@@ -84,10 +84,14 @@ public class AccountProvisioningService {
         AuthIntentCookie.Intent intent
     ) {
         long providerId = resolveProviderId(registrationId);
+        // Multi-instance IdP disambiguation: a Slack subject (U…) is only unique WITHIN its workspace (T…),
+        // so the login key is (provider, subject, team). teamId is null for single-tenant IdPs (GitHub/GitLab)
+        // — the COALESCE(team_id,'') in the lookup + unique index keeps their behaviour identical.
+        String teamId = teamIdOf(principal);
         AuthIntentCookie.Intent.Mode mode = (intent != null) ? intent.mode() : AuthIntentCookie.Intent.Mode.LOGIN;
 
         IdentityLink link = identityLinkRepository
-            .findActiveByProviderSubject(providerId, subject, /* teamId */ null)
+            .findActiveByProviderSubject(providerId, subject, teamId)
             .orElse(null);
 
         if (link != null) {
@@ -135,7 +139,7 @@ public class AccountProvisioningService {
                 .orElseThrow(() ->
                     new IllegalStateException("auth.link: linkingAccountId=" + intent.linkingAccountId() + " not found")
                 );
-            IdentityLink linked = newIdentityLink(account, providerId, subject, principal);
+            IdentityLink linked = newIdentityLink(account, providerId, subject, teamId, principal);
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
             log.info("auth.success: linked provider={} to existing accountId={}", registrationId, account.getId());
@@ -152,7 +156,7 @@ public class AccountProvisioningService {
         if (resolvedEmail.verified()) {
             account.setPrimaryEmailVerifiedAt(clock.instant());
         }
-        IdentityLink newLink = newIdentityLink(account, providerId, subject, principal);
+        IdentityLink newLink = newIdentityLink(account, providerId, subject, teamId, principal);
         try {
             // The insert runs in AccountJitCreator's REQUIRES_NEW transaction so a unique-constraint
             // loss rolls back ONLY that inner tx — this (the caller's) tx stays usable for the
@@ -185,7 +189,7 @@ public class AccountProvisioningService {
             // uq_identity_link_provider_subject_team insert. Fail closed by reading the now-existing
             // active link and returning the winner's account — never a second orphan account.
             return identityLinkRepository
-                .findActiveByProviderSubject(providerId, subject, /* teamId */ null)
+                .findActiveByProviderSubject(providerId, subject, teamId)
                 .map(IdentityLink::getAccount)
                 .map(winner -> {
                     log.info(
@@ -214,7 +218,7 @@ public class AccountProvisioningService {
     /**
      * Resolve the {@code git_provider} row id for a login registration: look up the instance-scoped
      * {@code login_provider} row (this module owns it), then let the integration-side registry upsert
-     * the provider row from its {@code (type, baseUrl)} — keeping the GitProvider entity out of auth.
+     * the provider row from its {@code (type, baseUrl)} — keeping the IdentityProvider entity out of auth.
      */
     private long resolveProviderId(String registrationId) {
         LoginProvider provider = loginProviderRepository
@@ -251,11 +255,18 @@ public class AccountProvisioningService {
         return stringAttr(principal, "login", "preferred_username", "username");
     }
 
-    private IdentityLink newIdentityLink(Account account, long providerId, String subject, OAuth2User principal) {
+    private IdentityLink newIdentityLink(
+        Account account,
+        long providerId,
+        String subject,
+        String teamId,
+        OAuth2User principal
+    ) {
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(providerId);
+        link.setProviderId(providerId);
         link.setSubject(subject);
+        link.setTeamId(teamId);
         link.setUsernameAtSignup(stringAttr(principal, "login", "preferred_username", "username"));
         link.setEmailAtSignup(email(principal));
         link.setDisplayName(stringAttr(principal, "name", "display_name"));
@@ -271,6 +282,27 @@ public class AccountProvisioningService {
 
     private static String email(OAuth2User principal) {
         return stringAttr(principal, "email");
+    }
+
+    /**
+     * The multi-instance IdP tenant id, or {@code null} for single-tenant IdPs (GitHub/GitLab, which emit
+     * no team claim). "Sign in with Slack" (OIDC) surfaces the workspace as the {@code https://slack.com/team_id}
+     * claim (flat) or a nested {@code team.id} — check both. Kept general: any future multi-tenant IdP that emits
+     * a {@code team_id}/{@code tenant_id} claim keys correctly without a special case.
+     */
+    private static String teamIdOf(OAuth2User principal) {
+        String flat = stringAttr(principal, "https://slack.com/team_id", "team_id", "tenant_id", "tid");
+        if (flat != null) {
+            return flat;
+        }
+        Object team = principal.getAttributes().get("team");
+        if (team == null) {
+            team = principal.getAttributes().get("https://slack.com/team");
+        }
+        if (team instanceof Map<?, ?> teamMap && teamMap.get("id") instanceof String id && !id.isBlank()) {
+            return id;
+        }
+        return null;
     }
 
     private static String stringAttr(OAuth2User principal, String... keys) {

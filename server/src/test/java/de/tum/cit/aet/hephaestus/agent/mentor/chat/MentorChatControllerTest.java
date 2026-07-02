@@ -56,9 +56,7 @@ class MentorChatControllerTest extends BaseUnitTest {
     void dispatchesToService() {
         UUID threadId = UUID.randomUUID();
         controller.chat(stubContext(), validBody(threadId, "hello mentor"), response);
-        ArgumentCaptor<MentorChatService.MentorTurnRequest> req = ArgumentCaptor.forClass(
-            MentorChatService.MentorTurnRequest.class
-        );
+        ArgumentCaptor<MentorTurnRequest> req = ArgumentCaptor.forClass(MentorTurnRequest.class);
         verify(mentorChatService).start(req.capture(), any());
         assertThat(req.getValue().threadId()).isEqualTo(threadId);
         assertThat(req.getValue().userMessage()).isEqualTo("hello mentor");
@@ -69,9 +67,7 @@ class MentorChatControllerTest extends BaseUnitTest {
         UUID clientMessageId = UUID.randomUUID();
         MentorChatRequestBody body = body(UUID.randomUUID(), clientMessageId.toString(), "hello");
         controller.chat(stubContext(), body, response);
-        ArgumentCaptor<MentorChatService.MentorTurnRequest> req = ArgumentCaptor.forClass(
-            MentorChatService.MentorTurnRequest.class
-        );
+        ArgumentCaptor<MentorTurnRequest> req = ArgumentCaptor.forClass(MentorTurnRequest.class);
         verify(mentorChatService).start(req.capture(), any());
         assertThat(req.getValue().clientUserMessageId()).isEqualTo(clientMessageId);
     }
@@ -80,9 +76,7 @@ class MentorChatControllerTest extends BaseUnitTest {
     void ignoresNonUuidClientMessageId() {
         MentorChatRequestBody body = body(UUID.randomUUID(), "not-a-uuid", "hello");
         controller.chat(stubContext(), body, response);
-        ArgumentCaptor<MentorChatService.MentorTurnRequest> req = ArgumentCaptor.forClass(
-            MentorChatService.MentorTurnRequest.class
-        );
+        ArgumentCaptor<MentorTurnRequest> req = ArgumentCaptor.forClass(MentorTurnRequest.class);
         verify(mentorChatService).start(req.capture(), any());
         assertThat(req.getValue().clientUserMessageId()).isNull();
     }

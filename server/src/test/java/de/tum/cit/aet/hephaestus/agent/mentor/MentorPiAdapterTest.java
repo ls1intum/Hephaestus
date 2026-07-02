@@ -27,7 +27,7 @@ import org.mockito.Mock;
 
 /**
  * Unit coverage for {@link MentorPiAdapter#buildSandboxSpec}: the genuinely error-prone branches the
- * orchestration-level {@code MentorChatServiceTest} stubs over — aspect-key validation, base-URL precedence,
+ * orchestration-level {@code MentorChatServiceTest} stubs over — context-key validation, base-URL precedence,
  * session-restore injection, and the always-present system prompt. {@link PiRuntimeFactory} is mocked so the
  * captured {@link PiPlanSpec} can be asserted on directly.
  */
@@ -66,18 +66,18 @@ class MentorPiAdapterTest extends BaseUnitTest {
         return new MentorLlmConfig(LlmProvider.OPENAI, CredentialMode.API_KEY, "sk-test-key", "gpt-5.4", baseUrl, 120);
     }
 
-    private PiPlanSpec capturePlanSpec(MentorLlmConfig config, Map<String, byte[]> aspects, SessionRestore restore) {
-        adapter.buildSandboxSpec(REQUEST, config, aspects, restore);
+    private PiPlanSpec capturePlanSpec(MentorLlmConfig config, Map<String, byte[]> contexts, SessionRestore restore) {
+        adapter.buildSandboxSpec(REQUEST, config, contexts, restore);
         ArgumentCaptor<PiPlanSpec> captor = ArgumentCaptor.forClass(PiPlanSpec.class);
         verify(runtimeFactory).build(captor.capture());
         return captor.getValue();
     }
 
     @Test
-    @DisplayName("a context-prefixed aspect key passes; a stray key is rejected")
-    void aspectKeyValidation() {
+    @DisplayName("a context-prefixed context key passes; a stray key is rejected")
+    void contextKeyValidation() {
         Map<String, byte[]> ok = Map.of(
-            MentorPiAdapter.ASPECT_INPUT_PREFIX + "recent_authored_work.json",
+            MentorPiAdapter.CONTEXT_INPUT_PREFIX + "recent_authored_work.json",
             "{}".getBytes(StandardCharsets.UTF_8)
         );
         // does not throw
@@ -86,7 +86,7 @@ class MentorPiAdapterTest extends BaseUnitTest {
         Map<String, byte[]> stray = Map.of("out/leak.json", "{}".getBytes(StandardCharsets.UTF_8));
         assertThatThrownBy(() -> adapter.buildSandboxSpec(REQUEST, llmConfig(null), stray, null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining(MentorPiAdapter.ASPECT_INPUT_PREFIX);
+            .hasMessageContaining(MentorPiAdapter.CONTEXT_INPUT_PREFIX);
     }
 
     @Test

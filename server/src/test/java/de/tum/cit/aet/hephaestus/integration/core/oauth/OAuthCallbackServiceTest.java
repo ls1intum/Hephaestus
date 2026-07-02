@@ -262,7 +262,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                 java.util.Set.of()
             );
-            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
+            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, java.util.Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

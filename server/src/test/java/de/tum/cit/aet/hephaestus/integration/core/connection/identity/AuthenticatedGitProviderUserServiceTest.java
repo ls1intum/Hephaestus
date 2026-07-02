@@ -13,9 +13,9 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery.IdentityLinkView;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -48,7 +48,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Mock
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Mock
     private AccountIdentityQuery accountIdentityQuery;
@@ -79,7 +79,11 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         IdentityLinkView gitlab = view(100L, GITLAB_PROVIDER_ID, "18024", "gitlabuser");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(gitlab));
-        GitProvider provider = gitProvider(GITLAB_PROVIDER_ID, GitProviderType.GITLAB, "https://gitlab.lrz.de");
+        IdentityProvider provider = gitProvider(
+            GITLAB_PROVIDER_ID,
+            IdentityProviderType.GITLAB,
+            "https://gitlab.lrz.de"
+        );
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(provider));
 
         User provisioned = user(555L, "gitlabuser", 18024L, provider);
@@ -114,8 +118,8 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         IdentityLinkView github = view(200L, GITHUB_PROVIDER_ID, "999", "ghuser");
         IdentityLinkView gitlab = view(100L, GITLAB_PROVIDER_ID, "18024", "gitlabuser");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(github, gitlab));
-        GitProvider gh = gitProvider(GITHUB_PROVIDER_ID, GitProviderType.GITHUB, "https://github.com");
-        GitProvider gl = gitProvider(GITLAB_PROVIDER_ID, GitProviderType.GITLAB, "https://gitlab.lrz.de");
+        IdentityProvider gh = gitProvider(GITHUB_PROVIDER_ID, IdentityProviderType.GITHUB, "https://github.com");
+        IdentityProvider gl = gitProvider(GITLAB_PROVIDER_ID, IdentityProviderType.GITLAB, "https://gitlab.lrz.de");
         lenient().when(gitProviderRepository.findById(GITHUB_PROVIDER_ID)).thenReturn(Optional.of(gh));
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(gl));
         User provisioned = user(555L, "gitlabuser", 18024L, gl);
@@ -144,7 +148,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
     void ensureGitLab_succeeds_forGitLabLoginOnlyUser() {
         IdentityLinkView gitlab = view(100L, GITLAB_PROVIDER_ID, "18024", "gitlabuser");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(gitlab));
-        GitProvider gl = gitProvider(GITLAB_PROVIDER_ID, GitProviderType.GITLAB, "https://gitlab.lrz.de");
+        IdentityProvider gl = gitProvider(GITLAB_PROVIDER_ID, IdentityProviderType.GITLAB, "https://gitlab.lrz.de");
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(gl));
         User provisioned = user(555L, "gitlabuser", 18024L, gl);
         when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID)).thenReturn(
@@ -162,7 +166,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
     void ensureGitLab_throwsConflict_forGitHubOnlyUser() {
         IdentityLinkView github = view(200L, GITHUB_PROVIDER_ID, "999", "ghuser");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(github));
-        GitProvider gh = gitProvider(GITHUB_PROVIDER_ID, GitProviderType.GITHUB, "https://github.com");
+        IdentityProvider gh = gitProvider(GITHUB_PROVIDER_ID, IdentityProviderType.GITHUB, "https://github.com");
         when(gitProviderRepository.findById(GITHUB_PROVIDER_ID)).thenReturn(Optional.of(gh));
 
         assertThatThrownBy(() -> service.ensureCurrentGitLabUserExists())
@@ -192,7 +196,11 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         IdentityLinkView poisoned = view(100L, GITLAB_PROVIDER_ID, "attacker-handle", "attacker-handle");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(poisoned));
-        GitProvider provider = gitProvider(GITLAB_PROVIDER_ID, GitProviderType.GITLAB, "https://gitlab.lrz.de");
+        IdentityProvider provider = gitProvider(
+            GITLAB_PROVIDER_ID,
+            IdentityProviderType.GITLAB,
+            "https://gitlab.lrz.de"
+        );
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(provider));
 
         assertThatThrownBy(() -> service.resolveOrProvisionCurrentUser())
@@ -226,13 +234,13 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         return new IdentityLinkView(linkId, providerId, subject, username, "Display", null, null, null);
     }
 
-    private static GitProvider gitProvider(long id, GitProviderType type, String serverUrl) {
-        GitProvider p = new GitProvider(type, serverUrl);
+    private static IdentityProvider gitProvider(long id, IdentityProviderType type, String serverUrl) {
+        IdentityProvider p = new IdentityProvider(type, serverUrl);
         p.setId(id);
         return p;
     }
 
-    private static User user(long id, String login, long nativeId, GitProvider provider) {
+    private static User user(long id, String login, long nativeId, IdentityProvider provider) {
         User u = new User();
         u.setId(id);
         u.setNativeId(nativeId);

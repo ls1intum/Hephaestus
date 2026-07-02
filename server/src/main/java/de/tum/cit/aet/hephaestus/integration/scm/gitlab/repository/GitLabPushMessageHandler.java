@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -71,7 +71,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     private final OrganizationRepository organizationRepository;
     private final RepositoryRepository repositoryRepository;
     private final CommitRepository commitRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
     private final GitRepositoryManager gitRepositoryManager;
     private final GitLabTokenService tokenService;
@@ -86,7 +86,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         OrganizationRepository organizationRepository,
         RepositoryRepository repositoryRepository,
         CommitRepository commitRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         GitRepositoryManager gitRepositoryManager,
         GitLabTokenService tokenService,
@@ -144,11 +144,11 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         );
 
         // Upsert the project as a Repository entity from the webhook payload.
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
                 )
             );
         var repository = projectProcessor.processPushEvent(event.project(), provider);
@@ -469,7 +469,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             DataSource.WEBHOOK,
             null,
             UUID.randomUUID().toString(),
-            GitProviderType.GITLAB
+            IdentityProviderType.GITLAB
         );
 
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
@@ -491,7 +491,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
     // Organization linking
 
-    private void ensureOrganizationLinked(Repository repository, String projectPath, GitProvider provider) {
+    private void ensureOrganizationLinked(Repository repository, String projectPath, IdentityProvider provider) {
         if (repository.getOrganization() != null) {
             return;
         }

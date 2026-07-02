@@ -74,15 +74,15 @@ public record PiPlanSpec(
                 : Map.of();
         for (String path : extraInputs.keySet()) {
             boolean ok =
-                WorkspaceAbi.allowedExtraInputPaths().contains(path) ||
-                WorkspaceAbi.allowedExtraInputPrefixes().stream().anyMatch(path::startsWith);
+                SandboxLayout.allowedExtraInputPaths().contains(path) ||
+                SandboxLayout.allowedExtraInputPrefixes().stream().anyMatch(path::startsWith);
             if (!ok) {
                 throw new IllegalArgumentException(
                     "extraInputs path '" +
                         path +
                         "' is not a recognised workspace path: must appear in " +
-                        "WorkspaceAbi.allowedExtraInputPaths() or be prefixed by one of " +
-                        WorkspaceAbi.allowedExtraInputPrefixes()
+                        "SandboxLayout.allowedExtraInputPaths() or be prefixed by one of " +
+                        SandboxLayout.allowedExtraInputPrefixes()
                 );
             }
         }

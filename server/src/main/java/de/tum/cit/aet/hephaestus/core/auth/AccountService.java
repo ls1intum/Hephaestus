@@ -125,7 +125,7 @@ public class AccountService {
                 "You can't unlink your only sign-in method. Link another provider first, or delete your account."
             );
         }
-        Long gitProviderId = target.getGitProviderId();
+        Long gitProviderId = target.getProviderId();
         if (identityLinkRepository.deleteByIdAndAccountId(identityLinkId, accountId) == 0) {
             // Lost a race (concurrently removed) — nothing to do; surface as not-found.
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "identity link not found");

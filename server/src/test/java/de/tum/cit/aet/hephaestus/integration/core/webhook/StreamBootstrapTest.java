@@ -45,12 +45,12 @@ class StreamBootstrapTest extends BaseUnitTest {
 
         new StreamBootstrap(jsm, properties).bootstrap();
 
-        // One stream per registered integration kind (gitlab/github/slack).
+        // One stream per registered integration kind (gitlab/github).
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
-        verify(jsm, times(3)).addStream(captor.capture());
+        verify(jsm, times(2)).addStream(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(StreamConfiguration::getName)
-            .containsExactlyInAnyOrder("gitlab", "github", "slack");
+            .containsExactlyInAnyOrder("gitlab", "github");
     }
 
     @Test

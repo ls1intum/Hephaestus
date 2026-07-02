@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorAspects;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
@@ -19,10 +19,12 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
+import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Timer;
@@ -56,7 +58,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
  */
 @Service
 @RequiredArgsConstructor
-public class MentorChatService {
+public class MentorChatService implements MentorTurnRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatService.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -104,9 +106,36 @@ public class MentorChatService {
         }
     }
 
+    /**
+     * Transport-neutral entry for a non-HTTP surface (e.g. a Slack DM). Runs one turn for the developer
+     * identified by {@code developerLogin} against the caller-supplied {@link MentorChannel}. The shared turn
+     * body resolves the {@code User} from the SCM-identity holder, so — because there is no HTTP security
+     * context here — we set that holder on the turn thread and clear it afterwards. Mirrors {@link #start}.
+     */
+    @Override
+    public void run(MentorTurnRequest request, MentorChannel channel, String developerLogin) {
+        metrics.recordStarted();
+        try {
+            turnExecutor
+                .executor()
+                .execute(() -> {
+                    CurrentScmIdentityHolder.set(developerLogin);
+                    try {
+                        dispatchTurn(request, channel, new AtomicReference<>());
+                    } finally {
+                        CurrentScmIdentityHolder.clear();
+                    }
+                });
+        } catch (RejectedExecutionException rejected) {
+            log.warn("Slack mentor turn rejected by executor: {}", rejected.getMessage());
+            metrics.recordCompleted(MentorChatMetrics.Outcome.REJECTED);
+            channel.completeWithError("Mentor service is shutting down — please retry shortly.");
+        }
+    }
+
     private void dispatchTurn(
         MentorTurnRequest request,
-        MentorSseChannel channel,
+        MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(request.workspaceId(), request.threadId());
@@ -170,7 +199,7 @@ public class MentorChatService {
 
     private MentorChatMetrics.Outcome runTurn(
         MentorTurnRequest request,
-        MentorSseChannel channel,
+        MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         // Push thread + workspace ids into MDC so every WARN/ERROR in this turn carries the
@@ -187,7 +216,7 @@ public class MentorChatService {
 
     private MentorChatMetrics.Outcome runTurnInternal(
         MentorTurnRequest request,
-        MentorSseChannel channel,
+        MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         User user = userRepository.getCurrentUserElseThrow();
@@ -213,7 +242,7 @@ public class MentorChatService {
         MentorRunnerClient client = null;
         CompletableFuture<Void> turnComplete = new CompletableFuture<>();
         java.util.concurrent.atomic.AtomicBoolean errorChunkSeen = new java.util.concurrent.atomic.AtomicBoolean();
-        channel.startHeartbeat();
+        channel.startKeepAlive();
         boolean poisoned = false;
         MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
         try {
@@ -227,7 +256,7 @@ public class MentorChatService {
             state.markStarted();
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
 
-            Map<String, byte[]> aspectInputs = buildAspectContext(request, user);
+            Map<String, byte[]> contextInputs = buildMentorContext(request, user);
             SessionRestore sessionRestore = priorSessionBytes
                 .filter(bytes -> bytes.length > 0)
                 .map(bytes -> new SessionRestore(request.threadId(), bytes))
@@ -235,7 +264,7 @@ public class MentorChatService {
             InteractiveSandboxSpec spec = mentorPiAdapter.buildSandboxSpec(
                 new MentorAgentRequest(request.workspaceId(), user.getId()),
                 llmConfig,
-                aspectInputs,
+                contextInputs,
                 sessionRestore
             );
             sandbox = interactiveSandboxServiceProvider.getObject().attach(spec);
@@ -253,7 +282,7 @@ public class MentorChatService {
                 sandbox,
                 objectMapper,
                 event -> handleEvent(event, state, channel, cookie, turnComplete, errorChunkSeen),
-                callback -> handleFetchContext(callback, aspectInputs),
+                callback -> handleFetchContext(callback, contextInputs),
                 runnerTimeoutScheduler.scheduler(),
                 // Per-thread event filter: the sandbox is shared by (userId, workspaceId), so
                 // a second tab in the same workspace would otherwise see this tab's events.
@@ -289,7 +318,7 @@ public class MentorChatService {
             try (var ignored = turnLock.acquireSandboxLock(sandboxKey)) {
                 client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
                 client
-                    .prompt(request.threadId(), request.userMessage())
+                    .prompt(request.threadId(), decorateForSurface(request))
                     .whenComplete((result, ex) -> {
                         if (ex != null && !turnComplete.isDone()) {
                             turnComplete.completeExceptionally(ex);
@@ -417,7 +446,7 @@ public class MentorChatService {
     private void handleEvent(
         JsonNode piEvent,
         TranslatorState state,
-        MentorSseChannel channel,
+        MentorChannel channel,
         MentorTurnPersistence.TurnPersistenceCookie cookie,
         CompletableFuture<Void> turnComplete,
         java.util.concurrent.atomic.AtomicBoolean errorChunkSeen
@@ -524,7 +553,25 @@ public class MentorChatService {
         return "Mentor turn failed unexpectedly.";
     }
 
-    private Map<String, byte[]> buildAspectContext(MentorTurnRequest request, User user) {
+    /**
+     * The prompt actually sent to the runner, with a per-turn style directive for non-web surfaces. The system
+     * prompt is static per (shared) sandbox, so surface adaptation must ride the turn. This wraps only the
+     * runner prompt — the persisted user message stays the developer's verbatim text.
+     */
+    private static String decorateForSurface(MentorTurnRequest request) {
+        if (request.surface() != ThreadSurface.SLACK_DM) {
+            return request.userMessage();
+        }
+        return """
+        [Surface: Slack DM. You are in a live chat, not a dashboard. Reply SHORT and conversational — a few \
+        sentences, plain Slack markdown only (no HTML tags, no wide tables, no multi-section reports). Raise \
+        AT MOST ONE point, ground it in the developer's actual work, and end with a question so the \
+        conversation continues. If they ask for a full summary, you may expand.]
+
+        %s""".formatted(request.userMessage());
+    }
+
+    private Map<String, byte[]> buildMentorContext(MentorTurnRequest request, User user) {
         return workspaceContextBuilder.build(
             new ContextRequest.MentorChatRequest(request.workspaceId(), user.getId(), request.threadId())
         );
@@ -561,22 +608,22 @@ public class MentorChatService {
             );
     }
 
-    private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> aspectInputs) {
+    private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> contextInputs) {
         String path = req.path();
-        String key = path.startsWith(MentorPiAdapter.ASPECT_INPUT_PREFIX)
+        String key = path.startsWith(MentorPiAdapter.CONTEXT_INPUT_PREFIX)
             ? path
-            : MentorPiAdapter.ASPECT_INPUT_PREFIX + stripLeadingPath(path);
-        if (!MentorAspects.ALLOWED_OUTPUT_KEYS.contains(key)) {
+            : MentorPiAdapter.CONTEXT_INPUT_PREFIX + stripLeadingPath(path);
+        if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(key)) {
             throw new IllegalArgumentException("fetch_context path not allowed: " + path);
         }
-        byte[] bytes = aspectInputs.get(key);
+        byte[] bytes = contextInputs.get(key);
         if (bytes == null) {
             return NODES.nullNode();
         }
         try {
             return objectMapper.readTree(bytes);
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to parse aspect JSON for path " + path, e);
+            throw new IllegalStateException("Failed to parse context JSON for path " + path, e);
         }
     }
 
@@ -584,16 +631,4 @@ public class MentorChatService {
         int slash = path.lastIndexOf('/');
         return slash >= 0 ? path.substring(slash + 1) : path;
     }
-
-    /**
-     * Service-facing request: extracted from the controller body + workspace context. The
-     * optional {@code clientUserMessageId} is the UUID the AI SDK transport minted for the
-     * user message — persistence honours it so optimistic UI on the client reconciles.
-     */
-    public record MentorTurnRequest(
-        long workspaceId,
-        UUID threadId,
-        String userMessage,
-        @Nullable UUID clientUserMessageId
-    ) {}
 }

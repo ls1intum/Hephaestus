@@ -170,7 +170,7 @@ public class ObservationService {
                 .stream()
                 .filter(f -> f.getAssessment() == Assessment.BAD)
                 .toList();
-            // Corroboration is per recurrence LOCUS, not per practice group (matching the standing-aspect
+            // Corroboration is per recurrence LOCUS, not per practice group (matching the standing content source
             // design, where distinct-target counts are keyed per row): an uncorroborated gap on target A must
             // not be rescued from quarantine just because an UNRELATED BAD exists on target B for the same
             // practice. Count distinct targets within each recurrenceKey; the whole-group count is the fallback

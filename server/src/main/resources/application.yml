@@ -567,6 +567,9 @@ hephaestus:
             client-secret: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}
             redirect-uri: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:}
             api-base: ${HEPHAESTUS_INTEGRATION_SLACK_API_BASE:https://slack.com}
+            # App signing secret — verifies inbound Events API POSTs to /slack/events (v0 HMAC over
+            # "v0:{ts}:{rawBody}", 300s replay window). Inbound (mentor DM + channel ingest) is inert without it.
+            signing-secret: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:}
     #     outline:
     #         enabled: false
 

@@ -4,9 +4,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.extractNumericId;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener.TeamsSyncedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -87,7 +87,7 @@ public class GitLabTeamSyncService {
     private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabTeamProcessor teamProcessor;
     private final GitLabUserService gitLabUserService;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
     private final RepositoryCollaboratorRepository collaboratorRepository;
     private final TransactionTemplate transactionTemplate;
@@ -101,7 +101,7 @@ public class GitLabTeamSyncService {
         GitLabGraphQlResponseHandler responseHandler,
         GitLabTeamProcessor teamProcessor,
         GitLabUserService gitLabUserService,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         RepositoryCollaboratorRepository collaboratorRepository,
         TransactionTemplate transactionTemplate,
@@ -137,7 +137,7 @@ public class GitLabTeamSyncService {
             return 0;
         }
 
-        GitProvider provider = resolveProvider();
+        IdentityProvider provider = resolveProvider();
         if (provider == null) {
             log.warn("Skipped team sync: reason=providerNotResolved, scopeId={}", scopeId);
             return 0;
@@ -292,7 +292,7 @@ public class GitLabTeamSyncService {
         HttpGraphQlClient client,
         Long scopeId,
         String groupFullPath,
-        GitProvider provider,
+        IdentityProvider provider,
         Map<Long, Team> syncedTeamsByNativeId,
         Map<Long, String> teamFullPathsByNativeId,
         Set<Long> syncedNativeIds
@@ -347,7 +347,7 @@ public class GitLabTeamSyncService {
         HttpGraphQlClient client,
         Long scopeId,
         String groupFullPath,
-        GitProvider provider,
+        IdentityProvider provider,
         Map<Long, Team> syncedTeamsByNativeId,
         Map<Long, Long> parentNativeIdByChildNativeId,
         Map<Long, String> teamFullPathsByNativeId,
@@ -849,9 +849,9 @@ public class GitLabTeamSyncService {
 
     // Helpers
 
-    private GitProvider resolveProvider() {
+    private IdentityProvider resolveProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElse(null);
     }
 

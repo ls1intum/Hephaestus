@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
 import java.util.List;
@@ -60,7 +60,7 @@ class AccountUnlinkIdentityIntegrationTest {
     private IdentityLinkRepository identityLinkRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private HephaestusJwtIssuer jwtIssuer;
@@ -76,8 +76,8 @@ class AccountUnlinkIdentityIntegrationTest {
     @Test
     void unlinkSecondaryIdentityDeletesItAndKeepsTheRest() {
         Account account = accountRepository.save(new Account("Two-provider User"));
-        IdentityLink github = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-1", "octocat");
-        IdentityLink gitlab = seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-1", "gluser");
+        IdentityLink github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-1", "octocat");
+        IdentityLink gitlab = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-1", "gluser");
         String token = tokenFor(account);
 
         webTestClient
@@ -98,8 +98,8 @@ class AccountUnlinkIdentityIntegrationTest {
     @Test
     void unlinkIsReversibleTheSameProviderCanBeRelinked() {
         Account account = accountRepository.save(new Account("Reversible User"));
-        IdentityLink github = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
-        seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-rev", "rev-gl");
+        IdentityLink github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
+        seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-rev", "rev-gl");
         String token = tokenFor(account);
 
         webTestClient
@@ -114,7 +114,7 @@ class AccountUnlinkIdentityIntegrationTest {
         // identity can be linked again — the promise the disconnect dialog makes. A soft-delete
         // regression would leave the key occupied and this re-link would throw a unique violation.
         assertThat(identityLinkRepository.findById(github.getId())).isEmpty();
-        IdentityLink relinked = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
+        IdentityLink relinked = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
         assertThat(identityLinkRepository.findActiveByAccountId(account.getId()))
             .extracting(IdentityLink::getId)
             .contains(relinked.getId());
@@ -123,7 +123,7 @@ class AccountUnlinkIdentityIntegrationTest {
     @Test
     void cannotUnlinkTheOnlyRemainingIdentity() {
         Account account = accountRepository.save(new Account("Single-provider User"));
-        IdentityLink only = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-only", "soloist");
+        IdentityLink only = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-only", "soloist");
         String token = tokenFor(account);
 
         webTestClient
@@ -145,12 +145,18 @@ class AccountUnlinkIdentityIntegrationTest {
     @Test
     void cannotUnlinkAnotherAccountsIdentity() {
         Account me = accountRepository.save(new Account("Me"));
-        seedLink(me, GitProviderType.GITHUB, "https://github.com", "gh-me", "me");
-        seedLink(me, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-me", "me-gl");
+        seedLink(me, IdentityProviderType.GITHUB, "https://github.com", "gh-me", "me");
+        seedLink(me, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-me", "me-gl");
         String myToken = tokenFor(me);
 
         Account other = accountRepository.save(new Account("Other"));
-        IdentityLink otherGithub = seedLink(other, GitProviderType.GITHUB, "https://github.com", "gh-other", "other");
+        IdentityLink otherGithub = seedLink(
+            other,
+            IdentityProviderType.GITHUB,
+            "https://github.com",
+            "gh-other",
+            "other"
+        );
 
         webTestClient
             .delete()
@@ -168,8 +174,8 @@ class AccountUnlinkIdentityIntegrationTest {
     @Test
     void unlinkingAnUnknownIdentityIs404() {
         Account account = accountRepository.save(new Account("User"));
-        seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-x", "x");
-        seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-x", "x-gl");
+        seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-x", "x");
+        seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-x", "x-gl");
         String token = tokenFor(account);
 
         webTestClient
@@ -184,8 +190,8 @@ class AccountUnlinkIdentityIntegrationTest {
     @Test
     void concurrentUnlinksCannotDrainTheAccountToZero() throws Exception {
         Account account = accountRepository.save(new Account("Race User"));
-        IdentityLink a = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-race", "race");
-        IdentityLink b = seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-race", "race-gl");
+        IdentityLink a = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-race", "race");
+        IdentityLink b = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-race", "race-gl");
         String token = tokenFor(account);
 
         // Fire both unlinks at once. The pessimistic write-lock over the account's active links
@@ -228,17 +234,17 @@ class AccountUnlinkIdentityIntegrationTest {
 
     private IdentityLink seedLink(
         Account account,
-        GitProviderType type,
+        IdentityProviderType type,
         String serverUrl,
         String subject,
         String login
     ) {
-        GitProvider provider = gitProviderRepository
+        IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(type, serverUrl)
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(type, serverUrl)));
+            .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, serverUrl)));
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(provider.getId());
+        link.setProviderId(provider.getId());
         link.setSubject(subject);
         link.setUsernameAtSignup(login);
         link.setDisplayName(login);

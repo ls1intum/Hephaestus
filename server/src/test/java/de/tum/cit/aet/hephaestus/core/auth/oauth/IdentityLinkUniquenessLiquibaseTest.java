@@ -23,10 +23,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 /**
  * Proves the {@code uq_identity_link_provider_subject_team} guarantee that the JIT first-login race
  * relies on, against the REAL Liquibase schema. The normal test profile uses Hibernate
- * {@code ddl-auto: create}, which emits a plain {@code UNIQUE(git_provider_id, subject, team_id)} —
+ * {@code ddl-auto: create}, which emits a plain {@code UNIQUE(provider_id, subject, team_id)} —
  * and SQL treats {@code NULL} values as DISTINCT, so under ddl-auto two login identities with the
  * same {@code (provider, subject)} and a NULL {@code team_id} would NOT collide. Production instead
- * uses {@code CREATE UNIQUE INDEX ... (git_provider_id, subject, COALESCE(team_id, ''))}, which
+ * uses {@code CREATE UNIQUE INDEX ... (provider_id, subject, COALESCE(team_id, ''))}, which
  * collapses NULL teams to a single key.
  *
  * <p>That difference is load-bearing: it is the index violation that makes
@@ -129,7 +129,7 @@ class IdentityLinkUniquenessLiquibaseTest {
     private static long insertGitProvider(Connection c, String type, String serverUrl) throws Exception {
         try (
             PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO git_provider (type, server_url) VALUES (?, ?) RETURNING id"
+                "INSERT INTO identity_provider (type, server_url) VALUES (?, ?) RETURNING id"
             )
         ) {
             ps.setString(1, type);
@@ -155,7 +155,7 @@ class IdentityLinkUniquenessLiquibaseTest {
         throws Exception {
         try (
             PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO identity_link (account_id, git_provider_id, subject, team_id) VALUES (?, ?, ?, ?)"
+                "INSERT INTO identity_link (account_id, provider_id, subject, team_id) VALUES (?, ?, ?, ?)"
             )
         ) {
             ps.setLong(1, accountId);

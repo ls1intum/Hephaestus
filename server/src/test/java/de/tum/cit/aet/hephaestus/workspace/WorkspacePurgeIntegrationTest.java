@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -107,7 +107,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         );
 
         // Link organization
-        GitProvider provider = ensureGitLabProvider();
+        IdentityProvider provider = ensureGitLabProvider();
         Organization org = new Organization();
         org.setNativeId(42L);
         org.setProvider(provider);

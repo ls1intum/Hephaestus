@@ -65,8 +65,8 @@ public class PracticeDetectionResultParser {
      * {@code OUTPUT_PATH} = {@code WORKSPACE_ROOT + "/out"}, so strip the root and the leading slash, then append one.
      */
     private static final String OUTPUT_RELATIVE_PREFIX =
-        de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.OUTPUT_PATH.substring(
-            de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.WORKSPACE_ROOT.length() + 1
+        de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.OUTPUT_PATH.substring(
+            de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.WORKSPACE_ROOT.length() + 1
         ) +
         "/";
 
@@ -230,12 +230,12 @@ public class PracticeDetectionResultParser {
 
         // Reject internal workspace paths — agent sometimes hallucinates inputs/context/ or work/analysis/ paths
         if (
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX) ||
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.CONTEXT_PREFIX) ||
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRACTICES_PREFIX) ||
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.ANALYSIS_PREFIX) ||
             filePath.startsWith(OUTPUT_RELATIVE_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX)
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_PREFIX) ||
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_OUT_PREFIX)
         ) {
             log.debug(
                 "Skipping suggestedDiffNote with internal path at finding {}, index {}: {}",

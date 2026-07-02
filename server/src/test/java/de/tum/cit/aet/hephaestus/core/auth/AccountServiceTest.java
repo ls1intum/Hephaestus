@@ -62,11 +62,11 @@ class AccountServiceTest extends BaseUnitTest {
     }
 
     private static IdentityLink link(long id, long gitProviderId) {
-        // Real owned entity, not a mock: stubbing getId()/getGitProviderId() would test the stub, not
+        // Real owned entity, not a mock: stubbing getId()/getProviderId() would test the stub, not
         // the service, and couple to getter names. IdentityLink is @NoArgsConstructor + @Setter.
         IdentityLink il = new IdentityLink();
         il.setId(id);
-        il.setGitProviderId(gitProviderId);
+        il.setProviderId(gitProviderId);
         return il;
     }
 

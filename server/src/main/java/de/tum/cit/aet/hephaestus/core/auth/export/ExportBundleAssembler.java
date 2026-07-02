@@ -143,7 +143,7 @@ public class ExportBundleAssembler {
     }
 
     private ExportBundle.Identity toIdentity(IdentityLink il) {
-        String provider = gitProviderRegistry.providerTypeName(il.getGitProviderId());
+        String provider = gitProviderRegistry.providerTypeName(il.getProviderId());
         return new ExportBundle.Identity(
             provider,
             il.getSubject(),

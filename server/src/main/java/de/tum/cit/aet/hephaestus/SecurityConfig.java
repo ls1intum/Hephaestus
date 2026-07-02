@@ -134,7 +134,8 @@ public class SecurityConfig {
                 "/actuator/health/**",
                 "/actuator/info",
                 "/webhooks/**",
-                "/oauth/callback/**"
+                "/oauth/callback/**",
+                "/slack/events"
             )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())

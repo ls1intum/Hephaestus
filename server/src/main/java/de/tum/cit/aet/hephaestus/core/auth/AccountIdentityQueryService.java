@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import java.util.List;
+import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,17 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Long> resolveAccountId(Long providerId, String subject, @Nullable String teamId) {
+        if (providerId == null || subject == null || subject.isBlank()) {
+            return Optional.empty();
+        }
+        return identityLinkRepository
+            .findActiveByProviderSubject(providerId, subject, teamId)
+            .map(link -> link.getAccount().getId());
+    }
+
+    @Override
     @Transactional
     public void linkExternalActor(Long identityLinkId, Long externalActorId) {
         if (identityLinkId == null || externalActorId == null) {
@@ -46,7 +59,7 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
     private IdentityLinkView toView(IdentityLink link) {
         return new IdentityLinkView(
             link.getId(),
-            link.getGitProviderId(),
+            link.getProviderId(),
             link.getSubject(),
             link.getUsernameAtSignup(),
             link.getDisplayName(),

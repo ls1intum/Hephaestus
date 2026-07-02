@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
@@ -18,7 +18,7 @@ public record AdminWorkspaceViewDTO(
     @NonNull String displayName,
     @NonNull String status,
     @NonNull String accountLogin,
-    @Nullable GitProviderType providerType,
+    @Nullable IdentityProviderType providerType,
     @Nullable String ownerLogin,
     @NonNull Long memberCount,
     @NonNull Instant createdAt

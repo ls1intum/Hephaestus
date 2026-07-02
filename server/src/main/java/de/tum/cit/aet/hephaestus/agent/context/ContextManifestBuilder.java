@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import java.io.IOException;
@@ -64,7 +64,7 @@ public class ContextManifestBuilder {
             ArrayNode entries = manifest.putArray("entries");
             // Deterministic order so the manifest bytes are stable for identical context (CAS dedup).
             for (String key : new TreeSet<>(files.keySet())) {
-                if (key.equals(WorkspaceAbi.MANIFEST_PATH) || !key.startsWith(ContentProvider.OUTPUT_PREFIX)) {
+                if (key.equals(SandboxLayout.MANIFEST_PATH) || !key.startsWith(ContentSource.OUTPUT_PREFIX)) {
                     continue;
                 }
                 byte[] bytes = files.get(key);
@@ -81,7 +81,7 @@ public class ContextManifestBuilder {
                 // name there reads as a different file and the enrichment context stays unopened.
                 entry.put("path", key);
                 // Never default to a connector name — that is exactly the mislabel the manifest exists to
-                // prevent. connectorId() is abstract so every provider-written key is present; "unknown" is
+                // prevent. originId() is abstract so every provider-written key is present; "unknown" is
                 // the fail-loud marker for the impossible case rather than a silent attribution to SCM.
                 // getOrDefault only substitutes on an ABSENT key, so coalesce a present-but-null mapping too.
                 String connector = keyConnector.get(key);
@@ -90,7 +90,7 @@ public class ContextManifestBuilder {
                 entry.put("sha256", cas.put(bytes));
             }
             byte[] manifestBytes = objectMapper.writeValueAsBytes(manifest);
-            files.put(WorkspaceAbi.MANIFEST_PATH, manifestBytes);
+            files.put(SandboxLayout.MANIFEST_PATH, manifestBytes);
             persistJobManifest(jobId, manifestBytes);
         } catch (RuntimeException e) {
             // Log the throwable, not just getMessage() — an NPE message is null/unhelpful and this path is

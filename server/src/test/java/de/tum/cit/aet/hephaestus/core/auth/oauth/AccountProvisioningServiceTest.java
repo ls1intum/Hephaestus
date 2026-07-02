@@ -134,7 +134,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private static IdentityLink linkOn(Account account) {
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(PROVIDER_ID);
+        link.setProviderId(PROVIDER_ID);
         link.setSubject("sub-1");
         return link;
     }

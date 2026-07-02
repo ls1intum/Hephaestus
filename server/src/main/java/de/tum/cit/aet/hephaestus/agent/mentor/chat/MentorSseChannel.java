@@ -17,13 +17,13 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
-/**
- * Per-turn façade over a single {@link SseEmitter}. Owns everything that writes to the wire —
- * chunk serialisation, comment-only heartbeats, terminal {@code [DONE]} sentinel, and the
- * "client gone" disconnect hook — so {@link MentorChatService} can stay focused on orchestration.
+ * The webapp {@link MentorChannel} implementation: a per-turn façade over a single
+ * {@link SseEmitter}. Owns everything that writes to the wire — chunk serialisation, comment-only
+ * keep-alive pings, terminal {@code [DONE]} sentinel, and the "client gone" disconnect hook — so
+ * {@link MentorChatService} can stay focused on orchestration and never branch on transport.
  * {@link #close()} is idempotent and called from the orchestrator's {@code finally} block.
  */
-final class MentorSseChannel implements AutoCloseable {
+final class MentorSseChannel implements MentorChannel {
 
     private static final Logger log = LoggerFactory.getLogger(MentorSseChannel.class);
 
@@ -95,7 +95,8 @@ final class MentorSseChannel implements AutoCloseable {
      * runs immediately on the calling thread — covers the race where the SSE lifecycle flips
      * the flag before the orchestrator attaches the runner.
      */
-    void onDisconnect(Runnable hook) {
+    @Override
+    public void onDisconnect(Runnable hook) {
         if (clientGone.get()) {
             try {
                 hook.run();
@@ -107,7 +108,8 @@ final class MentorSseChannel implements AutoCloseable {
         disconnectHook.set(hook);
     }
 
-    boolean isClientGone() {
+    @Override
+    public boolean isClientGone() {
         return clientGone.get();
     }
 
@@ -120,7 +122,8 @@ final class MentorSseChannel implements AutoCloseable {
      * concurrent chunk write from the runner-event thread, and a post-{@link #closed} tick is
      * a clean no-op instead of poisoning the disconnect flag.
      */
-    void startHeartbeat() {
+    @Override
+    public void startKeepAlive() {
         heartbeat = scheduler.scheduleAtFixedRate(
             () -> {
                 if (clientGone.get() || closed.get()) return;
@@ -159,7 +162,8 @@ final class MentorSseChannel implements AutoCloseable {
      * stream cleanly; a runner that emits a stray late event (e.g. a second {@code agent_end})
      * must not be treated as a client disconnect.
      */
-    void send(UIMessageChunk chunk) {
+    @Override
+    public void send(UIMessageChunk chunk) {
         if (clientGone.get() || closed.get()) return;
         // Serialise OUTSIDE the lock to keep the critical section small.
         String payload;
@@ -192,7 +196,8 @@ final class MentorSseChannel implements AutoCloseable {
      * inside the same monitor as {@link #send} so subsequent writes short-circuit instead of
      * tripping Spring's post-complete {@link IllegalStateException}. Idempotent.
      */
-    void completeWithDone() {
+    @Override
+    public void completeWithDone() {
         cancelHeartbeat();
         writeLock.lock();
         try {
@@ -209,7 +214,8 @@ final class MentorSseChannel implements AutoCloseable {
     }
 
     /** Error path: best-effort emit an {@link UIMessageChunk.Error} chunk + {@code [DONE]}. */
-    void completeWithError(String errorText) {
+    @Override
+    public void completeWithError(String errorText) {
         cancelHeartbeat();
         try {
             send(new UIMessageChunk.Error(errorText));
@@ -218,7 +224,8 @@ final class MentorSseChannel implements AutoCloseable {
     }
 
     /** 409 conflict path: emit a status hint + an error chunk + {@code [DONE]}. */
-    void completeWithConflict() {
+    @Override
+    public void completeWithConflict() {
         cancelHeartbeat();
         try {
             send(UIMessageChunk.DataMentorStatus.of("conflict", "another turn is in flight for this thread"));

@@ -114,6 +114,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             r.team().name(),
             /* notificationChannelId */ null,
             /* teamLabel */ null,
+            /* retentionDays */ null,
             Set.of()
         );
         return new ConnectFinalization.Completed(

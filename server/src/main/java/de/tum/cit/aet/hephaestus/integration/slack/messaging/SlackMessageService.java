@@ -4,7 +4,10 @@ import com.slack.api.Slack;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
+import com.slack.api.methods.response.chat.ChatAppendStreamResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.methods.response.chat.ChatStartStreamResponse;
+import com.slack.api.methods.response.chat.ChatStopStreamResponse;
 import com.slack.api.methods.response.users.UsersListResponse;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
@@ -70,6 +73,79 @@ public class SlackMessageService {
                 e.getMessage()
             );
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
+        }
+    }
+
+    /**
+     * Begin a streamed assistant reply in {@code threadTs}; returns the streaming message {@code ts} to append
+     * to. {@code markdownText} is standard Markdown (Slack renders it, incl. tables) — never legacy mrkdwn.
+     */
+    public String startStream(long workspaceId, String channel, String threadTs, String markdownText) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, channel, "no_active_slack_connection")
+        );
+        try {
+            ChatStartStreamResponse r = slack
+                .methods(token)
+                .chatStartStream(req -> req.channel(channel).threadTs(threadTs).markdownText(markdownText));
+            if (!r.isOk()) {
+                throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
+            }
+            return r.getTs();
+        } catch (SlackApiException | IOException e) {
+            throw new SlackSendException(workspaceId, channel, "transport_failure", e);
+        }
+    }
+
+    /** Append a Markdown delta to an in-progress stream. Throws with the Slack error so callers can detect a gone recipient. */
+    public void appendStream(long workspaceId, String channel, String ts, String markdownText) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, channel, "no_active_slack_connection")
+        );
+        try {
+            ChatAppendStreamResponse r = slack
+                .methods(token)
+                .chatAppendStream(req -> req.channel(channel).ts(ts).markdownText(markdownText));
+            if (!r.isOk()) {
+                throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
+            }
+        } catch (SlackApiException | IOException e) {
+            throw new SlackSendException(workspaceId, channel, "transport_failure", e);
+        }
+    }
+
+    /** Finalize a stream, optionally attaching terminal blocks (finding chips / actions). */
+    public void stopStream(long workspaceId, String channel, String ts, List<LayoutBlock> blocks) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, channel, "no_active_slack_connection")
+        );
+        try {
+            ChatStopStreamResponse r = slack
+                .methods(token)
+                .chatStopStream(req -> req.channel(channel).ts(ts).blocks(blocks));
+            if (!r.isOk()) {
+                throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
+            }
+        } catch (SlackApiException | IOException e) {
+            throw new SlackSendException(workspaceId, channel, "transport_failure", e);
+        }
+    }
+
+    /**
+     * Set the assistant "thinking…" status on a thread. Best-effort: only assistant threads support it, so a
+     * failure (e.g. a plain DM thread) is swallowed — it's a liveness nicety, never load-bearing.
+     */
+    public void setStatus(long workspaceId, String channel, String threadTs, String status) {
+        Optional<String> token = resolveToken(workspaceId);
+        if (token.isEmpty()) {
+            return;
+        }
+        try {
+            slack
+                .methods(token.get())
+                .assistantThreadsSetStatus(req -> req.channelId(channel).threadTs(threadTs).status(status));
+        } catch (Exception e) {
+            log.debug("Slack setStatus skipped (channel={}): {}", channel, e.getMessage());
         }
     }
 

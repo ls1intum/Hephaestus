@@ -111,6 +111,7 @@ public class WorkspaceSettingsService {
                     slack.teamName(),
                     channelId != null ? channelId : slack.notificationChannelId(),
                     team != null ? team : slack.teamLabel(),
+                    slack.retentionDays(),
                     slack.enabledStreams()
                 );
             });

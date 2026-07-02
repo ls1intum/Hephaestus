@@ -29,27 +29,22 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         return new ContextRequest.PracticeReviewRequest(anyJob());
     }
 
-    private static WorkspaceContextBuilder builderOf(ContentProvider... providers) {
+    private static WorkspaceContextBuilder builderOf(ContentSource... providers) {
         return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry(), null);
     }
 
     private static SimpleMeterRegistry sharedRegistry;
 
-    private static WorkspaceContextBuilder builderWithSharedRegistry(ContentProvider... providers) {
+    private static WorkspaceContextBuilder builderWithSharedRegistry(ContentSource... providers) {
         sharedRegistry = new SimpleMeterRegistry();
         return new WorkspaceContextBuilder(List.of(providers), sharedRegistry, null);
     }
 
     /** Helper to construct a stub provider inline. */
-    private static ContentProvider stubProvider(
-        boolean required,
-        String pathSuffix,
-        byte[] payload,
-        boolean throwError
-    ) {
-        return new ContentProvider() {
+    private static ContentSource stubProvider(boolean required, String pathSuffix, byte[] payload, boolean throwError) {
+        return new ContentSource() {
             @Override
-            public String connectorId() {
+            public String originId() {
                 return "test";
             }
 
@@ -126,9 +121,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("skips providers that do not support the request")
         void skipsUnsupported() {
             var supports = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
-            var skips = new ContentProvider() {
+            var skips = new ContentSource() {
                 @Override
-                public String connectorId() {
+                public String originId() {
                     return "test";
                 }
 
@@ -169,9 +164,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("re-raises JobPreparationException without re-wrapping")
         void jpePassThrough() {
-            var bad = new ContentProvider() {
+            var bad = new ContentSource() {
                 @Override
-                public String connectorId() {
+                public String originId() {
                     return "test";
                 }
 
@@ -198,17 +193,17 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("two providers writing the same path is a wiring bug")
         void detectsConflictingKey() {
             // Distinct concrete classes so dedup distinguishes ownership.
-            ContentProvider first = new ProviderA();
-            ContentProvider second = new ProviderB();
+            ContentSource first = new ProviderA();
+            ContentSource second = new ProviderB();
             assertThatThrownBy(() -> builderOf(first, second).build(reviewRequest()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate workspace key");
         }
 
-        private final class ProviderA implements ContentProvider {
+        private final class ProviderA implements ContentSource {
 
             @Override
-            public String connectorId() {
+            public String originId() {
                 return "test";
             }
 
@@ -223,10 +218,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             }
         }
 
-        private final class ProviderB implements ContentProvider {
+        private final class ProviderB implements ContentSource {
 
             @Override
-            public String connectorId() {
+            public String originId() {
                 return "test";
             }
 
@@ -248,9 +243,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("rejects providers that write outside inputs/context/")
         void rejectsBadPrefix() {
-            var wrong = new ContentProvider() {
+            var wrong = new ContentSource() {
                 @Override
-                public String connectorId() {
+                public String originId() {
                     return "test";
                 }
 
@@ -294,8 +289,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void serialisesOnRepoId() throws Exception {
             java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
             java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
-            ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
-            ContentProvider unboundedSecond = new LatchedProvider(null, null);
+            ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
+            ContentSource unboundedSecond = new LatchedProvider(null, null);
             // Two distinct concrete provider classes → injection-order semantics, not dedup.
             var builder = new WorkspaceContextBuilder(
                 List.of(gatedFirst, unboundedSecond),
@@ -339,8 +334,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void serialisesOnNullRepoKey() throws Exception {
             java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
             java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
-            ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
-            ContentProvider unboundedSecond = new LatchedProvider(null, null);
+            ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
+            ContentSource unboundedSecond = new LatchedProvider(null, null);
             var builder = new WorkspaceContextBuilder(
                 List.of(gatedFirst, unboundedSecond),
                 new SimpleMeterRegistry(),
@@ -396,10 +391,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
      * Provider that releases on {@code entered} and waits on {@code mayFinish}. Both latches
      * may be {@code null} for the unbounded variant.
      */
-    private static final class LatchedProvider implements ContentProvider {
+    private static final class LatchedProvider implements ContentSource {
 
         @Override
-        public String connectorId() {
+        public String originId() {
             return "test";
         }
 
@@ -433,10 +428,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     /** Ordered provider: writes a single file; reports a fixed precedence. */
-    private static final class OrderedStubProvider implements ContentProvider, Ordered {
+    private static final class OrderedStubProvider implements ContentSource, Ordered {
 
         @Override
-        public String connectorId() {
+        public String originId() {
             return "test";
         }
 

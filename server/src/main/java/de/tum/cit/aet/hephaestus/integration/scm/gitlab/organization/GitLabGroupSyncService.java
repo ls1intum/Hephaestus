@@ -6,9 +6,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.extractEntityId;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -60,7 +60,7 @@ public class GitLabGroupSyncService {
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabProperties gitLabProperties;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
     public GitLabGroupSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
@@ -68,7 +68,7 @@ public class GitLabGroupSyncService {
         GitLabGroupProcessor groupProcessor,
         GitLabProjectProcessor projectProcessor,
         GitLabProperties gitLabProperties,
-        GitProviderRepository gitProviderRepository
+        IdentityProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
@@ -90,12 +90,12 @@ public class GitLabGroupSyncService {
      *                   or {@code null} to fall back to the global default
      * @throws IllegalStateException if no GitLab provider row exists for the URL
      */
-    private GitProvider resolveProvider(@org.jspecify.annotations.Nullable String serverUrl) {
+    private IdentityProvider resolveProvider(@org.jspecify.annotations.Nullable String serverUrl) {
         String effective = (serverUrl == null || serverUrl.isBlank()) ? gitLabProperties.defaultServerUrl() : serverUrl;
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, effective)
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, effective)
             .orElseThrow(() ->
-                new IllegalStateException("GitProvider not found for type=GITLAB, serverUrl=" + effective)
+                new IllegalStateException("IdentityProvider not found for type=GITLAB, serverUrl=" + effective)
             );
     }
 
@@ -122,7 +122,7 @@ public class GitLabGroupSyncService {
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
         try {
-            GitProvider provider = resolveProvider(serverUrl);
+            IdentityProvider provider = resolveProvider(serverUrl);
             Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
@@ -219,7 +219,7 @@ public class GitLabGroupSyncService {
         int reportedTotalCount = -1;
 
         try {
-            GitProvider provider = resolveProvider(serverUrl);
+            IdentityProvider provider = resolveProvider(serverUrl);
             Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
 
@@ -505,7 +505,7 @@ public class GitLabGroupSyncService {
         Long scopeId,
         String groupFullPath,
         Organization topLevelOrganization,
-        GitProvider provider,
+        IdentityProvider provider,
         Long providerId,
         Set<Long> seenNativeIds
     ) {

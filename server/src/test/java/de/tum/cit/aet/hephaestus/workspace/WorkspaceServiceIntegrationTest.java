@@ -99,7 +99,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 workspace,
                 IntegrationKind.SLACK,
                 "test-team-id",
-                new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, java.util.Set.of())
+                new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, null, java.util.Set.of())
             );
         org.springframework.test.util.ReflectionTestUtils.setField(
             conn,

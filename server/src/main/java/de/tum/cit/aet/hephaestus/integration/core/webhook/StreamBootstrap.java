@@ -22,17 +22,14 @@ import org.slf4j.LoggerFactory;
  *       Operators handle drift explicitly via {@code nats stream edit}.</li>
  * </ul>
  *
- * <p>Stay in lockstep with {@code integration.webhook.IntegrationKindRouting.ROUTES} —
- * any new integration kind needs a stream here AND a route there. The
- * {@code IntegrationKindRoutingTest} arch check pins the routing side; this list is the
- * matching infrastructure side. They are intentionally kept as two literal lists so the
- * stream lifecycle stays in {@code integration.scm/} (infrastructure) while the routing stays
- * in {@code integration/} (framework SPI).
+ * <p>Streams are created only for kinds that flow over NATS. {@code IntegrationKindRouting.ROUTES}
+ * is a superset: it also carries {@code slack}, which is routed for the OAuth callback only and has
+ * no publisher or consumer on any NATS subject, so it gets no stream here.
  */
 public class StreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(StreamBootstrap.class);
-    private static final String[] STREAMS = { "gitlab", "github", "slack" };
+    private static final String[] STREAMS = { "gitlab", "github" };
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;

@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  *       registry (a {@code Map<IntegrationKind, …Channel>} keyed by {@code channel.kind()}),
  *       never by naming a concrete enum constant ({@code IntegrationKind.GITHUB} /
  *       {@code GITLAB} / {@code SLACK}), and must never reach for the legacy
- *       {@code GitProviderType} enum at all. This is Issue #1198 AC#8: the delivery classes
+ *       {@code IdentityProviderType} enum at all. This is Issue #1198 AC#8: the delivery classes
  *       {@code DiffNotePoster}, {@code PullRequestCommentPoster}, {@code FeedbackDeliveryService}
  *       must not branch on the provider enum.
  * </ul>
@@ -40,7 +40,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
 
     private static final String INTEGRATION_KIND_FQN = "de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind";
     private static final String GIT_PROVIDER_TYPE_FQN =
-        "de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType";
+        "de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType";
 
     @Test
     void spiHasNoVendorSdkDependencies() {
@@ -112,8 +112,8 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
             .that()
             .resideInAPackage("..agent..")
             // Bites for both enums: no constant reads of IntegrationKind, and no dependency at all
-            // on the legacy GitProviderType (whose only legitimate agent-side use would itself be a
-            // branch-on-provider). Reading a GitProviderType constant is caught by the same
+            // on the legacy IdentityProviderType (whose only legitimate agent-side use would itself be a
+            // branch-on-provider). Reading a IdentityProviderType constant is caught by the same
             // constant-read condition; depending on the type in any other way is caught explicitly.
             .should(
                 notReadEnumConstantsOf(INTEGRATION_KIND_FQN)
@@ -127,7 +127,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 "Issue #1198 AC#8: agent/** dispatches on the provider via the SPI registry " +
                     "(Map<IntegrationKind, …Channel> keyed by channel.kind()). Reading a concrete " +
                     "IntegrationKind constant (GITHUB/GITLAB/SLACK) — or touching the legacy " +
-                    "GitProviderType enum at all — is the branch-on-provider smell; push the " +
+                    "IdentityProviderType enum at all — is the branch-on-provider smell; push the " +
                     "behaviour into the per-kind SPI adapter instead."
             );
         rule.check(classes);
@@ -178,7 +178,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
     /**
      * Fails a class that has any direct dependency on the named class — extends/implements, field,
      * parameter, return type, local variable, annotation, or call target. Used to forbid the legacy
-     * {@code GitProviderType} from agent/** entirely, not just its constant reads.
+     * {@code IdentityProviderType} from agent/** entirely, not just its constant reads.
      */
     private static ArchCondition<JavaClass> notDependOnClass(String fqn) {
         return new ArchCondition<>("not depend on " + fqn) {
@@ -191,7 +191,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                                 javaClass,
                                 String.format(
                                     "%s depends on %s at %s — agent/** must dispatch by IntegrationKind " +
-                                        "via the SPI registry, never the legacy GitProviderType",
+                                        "via the SPI registry, never the legacy IdentityProviderType",
                                     javaClass.getSimpleName(),
                                     fqn,
                                     dependency.getSourceCodeLocation()

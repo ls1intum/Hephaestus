@@ -64,7 +64,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         account.setStatus(Account.Status.ACTIVE);
 
         IdentityLink link = new IdentityLink();
-        link.setGitProviderId(55L);
+        link.setProviderId(55L);
         when(gitProviderRegistry.providerTypeName(55L)).thenReturn("GITLAB");
         link.setSubject("123");
         link.setUsernameAtSignup("ada");

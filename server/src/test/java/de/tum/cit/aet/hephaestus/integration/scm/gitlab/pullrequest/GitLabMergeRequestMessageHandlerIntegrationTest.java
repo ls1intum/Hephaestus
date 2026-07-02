@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -111,7 +111,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -123,7 +123,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private RecordingScmEventListener eventListener;
 
     private Repository savedRepo;
-    private GitProvider savedProvider;
+    private IdentityProvider savedProvider;
 
     @BeforeEach
     void setUp() {
@@ -172,7 +172,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(pr.getBaseRefName()).isEqualTo(MR3_TARGET_BRANCH);
 
                 // Provider
-                assertThat(pr.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
+                assertThat(pr.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
 
                 // Timestamps
                 assertThat(pr.getCreatedAt()).isNotNull();
@@ -545,7 +545,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .findByNativeIdAndProviderId(NATIVE_AUTHOR_ID, savedProvider.getId())
                     .orElseThrow();
                 assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-                assertThat(author.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
+                assertThat(author.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
             });
         }
     }
@@ -560,9 +560,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     private void setupTestData() {
         savedProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
             .orElseGet(() ->
-                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de"))
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
             );
 
         Organization org = new Organization();

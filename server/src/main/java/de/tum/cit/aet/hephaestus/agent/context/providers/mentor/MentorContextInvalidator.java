@@ -17,7 +17,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Evicts mentor aspect caches after committed domain events. Surgical point-key eviction
+ * Evicts mentor context caches after committed domain events. Surgical point-key eviction
  * (per {@code workspaceId + ":" + userId} or per {@code workspaceId}) so a single CRUD does
  * not amplify into a thundering herd across active users.
  *
@@ -35,13 +35,13 @@ public class MentorContextInvalidator {
 
     /** Caches scoped by {@code workspaceId + ":" + userId}. */
     private static final List<String> PER_USER_CACHES = List.of(
-        "mentor_user_aspect",
-        "mentor_workspace_aspect",
-        "mentor_findings_aspect",
-        "mentor_practice_standing_aspect",
-        // The authored-work aspect (RecentAuthoredWorkAspectProvider) is keyed per
+        "mentor_user_context",
+        "mentor_workspace_context",
+        "mentor_findings_context",
+        "mentor_practice_standing_context",
+        // The authored-work context (RecentAuthoredWorkContentSource) is keyed per
         // workspaceId:developerId and goes stale on the same PR/issue/review events.
-        "mentor_authored_work_aspect"
+        "mentor_authored_work_context"
     );
 
     /**
@@ -52,8 +52,8 @@ public class MentorContextInvalidator {
      * once posted (ADR 0021), so its cache cannot drift.
      */
     private static final List<String> DETECTION_DEPENDENT_CACHES = List.of(
-        "mentor_findings_aspect",
-        "mentor_practice_standing_aspect"
+        "mentor_findings_context",
+        "mentor_practice_standing_context"
     );
 
     private final CacheManager cacheManager;
@@ -62,7 +62,7 @@ public class MentorContextInvalidator {
 
     /**
      * PR updates change the per-user activity counts: open PRs, merged-this-week, unresolved
-     * threads, review states, etc. We invalidate per-user aspects for both the author and
+     * threads, review states, etc. We invalidate per-user contexts for both the author and
      * (since the PR may have just been merged) the mergedBy user.
      */
     @Async
@@ -81,7 +81,7 @@ public class MentorContextInvalidator {
     }
 
     /**
-     * Issue updates affect the assigned-work surface. Invalidate the workspace aspect for the
+     * Issue updates affect the assigned-work surface. Invalidate the workspace context for the
      * author (who sees their work list change).
      */
     @Async
@@ -96,7 +96,7 @@ public class MentorContextInvalidator {
     /**
      * Review submissions change the reviewer's "reviews-given-this-week" counter AND, indirectly,
      * the PR author's "reviews-received-this-week" / "pending-review-requests" / "unresolved-threads"
-     * counters. Without this, the user-aspect cache would lie for up to its TTL after every code
+     * counters. Without this, the user-context cache would lie for up to its TTL after every code
      * review — which is the highest-frequency event in the mentor's per-user surface.
      *
      * <p>{@code @Transactional(REQUIRES_NEW)} is mandatory: {@code AFTER_COMMIT} runs after the
@@ -127,7 +127,7 @@ public class MentorContextInvalidator {
 
     /**
      * A completed detection run persists new observations for this developer, staling the findings-history and
-     * practice-standing aspects (they would otherwise lie until their TTL). Evict the two detection-dependent
+     * practice-standing contexts (they would otherwise lie until their TTL). Evict the two detection-dependent
      * per-user caches for the evaluated developer. The event carries only scalars, so no transaction is needed.
      */
     @Async
@@ -164,7 +164,7 @@ public class MentorContextInvalidator {
     private Long resolveWorkspaceId(de.tum.cit.aet.hephaestus.integration.core.events.EventContext context) {
         if (context == null || context.repository() == null) return null;
         // The ScmDomainEvent context carries a RepositoryRef — we resolve to workspace via the
-        // RepositoryToMonitor join (same approach the aspect queries use).
+        // RepositoryToMonitor join (same approach the context queries use).
         return workspaceRepository.findWorkspaceIdByRepositoryId(context.repository().id()).orElse(null);
     }
 

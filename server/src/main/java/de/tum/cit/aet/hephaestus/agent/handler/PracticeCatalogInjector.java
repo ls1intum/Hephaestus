@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Injects the practice registry, criteria, and precompute scripts into a job's workspace under
  * {@code inputs/practices/} and {@code work/precompute/}. Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
  * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
- * so it does not live behind the {@code ContentProvider} SPI.
+ * so it does not live behind the {@code ContentSource} SPI.
  *
  * <p>Filters by {@link WorkArtifact}: a PR job injects only PR-focus practices, an issue job only
  * issue-focus practices — so a diff-anchored practice never reaches an issue (and vice-versa).
@@ -114,9 +114,9 @@ class PracticeCatalogInjector {
         // doesn't match the ABI pattern before it can escape "inputs/practices/" / "work/precompute/".
         for (Practice p : practices) {
             String slug = p.getSlug();
-            if (slug == null || !WorkspaceAbi.PRACTICE_SLUG.matcher(slug).matches()) {
+            if (slug == null || !SandboxLayout.PRACTICE_SLUG.matcher(slug).matches()) {
                 throw new JobPreparationException(
-                    "Practice slug fails ABI pattern " + WorkspaceAbi.PRACTICE_SLUG.pattern() + ": " + slug
+                    "Practice slug fails ABI pattern " + SandboxLayout.PRACTICE_SLUG.pattern() + ": " + slug
                 );
             }
         }
@@ -132,7 +132,7 @@ class PracticeCatalogInjector {
             entry.put("area", areaSlug);
         }
         try {
-            files.put(WorkspaceAbi.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
+            files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
         } catch (JacksonException e) {
             throw new JobPreparationException("Failed to serialize practice index.json: " + e.getMessage());
         }
@@ -140,22 +140,22 @@ class PracticeCatalogInjector {
         StringBuilder bundle = new StringBuilder();
         for (Practice p : practices) {
             String criteria = p.getCriteria();
-            files.put(WorkspaceAbi.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
+            files.put(SandboxLayout.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
             bundle.append("# ").append(p.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
         }
         files.put(
-            WorkspaceAbi.PRACTICES_PREFIX + "all-criteria.md",
+            SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
             bundle.toString().getBytes(StandardCharsets.UTF_8)
         );
 
-        files.put(WorkspaceAbi.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
+        files.put(SandboxLayout.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
 
         int precomputeCount = 0;
         for (Practice p : practices) {
             String script = p.getPrecomputeScript();
             if (script != null && !script.isBlank()) {
                 files.put(
-                    WorkspaceAbi.PRECOMPUTE_PREFIX + "practices/" + p.getSlug() + ".ts",
+                    SandboxLayout.PRECOMPUTE_PREFIX + "practices/" + p.getSlug() + ".ts",
                     script.getBytes(StandardCharsets.UTF_8)
                 );
                 precomputeCount++;

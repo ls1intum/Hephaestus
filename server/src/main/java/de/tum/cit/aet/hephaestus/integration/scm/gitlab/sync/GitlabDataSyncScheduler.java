@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
@@ -294,7 +294,7 @@ public class GitlabDataSyncScheduler {
 
         try {
             organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), GitProviderType.GITLAB)
+                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), IdentityProviderType.GITLAB)
                 .ifPresent(org -> {
                     int count = memberSync.syncGroupMemberships(session.scopeId(), session.accountLogin(), org);
                     log.info("GitLab membership sync: scopeId={}, membersSynced={}", session.scopeId(), count);
@@ -635,7 +635,7 @@ public class GitlabDataSyncScheduler {
      */
     private Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(accountLogin, GitProviderType.GITLAB)
+            .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
             .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
             .orElse(null);
     }

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -119,7 +119,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             }
         }
 
-        GitProvider provider = context.provider();
+        IdentityProvider provider = context.provider();
 
         // Extract position data from the webhook payload
         @SuppressWarnings("unchecked")

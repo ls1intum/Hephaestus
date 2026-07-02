@@ -88,11 +88,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         void loadsClasspathResources() {
             var inputs = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).inputFiles();
-            assertThat(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH)).isNotNull();
-            assertThat(new String(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
+            assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotNull();
+            assertThat(new String(inputs.get(SandboxLayout.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
                 "findings"
             );
-            assertThat(inputs.get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
+            assertThat(inputs.get(SandboxLayout.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
         }
 
         @Test
@@ -108,10 +108,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 true,
                 600,
                 PRACTICE,
-                Map.of(WorkspaceAbi.CONTEXT_PREFIX + "metadata.json", payload),
+                Map.of(SandboxLayout.CONTEXT_PREFIX + "metadata.json", payload),
                 ""
             );
-            assertThat(factory.build(spec).inputFiles()).containsKey(WorkspaceAbi.CONTEXT_PREFIX + "metadata.json");
+            assertThat(factory.build(spec).inputFiles()).containsKey(SandboxLayout.CONTEXT_PREFIX + "metadata.json");
         }
     }
 
@@ -186,7 +186,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(env)
                 .containsEntry("HOME", "/home/agent")
                 .containsEntry("TMPDIR", "/home/agent/.local/tmp")
-                .containsEntry("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
+                .containsEntry("PI_CODING_AGENT_DIR", SandboxLayout.PI_AGENT_DIR);
         }
 
         @Test
@@ -260,7 +260,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     "provider extension files are no longer emitted; the runner script's " +
                         "modelRegistry.registerProvider() call is the single source of truth"
                 )
-                .noneMatch(k -> k.startsWith(WorkspaceAbi.PI_AGENT_PREFIX + "extensions/"));
+                .noneMatch(k -> k.startsWith(SandboxLayout.PI_AGENT_PREFIX + "extensions/"));
         }
 
         @Test
@@ -280,7 +280,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             JsonNode settings = objectMapper.readTree(
                 new String(
-                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
                     StandardCharsets.UTF_8
                 )
             );
@@ -305,7 +305,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             JsonNode settings = objectMapper.readTree(
                 new String(
-                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
                     StandardCharsets.UTF_8
                 )
             );
@@ -333,7 +333,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             JsonNode settings = objectMapper.readTree(
                 new String(
-                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
                     StandardCharsets.UTF_8
                 )
             );
@@ -358,7 +358,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             JsonNode settings = objectMapper.readTree(
                 new String(
-                    factory.build(spec).inputFiles().get(WorkspaceAbi.PI_AGENT_PREFIX + "settings.json"),
+                    factory.build(spec).inputFiles().get(SandboxLayout.PI_AGENT_PREFIX + "settings.json"),
                     StandardCharsets.UTF_8
                 )
             );
@@ -374,7 +374,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void nodeFlagsForPractice() {
             String body = factory.build(apiKeySpec(LlmProvider.OPENAI)).command().get(2);
             int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             String nodePrefix = body.substring(nodeIdx, scriptIdx);
             assertThat(nodePrefix)
                 .contains("--no-warnings")
@@ -404,7 +404,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             String body = factory.build(spec).command().get(2);
             int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             assertThat(body.substring(nodeIdx, scriptIdx))
                 .contains("--max-old-space-size=256")
                 .contains("--no-warnings")
@@ -418,7 +418,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @Test
         void profilesResolveToDistinctScripts() {
             PiPlanSpec base = proxySpec(LlmProvider.AZURE_OPENAI, null);
-            byte[] practiceBytes = factory.build(base).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            byte[] practiceBytes = factory.build(base).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             PiPlanSpec mentorSpec = new PiPlanSpec(
                 LlmProvider.OPENAI,
                 CredentialMode.API_KEY,
@@ -432,7 +432,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 Map.of(),
                 ""
             );
-            byte[] mentorBytes = factory.build(mentorSpec).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
+            byte[] mentorBytes = factory.build(mentorSpec).inputFiles().get(SandboxLayout.RUNNER_SCRIPT_FILENAME);
             assertThat(mentorBytes).isNotEqualTo(practiceBytes);
         }
 
@@ -456,7 +456,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(plan.command().get(0)).isEqualTo("sh");
             String body = plan.command().get(2);
             assertThat(body.indexOf("echo precompute")).isLessThan(
-                body.indexOf(WorkspaceAbi.WORKSPACE_ROOT + "/" + WorkspaceAbi.RUNNER_SCRIPT_FILENAME)
+                body.indexOf(SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.RUNNER_SCRIPT_FILENAME)
             );
         }
 

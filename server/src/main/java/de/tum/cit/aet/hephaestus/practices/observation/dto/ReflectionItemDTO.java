@@ -76,7 +76,7 @@ public record ReflectionItemDTO(
 
     // Workspace ABI prefixes (ADR 0020), mirrored locally to avoid a practices -> agent module dependency.
     // The repo checkout mounts at REPO_MOUNT_RELATIVE; the agent-internal artifacts live under context/,
-    // practices/, and the input manifest. WorkspaceAbi is the source of truth for these literals.
+    // practices/, and the input manifest. SandboxLayout is the source of truth for these literals.
     private static final String REPO_MOUNT_RELATIVE = "inputs/sources/scm/repo/";
     private static final String CONTEXT_PREFIX = "inputs/context/";
     private static final String PRACTICES_PREFIX = "inputs/practices/";

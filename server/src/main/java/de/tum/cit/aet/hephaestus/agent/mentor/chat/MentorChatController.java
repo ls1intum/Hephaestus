@@ -72,7 +72,7 @@ public class MentorChatController {
         SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MS);
         UUID threadId = body.id() != null ? body.id() : UUID.randomUUID();
         UUID clientUserMessageId = extractMessageId(body.message());
-        MentorChatService.MentorTurnRequest serviceRequest = new MentorChatService.MentorTurnRequest(
+        MentorTurnRequest serviceRequest = MentorTurnRequest.web(
             workspaceContext.id(),
             threadId,
             userMessage,

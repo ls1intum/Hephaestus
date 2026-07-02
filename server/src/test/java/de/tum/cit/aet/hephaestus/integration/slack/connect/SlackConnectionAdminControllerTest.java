@@ -44,7 +44,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
         lenient()
             .when(connectionService.findSlackNotificationConfig(anyLong()))
             .thenReturn(
-                Optional.of(new ConnectionConfig.SlackConfig("T1", "Acme", "C123456789", "core-team", Set.of()))
+                Optional.of(new ConnectionConfig.SlackConfig("T1", "Acme", "C123456789", "core-team", null, Set.of()))
             );
     }
 

@@ -79,12 +79,25 @@ public sealed interface ConnectionConfig
      * Slack — single record holds bot identity AND notification config (D24 — resolves
      * the prior plan's collision between separate SlackBotConfig + SlackNotificationConfig
      * rows under {@code UNIQUE(workspace_id, kind)}).
+     *
+     * <p>{@code retentionDays} bounds how long ingested {@code slack_message} rows are kept
+     * before the transactional retention sweep purges them (GDPR Art. 5(1)(e), D10). {@code null}
+     * means "use the default"; read it through {@link #retentionDaysOrDefault()}.
      */
     record SlackConfig(
         @Nullable String teamId,
         @Nullable String teamName,
         @Nullable String notificationChannelId,
         @Nullable String teamLabel,
+        @Nullable Integer retentionDays,
         Set<String> enabledStreams
-    ) implements ConnectionConfig {}
+    ) implements ConnectionConfig {
+        /** Default bounded-retention window for ingested Slack messages, in days. */
+        public static final int DEFAULT_RETENTION_DAYS = 30;
+
+        /** The configured retention window, or {@link #DEFAULT_RETENTION_DAYS} when unset. */
+        public int retentionDaysOrDefault() {
+            return retentionDays != null ? retentionDays : DEFAULT_RETENTION_DAYS;
+        }
+    }
 }

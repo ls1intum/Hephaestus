@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.identity;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery.IdentityLinkView;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.List;
@@ -25,7 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
  * account's federated identities. Each {@link IdentityLinkView} supplies the IdP-stable numeric
  * {@code subject} (the {@code native_id}) and the {@code usernameAtSignup} (the {@code login});
  * the provider <em>type</em> / <em>server URL</em> is resolved here through
- * {@link GitProviderRepository} so {@code core.auth} stays vendor-neutral.
+ * {@link IdentityProviderRepository} so {@code core.auth} stays vendor-neutral.
  *
  * <p>After the {@code User} is upserted, its id is wired back onto the {@code IdentityLink}'s
  * {@code externalActorId} (idempotent) so profile surfaces can resolve "your activity" without a
@@ -40,12 +40,12 @@ public class AuthenticatedGitProviderUserService {
     private static final Logger log = LoggerFactory.getLogger(AuthenticatedGitProviderUserService.class);
 
     private final UserRepository userRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final AccountIdentityQuery accountIdentityQuery;
 
     public AuthenticatedGitProviderUserService(
         UserRepository userRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         AccountIdentityQuery accountIdentityQuery
     ) {
         this.userRepository = userRepository;
@@ -73,11 +73,11 @@ public class AuthenticatedGitProviderUserService {
         }
 
         // GitLab first (matches the historical gitlab_id-before-github_id ordering), then GitHub.
-        IdentityLinkView gitLabLink = firstOfType(links, GitProviderType.GITLAB);
+        IdentityLinkView gitLabLink = firstOfType(links, IdentityProviderType.GITLAB);
         if (gitLabLink != null) {
             return Optional.of(provisionUser(gitLabLink));
         }
-        IdentityLinkView gitHubLink = firstOfType(links, GitProviderType.GITHUB);
+        IdentityLinkView gitHubLink = firstOfType(links, IdentityProviderType.GITHUB);
         if (gitHubLink != null) {
             return Optional.of(provisionUser(gitHubLink));
         }
@@ -93,13 +93,13 @@ public class AuthenticatedGitProviderUserService {
     public void ensureCurrentGitLabUserExists() {
         List<IdentityLinkView> links = activeLinksForCurrentAccount();
 
-        IdentityLinkView gitLabLink = firstOfType(links, GitProviderType.GITLAB);
+        IdentityLinkView gitLabLink = firstOfType(links, IdentityProviderType.GITLAB);
         if (gitLabLink != null) {
             provisionUser(gitLabLink);
             return;
         }
 
-        if (firstOfType(links, GitProviderType.GITHUB) != null) {
+        if (firstOfType(links, IdentityProviderType.GITHUB) != null) {
             throw new ResponseStatusException(
                 org.springframework.http.HttpStatus.CONFLICT,
                 "You need to link your GitLab account before creating a GitLab workspace. Go to Settings → Linked Accounts to connect your GitLab identity."
@@ -126,9 +126,9 @@ public class AuthenticatedGitProviderUserService {
      * login condition).
      */
     @Nullable
-    private IdentityLinkView firstOfType(List<IdentityLinkView> links, GitProviderType type) {
+    private IdentityLinkView firstOfType(List<IdentityLinkView> links, IdentityProviderType type) {
         for (IdentityLinkView link : links) {
-            GitProvider provider = gitProviderRepository.findById(link.gitProviderId()).orElse(null);
+            IdentityProvider provider = gitProviderRepository.findById(link.gitProviderId()).orElse(null);
             if (provider != null && provider.getType() == type) {
                 return link;
             }
@@ -142,7 +142,7 @@ public class AuthenticatedGitProviderUserService {
      * {@code usernameAtSignup}; the server URL / provider come from the link's {@code git_provider} row.
      */
     private User provisionUser(IdentityLinkView link) {
-        GitProvider provider = gitProviderRepository
+        IdentityProvider provider = gitProviderRepository
             .findById(link.gitProviderId())
             .orElseThrow(() ->
                 new IllegalStateException(
@@ -166,7 +166,7 @@ public class AuthenticatedGitProviderUserService {
             .orElseThrow(() -> new IllegalStateException("User not found after upsert: userId=" + userId));
     }
 
-    private static long parseSubject(String subject, GitProviderType type) {
+    private static long parseSubject(String subject, IdentityProviderType type) {
         try {
             return Long.parseLong(subject);
         } catch (NumberFormatException e) {
@@ -196,7 +196,7 @@ public class AuthenticatedGitProviderUserService {
         String name,
         @Nullable String avatarUrl,
         String webUrl,
-        GitProvider provider
+        IdentityProvider provider
     ) {
         String safeName = name != null ? name : login;
         String safeAvatar = avatarUrl != null ? avatarUrl : "";

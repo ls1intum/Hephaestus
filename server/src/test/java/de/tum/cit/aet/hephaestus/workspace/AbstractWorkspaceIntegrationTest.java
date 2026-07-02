@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
@@ -22,7 +22,7 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     protected UserRepository userRepository;
 
     @Autowired
-    protected GitProviderRepository gitProviderRepository;
+    protected IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     protected WorkspaceService workspaceService;
@@ -43,20 +43,24 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
         databaseTestUtils.cleanDatabase();
     }
 
-    protected GitProvider ensureGitHubProvider() {
+    protected IdentityProvider ensureGitHubProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
     }
 
-    protected GitProvider ensureGitLabProvider() {
+    protected IdentityProvider ensureGitLabProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
+            );
     }
 
     protected User persistUser(String login) {
-        GitProvider provider = ensureGitHubProvider();
+        IdentityProvider provider = ensureGitHubProvider();
         User user = new User();
         long nativeId = userIdGenerator.incrementAndGet();
         user.setNativeId(nativeId);

@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
@@ -65,7 +65,7 @@ class AccountControllerIntegrationTest {
     private IdentityLinkRepository identityLinkRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private HephaestusJwtIssuer jwtIssuer;
@@ -111,8 +111,8 @@ class AccountControllerIntegrationTest {
         assertThat(provisionedUser.getNativeId()).isEqualTo(GITLAB_NATIVE_ID);
         // The provider FK is lazy on the detached User; resolve it eagerly via the repository to
         // assert type / server URL without an open session.
-        GitProvider provider = gitProviderRepository.findById(seeded.gitProviderId()).orElseThrow();
-        assertThat(provider.getType()).isEqualTo(GitProviderType.GITLAB);
+        IdentityProvider provider = gitProviderRepository.findById(seeded.gitProviderId()).orElseThrow();
+        assertThat(provider.getType()).isEqualTo(IdentityProviderType.GITLAB);
         assertThat(provider.getServerUrl()).isEqualTo(gitLabProperties.defaultServerUrl());
 
         // The IdentityLink → ExternalActor wiring gap is closed: the link now points at the mirror.
@@ -123,17 +123,19 @@ class AccountControllerIntegrationTest {
     private record SeededIdentity(String token, long identityLinkId, long gitProviderId) {}
 
     private SeededIdentity seedGitLabLoginAccount() {
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElseGet(() ->
-                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl()))
+                gitProviderRepository.save(
+                    new IdentityProvider(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                )
             );
 
         Account account = accountRepository.save(new Account("GitLab User"));
 
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(provider.getId());
+        link.setProviderId(provider.getId());
         link.setSubject(String.valueOf(GITLAB_NATIVE_ID));
         link.setUsernameAtSignup(GITLAB_LOGIN);
         link.setDisplayName("GitLab User");

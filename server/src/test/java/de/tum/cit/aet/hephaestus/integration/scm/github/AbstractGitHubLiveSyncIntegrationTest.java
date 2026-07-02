@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
@@ -50,7 +50,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     protected RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
-    protected GitProviderRepository gitProviderRepository;
+    protected IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     protected ConnectionRepository connectionRepository;
@@ -67,7 +67,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
 
     protected GitHubTestFixtureService fixtureService;
     protected Workspace workspace;
-    protected GitProvider githubProvider;
+    protected IdentityProvider githubProvider;
 
     @BeforeAll
     void setUpFixtureService() {
@@ -85,8 +85,10 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         repositoriesToDelete.clear();
         teamsToDelete.clear();
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
         workspace = createWorkspace();
     }
 

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.commit;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -392,7 +392,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             DataSource.WEBHOOK,
             null,
             UUID.randomUUID().toString(),
-            GitProviderType.GITHUB
+            IdentityProviderType.GITHUB
         );
 
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));

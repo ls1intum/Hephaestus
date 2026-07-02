@@ -7,9 +7,9 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlight
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -57,7 +57,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -97,9 +97,11 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountType(AccountType.ORG);
         workspace = workspaceRepository.save(workspace);
 
-        GitProvider gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.com")));
+        IdentityProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
+            );
 
         user = new User();
         user.setNativeId(7_001L);

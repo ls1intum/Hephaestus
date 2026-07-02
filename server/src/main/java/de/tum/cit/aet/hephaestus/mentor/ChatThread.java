@@ -44,6 +44,16 @@ public class ChatThread {
     private String title;
 
     /**
+     * The surface this thread is conducted on (changelog {@code 1782980500800-1}). Existing rows backfill to
+     * {@code WEB}; a Slack DM thread is created with {@code SLACK_DM}. Value-constrained by
+     * {@code chk_chat_thread_surface}.
+     */
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "surface", nullable = false, length = 16)
+    private ThreadSurface surface = ThreadSurface.WEB;
+
+    /**
      * All messages in this thread. DB-side {@code ON DELETE CASCADE} (migration
      * {@code mentor-1071-cascade-legacy-fks}) covers parent-delete propagation in a single
      * statement; the JPA-level cascade would issue N per-row DELETEs for nothing. We keep

@@ -177,7 +177,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
     }
 
     private static ConnectionConfig.SlackConfig slackConfig(String channelId, String teamLabel) {
-        return new ConnectionConfig.SlackConfig("T1", "Acme", channelId, teamLabel, Set.of());
+        return new ConnectionConfig.SlackConfig("T1", "Acme", channelId, teamLabel, null, Set.of());
     }
 
     private static LeaderboardEntryDTO leaderboardEntry(String name) {

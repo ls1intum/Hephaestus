@@ -7,8 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
@@ -31,7 +31,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
     private OrganizationRepository organizationRepository;
 
     @Mock
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     private GitLabGroupProcessor processor;
 
@@ -45,7 +45,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
             .thenAnswer(inv -> inv.getArgument(0));
 
         // Default: provider reference (lenient — not used by null-guard tests)
-        lenient().when(gitProviderRepository.getReferenceById(PROVIDER_ID)).thenReturn(new GitProvider());
+        lenient().when(gitProviderRepository.getReferenceById(PROVIDER_ID)).thenReturn(new IdentityProvider());
     }
 
     @Nested

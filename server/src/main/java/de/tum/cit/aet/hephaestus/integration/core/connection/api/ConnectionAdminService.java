@@ -201,6 +201,7 @@ public class ConnectionAdminService {
                 /* teamName */ null,
                 /* notificationChannelId */ null,
                 /* teamLabel */ null,
+                /* retentionDays */ null,
                 enabledStreams
             );
         };

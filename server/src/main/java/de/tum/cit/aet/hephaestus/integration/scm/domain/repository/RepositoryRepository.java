@@ -89,7 +89,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * to keep the parameter count within architecture limits.
      *
      * @param nativeId       the provider's original numeric ID for the repository
-     * @param providerId     the GitProvider entity ID
+     * @param providerId     the IdentityProvider entity ID
      * @param nameWithOwner  the full name (e.g., "owner/repo")
      * @param name           the short repository name
      * @param isPrivate      whether the repository is private

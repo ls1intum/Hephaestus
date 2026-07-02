@@ -450,7 +450,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     }
 
     /**
-     * Per-area standing rows for the mentor prepared-context aspect: one row per
+     * Per-area standing rows for the mentor prepared context: one row per
      * (area, presence, assessment, severity) for a developer in the look-back window, with the
      * recent-window sub-count and the most-recent detection. The sign decision (problem vs strength)
      * is the per-observation {@code assessment} (ADR 0022): {@code BAD} is a problem, {@code GOOD} a strength.
@@ -501,7 +501,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
          * Distinct review targets (artifact_id) contributing to this row — the corroboration signal the
          * standing floor keys on (P4). One BAD on one PR is {@code 1}; the same gap on two distinct PRs is
          * {@code 2}. A single-target gap must not set MAJOR area-priority on its own (see
-         * {@code PracticeStandingAspectProvider}).
+         * {@code PracticeStandingContentSource}).
          */
         Long getDistinctTargets();
 

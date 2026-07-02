@@ -8,8 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -99,7 +99,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         project.setNumber(1);
         project.setUrl("https://github.com/orgs/test/projects/1");
 
-        GitProvider provider = new GitProvider(GitProviderType.GITHUB, "https://github.com");
+        IdentityProvider provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
         provider.setId(PROVIDER_ID);
         context = new ProcessingContext(
             SCOPE_ID,

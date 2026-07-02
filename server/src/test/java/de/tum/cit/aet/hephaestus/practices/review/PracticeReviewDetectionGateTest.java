@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -122,7 +122,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         user.setLogin(login);
         // The gate resolves the role by the stable (gitProviderId, subject) identity, not the login.
         user.setNativeId(nativeIdOf(login));
-        GitProvider provider = new GitProvider();
+        IdentityProvider provider = new IdentityProvider();
         provider.setId(TEST_PROVIDER_ID);
         user.setProvider(provider);
         return user;

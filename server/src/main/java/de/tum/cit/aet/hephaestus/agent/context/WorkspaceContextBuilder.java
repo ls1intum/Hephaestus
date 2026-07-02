@@ -18,12 +18,12 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Orchestrates {@link ContentProvider}s to materialise the AI-readable workspace context under
+ * Orchestrates {@link ContentSource}s to materialise the AI-readable workspace context under
  * {@code inputs/context/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
  * ({@code @Order} / {@code Ordered}); a per-repository {@link ReentrantLock} serialises
  * concurrent builds against the same on-disk git working tree.
  *
- * <p>Failure policy is per-provider: {@link ContentProvider#required()} failures bubble as
+ * <p>Failure policy is per-provider: {@link ContentSource#required()} failures bubble as
  * {@link JobPreparationException}; non-required failures are logged and skipped. Programmer
  * errors ({@link NullPointerException}, {@link IllegalArgumentException}, {@link IllegalStateException})
  * propagate as-is so production stack traces stay diagnostic.
@@ -41,7 +41,7 @@ public class WorkspaceContextBuilder {
     /** Number of stripes for per-repo single-flight locks. Bounded → no map-leak. */
     private static final int LOCK_STRIPES = 64;
 
-    private final List<ContentProvider> providers;
+    private final List<ContentSource> providers;
     private final MeterRegistry meterRegistry;
 
     /** Builds the integration-agnostic context manifest after the providers run; null in unit tests. */
@@ -50,11 +50,11 @@ public class WorkspaceContextBuilder {
     private final ReentrantLock[] repoLockStripes;
 
     public WorkspaceContextBuilder(
-        List<ContentProvider> providers,
+        List<ContentSource> providers,
         MeterRegistry meterRegistry,
         @Nullable ContextManifestBuilder manifestBuilder
     ) {
-        List<ContentProvider> sorted = new ArrayList<>(providers);
+        List<ContentSource> sorted = new ArrayList<>(providers);
         AnnotationAwareOrderComparator.sort(sorted);
         this.providers = List.copyOf(sorted);
         this.meterRegistry = meterRegistry;
@@ -104,7 +104,7 @@ public class WorkspaceContextBuilder {
         Map<String, String> keyOwner = new java.util.HashMap<>();
         Map<String, String> keyConnector = new java.util.HashMap<>();
         int contributed = 0;
-        for (ContentProvider provider : providers) {
+        for (ContentSource provider : providers) {
             if (!provider.supports(request)) {
                 continue;
             }
@@ -115,7 +115,7 @@ public class WorkspaceContextBuilder {
             // would otherwise replace the value in-place, and the keyOwner check below
             // (gated on `if (beforeKeys.contains(key)) continue`) would miss it.
             java.util.Set<String> beforeKeys = java.util.Set.copyOf(files.keySet());
-            // Reference-snapshot is enough: ContentProvider#contribute is required to publish
+            // Reference-snapshot is enough: ContentSource#contribute is required to publish
             // a NEW byte[] for any modification (the existing arrays are interpreted as the
             // owner's immutable output), so reference equality identifies an in-place replace.
             java.util.Map<String, byte[]> beforeValues = java.util.Map.copyOf(files);
@@ -151,9 +151,9 @@ public class WorkspaceContextBuilder {
                     }
                     continue;
                 }
-                if (!key.startsWith(ContentProvider.OUTPUT_PREFIX)) {
+                if (!key.startsWith(ContentSource.OUTPUT_PREFIX)) {
                     throw new IllegalStateException(
-                        providerName + " wrote file outside " + ContentProvider.OUTPUT_PREFIX + ": " + key
+                        providerName + " wrote file outside " + ContentSource.OUTPUT_PREFIX + ": " + key
                     );
                 }
                 // Invariant: a brand-new key (absent from beforeKeys) cannot already be owned —
@@ -162,7 +162,7 @@ public class WorkspaceContextBuilder {
                 // cross-provider duplicate detector.
                 assert keyOwner.get(key) == null : "brand-new key already owned: " + key;
                 keyOwner.put(key, providerName);
-                keyConnector.put(key, provider.connectorId());
+                keyConnector.put(key, provider.originId());
             }
             contributed++;
         }

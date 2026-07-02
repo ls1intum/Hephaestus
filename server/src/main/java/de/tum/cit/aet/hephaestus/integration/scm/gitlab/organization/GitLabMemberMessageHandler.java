@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
@@ -47,7 +47,7 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
     private final OrganizationRepository organizationRepository;
     private final OrganizationMembershipRepository membershipRepository;
     private final UserRepository userRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
 
     @Nullable
@@ -59,7 +59,7 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
         OrganizationRepository organizationRepository,
         OrganizationMembershipRepository membershipRepository,
         UserRepository userRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         @Nullable OrganizationMembershipListener membershipListener,
         NatsMessageDeserializer deserializer,
@@ -96,10 +96,10 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
         );
 
         Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElseThrow(() ->
                 new IllegalStateException(
-                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
                 )
             )
             .getId();

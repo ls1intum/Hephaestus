@@ -283,7 +283,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
         IdentityLink link = new IdentityLink();
         link.setAccount(accountRepository.findById(accountId).orElseThrow());
-        link.setGitProviderId(1L); // scalar FK column (no JPA association → no ddl-auto FK constraint)
+        link.setProviderId(1L); // scalar FK column (no JPA association → no ddl-auto FK constraint)
         link.setSubject("subject-" + accountId);
         link.setUsernameAtSignup("user" + accountId);
         identityLinkRepository.save(link);
