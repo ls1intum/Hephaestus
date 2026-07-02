@@ -46,7 +46,13 @@ public class LoginProviderService {
     // path and validate the id_token JWS via a jwkSetUri the registration never sets, which 500s the
     // callback. "read_user" alone returns id + username + email from /api/v4/user. See ADR 0017.
     static final String GITLAB_SCOPES = "read_user";
+    // "Sign in with Slack" is OIDC (unlike the SCM providers' OAuth2 flow): the id_token carries the sub +
+    // verified team_id claim. "openid" is REQUIRED here (it makes Spring take the OIDC path); the GitLab
+    // "must not contain openid" guard in sanitizeScopesOrThrow is scoped to GITLAB, so it never fires for SLACK.
+    static final String SLACK_SCOPES = "openid profile email";
     private static final String GITHUB_COM = "https://github.com";
+    // The single Slack instance. Canonical origin the seeded identity_provider + SlackMentorIdentityResolver key on.
+    private static final String SLACK_COM = "https://slack.com";
 
     private static final Logger log = LoggerFactory.getLogger(LoginProviderService.class);
 
@@ -247,6 +253,10 @@ public class LoginProviderService {
         if (type == LoginProvider.ProviderType.GITHUB) {
             return GITHUB_COM;
         }
+        if (type == LoginProvider.ProviderType.SLACK) {
+            // Slack login is slack.com only (the registration builder hardcodes the slack.com OIDC endpoints).
+            return SLACK_COM;
+        }
         String value = baseUrl == null ? "" : baseUrl.trim();
         try {
             ServerUrlValidator.validate(value);
@@ -260,7 +270,11 @@ public class LoginProviderService {
         if (scopes != null && !scopes.isBlank()) {
             return sanitizeScopesOrThrow(type, scopes);
         }
-        return type == LoginProvider.ProviderType.GITHUB ? GITHUB_SCOPES : GITLAB_SCOPES;
+        return switch (type) {
+            case GITHUB -> GITHUB_SCOPES;
+            case GITLAB -> GITLAB_SCOPES;
+            case SLACK -> SLACK_SCOPES;
+        };
     }
 
     /**

@@ -288,4 +288,36 @@
         <rollback><dropColumn tableName="slack_thread" columnName="last_reviewed_ts"/></rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-slack" id="1782980500800-14">
+        <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_one_active_slack_per_team already present">
+            <not><indexExists indexName="uq_connection_one_active_slack_per_team"/></not>
+        </preConditions>
+        <comment>
+            Partial unique over (instance_key) WHERE state = 'ACTIVE' AND kind = 'SLACK' — DB-level
+            enforcement of the "one ACTIVE Slack workspace connection per Slack team" invariant (the Slack
+            team_id is the connection instance_key, bound from the VERIFIED id_token/OAuth claim, never a URL
+            param). Mirrors uq_connection_one_active_scm_per_workspace. Data-safe: the dedup pre-step demotes
+            all-but-newest duplicate ACTIVE Slack rows per team to SUSPENDED so the unique index creation
+            cannot fail on pre-existing duplicates; history rows in other states are untouched.
+        </comment>
+        <sql>
+            UPDATE connection c
+               SET state = 'SUSPENDED',
+                   state_reason = 'superseded by newer active Slack connection (uq_connection_one_active_slack_per_team backfill)'
+             WHERE c.state = 'ACTIVE'
+               AND c.kind = 'SLACK'
+               AND c.instance_key IS NOT NULL
+               AND c.id &lt; (
+                   SELECT MAX(c2.id) FROM connection c2
+                    WHERE c2.state = 'ACTIVE' AND c2.kind = 'SLACK' AND c2.instance_key = c.instance_key
+               );
+            CREATE UNIQUE INDEX uq_connection_one_active_slack_per_team
+                ON connection (instance_key)
+                WHERE state = 'ACTIVE' AND kind = 'SLACK';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_connection_one_active_slack_per_team;</sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

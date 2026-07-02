@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
 import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +35,7 @@ public class SlackEventsController {
     private final SlackSignatureVerifier verifier;
     private final SlackMentorService mentorService;
     private final SlackIngestService ingestService;
+    private final SlackOnboardingService onboardingService;
     private final ObjectMapper objectMapper;
 
     // Slack retries un-acked events; drop duplicates by event_id (bounded).
@@ -43,11 +45,13 @@ public class SlackEventsController {
         SlackSignatureVerifier verifier,
         SlackMentorService mentorService,
         SlackIngestService ingestService,
+        SlackOnboardingService onboardingService,
         ObjectMapper objectMapper
     ) {
         this.verifier = verifier;
         this.mentorService = mentorService;
         this.ingestService = ingestService;
+        this.onboardingService = onboardingService;
         this.objectMapper = objectMapper;
     }
 
@@ -97,6 +101,13 @@ public class SlackEventsController {
         String teamId = root.path("team_id").asString("");
         JsonNode event = root.path("event");
         String eventType = event.path("type").asString("");
+        if ("app_home_opened".equals(eventType)) {
+            // Only (re)publish on the Home tab open; the Messages tab open fires the same event with tab=messages.
+            if ("home".equals(event.path("tab").asString("home"))) {
+                onboardingService.onHomeOpened(teamId, event.path("user").asString(""));
+            }
+            return;
+        }
         if (!"message".equals(eventType)) {
             return;
         }

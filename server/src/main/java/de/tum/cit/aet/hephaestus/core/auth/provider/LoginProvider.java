@@ -48,6 +48,13 @@ public class LoginProvider {
     public enum ProviderType {
         GITHUB,
         GITLAB,
+        /**
+         * "Sign in with Slack" (OIDC). A <em>link-only</em> secondary provider: it is never offered on the
+         * public login picker ({@code IdentityProviderCatalog.listRegistrations} filters it out) and is only
+         * reachable by registration id from the authenticated account-linking flow. Unlike the SCM providers
+         * it uses the OIDC path (id_token with a {@code sub} + verified {@code team_id} claim), not OAuth2.
+         */
+        SLACK,
     }
 
     @Id

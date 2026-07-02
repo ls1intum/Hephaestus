@@ -75,9 +75,13 @@ public class LoginProviderClientRegistrationRepository
 
     @Override
     public List<ClientRegistration> listRegistrations() {
+        // SLACK is a link-only (secondary) provider: it never appears on the public sign-in picker. It is
+        // still resolvable by registration id via findByRegistrationId (the authenticated account-linking
+        // flow), just not advertised for a fresh login.
         return loginProviderRepository
             .findByEnabledTrueOrderByDisplayNameAsc()
             .stream()
+            .filter(p -> p.getType() != LoginProvider.ProviderType.SLACK)
             .map(this::toRegistration)
             .toList();
     }
@@ -100,6 +104,18 @@ public class LoginProviderClientRegistrationRepository
                 .authorizationUri("https://github.com/login/oauth/authorize")
                 .tokenUri("https://github.com/login/oauth/access_token")
                 .userInfoUri("https://api.github.com/user");
+        } else if (provider.getType() == LoginProvider.ProviderType.SLACK) {
+            // "Sign in with Slack" is OIDC: the id_token carries the stable subject (sub) and the verified
+            // team_id claim that keys a Slack identity within its workspace. Setting jwkSetUri (+ the openid
+            // scope, enforced in LoginProviderService) makes Spring Security take the OIDC login path and
+            // validate the id_token JWS. userNameAttributeName MUST be "sub" — Slack has no top-level "id".
+            // Endpoints hang off the slack.com base URL (the only Slack instance).
+            builder
+                .authorizationUri(base + "/openid/connect/authorize")
+                .tokenUri(base + "/api/openid.connect.token")
+                .userInfoUri(base + "/api/openid.connect.userInfo")
+                .jwkSetUri(base + "/openid/connect/keys")
+                .userNameAttributeName("sub");
         } else {
             // GitLab (gitlab.com or self-hosted) — all endpoints hang off the instance base URL.
             builder
