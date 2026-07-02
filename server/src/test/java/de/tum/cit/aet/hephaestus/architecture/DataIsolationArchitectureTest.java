@@ -83,7 +83,14 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         // FK to avoid a Modulith cycle, mirrors Observation.agentJobId).
         "Feedback", // direct workspace_id scalar column (sfk_feedback_workspace)
         "FeedbackObservation", // through Feedback.workspace_id (and finding -> Practice.workspace)
-        "FeedbackPlacement" // through Feedback.workspace_id
+        "FeedbackPlacement", // through Feedback.workspace_id
+        // Slack integration — every table carries a direct workspace_id scalar and is therefore
+        // auto-classified scoped by WorkspaceScopedTables (absent from GLOBAL_TABLES). Listed here
+        // so a future refactor that drops the column trips slackEntitiesCarryDirectWorkspaceId().
+        "SlackMessage", // direct workspace_id scalar
+        "SlackThread", // direct workspace_id scalar
+        "SlackMonitoredChannel", // direct workspace_id scalar
+        "MentorSlackThread" // direct workspace_id scalar
     );
 
     /**
@@ -203,6 +210,55 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * <p>If an entity has a direct Workspace relationship, it should
          * use @NotNull or equivalent to prevent orphaned data.
          */
+        /**
+         * Targeted tenancy proof for the Slack integration tables (Slice 1).
+         *
+         * <p>The four {@code slack_*}/{@code mentor_slack_thread} entities are workspace-scoped by a direct
+         * {@code workspace_id} scalar column (no FK chain). This is the single assertion the finish plan calls
+         * for: each Slack entity must resolve to a real {@code workspaceId} field so {@code WorkspaceScopedTables}
+         * classifies it scoped and the {@code StatementInspector} rides a tenancy predicate on every query.
+         */
+        @Test
+        void slackEntitiesCarryDirectWorkspaceId() {
+            Set<String> slackEntities = Set.of(
+                "SlackMessage",
+                "SlackThread",
+                "SlackMonitoredChannel",
+                "MentorSlackThread"
+            );
+            ArchCondition<JavaClass> haveWorkspaceIdField = new ArchCondition<>("carry a direct workspaceId field") {
+                @Override
+                public void check(JavaClass javaClass, ConditionEvents events) {
+                    if (!slackEntities.contains(javaClass.getSimpleName())) {
+                        return;
+                    }
+                    boolean hasWorkspaceId = javaClass.getFields().stream().anyMatch(f -> f.getName().equals("workspaceId"));
+                    if (!hasWorkspaceId) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                javaClass,
+                                String.format(
+                                    "SLACK TENANCY: %s must carry a direct workspaceId field so it stays workspace-scoped. " +
+                                        "Removing it silently un-scopes Slack PII across tenants.",
+                                    javaClass.getSimpleName()
+                                )
+                            )
+                        );
+                    }
+                }
+            };
+
+            ArchRule rule = classes()
+                .that()
+                .areAnnotatedWith(jakarta.persistence.Entity.class)
+                .and()
+                .resideInAPackage(BASE_PACKAGE + "..")
+                .should(haveWorkspaceIdField)
+                .because("Slack tables hold PII and must be workspace-scoped by a direct workspace_id column");
+
+            rule.check(classes);
+        }
+
         @Test
         void directWorkspaceRelationshipsNotNullable() {
             ArchRule rule = fields()

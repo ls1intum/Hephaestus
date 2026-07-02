@@ -235,4 +235,57 @@
         <rollback><sql>DROP TABLE IF EXISTS slack_message;</sql></rollback>
     </changeSet>
 
+    <!--
+        Additive columns (Slice 1) that the channel-ingest write-path (Slice 6) and the
+        conversation-detection lane (Slice 11) compile and query against:
+          -11 slack_message.author_member_id — firewall stamp: the resolved workspace User id of the
+              message author (nullable; backfilled on identity-link). Read/written by raw JDBC in the
+              ingest/projector path, so it is deliberately NOT mapped on the SlackMessage entity.
+          -12 slack_thread.participant_member_ids — the set of resolved participant member ids used by
+              the mentor-context participant firewall (audienceMemberId = ANY(participant_member_ids)).
+              bigint[] with an explicit GIN index (btree cannot index array membership). Raw-JDBC-only
+              (unmapped on the entity) so Hibernate validate does not need array-type mapping.
+          -13 slack_thread.last_reviewed_ts — the conversation-detection watermark (a Slack ts string):
+              the ts through which the thread was last analysed, so a re-sweep with no new human turn
+              past the watermark enqueues nothing.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-11">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_message.author_member_id already present">
+            <not><columnExists tableName="slack_message" columnName="author_member_id"/></not>
+        </preConditions>
+        <comment>Firewall stamp: resolved workspace User id of the message author (nullable; backfilled on link). Raw-JDBC only.</comment>
+        <addColumn tableName="slack_message">
+            <column name="author_member_id" type="BIGINT"/>
+        </addColumn>
+        <rollback><dropColumn tableName="slack_message" columnName="author_member_id"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_thread.participant_member_ids already present">
+            <not><columnExists tableName="slack_thread" columnName="participant_member_ids"/></not>
+        </preConditions>
+        <comment>Resolved participant member ids for the mentor-context participant firewall; bigint[] + GIN for array-membership lookups.</comment>
+        <sql>
+            ALTER TABLE slack_thread ADD COLUMN participant_member_ids BIGINT[] NOT NULL DEFAULT '{}';
+            CREATE INDEX idx_slack_thread_participants ON slack_thread USING GIN (participant_member_ids);
+        </sql>
+        <rollback>
+            <sql>
+                DROP INDEX IF EXISTS idx_slack_thread_participants;
+                ALTER TABLE slack_thread DROP COLUMN IF EXISTS participant_member_ids;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-13">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_thread.last_reviewed_ts already present">
+            <not><columnExists tableName="slack_thread" columnName="last_reviewed_ts"/></not>
+        </preConditions>
+        <comment>Conversation-detection watermark: the Slack ts through which this thread was last analysed.</comment>
+        <addColumn tableName="slack_thread">
+            <column name="last_reviewed_ts" type="VARCHAR(32)"/>
+        </addColumn>
+        <rollback><dropColumn tableName="slack_thread" columnName="last_reviewed_ts"/></rollback>
+    </changeSet>
+
 </databaseChangeLog>

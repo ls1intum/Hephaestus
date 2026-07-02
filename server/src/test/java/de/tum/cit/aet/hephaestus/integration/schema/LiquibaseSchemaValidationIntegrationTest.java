@@ -104,6 +104,25 @@ class LiquibaseSchemaValidationIntegrationTest {
         // Hibernate-create schema). Query information_schema so we assert against the real catalog.
         assertColumnExists("workspace", "account_login");
         assertColumnExists("connection", "credentials_encrypted");
+
+        // Slack integration (Slice 1): the four tables + the additive columns the ingest/detection
+        // paths rely on must be present in the Liquibase-built schema, and the git_provider->
+        // identity_provider rename must have landed (data-safe rename, not drop+add).
+        assertColumnExists("slack_message", "author_member_id");
+        assertColumnExists("slack_thread", "participant_member_ids");
+        assertColumnExists("slack_thread", "last_reviewed_ts");
+        assertColumnExists("identity_provider", "type"); // table renamed from git_provider
+        assertIndexExists("idx_slack_thread_participants"); // GIN over the bigint[] participant set
+        assertIndexExists("idx_slack_message_ingest"); // drives the bounded-retention sweep
+    }
+
+    private void assertIndexExists(String indexName) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = ?",
+            Integer.class,
+            indexName
+        );
+        assertThat(count).as("Liquibase-built schema must contain index %s", indexName).isNotNull().isEqualTo(1);
     }
 
     private void assertColumnExists(String table, String column) {
