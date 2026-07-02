@@ -232,7 +232,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                     if (!slackEntities.contains(javaClass.getSimpleName())) {
                         return;
                     }
-                    boolean hasWorkspaceId = javaClass.getFields().stream().anyMatch(f -> f.getName().equals("workspaceId"));
+                    boolean hasWorkspaceId = javaClass
+                        .getFields()
+                        .stream()
+                        .anyMatch(f -> f.getName().equals("workspaceId"));
                     if (!hasWorkspaceId) {
                         events.add(
                             SimpleConditionEvent.violated(
