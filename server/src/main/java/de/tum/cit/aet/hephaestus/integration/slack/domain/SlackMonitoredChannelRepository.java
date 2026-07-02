@@ -34,4 +34,10 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
         @Param("slackTeamId") String slackTeamId,
         @Param("slackChannelId") String slackChannelId
     );
+
+    /** Workspace purge: delete every allow-list row for one workspace (S2). Derived DELETE carries the predicate. */
+    long deleteByWorkspaceId(Long workspaceId);
+
+    /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
+    long countByWorkspaceId(Long workspaceId);
 }

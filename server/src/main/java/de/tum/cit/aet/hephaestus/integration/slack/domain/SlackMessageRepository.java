@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -16,6 +17,21 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
 
     /** Bounded-retention sweep: delete every message ingested before {@code cutoff} for one workspace (D10). */
     long deleteByWorkspaceIdAndIngestedAtBefore(Long workspaceId, Instant cutoff);
+
+    /** Workspace purge: delete every ingested message for one workspace (S2). Derived DELETE carries the predicate. */
+    long deleteByWorkspaceId(Long workspaceId);
+
+    /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
+    long countByWorkspaceId(Long workspaceId);
+
+    /**
+     * Retention-sweep fan-out: every workspace that currently has at least one ingested message. Native +
+     * unscoped by design (the {@link de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper}
+     * runs {@code @WorkspaceAgnostic}, so the tenancy {@code StatementInspector} treats this as exempt). Callers
+     * outside a bypass scope will trip the inspector — that is intentional.
+     */
+    @Query(value = "SELECT DISTINCT workspace_id FROM slack_message", nativeQuery = true)
+    List<Long> findDistinctWorkspaceIds();
 
     /**
      * Idempotent ingest: insert the rendered message and no-op on the unique

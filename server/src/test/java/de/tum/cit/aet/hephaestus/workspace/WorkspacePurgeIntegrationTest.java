@@ -8,18 +8,29 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -51,6 +62,24 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
+
+    @Autowired
+    private SlackMessageRepository slackMessageRepository;
+
+    @Autowired
+    private SlackThreadRepository slackThreadRepository;
+
+    @Autowired
+    private SlackMonitoredChannelRepository slackMonitoredChannelRepository;
+
+    @Autowired
+    private MentorSlackThreadRepository mentorSlackThreadRepository;
+
+    @Autowired
+    private SlackRetentionSweeper slackRetentionSweeper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     // Helpers
 
@@ -385,6 +414,125 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // Workspace should still be ACTIVE (purge was denied)
             Workspace unchanged = workspaceRepository.findById(workspace.getId()).orElseThrow();
             assertThat(unchanged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
+        }
+    }
+
+    // Slack purge + retention (S2)
+
+    @Nested
+    class SlackCleanup {
+
+        private Workspace createBareWorkspace(String slug) {
+            User owner = persistUser(slug + "-owner");
+            return workspaceService.createWorkspace(
+                new CreateWorkspaceRequestDTO(
+                    slug,
+                    "Slack Test " + slug,
+                    slug + "-group",
+                    AccountType.ORG,
+                    owner.getId(),
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                    "glpat-slack-test-token",
+                    null
+                )
+            );
+        }
+
+        /** Insert one ingested Slack message with a controlled {@code ingested_at} (native — bypasses @CreationTimestamp). */
+        private void insertMessage(Long workspaceId, String slackTs, Instant ingestedAt) {
+            jdbcTemplate.update(
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, ingested_at) " +
+                    "VALUES (?, ?, ?, ?, ?)",
+                workspaceId,
+                "T1",
+                "C1",
+                slackTs,
+                Timestamp.from(ingestedAt)
+            );
+        }
+
+        /** Seed one row into each of the three non-message Slack tables for the workspace. */
+        private void seedAggregates(Workspace workspace, String channelId, String threadTs) {
+            Long workspaceId = workspace.getId();
+            SlackThread thread = new SlackThread();
+            thread.setWorkspaceId(workspaceId);
+            thread.setSlackChannelId(channelId);
+            thread.setSlackThreadTs(threadTs);
+            slackThreadRepository.save(thread);
+
+            SlackMonitoredChannel channel = new SlackMonitoredChannel();
+            channel.setWorkspaceId(workspaceId);
+            channel.setSlackTeamId("T1");
+            channel.setSlackChannelId(channelId);
+            channel.setConsentState(SlackMonitoredChannel.ConsentState.PENDING);
+            channel.setBackfillState(SlackMonitoredChannel.BackfillState.NONE);
+            slackMonitoredChannelRepository.save(channel);
+
+            // mentor_slack_thread.chat_thread_id is a NOT NULL FK → chat_thread(id); seed a real thread first.
+            User owner = persistUser(channelId + "-mentor-owner");
+            ChatThread chatThread = new ChatThread();
+            chatThread.setId(UUID.randomUUID());
+            chatThread.setTitle("Slack DM " + channelId);
+            chatThread.setWorkspace(workspace);
+            chatThread.setUser(owner);
+            chatThreadRepository.save(chatThread);
+
+            MentorSlackThread mentorThread = new MentorSlackThread();
+            mentorThread.setId(UUID.randomUUID());
+            mentorThread.setWorkspaceId(workspaceId);
+            mentorThread.setChatThreadId(chatThread.getId());
+            mentorThread.setSlackTeamId("T1");
+            mentorThread.setSlackChannelId(channelId);
+            mentorThread.setSlackUserId("U1");
+            mentorSlackThreadRepository.save(mentorThread);
+        }
+
+        @Test
+        @DisplayName("retention sweep deletes only messages older than the default window, per workspace")
+        void retentionSweepDeletesOnlyExpiredMessages() {
+            // Arrange — workspace A has recent + expired rows; workspace B has only a recent row.
+            // Neither workspace has a Slack Connection, so both resolve to DEFAULT_RETENTION_DAYS (30d).
+            Instant now = Instant.now();
+            Workspace a = createBareWorkspace("slack-retain-a");
+            Workspace b = createBareWorkspace("slack-retain-b");
+            insertMessage(a.getId(), "100.1", now);
+            insertMessage(a.getId(), "100.2", now.minus(Duration.ofDays(40)));
+            insertMessage(a.getId(), "100.3", now.minus(Duration.ofDays(200)));
+            insertMessage(b.getId(), "200.1", now);
+
+            // Act
+            slackRetentionSweeper.sweepNow();
+
+            // Assert — only the two expired rows in A are gone; A's recent row and all of B survive.
+            assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isEqualTo(1);
+            assertThat(slackMessageRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("purge empties every Slack table for the workspace while other workspaces stay intact")
+        void purgeEmptiesAllSlackTables() {
+            // Arrange — seed all four Slack tables for both A and B.
+            Instant now = Instant.now();
+            Workspace a = createBareWorkspace("slack-purge-a");
+            Workspace b = createBareWorkspace("slack-purge-b");
+            insertMessage(a.getId(), "300.1", now);
+            insertMessage(b.getId(), "400.1", now);
+            seedAggregates(a, "CA", "300.1");
+            seedAggregates(b, "CB", "400.1");
+
+            // Act
+            workspaceLifecycleService.purgeWorkspace(a.getWorkspaceSlug());
+
+            // Assert — A's four Slack tables are empty; B's rows are untouched.
+            assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isZero();
+            assertThat(slackThreadRepository.countByWorkspaceId(a.getId())).isZero();
+            assertThat(slackMonitoredChannelRepository.countByWorkspaceId(a.getId())).isZero();
+            assertThat(mentorSlackThreadRepository.countByWorkspaceId(a.getId())).isZero();
+
+            assertThat(slackMessageRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+            assertThat(slackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+            assertThat(slackMonitoredChannelRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+            assertThat(mentorSlackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
         }
     }
 }
