@@ -22,17 +22,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Slack App Home onboarding: when a workspace member opens the Hephaestus App Home and is not yet
- * linked, surface a single "Link Slack" call-to-action that deep-links into the authenticated account-linking
- * flow ({@code /auth/login?provider=slack&mode=link}). Linking there attaches a {@code SLACK} identity to the
- * signed-in account, after which {@link SlackMentorIdentityResolver} can resolve the member's SCM work.
+ * Owns the "Link Slack" call-to-action: when a workspace member who has not yet linked their identity opens
+ * the Hephaestus App Home, deliver a single CTA to their DM (via {@link SlackMessageService}) that deep-links
+ * into the authenticated account-linking flow ({@code /auth/login?provider=slack&mode=link}). Linking there
+ * attaches a {@code SLACK} identity to the signed-in account, after which {@link SlackMentorIdentityResolver}
+ * can resolve the member's SCM work. The CTA is idempotently gated on "not yet linked", so an already-linked
+ * member is never nudged.
  *
- * <p>Scope is deliberately the CTA only. The privacy disclosure block, the research-participation consent
- * toggle, and quiet-hours are deferred — no write path yet.
- *
- * <p>The live {@code views.publish} App Home render is deferred; for now the CTA is delivered to the
- * opening user's DM via {@link SlackMessageService}, which is the only outbound surface that exists today.
- * The CTA is idempotently gated on "not yet linked", so an already-linked member is never nudged.
+ * <p>This service owns only the CTA blocks and their DM delivery. The persistent Home tab — the privacy
+ * disclosure and the research-participation consent toggle — is rendered by {@link SlackAppHomeService} via
+ * {@code views.publish}, which reuses {@link #linkCtaBlocks()} to lead an unlinked member with the same CTA.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)

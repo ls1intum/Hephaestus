@@ -27,8 +27,8 @@ import org.mockito.Mock;
 
 /**
  * App Home render. Deterministic: the {@code views.publish} round-trip is mocked, so these lock the view
- * assembly (disclosure + research-consent toggle reflecting current state + quiet-hours) and the linked/unlinked
- * routing (an unlinked member leads with the link CTA, no toggle).
+ * assembly (disclosure + research-consent toggle reflecting current state) and the linked/unlinked routing
+ * (an unlinked member leads with the link CTA, no toggle). The unwired quiet-hours control is asserted absent.
  */
 class SlackAppHomeServiceTest extends BaseUnitTest {
 
@@ -61,7 +61,7 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void linkedParticipatingMember_rendersDisclosureOptOutToggleAndQuietHours() {
+    void linkedParticipatingMember_rendersDisclosureAndOptOutToggle_noQuietHours() {
         when(identityResolver.resolveDeveloperLogin(7L, "T1", "U1")).thenReturn(Optional.of("octocat"));
         when(preferencesQuery.preferencesForLogin("octocat")).thenReturn(Optional.of(new PreferencesView(true, true)));
 
@@ -72,8 +72,9 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
         assertThat(rendered).contains("Your privacy"); // disclosure
         assertThat(rendered).contains(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT); // participating → offer opt-out
         assertThat(rendered).doesNotContain(SlackAppHomeService.ACTION_RESEARCH_OPT_IN);
-        assertThat(rendered).contains("Quiet hours");
-        assertThat(rendered).contains(SlackAppHomeService.ACTION_QUIET_HOURS);
+        // The unwired quiet-hours control must not reach users until its write path exists.
+        assertThat(rendered).doesNotContain("open_quiet_hours");
+        assertThat(rendered).doesNotContain("Quiet hours");
     }
 
     @Test

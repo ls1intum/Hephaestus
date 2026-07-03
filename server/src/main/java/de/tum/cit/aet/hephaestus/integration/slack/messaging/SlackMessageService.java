@@ -155,7 +155,7 @@ public class SlackMessageService {
 
     /**
      * Publish (replace) the App Home tab view for one member via {@code views.publish}. The seam the App
-     * Home (disclosure + research-consent toggle + quiet-hours) renders through — the sibling of
+     * Home (disclosure + research-consent toggle) renders through — the sibling of
      * {@code chat.postMessage} for the Home surface. Throws {@link SlackSendException} carrying the Slack
      * error so the caller can log-and-swallow (App Home render is best-effort, like the onboarding CTA).
      */

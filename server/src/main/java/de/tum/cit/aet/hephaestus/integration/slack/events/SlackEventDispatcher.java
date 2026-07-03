@@ -74,7 +74,7 @@ public class SlackEventDispatcher {
                 // retry storm. Offload off the ACK thread (best-effort: a dropped render re-fires on the next open).
                 offload(
                     () -> {
-                        // publish the persistent Home tab (disclosure + research-consent toggle + quiet-hours).
+                        // publish the persistent Home tab (disclosure + research-consent toggle).
                         appHomeService.onHomeOpened(teamId, slackUserId);
                         // the DM link CTA for a not-yet-linked member (no-op once linked).
                         onboardingService.onHomeOpened(teamId, slackUserId);

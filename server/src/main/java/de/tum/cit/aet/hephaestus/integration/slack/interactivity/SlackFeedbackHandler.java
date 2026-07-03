@@ -159,7 +159,7 @@ public class SlackFeedbackHandler {
                     slackUserId,
                     true
                 );
-                // Quiet hours is rendered on the App Home but its write path is deferred (unbuilt) — no-op today.
+                // Defensive fallback for any action_id we do not (yet) route — logged and ignored.
                 default -> log.debug("slack.interactivity: unhandled action_id {}", actionId);
             }
         }
