@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,17 +42,20 @@ public class SlackUninstallService {
     private final ConnectionService connectionService;
     private final SlackWorkspacePurgeAdapter purgeAdapter;
     private final MentorSlackThreadService mentorSlackThreadService;
+    private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     public SlackUninstallService(
         SlackWorkspaceResolver workspaceResolver,
         ConnectionService connectionService,
         SlackWorkspacePurgeAdapter purgeAdapter,
-        MentorSlackThreadService mentorSlackThreadService
+        MentorSlackThreadService mentorSlackThreadService,
+        ConversationFeedbackErasure conversationFeedbackErasure
     ) {
         this.workspaceResolver = workspaceResolver;
         this.connectionService = connectionService;
         this.purgeAdapter = purgeAdapter;
         this.mentorSlackThreadService = mentorSlackThreadService;
+        this.conversationFeedbackErasure = conversationFeedbackErasure;
     }
 
     /**
@@ -85,15 +89,21 @@ public class SlackUninstallService {
                     )
                 )
             );
+        // Erase the derived CONVERSATION_THREAD observations/feedback (composed over this workspace's Slack threads)
+        // BEFORE dropping the slack_* tables — those aggregates are the artifact the derived rows point at, and the
+        // five slack_* tables alone would leave the derived practice rows behind on an uninstall (a common GDPR
+        // erasure trigger). Scoped to CONVERSATION_THREAD + this workspace; idempotent, so a redelivery is a no-op.
+        int erasedConversationRows = conversationFeedbackErasure.eraseAllConversationForWorkspace(workspaceId);
         purgeAdapter.deleteWorkspaceData(workspaceId);
         // Also erase the derived Slack-originated mentor DM conversation (SLACK_DM chat_thread/chat_message rows);
         // the slack_* tables alone would leave it behind. Idempotent, so a Slack uninstall redelivery is a no-op.
         int purgedThreads = mentorSlackThreadService.purgeSlackThreads(workspaceId);
         log.info(
-            "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} mentor DM threads erased)",
+            "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} conversation-derived practice rows erased, {} mentor DM threads erased)",
             eventType,
             teamId,
             workspaceId,
+            erasedConversationRows,
             purgedThreads
         );
     }

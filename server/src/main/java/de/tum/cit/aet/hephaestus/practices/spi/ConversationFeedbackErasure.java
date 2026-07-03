@@ -33,4 +33,35 @@ public interface ConversationFeedbackErasure {
      * @return the number of observation + feedback rows deleted
      */
     int eraseForThreads(long workspaceId, Collection<Long> slackThreadIds);
+
+    /**
+     * Hard-delete <em>every</em> {@code CONVERSATION_THREAD} observation and feedback unit for {@code workspaceId},
+     * regardless of which {@code slack_thread} the row is anchored to — the whole-tenant erasure a source module
+     * invokes when the entire Slack surface is being torn down (app uninstall, workspace purge). Feedback is deleted
+     * first so its DB-level {@code ON DELETE CASCADE} clears the bound {@code feedback_observation} /
+     * {@code feedback_placement} / {@code feedback_reaction} rows, then the observations. Transactional, idempotent (a
+     * workspace with no conversation-derived rows deletes nothing), and strictly scoped to
+     * {@code artifact_type = CONVERSATION_THREAD} + {@code workspaceId} — PR/ISSUE rows and other tenants' rows are
+     * never touched (the artifact-type and workspace predicates are both load-bearing).
+     *
+     * @param workspaceId the tenant whose conversation-derived rows are being erased
+     * @return the number of observation + feedback rows deleted
+     */
+    int eraseAllConversationForWorkspace(long workspaceId);
+
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} observations and feedback that a single person is the <em>subject</em>
+     * of within {@code workspaceId} — the derived-content half of a person opt-out or account hard-delete. Feedback is
+     * matched on {@code feedback.about_user_id = aboutUserId} and observations on
+     * {@code observation.about_user_id = aboutUserId} (ADR 0022: the about-user is who the row is filed against, not
+     * who it is delivered to). Feedback is deleted first so its {@code ON DELETE CASCADE} clears the join/placement/
+     * reaction children, then the observations. Transactional, idempotent, and strictly scoped to
+     * {@code artifact_type = CONVERSATION_THREAD} + {@code workspaceId} + {@code about_user_id = aboutUserId} — another
+     * person's rows, PR/ISSUE rows, and other tenants' rows are all left intact (all three predicates are load-bearing).
+     *
+     * @param workspaceId the tenant the derived rows must belong to
+     * @param aboutUserId the subject ({@code about_user_id}) whose conversation-derived rows are being erased
+     * @return the number of observation + feedback rows deleted
+     */
+    int eraseConversationFeedbackAboutUser(long workspaceId, long aboutUserId);
 }

@@ -90,6 +90,57 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      */
     long deleteByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
 
+    /**
+     * Retention sweep: the ids of every thread aggregate for a workspace that has gone cold — its most recent
+     * activity ({@code last_ts}, the newest message in the thread) is strictly older than {@code cutoffTs}.
+     * Because {@code last_ts} is the maximum message {@code ts} in the thread, "last_ts older than the cutoff" is
+     * exactly "every message in the thread is older than the cutoff", so the whole thread (raw messages, the
+     * {@code participant_member_ids} aggregate, and the derived CONVERSATION feedback) can be erased together.
+     *
+     * <p>{@code cutoffTs} is the retention cutoff rendered as a Slack {@code ts} string
+     * ({@code <10-digit-epoch-seconds>.000000}); the comparison is lexicographic, which equals numeric ordering for
+     * the fixed {@code <10-digit>.<6-digit>} Slack {@code ts} format (the same invariant {@link #upsertOnMessage}
+     * relies on). {@code last_ts} is always populated on ingest, so a NULL guard is unnecessary. Carries the
+     * {@code workspace_id} predicate the tenancy inspector requires.
+     */
+    @Query(
+        "SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.lastTs IS NOT NULL AND t.lastTs < :cutoffTs"
+    )
+    List<Long> findAgedThreadIds(@Param("workspaceId") Long workspaceId, @Param("cutoffTs") String cutoffTs);
+
+    /**
+     * Retention sweep: drop a set of aged thread aggregates for a workspace after their derived CONVERSATION feedback
+     * has already been erased through the practices port. Carries the {@code workspace_id} predicate the tenancy
+     * inspector requires; idempotent (0 when the id set is empty / already gone). Callers guard an empty collection.
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.id IN :ids")
+    int deleteByWorkspaceIdAndIdIn(
+        @Param("workspaceId") Long workspaceId,
+        @Param("ids") java.util.Collection<Long> ids
+    );
+
+    /**
+     * Person erasure (opt-out / account hard-delete): drop one member's id out of every thread's
+     * {@code participant_member_ids} for a workspace via {@code array_remove}. The append-only participant array
+     * otherwise keeps a person's id (and, on id reuse, their thread visibility) after they leave — this prunes it.
+     * The {@code :memberId = ANY(participant_member_ids)} guard narrows the write set to rows that actually contain
+     * the member (the GIN index on the array serves it), so unaffected threads are not rewritten. Native (the
+     * {@code participant_member_ids} {@code bigint[]} is unmapped on the entity) and workspace-scoped. Idempotent
+     * (0 when no thread references the member).
+     *
+     * @return the number of thread aggregates pruned
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE slack_thread SET participant_member_ids = array_remove(participant_member_ids, :memberId) " +
+            "WHERE workspace_id = :workspaceId AND :memberId = ANY(participant_member_ids)",
+        nativeQuery = true
+    )
+    int pruneParticipant(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
+
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
     long countByWorkspaceId(Long workspaceId);
 }

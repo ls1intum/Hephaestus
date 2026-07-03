@@ -13,11 +13,14 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 
 /**
  * Uninstall-routing unit tests: an {@code app_uninstalled}/{@code tokens_revoked} event flips the Slack
@@ -41,10 +44,19 @@ class SlackUninstallServiceTest extends BaseUnitTest {
     private MentorSlackThreadService mentorSlackThreadService;
 
     @Mock
+    private ConversationFeedbackErasure conversationFeedbackErasure;
+
+    @Mock
     private Connection connection;
 
     private SlackUninstallService service() {
-        return new SlackUninstallService(workspaceResolver, connectionService, purgeAdapter, mentorSlackThreadService);
+        return new SlackUninstallService(
+            workspaceResolver,
+            connectionService,
+            purgeAdapter,
+            mentorSlackThreadService,
+            conversationFeedbackErasure
+        );
     }
 
     @Test
@@ -60,8 +72,14 @@ class SlackUninstallServiceTest extends BaseUnitTest {
         verify(connectionService).transition(eq(connection), captor.capture());
         assertThat(captor.getValue().next()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(captor.getValue().eventType()).isEqualTo("APP_UNINSTALLED");
+        // The derived CONVERSATION_THREAD observations/feedback are erased for the workspace, BEFORE the slack_*
+        // tables are dropped (the aggregates are the artifact the derived rows point at).
+        verify(conversationFeedbackErasure).eraseAllConversationForWorkspace(WORKSPACE);
         // Content is purged after the connection flip (adapter reused).
         verify(purgeAdapter).deleteWorkspaceData(WORKSPACE);
+        InOrder order = Mockito.inOrder(conversationFeedbackErasure, purgeAdapter);
+        order.verify(conversationFeedbackErasure).eraseAllConversationForWorkspace(WORKSPACE);
+        order.verify(purgeAdapter).deleteWorkspaceData(WORKSPACE);
         // The derived Slack-originated mentor DM content (SLACK_DM chat_thread/chat_message) is erased too.
         verify(mentorSlackThreadService).purgeSlackThreads(WORKSPACE);
     }
@@ -90,6 +108,6 @@ class SlackUninstallServiceTest extends BaseUnitTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any()
         );
-        verifyNoInteractions(purgeAdapter, mentorSlackThreadService);
+        verifyNoInteractions(purgeAdapter, mentorSlackThreadService, conversationFeedbackErasure);
     }
 }

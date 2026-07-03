@@ -86,6 +86,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
     private Practice practiceB;
     private User recipientA;
     private User recipientB;
+    private User recipientC;
     private AgentJob jobA;
     private AgentJob jobB;
 
@@ -103,6 +104,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         practiceB = savePractice(workspaceB);
         recipientA = userRepository.save(TestUserFactory.createUser(100L, "recipient-a", provider));
         recipientB = userRepository.save(TestUserFactory.createUser(200L, "recipient-b", provider));
+        recipientC = userRepository.save(TestUserFactory.createUser(300L, "recipient-c", provider));
         jobA = newJob(workspaceA);
         jobB = newJob(workspaceB);
     }
@@ -169,6 +171,125 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
         // The join rows of the two erased conversation feedback units cascaded away; the 2 survivors' joins remain.
         assertThat(feedbackObservationRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName(
+        "eraseAllConversationForWorkspace deletes every CONVERSATION row for the workspace; PR + other tenant survive"
+    )
+    void eraseAllConversationForWorkspaceScopedToTenantAndArtifactType() {
+        // Workspace A: two CONVERSATION threads (different artifact ids) + one PR unit (must survive).
+        UUID convObs1 = seedBoundObservationAndFeedback(
+            jobA,
+            practiceA,
+            recipientA,
+            WorkArtifact.CONVERSATION_THREAD,
+            8001L
+        );
+        UUID convFb1 = lastFeedbackId;
+        UUID convObs2 = seedBoundObservationAndFeedback(
+            jobA,
+            practiceA,
+            recipientA,
+            WorkArtifact.CONVERSATION_THREAD,
+            8002L
+        );
+        UUID convFb2 = lastFeedbackId;
+        UUID prObs = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, WorkArtifact.PULL_REQUEST, 8001L);
+        UUID prFb = lastFeedbackId;
+
+        // Workspace B: a CONVERSATION unit — a different tenant, MUST survive.
+        UUID otherWsObs = seedBoundObservationAndFeedback(
+            jobB,
+            practiceB,
+            recipientB,
+            WorkArtifact.CONVERSATION_THREAD,
+            8003L
+        );
+        UUID otherWsFb = lastFeedbackId;
+
+        assertThat(feedbackObservationRepository.count()).isEqualTo(4);
+
+        int deleted = erasure.eraseAllConversationForWorkspace(workspaceA.getId());
+
+        // 2 conversation observations + 2 conversation feedback units deleted (NOT the PR unit).
+        assertThat(deleted).isEqualTo(4);
+        assertThat(observationRepository.findById(convObs1)).isEmpty();
+        assertThat(observationRepository.findById(convObs2)).isEmpty();
+        assertThat(feedbackRepository.findById(convFb1)).isEmpty();
+        assertThat(feedbackRepository.findById(convFb2)).isEmpty();
+
+        // PR row (same workspace, different artifact type) survives…
+        assertThat(observationRepository.findById(prObs)).isPresent();
+        assertThat(feedbackRepository.findById(prFb)).isPresent();
+        // …and the other tenant's conversation row survives.
+        assertThat(observationRepository.findById(otherWsObs)).isPresent();
+        assertThat(feedbackRepository.findById(otherWsFb)).isPresent();
+
+        assertThat(feedbackObservationRepository.count()).isEqualTo(2);
+        // Idempotent: a second whole-workspace erasure is a no-op.
+        assertThat(erasure.eraseAllConversationForWorkspace(workspaceA.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName(
+        "eraseConversationFeedbackAboutUser deletes only that subject's CONVERSATION rows; other user + PR/ISSUE + other tenant survive"
+    )
+    void eraseConversationFeedbackAboutUserScopedToSubject() {
+        // Workspace A, subject = recipientA: one CONVERSATION unit (target) + one PR unit + one ISSUE unit (survive).
+        UUID convObsA = seedBoundObservationAndFeedback(
+            jobA,
+            practiceA,
+            recipientA,
+            WorkArtifact.CONVERSATION_THREAD,
+            9001L
+        );
+        UUID convFbA = lastFeedbackId;
+        UUID prObsA = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, WorkArtifact.PULL_REQUEST, 9001L);
+        UUID prFbA = lastFeedbackId;
+        UUID issueObsA = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, WorkArtifact.ISSUE, 9002L);
+        UUID issueFbA = lastFeedbackId;
+
+        // Workspace A, subject = recipientC: a CONVERSATION unit for a DIFFERENT person — MUST survive.
+        UUID convObsOther = seedBoundObservationAndFeedback(
+            jobA,
+            practiceA,
+            recipientC,
+            WorkArtifact.CONVERSATION_THREAD,
+            9003L
+        );
+        UUID convFbOther = lastFeedbackId;
+
+        // Workspace B, subject = recipientA (same user id, different tenant): a CONVERSATION unit — MUST survive.
+        UUID convObsWsB = seedBoundObservationAndFeedback(
+            jobB,
+            practiceB,
+            recipientA,
+            WorkArtifact.CONVERSATION_THREAD,
+            9004L
+        );
+        UUID convFbWsB = lastFeedbackId;
+
+        int deleted = erasure.eraseConversationFeedbackAboutUser(workspaceA.getId(), recipientA.getId());
+
+        // Exactly recipientA's single CONVERSATION observation + feedback in workspace A.
+        assertThat(deleted).isEqualTo(2);
+        assertThat(observationRepository.findById(convObsA)).isEmpty();
+        assertThat(feedbackRepository.findById(convFbA)).isEmpty();
+
+        // recipientA's PR + ISSUE units (same subject, different artifact type) survive.
+        assertThat(observationRepository.findById(prObsA)).isPresent();
+        assertThat(feedbackRepository.findById(prFbA)).isPresent();
+        assertThat(observationRepository.findById(issueObsA)).isPresent();
+        assertThat(feedbackRepository.findById(issueFbA)).isPresent();
+
+        // The other person's conversation row (same workspace) survives.
+        assertThat(observationRepository.findById(convObsOther)).isPresent();
+        assertThat(feedbackRepository.findById(convFbOther)).isPresent();
+
+        // The same user's conversation row in another tenant survives.
+        assertThat(observationRepository.findById(convObsWsB)).isPresent();
+        assertThat(feedbackRepository.findById(convFbWsB)).isPresent();
     }
 
     @Test

@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
@@ -18,6 +21,17 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -79,7 +93,30 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private SlackRetentionSweeper slackRetentionSweeper;
 
     @Autowired
+    private de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter slackWorkspacePurgeAdapter;
+
+    @Autowired
+    private PracticeRepository practiceRepository;
+
+    @Autowired
+    private ObservationRepository observationRepository;
+
+    @Autowired
+    private FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private FeedbackObservationRepository feedbackObservationRepository;
+
+    @Autowired
+    private AgentJobRepository agentJobRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    private static final tools.jackson.databind.ObjectMapper OM = new tools.jackson.databind.ObjectMapper();
 
     // Helpers
 
@@ -532,6 +569,106 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(slackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
             assertThat(slackMonitoredChannelRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
             assertThat(mentorSlackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName(
+            "SlackWorkspacePurgeAdapter erases the workspace's derived CONVERSATION rows; another workspace's survive"
+        )
+        void purgeAdapterErasesDerivedConversationRows() {
+            Workspace a = createBareWorkspace("slack-conv-a");
+            Workspace b = createBareWorkspace("slack-conv-b");
+
+            // Seed a slack_thread + its derived CONVERSATION_THREAD observation/feedback for each workspace.
+            SlackThread threadA = new SlackThread();
+            threadA.setWorkspaceId(a.getId());
+            threadA.setSlackChannelId("CA");
+            threadA.setSlackThreadTs("500.1");
+            threadA = slackThreadRepository.save(threadA);
+            java.util.UUID convObsA = seedDerivedConversation(a, threadA.getId());
+
+            SlackThread threadB = new SlackThread();
+            threadB.setWorkspaceId(b.getId());
+            threadB.setSlackChannelId("CB");
+            threadB.setSlackThreadTs("600.1");
+            threadB = slackThreadRepository.save(threadB);
+            java.util.UUID convObsB = seedDerivedConversation(b, threadB.getId());
+
+            // Act — drive the Slack purge contributor for A in isolation (the real chain wraps the contributors in
+            // one transaction, so mirror that with a TransactionTemplate). It is the explicit
+            // eraseAllConversationForWorkspace call (not the practices contributor) that must erase the derived rows
+            // here, so this fails if that port call is removed from the adapter.
+            org.springframework.transaction.support.TransactionTemplate tx =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+            tx.executeWithoutResult(status -> slackWorkspacePurgeAdapter.deleteWorkspaceData(a.getId()));
+
+            // A's derived CONVERSATION rows are erased; B's remain intact (tenant scoping).
+            assertThat(observationRepository.findById(convObsA)).isEmpty();
+            assertThat(observationRepository.findById(convObsB)).isPresent();
+            // Idempotent: a second contributor pass (double-delete) is a no-op.
+            tx.executeWithoutResult(status -> slackWorkspacePurgeAdapter.deleteWorkspaceData(a.getId()));
+            assertThat(observationRepository.findById(convObsB)).isPresent();
+        }
+
+        /** Seed a CONVERSATION_THREAD observation + feedback + join anchored to {@code threadId} for {@code workspace}. */
+        private java.util.UUID seedDerivedConversation(Workspace workspace, long threadId) {
+            User owner = persistUser("conv-" + workspace.getId() + "-subject");
+            Practice practice = new Practice();
+            practice.setWorkspace(workspace);
+            practice.setSlug("conv-practice-" + workspace.getId());
+            practice.setName("Conversation Practice");
+            practice.setCriteria("Test description");
+            practice.setTriggerEvents(OM.valueToTree(java.util.List.of("PullRequestCreated")));
+            practice = practiceRepository.save(practice);
+
+            AgentJob job = new AgentJob();
+            job.setWorkspace(workspace);
+            job.setJobType(AgentJobType.CONVERSATION_REVIEW);
+            job.setConfigSnapshot(OM.valueToTree(java.util.Map.of("model", "test")));
+            job = agentJobRepository.save(job);
+
+            java.util.UUID observationId = java.util.UUID.randomUUID();
+            observationRepository.insertIfAbsent(
+                observationId,
+                "occ-" + observationId,
+                job.getId(),
+                practice.getId(),
+                null,
+                WorkArtifact.CONVERSATION_THREAD.name(),
+                threadId,
+                owner.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                0.8f,
+                null,
+                null,
+                null,
+                Instant.now()
+            );
+            Feedback feedback = feedbackRepository.save(
+                Feedback.builder()
+                    .agentJobId(job.getId())
+                    .workspaceId(workspace.getId())
+                    .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                    .artifactId(threadId)
+                    .recipientUserId(owner.getId())
+                    .aboutUserId(owner.getId())
+                    .channel(FeedbackChannel.CONVERSATION)
+                    .position(0)
+                    .deliveryState(FeedbackDeliveryState.PREPARED)
+                    .source(FeedbackSource.AGENT)
+                    .createdAt(Instant.now())
+                    .build()
+            );
+            feedbackObservationRepository.insertIfAbsent(
+                feedback.getId(),
+                observationId,
+                EvidenceRole.PRIMARY.name(),
+                0
+            );
+            return observationId;
         }
     }
 }

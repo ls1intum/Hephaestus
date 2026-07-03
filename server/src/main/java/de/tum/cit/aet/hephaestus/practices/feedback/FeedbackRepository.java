@@ -154,6 +154,54 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         @Param("artifactIds") java.util.Collection<Long> artifactIds
     );
 
+    /**
+     * Hard-delete <em>every</em> {@code CONVERSATION_THREAD} feedback unit for a workspace — the whole-tenant erasure
+     * the Slack module invokes through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
+     * app-uninstall / workspace-purge. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} /
+     * {@code feedback_placement} / {@code feedback_reaction}. The {@code workspace_id} + {@code artifact_type}
+     * predicates keep it scoped so no PR/ISSUE unit and no other-tenant row is affected. Idempotent (0 when the
+     * workspace has no conversation feedback).
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+        """
+    )
+    int deleteAllConversationThreadFeedback(@Param("workspaceId") Long workspaceId);
+
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} feedback a single person is the <em>subject</em> of
+     * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
+     * account hard-delete, invoked through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
+     * DB {@code ON DELETE CASCADE} clears the join/placement/reaction children. The {@code workspace_id} +
+     * {@code artifact_type} + {@code about_user_id} predicates keep another person's rows, PR/ISSUE rows, and other
+     * tenants' rows intact. Idempotent.
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.aboutUserId = :aboutUserId
+        """
+    )
+    int deleteConversationThreadFeedbackAboutUser(
+        @Param("workspaceId") Long workspaceId,
+        @Param("aboutUserId") Long aboutUserId
+    );
+
     // --- conversational feedback delivery loop ---
 
     /**

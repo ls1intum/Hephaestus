@@ -62,4 +62,44 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
         }
         return feedbackDeleted + observationsDeleted;
     }
+
+    @Override
+    @Transactional
+    public int eraseAllConversationForWorkspace(long workspaceId) {
+        // Feedback first (its ON DELETE CASCADE cleans the join/placement/reaction children), then observations.
+        // Both pin CONVERSATION_THREAD + workspace, so no PR/ISSUE or cross-tenant row is in range.
+        int feedbackDeleted = feedbackRepository.deleteAllConversationThreadFeedback(workspaceId);
+        int observationsDeleted = observationRepository.deleteAllConversationThreadObservations(workspaceId);
+        if (feedbackDeleted > 0 || observationsDeleted > 0) {
+            log.info(
+                "Erased all conversation-derived practice rows for workspace: workspaceId={}, feedback={}, observations={}",
+                workspaceId,
+                feedbackDeleted,
+                observationsDeleted
+            );
+        }
+        return feedbackDeleted + observationsDeleted;
+    }
+
+    @Override
+    @Transactional
+    public int eraseConversationFeedbackAboutUser(long workspaceId, long aboutUserId) {
+        // Feedback first (cascade cleans children), then observations. Both pin CONVERSATION_THREAD + workspace +
+        // about_user_id, so another person's rows, PR/ISSUE rows, and other tenants' rows are all left intact.
+        int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedbackAboutUser(workspaceId, aboutUserId);
+        int observationsDeleted = observationRepository.deleteConversationThreadObservationsAboutUser(
+            workspaceId,
+            aboutUserId
+        );
+        if (feedbackDeleted > 0 || observationsDeleted > 0) {
+            log.info(
+                "Erased conversation-derived practice rows about user: workspaceId={}, aboutUserId={}, feedback={}, observations={}",
+                workspaceId,
+                aboutUserId,
+                feedbackDeleted,
+                observationsDeleted
+            );
+        }
+        return feedbackDeleted + observationsDeleted;
+    }
 }
