@@ -4,7 +4,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.SlackConversationProjector;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import java.util.Map;
@@ -25,9 +25,10 @@ import tools.jackson.databind.node.ObjectNode;
  *       author and text, wrapped in the untrusted-content quarantine envelope.</li>
  * </ul>
  *
- * <p>Reuses the {@link SlackConversationProjector}, which reads the Slack substrate via raw
- * {@code JdbcTemplate} with an explicit {@code workspace_id} predicate (the tenancy inspector is bypassed for
- * raw JDBC). Required: a job whose metadata does not name a thread is a preparation failure.
+ * <p>Reads the Slack substrate through the agent-owned {@link ConversationThreadProjection} SPI, implemented by
+ * {@code integration.slack} (the owner of the Slack schema) — this content source never touches {@code slack_*}
+ * tables itself, so the coupling runs one way ({@code integration.slack → agent}). Required: a job whose metadata
+ * does not name a thread is a preparation failure.
  */
 @Component
 public class ConversationThreadContentSource implements ContentSource {
@@ -38,11 +39,11 @@ public class ConversationThreadContentSource implements ContentSource {
     static final String OUTPUT_KEY = OUTPUT_PREFIX + "conversation_thread.json";
 
     private final ObjectMapper objectMapper;
-    private final SlackConversationProjector projector;
+    private final ConversationThreadProjection projection;
 
-    public ConversationThreadContentSource(ObjectMapper objectMapper, SlackConversationProjector projector) {
+    public ConversationThreadContentSource(ObjectMapper objectMapper, ConversationThreadProjection projection) {
         this.objectMapper = objectMapper;
-        this.projector = projector;
+        this.projection = projection;
     }
 
     @Override
@@ -70,7 +71,7 @@ public class ConversationThreadContentSource implements ContentSource {
         String channelId = requireText(metadata, "slack_channel_id");
         String threadTs = requireText(metadata, "slack_thread_ts");
 
-        ObjectNode payload = projector.buildThreadPayload(workspaceId, channelId, threadTs);
+        ObjectNode payload = projection.buildThreadPayload(workspaceId, channelId, threadTs);
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (Exception e) {

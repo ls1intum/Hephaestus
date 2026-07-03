@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.SlackConversationProjector;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -23,13 +23,13 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     @Mock
-    private SlackConversationProjector projector;
+    private ConversationThreadProjection projection;
 
     private ConversationThreadContentSource source;
 
     @BeforeEach
     void setUp() {
-        source = new ConversationThreadContentSource(objectMapper, projector);
+        source = new ConversationThreadContentSource(objectMapper, projection);
     }
 
     private AgentJob conversationJob() {
@@ -56,7 +56,7 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("channel", "C0ABC");
         payload.put("messageCount", 3);
-        when(projector.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
+        when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
 
         Map<String, byte[]> files = new HashMap<>();
         source.contribute(new ContextRequest.ConversationReviewRequest(job), files);

@@ -46,7 +46,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><strong>Consent gate (fail-closed).</strong> A {@code CONVERSATION_THREAD} observation's title + reasoning is
  * LLM-composed from the raw messages of a Slack thread's participants (its {@code artifactId} IS the source
  * {@code slack_thread.id}). Such an observation is surfaced ONLY while its source channel consent is still
- * {@code ACTIVE} — the same {@link ConversationConsentGate} gate the raw {@link SlackConversationProjector} applies.
+ * {@code ACTIVE} — the same {@link ConversationConsentGate} gate the raw {@code SlackConversationProjector} applies.
  * A paused/revoked/erased channel (or a deleted thread) drops the row (fail-closed). PR- and ISSUE-derived
  * observations carry no Slack content and pass through unchanged. When a surviving conversation row is present, the
  * whole payload carries the {@code _meta.trustLevel: "UNTRUSTED_EXTERNAL"} quarantine envelope; a PR/issue-only

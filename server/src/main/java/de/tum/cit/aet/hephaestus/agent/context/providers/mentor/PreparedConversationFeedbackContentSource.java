@@ -26,7 +26,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p><strong>Consent gate (fail-closed).</strong> A CONVERSATION_THREAD-derived fact's {@code title}/{@code
  * reasoning} is LLM-composed from the raw messages of a Slack thread's participants, so it may only surface while
- * that thread's source channel consent is still {@code ACTIVE} — the same gate {@link SlackConversationProjector}
+ * that thread's source channel consent is still {@code ACTIVE} — the same gate {@code SlackConversationProjector}
  * applies on the raw message read. A paused/revoked/erased channel (or a deleted thread) yields nothing here, so a
  * withdrawn-consent channel's derived reasoning never flows into the developer's next mentor turn. Facts derived
  * from a PR or issue carry no Slack content and are surfaced unconditionally. The check is raw JDBC by table name

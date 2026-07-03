@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,9 +14,14 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/slack_conversations.json} for a {@link MentorChatRequest}: the Slack threads
  * the requesting developer <em>participated in</em>, grouped by thread, from channels whose consent is
- * {@code ACTIVE}, non-tombstoned messages only. Pure EXTRACT+LOAD of the raw native {@code slack_thread}/
- * {@code slack_message} rows via {@link SlackConversationProjector} — no practice-shaped feature, no observation,
- * no threshold (per the {@link ContentSource} provenance contract). {@code originId="slack"}. Best-effort.
+ * {@code ACTIVE}, non-tombstoned messages only. Pure EXTRACT+LOAD of the raw native Slack thread/message rows via
+ * the agent-owned {@link ConversationThreadProjection} SPI (implemented by {@code integration.slack}, the owner of
+ * the Slack schema) — no practice-shaped feature, no observation, no threshold (per the {@link ContentSource}
+ * provenance contract). {@code originId="slack"}. Best-effort.
+ *
+ * <p>This content source never reads {@code slack_*} tables itself: the projection lives behind the SPI so the
+ * coupling runs one way ({@code integration.slack → agent}), and a Slack column rename is a compile error inside
+ * Slack, not a silent break here.
  *
  * <p><strong>Keyed on the developer, not the workspace.</strong> The projector filters on
  * {@code developerId() = ANY(participant_member_ids)}, so this is the audience's own conversation history — it
@@ -32,11 +38,11 @@ public class SlackConversationContentSource implements ContentSource {
     /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "slack_conversations.json";
 
-    private final SlackConversationProjector projector;
+    private final ConversationThreadProjection projection;
     private final ObjectMapper objectMapper;
 
-    public SlackConversationContentSource(SlackConversationProjector projector, ObjectMapper objectMapper) {
-        this.projector = projector;
+    public SlackConversationContentSource(ConversationThreadProjection projection, ObjectMapper objectMapper) {
+        this.projection = projection;
         this.objectMapper = objectMapper;
     }
 
@@ -59,7 +65,7 @@ public class SlackConversationContentSource implements ContentSource {
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
-        ObjectNode payload = projector.buildPayload(req.workspaceId(), req.developerId());
+        ObjectNode payload = projection.buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {

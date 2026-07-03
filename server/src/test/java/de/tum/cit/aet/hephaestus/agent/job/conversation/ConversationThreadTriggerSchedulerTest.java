@@ -1,19 +1,22 @@
 package de.tum.cit.aet.hephaestus.agent.job.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Deterministic gate logic for conversation-thread detection: quiescence, depth, growth, and ts parsing. */
 class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
@@ -80,26 +83,27 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
 
     @Test
     void detectNow_withCapabilityFlagOff_isDormantAndDoesNoWork() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        ConversationCandidateSource candidateSource = mock(ConversationCandidateSource.class);
         AgentJobService agentJobService = mock(AgentJobService.class);
-        var disabled = new ConversationThreadTriggerScheduler(jdbc, agentJobService, false);
+        var disabled = new ConversationThreadTriggerScheduler(candidateSource, agentJobService, false);
 
         // Off by default: the sweep no-ops without even running the candidate scan. Remove the flag gate and this
-        // fails — findCandidates() would query the JdbcTemplate.
+        // fails — settledCandidates() would be queried through the SPI.
         assertThat(disabled.detectNow()).isZero();
-        verifyNoInteractions(jdbc, agentJobService);
+        verifyNoInteractions(candidateSource, agentJobService);
     }
 
     @Test
     void detectNow_withCapabilityFlagOn_runsTheCandidateScan() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        ConversationCandidateSource candidateSource = mock(ConversationCandidateSource.class);
         AgentJobService agentJobService = mock(AgentJobService.class);
-        var enabled = new ConversationThreadTriggerScheduler(jdbc, agentJobService, true);
+        when(candidateSource.settledCandidates(anyInt())).thenReturn(List.of());
+        var enabled = new ConversationThreadTriggerScheduler(candidateSource, agentJobService, true);
 
-        // With the capability enabled the gate opens: the candidate scan runs against the JdbcTemplate. The mock
-        // yields no candidates, so nothing is enqueued (0) — but the scan itself did execute.
+        // With the capability enabled the gate opens: the candidate scan runs through the SPI. The mock yields no
+        // candidates, so nothing is enqueued (0) — but the scan itself did execute.
         assertThat(enabled.detectNow()).isZero();
-        assertThat(mockingDetails(jdbc).getInvocations()).isNotEmpty();
+        verify(candidateSource).settledCandidates(anyInt());
         verifyNoInteractions(agentJobService);
     }
 }

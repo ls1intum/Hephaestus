@@ -48,6 +48,13 @@
         // The Slack mentor adapter (integration.slack.mentor) runs a turn via the narrow MentorTurnRunner
         // port and streams through MentorChannel (propagate pulls in UIMessageChunk + MentorTurnRequest).
         "agent::mentor-chat",
+        // integration.slack.conversation implements the agent-owned conversation-source SPIs
+        // (ConversationThreadProjection / ConversationSourceLiveness / ConversationCandidateSource): Slack owns the
+        // slack_thread/slack_message/slack_monitored_channel tables and PROJECTS them to the agent through these
+        // ports, so the agent's mentor/detection read path carries no raw SQL against the Slack schema. This edge
+        // runs one way (integration.slack -> agent), the same direction as the mentor-chat and practices::spi
+        // inversions, so no bounded-context cycle forms.
+        "agent::conversation-source",
         // SlackFeedbackHandler (integration.slack.interactivity) writes developer reactions
         // (ADDRESSED / NOT_APPLICABLE / DISPUTED) against a delivered observation via the practices
         // reaction port — the uptake buttons + dispute modal are the Slack surface of the closed-loop

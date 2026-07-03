@@ -44,7 +44,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><strong>Consent gate (fail-closed).</strong> A {@code CONVERSATION_THREAD} feedback unit's body is composed
  * from the raw messages of a Slack thread (its {@code artifactId} IS the source {@code slack_thread.id}), so it is
  * surfaced ONLY while that thread's source channel consent is still {@code ACTIVE} — the same
- * {@link ConversationConsentGate} gate the raw {@link SlackConversationProjector} applies. PR- and ISSUE-derived
+ * {@link ConversationConsentGate} gate the raw {@code SlackConversationProjector} applies. PR- and ISSUE-derived
  * feedback carries no Slack content and passes through unchanged. When a surviving conversation unit is present,
  * the whole payload carries the {@code _meta.trustLevel: "UNTRUSTED_EXTERNAL"} quarantine envelope; a PR/issue-only
  * payload keeps its trusted shape (no envelope). The consent decision is (re)computed on every cache build, so a

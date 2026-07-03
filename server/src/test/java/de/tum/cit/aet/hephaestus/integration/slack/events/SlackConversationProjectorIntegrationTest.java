@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.SlackConversationProjector;
+import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.util.concurrent.atomic.AtomicLong;

@@ -1,5 +1,6 @@
-package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
+package de.tum.cit.aet.hephaestus.integration.slack.conversation;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,10 +10,16 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Projects the Slack channel-ingest substrate into the per-audience, thread-grouped conversation view the mentor
- * sees. The single privacy invariant lives here: a thread is only visible to a mentor audience that is itself a
+ * Slack-owned implementation of the agent {@link ConversationThreadProjection} SPI: projects the Slack
+ * channel-ingest substrate into the per-audience, thread-grouped conversation view the mentor sees. The single
+ * privacy invariant lives here: a thread is only visible to a mentor audience that is itself a
  * <em>participant</em> of it, only while the channel's consent is {@code ACTIVE}, and only its non-tombstoned
  * messages ({@code deleted_at IS NULL}).
+ *
+ * <p><strong>Ownership.</strong> This class lives in {@code integration.slack} because it reads Slack's own
+ * private tables ({@code slack_thread}/{@code slack_message}/{@code slack_monitored_channel}); the agent consumes
+ * the projected payload through the SPI, never the schema. A column rename in these tables is therefore a compile-
+ * and-SQL change <em>inside Slack</em>, not a silent runtime break in the agent.
  *
  * <p><strong>Participant firewall.</strong> {@code slack_thread.participant_member_ids} is the GIN-indexed
  * {@code bigint[]} of resolved workspace member ids stamped by the ingest write-path; the audience match is
@@ -20,12 +27,12 @@ import tools.jackson.databind.node.ObjectNode;
  * requesting developer actually took part in — never a channel they merely share a workspace with.
  *
  * <p><strong>Tenancy.</strong> Every statement here is raw {@link JdbcTemplate} (the tenancy
- * {@code StatementInspector} is bypassed), so <em>every</em> query carries an explicit {@code workspace_id = ?}
- * predicate, on both the thread scan and the per-thread message fetch. There is no path that reads a Slack row
- * without pinning the workspace.
+ * {@code StatementInspector} only hooks Hibernate, and these {@code bigint[]}/{@code = ANY} reads are unmapped),
+ * so <em>every</em> query carries an explicit {@code workspace_id = ?} predicate, on both the thread scan and the
+ * per-thread message fetch. There is no path that reads a Slack row without pinning the workspace.
  */
 @Component
-public class SlackConversationProjector {
+public class SlackConversationProjector implements ConversationThreadProjection {
 
     /** Cap on distinct threads surfaced per turn — the envelope budget. */
     static final int MAX_THREADS = 30;
@@ -51,6 +58,7 @@ public class SlackConversationProjector {
      * @param workspaceId     the workspace to scope every query to (explicit predicate)
      * @param audienceMemberId the mentor-chat requester's workspace member id — the participant-firewall audience
      */
+    @Override
     public ObjectNode buildPayload(long workspaceId, long audienceMemberId) {
         ObjectNode root = objectMapper.createObjectNode();
 
@@ -93,6 +101,7 @@ public class SlackConversationProjector {
      * @param channelId   the thread's Slack channel id
      * @param threadTs    the thread root {@code ts} (aggregate key)
      */
+    @Override
     public ObjectNode buildThreadPayload(long workspaceId, String channelId, String threadTs) {
         ObjectNode root = objectMapper.createObjectNode();
 
