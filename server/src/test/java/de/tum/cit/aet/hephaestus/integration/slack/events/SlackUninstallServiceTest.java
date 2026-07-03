@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSlackThreadService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -37,10 +38,13 @@ class SlackUninstallServiceTest extends BaseUnitTest {
     private SlackWorkspacePurgeAdapter purgeAdapter;
 
     @Mock
+    private MentorSlackThreadService mentorSlackThreadService;
+
+    @Mock
     private Connection connection;
 
     private SlackUninstallService service() {
-        return new SlackUninstallService(workspaceResolver, connectionService, purgeAdapter);
+        return new SlackUninstallService(workspaceResolver, connectionService, purgeAdapter, mentorSlackThreadService);
     }
 
     @Test
@@ -58,6 +62,8 @@ class SlackUninstallServiceTest extends BaseUnitTest {
         assertThat(captor.getValue().eventType()).isEqualTo("APP_UNINSTALLED");
         // Content is purged after the connection flip (adapter reused).
         verify(purgeAdapter).deleteWorkspaceData(WORKSPACE);
+        // The derived Slack-originated mentor DM content (SLACK_DM chat_thread/chat_message) is erased too.
+        verify(mentorSlackThreadService).purgeSlackThreads(WORKSPACE);
     }
 
     @Test
@@ -84,6 +90,6 @@ class SlackUninstallServiceTest extends BaseUnitTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any()
         );
-        verifyNoInteractions(purgeAdapter);
+        verifyNoInteractions(purgeAdapter, mentorSlackThreadService);
     }
 }

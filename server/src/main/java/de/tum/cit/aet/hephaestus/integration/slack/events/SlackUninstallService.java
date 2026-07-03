@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSlackThreadService;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -19,9 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The teardown, in one transaction: flip the Slack {@link Connection} to {@link IntegrationState#UNINSTALLED}
  * (which clears the stored credentials via {@link ConnectionService#transition}) <em>then</em> drop the Slack
- * content through {@link SlackWorkspacePurgeAdapter}. Ordering the connection flip before/with the purge mirrors the
- * workspace-purge chain, where {@code SlackWorkspacePurgeAdapter} ({@code @Order -200}) already runs ahead of
- * {@code ConnectionPurgeContributor} ({@code -100}).
+ * content through {@link SlackWorkspacePurgeAdapter} <em>and</em> erase the Slack-originated mentor DM content
+ * (the {@code SLACK_DM} {@code chat_thread}/{@code chat_message} rows) via
+ * {@link MentorSlackThreadService#purgeSlackThreads} — the five {@code slack_*} tables alone leave the derived
+ * mentor conversation behind, which an uninstall (a common GDPR-erasure trigger) should also remove. Ordering the
+ * connection flip before/with the purge mirrors the workspace-purge chain, where {@code SlackWorkspacePurgeAdapter}
+ * ({@code @Order -200}) already runs ahead of {@code ConnectionPurgeContributor} ({@code -100}).
  *
  * <p>The audit row's stable {@code correlationId} makes a Slack retry idempotent: the second delivery's transition
  * is a no-op and the content-purge is already empty.
@@ -36,15 +40,18 @@ public class SlackUninstallService {
     private final SlackWorkspaceResolver workspaceResolver;
     private final ConnectionService connectionService;
     private final SlackWorkspacePurgeAdapter purgeAdapter;
+    private final MentorSlackThreadService mentorSlackThreadService;
 
     public SlackUninstallService(
         SlackWorkspaceResolver workspaceResolver,
         ConnectionService connectionService,
-        SlackWorkspacePurgeAdapter purgeAdapter
+        SlackWorkspacePurgeAdapter purgeAdapter,
+        MentorSlackThreadService mentorSlackThreadService
     ) {
         this.workspaceResolver = workspaceResolver;
         this.connectionService = connectionService;
         this.purgeAdapter = purgeAdapter;
+        this.mentorSlackThreadService = mentorSlackThreadService;
     }
 
     /**
@@ -79,11 +86,15 @@ public class SlackUninstallService {
                 )
             );
         purgeAdapter.deleteWorkspaceData(workspaceId);
+        // Also erase the derived Slack-originated mentor DM conversation (SLACK_DM chat_thread/chat_message rows);
+        // the slack_* tables alone would leave it behind. Idempotent, so a Slack uninstall redelivery is a no-op.
+        int purgedThreads = mentorSlackThreadService.purgeSlackThreads(workspaceId);
         log.info(
-            "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged)",
+            "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} mentor DM threads erased)",
             eventType,
             teamId,
-            workspaceId
+            workspaceId,
+            purgedThreads
         );
     }
 }

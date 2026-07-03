@@ -55,4 +55,14 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     @Modifying
     @Transactional
     int deleteByWorkspaceId(Long workspaceId);
+
+    /**
+     * Bulk-delete every thread of one {@link ThreadSurface} for a workspace. Cascades to {@code chat_message} +
+     * {@code chat_message_vote} (and, for {@code SLACK_DM}, the {@code mentor_slack_thread} mapping) via the
+     * existing DB {@code ON DELETE CASCADE} FKs. Used to erase Slack-originated DM content on an app uninstall
+     * without touching the workspace's web mentor history. Returns the thread count deleted, for observability.
+     */
+    @Modifying
+    @Transactional
+    int deleteByWorkspaceIdAndSurface(Long workspaceId, ThreadSurface surface);
 }

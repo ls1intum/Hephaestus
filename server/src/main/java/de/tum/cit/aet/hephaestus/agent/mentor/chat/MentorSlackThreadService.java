@@ -24,4 +24,17 @@ public interface MentorSlackThreadService {
      * @return the id of the backing {@code chat_thread}
      */
     UUID ensureSlackThread(long workspaceId, @Nullable UUID chatThreadId, String developerLogin);
+
+    /**
+     * Erase every Slack-originated ({@code SLACK_DM} surface) {@code chat_thread} — and its cascaded
+     * {@code chat_message} rows — for {@code workspaceId}. The mentor-owned counterpart to
+     * {@link #ensureSlackThread}: it lets {@code integration.slack} drop the derived mentor content a Slack DM
+     * created (a common GDPR-erasure trigger on app uninstall) without reaching across the module boundary with a
+     * raw {@code DELETE}. The workspace's web mentor history ({@code WEB} surface) is untouched.
+     *
+     * <p>Idempotent (a bulk delete is a no-op the second time), so it is safe under Slack's uninstall redelivery.
+     *
+     * @return the number of Slack DM threads deleted
+     */
+    int purgeSlackThreads(long workspaceId);
 }
