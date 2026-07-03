@@ -38,9 +38,11 @@ public class SlackManifest implements IntegrationManifest {
         //     OutboundChannel push, so it is not a manifest capability either.
         //
         // Promoting Slack to a first-class WEBHOOK_INGEST/outbound citizen (extracting the
-        // EventProducer/OutboundChannel/WebhookEndpoint ports) is a deferred follow-up — see the
-        // integration-framework converged design (.ai/notes/integration-framework-design.md §6) and its
-        // planned ADR. Until then, an empty set is the truthful declaration.
+        // EventProducer/OutboundChannel/WebhookEndpoint ports) is a deliberate future evolution of the integration
+        // framework, not a gap in this class: the in-process handling above is correct and complete for how Slack
+        // works today. The port extraction is specified in the integration-framework converged design
+        // (.ai/notes/integration-framework-design.md §6) and its planned ADR. Until it lands, an empty set is the
+        // truthful declaration.
         return Set.of();
     }
 }

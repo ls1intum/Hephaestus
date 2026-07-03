@@ -1,7 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.job.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -9,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Deterministic gate logic for conversation-thread detection: quiescence, depth, growth, and ts parsing. */
 class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
@@ -71,5 +76,30 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
         assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds(null)).isNull();
         assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds("  ")).isNull();
         assertThat(ConversationThreadTriggerScheduler.slackTsEpochSeconds("abc.def")).isNull();
+    }
+
+    @Test
+    void detectNow_withCapabilityFlagOff_isDormantAndDoesNoWork() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        AgentJobService agentJobService = mock(AgentJobService.class);
+        var disabled = new ConversationThreadTriggerScheduler(jdbc, agentJobService, false);
+
+        // Off by default: the sweep no-ops without even running the candidate scan. Remove the flag gate and this
+        // fails — findCandidates() would query the JdbcTemplate.
+        assertThat(disabled.detectNow()).isZero();
+        verifyNoInteractions(jdbc, agentJobService);
+    }
+
+    @Test
+    void detectNow_withCapabilityFlagOn_runsTheCandidateScan() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        AgentJobService agentJobService = mock(AgentJobService.class);
+        var enabled = new ConversationThreadTriggerScheduler(jdbc, agentJobService, true);
+
+        // With the capability enabled the gate opens: the candidate scan runs against the JdbcTemplate. The mock
+        // yields no candidates, so nothing is enqueued (0) — but the scan itself did execute.
+        assertThat(enabled.detectNow()).isZero();
+        assertThat(mockingDetails(jdbc).getInvocations()).isNotEmpty();
+        verifyNoInteractions(agentJobService);
     }
 }

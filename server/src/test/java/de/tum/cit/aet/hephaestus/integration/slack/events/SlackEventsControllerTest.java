@@ -67,6 +67,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            Runnable::run,
             Runnable::run
         );
         controller = new SlackEventsController(verifier, dispatcher, dedupService, JsonMapper.builder().build());
@@ -103,6 +104,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            queued::add,
             queued::add
         );
         SlackEventsController asyncController = new SlackEventsController(
@@ -146,6 +148,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            queued::add,
             queued::add
         );
         SlackEventsController asyncController = new SlackEventsController(
@@ -185,6 +188,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            queued::add,
             queued::add
         );
         SlackEventsController asyncController = new SlackEventsController(
@@ -224,6 +228,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            queued::add,
             queued::add
         );
         SlackEventsController asyncController = new SlackEventsController(

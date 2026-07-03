@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,11 +18,20 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
  * Idempotent on {@code (workspace, channel, ts)}.
  *
- * <p><strong>Consent gate.</strong> Seeing a message on a channel auto-creates the allow-list row in
- * {@code PENDING} (discovery: the bot only receives events for channels it was invited to), but a message is only
- * persisted once that channel's {@link ConsentState} is {@code ACTIVE}. A {@code PENDING}/{@code ANNOUNCED}/
- * {@code PAUSED}/{@code REVOKED} channel discovers itself but ingests nothing — approval is an explicit,
- * out-of-band consent action, never an implicit side effect of traffic.
+ * <p><strong>Capability flag (fail-closed layer 1).</strong> Channel/group message ingestion is a deliberate,
+ * privacy-sensitive capability that is <em>off by default</em>: it only runs when
+ * {@code hephaestus.integration.slack.conversation-ingest.enabled=true}. While the flag is off (the shipped
+ * default), {@link #ingestChannelMessage} returns immediately — no discovery row, no store — so the whole
+ * channel-ingest → conversation-detection → conversation-feedback subsystem stays inert. Turning it on is a
+ * conscious operator decision that presupposes an explicit channel-activation/consent design (which sets a
+ * channel's {@code ACTIVE} state); it is not built here. The DM/mentor path and everything else in the Slack
+ * integration are unaffected by this flag.
+ *
+ * <p><strong>Consent gate (fail-closed layer 2).</strong> Even with the capability flag on, seeing a message on a
+ * channel auto-creates the allow-list row in {@code PENDING} (discovery: the bot only receives events for channels
+ * it was invited to), but a message is only persisted once that channel's {@link ConsentState} is {@code ACTIVE}.
+ * A {@code PENDING}/{@code ANNOUNCED}/{@code PAUSED}/{@code REVOKED} channel discovers itself but ingests nothing —
+ * approval is an explicit, out-of-band consent action, never an implicit side effect of traffic.
  *
  * <p>On a genuinely new message the author's Slack id is resolved to the workspace {@code User} (member) id and
  * stamped onto {@code slack_message.author_member_id} (the participant-firewall stamp), and the thread aggregate
@@ -44,13 +54,22 @@ public class SlackIngestService {
     private final SlackThreadRepository threadRepository;
     private final SlackMentorIdentityResolver identityResolver;
 
+    /**
+     * Off by default. Gates the channel-ingest entry point ({@link #ingestChannelMessage}) as a second fail-closed
+     * layer in front of the per-channel consent gate: while this is {@code false}, channel/group messages are never
+     * ingested at all, so the conversation-detection/feedback subsystem downstream of it stays completely dormant.
+     * Bound from {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+     */
+    private final boolean conversationIngestEnabled;
+
     public SlackIngestService(
         SlackWorkspaceResolver workspaceResolver,
         SlackMonitoredChannelRepository monitoredChannelRepository,
         SlackChannelConsentGate consentGate,
         SlackMessageRepository messageRepository,
         SlackThreadRepository threadRepository,
-        SlackMentorIdentityResolver identityResolver
+        SlackMentorIdentityResolver identityResolver,
+        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:false}") boolean conversationIngestEnabled
     ) {
         this.workspaceResolver = workspaceResolver;
         this.monitoredChannelRepository = monitoredChannelRepository;
@@ -58,6 +77,7 @@ public class SlackIngestService {
         this.messageRepository = messageRepository;
         this.threadRepository = threadRepository;
         this.identityResolver = identityResolver;
+        this.conversationIngestEnabled = conversationIngestEnabled;
     }
 
     @Transactional
@@ -69,6 +89,11 @@ public class SlackIngestService {
         @Nullable String authorSlackUserId,
         @Nullable String text
     ) {
+        // Fail-closed layer 1: channel ingestion is a deliberate, privacy-sensitive capability that is off by
+        // default. While disabled, nothing is discovered, gated, or stored — the subsystem is fully dormant.
+        if (!conversationIngestEnabled) {
+            return;
+        }
         if (channelId.isEmpty() || ts.isEmpty()) {
             return;
         }

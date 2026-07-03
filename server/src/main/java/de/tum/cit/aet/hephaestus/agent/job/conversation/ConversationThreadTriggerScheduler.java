@@ -14,6 +14,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,13 @@ import org.springframework.stereotype.Component;
  *   <li><b>Growth</b> — at least {@value #MIN_GROWTH} new non-tombstoned turns since {@code slack_thread.last_reviewed_ts}
  *       (the watermark), so a re-sweep with no fresh human turn past the watermark enqueues nothing.</li>
  * </ul>
+ *
+ * <p><b>Capability flag.</b> This scheduler is the second entry point of the channel-ingest → conversation-feedback
+ * subsystem, so it is gated by the same off-by-default capability flag as {@code SlackIngestService}:
+ * {@code hephaestus.integration.slack.conversation-ingest.enabled}. The bean is always created (so it stays wired
+ * and unit-testable), but {@link #detectNow()} no-ops while the flag is off. With ingestion disabled there is no
+ * {@code ACTIVE} channel and hence no candidate thread anyway; the flag makes that dormancy explicit rather than
+ * incidental, and stops the cron doing pointless work.
  *
  * <p>The watermark is advanced to the thread's newest {@code ts} only <em>after</em> a job is enqueued. Cooldown
  * is keyed on the thread + subject alone (via the idempotency-key prefix, freshness stripped by
@@ -64,9 +72,21 @@ public class ConversationThreadTriggerScheduler {
     private final JdbcTemplate jdbc;
     private final AgentJobService agentJobService;
 
-    public ConversationThreadTriggerScheduler(JdbcTemplate jdbc, AgentJobService agentJobService) {
+    /**
+     * Off by default. When {@code false} the sweep no-ops, keeping the conversation-detection subsystem dormant in
+     * lockstep with {@link de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService}'s channel-ingest
+     * gate. Bound from {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+     */
+    private final boolean conversationIngestEnabled;
+
+    public ConversationThreadTriggerScheduler(
+        JdbcTemplate jdbc,
+        AgentJobService agentJobService,
+        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:false}") boolean conversationIngestEnabled
+    ) {
         this.jdbc = jdbc;
         this.agentJobService = agentJobService;
+        this.conversationIngestEnabled = conversationIngestEnabled;
     }
 
     @Scheduled(cron = "0 */5 * * * *")
@@ -82,6 +102,10 @@ public class ConversationThreadTriggerScheduler {
      * @return the number of conversation-review jobs enqueued this run
      */
     public long detectNow() {
+        // Capability gate: while channel ingestion is disabled the subsystem is dormant — do no work at all.
+        if (!conversationIngestEnabled) {
+            return 0;
+        }
         List<ThreadCandidate> candidates = findCandidates();
         Instant now = Instant.now();
         long enqueued = 0;

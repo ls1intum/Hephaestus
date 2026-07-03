@@ -17,11 +17,14 @@ import tools.jackson.databind.JsonNode;
  * mirroring how {@code SlackInteractivityController} delegates to {@code SlackFeedbackHandler}.
  *
  * <p>The caller wraps {@link #dispatch(JsonNode)} in a try/catch and always ACKs within Slack's 3&nbsp;s window.
- * Every branch that makes a slow/remote Slack Web API call before it can finish — the DM mentor turn (its
- * {@code assistant.threads.setStatus} ping and any canned reply), the App Home re-render + onboarding CTA, and the
- * {@code assistant_thread_started} suggested-prompt seed — is offloaded to {@code slackMentorDmExecutor}, so NO
- * Slack Web API call runs before the 200. Those offloaded branches are best-effort: a dropped Home render or
- * prompt seed re-fires on the next open, and a saturated pool drops the task (logged) without holding the ACK.
+ * Every branch that makes a slow/remote Slack Web API call before it can finish is offloaded off the ACK thread so
+ * NO Slack Web API call runs before the 200. The offloads use two isolated pools: the DM mentor turn (its
+ * {@code assistant.threads.setStatus} ping and any canned reply) runs on {@code slackMentorDmExecutor}, while the
+ * privacy/consent surfaces — the App Home re-render + onboarding CTA and the {@code assistant_thread_started}
+ * suggested-prompt seed — run on the dedicated {@code slackHomeExecutor}, so a DM burst can never delay the App
+ * Home render that shows the privacy disclosure and research-consent toggle. All offloaded branches are
+ * best-effort: a dropped Home render or prompt seed re-fires on the next open, and a saturated pool drops the task
+ * (logged) without holding the ACK.
  *
  * <p>Uninstall / token-revocation and channel-message ingest stay synchronous so they commit before the ACK.
  * Channel ingest is only <em>best-effort</em> end-to-end though: {@link SlackEventsController} logs-and-200s a
@@ -41,6 +44,7 @@ public class SlackEventDispatcher {
     private final SlackAssistantEventHandler assistantEventHandler;
     private final SlackUninstallService uninstallService;
     private final Executor mentorDmExecutor;
+    private final Executor homeExecutor;
 
     public SlackEventDispatcher(
         SlackMentorService mentorService,
@@ -49,7 +53,8 @@ public class SlackEventDispatcher {
         SlackAppHomeService appHomeService,
         SlackAssistantEventHandler assistantEventHandler,
         SlackUninstallService uninstallService,
-        @Qualifier("slackMentorDmExecutor") Executor mentorDmExecutor
+        @Qualifier("slackMentorDmExecutor") Executor mentorDmExecutor,
+        @Qualifier("slackHomeExecutor") Executor homeExecutor
     ) {
         this.mentorService = mentorService;
         this.ingestService = ingestService;
@@ -58,6 +63,7 @@ public class SlackEventDispatcher {
         this.assistantEventHandler = assistantEventHandler;
         this.uninstallService = uninstallService;
         this.mentorDmExecutor = mentorDmExecutor;
+        this.homeExecutor = homeExecutor;
     }
 
     /** Route one {@code event_callback} envelope by its inner event type. */
@@ -71,8 +77,10 @@ public class SlackEventDispatcher {
                 String slackUserId = event.path("user").asString("");
                 // Both publishes go through SlackMessageService.callHonoringRateLimit, whose Retry-After budget is
                 // up to 30s each — a 429 on the ACK thread would blow Slack's 3s Events-API window and provoke a
-                // retry storm. Offload off the ACK thread (best-effort: a dropped render re-fires on the next open).
+                // retry storm. Offload onto the dedicated Home pool (isolated from the DM pool so a DM burst cannot
+                // delay this privacy/consent render; best-effort: a dropped render re-fires on the next open).
                 offload(
+                    homeExecutor,
                     () -> {
                         // publish the persistent Home tab (disclosure + research-consent toggle).
                         appHomeService.onHomeOpened(teamId, slackUserId);
@@ -86,9 +94,9 @@ public class SlackEventDispatcher {
         }
         if ("assistant_thread_started".equals(eventType)) {
             // Seed the mentor DM with suggested prompts (assistant.threads.setSuggestedPrompts, a remote Slack call)
-            // — MUST route before the non-message early-return below. Offloaded off the ACK thread for the same
-            // Retry-After-budget reason as App Home (best-effort: a dropped seed re-fires on the next open).
-            offload(() -> assistantEventHandler.onThreadStarted(teamId, event), "assistant thread seed");
+            // — MUST route before the non-message early-return below. Offloaded onto the dedicated Home pool for the
+            // same Retry-After-budget reason as App Home (best-effort: a dropped seed re-fires on the next open).
+            offload(homeExecutor, () -> assistantEventHandler.onThreadStarted(teamId, event), "assistant thread seed");
             return;
         }
         // App removal / token revocation — MUST route before the non-message early-return (which would otherwise
@@ -138,7 +146,11 @@ public class SlackEventDispatcher {
             // run it off the ACK thread — the 200 must return inside Slack's 3s window. Best-effort: a crash before
             // completion loses at most one mentor reply, which the member can re-request.
             String messageTs = event.path("ts").asString("");
-            offload(() -> mentorService.handleDm(teamId, channelId, slackUserId, text, messageTs), "mentor DM");
+            offload(
+                mentorDmExecutor,
+                () -> mentorService.handleDm(teamId, channelId, slackUserId, text, messageTs),
+                "mentor DM"
+            );
         } else if ("channel".equals(channelType) || "group".equals(channelType)) {
             ingestService.ingestChannelMessage(
                 teamId,
@@ -152,13 +164,14 @@ public class SlackEventDispatcher {
     }
 
     /**
-     * Run best-effort post-ACK work on {@code slackMentorDmExecutor} so no Slack Web API call precedes the 200 on
-     * the events endpoint. A saturated pool rejects (default {@code AbortPolicy}) → logged as a drop; the ACK
-     * still goes out. {@code label} names the dropped work in the log line.
+     * Run best-effort post-ACK work on the given pool so no Slack Web API call precedes the 200 on the events
+     * endpoint. DM turns go on {@code slackMentorDmExecutor}; the App Home render and assistant-thread seed go on the
+     * isolated {@code slackHomeExecutor}. A saturated pool rejects (default {@code AbortPolicy}) → logged as a drop;
+     * the ACK still goes out. {@code label} names the dropped work in the log line.
      */
-    private void offload(Runnable work, String label) {
+    private void offload(Executor executor, Runnable work, String label) {
         try {
-            mentorDmExecutor.execute(work);
+            executor.execute(work);
         } catch (RuntimeException rejected) {
             log.warn("Slack {} dropped: executor rejected the task ({})", label, rejected.getMessage());
         }

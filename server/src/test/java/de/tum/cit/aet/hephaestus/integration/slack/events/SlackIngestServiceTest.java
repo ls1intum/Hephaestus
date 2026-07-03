@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
@@ -44,9 +45,37 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
     private SlackIngestService service;
 
+    /** Construct the service with the channel-ingest capability flag in the given state. */
+    private SlackIngestService serviceWithFlag(boolean conversationIngestEnabled) {
+        return new SlackIngestService(
+            workspaceResolver,
+            monitoredChannelRepository,
+            consentGate,
+            messageRepository,
+            threadRepository,
+            identityResolver,
+            conversationIngestEnabled
+        );
+    }
+
     @BeforeEach
     void setUp() {
-        service = new SlackIngestService(
+        // Existing behavior is exercised with the capability ENABLED; the disabled-by-default gate is covered
+        // explicitly by flagOff_* below.
+        service = serviceWithFlag(true);
+    }
+
+    @Test
+    void flagOff_channelMessage_isCompletelyDormant_storesNothingAndDoesNotEvenDiscover() {
+        // Off-by-default capability gate (fail-closed layer 1). Even a well-formed message on what would be an
+        // ACTIVE channel must not touch any collaborator: no workspace resolution, no discovery row, no consent
+        // check, no store. This is the explicit, operator-controlled parked state — remove the flag gate and this
+        // test fails (resolveWorkspaceId would be called before the consent gate could apply).
+        SlackIngestService disabled = serviceWithFlag(false);
+
+        disabled.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
+
+        verifyNoInteractions(
             workspaceResolver,
             monitoredChannelRepository,
             consentGate,

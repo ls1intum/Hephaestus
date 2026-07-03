@@ -570,6 +570,11 @@ hephaestus:
             # App signing secret — verifies inbound Events API POSTs to /slack/events (v0 HMAC over
             # "v0:{ts}:{rawBody}", 300s replay window). Inbound (mentor DM + channel ingest) is inert without it.
             signing-secret: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:}
+            conversation-ingest:
+                # Channel/group message ingestion (the channel-ingest → conversation-detection →
+                # conversation-feedback subsystem) is a deliberate, privacy-sensitive capability that is DISABLED
+                # pending an explicit channel-activation/consent design — do not enable without that review.
+                enabled: ${HEPHAESTUS_INTEGRATION_SLACK_CONVERSATION_INGEST_ENABLED:false}
             # S9 adversarial-safety hardening.
             dedup:
                 # How long a durable Slack event_id dedup marker is retained before the daily sweep prunes it.

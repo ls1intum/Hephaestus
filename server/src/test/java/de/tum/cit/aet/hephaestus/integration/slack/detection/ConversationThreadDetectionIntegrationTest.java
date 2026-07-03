@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -32,7 +33,11 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code bigint[]} column, the growth count rides lexicographic Slack-{@code ts} comparison, and the watermark
  * advance is a real UPDATE). {@link AgentJobService} is mocked so the enqueue is observable without seeding a
  * workspace/agent-config graph; the raw SQL the scheduler owns is exercised for real.
+ *
+ * <p>Channel ingestion is off by default (a deliberate, privacy-sensitive parked capability), so this test — which
+ * exercises subsystem B directly — enables it via {@code hephaestus.integration.slack.conversation-ingest.enabled}.
  */
+@TestPropertySource(properties = "hephaestus.integration.slack.conversation-ingest.enabled=true")
 class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

@@ -128,9 +128,17 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     }
 
     /**
-     * Bind the conversational feedback this turn delivered so the terminal feedback buttons carry its id (enabling
-     * the dispute path on a thumbs-down). Optional: an unbound turn still gets pure satisfaction thumbs. Wiring the
-     * actual id from the delivery reconciler is a follow-up; the buttons render either way.
+     * Bind the conversational-feedback id this turn delivered so the terminal buttons carry it and can offer the
+     * dispute path on a thumbs-down. Optional by design: an unbound turn still renders pure satisfaction thumbs.
+     *
+     * <p>This surface belongs to the conversation-feedback capability (the channel-ingest → conversation-detection →
+     * conversation-feedback subsystem gated by {@code hephaestus.integration.slack.conversation-ingest.enabled}). A
+     * conversation-feedback id only exists once that capability is enabled and a feedback unit is delivered in the
+     * same turn; the delivery reconciler would then call this to bind it. That capability is off by default, so
+     * today no caller invokes this and {@link #boundFeedbackId} is always null — the DM mentor turn is pure chat and
+     * delivers no conversation-feedback unit. This is a parked, capability-gated seam, not a forgotten wiring TODO:
+     * the reconciler→channel callback is deliberately not built while the subsystem is dormant (it is untestable
+     * end-to-end until then), and the buttons render correctly bound-or-not.
      */
     public void bindFeedback(@Nullable UUID feedbackId) {
         this.boundFeedbackId = feedbackId;
