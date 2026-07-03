@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Scoped access to allow-listed Slack channels. Every finder carries the {@code workspace_id} predicate the
@@ -14,6 +16,34 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
     Optional<SlackMonitoredChannel> findByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
 
     boolean existsByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
+
+    /**
+     * The consent lifecycle state of one allow-listed channel, if the row exists. Carries the
+     * {@code workspace_id} predicate the tenancy {@code StatementInspector} requires. Read by the S6 ingest
+     * gate: a message is only persisted when this is {@link ConsentState#ACTIVE}.
+     */
+    @Query(
+        "SELECT c.consentState FROM SlackMonitoredChannel c " +
+            "WHERE c.workspaceId = :workspaceId AND c.slackChannelId = :slackChannelId"
+    )
+    Optional<ConsentState> findConsentState(
+        @Param("workspaceId") Long workspaceId,
+        @Param("slackChannelId") String slackChannelId
+    );
+
+    /**
+     * Data-subject / channel erasure (S6): flip a channel's consent to {@code REVOKED} so ingestion stops
+     * immediately. Scoped UPDATE carrying the {@code workspace_id} predicate. Returns the rows affected (0 when
+     * the channel was never allow-listed). The stored message history is cleared separately by the caller.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        "UPDATE SlackMonitoredChannel c SET c.consentState = " +
+            "de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.REVOKED " +
+            "WHERE c.workspaceId = :workspaceId AND c.slackChannelId = :slackChannelId"
+    )
+    int revokeConsent(@Param("workspaceId") Long workspaceId, @Param("slackChannelId") String slackChannelId);
 
     /**
      * Idempotent allow-list registration: create the channel row on first sight (consent {@code PENDING},

@@ -111,12 +111,35 @@ public class SlackEventsController {
         if (!"message".equals(eventType)) {
             return;
         }
-        // Never react to our own bot's messages, edits, deletes, or joins.
-        if (event.has("bot_id") || !event.path("subtype").asString("").isEmpty()) {
+        // Edits/deletes arrive as message SUBTYPES, so they MUST be routed before the subtype early-return below
+        // (which otherwise drops every subtyped message). Slack carries the changed/deleted payload nested under
+        // event.message / event.previous_message, so the outer bot_id guard does not apply to these — a bot-authored
+        // message we never stored simply no-ops the scoped UPDATE.
+        String subtype = event.path("subtype").asString("");
+        String channelId = event.path("channel").asString("");
+        if ("message_deleted".equals(subtype)) {
+            // Tombstone keys on the DELETED message's ts (deleted_ts, fallback previous_message.ts), never event.ts.
+            String deletedTs = event
+                .path("deleted_ts")
+                .asString(event.path("previous_message").path("ts").asString(""));
+            ingestService.tombstoneMessage(teamId, channelId, deletedTs);
+            return;
+        }
+        if ("message_changed".equals(subtype)) {
+            JsonNode changed = event.path("message");
+            ingestService.editMessage(
+                teamId,
+                channelId,
+                changed.path("ts").asString(""),
+                changed.path("text").asString("")
+            );
+            return;
+        }
+        // Never react to our own bot's messages, or to any other subtype (joins, channel_topic, thread_broadcast…).
+        if (event.has("bot_id") || !subtype.isEmpty()) {
             return;
         }
         String channelType = event.path("channel_type").asString("");
-        String channelId = event.path("channel").asString("");
         String slackUserId = event.path("user").asString("");
         String text = event.path("text").asString("");
 

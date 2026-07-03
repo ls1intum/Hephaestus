@@ -58,6 +58,15 @@ public class SlackMessage {
     @Column(name = "author_slack_user_id", length = 32)
     private @Nullable String authorSlackUserId;
 
+    /**
+     * The resolved workspace {@code User} id of the author (the same id space as
+     * {@code MentorChatRequest#developerId}), or {@code null} when the Slack sender is not a linked, workspace-member
+     * developer. This is the firewall stamp the conversation projector unions into {@code slack_thread}'s
+     * {@code participant_member_ids}. Written via the native ingest insert.
+     */
+    @Column(name = "author_member_id")
+    private @Nullable Long authorMemberId;
+
     @Column(name = "author_display_name", length = 256)
     private @Nullable String authorDisplayName;
 

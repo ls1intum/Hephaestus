@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.slack.mentor;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -40,15 +42,18 @@ public class SlackMentorIdentityResolver {
     private final GitProviderRegistry gitProviderRegistry;
     private final AccountIdentityQuery accountIdentityQuery;
     private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
+    private final UserRepository userRepository;
 
     public SlackMentorIdentityResolver(
         GitProviderRegistry gitProviderRegistry,
         AccountIdentityQuery accountIdentityQuery,
-        AccountWorkspaceMembershipQuery workspaceMembershipQuery
+        AccountWorkspaceMembershipQuery workspaceMembershipQuery,
+        UserRepository userRepository
     ) {
         this.gitProviderRegistry = gitProviderRegistry;
         this.accountIdentityQuery = accountIdentityQuery;
         this.workspaceMembershipQuery = workspaceMembershipQuery;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -74,6 +79,23 @@ public class SlackMentorIdentityResolver {
             .distinct()
             .filter(login -> isWorkspaceMember(login, workspaceId))
             .findFirst();
+    }
+
+    /**
+     * The workspace {@code User} (member) id the Slack sender resolves to — the firewall stamp written onto
+     * {@code slack_message.author_member_id} and unioned into {@code slack_thread.participant_member_ids} by the
+     * S6 ingest write-path. Resolves through the same provider-scoped, membership-gated chain as
+     * {@link #resolveDeveloperLogin} and then maps the workspace-scoped login to its SCM {@code User} row, so the
+     * stamped id is exactly the {@code MentorChatRequest.developerId()} the participant projector matches against
+     * (a Slack user only ever stamps as the member they are linked to within this workspace).
+     *
+     * @return the SCM {@code User} id, or empty when the Slack user is not linked to a member of {@code workspaceId}
+     */
+    @Transactional(readOnly = true)
+    public Optional<Long> resolveMemberId(long workspaceId, @Nullable String teamId, String slackUserId) {
+        return resolveDeveloperLogin(workspaceId, teamId, slackUserId)
+            .flatMap(userRepository::findByLogin)
+            .map(User::getId);
     }
 
     private boolean isWorkspaceMember(String login, long workspaceId) {
