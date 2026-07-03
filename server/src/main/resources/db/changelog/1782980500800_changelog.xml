@@ -359,4 +359,38 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-slack" id="1782980500800-16">
+        <preConditions onFail="MARK_RAN" onFailMessage="mentor_turn_rating already present">
+            <not><tableExists tableName="mentor_turn_rating"/></not>
+        </preConditions>
+        <comment>
+            Binary thumbs on a mentor turn (S5). Workspace-scoped (carries workspace_id, absent from
+            WorkspaceScopedTables.GLOBAL_TABLES) → a tenancy predicate rides every query. Append-only (@Immutable
+            entity): a click writes a new row, and the newest row per (rater, turn) is the current rating —
+            "latest wins" is read-side, never an in-place update. feedback_id is a nullable FK to the delivered
+            conversational feedback the turn raised (ON DELETE SET NULL keeps the research signal after the
+            per-run feedback row is purged); an unbound turn (pure "was this helpful?") leaves it NULL. Thumbs
+            never write a Reaction — ADDRESSED/NOT_APPLICABLE/DISPUTED are the uptake block's job. The
+            (rater_user_id, created_at DESC) index serves the per-user recency scan.
+        </comment>
+        <sql>
+            CREATE TABLE mentor_turn_rating (
+                id UUID PRIMARY KEY,
+                workspace_id BIGINT NOT NULL,
+                rater_user_id BIGINT NOT NULL,
+                channel_id VARCHAR(32) NOT NULL,
+                thread_ts VARCHAR(32),
+                slack_message_ts VARCHAR(32) NOT NULL,
+                feedback_id UUID REFERENCES feedback(id) ON DELETE SET NULL,
+                rating VARCHAR(16) NOT NULL,
+                source VARCHAR(16) NOT NULL DEFAULT 'BUTTON',
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                CONSTRAINT chk_mentor_turn_rating_rating CHECK (rating IN ('HELPFUL', 'UNHELPFUL')),
+                CONSTRAINT chk_mentor_turn_rating_source CHECK (source IN ('BUTTON'))
+            );
+            CREATE INDEX idx_mentor_turn_rating_rater_created ON mentor_turn_rating (rater_user_id, created_at DESC);
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS mentor_turn_rating;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

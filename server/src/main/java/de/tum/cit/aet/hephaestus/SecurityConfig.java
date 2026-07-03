@@ -135,7 +135,8 @@ public class SecurityConfig {
                 "/actuator/info",
                 "/webhooks/**",
                 "/oauth/callback/**",
-                "/slack/events"
+                "/slack/events",
+                "/slack/interactivity"
             )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())

@@ -9,8 +9,10 @@ import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatStartStreamResponse;
 import com.slack.api.methods.response.chat.ChatStopStreamResponse;
 import com.slack.api.methods.response.users.UsersListResponse;
+import com.slack.api.methods.response.views.ViewsOpenResponse;
 import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.User;
+import com.slack.api.model.assistant.SuggestedPrompt;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -181,6 +183,56 @@ public class SlackMessageService {
                 .assistantThreadsSetStatus(req -> req.channelId(channel).threadTs(threadTs).status(status));
         } catch (Exception e) {
             log.debug("Slack setStatus skipped (channel={}): {}", channel, e.getMessage());
+        }
+    }
+
+    /**
+     * Open a modal on an interaction {@code trigger_id} via {@code views.open} — the seam the S5 interactivity
+     * dispute flow renders through (a thumbs-down / "Disagree" on a bound turn asks for the required dispute
+     * reason). Throws {@link SlackSendException} carrying the Slack error so the caller can log-and-swallow
+     * (a stale/expired trigger just means the modal never opened; the ACK already went out).
+     */
+    public void openModal(long workspaceId, String triggerId, View view) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, triggerId, "no_active_slack_connection")
+        );
+        try {
+            ViewsOpenResponse r = slack.methods(token).viewsOpen(req -> req.triggerId(triggerId).view(view));
+            if (!r.isOk()) {
+                String error = r.getError() == null ? "unknown" : r.getError();
+                log.warn("Slack views.open failed: workspaceId={}, error={}", workspaceId, error);
+                throw new SlackSendException(workspaceId, triggerId, error);
+            }
+        } catch (SlackApiException | IOException e) {
+            log.warn("Slack views.open transport failure: workspaceId={}, error={}", workspaceId, e.getMessage());
+            throw new SlackSendException(workspaceId, triggerId, "transport_failure", e);
+        }
+    }
+
+    /**
+     * Set the suggested prompts on an assistant thread ({@code assistant.threads.setSuggestedPrompts}). Rendered
+     * when a member opens a mentor DM ({@code assistant_thread_started}). Best-effort: only assistant threads
+     * accept it, so a failure is swallowed — the prompts are a discovery nicety, never load-bearing.
+     */
+    public void setSuggestedPrompts(
+        long workspaceId,
+        String channel,
+        String threadTs,
+        String title,
+        List<SuggestedPrompt> prompts
+    ) {
+        Optional<String> token = resolveToken(workspaceId);
+        if (token.isEmpty() || prompts.isEmpty()) {
+            return;
+        }
+        try {
+            slack
+                .methods(token.get())
+                .assistantThreadsSetSuggestedPrompts(req ->
+                    req.channelId(channel).threadTs(threadTs).title(title).prompts(prompts)
+                );
+        } catch (Exception e) {
+            log.debug("Slack setSuggestedPrompts skipped (channel={}): {}", channel, e.getMessage());
         }
     }
 

@@ -7,12 +7,14 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +83,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final AtomicBoolean flushing = new AtomicBoolean(false);
 
     private volatile Runnable disconnectHook;
+    /** The delivered conversational feedback this turn raised, bound before the terminal so the buttons carry it. */
+    private volatile @Nullable UUID boundFeedbackId;
     private volatile String streamTs; // null until the first drain opens the stream; only mutated on the flush thread
     private volatile ScheduledFuture<?> flushTask;
     private int consecutiveFailures; // flush-thread only
@@ -103,6 +107,15 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     @Override
     public boolean isClientGone() {
         return clientGone.get();
+    }
+
+    /**
+     * Bind the conversational feedback this turn delivered so the terminal feedback buttons carry its id (enabling
+     * the dispute path on a thumbs-down). Optional: an unbound turn still gets pure satisfaction thumbs. Wiring the
+     * actual id from the S7 delivery reconciler is a follow-up; the buttons render either way.
+     */
+    public void bindFeedback(@Nullable UUID feedbackId) {
+        this.boundFeedbackId = feedbackId;
     }
 
     @Override
@@ -300,7 +313,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
         try {
             if (streamTs != null && !clientGone.get()) {
-                slack.stopStream(workspaceId, channel, streamTs, List.<LayoutBlock>of());
+                // Attach the feedback buttons (👍/👎, bound to this turn's ts + optional feedback id) as terminal blocks.
+                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(streamTs, boundFeedbackId);
+                slack.stopStream(workspaceId, channel, streamTs, blocks);
             }
         } catch (Exception e) {
             // Terminals never throw (contract). A gone recipient just means the stream is already finalized.

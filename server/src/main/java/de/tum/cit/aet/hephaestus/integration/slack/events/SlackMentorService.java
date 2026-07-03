@@ -122,6 +122,8 @@ public class SlackMentorService {
         }
         Developer dev = devOpt.get();
         UUID threadId = findOrCreateThread(workspaceId, teamId, channelId, slackUserId, dev.login());
+        // First feedback to the member on turn receipt, before any token streams (superseded by the first append).
+        slackMessageService.setStatus(workspaceId, channelId, messageTs, "Reviewing your recent feedback…");
         // Stream the reply into the DM thread rooted at the user's message.
         SlackStreamingMentorChannel channel = new SlackStreamingMentorChannel(
             slackMessageService,

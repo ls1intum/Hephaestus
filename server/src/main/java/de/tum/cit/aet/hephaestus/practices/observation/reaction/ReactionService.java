@@ -98,6 +98,59 @@ public class ReactionService {
     }
 
     /**
+     * Records a reaction on behalf of an already-resolved recipient, without consulting the HTTP security context.
+     *
+     * <p>The Slack interactivity surface (S5) has no authenticated {@code SecurityContext}: the reactor is resolved
+     * from the verified Slack identity ({@code (team, user)} → workspace member) upstream, so this overload takes
+     * the {@code reactorUserId} explicitly. It applies the same invariants as {@link #submitReaction}: the reactor
+     * must be the feedback's recipient, the unit must have been DELIVERED, and a {@code DISPUTED} reaction requires
+     * a non-blank explanation. The dispute reason a member types into the Slack modal IS that explanation.
+     *
+     * @throws EntityNotFoundException  if the feedback does not exist in {@code workspaceId}
+     * @throws AccessForbiddenException if {@code reactorUserId} is not the feedback's recipient
+     * @throws IllegalArgumentException if the unit was never delivered, or DISPUTED without an explanation
+     */
+    public ReactionDTO submitReactionForRecipient(
+        long workspaceId,
+        UUID feedbackId,
+        Long reactorUserId,
+        ReactionAction action,
+        String explanation
+    ) {
+        Feedback feedback = feedbackRepository
+            .findByIdAndWorkspaceId(feedbackId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
+
+        if (!feedback.getRecipientUserId().equals(reactorUserId)) {
+            throw new AccessForbiddenException("Only the recipient of the feedback can submit a reaction");
+        }
+        if (feedback.getDeliveryState() != FeedbackDeliveryState.DELIVERED) {
+            throw new IllegalArgumentException("Only delivered feedback can be reacted to");
+        }
+        if (action == ReactionAction.DISPUTED && (explanation == null || explanation.isBlank())) {
+            throw new IllegalArgumentException("Explanation is required when disputing feedback");
+        }
+
+        Reaction reaction = Reaction.builder()
+            .feedback(feedback)
+            .feedbackId(feedbackId)
+            .reactorUserId(reactorUserId)
+            .action(action)
+            .explanation(explanation)
+            .recurrenceKey(feedbackRepository.findHeadlineRecurrenceKey(feedbackId).orElse(null))
+            .build();
+
+        Reaction saved = reactionRepository.save(reaction);
+        log.info(
+            "Recorded Slack-originated reaction: feedbackId={}, action={}, reactorUserId={}",
+            feedbackId,
+            action,
+            reactorUserId
+        );
+        return ReactionDTO.from(saved);
+    }
+
+    /**
      * Returns the latest reaction by the current user for a specific feedback unit.
      */
     @Transactional(readOnly = true)

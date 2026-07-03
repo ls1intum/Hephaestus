@@ -38,6 +38,7 @@ public class SlackEventsController {
     private final SlackIngestService ingestService;
     private final SlackOnboardingService onboardingService;
     private final SlackAppHomeService appHomeService;
+    private final SlackAssistantEventHandler assistantEventHandler;
     private final ObjectMapper objectMapper;
 
     // Slack retries un-acked events; drop duplicates by event_id (bounded).
@@ -49,6 +50,7 @@ public class SlackEventsController {
         SlackIngestService ingestService,
         SlackOnboardingService onboardingService,
         SlackAppHomeService appHomeService,
+        SlackAssistantEventHandler assistantEventHandler,
         ObjectMapper objectMapper
     ) {
         this.verifier = verifier;
@@ -56,6 +58,7 @@ public class SlackEventsController {
         this.ingestService = ingestService;
         this.onboardingService = onboardingService;
         this.appHomeService = appHomeService;
+        this.assistantEventHandler = assistantEventHandler;
         this.objectMapper = objectMapper;
     }
 
@@ -114,6 +117,11 @@ public class SlackEventsController {
                 // S3: the DM link CTA for a not-yet-linked member (no-op once linked).
                 onboardingService.onHomeOpened(teamId, slackUserId);
             }
+            return;
+        }
+        if ("assistant_thread_started".equals(eventType)) {
+            // Seed the mentor DM with suggested prompts — MUST route before the non-message early-return below.
+            assistantEventHandler.onThreadStarted(teamId, event);
             return;
         }
         if (!"message".equals(eventType)) {
