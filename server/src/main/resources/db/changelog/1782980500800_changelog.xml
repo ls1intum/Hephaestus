@@ -418,4 +418,57 @@
         <rollback><sql>DROP TABLE IF EXISTS slack_event_dedup;</sql></rollback>
     </changeSet>
 
+    <!--
+        Make CONVERSATION_THREAD a first-class detection artifact at the schema level. The WorkArtifact enum
+        already carries CONVERSATION_THREAD, but the observation/feedback artifact_type CHECKs still admit only
+        PULL_REQUEST/ISSUE, so a conversation observation or feedback row could never be written. Widening a CHECK
+        to admit an additional value never affects existing rows or PR/ISSUE writes; it only lets the (currently
+        disabled) conversation-detection capability persist its rows once activated.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-18">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation artifact_type CHECK already admits CONVERSATION_THREAD">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_observation_target_type'
+                AND pg_get_constraintdef(oid) LIKE '%CONVERSATION_THREAD%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Widen the observation artifact_type CHECK to admit CONVERSATION_THREAD observations.</comment>
+        <sql>
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_target_type;
+            ALTER TABLE observation
+            ADD CONSTRAINT chk_observation_target_type
+            CHECK (artifact_type IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD'));
+        </sql>
+        <rollback>
+            ALTER TABLE observation DROP CONSTRAINT IF EXISTS chk_observation_target_type;
+            ALTER TABLE observation
+            ADD CONSTRAINT chk_observation_target_type
+            CHECK (artifact_type IN ('PULL_REQUEST', 'ISSUE'));
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-19">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback artifact_type CHECK already admits CONVERSATION_THREAD">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_feedback_target_type'
+                AND pg_get_constraintdef(oid) LIKE '%CONVERSATION_THREAD%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Widen the feedback artifact_type CHECK to admit CONVERSATION_THREAD feedback.</comment>
+        <sql>
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_target_type;
+            ALTER TABLE feedback
+            ADD CONSTRAINT chk_feedback_target_type
+            CHECK (artifact_type IS NULL OR artifact_type IN ('PULL_REQUEST', 'ISSUE', 'CONVERSATION_THREAD'));
+        </sql>
+        <rollback>
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_target_type;
+            ALTER TABLE feedback
+            ADD CONSTRAINT chk_feedback_target_type
+            CHECK (artifact_type IS NULL OR artifact_type IN ('PULL_REQUEST', 'ISSUE'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
