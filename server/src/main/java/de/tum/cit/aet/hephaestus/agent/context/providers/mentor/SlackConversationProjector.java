@@ -84,8 +84,10 @@ public class SlackConversationProjector {
      * Build the ordered-turns payload for a SINGLE settled thread (S11 conversation detection). Unlike
      * {@link #buildPayload} this is keyed on the thread itself — there is no participant firewall, because the
      * detection job judges the thread as a work artifact, not a per-audience mentor view. The same
-     * untrusted-content quarantine envelope and the same non-tombstoned, workspace-pinned message fetch are
-     * reused. Pure read; the content source wraps the result under {@code conversation_thread.json}.
+     * untrusted-content quarantine envelope and the same non-tombstoned, workspace-pinned, consent-gated
+     * ({@code slack_monitored_channel.consent_state = 'ACTIVE'}) message fetch are reused — so a channel that is
+     * paused/revoked between enqueue and execution yields an empty payload rather than leaking its messages.
+     * Pure read; the content source wraps the result under {@code conversation_thread.json}.
      *
      * @param workspaceId the workspace to scope every query to (explicit predicate)
      * @param channelId   the thread's Slack channel id
@@ -147,18 +149,26 @@ public class SlackConversationProjector {
 
     /**
      * Non-tombstoned messages of one thread (root {@code slack_ts = thread_ts} + replies
-     * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned.
+     * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned, and gated on the channel's consent
+     * being {@code ACTIVE} — the same {@code slack_monitored_channel} join as {@link #findParticipatingThreads}.
+     * The consent predicate lives on the message read itself (not only on the thread scan) so the S11 detection
+     * path — which keys straight into {@link #buildThreadPayload} without a prior consent-filtered thread scan —
+     * cannot leak revoked/paused-channel messages when a channel is paused or revoked between enqueue and
+     * execution (or on a retry): a non-ACTIVE channel yields zero messages, atomically with the read.
      */
     private void appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
         jdbc.query(
             """
-            SELECT slack_ts, author_slack_user_id, author_display_name, text, edited_at
-            FROM slack_message
-            WHERE workspace_id = ?
-              AND slack_channel_id = ?
-              AND (slack_thread_ts = ? OR slack_ts = ?)
-              AND deleted_at IS NULL
-            ORDER BY slack_ts ASC
+            SELECT m.slack_ts, m.author_slack_user_id, m.author_display_name, m.text, m.edited_at
+            FROM slack_message m
+            JOIN slack_monitored_channel c
+              ON c.workspace_id = m.workspace_id AND c.slack_channel_id = m.slack_channel_id
+            WHERE m.workspace_id = ?
+              AND m.slack_channel_id = ?
+              AND (m.slack_thread_ts = ? OR m.slack_ts = ?)
+              AND m.deleted_at IS NULL
+              AND c.consent_state = 'ACTIVE'
+            ORDER BY m.slack_ts ASC
             LIMIT ?
             """,
             rs -> {

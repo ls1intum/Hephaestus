@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.model.view.View;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
@@ -18,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -63,6 +66,12 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
     @Mock
     private SlackMessageService messageService;
 
+    @Mock
+    private ResearchParticipationCommand researchParticipationCommand;
+
+    @Mock
+    private SlackAppHomeService appHomeService;
+
     private SlackFeedbackHandler handler;
 
     @BeforeEach
@@ -72,7 +81,9 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
             workspaceResolver,
             identityResolver,
             reactionService,
-            messageService
+            messageService,
+            researchParticipationCommand,
+            appHomeService
         );
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
         when(identityResolver.resolveMemberId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of(RATER_ID));
@@ -103,6 +114,8 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
         verify(ratingRepository).save(captor.capture());
         assertThat(captor.getValue().getRating()).isEqualTo(TurnRating.HELPFUL);
         verifyNoInteractions(reactionService);
+        // A satisfaction thumb is NOT a consent decision — it must never touch research participation.
+        verifyNoInteractions(researchParticipationCommand);
     }
 
     @Test
@@ -196,6 +209,38 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
             "this rule does not apply to generated code"
         );
         verify(ratingRepository, never()).save(any());
+    }
+
+    @Test
+    void researchOptOut_setsParticipationFalse_withSlackAppHomeSource_andRepublishesHome() {
+        when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of("octocat"));
+
+        handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT, "false"));
+
+        verify(researchParticipationCommand).setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME);
+        verify(appHomeService).onHomeOpened(TEAM, USER);
+        // A consent toggle is not a rating and not a reaction.
+        verifyNoInteractions(ratingRepository, reactionService);
+    }
+
+    @Test
+    void researchOptIn_setsParticipationTrue_withSlackAppHomeSource() {
+        when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of("octocat"));
+
+        handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_RESEARCH_OPT_IN, "true"));
+
+        verify(researchParticipationCommand).setForLogin("octocat", true, ConsentSource.SLACK_APP_HOME);
+        verify(appHomeService).onHomeOpened(TEAM, USER);
+    }
+
+    @Test
+    void researchOptOut_unlinkedLogin_isSkipped_notThrown() {
+        // Rater (member id) resolves, but the SCM login does not — the ACK path must not throw.
+        when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.empty());
+
+        handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT, "false"));
+
+        verifyNoInteractions(researchParticipationCommand, appHomeService);
     }
 
     @Test

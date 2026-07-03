@@ -31,9 +31,10 @@ import org.springframework.stereotype.Service;
  * <ul>
  *   <li>a <strong>privacy disclosure</strong> block — what the mentor reads and why (legitimate interest);</li>
  *   <li>a <strong>research-participation consent toggle</strong> reflecting the member's current opt-in state,
- *       whose button {@code action_id}s the Slice-5 interactivity handler routes to
+ *       whose button {@code action_id}s the S5 interactivity handler ({@code SlackFeedbackHandler}) routes to
  *       {@code ResearchParticipationCommand.setForLogin}; and</li>
- *   <li>a <strong>quiet-hours</strong> control (its write path + persistence land in Slice 5).</li>
+ *   <li>a <strong>quiet-hours</strong> control that is rendered but not yet wired — its write path and
+ *       persistence are deferred (no live modal/store today), so clicking it is intentionally a no-op.</li>
  * </ul>
  *
  * <p>For a member who has not linked their identity yet the consent toggle is meaningless, so the Home tab
@@ -48,9 +49,14 @@ public class SlackAppHomeService {
 
     private static final Logger log = LoggerFactory.getLogger(SlackAppHomeService.class);
 
-    /** Stable action_ids the Slice-5 interactivity handler binds to; the App Home only renders them today. */
-    static final String ACTION_RESEARCH_OPT_OUT = "research_opt_out";
-    static final String ACTION_RESEARCH_OPT_IN = "research_opt_in";
+    /**
+     * Stable action_ids. The two research-consent ids are the single source of truth shared with the S5
+     * interactivity router ({@code SlackFeedbackHandler}), which binds them to
+     * {@link de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand#setForLogin}. The quiet-hours
+     * id is rendered but not yet wired — see {@link #quietHoursBlocks()}.
+     */
+    public static final String ACTION_RESEARCH_OPT_OUT = "research_opt_out";
+    public static final String ACTION_RESEARCH_OPT_IN = "research_opt_in";
     static final String ACTION_QUIET_HOURS = "open_quiet_hours";
 
     private final SlackWorkspaceResolver workspaceResolver;
@@ -168,7 +174,11 @@ public class SlackAppHomeService {
         );
     }
 
-    /** Quiet-hours control. Rendered here; its write path + persistence land in Slice 5. */
+    /**
+     * Quiet-hours control. Rendered here, but its write path + persistence are deferred (unbuilt) — the S5
+     * interactivity router leaves {@link #ACTION_QUIET_HOURS} on its default no-op branch, so only the two
+     * research-consent buttons are functional today.
+     */
     List<LayoutBlock> quietHoursBlocks() {
         return List.of(
             section(s ->

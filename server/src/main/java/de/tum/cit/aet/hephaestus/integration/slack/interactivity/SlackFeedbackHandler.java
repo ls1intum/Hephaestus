@@ -7,6 +7,8 @@ import static com.slack.api.model.block.element.BlockElements.plainTextInput;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewClose;
 import com.slack.api.model.view.ViewSubmit;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.RatingSource;
@@ -16,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
+import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService;
 import java.util.List;
@@ -40,6 +43,10 @@ import tools.jackson.databind.JsonNode;
  *   <li><strong>Dispute</strong> — a thumbs-down on a bound turn, or the uptake "Disagree", opens a modal that
  *       collects the required reason; the modal's {@code view_submission} routes into {@code Reaction} as
  *       {@code DISPUTED} with that reason.</li>
+ *   <li><strong>Research consent</strong> ({@code research_opt_out}/{@code research_opt_in}) from the App Home
+ *       toggle flip the acting member's research-participation flag via
+ *       {@link ResearchParticipationCommand#setForLogin} (source {@link ConsentSource#SLACK_APP_HOME}) and
+ *       re-publish the Home tab so it reflects the new state.</li>
  * </ul>
  *
  * <p>The reactor is resolved from the verified Slack identity ({@code (team, user)} → workspace member), so this
@@ -61,19 +68,25 @@ public class SlackFeedbackHandler {
     private final SlackMentorIdentityResolver identityResolver;
     private final ReactionService reactionService;
     private final SlackMessageService messageService;
+    private final ResearchParticipationCommand researchParticipationCommand;
+    private final SlackAppHomeService appHomeService;
 
     public SlackFeedbackHandler(
         MentorTurnRatingRepository ratingRepository,
         SlackWorkspaceResolver workspaceResolver,
         SlackMentorIdentityResolver identityResolver,
         ReactionService reactionService,
-        SlackMessageService messageService
+        SlackMessageService messageService,
+        ResearchParticipationCommand researchParticipationCommand,
+        SlackAppHomeService appHomeService
     ) {
         this.ratingRepository = ratingRepository;
         this.workspaceResolver = workspaceResolver;
         this.identityResolver = identityResolver;
         this.reactionService = reactionService;
         this.messageService = messageService;
+        this.researchParticipationCommand = researchParticipationCommand;
+        this.appHomeService = appHomeService;
     }
 
     /** Handle a {@code block_actions} payload: each element routes by its {@code action_id}. */
@@ -134,6 +147,19 @@ public class SlackFeedbackHandler {
                     triggerId,
                     parseFid(value)
                 );
+                case SlackAppHomeService.ACTION_RESEARCH_OPT_OUT -> setResearchParticipation(
+                    workspaceId,
+                    teamId,
+                    slackUserId,
+                    false
+                );
+                case SlackAppHomeService.ACTION_RESEARCH_OPT_IN -> setResearchParticipation(
+                    workspaceId,
+                    teamId,
+                    slackUserId,
+                    true
+                );
+                // Quiet hours is rendered on the App Home but its write path is deferred (unbuilt) — no-op today.
                 default -> log.debug("slack.interactivity: unhandled action_id {}", actionId);
             }
         }
@@ -169,6 +195,26 @@ public class SlackFeedbackHandler {
             .ifPresent(raterUserId ->
                 routeReaction(workspaceId, raterUserId, feedbackId, ReactionAction.DISPUTED, reason)
             );
+    }
+
+    /**
+     * Flip the acting member's research-participation flag from the App Home consent toggle, then re-publish the
+     * Home tab so it renders the new state. Lenient by the {@link ResearchParticipationCommand} contract and by
+     * the ACK path: an unlinked user is logged and skipped (never thrown), so Slack's 3s ACK is never blocked.
+     */
+    private void setResearchParticipation(long workspaceId, String teamId, String slackUserId, boolean participate) {
+        Optional<String> login = identityResolver.resolveDeveloperLogin(workspaceId, teamId, slackUserId);
+        if (login.isEmpty()) {
+            log.debug(
+                "slack.interactivity: research consent toggle from unlinked Slack user {} in team {} — skipping",
+                slackUserId,
+                teamId
+            );
+            return;
+        }
+        researchParticipationCommand.setForLogin(login.get(), participate, ConsentSource.SLACK_APP_HOME);
+        // Best-effort re-render of the Home tab so the toggle immediately reflects the new consent state.
+        appHomeService.onHomeOpened(teamId, slackUserId);
     }
 
     private void recordRating(

@@ -205,6 +205,42 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("consent gate is atomic with the read: a revoked/paused channel yields an EMPTY detection projection")
+    void projectsNothingWhenChannelConsentIsNotActive() {
+        long baseSecond = Instant.now().getEpochSecond() - 1200;
+        String rootTs = baseSecond + ".000000";
+        String replyTs = (baseSecond + 1) + ".000000";
+
+        // A channel whose consent was REVOKED between enqueue and execution: the settled thread is unchanged,
+        // but the detection projection must not leak its messages into the LLM.
+        long wsRevoked = newWorkspace();
+        seedChannel(wsRevoked, "C1", "REVOKED");
+        seedThread(wsRevoked, "C1", rootTs, replyTs, 2, "{100}");
+        seedMessage(wsRevoked, "C1", rootTs, null);
+        seedMessage(wsRevoked, "C1", replyTs, rootTs);
+
+        ObjectNode revoked = projector.buildThreadPayload(wsRevoked, "C1", rootTs);
+        assertThat(revoked.get("messageCount").asInt()).isZero();
+        assertThat(revoked.get("messages")).isEmpty();
+
+        // A PAUSED channel is likewise gated out.
+        long wsPaused = newWorkspace();
+        seedChannel(wsPaused, "C1", "PAUSED");
+        seedThread(wsPaused, "C1", rootTs, replyTs, 2, "{100}");
+        seedMessage(wsPaused, "C1", rootTs, null);
+        seedMessage(wsPaused, "C1", replyTs, rootTs);
+        assertThat(projector.buildThreadPayload(wsPaused, "C1", rootTs).get("messages")).isEmpty();
+
+        // Control: the SAME thread shape on an ACTIVE channel still projects both turns.
+        long wsActive = newWorkspace();
+        seedChannel(wsActive, "C1", "ACTIVE");
+        seedThread(wsActive, "C1", rootTs, replyTs, 2, "{100}");
+        seedMessage(wsActive, "C1", rootTs, null);
+        seedMessage(wsActive, "C1", replyTs, rootTs);
+        assertThat(projector.buildThreadPayload(wsActive, "C1", rootTs).get("messages")).hasSize(2);
+    }
+
+    @Test
     @DisplayName(
         "candidate scan is workspace-pinned: another workspace's thread with the same ids is not enqueued for this one"
     )
