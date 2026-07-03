@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -56,13 +58,16 @@ class SlackEventsControllerTest extends BaseUnitTest {
     void setUp() {
         // Real dispatcher over the mocked handlers so the HTTP path still exercises end-to-end event routing;
         // the controller itself is now a thin signature-verify + dedup + ACK entry point.
+        // Same-thread executor so the existing routing assertions can verify handleDm synchronously; the
+        // ack-before-work ordering is proven separately with a capturing executor.
         SlackEventDispatcher dispatcher = new SlackEventDispatcher(
             mentorService,
             ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
-            uninstallService
+            uninstallService,
+            Runnable::run
         );
         controller = new SlackEventsController(verifier, dispatcher, dedupService, JsonMapper.builder().build());
         when(verifier.verify(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
@@ -85,6 +90,47 @@ class SlackEventsControllerTest extends BaseUnitTest {
         );
 
         verify(ingestService).ingestChannelMessage("T1", "C1", "100.1", "100.0", "U1", "hello");
+    }
+
+    @Test
+    void directMessage_acksBeforeRunningMentorWork_soNoSlackApiOrLlmCallPrecedesThe200() {
+        // A capturing executor queues the offloaded task WITHOUT running it, so we can observe the ACK first.
+        List<Runnable> queued = new ArrayList<>();
+        SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
+            mentorService,
+            ingestService,
+            onboardingService,
+            appHomeService,
+            assistantEventHandler,
+            uninstallService,
+            queued::add
+        );
+        SlackEventsController asyncController = new SlackEventsController(
+            verifier,
+            asyncDispatcher,
+            dedupService,
+            JsonMapper.builder().build()
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", "1");
+        headers.add("X-Slack-Signature", "v0=deadbeef");
+        ResponseEntity<String> res = asyncController.events(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","channel_type":"im","channel":"D9","user":"U1","ts":"100.1","text":"hi heph"}}
+            """.getBytes(StandardCharsets.UTF_8),
+            headers
+        );
+
+        // The 200 is returned while the mentor turn (its setStatus Slack call + LLM work) is still only QUEUED.
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verifyNoInteractions(mentorService);
+        assertThat(queued).hasSize(1);
+
+        // Draining the executor runs the offloaded mentor work — proving it was deferred, not skipped.
+        queued.forEach(Runnable::run);
+        verify(mentorService).handleDm("T1", "D9", "U1", "hi heph", "100.1");
     }
 
     @Test

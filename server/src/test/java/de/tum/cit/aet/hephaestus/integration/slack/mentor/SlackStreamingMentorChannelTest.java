@@ -146,6 +146,50 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("a 429 rate-limit is honored via Retry-After and does NOT abort or disconnect the turn")
+    void rateLimitHonoredWithoutAbort() {
+        SlackMessageService slack = mock(SlackMessageService.class);
+        List<String> got = Collections.synchronizedList(new java.util.ArrayList<>());
+        AtomicInteger startCalls = new AtomicInteger();
+        AtomicBoolean stopped = new AtomicBoolean();
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
+            // First open is rate-limited (429, Retry-After ~20 ms); the loop must honor it and retry, not give up.
+            if (startCalls.incrementAndGet() == 1) {
+                throw new SlackSendException(WS, CH, "ratelimited", 20L);
+            }
+            got.add(inv.getArgument(3));
+            return "ts";
+        });
+        lenient()
+            .doAnswer(inv -> {
+                got.add(inv.getArgument(3));
+                return null;
+            })
+            .when(slack)
+            .appendStream(anyLong(), anyString(), anyString(), anyString());
+        doAnswer(inv -> {
+            stopped.set(true);
+            return null;
+        })
+            .when(slack)
+            .stopStream(anyLong(), anyString(), anyString(), any());
+
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+        AtomicBoolean disconnected = new AtomicBoolean();
+        channel.onDisconnect(() -> disconnected.set(true));
+
+        channel.send(delta("hello world "));
+        channel.completeWithDone();
+        waitUntil(stopped::get, 5000);
+
+        assertThat(disconnected.get()).as("a 429 throttle must not be treated as a disconnect").isFalse();
+        assertThat(startCalls.get())
+            .as("startStream retried after honoring the Retry-After backoff")
+            .isGreaterThanOrEqualTo(2);
+        assertThat(String.join("", got)).contains("hello world");
+    }
+
+    @Test
     @DisplayName("a genuine 'gone' error fires the disconnect hook once")
     void goneErrorDisconnects() {
         SlackMessageService slack = mock(SlackMessageService.class);

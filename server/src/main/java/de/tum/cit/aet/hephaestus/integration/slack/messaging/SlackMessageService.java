@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -40,6 +42,14 @@ public class SlackMessageService {
     private static final int USERS_LIST_PAGE_SIZE = 1000;
     private static final int USERS_LIST_MAX_PAGES = 50; // hard cap: 50_000 users is well above any realistic workspace
 
+    /**
+     * Total {@code Retry-After} budget for a single non-streaming send; a throttle beyond this gives up rather than
+     * blocking a request/worker thread unboundedly.
+     */
+    private static final long RATE_LIMIT_TOTAL_BUDGET_MS = 30_000L;
+    /** Never honor a single {@code Retry-After} longer than this — defends against an absurd/hostile header. */
+    private static final long RATE_LIMIT_MAX_WAIT_MS = 20_000L;
+
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
 
@@ -58,7 +68,9 @@ public class SlackMessageService {
             .text(fallback) // fallback text shown in notifications + accessibility tools
             .build();
         try {
-            ChatPostMessageResponse response = slack.methods(token).chatPostMessage(request);
+            ChatPostMessageResponse response = callHonoringRateLimit(() ->
+                slack.methods(token).chatPostMessage(request)
+            );
             if (!response.isOk()) {
                 String error = response.getError() == null ? "unknown" : response.getError();
                 log.warn(
@@ -96,7 +108,9 @@ public class SlackMessageService {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
             return r.getTs();
-        } catch (SlackApiException | IOException e) {
+        } catch (SlackApiException e) {
+            throw streamFailure(workspaceId, channel, e);
+        } catch (IOException e) {
             throw new SlackSendException(workspaceId, channel, "transport_failure", e);
         }
     }
@@ -113,7 +127,9 @@ public class SlackMessageService {
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
-        } catch (SlackApiException | IOException e) {
+        } catch (SlackApiException e) {
+            throw streamFailure(workspaceId, channel, e);
+        } catch (IOException e) {
             throw new SlackSendException(workspaceId, channel, "transport_failure", e);
         }
     }
@@ -130,7 +146,9 @@ public class SlackMessageService {
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
-        } catch (SlackApiException | IOException e) {
+        } catch (SlackApiException e) {
+            throw streamFailure(workspaceId, channel, e);
+        } catch (IOException e) {
             throw new SlackSendException(workspaceId, channel, "transport_failure", e);
         }
     }
@@ -146,7 +164,9 @@ public class SlackMessageService {
             new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
         );
         try {
-            ViewsPublishResponse r = slack.methods(token).viewsPublish(req -> req.userId(slackUserId).view(view));
+            ViewsPublishResponse r = callHonoringRateLimit(() ->
+                slack.methods(token).viewsPublish(req -> req.userId(slackUserId).view(view))
+            );
             if (!r.isOk()) {
                 String error = r.getError() == null ? "unknown" : r.getError();
                 log.warn(
@@ -281,6 +301,100 @@ public class SlackMessageService {
                 e.getMessage()
             );
             return accumulator;
+        }
+    }
+
+    // --- rate-limit handling ---
+
+    /** A synchronous Slack Web API call that may throw the SDK's checked failures. */
+    @FunctionalInterface
+    private interface SlackCall<T> {
+        T call() throws SlackApiException, IOException;
+    }
+
+    /**
+     * Run a synchronous Slack Web API call, transparently honoring a 429 {@code Retry-After} (jittered, bounded by
+     * {@link #RATE_LIMIT_TOTAL_BUDGET_MS}). The SDK's synchronous {@code MethodsClient} surfaces a 429 as a
+     * {@link SlackApiException} and does <em>not</em> retry it (only the async client throttles), so the bounded
+     * wait-and-retry happens here. Non-429 {@link SlackApiException} and {@link IOException} propagate unchanged so
+     * the caller's existing error handling is preserved.
+     */
+    private <T> T callHonoringRateLimit(SlackCall<T> call) throws SlackApiException, IOException {
+        long budgetLeftMs = RATE_LIMIT_TOTAL_BUDGET_MS;
+        int attempt = 0;
+        while (true) {
+            try {
+                return call.call();
+            } catch (SlackApiException e) {
+                long retryAfterMs = rateLimitRetryAfterMillis(e);
+                if (retryAfterMs == SlackSendException.NOT_RATE_LIMITED || budgetLeftMs <= 0) {
+                    throw e; // not a rate-limit, or the retry budget is spent — let the caller map it
+                }
+                long waitMs = Math.min(backoffWithJitter(retryAfterMs, ++attempt), budgetLeftMs);
+                log.warn(
+                    "Slack rate-limited (429); backing off {} ms before retry (attempt {}, budget left {} ms)",
+                    waitMs,
+                    attempt,
+                    budgetLeftMs
+                );
+                budgetLeftMs -= waitMs;
+                sleepQuietly(waitMs);
+            }
+        }
+    }
+
+    /**
+     * Map a streaming-call {@link SlackApiException} onto a {@link SlackSendException}, carrying the 429
+     * {@code Retry-After} wait so the streaming channel can honor it without counting it as a stream death.
+     */
+    private static SlackSendException streamFailure(long workspaceId, String channel, SlackApiException e) {
+        long retryAfterMs = rateLimitRetryAfterMillis(e);
+        if (retryAfterMs != SlackSendException.NOT_RATE_LIMITED) {
+            return new SlackSendException(workspaceId, channel, "ratelimited", retryAfterMs, e);
+        }
+        return new SlackSendException(workspaceId, channel, "transport_failure", e);
+    }
+
+    /**
+     * The {@code Retry-After} wait in ms for a 429, else {@link SlackSendException#NOT_RATE_LIMITED}. Slack always
+     * sends {@code Retry-After} on a 429; a missing/garbled header defaults to 1s.
+     */
+    static long rateLimitRetryAfterMillis(SlackApiException e) {
+        Response resp = e.getResponse();
+        if (resp == null || resp.code() != 429) {
+            return SlackSendException.NOT_RATE_LIMITED;
+        }
+        String header = resp.header("Retry-After");
+        long seconds = 1L;
+        if (header != null) {
+            try {
+                seconds = Long.parseLong(header.trim());
+            } catch (NumberFormatException ignored) {
+                // keep the 1s default
+            }
+        }
+        return Math.max(0L, seconds) * 1000L;
+    }
+
+    /**
+     * Honor {@code retryAfterMs} (capped at {@link #RATE_LIMIT_MAX_WAIT_MS}) plus a small jitter; when the header
+     * asked for no wait, fall back to a mild exponential backoff (1s, 2s, 4s… capped). Jitter avoids a thundering
+     * herd of replicas retrying in lockstep.
+     */
+    private static long backoffWithJitter(long retryAfterMs, int attempt) {
+        long base = retryAfterMs > 0 ? retryAfterMs : 1000L * (1L << Math.min(attempt - 1, 4));
+        base = Math.min(base, RATE_LIMIT_MAX_WAIT_MS);
+        return base + ThreadLocalRandom.current().nextLong(0L, 250L);
+    }
+
+    private static void sleepQuietly(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

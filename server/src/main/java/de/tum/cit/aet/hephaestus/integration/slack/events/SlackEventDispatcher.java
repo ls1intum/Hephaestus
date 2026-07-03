@@ -2,6 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
+import java.util.concurrent.Executor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -13,11 +17,16 @@ import tools.jackson.databind.JsonNode;
  * mirroring how {@code SlackInteractivityController} delegates to {@code SlackFeedbackHandler}.
  *
  * <p>Every branch is best-effort; the caller wraps {@link #dispatch(JsonNode)} in a try/catch and always ACKs
- * within Slack's 3&nbsp;s window.
+ * within Slack's 3&nbsp;s window. The DM mentor branch is the one path that makes a slow/remote Slack call before
+ * the turn (its {@code assistant.threads.setStatus} liveness ping and any canned reply), so it is offloaded to
+ * {@code slackMentorDmExecutor} — no Slack Web API call or LLM work runs before the ACK. Durable channel-message
+ * ingest stays synchronous so it commits before the ACK (at-least-once for channel content).
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackEventDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(SlackEventDispatcher.class);
 
     private final SlackMentorService mentorService;
     private final SlackIngestService ingestService;
@@ -25,6 +34,7 @@ public class SlackEventDispatcher {
     private final SlackAppHomeService appHomeService;
     private final SlackAssistantEventHandler assistantEventHandler;
     private final SlackUninstallService uninstallService;
+    private final Executor mentorDmExecutor;
 
     public SlackEventDispatcher(
         SlackMentorService mentorService,
@@ -32,7 +42,8 @@ public class SlackEventDispatcher {
         SlackOnboardingService onboardingService,
         SlackAppHomeService appHomeService,
         SlackAssistantEventHandler assistantEventHandler,
-        SlackUninstallService uninstallService
+        SlackUninstallService uninstallService,
+        @Qualifier("slackMentorDmExecutor") Executor mentorDmExecutor
     ) {
         this.mentorService = mentorService;
         this.ingestService = ingestService;
@@ -40,6 +51,7 @@ public class SlackEventDispatcher {
         this.appHomeService = appHomeService;
         this.assistantEventHandler = assistantEventHandler;
         this.uninstallService = uninstallService;
+        this.mentorDmExecutor = mentorDmExecutor;
     }
 
     /** Route one {@code event_callback} envelope by its inner event type. */
@@ -106,7 +118,16 @@ public class SlackEventDispatcher {
         String text = event.path("text").asString("");
 
         if ("im".equals(channelType)) {
-            mentorService.handleDm(teamId, channelId, slackUserId, text, event.path("ts").asString(""));
+            // A DM mentor turn makes a remote Slack call (setStatus + any canned reply) before the turn runs, so
+            // run it off the ACK thread — the 200 must return inside Slack's 3s window. Best-effort: a crash before
+            // completion loses at most one mentor reply, which the member can re-request (unlike durable channel
+            // ingest above). A saturated pool rejects → logged; the ACK still goes out.
+            String messageTs = event.path("ts").asString("");
+            try {
+                mentorDmExecutor.execute(() -> mentorService.handleDm(teamId, channelId, slackUserId, text, messageTs));
+            } catch (RuntimeException rejected) {
+                log.warn("Slack mentor DM dropped: executor rejected the turn ({})", rejected.getMessage());
+            }
         } else if ("channel".equals(channelType) || "group".equals(channelType)) {
             ingestService.ingestChannelMessage(
                 teamId,

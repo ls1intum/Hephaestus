@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -52,6 +53,13 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private static final int MAX_APPEND_CHARS = 8000;
     /** Give up (and abort) after this many consecutive transient failures so a Slack outage cannot wedge a turn. */
     private static final int MAX_CONSECUTIVE_FAILURES = 8;
+    /** Cap a single honored {@code Retry-After} wait so a hostile/absurd header cannot wedge the flush thread. */
+    private static final long MAX_RATE_LIMIT_WAIT_MS = 20_000;
+    /**
+     * A sane ceiling on back-to-back throttles: a rate-limit is deliberately NOT counted against
+     * {@value #MAX_CONSECUTIVE_FAILURES}, but an unbounded 429 storm must still terminate the turn eventually.
+     */
+    private static final int MAX_CONSECUTIVE_RATE_LIMITS = 20;
 
     /** Slack error codes that mean the target is genuinely gone — everything else is treated as transient/retryable. */
     private static final Set<String> GONE_ERRORS = Set.of(
@@ -88,6 +96,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private volatile String streamTs; // null until the first drain opens the stream; only mutated on the flush thread
     private volatile ScheduledFuture<?> flushTask;
     private int consecutiveFailures; // flush-thread only
+    private int consecutiveRateLimits; // flush-thread only
 
     public SlackStreamingMentorChannel(SlackMessageService slack, long workspaceId, String channel, String threadTs) {
         this.slack = slack;
@@ -253,18 +262,35 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                 slack.appendStream(workspaceId, channel, streamTs, text);
             }
             consecutiveFailures = 0;
+            consecutiveRateLimits = 0;
         } catch (SlackSendException e) {
             if (isGone(e)) {
                 markGone();
                 return;
             }
-            // Transient (rate limit / 5xx / transport): put the text back at the front and retry next tick.
+            // Put the text back at the front so no delta is lost, whatever the failure kind.
             lock.lock();
             try {
                 pending.insert(0, text);
             } finally {
                 lock.unlock();
             }
+            if (e.isRateLimited()) {
+                // A throttle is NOT a stream death: honor Slack's Retry-After (bounded, jittered) on this flush
+                // thread and DO NOT count it against the transient-failure abort budget. A separate high ceiling
+                // still terminates an unbounded 429 storm.
+                honorRetryAfter(e.retryAfterMillis());
+                if (++consecutiveRateLimits >= MAX_CONSECUTIVE_RATE_LIMITS) {
+                    log.warn(
+                        "Slack stream giving up after {} consecutive rate-limits (channel={})",
+                        consecutiveRateLimits,
+                        channel
+                    );
+                    markGone();
+                }
+                return;
+            }
+            // Transient (5xx / transport): retry next tick, counting toward the abort budget.
             if (++consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                 log.warn(
                     "Slack stream giving up after {} transient failures (channel={}): {}",
@@ -281,6 +307,21 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                     e.slackError()
                 );
             }
+        }
+    }
+
+    /**
+     * Sleep for Slack's requested {@code Retry-After} (capped at {@value #MAX_RATE_LIMIT_WAIT_MS} ms) plus a small
+     * jitter, on the flush thread. Interruption (from {@code stopFlusher}'s {@code shutdownNow}) just returns so a
+     * terminating turn is never blocked.
+     */
+    private static void honorRetryAfter(long retryAfterMs) {
+        long base = Math.min(Math.max(retryAfterMs, 0L), MAX_RATE_LIMIT_WAIT_MS);
+        long sleepMs = base + ThreadLocalRandom.current().nextLong(0L, 250L);
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -342,10 +383,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                     log.debug("Slack terminal write gave up (channel={}): {}", channel, e.slackError());
                     return;
                 }
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
+                // Honor a throttle's Retry-After (bounded); otherwise a short fixed transient backoff.
+                honorRetryAfter(e.isRateLimited() ? e.retryAfterMillis() : 200L);
+                if (Thread.currentThread().isInterrupted()) {
                     return;
                 }
             }
