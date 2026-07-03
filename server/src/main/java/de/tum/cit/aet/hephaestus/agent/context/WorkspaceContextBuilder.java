@@ -180,13 +180,16 @@ public class WorkspaceContextBuilder {
         return files;
     }
 
-    /** The job behind a PR/Issue review request, or {@code null} for the mentor-chat flow. */
+    /** The job behind a PR/Issue/conversation review request, or {@code null} for the mentor-chat flow. */
     private static @Nullable AgentJob reviewJob(ContextRequest request) {
         if (request instanceof ContextRequest.PracticeReviewRequest pr) {
             return pr.job();
         }
         if (request instanceof ContextRequest.IssueReviewRequest ir) {
             return ir.job();
+        }
+        if (request instanceof ContextRequest.ConversationReviewRequest cr) {
+            return cr.job();
         }
         return null;
     }

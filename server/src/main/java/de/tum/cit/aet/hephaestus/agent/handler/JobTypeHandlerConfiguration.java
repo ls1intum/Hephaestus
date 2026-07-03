@@ -147,6 +147,26 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
+    JobTypeHandler conversationReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService,
+        org.springframework.context.ApplicationEventPublisher eventPublisher,
+        org.springframework.transaction.support.TransactionTemplate transactionTemplate
+    ) {
+        return new ConversationReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            practiceCatalogInjector,
+            resultParser,
+            deliveryService,
+            eventPublisher,
+            transactionTemplate
+        );
+    }
+
+    @Bean
     JobTypeHandlerRegistry jobTypeHandlerRegistry(List<JobTypeHandler> handlers) {
         return new JobTypeHandlerRegistry(handlers);
     }

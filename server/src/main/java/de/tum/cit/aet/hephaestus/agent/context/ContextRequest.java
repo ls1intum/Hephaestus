@@ -13,7 +13,11 @@ import java.util.UUID;
  * variant-specific identity instead.
  */
 public sealed interface ContextRequest
-    permits ContextRequest.PracticeReviewRequest, ContextRequest.IssueReviewRequest, ContextRequest.MentorChatRequest
+    permits
+        ContextRequest.PracticeReviewRequest,
+        ContextRequest.IssueReviewRequest,
+        ContextRequest.MentorChatRequest,
+        ContextRequest.ConversationReviewRequest
 {
     /**
      * Build the materialised PR-review context: metadata, comments, diff, developer history.
@@ -54,6 +58,18 @@ public sealed interface ContextRequest
             if (developerId <= 0) {
                 throw new IllegalArgumentException("developerId must be positive, got " + developerId);
             }
+        }
+    }
+
+    /**
+     * Build the materialised conversation-detection context (S11): the ordered human turns of one
+     * settled Slack thread, materialised as {@code inputs/context/conversation_thread.json} — NO diff,
+     * NO code, NO SCM source. Carries the {@link AgentJob} the practice runner executes; the thread is
+     * identified by {@code slack_channel_id} / {@code slack_thread_ts} in the job metadata.
+     */
+    record ConversationReviewRequest(AgentJob job) implements ContextRequest {
+        public ConversationReviewRequest {
+            Objects.requireNonNull(job, "job must not be null");
         }
     }
 }

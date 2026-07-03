@@ -37,7 +37,8 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         "linked_work_items.json", // LinkedWorkItemContentSource.OUTPUT_FILE — resolved linked-issue rows
         "review_threads.json", // ReviewThreadContentSource — review-decision/thread rows
         "general_comments.json", // GeneralReviewCommentContentSource — conversation-tab (non-inline) MR review notes
-        "project_inventory.json" // WorkspaceInventoryContentSource.OUTPUT_FILE — whole-project issue/PR index
+        "project_inventory.json", // WorkspaceInventoryContentSource.OUTPUT_FILE — whole-project issue/PR index
+        "conversation_thread.json" // ConversationThreadContentSource — the ordered human turns of one settled Slack thread (S11)
         // These must never appear: test_presence.json + branch_graph.json are worktree-derived Transforms,
         // not content; acceptance_criteria.json is emitted by no provider.
     );
