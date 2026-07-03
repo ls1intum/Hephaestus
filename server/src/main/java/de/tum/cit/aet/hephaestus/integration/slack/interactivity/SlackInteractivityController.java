@@ -83,7 +83,13 @@ public class SlackInteractivityController {
 
         String type = payload.path("type").asString("");
         // ACK immediately; run the handler off the request thread so a Slack round-trip never breaches the 3s ACK.
-        executor.execute(() -> dispatch(type, payload));
+        // A saturated pool rejects (default AbortPolicy) → log the drop and still ACK 200. Letting the rejection
+        // propagate would 500, surfacing an error dialog to the user and making Slack retry the interaction.
+        try {
+            executor.execute(() -> dispatch(type, payload));
+        } catch (RuntimeException rejected) {
+            log.warn("Slack interactivity dropped: executor rejected the task ({})", rejected.getMessage());
+        }
         // An empty 200 both ACKs an action and closes a submitted modal.
         return ResponseEntity.ok().build();
     }

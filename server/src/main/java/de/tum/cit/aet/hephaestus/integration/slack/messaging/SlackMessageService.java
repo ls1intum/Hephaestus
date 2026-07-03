@@ -339,6 +339,12 @@ public class SlackMessageService {
                 );
                 budgetLeftMs -= waitMs;
                 sleepQuietly(waitMs);
+                if (Thread.currentThread().isInterrupted()) {
+                    // Interrupted mid-backoff (e.g. a shutting-down worker thread): stop retrying immediately rather
+                    // than spinning the rest of the budget in a tight loop; surface the last 429 unchanged (the
+                    // interrupt flag stays set for the caller) so its error handling maps it.
+                    throw e;
+                }
             }
         }
     }

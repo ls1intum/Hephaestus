@@ -134,6 +134,121 @@ class SlackEventsControllerTest extends BaseUnitTest {
     }
 
     @Test
+    void appHomeOpened_isOffloaded_soNoSlackApiCallPrecedesThe200() {
+        // App Home publishes go through the rate-limit-honoring path (up to 30s Retry-After budget); running them
+        // on the ACK thread would blow Slack's 3s window. A capturing executor proves they are queued, not run,
+        // before the 200 — then draining it runs both the Home render and the onboarding CTA.
+        List<Runnable> queued = new ArrayList<>();
+        SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
+            mentorService,
+            ingestService,
+            onboardingService,
+            appHomeService,
+            assistantEventHandler,
+            uninstallService,
+            queued::add
+        );
+        SlackEventsController asyncController = new SlackEventsController(
+            verifier,
+            asyncDispatcher,
+            dedupService,
+            JsonMapper.builder().build()
+        );
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", "1");
+        headers.add("X-Slack-Signature", "v0=deadbeef");
+
+        ResponseEntity<String> res = asyncController.events(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"app_home_opened","tab":"home","user":"U1"}}
+            """.getBytes(StandardCharsets.UTF_8),
+            headers
+        );
+
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verifyNoInteractions(appHomeService, onboardingService);
+        assertThat(queued).hasSize(1);
+
+        queued.forEach(Runnable::run);
+        verify(appHomeService).onHomeOpened("T1", "U1");
+        verify(onboardingService).onHomeOpened("T1", "U1");
+    }
+
+    @Test
+    void assistantThreadStarted_isOffloaded_soNoSlackApiCallPrecedesThe200() {
+        List<Runnable> queued = new ArrayList<>();
+        SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
+            mentorService,
+            ingestService,
+            onboardingService,
+            appHomeService,
+            assistantEventHandler,
+            uninstallService,
+            queued::add
+        );
+        SlackEventsController asyncController = new SlackEventsController(
+            verifier,
+            asyncDispatcher,
+            dedupService,
+            JsonMapper.builder().build()
+        );
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", "1");
+        headers.add("X-Slack-Signature", "v0=deadbeef");
+
+        ResponseEntity<String> res = asyncController.events(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"assistant_thread_started","assistant_thread":{"channel_id":"D9","thread_ts":"100.0"}}}
+            """.getBytes(StandardCharsets.UTF_8),
+            headers
+        );
+
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verifyNoInteractions(assistantEventHandler);
+        assertThat(queued).hasSize(1);
+
+        queued.forEach(Runnable::run);
+        verify(assistantEventHandler).onThreadStarted(eq("T1"), any());
+    }
+
+    @Test
+    void appHomeOpened_onMessagesTab_isIgnored() {
+        // The Messages-tab open fires the same event with tab=messages and must NOT re-render or offload anything.
+        List<Runnable> queued = new ArrayList<>();
+        SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
+            mentorService,
+            ingestService,
+            onboardingService,
+            appHomeService,
+            assistantEventHandler,
+            uninstallService,
+            queued::add
+        );
+        SlackEventsController asyncController = new SlackEventsController(
+            verifier,
+            asyncDispatcher,
+            dedupService,
+            JsonMapper.builder().build()
+        );
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", "1");
+        headers.add("X-Slack-Signature", "v0=deadbeef");
+
+        asyncController.events(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"app_home_opened","tab":"messages","user":"U1"}}
+            """.getBytes(StandardCharsets.UTF_8),
+            headers
+        );
+
+        assertThat(queued).isEmpty();
+        verifyNoInteractions(appHomeService, onboardingService);
+    }
+
+    @Test
     void directMessage_drivesMentorTurn() {
         post(
             """

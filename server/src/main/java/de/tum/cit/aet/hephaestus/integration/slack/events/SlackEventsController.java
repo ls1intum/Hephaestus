@@ -84,10 +84,13 @@ public class SlackEventsController {
             try {
                 dispatcher.dispatch(root);
             } catch (Exception e) {
+                // Best-effort: we log and still 200, so a synchronous channel-ingest failure is NOT retried by
+                // Slack (it only redelivers on a non-2xx/timeout) — channel ingest is best-effort, not at-least-once.
                 log.warn("Slack event handling failed: {}", e.getMessage(), e);
             }
         }
-        // Always ACK 200 within Slack's 3s window; work runs synchronously-but-fast (the mentor turn is async).
+        // Always ACK 200 within Slack's 3s window; the slow/remote branches (mentor DM, App Home, prompt seed) are
+        // offloaded off this thread, so only the fast synchronous work (dedup claim, channel ingest) runs before it.
         return ResponseEntity.ok().build();
     }
 }

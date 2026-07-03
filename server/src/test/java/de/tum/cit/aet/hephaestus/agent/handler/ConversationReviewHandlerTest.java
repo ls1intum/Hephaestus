@@ -125,6 +125,14 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
+        void volumeMountsAreEmpty() {
+            // The load-bearing repo-less contract: a CONVERSATION_REVIEW job binds NO volume mounts (it inherits the
+            // default JobTypeHandler.volumeMounts() == Map.of(), unlike the PR handler that mounts the clone). This
+            // empty map is exactly what lets the orchestrator/runner run without a repository clone.
+            assertThat(handler.volumeMounts(conversationJob())).isEmpty();
+        }
+
+        @Test
         void prepareInputFilesWritesNoScmSourceAndOnlyContextPlusTask() {
             AgentJob job = conversationJob();
             // The only context provider that fires materialises conversation_thread.json — stub the builder.
@@ -135,6 +143,9 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
 
             Map<String, byte[]> files = handler.prepareInputFiles(job);
 
+            // The conversation context file is the sole case input, alongside the task envelope — the
+            // "context + task, nothing else" shape the test name asserts.
+            assertThat(files).containsKey(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json");
             assertThat(files).containsKey(SandboxLayout.TASK_ENVELOPE_FILENAME);
             // Repo-less proof: no SCM source keep file is written anywhere in the prepared workspace.
             assertThat(files).doesNotContainKey(SandboxLayout.SCM_SOURCE_KEEP);

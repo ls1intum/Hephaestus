@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,6 +89,31 @@ class SlackInteractivityControllerTest extends BaseUnitTest {
 
         assertThat(res.getStatusCode().value()).isEqualTo(401);
         verifyNoInteractions(handler);
+    }
+
+    @Test
+    void saturatedExecutor_stillAcks200_soSlackDoesNotSeeAnErrorDialogOrRetry() {
+        // A saturated pool throws RejectedExecutionException from execute(); the controller must swallow it and
+        // still ACK 200 — a propagated rejection would 500 (error dialog + Slack retry).
+        Executor rejecting = task -> {
+            throw new RejectedExecutionException("pool full");
+        };
+        SlackInteractivityController saturated = new SlackInteractivityController(
+            new SlackSignatureVerifier(SIGNING_SECRET),
+            handler,
+            JsonMapper.builder().build(),
+            rejecting
+        );
+        byte[] body = formBody("{\"type\":\"block_actions\",\"actions\":[]}").getBytes(StandardCharsets.UTF_8);
+        String ts = Long.toString(Instant.now().getEpochSecond());
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", ts);
+        headers.add("X-Slack-Signature", sign(ts, body));
+
+        ResponseEntity<String> res = saturated.interactivity(body, headers);
+
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verifyNoInteractions(handler); // the task never ran, but the ACK still went out
     }
 
     @Test

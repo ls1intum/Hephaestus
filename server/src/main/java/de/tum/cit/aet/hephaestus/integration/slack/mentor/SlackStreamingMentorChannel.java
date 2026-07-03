@@ -14,6 +14,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -93,7 +94,15 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private volatile Runnable disconnectHook;
     /** The delivered conversational feedback this turn raised, bound before the terminal so the buttons carry it. */
     private volatile @Nullable UUID boundFeedbackId;
-    private volatile String streamTs; // null until the first drain opens the stream; only mutated on the flush thread
+    /**
+     * The streaming message ts: {@code null} until the first write opens the stream, set exactly once. Every
+     * open-or-append goes through {@link #openOrAppend} under {@link #streamLock}, so a late flush tick and the
+     * terminal write can never both call {@code startStream} — the one-start/N-append/one-stop contract holds even
+     * if {@link #stopFlusher} times out with a tick still stuck inside an (interrupt-immune) OkHttp call.
+     */
+    private final AtomicReference<String> streamTs = new AtomicReference<>();
+    /** Serializes the open-or-append decision so the stream is opened exactly once across the flush + runner threads. */
+    private final ReentrantLock streamLock = new ReentrantLock();
     private volatile ScheduledFuture<?> flushTask;
     private int consecutiveFailures; // flush-thread only
     private int consecutiveRateLimits; // flush-thread only
@@ -256,11 +265,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             return;
         }
         try {
-            if (streamTs == null) {
-                streamTs = slack.startStream(workspaceId, channel, threadTs, text);
-            } else {
-                slack.appendStream(workspaceId, channel, streamTs, text);
-            }
+            openOrAppend(text);
             consecutiveFailures = 0;
             consecutiveRateLimits = 0;
         } catch (SlackSendException e) {
@@ -311,6 +316,26 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     }
 
     /**
+     * Open the stream on the first call, append on every later one — serialized on {@link #streamLock} so a late
+     * flush tick and the terminal write can never both call {@code startStream} (exactly one open). {@code streamTs}
+     * is only set on a successful open, so a failed open leaves the stream un-opened and the next call retries it.
+     * Throws the {@link SlackSendException} unchanged so callers keep their transient/gone handling.
+     */
+    private void openOrAppend(String text) {
+        streamLock.lock();
+        try {
+            String ts = streamTs.get();
+            if (ts == null) {
+                streamTs.set(slack.startStream(workspaceId, channel, threadTs, text));
+            } else {
+                slack.appendStream(workspaceId, channel, ts, text);
+            }
+        } finally {
+            streamLock.unlock();
+        }
+    }
+
+    /**
      * Sleep for Slack's requested {@code Retry-After} (capped at {@value #MAX_RATE_LIMIT_WAIT_MS} ms) plus a small
      * jitter, on the flush thread. Interruption (from {@code stopFlusher}'s {@code shutdownNow}) just returns so a
      * terminating turn is never blocked.
@@ -348,15 +373,17 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
         // A turn that finishes before the first flush tick (or leaves a tail) writes here. No further tick will
         // run, so retry the terminal write inline rather than dropping it on a transient blip.
-        String body = (streamTs == null && remainder.isBlank()) ? "_(the mentor produced no response)_" : remainder;
-        if (!body.isBlank() || streamTs == null) {
+        boolean unopened = streamTs.get() == null;
+        String body = (unopened && remainder.isBlank()) ? "_(the mentor produced no response)_" : remainder;
+        if (!body.isBlank() || unopened) {
             terminalWrite(body);
         }
         try {
-            if (streamTs != null && !clientGone.get()) {
+            String ts = streamTs.get();
+            if (ts != null && !clientGone.get()) {
                 // Attach the feedback buttons (👍/👎, bound to this turn's ts + optional feedback id) as terminal blocks.
-                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(streamTs, boundFeedbackId);
-                slack.stopStream(workspaceId, channel, streamTs, blocks);
+                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(ts, boundFeedbackId);
+                slack.stopStream(workspaceId, channel, ts, blocks);
             }
         } catch (Exception e) {
             // Terminals never throw (contract). A gone recipient just means the stream is already finalized.
@@ -368,11 +395,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private void terminalWrite(String text) {
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
-                if (streamTs == null) {
-                    streamTs = slack.startStream(workspaceId, channel, threadTs, text);
-                } else {
-                    slack.appendStream(workspaceId, channel, streamTs, text);
-                }
+                openOrAppend(text);
                 return;
             } catch (SlackSendException e) {
                 if (isGone(e)) {
@@ -395,6 +418,11 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     /**
      * Stop the flush loop and wait for any in-flight tick so it can never race the terminal finalize. Called only
      * from {@link #finish} (the runner thread) — never from the flush thread, which must not await itself.
+     *
+     * <p>OkHttp calls do not respond to {@code interrupt}, so a tick stuck inside {@code startStream}/
+     * {@code appendStream} keeps running past {@code shutdownNow()}. We therefore await a second, longer bound so
+     * the terminal write does not interleave with a live tick. {@link #streamLock} is the hard guarantee against a
+     * double open even if that second wait also times out; this bounded wait just avoids overlapping writes.
      */
     private void stopFlusher() {
         ScheduledFuture<?> task = flushTask;
@@ -405,6 +433,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         try {
             if (!scheduler.awaitTermination(2, TimeUnit.SECONDS)) {
                 scheduler.shutdownNow();
+                if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
+                    log.warn("Slack stream flush tick still in-flight at finalize (channel={})", channel);
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

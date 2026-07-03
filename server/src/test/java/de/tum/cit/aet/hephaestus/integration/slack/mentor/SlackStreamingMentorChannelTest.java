@@ -17,6 +17,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -187,6 +189,52 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
             .as("startStream retried after honoring the Retry-After backoff")
             .isGreaterThanOrEqualTo(2);
         assertThat(String.join("", got)).contains("hello world");
+    }
+
+    @Test
+    @DisplayName("a slow flush tick still in startStream at finish never opens the stream twice")
+    void slowTickAtFinishNeverDoubleOpensStream() throws InterruptedException {
+        SlackMessageService slack = mock(SlackMessageService.class);
+        AtomicInteger startCalls = new AtomicInteger();
+        CountDownLatch startEntered = new CountDownLatch(1);
+        AtomicBoolean released = new AtomicBoolean(false);
+        // The first startStream blocks until released, IGNORING interrupts — modelling an OkHttp call that does not
+        // respond to shutdownNow()'s interrupt. This keeps a flush tick "in-flight" while finish() runs.
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
+            startCalls.incrementAndGet();
+            startEntered.countDown();
+            while (!released.get()) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException ignored) {
+                    // swallow: OkHttp does not abort on interrupt
+                }
+            }
+            return "ts-" + startCalls.get();
+        });
+        lenient()
+            .doAnswer(inv -> null)
+            .when(slack)
+            .appendStream(anyLong(), anyString(), anyString(), anyString());
+        lenient()
+            .doAnswer(inv -> null)
+            .when(slack)
+            .stopStream(anyLong(), anyString(), anyString(), any());
+
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+        channel.send(delta("first words here "));
+        // Wait until the flush tick has entered startStream (now blocked, holding streamLock).
+        assertThat(startEntered.await(3, TimeUnit.SECONDS)).as("flush tick should open the stream").isTrue();
+
+        // finish() on another thread: stopFlusher's 2s await times out, shutdownNow can't unblock the tick, so the
+        // second bounded await holds the terminal write until we release — a buggy impl would open a 2nd stream.
+        Thread finisher = new Thread(channel::completeWithDone, "finisher");
+        finisher.start();
+        Thread.sleep(2500); // past the 2s stopFlusher await, into the window where a double-open would happen
+        released.set(true); // let the in-flight open complete
+        finisher.join(8000);
+
+        assertThat(startCalls.get()).as("the stream must be opened exactly once, never twice").isEqualTo(1);
     }
 
     @Test
