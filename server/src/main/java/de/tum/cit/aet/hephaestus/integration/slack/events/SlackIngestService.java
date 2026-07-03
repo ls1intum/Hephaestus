@@ -52,6 +52,7 @@ public class SlackIngestService {
     private final SlackWorkspaceResolver workspaceResolver;
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final SlackChannelConsentGate consentGate;
+    private final SlackParticipantConsentGate participantConsentGate;
     private final SlackMessageRepository messageRepository;
     private final SlackThreadRepository threadRepository;
     private final SlackMentorIdentityResolver identityResolver;
@@ -69,6 +70,7 @@ public class SlackIngestService {
         SlackWorkspaceResolver workspaceResolver,
         SlackMonitoredChannelRepository monitoredChannelRepository,
         SlackChannelConsentGate consentGate,
+        SlackParticipantConsentGate participantConsentGate,
         SlackMessageRepository messageRepository,
         SlackThreadRepository threadRepository,
         SlackMentorIdentityResolver identityResolver,
@@ -78,6 +80,7 @@ public class SlackIngestService {
         this.workspaceResolver = workspaceResolver;
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.consentGate = consentGate;
+        this.participantConsentGate = participantConsentGate;
         this.messageRepository = messageRepository;
         this.threadRepository = threadRepository;
         this.identityResolver = identityResolver;
@@ -114,6 +117,19 @@ public class SlackIngestService {
         // Consent gate (single authority): only ACTIVE channels flow content. A brand-new channel is
         // PENDING → nothing ingested. Fails closed on an absent row.
         if (!consentGate.ingestAllowed(workspaceId, channelId)) {
+            return;
+        }
+
+        // Person firewall (the fix for the #1 defect): an individual who opted out of ingestion is never stored,
+        // even on an ACTIVE channel with the capability on. This composes the two-layer gate into:
+        //   ingest iff conversationIngestEnabled AND channel == ACTIVE AND NOT participantOptedOut(workspace, author).
+        // Deny-if-opted-out / allow-if-absent, keyed on the author's Slack id (an unauthored/blank sender has no
+        // person to gate, so it proceeds — it stamps no member id and unions nothing into participant_member_ids).
+        if (
+            authorSlackUserId != null &&
+            !authorSlackUserId.isBlank() &&
+            !participantConsentGate.ingestionAllowed(workspaceId, authorSlackUserId)
+        ) {
             return;
         }
 

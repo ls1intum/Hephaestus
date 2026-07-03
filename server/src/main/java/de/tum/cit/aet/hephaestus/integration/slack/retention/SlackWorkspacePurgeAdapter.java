@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepos
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
@@ -15,9 +16,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@code WorkspaceStatus.PURGED} is a soft delete, so an {@code ON DELETE CASCADE} on
  * {@code workspace_id} would not fire — each module must drop its own rows explicitly. This
- * contributor covers the five Slack tables: {@code slack_message} (PII-bearing content),
- * {@code slack_thread}, {@code slack_monitored_channel}, {@code mentor_slack_thread}, and
- * {@code mentor_turn_rating} (the feedback-button ratings).
+ * contributor covers the six Slack tables: {@code slack_message} (PII-bearing content),
+ * {@code slack_thread}, {@code slack_monitored_channel}, {@code mentor_slack_thread},
+ * {@code mentor_turn_rating} (the feedback-button ratings), and {@code slack_participant_consent}
+ * (per-person opt-out records — cleared with the tenant they belong to).
  *
  * <p>{@link #getOrder()} returns {@value #PURGE_ORDER} so this runs <b>before</b>
  * {@code ConnectionPurgeContributor} ({@code -100}, which transitions the Slack Connection to
@@ -47,6 +49,7 @@ public class SlackWorkspacePurgeAdapter implements WorkspacePurgeContributor {
     private final SlackMonitoredChannelRepository slackMonitoredChannelRepository;
     private final MentorSlackThreadRepository mentorSlackThreadRepository;
     private final MentorTurnRatingRepository mentorTurnRatingRepository;
+    private final SlackParticipantConsentRepository slackParticipantConsentRepository;
     private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     @Override
@@ -59,6 +62,7 @@ public class SlackWorkspacePurgeAdapter implements WorkspacePurgeContributor {
         slackMonitoredChannelRepository.deleteByWorkspaceId(workspaceId);
         mentorSlackThreadRepository.deleteByWorkspaceId(workspaceId);
         mentorTurnRatingRepository.deleteByWorkspaceId(workspaceId);
+        slackParticipantConsentRepository.deleteByWorkspaceId(workspaceId);
     }
 
     @Override

@@ -13,6 +13,8 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.RatingSource;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
+import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
+import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
@@ -21,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,10 +46,12 @@ import tools.jackson.databind.JsonNode;
  *   <li><strong>Dispute</strong> — a thumbs-down on a bound turn, or the uptake "Disagree", opens a modal that
  *       collects the required reason; the modal's {@code view_submission} routes into {@code Reaction} as
  *       {@code DISPUTED} with that reason.</li>
- *   <li><strong>Research consent</strong> ({@code research_opt_out}/{@code research_opt_in}) from the App Home
- *       toggle flip the acting member's research-participation flag via
+ *   <li><strong>App Home consent</strong> ({@code research_opt_out}/{@code research_opt_in}) drives BOTH purposes
+ *       from one toggle: it persists the person-level ingestion opt-out/-in ({@code slack_participant_consent},
+ *       member-optional), on opt-out ERASES that person's already-stored Slack data
+ *       ({@link SlackPersonErasureService}), and still flips the research-participation flag via
  *       {@link ResearchParticipationCommand#setForLogin} (source {@link ConsentSource#SLACK_APP_HOME}) and
- *       re-publish the Home tab so it reflects the new state.</li>
+ *       re-publishes the Home tab. Handled outside the member-id guard so an unlinked user can still opt out.</li>
  * </ul>
  *
  * <p>The reactor is resolved from the verified Slack identity ({@code (team, user)} → workspace member), so this
@@ -70,6 +75,8 @@ public class SlackFeedbackHandler {
     private final SlackMessageService messageService;
     private final ResearchParticipationCommand researchParticipationCommand;
     private final SlackAppHomeService appHomeService;
+    private final SlackParticipantConsentService participantConsentService;
+    private final SlackPersonErasureService personErasureService;
 
     public SlackFeedbackHandler(
         MentorTurnRatingRepository ratingRepository,
@@ -78,7 +85,9 @@ public class SlackFeedbackHandler {
         ReactionService reactionService,
         SlackMessageService messageService,
         ResearchParticipationCommand researchParticipationCommand,
-        SlackAppHomeService appHomeService
+        SlackAppHomeService appHomeService,
+        SlackParticipantConsentService participantConsentService,
+        SlackPersonErasureService personErasureService
     ) {
         this.ratingRepository = ratingRepository;
         this.workspaceResolver = workspaceResolver;
@@ -87,6 +96,8 @@ public class SlackFeedbackHandler {
         this.messageService = messageService;
         this.researchParticipationCommand = researchParticipationCommand;
         this.appHomeService = appHomeService;
+        this.participantConsentService = participantConsentService;
+        this.personErasureService = personErasureService;
     }
 
     /** Handle a {@code block_actions} payload: each element routes by its {@code action_id}. */
@@ -101,6 +112,33 @@ public class SlackFeedbackHandler {
             return;
         }
         long workspaceId = workspaceOpt.get();
+
+        // App Home consent toggles are handled FIRST and OUTSIDE the member-id guard below: they key on the Slack
+        // user id and are member-optional by design, so an unlinked user can still opt out (the decision is recorded
+        // and takes effect once they later link). Everything else (thumbs/uptake/dispute) needs a resolved member id.
+        List<JsonNode> memberGatedActions = new ArrayList<>();
+        for (JsonNode action : payload.path("actions")) {
+            String actionId = action.path("action_id").asString("");
+            switch (actionId) {
+                case SlackAppHomeService.ACTION_RESEARCH_OPT_OUT -> handleConsentToggle(
+                    workspaceId,
+                    teamId,
+                    slackUserId,
+                    false
+                );
+                case SlackAppHomeService.ACTION_RESEARCH_OPT_IN -> handleConsentToggle(
+                    workspaceId,
+                    teamId,
+                    slackUserId,
+                    true
+                );
+                default -> memberGatedActions.add(action);
+            }
+        }
+        if (memberGatedActions.isEmpty()) {
+            return;
+        }
+
         Optional<Long> raterOpt = identityResolver.resolveMemberId(workspaceId, teamId, slackUserId);
         if (raterOpt.isEmpty()) {
             log.debug("slack.interactivity: unlinked Slack user {} in team {} — dropping action", slackUserId, teamId);
@@ -108,7 +146,7 @@ public class SlackFeedbackHandler {
         }
         long raterUserId = raterOpt.get();
 
-        for (JsonNode action : payload.path("actions")) {
+        for (JsonNode action : memberGatedActions) {
             String actionId = action.path("action_id").asString("");
             String value = action.path("value").asString("");
             switch (actionId) {
@@ -147,18 +185,6 @@ public class SlackFeedbackHandler {
                     triggerId,
                     parseFid(value)
                 );
-                case SlackAppHomeService.ACTION_RESEARCH_OPT_OUT -> setResearchParticipation(
-                    workspaceId,
-                    teamId,
-                    slackUserId,
-                    false
-                );
-                case SlackAppHomeService.ACTION_RESEARCH_OPT_IN -> setResearchParticipation(
-                    workspaceId,
-                    teamId,
-                    slackUserId,
-                    true
-                );
                 // Defensive fallback for any action_id we do not (yet) route — logged and ignored.
                 default -> log.debug("slack.interactivity: unhandled action_id {}", actionId);
             }
@@ -195,6 +221,44 @@ public class SlackFeedbackHandler {
             .ifPresent(raterUserId ->
                 routeReaction(workspaceId, raterUserId, feedbackId, ReactionAction.DISPUTED, reason)
             );
+    }
+
+    /**
+     * Route an App Home consent toggle. A single toggle now drives BOTH purposes:
+     * <ol>
+     *   <li><strong>Person ingestion consent</strong> — persist the opt-out/-in keyed by the Slack user id (always,
+     *       even for an unlinked user, so a later link is covered) via {@link SlackParticipantConsentService}. This is
+     *       what {@link de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService} consults to stop future
+     *       ingestion of an opted-out person.</li>
+     *   <li><strong>Erase-on-opt-out</strong> — on opt-out, immediately erase this person's already-stored Slack data
+     *       (messages + participant-array prune + derived CONVERSATION feedback) via {@link SlackPersonErasureService},
+     *       so opting out both STOPS future ingestion and ERASES past data. Requires a resolved member id; an unlinked
+     *       user has nothing stored to erase (logged, skipped — never thrown). Opting back in never un-erases.</li>
+     *   <li><strong>Research participation</strong> — the pre-existing flag write, unchanged.</li>
+     * </ol>
+     * Lenient throughout: this runs on the already-ACKed thread, so nothing here may throw.
+     */
+    private void handleConsentToggle(long workspaceId, String teamId, String slackUserId, boolean optIn) {
+        // 1) Persist the person-level ingestion (+ research) consent, keyed by Slack user id (member-optional).
+        participantConsentService.recordAppHomeDecision(workspaceId, slackUserId, optIn);
+
+        // 2) On opt-out, erase this person's already-collected Slack data (needs a resolved workspace member id).
+        if (!optIn) {
+            identityResolver
+                .resolveMemberId(workspaceId, teamId, slackUserId)
+                .ifPresentOrElse(
+                    memberId -> personErasureService.eraseMember(workspaceId, memberId, slackUserId),
+                    () ->
+                        log.debug(
+                            "slack.interactivity: ingestion opt-out from unlinked Slack user {} in team {} — consent recorded, no stored data to erase",
+                            slackUserId,
+                            teamId
+                        )
+                );
+        }
+
+        // 3) Pre-existing research-participation flag write (+ Home-tab re-render), unchanged.
+        setResearchParticipation(workspaceId, teamId, slackUserId, optIn);
     }
 
     /**

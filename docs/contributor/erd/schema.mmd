@@ -896,6 +896,15 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
+    SlackParticipantConsent {
+        BIGINT workspace_id PK
+        VARCHAR(32) slack_user_id PK
+        BOOLEAN ingestion_opted_out "NOT NULL"
+        BOOLEAN research_opted_out "NOT NULL"
+        VARCHAR(32) source
+        TIMESTAMPTZ decided_at "NOT NULL"
+    }
+
     SlackThread {
         BIGINT id PK
         BIGINT workspace_id UK "NOT NULL"

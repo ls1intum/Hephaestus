@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
+import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
+import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
@@ -72,6 +74,12 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
     @Mock
     private SlackAppHomeService appHomeService;
 
+    @Mock
+    private SlackParticipantConsentService participantConsentService;
+
+    @Mock
+    private SlackPersonErasureService personErasureService;
+
     private SlackFeedbackHandler handler;
 
     @BeforeEach
@@ -83,10 +91,16 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
             reactionService,
             messageService,
             researchParticipationCommand,
-            appHomeService
+            appHomeService,
+            participantConsentService,
+            personErasureService
         );
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of(RATER_ID));
+        // The App Home opt-IN path no longer resolves a member id (only opt-out, for erasure), so this shared
+        // stub is lenient — the member-gated action tests and the opt-out path still consume it.
+        org.mockito.Mockito.lenient()
+            .when(identityResolver.resolveMemberId(WORKSPACE_ID, TEAM, USER))
+            .thenReturn(Optional.of(RATER_ID));
     }
 
     private ObjectNode blockActions(String actionId, String value) {
@@ -212,11 +226,15 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void researchOptOut_setsParticipationFalse_withSlackAppHomeSource_andRepublishesHome() {
+    void appHomeOptOut_recordsIngestionConsent_erasesMemberData_setsResearchFalse_republishesHome() {
         when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of("octocat"));
 
         handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT, "false"));
 
+        // Opting out BOTH stops future ingestion (person consent) AND erases past data (person erasure)…
+        verify(participantConsentService).recordAppHomeDecision(WORKSPACE_ID, USER, false);
+        verify(personErasureService).eraseMember(WORKSPACE_ID, RATER_ID, USER);
+        // …and still flips research participation + re-renders the Home tab.
         verify(researchParticipationCommand).setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME);
         verify(appHomeService).onHomeOpened(TEAM, USER);
         // A consent toggle is not a rating and not a reaction.
@@ -224,23 +242,30 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void researchOptIn_setsParticipationTrue_withSlackAppHomeSource() {
+    void appHomeOptIn_recordsConsent_neverUnErases_setsResearchTrue() {
         when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of("octocat"));
 
         handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_RESEARCH_OPT_IN, "true"));
 
+        verify(participantConsentService).recordAppHomeDecision(WORKSPACE_ID, USER, true);
         verify(researchParticipationCommand).setForLogin("octocat", true, ConsentSource.SLACK_APP_HOME);
         verify(appHomeService).onHomeOpened(TEAM, USER);
+        // Opting back in never un-erases — the erasure service is never touched.
+        verifyNoInteractions(personErasureService);
     }
 
     @Test
-    void researchOptOut_unlinkedLogin_isSkipped_notThrown() {
-        // Rater (member id) resolves, but the SCM login does not — the ACK path must not throw.
+    void appHomeOptOut_unlinkedUser_recordsConsent_noErase_noResearch_notThrown() {
+        // A truly unlinked user (no member id, no SCM login): the opt-out is still recorded (keyed by Slack user id,
+        // covered when they later link), nothing is erased (nothing stored under a member id), and the ACK path
+        // never throws. This proves the consent write lives OUTSIDE the member-id guard.
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.empty());
         when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.empty());
 
         handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT, "false"));
 
-        verifyNoInteractions(researchParticipationCommand, appHomeService);
+        verify(participantConsentService).recordAppHomeDecision(WORKSPACE_ID, USER, false);
+        verifyNoInteractions(personErasureService, researchParticipationCommand, appHomeService);
     }
 
     @Test

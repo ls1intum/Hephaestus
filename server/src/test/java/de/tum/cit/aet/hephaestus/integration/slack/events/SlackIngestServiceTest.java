@@ -37,6 +37,9 @@ class SlackIngestServiceTest extends BaseUnitTest {
     private SlackChannelConsentGate consentGate;
 
     @Mock
+    private SlackParticipantConsentGate participantConsentGate;
+
+    @Mock
     private SlackMessageRepository messageRepository;
 
     @Mock
@@ -56,6 +59,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
             workspaceResolver,
             monitoredChannelRepository,
             consentGate,
+            participantConsentGate,
             messageRepository,
             threadRepository,
             identityResolver,
@@ -85,6 +89,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
             workspaceResolver,
             monitoredChannelRepository,
             consentGate,
+            participantConsentGate,
             messageRepository,
             threadRepository,
             identityResolver
@@ -144,9 +149,41 @@ class SlackIngestServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void activeChannel_authorOptedOut_isNotStored_evenOnActiveChannel() {
+        // The person firewall (the #1-defect fix): capability ON + channel ACTIVE, but this individual opted out of
+        // ingestion → nothing is stored. Remove the firewall and this test fails (the message would be inserted).
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(false);
+
+        service.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
+
+        // Discovery still happens; the store does not. The identity resolver is never even consulted.
+        verify(monitoredChannelRepository).insertIfAbsent(7L, "T1", "C1");
+        verify(messageRepository, never()).insertIfAbsent(
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+        verify(threadRepository, never()).upsertOnMessage(
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
     void activeChannel_stampsResolvedMemberIdAndUpsertsThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", "99.0", "U1", 42L, "hi")).thenReturn(1);
 
@@ -161,6 +198,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     void activeChannel_rootMessageUsesOwnTsAsThreadTs() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.empty());
         when(
             messageRepository.insertIfAbsent(
@@ -202,6 +240,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     void duplicateMessage_doesNotBumpThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", null, "U1", 42L, "hi")).thenReturn(0);
 

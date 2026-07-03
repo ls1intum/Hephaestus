@@ -468,4 +468,32 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Person-level Slack consent firewall (Slice E — fixes the #1 defect: an opted-out individual was still
+        ingested because ingestChannelMessage consulted no person signal). One row per (workspace, Slack user).
+        ingestion_opted_out=true is the mentoring-purpose person firewall: the ingest write-path denies storage for
+        that individual, composing with the capability flag + channel-ACTIVE gate. research_opted_out persists the
+        research bit alongside it (App Home writes both) but does NOT change research-eligibility semantics here —
+        the research opt-in-vs-opt-out default stays a separate maintainer decision. Workspace-scoped (carries
+        workspace_id, absent from WorkspaceScopedTables.GLOBAL_TABLES) → a tenancy predicate rides every query.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-20">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_participant_consent already present">
+            <not><tableExists tableName="slack_participant_consent"/></not>
+        </preConditions>
+        <comment>Person-level Slack ingestion/research consent, keyed by (workspace_id, slack_user_id).</comment>
+        <sql>
+            CREATE TABLE slack_participant_consent (
+                workspace_id BIGINT NOT NULL,
+                slack_user_id VARCHAR(32) NOT NULL,
+                ingestion_opted_out BOOLEAN NOT NULL DEFAULT false,
+                research_opted_out BOOLEAN NOT NULL DEFAULT false,
+                source VARCHAR(32),
+                decided_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                CONSTRAINT pk_slack_participant_consent PRIMARY KEY (workspace_id, slack_user_id)
+            );
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS slack_participant_consent;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>
