@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * S5 interactivity-controller unit tests: the HMAC is computed IN-TEST (real {@link SlackSignatureVerifier} with a
+ * Interactivity-controller unit tests: the HMAC is computed IN-TEST (real {@link SlackSignatureVerifier} with a
  * known secret) so a genuinely signed payload ACKs 200 and dispatches, while a bad signature is rejected 401
  * before any handler runs. A same-thread executor makes the post-ACK dispatch deterministic.
  */

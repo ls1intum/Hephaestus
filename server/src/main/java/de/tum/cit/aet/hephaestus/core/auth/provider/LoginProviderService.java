@@ -21,8 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Owns the instance-scoped {@link LoginProvider} table: seeds the env-configured defaults on first
- * boot, is the single read path for building login {@code ClientRegistration}s (Slice 1b), and backs
- * the instance-admin CRUD (Slice 2).
+ * boot, is the single read path for building login {@code ClientRegistration}s, and backs
+ * the instance-admin CRUD.
  *
  * <p>Seeding is idempotent and promote-once: a provider is created from {@code hephaestus.auth.login-
  * providers.*} only when it does not already exist, so env becomes the <em>seed</em>, never the live

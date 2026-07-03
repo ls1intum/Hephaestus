@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Slice 3 App Home onboarding CTA. Deterministic: the Slack round-trip is mocked, so these lock the routing
+ * App Home onboarding CTA. Deterministic: the Slack round-trip is mocked, so these lock the routing
  * decisions (unknown team / already-linked / unlinked) and the deep-link the "Link Slack" button carries.
  */
 class SlackOnboardingServiceTest extends BaseUnitTest {

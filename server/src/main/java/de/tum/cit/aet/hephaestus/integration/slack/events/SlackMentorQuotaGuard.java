@@ -11,7 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Per-user turn/day cap plus a fleet-wide daily LLM-budget cap for the Slack mentor DM path (S9). The existing
+ * Per-user turn/day cap plus a fleet-wide daily LLM-budget cap for the Slack mentor DM path. The existing
  * {@code core.auth.ratelimit} filter is HTTP-auth-scoped and never sees this flow (inbound Slack events ride the
  * unauthenticated worker-hub chain), so a runaway or abusive DM sender would otherwise be uncapped. This guard is
  * consulted in {@link SlackMentorService#handleDm} — deliberately not in {@code MentorTurnRunner}, which would also

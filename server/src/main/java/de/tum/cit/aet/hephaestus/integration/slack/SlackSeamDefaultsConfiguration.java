@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Registers the overridable default beans for the Slack duty-of-care and token-liveness seams (S9).
+ * Registers the overridable default beans for the Slack duty-of-care and token-liveness seams.
  *
  * <p>Both defaults use {@code @ConditionalOnMissingBean} so a richer implementation (a model-backed
  * safety classifier, a live {@code auth.test} client) can replace them without touching the mentor flow.

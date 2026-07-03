@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Routes inbound Slack {@code app_uninstalled} / {@code tokens_revoked} events into a clean teardown (S9). These
+ * Routes inbound Slack {@code app_uninstalled} / {@code tokens_revoked} events into a clean teardown. These
  * arrive on {@code POST /slack/events} and were previously dropped by the controller's non-{@code message}
  * early-return, so a workspace that removed the app kept its ingested Slack content and a now-dead bot token.
  *

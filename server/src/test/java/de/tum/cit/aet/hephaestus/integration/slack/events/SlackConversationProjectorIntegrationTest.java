@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Slice 6 conversation-projector firewall + tombstone/edit integration tests (Testcontainers — the participant
+ * Conversation-projector firewall + tombstone/edit integration tests (Testcontainers — the participant
  * union rides a real Postgres {@code bigint[]}/GIN column and {@code = ANY(...)}). Deterministic: rows are seeded
  * with distinct workspace ids per test, so no shared-container bleed. Proves the single privacy invariant — a
  * non-participant never sees a thread — and the consent gate + tombstone/edit projection.

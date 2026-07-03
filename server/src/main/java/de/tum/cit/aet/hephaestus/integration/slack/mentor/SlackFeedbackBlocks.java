@@ -14,7 +14,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Assembles the interactive blocks the mentor attaches to a turn (S5): a binary "was this helpful?" feedback-button
+ * Assembles the interactive blocks the mentor attaches to a turn: a binary "was this helpful?" feedback-button
  * pair, and a three-way uptake block for a piece of delivered feedback.
  *
  * <p>These are valid Bolt {@link LayoutBlock}s (a {@code context} label + an {@code actions} row of buttons) with a
@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * {@code {"ts":"…","fid":"…"}} for a thumb (the turn's message {@code ts} plus the optional bound feedback id) and
  * {@code {"fid":"…"}} for an uptake button.
  *
- * <p><strong>Separation of concerns (the S5 correctness trap).</strong> The thumbs
+ * <p><strong>Separation of concerns (the correctness trap).</strong> The thumbs
  * ({@link #ACTION_TURN_HELPFUL}/{@link #ACTION_TURN_UNHELPFUL}) are a satisfaction signal and route ONLY to
  * {@code mentor_turn_rating}. The uptake buttons ({@link #ACTION_UPTAKE_ADDRESSED} /
  * {@link #ACTION_UPTAKE_NOT_APPLICABLE} / {@link #ACTION_UPTAKE_DISPUTED}) are the ONLY path that writes a

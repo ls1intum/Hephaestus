@@ -31,7 +31,7 @@ public interface MentorTurnRatingRepository extends JpaRepository<MentorTurnRati
         Long raterUserId
     );
 
-    /** Workspace purge (S5, folded into {@code SlackWorkspacePurgeAdapter}). Derived DELETE carries the predicate. */
+    /** Workspace purge (folded into {@code SlackWorkspacePurgeAdapter}). Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /** Scoped row count — carries the {@code workspace_id} predicate the inspector requires. */

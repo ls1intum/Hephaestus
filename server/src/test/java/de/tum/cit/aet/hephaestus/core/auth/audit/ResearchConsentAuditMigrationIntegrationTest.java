@@ -19,7 +19,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * S4 migration guard (changeset {@code 1782980500800-15}): the {@code ck_auth_event_event_type} CHECK
+ * Migration guard (changeset {@code 1782980500800-15}): the {@code ck_auth_event_event_type} CHECK
  * constraint must admit the new {@code RESEARCH_CONSENT_REVOKED} value against real Postgres. If the constraint
  * widening did not run, inserting the row raises a check violation and this test fails — proving the enum value
  * and its schema delta landed together (the {@code ddl-auto: validate} + boot gate covers the rest).

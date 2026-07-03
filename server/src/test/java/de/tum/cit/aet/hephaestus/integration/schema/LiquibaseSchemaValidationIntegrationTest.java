@@ -105,7 +105,7 @@ class LiquibaseSchemaValidationIntegrationTest {
         assertColumnExists("workspace", "account_login");
         assertColumnExists("connection", "credentials_encrypted");
 
-        // Slack integration (Slice 1): the four tables + the additive columns the ingest/detection
+        // Slack integration: the four tables + the additive columns the ingest/detection
         // paths rely on must be present in the Liquibase-built schema, and the git_provider->
         // identity_provider rename must have landed (data-safe rename, not drop+add).
         assertColumnExists("slack_message", "author_member_id");

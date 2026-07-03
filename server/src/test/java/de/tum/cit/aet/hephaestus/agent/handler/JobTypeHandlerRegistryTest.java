@@ -111,7 +111,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
             assertThat(registry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).isSameAs(pr);
             assertThat(registry.getHandler(AgentJobType.ISSUE_REVIEW)).isSameAs(issue);
-            // Handler-registered contract: the S11 conversation job type resolves to its handler, so a boot
+            // Handler-registered contract: the conversation job type resolves to its handler, so a boot
             // with this bean set never trips the registry's "no handler registered" fail-fast.
             assertThat(registry.getHandler(AgentJobType.CONVERSATION_REVIEW)).isSameAs(conversation);
         }

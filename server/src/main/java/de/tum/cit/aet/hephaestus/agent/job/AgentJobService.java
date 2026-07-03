@@ -298,7 +298,7 @@ public class AgentJobService {
             job.setJobType(jobType);
             // Stamp the polymorphic subject discriminator from the job type so downstream dispatch (e.g.
             // DiffNotePoster short-circuits when subjectClass != PULL_REQUEST) is driven off an explicit
-            // value rather than the legacy PULL_REQUEST backfill. Wires SLACK_MESSAGE_THREAD for S11.
+            // value rather than the legacy PULL_REQUEST backfill. Wires SLACK_MESSAGE_THREAD.
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);

@@ -128,7 +128,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    // --- S7: conversational feedback delivery loop ---
+    // --- conversational feedback delivery loop ---
 
     /**
      * Flip a PREPARED conversational unit to DELIVERED (compare-and-set). Native (not JPQL) because the

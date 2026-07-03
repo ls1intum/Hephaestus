@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MentorSlackThreadRepository extends JpaRepository<MentorSlackThread, UUID> {
     Optional<MentorSlackThread> findByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
 
-    /** Workspace purge: delete every DM→mentor-thread mapping for one workspace (S2). Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every DM→mentor-thread mapping for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */

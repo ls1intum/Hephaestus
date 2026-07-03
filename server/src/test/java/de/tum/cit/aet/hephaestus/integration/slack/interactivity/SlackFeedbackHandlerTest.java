@@ -35,7 +35,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * S5 interactivity-routing unit tests. Lock the correctness trap: a binary thumb goes ONLY to
+ * Interactivity-routing unit tests. Lock the correctness trap: a binary thumb goes ONLY to
  * {@code mentor_turn_rating}, never to {@code Reaction}; the three-way uptake block is the only path into
  * {@code Reaction}; a thumbs-down on a bound turn opens the dispute modal, whose submission is what writes DISPUTED.
  */

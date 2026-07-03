@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * S4 single consent gate. Deterministic: locks that a channel flows content <strong>only</strong> when its
- * consent is {@code ACTIVE}, and fails closed on an absent row — the one authority the S6 ingest write-path and
+ * Single consent gate. Deterministic: locks that a channel flows content <strong>only</strong> when its
+ * consent is {@code ACTIVE}, and fails closed on an absent row — the one authority the ingest write-path and
  * any later projector share, so a non-{@code ACTIVE} channel can never silently leak.
  */
 class SlackChannelConsentGateTest extends BaseUnitTest {

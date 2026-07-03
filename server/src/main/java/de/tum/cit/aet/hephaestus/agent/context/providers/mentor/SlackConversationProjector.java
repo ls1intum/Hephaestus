@@ -15,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
  * messages ({@code deleted_at IS NULL}).
  *
  * <p><strong>Participant firewall.</strong> {@code slack_thread.participant_member_ids} is the GIN-indexed
- * {@code bigint[]} of resolved workspace member ids stamped by the S6 ingest write-path; the audience match is
+ * {@code bigint[]} of resolved workspace member ids stamped by the ingest write-path; the audience match is
  * {@code audienceMemberId = ANY(participant_member_ids)}. A mentor chat therefore surfaces only conversations the
  * requesting developer actually took part in — never a channel they merely share a workspace with.
  *
@@ -81,7 +81,7 @@ public class SlackConversationProjector {
     }
 
     /**
-     * Build the ordered-turns payload for a SINGLE settled thread (S11 conversation detection). Unlike
+     * Build the ordered-turns payload for a SINGLE settled thread (conversation detection). Unlike
      * {@link #buildPayload} this is keyed on the thread itself — there is no participant firewall, because the
      * detection job judges the thread as a work artifact, not a per-audience mentor view. The same
      * untrusted-content quarantine envelope and the same non-tombstoned, workspace-pinned, consent-gated
@@ -151,7 +151,7 @@ public class SlackConversationProjector {
      * Non-tombstoned messages of one thread (root {@code slack_ts = thread_ts} + replies
      * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned, and gated on the channel's consent
      * being {@code ACTIVE} — the same {@code slack_monitored_channel} join as {@link #findParticipatingThreads}.
-     * The consent predicate lives on the message read itself (not only on the thread scan) so the S11 detection
+     * The consent predicate lives on the message read itself (not only on the thread scan) so the detection
      * path — which keys straight into {@link #buildThreadPayload} without a prior consent-filtered thread scan —
      * cannot leak revoked/paused-channel messages when a channel is paused or revoked between enqueue and
      * execution (or on a retry): a non-ACTIVE channel yields zero messages, atomically with the read.

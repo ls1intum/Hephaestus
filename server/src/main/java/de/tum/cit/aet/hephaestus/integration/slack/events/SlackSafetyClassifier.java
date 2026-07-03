@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 /**
- * Duty-of-care classifier seam for inbound mentor DMs (S9). Before a message drives a mentor turn,
+ * Duty-of-care classifier seam for inbound mentor DMs. Before a message drives a mentor turn,
  * {@link SlackMentorService#handleDm} asks this whether it is safe to answer as a coding mentor. A non-{@code OK}
  * verdict short-circuits the turn and posts a fixed, safe canned response instead.
  *

@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * S4 App Home render. Deterministic: the {@code views.publish} round-trip is mocked, so these lock the view
+ * App Home render. Deterministic: the {@code views.publish} round-trip is mocked, so these lock the view
  * assembly (disclosure + research-consent toggle reflecting current state + quiet-hours) and the linked/unlinked
  * routing (an unlinked member leads with the link CTA, no toggle).
  */

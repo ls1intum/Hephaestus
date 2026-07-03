@@ -91,7 +91,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         Instant getFeedbackCreatedAt();
     }
 
-    // --- S7: conversational feedback delivery loop ---
+    // --- conversational feedback delivery loop ---
 
     /**
      * The id(s) of the PREPARED CONVERSATION feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the

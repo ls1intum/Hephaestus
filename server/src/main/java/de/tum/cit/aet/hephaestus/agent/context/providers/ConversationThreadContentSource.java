@@ -18,14 +18,14 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Materialises the CONVERSATION_THREAD detection context under {@code inputs/context/} — the repo-less,
- * no-diff counterpart of {@link IssueContentSource} for a settled Slack thread (S11):
+ * no-diff counterpart of {@link IssueContentSource} for a settled Slack thread:
  *
  * <ul>
  *   <li>{@code conversation_thread.json} — the ordered, non-tombstoned human turns of one thread, each with its
  *       author and text, wrapped in the untrusted-content quarantine envelope.</li>
  * </ul>
  *
- * <p>Reuses the S6 {@link SlackConversationProjector}, which reads the Slack substrate via raw
+ * <p>Reuses the {@link SlackConversationProjector}, which reads the Slack substrate via raw
  * {@code JdbcTemplate} with an explicit {@code workspace_id} predicate (the tenancy inspector is bypassed for
  * raw JDBC). Required: a job whose metadata does not name a thread is a preparation failure.
  */

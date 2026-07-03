@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
 /**
- * S9 duty-of-care heuristic tests: unambiguous self-harm and harassment cues divert with a canned response, while
+ * Duty-of-care heuristic tests: unambiguous self-harm and harassment cues divert with a canned response, while
  * an ordinary coding question (even one mentioning "kill" in a technical sense) is answered normally.
  */
 class HeuristicSlackSafetyClassifierTest extends BaseUnitTest {

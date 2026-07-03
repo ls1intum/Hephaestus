@@ -19,7 +19,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     );
 
     /**
-     * Idempotent thread-aggregate upsert on a freshly ingested message (S6). Creates the
+     * Idempotent thread-aggregate upsert on a freshly ingested message. Creates the
      * {@code (workspace_id, slack_channel_id, slack_thread_ts)} row on first sight and, on the unique conflict,
      * advances the {@code first_ts}/{@code last_ts} window (Slack {@code ts} strings sort lexicographically —
      * fixed {@code <10-digit>.<6-digit>} format), bumps {@code message_count}, and unions the author's resolved
@@ -64,7 +64,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         @Param("authorMemberId") @Nullable Long authorMemberId
     );
 
-    /** Workspace purge: delete every thread aggregate for one workspace (S2). Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every thread aggregate for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */

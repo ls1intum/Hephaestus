@@ -19,7 +19,7 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
 
     /**
      * The consent lifecycle state of one allow-listed channel, if the row exists. Carries the
-     * {@code workspace_id} predicate the tenancy {@code StatementInspector} requires. Read by the S6 ingest
+     * {@code workspace_id} predicate the tenancy {@code StatementInspector} requires. Read by the ingest
      * gate: a message is only persisted when this is {@link ConsentState#ACTIVE}.
      */
     @Query(
@@ -32,7 +32,7 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
     );
 
     /**
-     * Data-subject / channel erasure (S6): flip a channel's consent to {@code REVOKED} so ingestion stops
+     * Data-subject / channel erasure: flip a channel's consent to {@code REVOKED} so ingestion stops
      * immediately. Scoped UPDATE carrying the {@code workspace_id} predicate. Returns the rows affected (0 when
      * the channel was never allow-listed). The stored message history is cleared separately by the caller.
      */
@@ -65,7 +65,7 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
         @Param("slackChannelId") String slackChannelId
     );
 
-    /** Workspace purge: delete every allow-list row for one workspace (S2). Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every allow-list row for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */

@@ -258,7 +258,7 @@ public class MentorTurnPersistence {
         // a benign reaper race into a logged turn failure.
         chatMessageRepository.saveAndFlush(assistant);
 
-        // S7: close the conversational-delivery loop for any PREPARED unit the mentor raised this turn. MUST run
+        // close the conversational-delivery loop for any PREPARED unit the mentor raised this turn. MUST run
         // AFTER the assistant saveAndFlush above - the CONVERSATION_TURN placement's chat_message_id FK
         // (ON DELETE SET NULL) references this just-flushed row. Runs in THIS (finalise) transaction. Best-effort.
         reconcileConversationalDelivery(assistant, state);
@@ -270,7 +270,7 @@ public class MentorTurnPersistence {
     }
 
     /**
-     * Reconcile the mentor's linked findings for this turn against the PREPARED conversational queue (S7).
+     * Reconcile the mentor's linked findings for this turn against the PREPARED conversational queue.
      * Derives the recipient + workspace from the assistant message's thread. Best-effort - a failure is logged
      * and swallowed so it can never fail the turn persistence the finalise transaction just did.
      */

@@ -248,7 +248,7 @@ public class PracticeDetectionDeliveryService {
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String artifactType = metadata.has("artifact_type") ? metadata.get("artifact_type").asString() : "PULL_REQUEST";
         if (WorkArtifact.CONVERSATION_THREAD.name().equals(artifactType)) {
-            // A conversation-review job (S11) is repo-less: the subject is a settled Slack thread and the
+            // A conversation-review job is repo-less: the subject is a settled Slack thread and the
             // person the finding is about is carried EXPLICITLY in metadata (about_user_id), not resolved
             // from an SCM artifact author. artifactId is the slack_thread aggregate id.
             JsonNode threadIdNode = metadata.get("slack_thread_id");

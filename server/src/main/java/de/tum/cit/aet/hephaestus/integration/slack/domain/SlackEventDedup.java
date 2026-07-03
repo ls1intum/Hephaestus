@@ -12,7 +12,7 @@ import lombok.Setter;
 
 /**
  * Durable first-writer-wins dedup marker for one inbound Slack Events API delivery, keyed on the Slack
- * {@code event_id} (S9). Slack redelivers an un-acked event, and in a multi-replica deployment two pods can each
+ * {@code event_id}. Slack redelivers an un-acked event, and in a multi-replica deployment two pods can each
  * receive the same delivery — an in-memory {@code Set} on one controller instance cannot suppress that. A row here,
  * written with {@code INSERT … ON CONFLICT (event_id) DO NOTHING}, lets exactly one replica claim the event.
  *

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Durable, multi-replica event dedup for the Slack Events API (S9). Replaces the in-memory {@code Set} that only
+ * Durable, multi-replica event dedup for the Slack Events API. Replaces the in-memory {@code Set} that only
  * suppressed duplicates seen by one controller instance: Slack redelivers un-acked events, and two pods can each
  * receive the same delivery, so the suppression must live in the shared DB.
  *

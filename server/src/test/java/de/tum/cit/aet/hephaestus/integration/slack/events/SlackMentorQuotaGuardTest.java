@@ -10,7 +10,7 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 
 /**
- * S9 quota-guard unit tests: the per-user turn cap and the fleet daily-budget cap each trip at the right count and
+ * Quota-guard unit tests: the per-user turn cap and the fleet daily-budget cap each trip at the right count and
  * return a friendly {@link Decision} (never throw), and both tallies reset when the UTC day rolls over.
  */
 class SlackMentorQuotaGuardTest extends BaseUnitTest {

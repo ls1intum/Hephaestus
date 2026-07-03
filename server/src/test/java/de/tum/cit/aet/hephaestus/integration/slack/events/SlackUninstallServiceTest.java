@@ -19,7 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 /**
- * S9 uninstall-routing unit tests: an {@code app_uninstalled}/{@code tokens_revoked} event flips the Slack
+ * Uninstall-routing unit tests: an {@code app_uninstalled}/{@code tokens_revoked} event flips the Slack
  * Connection to UNINSTALLED and then purges the workspace's Slack content; an unknown team is a safe no-op.
  */
 class SlackUninstallServiceTest extends BaseUnitTest {
@@ -56,7 +56,7 @@ class SlackUninstallServiceTest extends BaseUnitTest {
         verify(connectionService).transition(eq(connection), captor.capture());
         assertThat(captor.getValue().next()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(captor.getValue().eventType()).isEqualTo("APP_UNINSTALLED");
-        // Content is purged after the connection flip (S2 adapter reused).
+        // Content is purged after the connection flip (adapter reused).
         verify(purgeAdapter).deleteWorkspaceData(WORKSPACE);
     }
 

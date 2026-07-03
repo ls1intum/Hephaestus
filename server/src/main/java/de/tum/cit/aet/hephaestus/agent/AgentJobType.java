@@ -10,7 +10,7 @@ public enum AgentJobType {
     PULL_REQUEST_REVIEW,
     ISSUE_REVIEW,
     /**
-     * Detection over a settled Slack conversation thread (S11). Repo-less: the case context is the
+     * Detection over a settled Slack conversation thread. Repo-less: the case context is the
      * thread's human turns (materialised as {@code inputs/context/conversation_thread.json}), with no
      * clone, no diff, and no SCM source mount. Handled by {@code ConversationReviewHandler}.
      */

@@ -43,7 +43,7 @@ import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Real-Postgres, stub-Pi (no live Slack) proof of the S7 conversational delivery loop: two jobs prepare body-null
+ * Real-Postgres, stub-Pi (no live Slack) proof of the conversational delivery loop: two jobs prepare body-null
  * CONVERSATION units; three simulated {@code link_finding} events flip exactly one to DELIVERED (one-per-turn) and
  * bind a CONVERSATION_TURN placement; a re-run is a no-op; a clock-advanced sweep expires the remaining PREPARED
  * units to CONVERSATION_EXPIRED. Deterministic.

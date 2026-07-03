@@ -62,7 +62,7 @@ public sealed interface ContextRequest
     }
 
     /**
-     * Build the materialised conversation-detection context (S11): the ordered human turns of one
+     * Build the materialised conversation-detection context: the ordered human turns of one
      * settled Slack thread, materialised as {@code inputs/context/conversation_thread.json} — NO diff,
      * NO code, NO SCM source. Carries the {@link AgentJob} the practice runner executes; the thread is
      * identified by {@code slack_channel_id} / {@code slack_thread_ts} in the job metadata.

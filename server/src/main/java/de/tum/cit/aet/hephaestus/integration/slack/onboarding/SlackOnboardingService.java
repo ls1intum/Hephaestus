@@ -22,15 +22,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Slack App Home onboarding (Slice 3): when a workspace member opens the Hephaestus App Home and is not yet
+ * Slack App Home onboarding: when a workspace member opens the Hephaestus App Home and is not yet
  * linked, surface a single "Link Slack" call-to-action that deep-links into the authenticated account-linking
  * flow ({@code /auth/login?provider=slack&mode=link}). Linking there attaches a {@code SLACK} identity to the
  * signed-in account, after which {@link SlackMentorIdentityResolver} can resolve the member's SCM work.
  *
  * <p>Scope is deliberately the CTA only. The privacy disclosure block, the research-participation consent
- * toggle, and quiet-hours belong to later slices (S4/S5) and are not pulled forward here.
+ * toggle, and quiet-hours are deferred — no write path yet.
  *
- * <p>The live {@code views.publish} App Home render is a later slice; for now the CTA is delivered to the
+ * <p>The live {@code views.publish} App Home render is deferred; for now the CTA is delivered to the
  * opening user's DM via {@link SlackMessageService}, which is the only outbound surface that exists today.
  * The CTA is idempotently gated on "not yet linked", so an already-linked member is never nudged.
  */
@@ -40,7 +40,7 @@ public class SlackOnboardingService {
 
     private static final Logger log = LoggerFactory.getLogger(SlackOnboardingService.class);
 
-    /** Distinct from the interactivity action_ids (S5) — this button only opens a URL, it posts no payload. */
+    /** Distinct from the interactivity action_ids — this button only opens a URL, it posts no payload. */
     private static final String LINK_ACTION_ID = "link_slack_identity";
     private static final String FALLBACK_TEXT = "Connect your account to Hephaestus";
 

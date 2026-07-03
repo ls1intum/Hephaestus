@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Slice 6 ingest write-path unit tests. Deterministic: the repositories and the identity resolver are mocked, so
+ * Ingest write-path unit tests. Deterministic: the repositories and the identity resolver are mocked, so
  * these lock the consent gate (only ACTIVE channels flow content), the author→member firewall stamp, and the
  * thread upsert bookkeeping — the behavioral break from the old "auto-PENDING then persist unconditionally" path.
  */

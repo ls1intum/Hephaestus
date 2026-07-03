@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import java.util.Objects;
 
 /**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#CONVERSATION_REVIEW} jobs (S11).
+ * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#CONVERSATION_REVIEW} jobs.
  *
  * <p>Identifies one settled Slack thread and the single participant the findings are filed against. There is no
  * repository / diff / head SHA — the thread is identified by {@code (channelId, threadTs)} and the freshness

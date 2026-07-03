@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Routes a verified Slack {@code event_callback} payload to the right handler (S3/S4/S8). Extracted from
+ * Routes a verified Slack {@code event_callback} payload to the right handler. Extracted from
  * {@link SlackEventsController} so the controller stays a thin signature-verify + dedup + ACK entry point and
  * the event fan-out (mentor DM, channel ingest, App Home, assistant seed, uninstall) lives in one place —
  * mirroring how {@code SlackInteractivityController} delegates to {@code SlackFeedbackHandler}.
@@ -51,9 +51,9 @@ public class SlackEventDispatcher {
             // Only (re)publish on the Home tab open; the Messages tab open fires the same event with tab=messages.
             if ("home".equals(event.path("tab").asString("home"))) {
                 String slackUserId = event.path("user").asString("");
-                // S4: publish the persistent Home tab (disclosure + research-consent toggle + quiet-hours).
+                // publish the persistent Home tab (disclosure + research-consent toggle + quiet-hours).
                 appHomeService.onHomeOpened(teamId, slackUserId);
-                // S3: the DM link CTA for a not-yet-linked member (no-op once linked).
+                // the DM link CTA for a not-yet-linked member (no-op once linked).
                 onboardingService.onHomeOpened(teamId, slackUserId);
             }
             return;

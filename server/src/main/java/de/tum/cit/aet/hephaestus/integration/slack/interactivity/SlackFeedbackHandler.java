@@ -32,7 +32,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Routes verified Slack interactivity payloads (S5) into the right store:
+ * Routes verified Slack interactivity payloads into the right store:
  *
  * <ul>
  *   <li><strong>Thumbs</strong> ({@code turn_helpful}/{@code turn_unhelpful}) append a {@link MentorTurnRating}.

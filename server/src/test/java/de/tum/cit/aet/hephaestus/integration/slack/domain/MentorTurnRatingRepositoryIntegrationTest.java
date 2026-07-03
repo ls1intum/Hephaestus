@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * S5 rating-store integration tests (Testcontainers): a thumb persists as an append-only row, "latest wins" is a
+ * Rating-store integration tests (Testcontainers): a thumb persists as an append-only row, "latest wins" is a
  * recency read over those rows, and the workspace-scoped bulk delete (the fifth table folded into
  * {@code SlackWorkspacePurgeAdapter}) empties one workspace without touching another. Distinct workspace ids per
  * test give isolation without a clean-between step.

@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A member's binary thumb ({@link TurnRating}) on one mentor turn, captured from the feedback buttons attached to
- * the streamed reply (S5). Workspace-scoped (scalar {@code workspaceId} → a tenancy predicate rides every query;
+ * the streamed reply. Workspace-scoped (scalar {@code workspaceId} → a tenancy predicate rides every query;
  * the table is deliberately kept out of {@code WorkspaceScopedTables.GLOBAL_TABLES}).
  *
  * <p><strong>Append-only.</strong> {@code @Immutable}: each click writes a fresh row. The newest row per

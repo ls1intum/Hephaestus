@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Writes the PREPARED CONVERSATION feedback units for a cycle's admitted observations (S7). A prepared unit is a
+ * Writes the PREPARED CONVERSATION feedback units for a cycle's admitted observations. A prepared unit is a
  * standing "raise this next" marker: {@code channel=CONVERSATION}, {@code deliveryState=PREPARED}, and a deliberately
  * NULL body - the mentor composes the student-facing wording at delivery, so no stale snippet is frozen at
  * preparation time. Each unit's recipient is its own observation's {@code about_user_id} (per-observation).

@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Periodic {@code auth.test} liveness probe for every ACTIVE Slack connection (S9). Slack bot tokens can be revoked
+ * Periodic {@code auth.test} liveness probe for every ACTIVE Slack connection. Slack bot tokens can be revoked
  * out-of-band (workspace admin removes the app, org policy change) without Hephaestus hearing about it on any of its
  * own paths; this sweep catches a dead token and suspends the connection so downstream sends fail fast instead of
  * silently.

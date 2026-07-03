@@ -55,7 +55,7 @@ public final class TranslatorState {
 
     /**
      * Observation ids the mentor linked this turn via {@code link_finding}, in emission order. Read at
-     * end-of-turn by the S7 conversational-delivery reconciler to flip the matching PREPARED unit to DELIVERED.
+     * end-of-turn by the conversational-delivery reconciler to flip the matching PREPARED unit to DELIVERED.
      */
     private final java.util.List<UUID> linkedFindingIds = new java.util.ArrayList<>();
 

@@ -28,7 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Handler for {@link AgentJobType#CONVERSATION_REVIEW} jobs (S11) — the Slack-conversation counterpart of
+ * Handler for {@link AgentJobType#CONVERSATION_REVIEW} jobs — the Slack-conversation counterpart of
  * {@link IssueReviewHandler}. It is fully <strong>repo-less</strong>: there is no clone, no diff, no
  * {@code inputs/sources/scm/} mount ({@code volumeMounts()} defaults to empty), and no SCM comment is posted.
  * The case context is the thread's ordered human turns, materialised as
@@ -36,7 +36,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type CONVERSATION_THREAD,
  * {@code aboutUserId} carried explicitly in metadata) and then publishes {@link PracticeDetectionDeliveredEvent}
- * to drive the S7 conversational-delivery loop: OBSERVED problems become PREPARED CONVERSATION units for the
+ * to drive the conversational-delivery loop: OBSERVED problems become PREPARED CONVERSATION units for the
  * judged author and surface in their next mentor DM turn. Nothing is posted back to Slack from here.
  */
 public class ConversationReviewHandler implements JobTypeHandler {
@@ -187,7 +187,7 @@ public class ConversationReviewHandler implements JobTypeHandler {
             job.getId()
         );
 
-        // Drive the S7 conversational-delivery loop: publish INSIDE a transaction so the AFTER_COMMIT listener
+        // Drive the conversational-delivery loop: publish INSIDE a transaction so the AFTER_COMMIT listener
         // fires (deliver() runs outside a transaction in the executor). The listener re-reads the now-committed
         // observations, admits OBSERVED problems targeted at the judged author, and prepares CONVERSATION units
         // that surface in the author's next mentor DM turn. Best-effort — a publish hiccup never fails the job.

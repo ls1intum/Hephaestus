@@ -19,7 +19,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     /** Bounded-retention sweep: delete every message ingested before {@code cutoff} for one workspace (D10). */
     long deleteByWorkspaceIdAndIngestedAtBefore(Long workspaceId, Instant cutoff);
 
-    /** Workspace purge: delete every ingested message for one workspace (S2). Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every ingested message for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */

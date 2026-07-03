@@ -112,7 +112,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     /**
      * Bind the conversational feedback this turn delivered so the terminal feedback buttons carry its id (enabling
      * the dispute path on a thumbs-down). Optional: an unbound turn still gets pure satisfaction thumbs. Wiring the
-     * actual id from the S7 delivery reconciler is a follow-up; the buttons render either way.
+     * actual id from the delivery reconciler is a follow-up; the buttons render either way.
      */
     public void bindFeedback(@Nullable UUID feedbackId) {
         this.boundFeedbackId = feedbackId;

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.health;
 
 /**
- * Seam for the real Slack {@code auth.test} liveness round-trip and token rotation (S9). A live implementation
+ * Seam for the real Slack {@code auth.test} liveness round-trip and token rotation. A live implementation
  * calls Slack with the workspace's stored bot token; the default {@link NoopSlackAuthLivenessClient} returns
  * {@link Liveness#UNKNOWN} so the probe is inert without credentials (the actual network call is LIVE-only).
  *

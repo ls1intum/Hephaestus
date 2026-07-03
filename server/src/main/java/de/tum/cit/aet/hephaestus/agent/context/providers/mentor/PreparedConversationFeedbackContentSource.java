@@ -18,7 +18,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/prepared_conversation_feedback.json} for a {@link MentorChatRequest}: the newest
  * PREPARED conversational feedback units queued for the requesting developer - the mentor's "raise these next"
- * shortlist (S7). Facts + practice only, never a body (a PREPARED unit carries a NULL body by construction; the
+ * shortlist. Facts + practice only, never a body (a PREPARED unit carries a NULL body by construction; the
  * mentor composes the wording at delivery). {@code originId="core"}. Best-effort.
  */
 @Component

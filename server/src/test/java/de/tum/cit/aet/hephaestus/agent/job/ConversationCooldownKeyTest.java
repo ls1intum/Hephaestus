@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
 /**
- * Locks the S11 cooldown contract: a conversation-review idempotency key's cooldown prefix scopes on the thread
+ * Locks the cooldown contract: a conversation-review idempotency key's cooldown prefix scopes on the thread
  * + subject ALONE, never on the freshness ({@code lastTs}). Two enqueues of the same thread/subject with
  * different {@code lastTs} (a late reply) therefore share a cooldown prefix and do not re-fire immediately —
  * only genuine growth past the watermark does.

@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Conservative keyword heuristic implementing the {@link SlackSafetyClassifier} seam (S9). It errs toward answering
+ * Conservative keyword heuristic implementing the {@link SlackSafetyClassifier} seam. It errs toward answering
  * normally ({@link Category#OK}) and only diverts on unambiguous self-harm or harassment cues, so an ordinary
  * coding question is never blocked. {@link Category#OUT_OF_SCOPE} is left to a richer classifier — the heuristic
  * does not guess at topic scope.

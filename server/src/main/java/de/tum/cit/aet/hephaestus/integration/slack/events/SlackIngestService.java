@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
  * Idempotent on {@code (workspace, channel, ts)}.
  *
- * <p><strong>Consent gate (S6).</strong> Seeing a message on a channel auto-creates the allow-list row in
+ * <p><strong>Consent gate.</strong> Seeing a message on a channel auto-creates the allow-list row in
  * {@code PENDING} (discovery: the bot only receives events for channels it was invited to), but a message is only
  * persisted once that channel's {@link ConsentState} is {@code ACTIVE}. A {@code PENDING}/{@code ANNOUNCED}/
  * {@code PAUSED}/{@code REVOKED} channel discovers itself but ingests nothing — approval is an explicit,
@@ -81,7 +81,7 @@ public class SlackIngestService {
         // Discovery: register the channel on first sight (PENDING). This does NOT authorize ingestion.
         monitoredChannelRepository.insertIfAbsent(workspaceId, teamId, channelId);
 
-        // Consent gate (single authority, S4): only ACTIVE channels flow content. A brand-new channel is
+        // Consent gate (single authority): only ACTIVE channels flow content. A brand-new channel is
         // PENDING → nothing ingested. Fails closed on an absent row.
         if (!consentGate.ingestAllowed(workspaceId, channelId)) {
             return;
@@ -141,7 +141,7 @@ public class SlackIngestService {
     }
 
     /**
-     * Channel erasure (S6): flip the channel to {@code REVOKED} so ingestion stops immediately and its stored
+     * Channel erasure: flip the channel to {@code REVOKED} so ingestion stops immediately and its stored
      * threads drop out of the participant projector (which gates on {@code consent_state = 'ACTIVE'}). The
      * retained rows age out through the bounded-retention sweep. Idempotent — a channel that was never
      * allow-listed is a no-op.

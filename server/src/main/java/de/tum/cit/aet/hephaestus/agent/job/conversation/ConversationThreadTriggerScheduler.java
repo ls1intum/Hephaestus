@@ -20,14 +20,14 @@ import org.springframework.stereotype.Component;
 
 /**
  * Detects settled Slack conversation threads that are ready for a communication-practice review and enqueues
- * one {@link AgentJobType#CONVERSATION_REVIEW} job per human participant (S11).
+ * one {@link AgentJobType#CONVERSATION_REVIEW} job per human participant.
  *
  * <p>Three gates, all deterministic:
  * <ul>
  *   <li><b>Quiescence</b> — no new message for {@value #QUIESCENCE_MINUTES} minutes (the thread has settled).</li>
  *   <li><b>Depth</b> — at least {@value #MIN_HUMAN_TURNS} non-tombstoned turns (a real exchange, not a one-liner).</li>
  *   <li><b>Growth</b> — at least {@value #MIN_GROWTH} new non-tombstoned turns since {@code slack_thread.last_reviewed_ts}
- *       (the S1 watermark), so a re-sweep with no fresh human turn past the watermark enqueues nothing.</li>
+ *       (the watermark), so a re-sweep with no fresh human turn past the watermark enqueues nothing.</li>
  * </ul>
  *
  * <p>The watermark is advanced to the thread's newest {@code ts} only <em>after</em> a job is enqueued. Cooldown

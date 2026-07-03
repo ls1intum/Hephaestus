@@ -12,11 +12,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * S9 durable-dedup integration test (Testcontainers). Each {@code claim} runs in its own committed transaction to
+ * Durable-dedup integration test (Testcontainers). Each {@code claim} runs in its own committed transaction to
  * model a distinct replica: two replicas receiving the SAME Slack {@code event_id} see exactly one win the
  * first-writer-wins insert, while distinct event ids both win. The TTL sweep drops expired markers.
  *
- * <p>This is the deterministic half of S9's dedup coverage; the real Slack retry-replay across live replicas is
+ * <p>This is the deterministic half of the dedup coverage; the real Slack retry-replay across live replicas is
  * LIVE-only (it needs Slack actually redelivering to two pods).
  */
 class SlackEventDedupIntegrationTest extends BaseIntegrationTest {

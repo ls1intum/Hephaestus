@@ -28,7 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * S11 conversation-detection integration tests (Testcontainers — the candidate scan rides a real Postgres
+ * Conversation-detection integration tests (Testcontainers — the candidate scan rides a real Postgres
  * {@code bigint[]} column, the growth count rides lexicographic Slack-{@code ts} comparison, and the watermark
  * advance is a real UPDATE). {@link AgentJobService} is mocked so the enqueue is observable without seeding a
  * workspace/agent-config graph; the raw SQL the scheduler owns is exercised for real.

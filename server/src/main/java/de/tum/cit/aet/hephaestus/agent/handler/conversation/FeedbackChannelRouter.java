@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Decides which of a cycle's observations are eligible for conversational delivery (S7). An observation is
+ * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
  * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: author-targeted, a
  * {@link Assessment#BAD} problem, has no natural inline anchor, and does not share a {@code recurrence_key} with a
  * DELIVERED IN_CONTEXT unit for the same recipient. Every other case is a named, testable non-admission reason.

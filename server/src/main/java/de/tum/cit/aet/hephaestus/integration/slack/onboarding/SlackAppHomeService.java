@@ -25,13 +25,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Slack App Home renderer (Slice 4): on {@code app_home_opened}, publish the persistent Home tab via
- * {@code views.publish}. The Home tab carries three things the DM CTA (Slice 3) cannot:
+ * Slack App Home renderer: on {@code app_home_opened}, publish the persistent Home tab via
+ * {@code views.publish}. The Home tab carries three things the DM CTA cannot:
  *
  * <ul>
  *   <li>a <strong>privacy disclosure</strong> block — what the mentor reads and why (legitimate interest);</li>
  *   <li>a <strong>research-participation consent toggle</strong> reflecting the member's current opt-in state,
- *       whose button {@code action_id}s the S5 interactivity handler ({@code SlackFeedbackHandler}) routes to
+ *       whose button {@code action_id}s the interactivity handler ({@code SlackFeedbackHandler}) routes to
  *       {@code ResearchParticipationCommand.setForLogin}; and</li>
  *   <li>a <strong>quiet-hours</strong> control that is rendered but not yet wired — its write path and
  *       persistence are deferred (no live modal/store today), so clicking it is intentionally a no-op.</li>
@@ -50,7 +50,7 @@ public class SlackAppHomeService {
     private static final Logger log = LoggerFactory.getLogger(SlackAppHomeService.class);
 
     /**
-     * Stable action_ids. The two research-consent ids are the single source of truth shared with the S5
+     * Stable action_ids. The two research-consent ids are the single source of truth shared with the
      * interactivity router ({@code SlackFeedbackHandler}), which binds them to
      * {@link de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand#setForLogin}. The quiet-hours
      * id is rendered but not yet wired — see {@link #quietHoursBlocks()}.
@@ -175,7 +175,7 @@ public class SlackAppHomeService {
     }
 
     /**
-     * Quiet-hours control. Rendered here, but its write path + persistence are deferred (unbuilt) — the S5
+     * Quiet-hours control. Rendered here, but its write path + persistence are deferred (unbuilt) — the
      * interactivity router leaves {@link #ACTION_QUIET_HOURS} on its default no-op branch, so only the two
      * research-consent buttons are functional today.
      */

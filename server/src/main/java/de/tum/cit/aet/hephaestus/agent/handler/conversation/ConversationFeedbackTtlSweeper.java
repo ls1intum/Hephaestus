@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Ages out PREPARED conversational feedback that was never raised in a mentor turn within the TTL window (S7). After
+ * Ages out PREPARED conversational feedback that was never raised in a mentor turn within the TTL window. After
  * {@value #TTL_DAYS} days a still-PREPARED unit is flipped to SUPPRESSED / {@code CONVERSATION_EXPIRED}.
  *
  * <p>This bean owns only scheduling, cross-pod locking, and window arithmetic; the per-workspace delete runs in

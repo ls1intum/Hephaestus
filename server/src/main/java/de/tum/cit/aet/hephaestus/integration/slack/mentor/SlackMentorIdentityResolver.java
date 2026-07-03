@@ -84,7 +84,7 @@ public class SlackMentorIdentityResolver {
     /**
      * The workspace {@code User} (member) id the Slack sender resolves to — the firewall stamp written onto
      * {@code slack_message.author_member_id} and unioned into {@code slack_thread.participant_member_ids} by the
-     * S6 ingest write-path. Resolves through the same provider-scoped, membership-gated chain as
+     * Ingest write-path. Resolves through the same provider-scoped, membership-gated chain as
      * {@link #resolveDeveloperLogin} and then maps the workspace-scoped login to its SCM {@code User} row, so the
      * stamped id is exactly the {@code MentorChatRequest.developerId()} the participant projector matches against
      * (a Slack user only ever stamps as the member they are linked to within this workspace).

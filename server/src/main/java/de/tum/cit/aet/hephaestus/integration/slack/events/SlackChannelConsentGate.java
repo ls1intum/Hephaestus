@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
  * mentor substrate <strong>only</strong> when its {@link ConsentState} is {@code ACTIVE}. A channel with no
  * allow-list row, or one in any pre-consent / paused / revoked state, is denied (fails closed).
  *
- * <p>Built once (S4) so the consent decision lives in exactly one place: the S6 ingest write-path
+ * <p>Built once so the consent decision lives in exactly one place: the ingest write-path
  * ({@link SlackIngestService}) and any later projector/content-source that must honour consent share this gate
  * rather than re-deriving {@code state == ACTIVE} independently. Deriving it twice risks divergence — e.g. a
  * PENDING channel's rows silently flowing after a consent flip because one call site forgot the check.

@@ -417,7 +417,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // Slack purge + retention (S2)
+    // Slack purge + retention
 
     @Nested
     class SlackCleanup {

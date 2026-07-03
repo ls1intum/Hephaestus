@@ -19,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Slice 6 event-routing unit tests. The signature verifier is mocked to pass, so these lock the dispatch of the
+ * Event-routing unit tests. The signature verifier is mocked to pass, so these lock the dispatch of the
  * {@code message} subtypes — in particular that {@code message_deleted}/{@code message_changed} are routed to the
  * tombstone/edit path BEFORE the subtype early-return that drops every other subtyped message, and key on the
  * deleted/changed message's own ts (not the event ts).

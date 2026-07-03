@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * {@code workspace_id} would not fire — each module must drop its own rows explicitly. This
  * contributor covers the five Slack tables: {@code slack_message} (PII-bearing content),
  * {@code slack_thread}, {@code slack_monitored_channel}, {@code mentor_slack_thread}, and
- * {@code mentor_turn_rating} (the S5 feedback-button ratings).
+ * {@code mentor_turn_rating} (the feedback-button ratings).
  *
  * <p>{@link #getOrder()} returns {@value #PURGE_ORDER} so this runs <b>before</b>
  * {@code ConnectionPurgeContributor} ({@code -100}, which transitions the Slack Connection to

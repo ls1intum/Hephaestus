@@ -100,7 +100,7 @@ public class ReactionService {
     /**
      * Records a reaction on behalf of an already-resolved recipient, without consulting the HTTP security context.
      *
-     * <p>The Slack interactivity surface (S5) has no authenticated {@code SecurityContext}: the reactor is resolved
+     * <p>The Slack interactivity surface has no authenticated {@code SecurityContext}: the reactor is resolved
      * from the verified Slack identity ({@code (team, user)} → workspace member) upstream, so this overload takes
      * the {@code reactorUserId} explicitly. It applies the same invariants as {@link #submitReaction}: the reactor
      * must be the feedback's recipient, the unit must have been DELIVERED, and a {@code DISPUTED} reaction requires

@@ -69,7 +69,7 @@ public class FeedbackLedgerRecorder {
     private static final int POLICY_FLOOR_UNIT_ORDINAL_BASE = 2000;
 
     /**
-     * PREPARED conversational units (S7) start here so their {@code (agent_job_id, position)} never collides with
+     * PREPARED conversational units start here so their {@code (agent_job_id, position)} never collides with
      * the live IN_CONTEXT unit (0), the B2 base (1000), or the policy-floor base (2000). Public so the
      * {@link de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer} derives its
      * positions from the one shared constant rather than a second literal.

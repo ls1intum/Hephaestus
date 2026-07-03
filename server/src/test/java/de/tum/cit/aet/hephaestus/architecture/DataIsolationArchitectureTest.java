@@ -118,7 +118,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
         "LoginProvider", // Instance-scoped OAuth login provider (sign-in option); not workspace-scoped
         "WorkerRegistry", // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
-        "SlackEventDedup" // Slack Events API dedup keyed on the raw event_id; workspace-independent (S9)
+        "SlackEventDedup" // Slack Events API dedup keyed on the raw event_id; workspace-independent
     );
 
     // ENTITY WORKSPACE RELATIONSHIPS
@@ -212,7 +212,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * use @NotNull or equivalent to prevent orphaned data.
          */
         /**
-         * Targeted tenancy proof for the Slack integration tables (Slice 1).
+         * Targeted tenancy proof for the Slack integration tables.
          *
          * <p>The four {@code slack_*}/{@code mentor_slack_thread} entities are workspace-scoped by a direct
          * {@code workspace_id} scalar column (no FK chain). This is the single assertion the finish plan calls

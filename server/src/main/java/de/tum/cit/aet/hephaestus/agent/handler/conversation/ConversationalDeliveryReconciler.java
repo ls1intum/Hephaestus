@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Closes the conversational delivery loop when a mentor turn ends (S7). The mentor surfaces a practice locus by
+ * Closes the conversational delivery loop when a mentor turn ends. The mentor surfaces a practice locus by
  * calling the {@code link_finding} custom tool with an observation id; those ids arrive here as
  * {@code linkedFindingIds}. For each, this maps the observation back to its PREPARED CONVERSATION feedback unit,
  * flips it to DELIVERED via a guarded compare-and-set, and - on a winning flip - writes exactly one

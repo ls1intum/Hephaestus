@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Handles {@code assistant_thread_started} (S5): when a member opens the mentor's assistant DM, seed the thread
+ * Handles {@code assistant_thread_started}: when a member opens the mentor's assistant DM, seed the thread
  * with up to four suggested prompts so the first turn is a click, not a blank box.
  *
  * <p>The prompts are framed around the member's own practice history (needs-attention first), which is the mentor's

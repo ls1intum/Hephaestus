@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * S9 mentor-flow safety unit tests: duty-of-care diversion (self-harm / harassment) short-circuits before any
+ * Mentor-flow safety unit tests: duty-of-care diversion (self-harm / harassment) short-circuits before any
  * developer lookup or turn, and the per-user turn cap posts a friendly message instead of running a second turn.
  * Uses the real {@link HeuristicSlackSafetyClassifier} and a real {@link SlackMentorQuotaGuard} so the observable
  * behaviour — not mock wiring — is under test.
