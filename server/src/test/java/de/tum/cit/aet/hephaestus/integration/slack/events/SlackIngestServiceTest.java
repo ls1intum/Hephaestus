@@ -147,6 +147,17 @@ class SlackIngestServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void eraseChannel_revokesConsentAndDeletesStoredContentPromptly() {
+        service.eraseChannel(7L, "C1");
+
+        // Consent flip stops future ingestion + drops threads out of the ACTIVE-consent projectors…
+        verify(monitoredChannelRepository).revokeConsent(7L, "C1");
+        // …and the channel's raw content (messages) + thread aggregates are deleted now, not left for the sweep.
+        verify(messageRepository).deleteByWorkspaceIdAndSlackChannelId(7L, "C1");
+        verify(threadRepository).deleteByWorkspaceIdAndSlackChannelId(7L, "C1");
+    }
+
+    @Test
     void duplicateMessage_doesNotBumpThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);

@@ -69,6 +69,14 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     /** Workspace purge: delete every thread aggregate for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
 
+    /**
+     * Channel erasure: delete every thread aggregate of one channel promptly when its consent is withdrawn (the
+     * aggregates hold the {@code participant_member_ids} personal data and are the artifact the derived CONVERSATION
+     * feedback points at). Derived DELETE carries the {@code workspace_id} predicate the tenancy inspector requires;
+     * idempotent (returns 0 when the channel had no threads).
+     */
+    long deleteByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
+
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
     long countByWorkspaceId(Long workspaceId);
 }

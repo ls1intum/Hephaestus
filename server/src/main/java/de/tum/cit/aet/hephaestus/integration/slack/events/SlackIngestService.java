@@ -141,13 +141,25 @@ public class SlackIngestService {
     }
 
     /**
-     * Channel erasure: flip the channel to {@code REVOKED} so ingestion stops immediately and its stored
-     * threads drop out of the participant projector (which gates on {@code consent_state = 'ACTIVE'}). The
-     * retained rows age out through the bounded-retention sweep. Idempotent — a channel that was never
-     * allow-listed is a no-op.
+     * Channel erasure: flip the channel to {@code REVOKED} so ingestion stops immediately and its stored threads
+     * drop out of every {@code consent_state = 'ACTIVE'} projector, <em>and</em> promptly delete the channel's
+     * ingested content — its {@code slack_message} rows (the raw message text) and its {@code slack_thread}
+     * aggregates (which hold the {@code participant_member_ids} personal data) — rather than waiting for the
+     * 180-day retention sweep, which covers messages only and would leave the thread aggregates behind. All three
+     * writes carry the {@code workspace_id} predicate; the whole method is transactional and idempotent (a channel
+     * that was never allow-listed, or was already erased, deletes 0 rows).
+     *
+     * <p>The derived CONVERSATION feedback composed from these threads is already fail-closed by the REVOKED flip
+     * (once the channel is non-ACTIVE, {@code PreparedConversationFeedbackContentSource}'s consent gate no longer
+     * surfaces it — and deleting the thread here makes that gate fail-closed regardless of the flag), and is fully
+     * removed by a workspace purge. A per-channel hard-delete of that feedback is deliberately not done here: it
+     * would require a practices-feedback erasure port the Slack module may not depend on (the reverse edge already
+     * exists, so importing it would form a module cycle) — tracked as a follow-up.
      */
     @Transactional
     public void eraseChannel(long workspaceId, String channelId) {
         monitoredChannelRepository.revokeConsent(workspaceId, channelId);
+        messageRepository.deleteByWorkspaceIdAndSlackChannelId(workspaceId, channelId);
+        threadRepository.deleteByWorkspaceIdAndSlackChannelId(workspaceId, channelId);
     }
 }
