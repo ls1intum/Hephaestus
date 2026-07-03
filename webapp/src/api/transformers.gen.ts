@@ -205,39 +205,6 @@ export const listResponseTransformer = async (data: any): Promise<ListResponse> 
     return data;
 };
 
-const slackMonitoredChannelSchemaResponseTransformer = (data: any) => {
-    if (data.consentAnnouncedAt) {
-        data.consentAnnouncedAt = new Date(data.consentAnnouncedAt);
-    }
-    data.createdAt = new Date(data.createdAt);
-    return data;
-};
-
-export const listSlackChannelsResponseTransformer = async (data: any): Promise<ListSlackChannelsResponse> => {
-    data = data.map((item: any) => slackMonitoredChannelSchemaResponseTransformer(item));
-    return data;
-};
-
-export const registerSlackChannelResponseTransformer = async (data: any): Promise<RegisterSlackChannelResponse> => {
-    data = slackMonitoredChannelSchemaResponseTransformer(data);
-    return data;
-};
-
-export const updateSlackChannelConsentResponseTransformer = async (data: any): Promise<UpdateSlackChannelConsentResponse> => {
-    data = slackMonitoredChannelSchemaResponseTransformer(data);
-    return data;
-};
-
-const slackChannelConsentEventSchemaResponseTransformer = (data: any) => {
-    data.createdAt = new Date(data.createdAt);
-    return data;
-};
-
-export const listSlackChannelConsentEventsResponseTransformer = async (data: any): Promise<ListSlackChannelConsentEventsResponse> => {
-    data = data.map((item: any) => slackChannelConsentEventSchemaResponseTransformer(item));
-    return data;
-};
-
 const connectionDetailSchemaResponseTransformer = (data: any) => {
     if (data.createdAt) {
         data.createdAt = new Date(data.createdAt);
@@ -600,6 +567,39 @@ export const updatePublicVisibilityResponseTransformer = async (data: any): Prom
 
 export const updateScheduleResponseTransformer = async (data: any): Promise<UpdateScheduleResponse> => {
     data = workspaceSchemaResponseTransformer(data);
+    return data;
+};
+
+const slackMonitoredChannelSchemaResponseTransformer = (data: any) => {
+    if (data.consentAnnouncedAt) {
+        data.consentAnnouncedAt = new Date(data.consentAnnouncedAt);
+    }
+    data.createdAt = new Date(data.createdAt);
+    return data;
+};
+
+export const listSlackChannelsResponseTransformer = async (data: any): Promise<ListSlackChannelsResponse> => {
+    data = data.map((item: any) => slackMonitoredChannelSchemaResponseTransformer(item));
+    return data;
+};
+
+export const registerSlackChannelResponseTransformer = async (data: any): Promise<RegisterSlackChannelResponse> => {
+    data = slackMonitoredChannelSchemaResponseTransformer(data);
+    return data;
+};
+
+export const updateSlackChannelConsentResponseTransformer = async (data: any): Promise<UpdateSlackChannelConsentResponse> => {
+    data = slackMonitoredChannelSchemaResponseTransformer(data);
+    return data;
+};
+
+const slackChannelConsentEventSchemaResponseTransformer = (data: any) => {
+    data.createdAt = new Date(data.createdAt);
+    return data;
+};
+
+export const listSlackChannelConsentEventsResponseTransformer = async (data: any): Promise<ListSlackChannelConsentEventsResponse> => {
+    data = data.map((item: any) => slackChannelConsentEventSchemaResponseTransformer(item));
     return data;
 };
 

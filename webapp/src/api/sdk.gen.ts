@@ -551,69 +551,6 @@ export const initiate = <ThrowOnError extends boolean = false>(options: Options<
 });
 
 /**
- * List the workspace's allow-listed Slack channels with their consent state
- *
- * List the workspace's allow-listed Slack channels with their consent state
- */
-export const listSlackChannels = <ThrowOnError extends boolean = false>(options: Options<ListSlackChannelsData, ThrowOnError>) => (options.client ?? client).get<ListSlackChannelsResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/slack/channels',
-    ...options
-});
-
-/**
- * Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)
- *
- * Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)
- */
-export const registerSlackChannel = <ThrowOnError extends boolean = false>(options: Options<RegisterSlackChannelData, ThrowOnError>) => (options.client ?? client).post<RegisterSlackChannelResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/slack/channels',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Revoke a Slack channel and erase its raw + derived data (terminal)
- *
- * Revoke a Slack channel and erase its raw + derived data (terminal)
- */
-export const deleteSlackChannel = <ThrowOnError extends boolean = false>(options: Options<DeleteSlackChannelData, ThrowOnError>) => (options.client ?? client).delete<DeleteSlackChannelResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}',
-    ...options
-});
-
-/**
- * Transition a Slack channel to a target consent state (activate / pause / resume / revoke)
- *
- * Transition a Slack channel to a target consent state (activate / pause / resume / revoke)
- */
-export const updateSlackChannelConsent = <ThrowOnError extends boolean = false>(options: Options<UpdateSlackChannelConsentData, ThrowOnError>) => (options.client ?? client).patch<UpdateSlackChannelConsentResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * The immutable consent-transition audit trail of one Slack channel
- *
- * The immutable consent-transition audit trail of one Slack channel
- */
-export const listSlackChannelConsentEvents = <ThrowOnError extends boolean = false>(options: Options<ListSlackChannelConsentEventsData, ThrowOnError>) => (options.client ?? client).get<ListSlackChannelConsentEventsResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events',
-    ...options
-});
-
-/**
  * Probe the Slack connection by posting a test message.
  *
  * Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
@@ -1133,6 +1070,59 @@ export const updateSchedule = <ThrowOnError extends boolean = false>(options: Op
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * List the workspace's allow-listed Slack channels with their consent state
+ */
+export const listSlackChannels = <ThrowOnError extends boolean = false>(options: Options<ListSlackChannelsData, ThrowOnError>) => (options.client ?? client).get<ListSlackChannelsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/slack/channels',
+    ...options
+});
+
+/**
+ * Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)
+ */
+export const registerSlackChannel = <ThrowOnError extends boolean = false>(options: Options<RegisterSlackChannelData, ThrowOnError>) => (options.client ?? client).post<RegisterSlackChannelResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/slack/channels',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Revoke a Slack channel and erase its raw + derived data (terminal)
+ */
+export const deleteSlackChannel = <ThrowOnError extends boolean = false>(options: Options<DeleteSlackChannelData, ThrowOnError>) => (options.client ?? client).delete<DeleteSlackChannelResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}',
+    ...options
+});
+
+/**
+ * Transition a Slack channel to a target consent state (activate / pause / resume / revoke)
+ */
+export const updateSlackChannelConsent = <ThrowOnError extends boolean = false>(options: Options<UpdateSlackChannelConsentData, ThrowOnError>) => (options.client ?? client).patch<UpdateSlackChannelConsentResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * The immutable consent-transition audit trail of one Slack channel
+ */
+export const listSlackChannelConsentEvents = <ThrowOnError extends boolean = false>(options: Options<ListSlackChannelConsentEventsData, ThrowOnError>) => (options.client ?? client).get<ListSlackChannelConsentEventsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events',
+    ...options
 });
 
 /**

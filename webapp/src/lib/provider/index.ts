@@ -12,4 +12,5 @@ export {
 	type ProviderTerm,
 	type ProviderTerminology,
 	type ProviderType,
+	toScmProviderType,
 } from "./provider-terms";

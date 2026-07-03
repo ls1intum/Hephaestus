@@ -193,7 +193,7 @@ public class SlackIngestService {
         }
         workspaceResolver
             .resolveWorkspaceId(teamId)
-            .ifPresent(workspaceId -> messageRepository.tombstone(workspaceId, channelId, deletedTs));
+            .ifPresent(workspaceId -> messageRepository.tombstone(workspaceId, channelId, deletedTs, Instant.now()));
     }
 
     /**
@@ -208,7 +208,7 @@ public class SlackIngestService {
         }
         workspaceResolver
             .resolveWorkspaceId(teamId)
-            .ifPresent(workspaceId -> messageRepository.applyEdit(workspaceId, channelId, ts, text));
+            .ifPresent(workspaceId -> messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now()));
     }
 
     /**

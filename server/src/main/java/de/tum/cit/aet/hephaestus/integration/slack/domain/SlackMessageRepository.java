@@ -92,13 +92,14 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     @Modifying
     @Transactional
     @Query(
-        "UPDATE SlackMessage m SET m.deletedAt = CURRENT_TIMESTAMP, m.text = NULL " +
+        "UPDATE SlackMessage m SET m.deletedAt = :now, m.text = NULL " +
             "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs"
     )
     int tombstone(
         @Param("workspaceId") Long workspaceId,
         @Param("slackChannelId") String slackChannelId,
-        @Param("slackTs") String slackTs
+        @Param("slackTs") String slackTs,
+        @Param("now") Instant now
     );
 
     /**
@@ -109,7 +110,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     @Modifying
     @Transactional
     @Query(
-        "UPDATE SlackMessage m SET m.text = :text, m.editedAt = CURRENT_TIMESTAMP " +
+        "UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now " +
             "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs " +
             "AND m.deletedAt IS NULL"
     )
@@ -117,6 +118,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         @Param("workspaceId") Long workspaceId,
         @Param("slackChannelId") String slackChannelId,
         @Param("slackTs") String slackTs,
-        @Param("text") @Nullable String text
+        @Param("text") @Nullable String text,
+        @Param("now") Instant now
     );
 }

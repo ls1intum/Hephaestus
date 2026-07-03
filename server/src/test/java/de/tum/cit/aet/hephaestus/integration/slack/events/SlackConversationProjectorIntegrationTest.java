@@ -169,8 +169,8 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         seedMessage(ws, "C1", "100.5", "100.0", "reply will be deleted");
 
         // Edit the root, tombstone the reply (both via the scoped repository UPDATEs the ingest path drives).
-        assertThat(messageRepository.applyEdit(ws, "C1", "100.0", "root EDITED")).isEqualTo(1);
-        assertThat(messageRepository.tombstone(ws, "C1", "100.5")).isEqualTo(1);
+        assertThat(messageRepository.applyEdit(ws, "C1", "100.0", "root EDITED", java.time.Instant.now())).isEqualTo(1);
+        assertThat(messageRepository.tombstone(ws, "C1", "100.5", java.time.Instant.now())).isEqualTo(1);
 
         ObjectNode payload = projector.buildPayload(ws, 100L);
         ArrayNode messages = (ArrayNode) conversations(payload).get(0).get("messages");

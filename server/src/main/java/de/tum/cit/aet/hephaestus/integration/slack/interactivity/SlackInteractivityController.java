@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSignatureVerifier;
+import io.swagger.v3.oas.annotations.Hidden;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -31,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
  * never hold the ACK. Auth is the signature (this path sits on the unauthenticated worker-hub security chain,
  * alongside {@code /slack/events}).
  */
+@Hidden // inbound Slack webhook receiver — not part of the webapp API surface; excluded from the OpenAPI client
 @RestController
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 @WorkspaceAgnostic("Slack interactivity; the workspace is resolved from the payload's team_id, not the URL")

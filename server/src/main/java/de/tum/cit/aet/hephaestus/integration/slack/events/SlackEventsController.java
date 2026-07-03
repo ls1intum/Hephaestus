@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import io.swagger.v3.oas.annotations.Hidden;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  * a DM to the bot drives a mentor turn; a monitored channel message is ingested as content. Auth is the signature
  * (this path is on the unauthenticated worker-hub security chain, like {@code /webhooks/**}).
  */
+@Hidden // inbound Slack webhook receiver — not part of the webapp API surface; excluded from the OpenAPI client
 @RestController
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 @WorkspaceAgnostic("Slack events; the workspace is resolved from the payload's team_id, not the URL")

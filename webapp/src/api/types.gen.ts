@@ -163,7 +163,7 @@ export type WorkspaceListItem = {
     /**
      * High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound
      */
-    providerType?: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -277,7 +277,7 @@ export type Workspace = {
     /**
      * High-level git provider type for the workspace's SCM connection (null if none bound)
      */
-    providerType?: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
     /**
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
@@ -507,6 +507,20 @@ export type UpdateTeamSettingsRequest = {
 };
 
 /**
+ * Transition a Slack channel to a target consent state
+ */
+export type UpdateSlackChannelConsentRequest = {
+    /**
+     * Target consent state
+     */
+    consentState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * Optional free-text reason recorded in the immutable audit trail
+     */
+    reason?: string;
+};
+
+/**
  * Request to update repository contribution visibility settings in a workspace
  */
 export type UpdateRepositorySettingsRequest = {
@@ -549,7 +563,7 @@ export type UpdatePracticeRequest = {
     /**
      * Artifact this practice evaluates
      */
-    artifactType?: 'PULL_REQUEST' | 'ISSUE';
+    artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
      * Practice evaluation criteria
      */
@@ -870,43 +884,72 @@ export type SlackTestMessageRequest = {
  * An allow-listed Slack channel with its consent state and person opt-out count
  */
 export type SlackMonitoredChannel = {
-    id: number;
-    slackTeamId: string;
-    slackChannelId: string;
+    /**
+     * Human-readable channel name, if known
+     */
     channelName?: string;
-    consentState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * When the in-channel consent announcement was posted (stamped on first activation)
+     */
     consentAnnouncedAt?: Date;
-    optedOutMemberCount: number;
+    /**
+     * Current per-channel consent lifecycle state
+     */
+    consentState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * When the channel was first discovered / allow-listed
+     */
     createdAt: Date;
+    /**
+     * Internal allow-list row id
+     */
+    id: number;
+    /**
+     * Number of workspace members who have opted out of ingestion (workspace-wide)
+     */
+    optedOutMemberCount: number;
+    /**
+     * Slack channel id (the stable C… id; the natural key)
+     */
+    slackChannelId: string;
+    /**
+     * Slack team (workspace) id the channel belongs to
+     */
+    slackTeamId: string;
 };
 
 /**
  * An immutable Slack channel consent-transition audit entry
  */
 export type SlackChannelConsentEvent = {
-    id: number;
-    slackChannelId: string;
-    fromState?: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
-    toState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * Workspace user id of the admin who made the change
+     */
     actorUserId?: number;
-    reason?: string;
+    /**
+     * When the transition was recorded
+     */
     createdAt: Date;
-};
-
-/**
- * Transition a Slack channel to a target consent state
- */
-export type UpdateSlackChannelConsentRequest = {
-    consentState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * State the channel left (absent for the very first record)
+     */
+    fromState?: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * Audit entry id
+     */
+    id: number;
+    /**
+     * Optional free-text reason the admin supplied
+     */
     reason?: string;
-};
-
-/**
- * Allow-list a Slack channel (lands in PENDING)
- */
-export type RegisterSlackChannelRequest = {
+    /**
+     * Slack channel id the transition applied to
+     */
     slackChannelId: string;
-    channelName?: string;
+    /**
+     * State the channel entered
+     */
+    toState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
 };
 
 export type SessionView = {
@@ -954,6 +997,20 @@ export type RenameWorkspaceSlugRequest = {
      * New URL-friendly identifier for the workspace
      */
     newSlug: string;
+};
+
+/**
+ * Allow-list a Slack channel (lands in PENDING)
+ */
+export type RegisterSlackChannelRequest = {
+    /**
+     * Optional human-readable channel name to store alongside the id
+     */
+    channelName?: string;
+    /**
+     * Slack channel id (the stable C… id)
+     */
+    slackChannelId: string;
 };
 
 /**
@@ -1009,7 +1066,7 @@ export type ReflectionItem = {
     /**
      * The kind of work this is about (PR / issue)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
@@ -1427,7 +1484,7 @@ export type Practice = {
     /**
      * Artifact this practice evaluates
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
      * Timestamp when the practice was created
      */
@@ -1508,7 +1565,7 @@ export type ObservationList = {
     /**
      * Artifact type (e.g. PULL_REQUEST)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
@@ -1654,7 +1711,7 @@ export type AgentJob = {
     /**
      * Job type
      */
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW';
     /**
      * Tokens read from prompt cache
      */
@@ -1724,7 +1781,7 @@ export type ObservationDetail = {
     /**
      * Artifact type (e.g. PULL_REQUEST)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
      * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
      */
@@ -2226,7 +2283,7 @@ export type CreatePracticeRequest = {
     /**
      * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
      */
-    artifactType?: 'PULL_REQUEST' | 'ISSUE';
+    artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**
      * Practice evaluation criteria
      */
@@ -2309,7 +2366,7 @@ export type CreateLoginProviderRequest = {
      * Space-separated scopes; defaulted by provider type if omitted
      */
     scopes?: string;
-    type: 'GITHUB' | 'GITLAB';
+    type: 'GITHUB' | 'GITLAB' | 'SLACK';
 };
 
 /**
@@ -2660,7 +2717,7 @@ export type AdminWorkspaceView = {
     id: number;
     memberCount: number;
     ownerLogin?: string;
-    providerType?: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
     status: string;
     workspaceSlug: string;
 };
@@ -2739,7 +2796,7 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED';
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED';
         result?: 'SUCCESS' | 'FAILURE';
         from?: Date;
         to?: Date;
@@ -2762,7 +2819,7 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED';
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED';
         result?: 'SUCCESS' | 'FAILURE';
         from?: Date;
         to?: Date;
@@ -3830,118 +3887,6 @@ export type InitiateResponses = {
 };
 
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
-
-export type ListSlackChannelsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack/channels';
-};
-
-export type ListSlackChannelsResponses = {
-    /**
-     * OK
-     */
-    200: Array<SlackMonitoredChannel>;
-};
-
-export type ListSlackChannelsResponse = ListSlackChannelsResponses[keyof ListSlackChannelsResponses];
-
-export type RegisterSlackChannelData = {
-    body: RegisterSlackChannelRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack/channels';
-};
-
-export type RegisterSlackChannelResponses = {
-    /**
-     * OK
-     */
-    200: SlackMonitoredChannel;
-    /**
-     * Created
-     */
-    201: SlackMonitoredChannel;
-};
-
-export type RegisterSlackChannelResponse = RegisterSlackChannelResponses[keyof RegisterSlackChannelResponses];
-
-export type DeleteSlackChannelData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slackChannelId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
-};
-
-export type DeleteSlackChannelResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type DeleteSlackChannelResponse = DeleteSlackChannelResponses[keyof DeleteSlackChannelResponses];
-
-export type UpdateSlackChannelConsentData = {
-    body: UpdateSlackChannelConsentRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slackChannelId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
-};
-
-export type UpdateSlackChannelConsentResponses = {
-    /**
-     * OK
-     */
-    200: SlackMonitoredChannel;
-};
-
-export type UpdateSlackChannelConsentResponse = UpdateSlackChannelConsentResponses[keyof UpdateSlackChannelConsentResponses];
-
-export type ListSlackChannelConsentEventsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slackChannelId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events';
-};
-
-export type ListSlackChannelConsentEventsResponses = {
-    /**
-     * OK
-     */
-    200: Array<SlackChannelConsentEvent>;
-};
-
-export type ListSlackChannelConsentEventsResponse = ListSlackChannelConsentEventsResponses[keyof ListSlackChannelConsentEventsResponses];
 
 export type SendTestMessageData = {
     /**
@@ -5276,6 +5221,112 @@ export type UpdateScheduleResponses = {
 };
 
 export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
+
+export type ListSlackChannelsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels';
+};
+
+export type ListSlackChannelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SlackMonitoredChannel>;
+};
+
+export type ListSlackChannelsResponse = ListSlackChannelsResponses[keyof ListSlackChannelsResponses];
+
+export type RegisterSlackChannelData = {
+    body: RegisterSlackChannelRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels';
+};
+
+export type RegisterSlackChannelResponses = {
+    /**
+     * OK
+     */
+    200: SlackMonitoredChannel;
+};
+
+export type RegisterSlackChannelResponse = RegisterSlackChannelResponses[keyof RegisterSlackChannelResponses];
+
+export type DeleteSlackChannelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
+};
+
+export type DeleteSlackChannelResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type UpdateSlackChannelConsentData = {
+    body: UpdateSlackChannelConsentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
+};
+
+export type UpdateSlackChannelConsentResponses = {
+    /**
+     * OK
+     */
+    200: SlackMonitoredChannel;
+};
+
+export type UpdateSlackChannelConsentResponse = UpdateSlackChannelConsentResponses[keyof UpdateSlackChannelConsentResponses];
+
+export type ListSlackChannelConsentEventsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events';
+};
+
+export type ListSlackChannelConsentEventsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SlackChannelConsentEvent>;
+};
+
+export type ListSlackChannelConsentEventsResponse = ListSlackChannelConsentEventsResponses[keyof ListSlackChannelConsentEventsResponses];
 
 export type RenameSlugData = {
     body: RenameWorkspaceSlugRequest;
