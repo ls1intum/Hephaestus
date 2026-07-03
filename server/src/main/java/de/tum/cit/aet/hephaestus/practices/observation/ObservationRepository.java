@@ -105,6 +105,32 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     )
     void deleteAllByPracticeWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} observations for a workspace whose {@code artifact_id} (the
+     * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
+     * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
+     * withdrawn. Workspace is scoped through the {@code Practice.workspace} relationship (this repo is
+     * {@code @WorkspaceAgnostic}); the {@code artifactType} + {@code artifactId} predicates keep PR/ISSUE observations
+     * and other tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
+     * {@code reaction} children. Callers guard an empty {@code artifactIds}.
+     *
+     * @return the number of observations deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Observation o
+        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND o.artifactId IN :artifactIds
+          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+        """
+    )
+    int deleteConversationThreadObservations(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactIds") Collection<Long> artifactIds
+    );
+
     // Read queries for the developer dashboard (Issue #896)
 
     /**

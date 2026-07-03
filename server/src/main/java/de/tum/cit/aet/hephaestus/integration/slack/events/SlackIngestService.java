@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
+import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -53,6 +55,7 @@ public class SlackIngestService {
     private final SlackMessageRepository messageRepository;
     private final SlackThreadRepository threadRepository;
     private final SlackMentorIdentityResolver identityResolver;
+    private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     /**
      * Off by default. Gates the channel-ingest entry point ({@link #ingestChannelMessage}) as a second fail-closed
@@ -69,6 +72,7 @@ public class SlackIngestService {
         SlackMessageRepository messageRepository,
         SlackThreadRepository threadRepository,
         SlackMentorIdentityResolver identityResolver,
+        ConversationFeedbackErasure conversationFeedbackErasure,
         @Value("${hephaestus.integration.slack.conversation-ingest.enabled:false}") boolean conversationIngestEnabled
     ) {
         this.workspaceResolver = workspaceResolver;
@@ -77,6 +81,7 @@ public class SlackIngestService {
         this.messageRepository = messageRepository;
         this.threadRepository = threadRepository;
         this.identityResolver = identityResolver;
+        this.conversationFeedbackErasure = conversationFeedbackErasure;
         this.conversationIngestEnabled = conversationIngestEnabled;
     }
 
@@ -170,20 +175,27 @@ public class SlackIngestService {
      * drop out of every {@code consent_state = 'ACTIVE'} projector, <em>and</em> promptly delete the channel's
      * ingested content — its {@code slack_message} rows (the raw message text) and its {@code slack_thread}
      * aggregates (which hold the {@code participant_member_ids} personal data) — rather than waiting for the
-     * 180-day retention sweep, which covers messages only and would leave the thread aggregates behind. All three
-     * writes carry the {@code workspace_id} predicate; the whole method is transactional and idempotent (a channel
-     * that was never allow-listed, or was already erased, deletes 0 rows).
+     * 180-day retention sweep, which covers messages only and would leave the thread aggregates behind. Every
+     * write carries the {@code workspace_id} predicate; the whole method is transactional and idempotent (a
+     * channel that was never allow-listed, or was already erased, deletes 0 rows).
      *
-     * <p>The derived CONVERSATION feedback composed from these threads is already fail-closed by the REVOKED flip
-     * (once the channel is non-ACTIVE, {@code PreparedConversationFeedbackContentSource}'s consent gate no longer
-     * surfaces it — and deleting the thread here makes that gate fail-closed regardless of the flag), and is fully
-     * removed by a workspace purge. A per-channel hard-delete of that feedback is deliberately not done here: it
-     * would require a practices-feedback erasure port the Slack module may not depend on (the reverse edge already
-     * exists, so importing it would form a module cycle) — tracked as a follow-up.
+     * <p><strong>Derived CONVERSATION feedback is now hard-deleted too (true erasure, not inert-by-gate).</strong>
+     * The observations/feedback composed from these threads carry {@code artifact_type = CONVERSATION_THREAD} +
+     * {@code artifact_id = slack_thread.id} but hold no FK back to {@code slack_thread}, so dropping the aggregate
+     * alone would only render them INERT (the mentor consent gate withholds them once the channel is non-ACTIVE).
+     * To satisfy GDPR Art. 17 for the derived copies we collect the channel's thread ids first and call the
+     * practices-owned {@link ConversationFeedbackErasure} port, which deletes exactly those CONVERSATION_THREAD
+     * rows (cascading their {@code feedback_observation}/placement/reaction children) and nothing else — PR/ISSUE
+     * rows and other tenants' rows are untouched. The port inverts the dependency ({@code integration.slack →
+     * practices::spi}, implementation inside {@code practices}), so no Spring Modulith cycle forms.
      */
     @Transactional
     public void eraseChannel(long workspaceId, String channelId) {
+        // Collect the channel's thread ids BEFORE dropping the aggregates — the derived practice rows are keyed by
+        // slack_thread.id as their artifact_id, so we need the ids to erase the derived copies.
+        List<Long> threadIds = threadRepository.findIdsByWorkspaceIdAndSlackChannelId(workspaceId, channelId);
         monitoredChannelRepository.revokeConsent(workspaceId, channelId);
+        conversationFeedbackErasure.eraseForThreads(workspaceId, threadIds);
         messageRepository.deleteByWorkspaceIdAndSlackChannelId(workspaceId, channelId);
         threadRepository.deleteByWorkspaceIdAndSlackChannelId(workspaceId, channelId);
     }

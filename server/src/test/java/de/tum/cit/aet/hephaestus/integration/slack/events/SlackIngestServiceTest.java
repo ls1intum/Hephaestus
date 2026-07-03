@@ -12,7 +12,9 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,9 @@ class SlackIngestServiceTest extends BaseUnitTest {
     @Mock
     private SlackMentorIdentityResolver identityResolver;
 
+    @Mock
+    private ConversationFeedbackErasure conversationFeedbackErasure;
+
     private SlackIngestService service;
 
     /** Construct the service with the channel-ingest capability flag in the given state. */
@@ -54,6 +59,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
             messageRepository,
             threadRepository,
             identityResolver,
+            conversationFeedbackErasure,
             conversationIngestEnabled
         );
     }
@@ -176,11 +182,17 @@ class SlackIngestServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void eraseChannel_revokesConsentAndDeletesStoredContentPromptly() {
+    void eraseChannel_revokesConsentErasesDerivedFeedbackAndDeletesStoredContentPromptly() {
+        // The channel's thread ids are collected first (the derived practice rows are keyed by slack_thread.id).
+        when(threadRepository.findIdsByWorkspaceIdAndSlackChannelId(7L, "C1")).thenReturn(List.of(11L, 22L));
+
         service.eraseChannel(7L, "C1");
 
         // Consent flip stops future ingestion + drops threads out of the ACTIVE-consent projectors…
         verify(monitoredChannelRepository).revokeConsent(7L, "C1");
+        // …the derived CONVERSATION_THREAD observations/feedback are hard-deleted through the practices port
+        // (true erasure, not inert-by-gate)…
+        verify(conversationFeedbackErasure).eraseForThreads(7L, List.of(11L, 22L));
         // …and the channel's raw content (messages) + thread aggregates are deleted now, not left for the sweep.
         verify(messageRepository).deleteByWorkspaceIdAndSlackChannelId(7L, "C1");
         verify(threadRepository).deleteByWorkspaceIdAndSlackChannelId(7L, "C1");

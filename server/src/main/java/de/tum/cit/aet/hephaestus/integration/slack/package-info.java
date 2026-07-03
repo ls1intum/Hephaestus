@@ -53,6 +53,10 @@
         // reaction port — the uptake buttons + dispute modal are the Slack surface of the closed-loop
         // research signal, mirroring how the agent delivery layer reads the same named interface.
         "practices::reaction",
+        // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the CONVERSATION_THREAD-derived
+        // observations/feedback via the practices-owned ConversationFeedbackErasure port (implementation lives
+        // inside practices, so this one-way integration.slack → practices::spi edge forms no module cycle).
+        "practices::spi",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.slack;

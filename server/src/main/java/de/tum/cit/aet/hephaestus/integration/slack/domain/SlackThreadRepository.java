@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
+import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -64,6 +65,18 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         @Param("slackThreadTs") String slackThreadTs,
         @Param("slackTs") String slackTs,
         @Param("authorMemberId") @Nullable Long authorMemberId
+    );
+
+    /**
+     * The ids of every thread aggregate on one channel — collected on channel erasure so the derived
+     * {@code CONVERSATION_THREAD} observations/feedback (keyed by these {@code slack_thread} ids as
+     * {@code artifact_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
+     * are dropped. Carries the {@code workspace_id} predicate the tenancy inspector requires.
+     */
+    @Query("SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.slackChannelId = :slackChannelId")
+    List<Long> findIdsByWorkspaceIdAndSlackChannelId(
+        @Param("workspaceId") Long workspaceId,
+        @Param("slackChannelId") String slackChannelId
     );
 
     /** Workspace purge: delete every thread aggregate for one workspace. Derived DELETE carries the predicate. */

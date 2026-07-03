@@ -34,12 +34,33 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     private static final String AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
 
-    // Locked OAuth scope set; rotating apps rejected at finalize until token-rotation refresher ships.
+    // Locked, least-privilege OAuth bot-scope set for the live Slack subsystem (DM mentor + assistant + App
+    // Home). Each scope maps to a Slack API method or event the SHIPPED code actually exercises; rotating apps
+    // are rejected at finalize until the token-rotation refresher ships.
+    //
+    // NOTE — deliberately EXCLUDED: channels:history / groups:history. Those authorize delivery of public/private
+    // channel `message` events, which only the PARKED channel-ingestion subsystem consumes
+    // (SlackIngestService.ingestChannelMessage, gated off by hephaestus.integration.slack.conversation-ingest
+    // .enabled=false). Requesting them here would grant read access to every monitored channel's traffic before
+    // channel activation is a deliberate, consent-designed operator decision — so they stay off until that ships.
     static final Set<String> DEFAULT_SCOPES = Set.of(
+        // chat.postMessage + chat.startStream/appendStream/stopStream: canned replies and the streamed mentor DM
+        // reply (SlackMessageService).
         "chat:write",
+        // Post to an admin-configured notification channel / leaderboard-digest channel the bot may not have
+        // joined (SlackConnectionAdminController, SlackLeaderboardDigestPublisher).
         "chat:write.public",
+        // assistant.threads.setStatus + setSuggestedPrompts: the assistant "Thinking…" status and the
+        // suggested-prompt seed on assistant_thread_started (SlackMessageService / SlackStreamingMentorChannel).
+        "assistant:write",
+        // Delivery of `message` events with channel_type=im — the DM that drives a mentor turn
+        // (SlackEventDispatcher). Without it the mentor DM entry point receives nothing.
+        "im:history",
+        // team/workspace metadata resolution.
         "team:read",
+        // users.list + Slack user → workspace member identity resolution (SlackMentorIdentityResolver).
         "users:read",
+        // email-keyed member matching when linking a Slack user to a Hephaestus member.
         "users:read.email"
     );
 

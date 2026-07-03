@@ -128,6 +128,32 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} feedback for a workspace whose {@code artifact_id} (the
+     * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
+     * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
+     * withdrawn. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} / {@code feedback_placement} /
+     * {@code feedback_reaction}. Bulk JPQL delete (the {@code @Immutable} entity forbids an ORM remove). The
+     * {@code workspace_id} + {@code artifact_type} + {@code artifact_id} predicates keep it scoped so no PR/ISSUE unit
+     * and no other-tenant row is affected. Callers guard an empty {@code artifactIds}.
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.artifactId IN :artifactIds
+        """
+    )
+    int deleteConversationThreadFeedback(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactIds") java.util.Collection<Long> artifactIds
+    );
+
     // --- conversational feedback delivery loop ---
 
     /**

@@ -27,13 +27,13 @@ import tools.jackson.databind.node.ObjectNode;
  * the tenancy {@code StatementInspector}, so the predicate is spelled out) — no cross-module import, no cycle.
  *
  * <p><strong>Erasure (GDPR "erase the copies").</strong> On channel uninstall/erase the Slack module flips consent
- * to {@code REVOKED} and deletes the {@code slack_thread} aggregates (see {@code SlackIngestService.eraseChannel}),
- * so this gate immediately drops every derived CONVERSATION_THREAD observation/feedback — the copies are rendered
- * INERT even though the {@code observation}/{@code feedback} rows persist (no FK back to {@code slack_thread}). A
- * hard-delete of those derived rows on erase is deliberately NOT wired here: it would need a
- * practices/observation-erasure port invoked FROM the Slack module, and that reverse edge
- * ({@code integration.slack → practices}) forms a Modulith cycle. It is tracked as a follow-up that must land as a
- * practices-owned NamedInterface erasure seam; until then the fail-closed gate is the safety net.
+ * to {@code REVOKED}, hard-deletes the derived CONVERSATION_THREAD observations/feedback through the practices-owned
+ * {@code practices.spi.ConversationFeedbackErasure} port, and deletes the {@code slack_thread} aggregates (see
+ * {@code SlackIngestService.eraseChannel}). That port is the practices-owned NamedInterface erasure seam — the
+ * dependency runs one way ({@code integration.slack → practices::spi}, implementation inside {@code practices}), so
+ * no Modulith cycle forms. This gate remains the fail-closed safety net for the window between a consent change and
+ * the physical erase, and for any derived row a purge has not yet reached (the {@code observation}/{@code feedback}
+ * rows carry no FK back to {@code slack_thread}).
  */
 @Component
 public class ConversationConsentGate {
