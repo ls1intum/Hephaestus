@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -30,6 +32,25 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
         @Param("workspaceId") Long workspaceId,
         @Param("slackChannelId") String slackChannelId
     );
+
+    /**
+     * The consent-announcement timestamp of one allow-listed channel, if the row exists and was ever activated
+     * (null before the first {@code PENDING → ACTIVE} transition stamps it). Carries the {@code workspace_id}
+     * predicate the tenancy {@code StatementInspector} requires. Read by the ingest write-path to enforce the
+     * forward-only invariant: on an {@code ACTIVE} channel, only messages whose {@code ts} is strictly after this
+     * timestamp are ever stored (pre-announcement history never enters).
+     */
+    @Query(
+        "SELECT c.consentAnnouncedAt FROM SlackMonitoredChannel c " +
+            "WHERE c.workspaceId = :workspaceId AND c.slackChannelId = :slackChannelId"
+    )
+    Optional<Instant> findConsentAnnouncedAt(
+        @Param("workspaceId") Long workspaceId,
+        @Param("slackChannelId") String slackChannelId
+    );
+
+    /** All allow-listed channels for a workspace, newest-first — the admin activation control-plane listing. */
+    List<SlackMonitoredChannel> findByWorkspaceIdOrderByCreatedAtDesc(Long workspaceId);
 
     /**
      * Data-subject / channel erasure: flip a channel's consent to {@code REVOKED} so ingestion stops

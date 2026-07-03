@@ -41,6 +41,9 @@
         // Shared core infra: @WorkspaceAgnostic on the inbound Slack-events controller (this path resolves the
         // workspace from the payload's team_id, not the URL).
         "core",
+        // SlackChannelConsentService throws the shared EntityNotFoundException (→ 404) for an unknown /
+        // cross-workspace channel, mirroring how the workspace + leaderboard controllers reuse it.
+        "core::exception",
         // SlackMentorIdentityResolver resolves a Slack (team, user) to the workspace developer login through the
         // auth SPI ports only (GitProviderRegistry + AccountIdentityQuery + AccountWorkspaceMembershipQuery) —
         // never core.auth domain types.

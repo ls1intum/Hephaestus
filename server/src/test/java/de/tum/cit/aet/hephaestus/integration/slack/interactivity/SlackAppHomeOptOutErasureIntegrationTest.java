@@ -185,10 +185,12 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         ).isTrue();
 
         // 2) The person's stored message is erased; the co-participant's remains.
-        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "me.1"))
-            .isFalse();
-        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1"))
-            .isTrue();
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "me.1")
+        ).isFalse();
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1")
+        ).isTrue();
 
         // 3) The person's id is pruned out of participant_member_ids; the co-participant stays.
         assertThat(participantIds(threadId)).containsExactly(otherMemberId);

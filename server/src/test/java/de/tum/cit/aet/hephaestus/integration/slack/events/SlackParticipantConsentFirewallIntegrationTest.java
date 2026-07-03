@@ -83,6 +83,9 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
         channel.setSlackTeamId(TEAM);
         channel.setSlackChannelId(CHANNEL);
         channel.setConsentState(ConsentState.ACTIVE);
+        // Announced well before every test message ts (100.1 / 200.1 / 300.1), so the forward-only ingest invariant
+        // (ts > consent_announced_at) is satisfied and only the person firewall differentiates the two authors.
+        channel.setConsentAnnouncedAt(java.time.Instant.ofEpochSecond(1));
         monitoredChannelRepository.save(channel);
 
         // The two resolvers are pure lookups — mocked so the test exercises the REAL gates + REAL persistence.
@@ -102,7 +105,7 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
             threadRepository,
             identityResolver,
             conversationFeedbackErasure,
-            /* conversationIngestEnabled */true
+            /* conversationIngestEnabled */ true
         );
     }
 
@@ -129,8 +132,9 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
     void personFirewall_optBackIn_reallowsIngest() {
         participantConsentRepository.upsert(workspaceId, OPTED_OUT_USER, true, true, "SLACK_APP_HOME");
         ingestService.ingestChannelMessage(TEAM, CHANNEL, "100.1", null, OPTED_OUT_USER, "while opted out");
-        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1"))
-            .isFalse();
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1")
+        ).isFalse();
 
         // Opt back in (ingestion_opted_out → false), then a fresh message from the same author is now stored.
         participantConsentRepository.upsert(workspaceId, OPTED_OUT_USER, false, false, "SLACK_APP_HOME");
@@ -140,7 +144,8 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
             .as("after opting back in, the author's ingest is allowed again")
             .isTrue();
         // The message sent while opted out stays absent (no retroactive ingest).
-        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1"))
-            .isFalse();
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1")
+        ).isFalse();
     }
 }

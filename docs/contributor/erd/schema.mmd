@@ -864,6 +864,17 @@ erDiagram
         VARCHAR(255) locked_by "NOT NULL"
     }
 
+    SlackChannelConsentEvent {
+        BIGINT id PK
+        BIGINT workspace_id "NOT NULL"
+        VARCHAR(32) slack_channel_id "NOT NULL"
+        VARCHAR(16) from_state
+        VARCHAR(16) to_state "NOT NULL"
+        BIGINT actor_user_id
+        TEXT reason
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
     SlackEventDedup {
         VARCHAR(64) event_id PK
         TIMESTAMPTZ received_at "NOT NULL"

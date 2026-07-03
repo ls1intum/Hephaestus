@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,9 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
     @Mock
     private ConversationFeedbackErasure conversationFeedbackErasure;
+
+    /** A consent-announcement stamp well before the test messages (ts "100.1"), so the forward-only gate passes. */
+    private static final Instant ANNOUNCED_BEFORE = Instant.ofEpochSecond(1);
 
     private SlackIngestService service;
 
@@ -154,6 +158,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
         // ingestion → nothing is stored. Remove the firewall and this test fails (the message would be inserted).
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(false);
 
         service.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
@@ -180,9 +185,60 @@ class SlackIngestServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void activeChannel_preAnnouncementMessage_isNotStored_andPersonGateNotEvenConsulted() {
+        // Forward-only invariant: on an ACTIVE channel, a message whose ts predates consent_announced_at is never
+        // stored — pre-announcement history stays out. The check fires BEFORE the person firewall, so the participant
+        // gate is not even consulted. Remove the forward-only guard and this test fails (the message would be stored).
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        // Announcement is AFTER the message ts (100.1) → the message predates consent and must not enter.
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(
+            Optional.of(Instant.ofEpochSecond(200))
+        );
+
+        service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "old");
+
+        verifyNoInteractions(participantConsentGate);
+        verify(messageRepository, never()).insertIfAbsent(
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    void activeChannel_missingAnnouncementStamp_failsClosed() {
+        // An ACTIVE channel is always stamped at activation; a missing stamp is an inconsistency and must fail closed
+        // (store nothing) rather than fall through to ingest unbounded history.
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.empty());
+
+        service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
+
+        verifyNoInteractions(participantConsentGate);
+        verify(messageRepository, never()).insertIfAbsent(
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
     void activeChannel_stampsResolvedMemberIdAndUpsertsThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", "99.0", "U1", 42L, "hi")).thenReturn(1);
@@ -198,6 +254,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     void activeChannel_rootMessageUsesOwnTsAsThreadTs() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.empty());
         when(
@@ -240,6 +297,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     void duplicateMessage_doesNotBumpThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", null, "U1", 42L, "hi")).thenReturn(0);

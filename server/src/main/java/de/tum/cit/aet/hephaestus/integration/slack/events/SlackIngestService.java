@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelR
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -32,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><strong>Consent gate (fail-closed layer 2).</strong> Even with the capability flag on, seeing a message on a
  * channel auto-creates the allow-list row in {@code PENDING} (discovery: the bot only receives events for channels
  * it was invited to), but a message is only persisted once that channel's {@link ConsentState} is {@code ACTIVE}.
- * A {@code PENDING}/{@code ANNOUNCED}/{@code PAUSED}/{@code REVOKED} channel discovers itself but ingests nothing —
+ * A {@code PENDING}/{@code PAUSED}/{@code REVOKED} channel discovers itself but ingests nothing —
  * approval is an explicit, out-of-band consent action, never an implicit side effect of traffic.
  *
  * <p>On a genuinely new message the author's Slack id is resolved to the workspace {@code User} (member) id and
@@ -120,6 +121,15 @@ public class SlackIngestService {
             return;
         }
 
+        // Forward-only invariant: on an ACTIVE channel, ingestion is bounded to messages that arrived strictly after
+        // the consent announcement was posted (consent_announced_at). Pre-announcement history never enters — a
+        // channel activated today does not retroactively ingest the backlog people wrote before they were told. An
+        // ACTIVE channel is always stamped at activation, so a missing stamp fails closed (store nothing).
+        Instant announcedAt = monitoredChannelRepository.findConsentAnnouncedAt(workspaceId, channelId).orElse(null);
+        if (announcedAt == null || !isAfterAnnouncement(ts, announcedAt)) {
+            return;
+        }
+
         // Person firewall (the fix for the #1 defect): an individual who opted out of ingestion is never stored,
         // even on an ACTIVE channel with the capability on. This composes the two-layer gate into:
         //   ingest iff conversationIngestEnabled AND channel == ACTIVE AND NOT participantOptedOut(workspace, author).
@@ -153,6 +163,21 @@ public class SlackIngestService {
             String aggregateThreadTs = (threadTs == null || threadTs.isBlank()) ? ts : threadTs;
             threadRepository.upsertOnMessage(workspaceId, channelId, aggregateThreadTs, ts, authorMemberId);
             log.debug("Ingested Slack message workspace={} channel={} ts={}", workspaceId, channelId, ts);
+        }
+    }
+
+    /**
+     * Whether a Slack message {@code ts} arrived strictly after the channel's consent announcement — the
+     * forward-only comparison. A Slack {@code ts} is {@code <epoch-seconds>.<micros>}; parse it as a fractional
+     * epoch and compare against {@code announcedAt} rendered the same way. An unparseable {@code ts} fails closed.
+     */
+    private static boolean isAfterAnnouncement(String ts, Instant announcedAt) {
+        try {
+            double messageEpoch = Double.parseDouble(ts);
+            double announcedEpoch = announcedAt.getEpochSecond() + announcedAt.getNano() / 1_000_000_000.0;
+            return messageEpoch > announcedEpoch;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 

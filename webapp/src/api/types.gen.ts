@@ -866,6 +866,49 @@ export type SlackTestMessageRequest = {
     channelId?: string;
 };
 
+/**
+ * An allow-listed Slack channel with its consent state and person opt-out count
+ */
+export type SlackMonitoredChannel = {
+    id: number;
+    slackTeamId: string;
+    slackChannelId: string;
+    channelName?: string;
+    consentState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    consentAnnouncedAt?: Date;
+    optedOutMemberCount: number;
+    createdAt: Date;
+};
+
+/**
+ * An immutable Slack channel consent-transition audit entry
+ */
+export type SlackChannelConsentEvent = {
+    id: number;
+    slackChannelId: string;
+    fromState?: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    toState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    actorUserId?: number;
+    reason?: string;
+    createdAt: Date;
+};
+
+/**
+ * Transition a Slack channel to a target consent state
+ */
+export type UpdateSlackChannelConsentRequest = {
+    consentState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    reason?: string;
+};
+
+/**
+ * Allow-list a Slack channel (lands in PENDING)
+ */
+export type RegisterSlackChannelRequest = {
+    slackChannelId: string;
+    channelName?: string;
+};
+
 export type SessionView = {
     current?: boolean;
     expiresAt?: Date;
@@ -3787,6 +3830,118 @@ export type InitiateResponses = {
 };
 
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
+
+export type ListSlackChannelsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels';
+};
+
+export type ListSlackChannelsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SlackMonitoredChannel>;
+};
+
+export type ListSlackChannelsResponse = ListSlackChannelsResponses[keyof ListSlackChannelsResponses];
+
+export type RegisterSlackChannelData = {
+    body: RegisterSlackChannelRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels';
+};
+
+export type RegisterSlackChannelResponses = {
+    /**
+     * OK
+     */
+    200: SlackMonitoredChannel;
+    /**
+     * Created
+     */
+    201: SlackMonitoredChannel;
+};
+
+export type RegisterSlackChannelResponse = RegisterSlackChannelResponses[keyof RegisterSlackChannelResponses];
+
+export type DeleteSlackChannelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
+};
+
+export type DeleteSlackChannelResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteSlackChannelResponse = DeleteSlackChannelResponses[keyof DeleteSlackChannelResponses];
+
+export type UpdateSlackChannelConsentData = {
+    body: UpdateSlackChannelConsentRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
+};
+
+export type UpdateSlackChannelConsentResponses = {
+    /**
+     * OK
+     */
+    200: SlackMonitoredChannel;
+};
+
+export type UpdateSlackChannelConsentResponse = UpdateSlackChannelConsentResponses[keyof UpdateSlackChannelConsentResponses];
+
+export type ListSlackChannelConsentEventsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events';
+};
+
+export type ListSlackChannelConsentEventsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SlackChannelConsentEvent>;
+};
+
+export type ListSlackChannelConsentEventsResponse = ListSlackChannelConsentEventsResponses[keyof ListSlackChannelConsentEventsResponses];
 
 export type SendTestMessageData = {
     /**

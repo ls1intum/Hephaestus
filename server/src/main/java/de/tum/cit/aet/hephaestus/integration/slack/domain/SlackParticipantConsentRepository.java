@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
  * row that already names its workspace cannot leak across tenants).
  */
 public interface SlackParticipantConsentRepository
-    extends JpaRepository<SlackParticipantConsent, SlackParticipantConsent.Id> {
+    extends JpaRepository<SlackParticipantConsent, SlackParticipantConsent.Id>
+{
     /**
      * The single read behind {@code SlackParticipantConsentGate}: is this individual currently opted OUT of
      * ingestion in this workspace? Absent row ⇒ {@code false} (allowed) — the person firewall fails <em>open</em> on
@@ -49,6 +50,14 @@ public interface SlackParticipantConsentRepository
         @Param("researchOptedOut") boolean researchOptedOut,
         @Param("source") @Nullable String source
     );
+
+    /**
+     * The count of individuals who have opted OUT of ingestion in this workspace — surfaced to the admin
+     * activation control plane so an admin sees how many members have exercised the person firewall. Person opt-out
+     * is workspace-scoped (not per-channel), so this is a single workspace-wide count. Carries the
+     * {@code workspace_id} predicate the tenancy inspector requires.
+     */
+    long countByWorkspaceIdAndIngestionOptedOutTrue(Long workspaceId);
 
     /** Workspace purge: delete every consent row for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
