@@ -127,4 +127,94 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Transactional
     @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
+    // --- S7: conversational feedback delivery loop ---
+
+    /**
+     * Flip a PREPARED conversational unit to DELIVERED (compare-and-set). Native (not JPQL) because the
+     * {@code @Immutable} entity forbids ORM state mutation, mirroring {@link #updateState}. The
+     * {@code delivery_state='PREPARED'} predicate is the CAS guard: exactly one of N racing mentor turns wins the
+     * flip; the others see a rowcount of 0. A unit already DELIVERED, SUPPRESSED (aged out), or non-existent yields
+     * 0 - the caller treats that as a no-op and does NOT write a placement.
+     *
+     * @return {@code 1} on a clean flip, {@code 0} if the unit was no longer PREPARED (lost race / expired).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = :at " +
+            "WHERE id = :id AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markConversationDelivered(@Param("id") UUID id, @Param("at") Instant at);
+
+    /**
+     * Newest PREPARED conversational units for a developer (as RECIPIENT) in a workspace - the mentor's queue.
+     * Body is intentionally NULL on these rows (composed at delivery). Ordered newest-first, bounded by the caller's
+     * {@code Pageable}.
+     */
+    @Query(
+        """
+        SELECT f FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        ORDER BY f.createdAt DESC
+        """
+    )
+    List<Feedback> findRecentPreparedConversationForRecipient(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        Pageable pageable
+    );
+
+    /**
+     * Does a DELIVERED IN_CONTEXT feedback unit already exist for this recipient in this workspace bound to an
+     * observation carrying {@code recurrenceKey}? The router uses this to avoid re-raising a locus already received
+     * inline. A null key is never passed (the caller skips the check when the key is null).
+     */
+    @Query(
+        """
+        SELECT (COUNT(f) > 0) FROM Feedback f, FeedbackObservation fo
+        WHERE fo.feedback = f
+          AND fo.observation.recurrenceKey = :recurrenceKey
+          AND f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CONTEXT
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+        """
+    )
+    boolean existsDeliveredInContextForRecurrenceKey(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("recurrenceKey") String recurrenceKey
+    );
+
+    /** Distinct workspaces that currently hold at least one PREPARED conversational unit (TTL sweep enumeration). */
+    @Query(
+        """
+        SELECT DISTINCT f.workspaceId FROM Feedback f
+        WHERE f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        """
+    )
+    List<Long> findWorkspaceIdsWithPreparedConversation();
+
+    /**
+     * Age out every PREPARED conversational unit for a workspace created strictly before {@code cutoff}: SUPPRESSED /
+     * CONVERSATION_EXPIRED. Native - the {@code @Immutable} entity forbids an ORM update. Carries the
+     * {@code workspace_id} predicate the tenancy inspector requires for a raw native statement.
+     *
+     * @return the number of units expired
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = 'CONVERSATION_EXPIRED' " +
+            "WHERE workspace_id = :workspaceId AND channel = 'CONVERSATION' " +
+            "AND delivery_state = 'PREPARED' AND created_at < :cutoff",
+        nativeQuery = true
+    )
+    int expirePreparedConversationBefore(@Param("workspaceId") Long workspaceId, @Param("cutoff") Instant cutoff);
 }

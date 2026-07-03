@@ -44,6 +44,7 @@ public class MentorTurnPersistence {
     private final ChatMessageRepository chatMessageRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ModelPricingService pricingService;
+    private final de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler conversationalDeliveryReconciler;
 
     /**
      * Find the thread for {@code (workspaceId, threadId)} owned by {@code user}, creating a
@@ -257,9 +258,44 @@ public class MentorTurnPersistence {
         // a benign reaper race into a logged turn failure.
         chatMessageRepository.saveAndFlush(assistant);
 
+        // S7: close the conversational-delivery loop for any PREPARED unit the mentor raised this turn. MUST run
+        // AFTER the assistant saveAndFlush above - the CONVERSATION_TURN placement's chat_message_id FK
+        // (ON DELETE SET NULL) references this just-flushed row. Runs in THIS (finalise) transaction. Best-effort.
+        reconcileConversationalDelivery(assistant, state);
+
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
             chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
+        }
+    }
+
+    /**
+     * Reconcile the mentor's linked findings for this turn against the PREPARED conversational queue (S7).
+     * Derives the recipient + workspace from the assistant message's thread. Best-effort - a failure is logged
+     * and swallowed so it can never fail the turn persistence the finalise transaction just did.
+     */
+    private void reconcileConversationalDelivery(ChatMessage assistant, TranslatorState state) {
+        try {
+            java.util.List<UUID> linkedFindingIds = state.linkedFindingIds();
+            if (linkedFindingIds.isEmpty()) {
+                return;
+            }
+            ChatThread thread = assistant.getThread();
+            if (thread == null || thread.getWorkspace() == null || thread.getUser() == null) {
+                return;
+            }
+            conversationalDeliveryReconciler.reconcile(
+                thread.getWorkspace().getId(),
+                thread.getUser().getId(),
+                assistant.getId(),
+                linkedFindingIds
+            );
+        } catch (RuntimeException e) {
+            log.warn(
+                "Conversational delivery reconciliation failed (turn persistence unaffected): assistantMessageId={}, error={}",
+                assistant.getId(),
+                e.toString()
+            );
         }
     }
 

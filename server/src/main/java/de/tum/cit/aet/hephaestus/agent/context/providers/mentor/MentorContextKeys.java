@@ -18,7 +18,8 @@ public final class MentorContextKeys {
         PracticeStandingContentSource.OUTPUT_KEY,
         DeliveredFeedbackContentSource.OUTPUT_KEY,
         RecentAuthoredWorkContentSource.OUTPUT_KEY,
-        SlackConversationContentSource.OUTPUT_KEY
+        SlackConversationContentSource.OUTPUT_KEY,
+        PreparedConversationFeedbackContentSource.OUTPUT_KEY
     );
 
     private MentorContextKeys() {}

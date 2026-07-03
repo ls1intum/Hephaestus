@@ -107,6 +107,7 @@ const FETCH_CONTEXT_ALLOWED = new Set([
     "delivered_feedback.json",
     "recent_authored_work.json",
     "slack_conversations.json",
+    "prepared_conversation_feedback.json",
 ]);
 
 // JSON-RPC error codes

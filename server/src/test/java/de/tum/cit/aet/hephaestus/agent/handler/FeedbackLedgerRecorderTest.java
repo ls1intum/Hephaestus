@@ -69,7 +69,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             feedbackRepository,
             feedbackObservationRepository,
             feedbackPlacementRepository,
-            new PracticeReviewProperties(false, true, false, "", 15, false, false, policyFloor)
+            new PracticeReviewProperties(false, true, false, "", 15, false, false, policyFloor),
+            mock(org.springframework.context.ApplicationEventPublisher.class)
         );
     }
 

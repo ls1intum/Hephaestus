@@ -68,24 +68,35 @@ public class FeedbackLedgerRecorder {
     /** Policy-floor SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
     private static final int POLICY_FLOOR_UNIT_ORDINAL_BASE = 2000;
 
+    /**
+     * PREPARED conversational units (S7) start here so their {@code (agent_job_id, position)} never collides with
+     * the live IN_CONTEXT unit (0), the B2 base (1000), or the policy-floor base (2000). Public so the
+     * {@link de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer} derives its
+     * positions from the one shared constant rather than a second literal.
+     */
+    public static final int CONVERSATION_UNIT_ORDINAL_BASE = 3000;
+
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final PracticeReviewProperties reviewProperties;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     FeedbackLedgerRecorder(
         ObservationRepository observationRepository,
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
-        PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties,
+        org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.reviewProperties = reviewProperties;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -124,6 +135,10 @@ public class FeedbackLedgerRecorder {
         List<DeliveredSignal> inlineSignals,
         boolean summaryDelivered
     ) {
+        // Signal the conversational-delivery loop for EVERY cycle that reaches the ledger - before any early
+        // return below - so comms-only cycles (zero IN_CONTEXT posts) and transient no-ops are not skipped. The
+        // listener re-reads the observations and no-ops if nothing is admitted, so an unconditional signal is safe.
+        publishConversationDeliveryTrigger(job);
         if (delivery == null) {
             return;
         }
@@ -286,6 +301,24 @@ public class FeedbackLedgerRecorder {
             artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
             feedbackThreadKey
         );
+    }
+
+    /**
+     * Fire {@link de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent} so the
+     * conversational-delivery listener can route this cycle's observations and prepare CONVERSATION units.
+     * Best-effort - a publish failure must never poison the ledger write or the delivery already received.
+     */
+    private void publishConversationDeliveryTrigger(AgentJob job) {
+        try {
+            eventPublisher.publishEvent(
+                new de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent(
+                    job.getId(),
+                    job.getWorkspace().getId()
+                )
+            );
+        } catch (RuntimeException e) {
+            log.warn("Conversational-delivery trigger publish failed (delivery unaffected): jobId={}", job.getId(), e);
+        }
     }
 
     /**

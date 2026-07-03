@@ -53,6 +53,12 @@ public final class TranslatorState {
     /** AI SDK UIMessage parts as accumulated. Order matches the stream; written to JSONB at end-of-turn. */
     private final ArrayNode partsAccumulator = nodes.arrayNode();
 
+    /**
+     * Observation ids the mentor linked this turn via {@code link_finding}, in emission order. Read at
+     * end-of-turn by the S7 conversational-delivery reconciler to flip the matching PREPARED unit to DELIVERED.
+     */
+    private final java.util.List<UUID> linkedFindingIds = new java.util.ArrayList<>();
+
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
 
@@ -244,6 +250,15 @@ public final class TranslatorState {
         part.put("id", findingId.toString());
         part.putObject("data").put("findingId", findingId.toString());
         partsAccumulator.add(part);
+        linkedFindingIds.add(findingId);
+    }
+
+    /**
+     * The observation ids the mentor linked this turn via {@code link_finding}, in emission order (duplicates
+     * retained - the reconciler de-duplicates). Snapshot copy for cross-thread safety on the finalise path.
+     */
+    public synchronized java.util.List<UUID> linkedFindingIds() {
+        return java.util.List.copyOf(linkedFindingIds);
     }
 
     /**

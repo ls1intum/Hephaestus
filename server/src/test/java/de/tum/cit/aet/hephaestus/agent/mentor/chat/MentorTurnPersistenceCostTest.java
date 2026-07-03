@@ -37,12 +37,16 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
     @Mock
     ModelPricingService pricingService;
 
+    @Mock
+    de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+
     private MentorTurnPersistence persistence() {
         return new MentorTurnPersistence(
             chatThreadRepository,
             chatMessageRepository,
             workspaceRepository,
-            pricingService
+            pricingService,
+            conversationalDeliveryReconciler
         );
     }
 
