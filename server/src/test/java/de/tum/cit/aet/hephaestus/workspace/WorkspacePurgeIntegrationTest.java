@@ -465,7 +465,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             channel.setSlackTeamId("T1");
             channel.setSlackChannelId(channelId);
             channel.setConsentState(SlackMonitoredChannel.ConsentState.PENDING);
-            channel.setBackfillState(SlackMonitoredChannel.BackfillState.NONE);
             slackMonitoredChannelRepository.save(channel);
 
             // mentor_slack_thread.chat_thread_id is a NOT NULL FK → chat_thread(id); seed a real thread first.

@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -16,7 +15,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,8 +90,6 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final AtomicBoolean flushing = new AtomicBoolean(false);
 
     private volatile Runnable disconnectHook;
-    /** The delivered conversational feedback this turn raised, bound before the terminal so the buttons carry it. */
-    private volatile @Nullable UUID boundFeedbackId;
     /**
      * The streaming message ts: {@code null} until the first write opens the stream, set exactly once. Every
      * open-or-append goes through {@link #openOrAppend} under {@link #streamLock}, so a late flush tick and the
@@ -125,23 +121,6 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     @Override
     public boolean isClientGone() {
         return clientGone.get();
-    }
-
-    /**
-     * Bind the conversational-feedback id this turn delivered so the terminal buttons carry it and can offer the
-     * dispute path on a thumbs-down. Optional by design: an unbound turn still renders pure satisfaction thumbs.
-     *
-     * <p>This surface belongs to the conversation-feedback capability (the channel-ingest → conversation-detection →
-     * conversation-feedback subsystem gated by {@code hephaestus.integration.slack.conversation-ingest.enabled}). A
-     * conversation-feedback id only exists once that capability is enabled and a feedback unit is delivered in the
-     * same turn; the delivery reconciler would then call this to bind it. That capability is off by default, so
-     * today no caller invokes this and {@link #boundFeedbackId} is always null — the DM mentor turn is pure chat and
-     * delivers no conversation-feedback unit. This is a parked, capability-gated seam, not a forgotten wiring TODO:
-     * the reconciler→channel callback is deliberately not built while the subsystem is dormant (it is untestable
-     * end-to-end until then), and the buttons render correctly bound-or-not.
-     */
-    public void bindFeedback(@Nullable UUID feedbackId) {
-        this.boundFeedbackId = feedbackId;
     }
 
     @Override
@@ -389,8 +368,9 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         try {
             String ts = streamTs.get();
             if (ts != null && !clientGone.get()) {
-                // Attach the feedback buttons (👍/👎, bound to this turn's ts + optional feedback id) as terminal blocks.
-                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(ts, boundFeedbackId);
+                // Attach the feedback buttons (👍/👎, anchored to this turn's ts) as terminal blocks. The DM mentor
+                // turn is pure chat and delivers no conversation-feedback unit, so the thumbs carry no feedback id.
+                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(ts, null);
                 slack.stopStream(workspaceId, channel, ts, blocks);
             }
         } catch (Exception e) {

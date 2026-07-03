@@ -17,10 +17,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Slack channel the workspace has allow-listed for monitoring (P3). Consent + backfill lifecycle rides
- * dedicated state columns rather than a separate table (design D11: the backfill job folds into the allow-list
- * row). Workspace-scoped (scalar {@code workspaceId}); ingestion only flows for a channel whose
- * {@link ConsentState} is {@code ACTIVE} — enforced by the P3 message handler, not by this row's mere presence.
+ * A Slack channel the workspace has allow-listed for monitoring (P3). The consent lifecycle rides a dedicated
+ * state column on the allow-list row rather than a separate table. Workspace-scoped (scalar {@code workspaceId});
+ * ingestion only flows for a channel whose {@link ConsentState} is {@code ACTIVE} — enforced by the P3 message
+ * handler, not by this row's mere presence.
  */
 @Entity
 @Table(
@@ -42,14 +42,6 @@ public class SlackMonitoredChannel {
         ACTIVE,
         PAUSED,
         REVOKED,
-    }
-
-    /** Historical-message backfill lifecycle (value-constrained by {@code chk_slack_monitored_channel_backfill}). */
-    public enum BackfillState {
-        NONE,
-        IN_PROGRESS,
-        COMPLETE,
-        FAILED,
     }
 
     @Id
@@ -74,10 +66,6 @@ public class SlackMonitoredChannel {
 
     @Column(name = "consent_announced_at")
     private @Nullable Instant consentAnnouncedAt;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "backfill_state", nullable = false, length = 16)
-    private BackfillState backfillState = BackfillState.NONE;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

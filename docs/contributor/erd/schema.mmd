@@ -878,7 +878,6 @@ erDiagram
         VARCHAR(32) slack_ts UK "NOT NULL"
         VARCHAR(32) slack_thread_ts
         VARCHAR(32) author_slack_user_id
-        VARCHAR(256) author_display_name
         TEXT text
         TIMESTAMPTZ edited_at
         TIMESTAMPTZ deleted_at
@@ -894,7 +893,6 @@ erDiagram
         VARCHAR(256) channel_name
         VARCHAR(16) consent_state "NOT NULL"
         TIMESTAMPTZ consent_announced_at
-        VARCHAR(16) backfill_state "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
     }
 

@@ -67,9 +67,6 @@ public class SlackMessage {
     @Column(name = "author_member_id")
     private @Nullable Long authorMemberId;
 
-    @Column(name = "author_display_name", length = 256)
-    private @Nullable String authorDisplayName;
-
     @Column(name = "text", columnDefinition = "TEXT")
     private @Nullable String text;
 

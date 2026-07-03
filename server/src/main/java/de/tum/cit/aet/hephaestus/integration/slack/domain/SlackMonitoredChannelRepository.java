@@ -46,16 +46,16 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
     int revokeConsent(@Param("workspaceId") Long workspaceId, @Param("slackChannelId") String slackChannelId);
 
     /**
-     * Idempotent allow-list registration: create the channel row on first sight (consent {@code PENDING},
-     * backfill {@code NONE}) and no-op on the unique {@code (workspace_id, slack_channel_id)} conflict. INSERTs
-     * are exempt from the tenancy predicate check (creating a row cannot leak across workspaces).
+     * Idempotent allow-list registration: create the channel row on first sight (consent {@code PENDING})
+     * and no-op on the unique {@code (workspace_id, slack_channel_id)} conflict. INSERTs are exempt from the
+     * tenancy predicate check (creating a row cannot leak across workspaces).
      */
     @Modifying
     @Transactional
     @Query(
         value = """
-        INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, backfill_state, created_at)
-        VALUES (:workspaceId, :slackTeamId, :slackChannelId, 'PENDING', 'NONE', now())
+        INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, created_at)
+        VALUES (:workspaceId, :slackTeamId, :slackChannelId, 'PENDING', now())
         ON CONFLICT (workspace_id, slack_channel_id) DO NOTHING
         """,
         nativeQuery = true

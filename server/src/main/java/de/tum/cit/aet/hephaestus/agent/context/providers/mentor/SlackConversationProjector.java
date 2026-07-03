@@ -159,7 +159,7 @@ public class SlackConversationProjector {
     private void appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
         jdbc.query(
             """
-            SELECT m.slack_ts, m.author_slack_user_id, m.author_display_name, m.text, m.edited_at
+            SELECT m.slack_ts, m.author_slack_user_id, m.text, m.edited_at
             FROM slack_message m
             JOIN slack_monitored_channel c
               ON c.workspace_id = m.workspace_id AND c.slack_channel_id = m.slack_channel_id
@@ -175,10 +175,6 @@ public class SlackConversationProjector {
                 ObjectNode node = messages.addObject();
                 node.put("ts", rs.getString("slack_ts"));
                 node.put("author", rs.getString("author_slack_user_id"));
-                String display = rs.getString("author_display_name");
-                if (display != null) {
-                    node.put("authorName", display);
-                }
                 node.put("text", rs.getString("text"));
                 if (rs.getTimestamp("edited_at") != null) {
                     node.put("edited", true);

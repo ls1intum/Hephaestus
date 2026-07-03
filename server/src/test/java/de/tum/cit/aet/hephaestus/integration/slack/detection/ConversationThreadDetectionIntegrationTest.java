@@ -80,8 +80,8 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
     private void seedChannel(long workspaceId, String channelId, String consentState) {
         jdbc.update(
-            "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, backfill_state, created_at) " +
-                "VALUES (?, 'T1', ?, ?, 'NONE', now())",
+            "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, created_at) " +
+                "VALUES (?, 'T1', ?, ?, now())",
             workspaceId,
             channelId,
             consentState
