@@ -40,6 +40,11 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     @Mock
     FeedbackRepository feedbackRepository;
 
+    // No conversation units in these fixtures, so the gate's default empty allow-set (Mockito ReturnsEmptyValues)
+    // is exactly right — every unit here is PR/ISSUE-derived and passes through ungated.
+    @Mock
+    ConversationConsentGate conversationConsentGate;
+
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
 

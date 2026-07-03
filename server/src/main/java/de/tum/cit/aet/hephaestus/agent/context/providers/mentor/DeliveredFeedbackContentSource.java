@@ -8,10 +8,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -37,6 +40,15 @@ import tools.jackson.databind.node.ObjectNode;
  * scoped to the developer as RECIPIENT, newest first, over a 90-day window. Best-effort like its siblings.
  *
  * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
+ *
+ * <p><strong>Consent gate (fail-closed).</strong> A {@code CONVERSATION_THREAD} feedback unit's body is composed
+ * from the raw messages of a Slack thread (its {@code artifactId} IS the source {@code slack_thread.id}), so it is
+ * surfaced ONLY while that thread's source channel consent is still {@code ACTIVE} — the same
+ * {@link ConversationConsentGate} gate the raw {@link SlackConversationProjector} applies. PR- and ISSUE-derived
+ * feedback carries no Slack content and passes through unchanged. When a surviving conversation unit is present,
+ * the whole payload carries the {@code _meta.trustLevel: "UNTRUSTED_EXTERNAL"} quarantine envelope; a PR/issue-only
+ * payload keeps its trusted shape (no envelope). The consent decision is (re)computed on every cache build, so a
+ * revoked channel's derived body clears within one cache TTL ({@code MENTOR_CONTEXT_TTL} = 5 min) at the latest.
  */
 @Component
 @RequiredArgsConstructor
@@ -63,6 +75,7 @@ public class DeliveredFeedbackContentSource implements ContentSource {
 
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
+    private final ConversationConsentGate conversationConsentGate;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
 
@@ -108,7 +121,20 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             PageRequest.of(0, MAX_DELIVERED)
         );
 
+        // Fail-closed consent gate (see class javadoc): a CONVERSATION_THREAD feedback unit surfaces only while its
+        // source Slack channel is ACTIVE. PR/ISSUE feedback carries no Slack content and is never gated.
+        Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
+            workspaceId,
+            conversationThreadIds(delivered)
+        );
+        boolean anyConversationSurvivor = delivered.stream().anyMatch(f -> isSurvivingConversation(f, activeThreadIds));
+
         ObjectNode root = objectMapper.createObjectNode();
+        // Untrusted-content quarantine: only when a Slack-derived (attacker-controllable) body survives the gate does
+        // this file carry the envelope — a PR/issue-only payload stays byte-identical (no _meta).
+        if (anyConversationSurvivor) {
+            conversationConsentGate.writeUntrustedEnvelope(root);
+        }
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
         root.put("lookbackDays", LOOKBACK_DAYS);
 
@@ -118,6 +144,12 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             // A DELIVERED unit with no body is a data anomaly — skip it rather than ship an empty entry the
             // mentor might quote as "your feedback".
             if (body == null || body.isBlank()) {
+                continue;
+            }
+            if (
+                f.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && !isSurvivingConversation(f, activeThreadIds)
+            ) {
+                // Source Slack channel no longer ACTIVE, or its thread is gone — withheld (fail-closed).
                 continue;
             }
             ObjectNode node = arr.addObject();
@@ -135,5 +167,25 @@ public class DeliveredFeedbackContentSource implements ContentSource {
         }
         root.put("totalDelivered", arr.size());
         return root;
+    }
+
+    /** The {@code slack_thread} ids ({@code artifactId}) of the CONVERSATION_THREAD feedback units, if any. */
+    private static List<Long> conversationThreadIds(List<Feedback> units) {
+        List<Long> ids = new ArrayList<>();
+        for (Feedback f : units) {
+            if (f.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && f.getArtifactId() != null) {
+                ids.add(f.getArtifactId());
+            }
+        }
+        return ids;
+    }
+
+    /** A CONVERSATION_THREAD feedback unit whose source thread is still in an ACTIVE channel (consent-gated allow-set). */
+    private static boolean isSurvivingConversation(Feedback f, Set<Long> activeThreadIds) {
+        return (
+            f.getArtifactType() == WorkArtifact.CONVERSATION_THREAD &&
+            f.getArtifactId() != null &&
+            activeThreadIds.contains(f.getArtifactId())
+        );
     }
 }

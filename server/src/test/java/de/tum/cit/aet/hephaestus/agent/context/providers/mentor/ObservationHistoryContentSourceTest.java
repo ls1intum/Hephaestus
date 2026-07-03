@@ -41,6 +41,11 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
     @Mock
     MentorContextQueryRepository queryRepository;
 
+    // No conversation rows in these fixtures, so the gate's default empty allow-set (Mockito ReturnsEmptyValues)
+    // is exactly right — every observation here is PR/ISSUE-derived and passes through ungated.
+    @Mock
+    ConversationConsentGate conversationConsentGate;
+
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
 

@@ -12,13 +12,16 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -39,6 +42,17 @@ import tools.jackson.databind.node.ObjectNode;
  * work patterns.
  *
  * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
+ *
+ * <p><strong>Consent gate (fail-closed).</strong> A {@code CONVERSATION_THREAD} observation's title + reasoning is
+ * LLM-composed from the raw messages of a Slack thread's participants (its {@code artifactId} IS the source
+ * {@code slack_thread.id}). Such an observation is surfaced ONLY while its source channel consent is still
+ * {@code ACTIVE} — the same {@link ConversationConsentGate} gate the raw {@link SlackConversationProjector} applies.
+ * A paused/revoked/erased channel (or a deleted thread) drops the row (fail-closed). PR- and ISSUE-derived
+ * observations carry no Slack content and pass through unchanged. When a surviving conversation row is present, the
+ * whole payload carries the {@code _meta.trustLevel: "UNTRUSTED_EXTERNAL"} quarantine envelope; a PR/issue-only
+ * payload keeps its trusted shape (no envelope). The consent decision is (re)computed on every cache build, so a
+ * revoked channel's derived reasoning clears within one cache TTL ({@code MENTOR_CONTEXT_TTL} = 5 min) at the
+ * latest; the authoritative always-fresh gate is {@link PreparedConversationFeedbackContentSource} (uncached).
  */
 @Component
 @RequiredArgsConstructor
@@ -66,6 +80,7 @@ public class ObservationHistoryContentSource implements ContentSource {
     private final UserRepository userRepository;
     private final ObservationRepository observationRepository;
     private final MentorContextQueryRepository queryRepository;
+    private final ConversationConsentGate conversationConsentGate;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
 
@@ -127,7 +142,17 @@ public class ObservationHistoryContentSource implements ContentSource {
             PageRequest.of(0, MAX_RECENT_REVIEWS)
         );
 
+        // Fail-closed consent gate (see class javadoc): a CONVERSATION_THREAD observation surfaces only while its
+        // source Slack channel is ACTIVE. PR/ISSUE observations carry no Slack content and are never gated.
+        Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(workspaceId, conversationThreadIds(recent));
+        boolean anyConversationSurvivor = recent.stream().anyMatch(o -> isSurvivingConversation(o, activeThreadIds));
+
         ObjectNode root = objectMapper.createObjectNode();
+        // Untrusted-content quarantine: only when a Slack-derived (attacker-controllable) reasoning survives the gate
+        // does this file carry the envelope — a PR/issue-only payload stays byte-identical (no _meta).
+        if (anyConversationSurvivor) {
+            conversationConsentGate.writeUntrustedEnvelope(root);
+        }
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
 
         ObjectNode summary = root.putObject("summary");
@@ -154,6 +179,13 @@ public class ObservationHistoryContentSource implements ContentSource {
 
         ArrayNode observationsArr = root.putArray("recentObservations");
         for (Observation o : recent) {
+            if (
+                o.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && !isSurvivingConversation(o, activeThreadIds)
+            ) {
+                // Source Slack channel no longer ACTIVE, or its thread is gone — withheld (fail-closed). The
+                // per-presence/severity summary aggregates above are non-content counts, so they are left intact.
+                continue;
+            }
             ObjectNode node = observationsArr.addObject();
             node.put("id", o.getId().toString());
             node.put("title", o.getTitle());
@@ -193,5 +225,25 @@ public class ObservationHistoryContentSource implements ContentSource {
         }
 
         return root;
+    }
+
+    /** The {@code slack_thread} ids ({@code artifactId}) of the CONVERSATION_THREAD observations, if any. */
+    private static List<Long> conversationThreadIds(List<Observation> observations) {
+        List<Long> ids = new ArrayList<>();
+        for (Observation o : observations) {
+            if (o.getArtifactType() == WorkArtifact.CONVERSATION_THREAD && o.getArtifactId() != null) {
+                ids.add(o.getArtifactId());
+            }
+        }
+        return ids;
+    }
+
+    /** A CONVERSATION_THREAD observation whose source thread is still in an ACTIVE channel (consent-gated allow-set). */
+    private static boolean isSurvivingConversation(Observation o, Set<Long> activeThreadIds) {
+        return (
+            o.getArtifactType() == WorkArtifact.CONVERSATION_THREAD &&
+            o.getArtifactId() != null &&
+            activeThreadIds.contains(o.getArtifactId())
+        );
     }
 }
