@@ -2,9 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import java.util.List;
 import java.util.Locale;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 /**
  * Conservative keyword heuristic implementing the {@link SlackSafetyClassifier} seam (S9). It errs toward answering
@@ -12,12 +9,11 @@ import org.springframework.stereotype.Component;
  * coding question is never blocked. {@link Category#OUT_OF_SCOPE} is left to a richer classifier — the heuristic
  * does not guess at topic scope.
  *
- * <p>Registered as {@code @ConditionalOnMissingBean} so a model-backed classifier can replace it without touching
- * the mentor flow.
+ * <p>Registered as the default {@code @ConditionalOnMissingBean} in {@link SlackSeamDefaultsConfiguration} so a
+ * model-backed classifier can replace it without touching the mentor flow. It is NOT a component-scanned bean:
+ * {@code @ConditionalOnMissingBean} is only reliable on a {@code @Bean} factory method, not on a scanned
+ * {@code @Component} (where evaluation order left the default unregistered and broke context startup).
  */
-@Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
-@ConditionalOnMissingBean(SlackSafetyClassifier.class)
 public class HeuristicSlackSafetyClassifier implements SlackSafetyClassifier {
 
     private static final List<String> SELF_HARM_CUES = List.of(

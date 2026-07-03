@@ -1,17 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.slack.health;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
-
 /**
  * Default, credential-free {@link SlackAuthLivenessClient}: every probe returns {@link Liveness#UNKNOWN}, so the
  * scheduled liveness sweep enumerates connections and exercises the call site without ever suspending one. The real
- * {@code auth.test} round-trip is LIVE-only; a live client replaces this bean (it is {@code @ConditionalOnMissingBean}).
+ * {@code auth.test} round-trip is LIVE-only; a live client replaces this bean by supplying its own
+ * {@link SlackAuthLivenessClient} (the default is registered {@code @ConditionalOnMissingBean} in
+ * {@link SlackSeamDefaultsConfiguration}). It is NOT a component-scanned bean: {@code @ConditionalOnMissingBean}
+ * is only reliable on a {@code @Bean} factory method, not on a scanned {@code @Component}.
  */
-@Component
-@ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
-@ConditionalOnMissingBean(SlackAuthLivenessClient.class)
 public class NoopSlackAuthLivenessClient implements SlackAuthLivenessClient {
 
     @Override
