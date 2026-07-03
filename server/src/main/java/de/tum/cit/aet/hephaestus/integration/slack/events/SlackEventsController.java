@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
 import java.time.Instant;
 import java.util.Set;
@@ -36,6 +37,7 @@ public class SlackEventsController {
     private final SlackMentorService mentorService;
     private final SlackIngestService ingestService;
     private final SlackOnboardingService onboardingService;
+    private final SlackAppHomeService appHomeService;
     private final ObjectMapper objectMapper;
 
     // Slack retries un-acked events; drop duplicates by event_id (bounded).
@@ -46,12 +48,14 @@ public class SlackEventsController {
         SlackMentorService mentorService,
         SlackIngestService ingestService,
         SlackOnboardingService onboardingService,
+        SlackAppHomeService appHomeService,
         ObjectMapper objectMapper
     ) {
         this.verifier = verifier;
         this.mentorService = mentorService;
         this.ingestService = ingestService;
         this.onboardingService = onboardingService;
+        this.appHomeService = appHomeService;
         this.objectMapper = objectMapper;
     }
 
@@ -104,7 +108,11 @@ public class SlackEventsController {
         if ("app_home_opened".equals(eventType)) {
             // Only (re)publish on the Home tab open; the Messages tab open fires the same event with tab=messages.
             if ("home".equals(event.path("tab").asString("home"))) {
-                onboardingService.onHomeOpened(teamId, event.path("user").asString(""));
+                String slackUserId = event.path("user").asString("");
+                // S4: publish the persistent Home tab (disclosure + research-consent toggle + quiet-hours).
+                appHomeService.onHomeOpened(teamId, slackUserId);
+                // S3: the DM link CTA for a not-yet-linked member (no-op once linked).
+                onboardingService.onHomeOpened(teamId, slackUserId);
             }
             return;
         }

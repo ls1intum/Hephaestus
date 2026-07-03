@@ -38,6 +38,9 @@ class SlackEventsControllerTest extends BaseUnitTest {
     @Mock
     private SlackOnboardingService onboardingService;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService appHomeService;
+
     private SlackEventsController controller;
 
     @BeforeEach
@@ -47,6 +50,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             mentorService,
             ingestService,
             onboardingService,
+            appHomeService,
             JsonMapper.builder().build()
         );
         when(verifier.verify(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);

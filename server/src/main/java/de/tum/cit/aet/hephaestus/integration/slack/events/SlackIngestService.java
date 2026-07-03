@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
@@ -40,6 +39,7 @@ public class SlackIngestService {
 
     private final SlackWorkspaceResolver workspaceResolver;
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
+    private final SlackChannelConsentGate consentGate;
     private final SlackMessageRepository messageRepository;
     private final SlackThreadRepository threadRepository;
     private final SlackMentorIdentityResolver identityResolver;
@@ -47,12 +47,14 @@ public class SlackIngestService {
     public SlackIngestService(
         SlackWorkspaceResolver workspaceResolver,
         SlackMonitoredChannelRepository monitoredChannelRepository,
+        SlackChannelConsentGate consentGate,
         SlackMessageRepository messageRepository,
         SlackThreadRepository threadRepository,
         SlackMentorIdentityResolver identityResolver
     ) {
         this.workspaceResolver = workspaceResolver;
         this.monitoredChannelRepository = monitoredChannelRepository;
+        this.consentGate = consentGate;
         this.messageRepository = messageRepository;
         this.threadRepository = threadRepository;
         this.identityResolver = identityResolver;
@@ -79,11 +81,9 @@ public class SlackIngestService {
         // Discovery: register the channel on first sight (PENDING). This does NOT authorize ingestion.
         monitoredChannelRepository.insertIfAbsent(workspaceId, teamId, channelId);
 
-        // Consent gate: only ACTIVE channels flow content. A brand-new channel is PENDING → nothing ingested.
-        ConsentState consent = monitoredChannelRepository
-            .findConsentState(workspaceId, channelId)
-            .orElse(ConsentState.PENDING);
-        if (consent != ConsentState.ACTIVE) {
+        // Consent gate (single authority, S4): only ACTIVE channels flow content. A brand-new channel is
+        // PENDING → nothing ingested. Fails closed on an absent row.
+        if (!consentGate.ingestAllowed(workspaceId, channelId)) {
             return;
         }
 

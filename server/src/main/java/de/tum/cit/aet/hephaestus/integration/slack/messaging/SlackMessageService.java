@@ -9,8 +9,10 @@ import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatStartStreamResponse;
 import com.slack.api.methods.response.chat.ChatStopStreamResponse;
 import com.slack.api.methods.response.users.UsersListResponse;
+import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.view.View;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import java.io.IOException;
@@ -128,6 +130,39 @@ public class SlackMessageService {
             }
         } catch (SlackApiException | IOException e) {
             throw new SlackSendException(workspaceId, channel, "transport_failure", e);
+        }
+    }
+
+    /**
+     * Publish (replace) the App Home tab view for one member via {@code views.publish}. The seam the S4 App
+     * Home (disclosure + research-consent toggle + quiet-hours) renders through — the sibling of
+     * {@code chat.postMessage} for the Home surface. Throws {@link SlackSendException} carrying the Slack
+     * error so the caller can log-and-swallow (App Home render is best-effort, like the onboarding CTA).
+     */
+    public void publishHomeView(long workspaceId, String slackUserId, View view) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
+        );
+        try {
+            ViewsPublishResponse r = slack.methods(token).viewsPublish(req -> req.userId(slackUserId).view(view));
+            if (!r.isOk()) {
+                String error = r.getError() == null ? "unknown" : r.getError();
+                log.warn(
+                    "Slack views.publish failed: workspaceId={}, userId={}, error={}",
+                    workspaceId,
+                    slackUserId,
+                    error
+                );
+                throw new SlackSendException(workspaceId, slackUserId, error);
+            }
+        } catch (SlackApiException | IOException e) {
+            log.warn(
+                "Slack views.publish transport failure: workspaceId={}, userId={}, error={}",
+                workspaceId,
+                slackUserId,
+                e.getMessage()
+            );
+            throw new SlackSendException(workspaceId, slackUserId, "transport_failure", e);
         }
     }
 

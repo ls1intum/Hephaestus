@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
@@ -32,6 +31,9 @@ class SlackIngestServiceTest extends BaseUnitTest {
     private SlackMonitoredChannelRepository monitoredChannelRepository;
 
     @Mock
+    private SlackChannelConsentGate consentGate;
+
+    @Mock
     private SlackMessageRepository messageRepository;
 
     @Mock
@@ -47,6 +49,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
         service = new SlackIngestService(
             workspaceResolver,
             monitoredChannelRepository,
+            consentGate,
             messageRepository,
             threadRepository,
             identityResolver
@@ -79,7 +82,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     @Test
     void pendingChannel_registersButDoesNotIngest() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
-        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(ConsentState.PENDING));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(false);
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
@@ -108,7 +111,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     @Test
     void activeChannel_stampsResolvedMemberIdAndUpsertsThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
-        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(ConsentState.ACTIVE));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", "99.0", "U1", 42L, "hi")).thenReturn(1);
 
@@ -122,7 +125,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     @Test
     void activeChannel_rootMessageUsesOwnTsAsThreadTs() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
-        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(ConsentState.ACTIVE));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.empty());
         when(
             messageRepository.insertIfAbsent(
@@ -146,7 +149,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     @Test
     void duplicateMessage_doesNotBumpThread() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
-        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(ConsentState.ACTIVE));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", null, "U1", 42L, "hi")).thenReturn(0);
 
