@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * S5 rating-store integration tests (Testcontainers): a thumb persists as an append-only row, "latest wins" is a
@@ -21,6 +22,9 @@ class MentorTurnRatingRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private MentorTurnRatingRepository repository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private MentorTurnRating rating(long workspaceId, long raterId, String ts, TurnRating verdict, Instant createdAt) {
         return MentorTurnRating.builder()
@@ -65,7 +69,10 @@ class MentorTurnRatingRepositoryIntegrationTest extends BaseIntegrationTest {
         repository.save(rating(wsA, 7L, "100.5", TurnRating.HELPFUL, Instant.now()));
         repository.save(rating(wsB, 8L, "200.5", TurnRating.HELPFUL, Instant.now()));
 
-        repository.deleteByWorkspaceId(wsA);
+        // The production purge runs this bulk delete inside the purge orchestrator's transaction
+        // (see WorkspacePurgeIntegrationTest → workspaceLifecycleService.purgeWorkspace); mirror that
+        // boundary here so the derived delete has an active EntityManager transaction.
+        transactionTemplate.executeWithoutResult(status -> repository.deleteByWorkspaceId(wsA));
 
         assertThat(repository.countByWorkspaceId(wsA)).isZero();
         assertThat(repository.countByWorkspaceId(wsB)).isEqualTo(1L);

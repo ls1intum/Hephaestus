@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.SlackConversatio
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,10 +38,29 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         return WS_SEQ.incrementAndGet();
     }
 
+    /**
+     * {@code slack_thread.participant_member_ids} (bigint[] + GIN) and {@code last_reviewed_ts} are
+     * deliberately UNMAPPED on the {@code SlackThread} entity (raw-JDBC-only — see SlackThreadRepository
+     * and changelog changesets -12/-13). Production creates them via Liquibase; this integration profile
+     * builds the schema with Hibernate {@code ddl-auto: create} and disables Liquibase, so they are absent
+     * unless we add them. Idempotent DDL mirroring the production migration keeps the fixture green without
+     * touching production code or the changelog.
+     */
+    @BeforeEach
+    void ensureUnmappedSlackThreadColumns() {
+        jdbc.execute(
+            "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
+        );
+        jdbc.execute("ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS last_reviewed_ts VARCHAR(32)");
+        jdbc.execute(
+            "CREATE INDEX IF NOT EXISTS idx_slack_thread_participants ON slack_thread USING GIN (participant_member_ids)"
+        );
+    }
+
     private void seedChannel(long workspaceId, String channelId, String consentState) {
         jdbc.update(
-            "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, backfill_state) " +
-                "VALUES (?, 'T1', ?, ?, 'NONE')",
+            "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, backfill_state, created_at) " +
+                "VALUES (?, 'T1', ?, ?, 'NONE', now())",
             workspaceId,
             channelId,
             consentState
@@ -56,8 +76,8 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         String participantArrayLiteral
     ) {
         jdbc.update(
-            "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids) " +
-                "VALUES (?, ?, ?, ?, ?, 1, CAST(? AS bigint[]))",
+            "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) " +
+                "VALUES (?, ?, ?, ?, ?, 1, CAST(? AS bigint[]), now())",
             workspaceId,
             channelId,
             threadTs,
@@ -69,8 +89,8 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
     private void seedMessage(long workspaceId, String channelId, String ts, String threadTs, String text) {
         jdbc.update(
-            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, text) " +
-                "VALUES (?, 'T1', ?, ?, ?, 'U1', ?)",
+            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, text, ingested_at) " +
+                "VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",
             workspaceId,
             channelId,
             ts,
