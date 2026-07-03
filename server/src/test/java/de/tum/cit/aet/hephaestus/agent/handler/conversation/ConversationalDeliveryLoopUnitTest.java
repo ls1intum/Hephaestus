@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -28,13 +29,17 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Deterministic unit coverage for the S7 conversational-delivery router, preparer, and reconciler. */
+/** Deterministic unit coverage for the conversational-delivery router, preparer, and reconciler. */
 @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
@@ -69,45 +74,47 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         );
     }
 
-    @Test
-    void routerAdmitsAuthorProblemWithNoInlineAnchor() {
-        assertThat(router().route(problem(null, null), WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.ADMIT
+    private enum ObsKind {
+        PROBLEM_NO_ANCHOR,
+        PROBLEM_FILE_ANCHOR,
+        STRENGTH,
+        NOT_APPLICABLE,
+        ALREADY_DELIVERED,
+    }
+
+    static Stream<Arguments> routerCases() {
+        return Stream.of(
+            arguments(ObsKind.PROBLEM_NO_ANCHOR, false, ConversationRoutingDecision.ADMIT),
+            arguments(ObsKind.PROBLEM_NO_ANCHOR, true, ConversationRoutingDecision.REVIEWER_DEFERRED),
+            arguments(ObsKind.STRENGTH, false, ConversationRoutingDecision.NOT_DELIVERABLE),
+            arguments(ObsKind.NOT_APPLICABLE, false, ConversationRoutingDecision.NOT_DELIVERABLE),
+            arguments(ObsKind.PROBLEM_FILE_ANCHOR, false, ConversationRoutingDecision.HAS_INLINE_ANCHOR),
+            arguments(ObsKind.ALREADY_DELIVERED, false, ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT)
         );
     }
 
-    @Test
-    void routerDefersReviewerTargeted() {
-        assertThat(router().route(problem(null, null), WS, RoutingContext.reviewer())).isEqualTo(
-            ConversationRoutingDecision.REVIEWER_DEFERRED
-        );
-    }
+    @ParameterizedTest
+    @MethodSource("routerCases")
+    void routerMapsObservationToDecision(ObsKind kind, boolean reviewer, ConversationRoutingDecision expected) {
+        RoutingContext ctx = reviewer ? RoutingContext.reviewer() : RoutingContext.author();
+        Observation obs = switch (kind) {
+            case PROBLEM_NO_ANCHOR -> problem(null, null);
+            case PROBLEM_FILE_ANCHOR -> {
+                ObjectNode evidence = MAPPER.createObjectNode();
+                evidence.putArray("locations").addObject().put("path", "src/Main.java");
+                yield problem(evidence, null);
+            }
+            case STRENGTH -> strength();
+            case NOT_APPLICABLE -> notApplicable();
+            case ALREADY_DELIVERED -> {
+                when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-1")).thenReturn(
+                    true
+                );
+                yield problem(null, "rk-1");
+            }
+        };
 
-    @Test
-    void routerRejectsStrengthAndNotApplicable() {
-        assertThat(router().route(strength(), WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.NOT_DELIVERABLE
-        );
-        assertThat(router().route(notApplicable(), WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.NOT_DELIVERABLE
-        );
-    }
-
-    @Test
-    void routerRejectsPrObservationWithFileLocation() {
-        ObjectNode evidence = MAPPER.createObjectNode();
-        evidence.putArray("locations").addObject().put("path", "src/Main.java");
-        assertThat(router().route(problem(evidence, null), WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.HAS_INLINE_ANCHOR
-        );
-    }
-
-    @Test
-    void routerRejectsWhenAlreadyDeliveredInContext() {
-        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-1")).thenReturn(true);
-        assertThat(router().route(problem(null, "rk-1"), WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.ALREADY_DELIVERED_IN_CONTEXT
-        );
+        assertThat(router().route(obs, WS, ctx)).isEqualTo(expected);
     }
 
     @Test

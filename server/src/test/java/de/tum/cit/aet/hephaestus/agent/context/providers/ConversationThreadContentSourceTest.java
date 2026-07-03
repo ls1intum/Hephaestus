@@ -17,7 +17,7 @@ import org.mockito.Mock;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Unit tests for the S11 conversation-thread content source. */
+/** Unit tests for the conversation-thread content source. */
 class ConversationThreadContentSourceTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
@@ -51,13 +51,6 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void isRequiredSoAMissingThreadAbortsRatherThanHollowPositive() {
-        // An empty thread is NOT a failure (buildThreadPayload returns empty messages); a genuine read failure
-        // is, so the provider is required — mirrors IssueContentSource.
-        assertThat(source.required()).isTrue();
-    }
-
-    @Test
     void writesConversationThreadJsonFromProjector() {
         AgentJob job = conversationJob();
         ObjectNode payload = objectMapper.createObjectNode();
@@ -68,6 +61,8 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         source.contribute(new ContextRequest.ConversationReviewRequest(job), files);
 
+        // Required so a missing thread aborts rather than emitting a hollow positive — mirrors IssueContentSource.
+        assertThat(source.required()).isTrue();
         assertThat(files).containsKey("inputs/context/conversation_thread.json");
         String written = new String(files.get("inputs/context/conversation_thread.json"));
         assertThat(written).contains("\"channel\":\"C0ABC\"").contains("\"messageCount\":3");

@@ -18,11 +18,13 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * S4 research opt-out SPI. Deterministic: mocks lock the <strong>lenient</strong> {@code setForLogin} contract —
+ * Research opt-out SPI. Deterministic: mocks lock the <strong>lenient</strong> {@code setForLogin} contract —
  * a missing analytics subject or a PostHog failure never fails the opt-out (contrast {@code updateUserSettings},
  * which throws {@code BAD_REQUEST}/{@code BAD_GATEWAY}), and an opt-out always appends the audit event.
  */
@@ -71,33 +73,26 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
         return p;
     }
 
-    @Test
-    void optOut_missingSubject_stillSucceeds_andWritesAudit() {
-        User u = user(42L, "octocat");
-        UserPreferences p = prefs(u, true);
-        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(u));
-        when(userPreferencesRepository.findByUserId(42L)).thenReturn(Optional.of(p));
-        when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
-        // No PostHog person matches the fallback (user-id) distinct id — returns false, must NOT fail the opt-out.
-        when(posthogClient.deletePersonData("42")).thenReturn(false);
-        when(researchConsentAuditProvider.getIfAvailable()).thenReturn(audit);
-
-        service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME);
-
-        assertThat(p.isParticipateInResearch()).isFalse();
-        verify(userPreferencesRepository).save(p);
-        verify(posthogClient).deletePersonData("42"); // subjectId absent → falls back to the user id
-        verify(audit).recordOptOut("octocat", ConsentSource.SLACK_APP_HOME);
+    private enum PosthogOutcome {
+        RETURNS_FALSE,
+        THROWS,
     }
 
-    @Test
-    void optOut_posthogFailure_stillSucceeds_andWritesAudit() {
+    @ParameterizedTest
+    @EnumSource(PosthogOutcome.class)
+    void optOut_posthogNoMatchOrFailure_stillSucceeds_andWritesAudit(PosthogOutcome outcome) {
         User u = user(42L, "octocat");
         UserPreferences p = prefs(u, true);
         when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(u));
         when(userPreferencesRepository.findByUserId(42L)).thenReturn(Optional.of(p));
         when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
-        when(posthogClient.deletePersonData("42")).thenThrow(new PosthogClientException("posthog down"));
+        // Fallback (user-id) distinct id: no matching person (false) or a PostHog outage — neither may fail the opt-out.
+        switch (outcome) {
+            case RETURNS_FALSE -> when(posthogClient.deletePersonData("42")).thenReturn(false);
+            case THROWS -> when(posthogClient.deletePersonData("42")).thenThrow(
+                new PosthogClientException("posthog down")
+            );
+        }
         when(researchConsentAuditProvider.getIfAvailable()).thenReturn(audit);
 
         assertThatCode(() ->
@@ -106,6 +101,7 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
 
         assertThat(p.isParticipateInResearch()).isFalse();
         verify(userPreferencesRepository).save(p);
+        verify(posthogClient).deletePersonData("42"); // subjectId absent → falls back to the user id
         verify(audit).recordOptOut("octocat", ConsentSource.SLACK_APP_HOME);
     }
 

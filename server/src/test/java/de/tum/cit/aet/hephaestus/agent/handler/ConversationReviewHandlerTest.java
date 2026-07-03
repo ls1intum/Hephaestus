@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -25,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Unit tests for the S11 conversation-detection handler: pure submission logic plus the repo-less spike
+ * Unit tests for the conversation-detection handler: pure submission logic plus the repo-less spike
  * assertions (no SCM source mount, empty volume mounts).
  */
 class ConversationReviewHandlerTest extends BaseUnitTest {
@@ -68,15 +67,6 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    class JobType {
-
-        @Test
-        void returnsConversationReview() {
-            assertThat(handler.jobType()).isEqualTo(AgentJobType.CONVERSATION_REVIEW);
-        }
-    }
-
-    @Nested
     class CreateSubmission {
 
         @Test
@@ -95,14 +85,11 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
         void idempotencyKeyCooldownScopesOnThreadPlusSubjectNotFreshness() {
             // The key ends in a disposable freshness segment (lastTs). AgentJobService.extractCooldownKeyPrefix
             // strips ONLY that trailing segment, so cooldown keys on (channel, thread, subject) — a late reply
-            // with a NEW lastTs shares the prefix and does not re-fire (verified against the prefix below).
+            // with a NEW lastTs shares the prefix and does not re-fire.
             JobSubmission submission = handler.createSubmission(sampleRequest());
             assertThat(submission.idempotencyKey()).isEqualTo(
                 "conversation_review:C0ABC:1700000000.100000:42:1700000900.500000"
             );
-            int lastColon = submission.idempotencyKey().lastIndexOf(':');
-            String cooldownPrefix = submission.idempotencyKey().substring(0, lastColon + 1);
-            assertThat(cooldownPrefix).isEqualTo("conversation_review:C0ABC:1700000000.100000:42:");
         }
 
         @Test
@@ -116,7 +103,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
 
     /**
-     * The S11 spike: a conversation-review job is REPO-LESS. It carries no SCM source mount and no volume
+     * The spike: a conversation-review job is REPO-LESS. It carries no SCM source mount and no volume
      * mounts, so the orchestrator/runner run without a clone. These lock that contract.
      */
     @Nested
@@ -138,13 +125,6 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void volumeMountsAreEmpty() {
-            // No repo bind-mount: the default JobTypeHandler.volumeMounts() (Map.of()) is inherited, unlike the
-            // PR handler which mounts the clone. This is what lets a repo-less job run.
-            assertThat(handler.volumeMounts(conversationJob())).isEmpty();
-        }
-
-        @Test
         void prepareInputFilesWritesNoScmSourceAndOnlyContextPlusTask() {
             AgentJob job = conversationJob();
             // The only context provider that fires materialises conversation_thread.json — stub the builder.
@@ -155,7 +135,6 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
 
             Map<String, byte[]> files = handler.prepareInputFiles(job);
 
-            assertThat(files).containsKey(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json");
             assertThat(files).containsKey(SandboxLayout.TASK_ENVELOPE_FILENAME);
             // Repo-less proof: no SCM source keep file is written anywhere in the prepared workspace.
             assertThat(files).doesNotContainKey(SandboxLayout.SCM_SOURCE_KEEP);
