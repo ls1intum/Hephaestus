@@ -4,8 +4,6 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
 import java.time.Instant;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,7 +29,6 @@ import tools.jackson.databind.ObjectMapper;
 public class SlackEventsController {
 
     private static final Logger log = LoggerFactory.getLogger(SlackEventsController.class);
-    private static final int DEDUP_CAP = 4096;
 
     private final SlackSignatureVerifier verifier;
     private final SlackMentorService mentorService;
@@ -39,10 +36,9 @@ public class SlackEventsController {
     private final SlackOnboardingService onboardingService;
     private final SlackAppHomeService appHomeService;
     private final SlackAssistantEventHandler assistantEventHandler;
+    private final SlackEventDedupService dedupService;
+    private final SlackUninstallService uninstallService;
     private final ObjectMapper objectMapper;
-
-    // Slack retries un-acked events; drop duplicates by event_id (bounded).
-    private final Set<String> seenEventIds = ConcurrentHashMap.newKeySet();
 
     public SlackEventsController(
         SlackSignatureVerifier verifier,
@@ -51,6 +47,8 @@ public class SlackEventsController {
         SlackOnboardingService onboardingService,
         SlackAppHomeService appHomeService,
         SlackAssistantEventHandler assistantEventHandler,
+        SlackEventDedupService dedupService,
+        SlackUninstallService uninstallService,
         ObjectMapper objectMapper
     ) {
         this.verifier = verifier;
@@ -59,6 +57,8 @@ public class SlackEventsController {
         this.onboardingService = onboardingService;
         this.appHomeService = appHomeService;
         this.assistantEventHandler = assistantEventHandler;
+        this.dedupService = dedupService;
+        this.uninstallService = uninstallService;
         this.objectMapper = objectMapper;
     }
 
@@ -91,8 +91,10 @@ public class SlackEventsController {
 
         if ("event_callback".equals(type)) {
             String eventId = root.path("event_id").asString("");
-            if (!eventId.isEmpty() && !markSeen(eventId)) {
-                return ResponseEntity.ok().build(); // duplicate retry
+            // Durable, multi-replica dedup: exactly one replica claims a given event_id (Slack retries
+            // un-acked events, and two pods can each receive the same delivery).
+            if (!eventId.isEmpty() && !dedupService.claim(eventId)) {
+                return ResponseEntity.ok().build(); // duplicate retry / already claimed by another replica
             }
             try {
                 dispatchEvent(root);
@@ -122,6 +124,13 @@ public class SlackEventsController {
         if ("assistant_thread_started".equals(eventType)) {
             // Seed the mentor DM with suggested prompts — MUST route before the non-message early-return below.
             assistantEventHandler.onThreadStarted(teamId, event);
+            return;
+        }
+        // App removal / token revocation — MUST route before the non-message early-return (which would otherwise
+        // drop it, leaving a dead token and orphaned Slack content behind). Flip the Connection to UNINSTALLED and
+        // purge the Slack data.
+        if ("app_uninstalled".equals(eventType) || "tokens_revoked".equals(eventType)) {
+            uninstallService.onUninstall(teamId, eventType);
             return;
         }
         if (!"message".equals(eventType)) {
@@ -171,12 +180,5 @@ public class SlackEventsController {
                 text
             );
         }
-    }
-
-    private boolean markSeen(String eventId) {
-        if (seenEventIds.size() > DEDUP_CAP) {
-            seenEventIds.clear();
-        }
-        return seenEventIds.add(eventId);
     }
 }

@@ -117,7 +117,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "JwtSigningKey", // System-wide signing keys
         "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
         "LoginProvider", // Instance-scoped OAuth login provider (sign-in option); not workspace-scoped
-        "WorkerRegistry" // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
+        "WorkerRegistry", // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
+        "SlackEventDedup" // Slack Events API dedup keyed on the raw event_id; workspace-independent (S9)
     );
 
     // ENTITY WORKSPACE RELATIONSHIPS

@@ -44,6 +44,12 @@ class SlackEventsControllerTest extends BaseUnitTest {
     @Mock
     private SlackAssistantEventHandler assistantEventHandler;
 
+    @Mock
+    private SlackEventDedupService dedupService;
+
+    @Mock
+    private SlackUninstallService uninstallService;
+
     private SlackEventsController controller;
 
     @BeforeEach
@@ -55,6 +61,8 @@ class SlackEventsControllerTest extends BaseUnitTest {
             onboardingService,
             appHomeService,
             assistantEventHandler,
+            dedupService,
+            uninstallService,
             JsonMapper.builder().build()
         );
         when(verifier.verify(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
@@ -148,5 +156,57 @@ class SlackEventsControllerTest extends BaseUnitTest {
         ResponseEntity<String> res = post("{\"type\":\"url_verification\",\"challenge\":\"abc123\"}");
 
         assertThat(res.getBody()).isEqualTo("abc123");
+    }
+
+    @Test
+    void duplicateEvent_isDroppedWhenDedupClaimFails() {
+        when(dedupService.claim("Ev123")).thenReturn(false);
+
+        ResponseEntity<String> res = post(
+            """
+            {"type":"event_callback","event_id":"Ev123","team_id":"T1","event":{
+              "type":"message","channel_type":"im","channel":"D9","user":"U1","ts":"100.1","text":"hi heph"}}
+            """
+        );
+
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verifyNoInteractions(mentorService, ingestService);
+    }
+
+    @Test
+    void firstDeliveryOfEvent_isProcessedWhenDedupClaimSucceeds() {
+        when(dedupService.claim("Ev123")).thenReturn(true);
+
+        post(
+            """
+            {"type":"event_callback","event_id":"Ev123","team_id":"T1","event":{
+              "type":"message","channel_type":"im","channel":"D9","user":"U1","ts":"100.1","text":"hi heph"}}
+            """
+        );
+
+        verify(mentorService).handleDm("T1", "D9", "U1", "hi heph", "100.1");
+    }
+
+    @Test
+    void appUninstalled_routesToUninstallService_notDroppedBySubtypeReturn() {
+        post(
+            """
+            {"type":"event_callback","team_id":"T1","event":{"type":"app_uninstalled"}}
+            """
+        );
+
+        verify(uninstallService).onUninstall("T1", "app_uninstalled");
+        verifyNoInteractions(mentorService, ingestService);
+    }
+
+    @Test
+    void tokensRevoked_routesToUninstallService() {
+        post(
+            """
+            {"type":"event_callback","team_id":"T1","event":{"type":"tokens_revoked"}}
+            """
+        );
+
+        verify(uninstallService).onUninstall("T1", "tokens_revoked");
     }
 }

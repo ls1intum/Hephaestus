@@ -570,6 +570,16 @@ hephaestus:
             # App signing secret — verifies inbound Events API POSTs to /slack/events (v0 HMAC over
             # "v0:{ts}:{rawBody}", 300s replay window). Inbound (mentor DM + channel ingest) is inert without it.
             signing-secret: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:}
+            # S9 adversarial-safety hardening.
+            dedup:
+                # How long a durable Slack event_id dedup marker is retained before the daily sweep prunes it.
+                # Generous relative to Slack's retry horizon so a pruned row can never resurrect a duplicate.
+                ttl: ${HEPHAESTUS_INTEGRATION_SLACK_DEDUP_TTL:PT48H}
+            mentor:
+                # Per-user cap on mentor DM turns per (UTC) day — a friendly message is sent over-cap, never an error.
+                turns-per-user-per-day: ${HEPHAESTUS_INTEGRATION_SLACK_MENTOR_TURNS_PER_USER_PER_DAY:50}
+                # Fleet-wide daily mentor-turn budget (coarse LLM-spend safety valve, counted per replica).
+                daily-budget: ${HEPHAESTUS_INTEGRATION_SLACK_MENTOR_DAILY_BUDGET:1000}
     #     outline:
     #         enabled: false
 

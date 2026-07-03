@@ -40,6 +40,8 @@ public class SlackMentorService {
     private final MentorTurnRunner mentorTurnRunner;
     private final SlackMessageService slackMessageService;
     private final SlackMentorIdentityResolver identityResolver;
+    private final SlackMentorQuotaGuard quotaGuard;
+    private final SlackSafetyClassifier safetyClassifier;
 
     public SlackMentorService(
         SlackWorkspaceResolver workspaceResolver,
@@ -47,7 +49,9 @@ public class SlackMentorService {
         MentorSlackThreadService mentorSlackThreadService,
         MentorTurnRunner mentorTurnRunner,
         SlackMessageService slackMessageService,
-        SlackMentorIdentityResolver identityResolver
+        SlackMentorIdentityResolver identityResolver,
+        SlackMentorQuotaGuard quotaGuard,
+        SlackSafetyClassifier safetyClassifier
     ) {
         this.workspaceResolver = workspaceResolver;
         this.mentorSlackThreadRepository = mentorSlackThreadRepository;
@@ -55,6 +59,8 @@ public class SlackMentorService {
         this.mentorTurnRunner = mentorTurnRunner;
         this.slackMessageService = slackMessageService;
         this.identityResolver = identityResolver;
+        this.quotaGuard = quotaGuard;
+        this.safetyClassifier = safetyClassifier;
     }
 
     private record Developer(String login) {}
@@ -110,6 +116,18 @@ public class SlackMentorService {
             return;
         }
         long workspaceId = workspaceOpt.get();
+        // Duty of care: divert harassment / self-harm / out-of-scope messages to a safe canned response before any
+        // mentor turn runs. The classifier is a seam (default heuristic); a non-OK verdict never mentors.
+        SlackSafetyClassifier.Verdict verdict = safetyClassifier.classify(text);
+        if (!verdict.safeToMentor()) {
+            slackMessageService.sendForWorkspace(workspaceId, channelId, List.of(), verdict.cannedResponse());
+            log.info(
+                "Slack DM diverted by duty-of-care posture: workspace={} category={}",
+                workspaceId,
+                verdict.category()
+            );
+            return;
+        }
         Optional<Developer> devOpt = resolveDeveloper(workspaceId, teamId, slackUserId);
         if (devOpt.isEmpty()) {
             slackMessageService.sendForWorkspace(
@@ -121,6 +139,19 @@ public class SlackMentorService {
             return;
         }
         Developer dev = devOpt.get();
+        // Per-user turn/day + fleet daily-budget caps (this path is not covered by the HTTP-auth rate-limit
+        // filter). Over-cap posts a friendly message rather than throwing.
+        SlackMentorQuotaGuard.Decision quota = quotaGuard.tryAcquire(workspaceId + ":" + dev.login());
+        if (quota != SlackMentorQuotaGuard.Decision.ALLOWED) {
+            slackMessageService.sendForWorkspace(workspaceId, channelId, List.of(), overCapMessage(quota));
+            log.info(
+                "Slack mentor turn over cap: workspace={} developer={} decision={}",
+                workspaceId,
+                dev.login(),
+                quota
+            );
+            return;
+        }
         UUID threadId = findOrCreateThread(workspaceId, teamId, channelId, slackUserId, dev.login());
         // First feedback to the member on turn receipt, before any token streams (superseded by the first append).
         slackMessageService.setStatus(workspaceId, channelId, messageTs, "Reviewing your recent feedback…");
@@ -133,5 +164,16 @@ public class SlackMentorService {
         );
         mentorTurnRunner.run(MentorTurnRequest.slackDm(workspaceId, threadId, text), channel, dev.login());
         log.info("Started Slack mentor turn: workspace={} thread={} developer={}", workspaceId, threadId, dev.login());
+    }
+
+    /** The friendly, non-throwing reply shown when a DM is over a mentor quota. */
+    private static String overCapMessage(SlackMentorQuotaGuard.Decision decision) {
+        return switch (decision) {
+            case USER_CAP_EXCEEDED -> "You've reached your mentor limit for today — let's pick this back up tomorrow. " +
+            "In the meantime, take a look at the feedback already on your recent PRs and issues.";
+            case DAILY_BUDGET_EXCEEDED -> "The mentor is at capacity for today and can't take new questions right now. " +
+            "Please try again tomorrow.";
+            case ALLOWED -> ""; // unreachable — ALLOWED never routes here
+        };
     }
 }
