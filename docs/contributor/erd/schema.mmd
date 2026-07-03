@@ -158,6 +158,7 @@ erDiagram
         BIGINT user_id FK
         BIGINT workspace_id FK "NOT NULL"
         BYTEA session_jsonl
+        VARCHAR(16) surface "NOT NULL"
     }
 
     CommitContributor {
@@ -314,6 +315,7 @@ erDiagram
         VARCHAR(8) anchor_side
         TEXT posted_comment_ref
         TIMESTAMPTZ created_at "NOT NULL"
+        UUID chat_message_id FK
     }
 
     GitCommit {
@@ -347,17 +349,10 @@ erDiagram
         VARCHAR(255) on_behalf_of_login
     }
 
-    GitProvider {
-        BIGINT id PK
-        VARCHAR(10) type UK "NOT NULL"
-        VARCHAR(512) server_url UK "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-    }
-
     IdentityLink {
         BIGINT id PK
         BIGINT account_id FK "NOT NULL"
-        BIGINT git_provider_id FK "NOT NULL"
+        BIGINT provider_id FK "NOT NULL"
         VARCHAR(255) subject "NOT NULL"
         VARCHAR(255) team_id
         BIGINT external_actor_id
@@ -370,6 +365,13 @@ erDiagram
         VARCHAR(16) linked_via "NOT NULL"
         TIMESTAMPTZ last_login_at
         TIMESTAMPTZ disabled_at
+    }
+
+    IdentityProvider {
+        BIGINT id PK
+        VARCHAR(10) type UK "NOT NULL"
+        VARCHAR(512) server_url UK "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Issue {
@@ -500,6 +502,30 @@ erDiagram
         BOOLEAN seeded_from_env "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
+    MentorSlackThread {
+        UUID id PK
+        BIGINT workspace_id UK "NOT NULL"
+        UUID chat_thread_id FK "NOT NULL"
+        VARCHAR(32) slack_team_id "NOT NULL"
+        VARCHAR(32) slack_channel_id UK "NOT NULL"
+        VARCHAR(32) slack_thread_ts
+        VARCHAR(32) slack_user_id "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    MentorTurnRating {
+        UUID id PK
+        BIGINT workspace_id "NOT NULL"
+        BIGINT rater_user_id "NOT NULL"
+        VARCHAR(32) channel_id "NOT NULL"
+        VARCHAR(32) thread_ts
+        VARCHAR(32) slack_message_ts "NOT NULL"
+        UUID feedback_id FK
+        VARCHAR(16) rating "NOT NULL"
+        VARCHAR(16) source "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Milestone {
@@ -838,6 +864,53 @@ erDiagram
         VARCHAR(255) locked_by "NOT NULL"
     }
 
+    SlackEventDedup {
+        VARCHAR(64) event_id PK
+        TIMESTAMPTZ received_at "NOT NULL"
+        TIMESTAMPTZ expires_at "NOT NULL"
+    }
+
+    SlackMessage {
+        BIGINT id PK
+        BIGINT workspace_id UK "NOT NULL"
+        VARCHAR(32) slack_team_id "NOT NULL"
+        VARCHAR(32) slack_channel_id UK "NOT NULL"
+        VARCHAR(32) slack_ts UK "NOT NULL"
+        VARCHAR(32) slack_thread_ts
+        VARCHAR(32) author_slack_user_id
+        VARCHAR(256) author_display_name
+        TEXT text
+        TIMESTAMPTZ edited_at
+        TIMESTAMPTZ deleted_at
+        TIMESTAMPTZ ingested_at "NOT NULL"
+        BIGINT author_member_id
+    }
+
+    SlackMonitoredChannel {
+        BIGINT id PK
+        BIGINT workspace_id UK "NOT NULL"
+        VARCHAR(32) slack_team_id "NOT NULL"
+        VARCHAR(32) slack_channel_id UK "NOT NULL"
+        VARCHAR(256) channel_name
+        VARCHAR(16) consent_state "NOT NULL"
+        TIMESTAMPTZ consent_announced_at
+        VARCHAR(16) backfill_state "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    SlackThread {
+        BIGINT id PK
+        BIGINT workspace_id UK "NOT NULL"
+        VARCHAR(32) slack_channel_id UK "NOT NULL"
+        VARCHAR(32) slack_thread_ts UK "NOT NULL"
+        VARCHAR(32) first_ts
+        VARCHAR(32) last_ts
+        INTEGER message_count "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        ARRAY participant_member_ids "NOT NULL"
+        VARCHAR(32) last_reviewed_ts
+    }
+
     Team {
         BIGINT id PK
         VARCHAR(255) name
@@ -993,36 +1066,36 @@ erDiagram
     Workspace ||--|| Connection : has
     Repository ||--|| Discussion : has
     DiscussionComment ||--|| Discussion : references
-    GitProvider ||--|| Discussion : references
+    IdentityProvider ||--|| Discussion : references
     Repository ||--|| DiscussionCategory : has
-    GitProvider ||--|| DiscussionComment : commented_on
+    IdentityProvider ||--|| DiscussionComment : commented_on
     AgentJob ||--|| Feedback : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
-    GitProvider ||--|| Issue : references
-    GitProvider ||--|| IssueComment : commented_on
+    IdentityProvider ||--|| Issue : references
+    IdentityProvider ||--|| IssueComment : commented_on
     Repository ||--|| Label : labeled
-    GitProvider ||--|| Label : labeled
+    IdentityProvider ||--|| Label : labeled
     Repository ||--|| Milestone : has
-    GitProvider ||--|| Milestone : references
-    GitProvider ||--|| Organization : references
+    IdentityProvider ||--|| Milestone : references
+    IdentityProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
     Workspace ||--|| PracticeArea : has
     Practice ||--|| PracticeRevision : has
-    GitProvider ||--|| Project : references
+    IdentityProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectItem ||--|| ProjectFieldValue : has
     ProjectField ||--|| ProjectFieldValue : has
     Project ||--|| ProjectItem : has
-    GitProvider ||--|| ProjectItem : references
-    GitProvider ||--|| ProjectStatusUpdate : references
-    GitProvider ||--|| PullRequestReview : reviewed
-    GitProvider ||--|| PullRequestReviewComment : commented_on
+    IdentityProvider ||--|| ProjectItem : references
+    IdentityProvider ||--|| ProjectStatusUpdate : references
+    IdentityProvider ||--|| PullRequestReview : reviewed
+    IdentityProvider ||--|| PullRequestReviewComment : commented_on
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
-    GitProvider ||--|| PullRequestReviewThread : reviewed
-    GitProvider ||--|| Repository : references
-    GitProvider ||--|| Team : references
-    GitProvider ||--|| User : references
+    IdentityProvider ||--|| PullRequestReviewThread : reviewed
+    IdentityProvider ||--|| Repository : references
+    IdentityProvider ||--|| Team : references
+    IdentityProvider ||--|| User : references
     User ||--|| UserAchievement : has
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
@@ -1037,7 +1110,7 @@ erDiagram
     AgentConfig ||--o{ AgentJob : has
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id
-    GitProvider ||--o{ AuthEvent : has
+    IdentityProvider ||--o{ AuthEvent : references
     Workspace ||--o{ AuthEvent : has
     IdentityLink ||--o{ AuthEvent : has
     ChatMessage ||--o{ ChatMessage : references
@@ -1058,10 +1131,11 @@ erDiagram
     User ||--o{ Feedback : about_user_id
     Feedback ||--o{ Feedback : references
     Feedback ||--o{ FeedbackPlacement : has
+    ChatMessage ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     Account ||--o{ IdentityLink : has
-    GitProvider ||--o{ IdentityLink : has
+    IdentityProvider ||--o{ IdentityLink : references
     User ||--o{ Issue : authored_by
     Milestone ||--o{ Issue : has
     User ||--o{ Issue : merged_by
@@ -1071,6 +1145,8 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
+    ChatThread ||--o{ MentorSlackThread : has
+    Feedback ||--o{ MentorTurnRating : has
     User ||--o{ Milestone : created_by
     Practice ||--o{ Observation : has
     User ||--o{ Observation : has
