@@ -8,11 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSlackThreadService;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -40,10 +37,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     private SlackWorkspaceResolver workspaceResolver;
 
     @Mock
-    private MentorSlackThreadRepository mentorSlackThreadRepository;
-
-    @Mock
-    private MentorSlackThreadService mentorSlackThreadService;
+    private MentorSlackThreadLinker threadLinker;
 
     @Mock
     private MentorTurnRunner mentorTurnRunner;
@@ -57,8 +51,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     private SlackMentorService service(SlackMentorQuotaGuard quotaGuard) {
         return new SlackMentorService(
             workspaceResolver,
-            mentorSlackThreadRepository,
-            mentorSlackThreadService,
+            threadLinker,
             mentorTurnRunner,
             slackMessageService,
             identityResolver,
@@ -89,11 +82,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     void overUserCap_postsFriendlyMessage_andRunsOnlyTheFirstTurn() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         when(identityResolver.resolveDeveloperLogin(WORKSPACE, TEAM, USER)).thenReturn(Optional.of("alice"));
-        MentorSlackThread mapping = new MentorSlackThread();
-        mapping.setChatThreadId(UUID.randomUUID());
-        when(mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelId(WORKSPACE, CHANNEL)).thenReturn(
-            Optional.of(mapping)
-        );
+        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, USER, "alice")).thenReturn(UUID.randomUUID());
 
         SlackMentorService service = service(new SlackMentorQuotaGuard(1, 1000, Clock.systemUTC()));
 

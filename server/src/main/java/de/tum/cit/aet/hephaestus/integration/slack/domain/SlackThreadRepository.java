@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Scoped access to Slack thread aggregates. Every finder carries the {@code workspace_id} predicate the tenancy
@@ -33,6 +34,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * explicit {@code workspace_id} in the row, so no tenant leak is possible.
      */
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at)

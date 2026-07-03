@@ -40,6 +40,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      * exempt from the tenancy predicate check. Returns the number of rows actually inserted (0 on a duplicate).
      */
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, author_member_id, text, ingested_at)

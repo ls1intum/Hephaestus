@@ -51,6 +51,7 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
      * are exempt from the tenancy predicate check (creating a row cannot leak across workspaces).
      */
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, consent_state, backfill_state, created_at)

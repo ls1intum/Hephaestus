@@ -1,10 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSlackThreadService;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackStreamingMentorChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -15,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Bridges an inbound Slack DM to the mentor: resolves the workspace (from the Slack team) and developer, finds or
@@ -23,8 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
  * streaming the reply natively via {@link SlackStreamingMentorChannel}.
  *
  * <p>The Slack→mentor thread mapping is persisted with the {@code integration.slack.domain} JPA repository; the
- * {@code chat_thread} itself is created inside the mentor module via {@link MentorSlackThreadService} (no
- * cross-module raw insert). Developer identity resolves through {@code identity_link} (SLACK provider) via
+ * {@code chat_thread} itself is created inside the mentor module (no cross-module raw insert). The find-or-create
+ * of that mapping is delegated to {@link MentorSlackThreadLinker} so its two writes commit atomically across a real
+ * proxy hop. Developer identity resolves through {@code identity_link} (SLACK provider) via
  * {@link SlackMentorIdentityResolver}: an unlinked Slack user (or one with no membership in the resolved
  * workspace) gets the friendly "not linked" reply.
  */
@@ -35,8 +32,7 @@ public class SlackMentorService {
     private static final Logger log = LoggerFactory.getLogger(SlackMentorService.class);
 
     private final SlackWorkspaceResolver workspaceResolver;
-    private final MentorSlackThreadRepository mentorSlackThreadRepository;
-    private final MentorSlackThreadService mentorSlackThreadService;
+    private final MentorSlackThreadLinker threadLinker;
     private final MentorTurnRunner mentorTurnRunner;
     private final SlackMessageService slackMessageService;
     private final SlackMentorIdentityResolver identityResolver;
@@ -45,8 +41,7 @@ public class SlackMentorService {
 
     public SlackMentorService(
         SlackWorkspaceResolver workspaceResolver,
-        MentorSlackThreadRepository mentorSlackThreadRepository,
-        MentorSlackThreadService mentorSlackThreadService,
+        MentorSlackThreadLinker threadLinker,
         MentorTurnRunner mentorTurnRunner,
         SlackMessageService slackMessageService,
         SlackMentorIdentityResolver identityResolver,
@@ -54,8 +49,7 @@ public class SlackMentorService {
         SlackSafetyClassifier safetyClassifier
     ) {
         this.workspaceResolver = workspaceResolver;
-        this.mentorSlackThreadRepository = mentorSlackThreadRepository;
-        this.mentorSlackThreadService = mentorSlackThreadService;
+        this.threadLinker = threadLinker;
         this.mentorTurnRunner = mentorTurnRunner;
         this.slackMessageService = slackMessageService;
         this.identityResolver = identityResolver;
@@ -71,35 +65,6 @@ public class SlackMentorService {
      */
     private Optional<Developer> resolveDeveloper(long workspaceId, String teamId, String slackUserId) {
         return identityResolver.resolveDeveloperLogin(workspaceId, teamId, slackUserId).map(Developer::new);
-    }
-
-    /**
-     * Find (or lazily create) the mentor {@code chat_thread} that backs this Slack DM. The mapping row lives in
-     * {@code integration.slack.domain}; the {@code chat_thread} is provisioned inside the mentor module.
-     */
-    @Transactional
-    UUID findOrCreateThread(
-        long workspaceId,
-        String teamId,
-        String channelId,
-        String slackUserId,
-        String developerLogin
-    ) {
-        return mentorSlackThreadRepository
-            .findByWorkspaceIdAndSlackChannelId(workspaceId, channelId)
-            .map(MentorSlackThread::getChatThreadId)
-            .orElseGet(() -> {
-                UUID chatThreadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, developerLogin);
-                MentorSlackThread mapping = new MentorSlackThread();
-                mapping.setId(UUID.randomUUID());
-                mapping.setWorkspaceId(workspaceId);
-                mapping.setChatThreadId(chatThreadId);
-                mapping.setSlackTeamId(teamId);
-                mapping.setSlackChannelId(channelId);
-                mapping.setSlackUserId(slackUserId);
-                mentorSlackThreadRepository.save(mapping);
-                return chatThreadId;
-            });
     }
 
     /**
@@ -152,7 +117,9 @@ public class SlackMentorService {
             );
             return;
         }
-        UUID threadId = findOrCreateThread(workspaceId, teamId, channelId, slackUserId, dev.login());
+        // Find-or-create the Slack↔mentor thread mapping in its own atomic transaction (a real proxy hop), before
+        // any remote Slack streaming — handleDm itself stays outside any transaction.
+        UUID threadId = threadLinker.findOrCreateThread(workspaceId, teamId, channelId, slackUserId, dev.login());
         // First feedback to the member on turn receipt, before any token streams (superseded by the first append).
         slackMessageService.setStatus(workspaceId, channelId, messageTs, "Reviewing your recent feedback…");
         // Stream the reply into the DM thread rooted at the user's message.
