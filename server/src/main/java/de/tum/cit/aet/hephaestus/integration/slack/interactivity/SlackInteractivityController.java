@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -46,7 +47,7 @@ public class SlackInteractivityController {
         SlackSignatureVerifier verifier,
         SlackFeedbackHandler handler,
         ObjectMapper objectMapper,
-        Executor slackInteractivityExecutor
+        @Qualifier("slackInteractivityExecutor") Executor slackInteractivityExecutor
     ) {
         this.verifier = verifier;
         this.handler = handler;
