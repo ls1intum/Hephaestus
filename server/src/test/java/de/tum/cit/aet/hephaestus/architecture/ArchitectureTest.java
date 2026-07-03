@@ -96,6 +96,13 @@ class ArchitectureTest extends HephaestusArchitectureTest {
                     String tail = pkg.substring(BASE_PACKAGE.length() + 1);
                     int dot = tail.indexOf('.');
                     String top = dot < 0 ? tail : tail.substring(0, dot);
+                    // integration.slack is its own bounded context — a distinct integration modeled as
+                    // its own Spring Modulith module (see integration/slack/package-info.java), not part of
+                    // the folded SCM data platform. Folding it in would falsely couple every Slack->practices
+                    // /account/agent edge to the SCM data platform's own dependencies.
+                    if (tail.equals("integration.slack") || tail.startsWith("integration.slack.")) {
+                        return SliceIdentifier.of("integration-slack");
+                    }
                     return dataPlatform.contains(top)
                         ? SliceIdentifier.of("scm-data-platform")
                         : SliceIdentifier.of(top);
