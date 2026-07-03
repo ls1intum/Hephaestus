@@ -236,8 +236,8 @@
     </changeSet>
 
     <!--
-        Additive columns (Slice 1) that the channel-ingest write-path (Slice 6) and the
-        conversation-detection lane (Slice 11) compile and query against:
+        Additive columns that the channel-ingest write-path and the
+        conversation-detection lane compile and query against:
           -11 slack_message.author_member_id — firewall stamp: the resolved workspace User id of the
               message author (nullable; backfilled on identity-link). Read/written by raw JDBC in the
               ingest/projector path, so it is deliberately NOT mapped on the SlackMessage entity.
@@ -330,7 +330,7 @@
         </preConditions>
         <comment>
             Widen ck_auth_event_event_type to admit RESEARCH_CONSENT_REVOKED — the audit event written when a
-            user opts out of research participation (S4, incl. via the Slack App Home consent toggle). The new
+            user opts out of research participation (incl. via the Slack App Home consent toggle). The new
             constraint is a strict superset of the allowed set, so it validates against every existing
             partition without a data rewrite. Drop+recreate on the partitioned parent cascades to all children.
         </comment>
@@ -364,7 +364,7 @@
             <not><tableExists tableName="mentor_turn_rating"/></not>
         </preConditions>
         <comment>
-            Binary thumbs on a mentor turn (S5). Workspace-scoped (carries workspace_id, absent from
+            Binary thumbs on a mentor turn. Workspace-scoped (carries workspace_id, absent from
             WorkspaceScopedTables.GLOBAL_TABLES) → a tenancy predicate rides every query. Append-only (@Immutable
             entity): a click writes a new row, and the newest row per (rater, turn) is the current rating —
             "latest wins" is read-side, never an in-place update. feedback_id is a nullable FK to the delivered
@@ -398,7 +398,7 @@
             <not><tableExists tableName="slack_event_dedup"/></not>
         </preConditions>
         <comment>
-            Durable, multi-replica dedup for the Slack Events API (S9). Slack redelivers un-acked events, and in a
+            Durable, multi-replica dedup for the Slack Events API. Slack redelivers un-acked events, and in a
             multi-pod deployment two replicas can each receive the same delivery — an in-memory Set on one controller
             instance cannot suppress that. A row here, written first-writer-wins via INSERT … ON CONFLICT (event_id)
             DO NOTHING, lets exactly one replica claim an event. Workspace-INDEPENDENT by construction (the controller
