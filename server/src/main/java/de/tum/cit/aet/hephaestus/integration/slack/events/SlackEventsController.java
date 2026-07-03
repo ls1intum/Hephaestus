@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
-import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -31,38 +30,24 @@ public class SlackEventsController {
     private static final Logger log = LoggerFactory.getLogger(SlackEventsController.class);
 
     private final SlackSignatureVerifier verifier;
-    private final SlackMentorService mentorService;
-    private final SlackIngestService ingestService;
-    private final SlackOnboardingService onboardingService;
-    private final SlackAppHomeService appHomeService;
-    private final SlackAssistantEventHandler assistantEventHandler;
+    private final SlackEventDispatcher dispatcher;
     private final SlackEventDedupService dedupService;
-    private final SlackUninstallService uninstallService;
     private final ObjectMapper objectMapper;
 
     public SlackEventsController(
         SlackSignatureVerifier verifier,
-        SlackMentorService mentorService,
-        SlackIngestService ingestService,
-        SlackOnboardingService onboardingService,
-        SlackAppHomeService appHomeService,
-        SlackAssistantEventHandler assistantEventHandler,
+        SlackEventDispatcher dispatcher,
         SlackEventDedupService dedupService,
-        SlackUninstallService uninstallService,
         ObjectMapper objectMapper
     ) {
         this.verifier = verifier;
-        this.mentorService = mentorService;
-        this.ingestService = ingestService;
-        this.onboardingService = onboardingService;
-        this.appHomeService = appHomeService;
-        this.assistantEventHandler = assistantEventHandler;
+        this.dispatcher = dispatcher;
         this.dedupService = dedupService;
-        this.uninstallService = uninstallService;
         this.objectMapper = objectMapper;
     }
 
     @PostMapping(value = "/slack/events")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<String> events(
         @RequestBody(required = false) byte[] rawBody,
         @RequestHeader HttpHeaders headers
@@ -97,88 +82,12 @@ public class SlackEventsController {
                 return ResponseEntity.ok().build(); // duplicate retry / already claimed by another replica
             }
             try {
-                dispatchEvent(root);
+                dispatcher.dispatch(root);
             } catch (Exception e) {
                 log.warn("Slack event handling failed: {}", e.getMessage(), e);
             }
         }
         // Always ACK 200 within Slack's 3s window; work runs synchronously-but-fast (the mentor turn is async).
         return ResponseEntity.ok().build();
-    }
-
-    private void dispatchEvent(JsonNode root) {
-        String teamId = root.path("team_id").asString("");
-        JsonNode event = root.path("event");
-        String eventType = event.path("type").asString("");
-        if ("app_home_opened".equals(eventType)) {
-            // Only (re)publish on the Home tab open; the Messages tab open fires the same event with tab=messages.
-            if ("home".equals(event.path("tab").asString("home"))) {
-                String slackUserId = event.path("user").asString("");
-                // S4: publish the persistent Home tab (disclosure + research-consent toggle + quiet-hours).
-                appHomeService.onHomeOpened(teamId, slackUserId);
-                // S3: the DM link CTA for a not-yet-linked member (no-op once linked).
-                onboardingService.onHomeOpened(teamId, slackUserId);
-            }
-            return;
-        }
-        if ("assistant_thread_started".equals(eventType)) {
-            // Seed the mentor DM with suggested prompts — MUST route before the non-message early-return below.
-            assistantEventHandler.onThreadStarted(teamId, event);
-            return;
-        }
-        // App removal / token revocation — MUST route before the non-message early-return (which would otherwise
-        // drop it, leaving a dead token and orphaned Slack content behind). Flip the Connection to UNINSTALLED and
-        // purge the Slack data.
-        if ("app_uninstalled".equals(eventType) || "tokens_revoked".equals(eventType)) {
-            uninstallService.onUninstall(teamId, eventType);
-            return;
-        }
-        if (!"message".equals(eventType)) {
-            return;
-        }
-        // Edits/deletes arrive as message SUBTYPES, so they MUST be routed before the subtype early-return below
-        // (which otherwise drops every subtyped message). Slack carries the changed/deleted payload nested under
-        // event.message / event.previous_message, so the outer bot_id guard does not apply to these — a bot-authored
-        // message we never stored simply no-ops the scoped UPDATE.
-        String subtype = event.path("subtype").asString("");
-        String channelId = event.path("channel").asString("");
-        if ("message_deleted".equals(subtype)) {
-            // Tombstone keys on the DELETED message's ts (deleted_ts, fallback previous_message.ts), never event.ts.
-            String deletedTs = event
-                .path("deleted_ts")
-                .asString(event.path("previous_message").path("ts").asString(""));
-            ingestService.tombstoneMessage(teamId, channelId, deletedTs);
-            return;
-        }
-        if ("message_changed".equals(subtype)) {
-            JsonNode changed = event.path("message");
-            ingestService.editMessage(
-                teamId,
-                channelId,
-                changed.path("ts").asString(""),
-                changed.path("text").asString("")
-            );
-            return;
-        }
-        // Never react to our own bot's messages, or to any other subtype (joins, channel_topic, thread_broadcast…).
-        if (event.has("bot_id") || !subtype.isEmpty()) {
-            return;
-        }
-        String channelType = event.path("channel_type").asString("");
-        String slackUserId = event.path("user").asString("");
-        String text = event.path("text").asString("");
-
-        if ("im".equals(channelType)) {
-            mentorService.handleDm(teamId, channelId, slackUserId, text, event.path("ts").asString(""));
-        } else if ("channel".equals(channelType) || "group".equals(channelType)) {
-            ingestService.ingestChannelMessage(
-                teamId,
-                channelId,
-                event.path("ts").asString(""),
-                event.path("thread_ts").asString(null),
-                slackUserId,
-                text
-            );
-        }
     }
 }

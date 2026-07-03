@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClientException;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchConsentAudit;
-import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.LinkedHashSet;
@@ -32,7 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Service
 @WorkspaceAgnostic("User-scoped preferences + analytics consent — not workspace-specific")
-public class AccountPreferencesService implements ResearchParticipationCommand {
+public class AccountPreferencesService {
 
     private static final Logger log = LoggerFactory.getLogger(AccountPreferencesService.class);
 
@@ -112,7 +111,8 @@ public class AccountPreferencesService implements ResearchParticipationCommand {
     }
 
     /**
-     * {@link ResearchParticipationCommand} — set research participation by login, <strong>lenient</strong>.
+     * Backs the {@code ResearchParticipationCommand} port (bound by {@link AccountResearchParticipationAdapter})
+     * — set research participation by login, <strong>lenient</strong>.
      *
      * <p>Deliberately does NOT reuse {@link #updateUserSettings}: that path throws {@code BAD_REQUEST} on a
      * missing subject and {@code BAD_GATEWAY} on a PostHog failure, which is wrong for an out-of-band consent
@@ -127,7 +127,6 @@ public class AccountPreferencesService implements ResearchParticipationCommand {
      * </ul>
      * An opt-out (true → false) additionally writes a {@code RESEARCH_CONSENT_REVOKED} audit event.
      */
-    @Override
     @Transactional
     public void setForLogin(String login, boolean participate, ConsentSource source) {
         if (!StringUtils.hasText(login)) {

@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -54,6 +55,7 @@ public class SlackInteractivityController {
     }
 
     @PostMapping(value = "/slack/interactivity")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<String> interactivity(
         @RequestBody(required = false) byte[] rawBody,
         @RequestHeader HttpHeaders headers

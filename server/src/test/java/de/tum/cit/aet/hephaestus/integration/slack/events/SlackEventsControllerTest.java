@@ -54,17 +54,17 @@ class SlackEventsControllerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        controller = new SlackEventsController(
-            verifier,
+        // Real dispatcher over the mocked handlers so the HTTP path still exercises end-to-end event routing;
+        // the controller itself is now a thin signature-verify + dedup + ACK entry point.
+        SlackEventDispatcher dispatcher = new SlackEventDispatcher(
             mentorService,
             ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
-            dedupService,
-            uninstallService,
-            JsonMapper.builder().build()
+            uninstallService
         );
+        controller = new SlackEventsController(verifier, dispatcher, dedupService, JsonMapper.builder().build());
         when(verifier.verify(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
     }
 

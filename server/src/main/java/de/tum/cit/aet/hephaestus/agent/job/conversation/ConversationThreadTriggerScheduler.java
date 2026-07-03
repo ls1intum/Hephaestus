@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job.conversation;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.ConversationReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.sql.Array;
 import java.sql.SQLException;
@@ -42,6 +43,11 @@ import org.springframework.stereotype.Component;
  */
 @ConditionalOnServerRole
 @Component
+@WorkspaceAgnostic(
+    "Cross-workspace conversation-thread sweep on a schedule; every raw-JDBC read carries an explicit " +
+        "workspace_id predicate and the enqueue delegates to AgentJobService#submit, which scopes its own writes " +
+        "(same inherently cross-workspace pattern as SlackRetentionSweeper)"
+)
 public class ConversationThreadTriggerScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadTriggerScheduler.class);

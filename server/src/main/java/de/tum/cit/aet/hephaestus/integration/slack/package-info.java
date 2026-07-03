@@ -48,6 +48,11 @@
         // The Slack mentor adapter (integration.slack.mentor) runs a turn via the narrow MentorTurnRunner
         // port and streams through MentorChannel (propagate pulls in UIMessageChunk + MentorTurnRequest).
         "agent::mentor-chat",
+        // SlackFeedbackHandler (integration.slack.interactivity) writes developer reactions
+        // (ADDRESSED / NOT_APPLICABLE / DISPUTED) against a delivered observation via the practices
+        // reaction port — the uptake buttons + dispute modal are the Slack surface of the closed-loop
+        // research signal, mirroring how the agent delivery layer reads the same named interface.
+        "practices::reaction",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.slack;
