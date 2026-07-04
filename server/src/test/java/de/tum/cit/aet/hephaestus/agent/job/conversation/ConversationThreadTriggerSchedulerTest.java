@@ -87,8 +87,8 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
         AgentJobService agentJobService = mock(AgentJobService.class);
         var disabled = new ConversationThreadTriggerScheduler(candidateSource, agentJobService, false);
 
-        // Off by default: the sweep no-ops without even running the candidate scan. Remove the flag gate and this
-        // fails — settledCandidates() would be queried through the SPI.
+        // Kill-switch driven explicitly OFF: the sweep no-ops without even running the candidate scan. Remove the
+        // flag gate and this fails — settledCandidates() would be queried through the SPI.
         assertThat(disabled.detectNow()).isZero();
         verifyNoInteractions(candidateSource, agentJobService);
     }

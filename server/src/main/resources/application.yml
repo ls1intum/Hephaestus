@@ -572,9 +572,12 @@ hephaestus:
             signing-secret: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:}
             conversation-ingest:
                 # Channel/group message ingestion (the channel-ingest → conversation-detection →
-                # conversation-feedback subsystem) is a deliberate, privacy-sensitive capability that is DISABLED
-                # pending an explicit channel-activation/consent design — do not enable without that review.
-                enabled: ${HEPHAESTUS_INTEGRATION_SLACK_CONVERSATION_INGEST_ENABLED:false}
+                # conversation-feedback subsystem). The capability is AVAILABLE by default so each workspace can
+                # self-serve, but availability alone reads nothing: actual ingestion still requires a workspace
+                # admin to activate a channel (consent_state=ACTIVE) AND is gated per-person by the opt-out
+                # firewall, and is forward-only (never pre-announcement history). Nothing is read until a channel
+                # is deliberately activated. Set to false to hard-disable the whole subsystem fleet-wide.
+                enabled: ${HEPHAESTUS_INTEGRATION_SLACK_CONVERSATION_INGEST_ENABLED:true}
             # S9 adversarial-safety hardening.
             dedup:
                 # How long a durable Slack event_id dedup marker is retained before the daily sweep prunes it.

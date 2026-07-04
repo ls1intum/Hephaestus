@@ -1,17 +1,21 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 /**
- * Duty-of-care classifier seam for inbound mentor DMs. Before a message drives a mentor turn,
- * {@link SlackMentorService#handleDm} asks this whether it is safe to answer as a coding mentor. A non-{@code OK}
- * verdict short-circuits the turn and posts a fixed, safe canned response instead.
+ * Message-classification seam for inbound mentor DMs. Before a message drives a mentor turn,
+ * {@link SlackMentorService#handleDm} asks this how to treat it; a non-{@code OK} verdict short-circuits the turn
+ * and posts a fixed canned response instead of mentoring.
  *
- * <p>The default {@link HeuristicSlackSafetyClassifier} is a conservative keyword heuristic; a richer
- * model-backed classifier can replace it by providing an alternative bean (the default is
- * {@code @ConditionalOnMissingBean}). The point of the seam is that the mentor flow never has to embed
- * crisis/harassment handling inline.
+ * <p><strong>This seam does not, by itself, provide safety or crisis detection.</strong> The shipped default,
+ * {@link ObviousAbuseFastPathSlackSafetyClassifier}, is only an obvious-abuse keyword fast-path that short-circuits
+ * on a few unambiguous English cues; it cannot reliably detect self-harm, crisis, or harassment (paraphrase,
+ * other languages, and obfuscation all pass through it). Genuine crisis / self-harm detection is an unsolved
+ * problem here and must be supplied by a model-backed moderation/classification bean, which replaces the default
+ * through {@code @ConditionalOnMissingBean}. The seam exists so the mentor flow never embeds this logic inline and
+ * so that better classification can be dropped in without touching the flow — an {@code OK} verdict is a
+ * "no cheap signal", NOT an assertion that the message is safe.
  */
 public interface SlackSafetyClassifier {
-    /** What kind of message this is, from a duty-of-care standpoint. */
+    /** How to treat this message: answer normally, or divert with a canned response. */
     enum Category {
         /** Ordinary in-scope message — answer normally. */
         OK,
@@ -24,8 +28,8 @@ public interface SlackSafetyClassifier {
     }
 
     /**
-     * @param category the duty-of-care classification
-     * @param cannedResponse the safe reply to post for a non-{@code OK} category, or {@code null} for {@code OK}
+     * @param category how to treat the message
+     * @param cannedResponse the canned reply to post for a non-{@code OK} category, or {@code null} for {@code OK}
      */
     record Verdict(Category category, String cannedResponse) {
         public boolean safeToMentor() {

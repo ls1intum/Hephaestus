@@ -74,17 +74,17 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        // Existing behavior is exercised with the capability ENABLED; the disabled-by-default gate is covered
-        // explicitly by flagOff_* below.
+        // Every case drives the flag EXPLICITLY (never the @Value default): existing behavior is exercised with the
+        // capability enabled here, and the disabled kill-switch is covered explicitly by flagOff_* below.
         service = serviceWithFlag(true);
     }
 
     @Test
     void flagOff_channelMessage_isCompletelyDormant_storesNothingAndDoesNotEvenDiscover() {
-        // Off-by-default capability gate (fail-closed layer 1). Even a well-formed message on what would be an
-        // ACTIVE channel must not touch any collaborator: no workspace resolution, no discovery row, no consent
-        // check, no store. This is the explicit, operator-controlled parked state — remove the flag gate and this
-        // test fails (resolveWorkspaceId would be called before the consent gate could apply).
+        // Capability kill-switch (fail-closed layer 1), driven explicitly OFF. Even a well-formed message on what
+        // would be an ACTIVE channel must not touch any collaborator: no workspace resolution, no discovery row, no
+        // consent check, no store. Remove the flag gate and this test fails (resolveWorkspaceId would be called
+        // before the consent gate could apply).
         SlackIngestService disabled = serviceWithFlag(false);
 
         disabled.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");

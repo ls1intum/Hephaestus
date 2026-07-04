@@ -4,17 +4,26 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Conservative keyword heuristic implementing the {@link SlackSafetyClassifier} seam. It errs toward answering
- * normally ({@link Category#OK}) and only diverts on unambiguous self-harm or harassment cues, so an ordinary
- * coding question is never blocked. {@link Category#OUT_OF_SCOPE} is left to a richer classifier — the heuristic
- * does not guess at topic scope.
+ * Obvious-abuse keyword fast-path implementing the {@link SlackSafetyClassifier} seam. This is NOT a safety or
+ * crisis-detection system: it is a narrow substring matcher that only short-circuits on a handful of
+ * <em>unambiguous</em> English cues (an explicit self-harm phrase, an explicit slur/threat at the bot). It exists
+ * only so the mentor flow has a non-null default and so the most blatant messages get a fixed, non-mentoring
+ * reply instead of a code review.
  *
- * <p>Registered as the default {@code @ConditionalOnMissingBean} in {@link SlackSeamDefaultsConfiguration} so a
- * model-backed classifier can replace it without touching the mentor flow. It is NOT a component-scanned bean:
- * {@code @ConditionalOnMissingBean} is only reliable on a {@code @Bean} factory method, not on a scanned
+ * <p><strong>Known limits — do not mistake this for safety.</strong> A substring list cannot detect crisis or
+ * self-harm: it misses paraphrase ("I don't want to be here anymore"), every non-English phrasing, sarcasm,
+ * negation, and obfuscation, and it will false-positive on quoted or technical text. Real crisis / self-harm
+ * detection is an <em>unsolved</em> problem here and is deliberately out of scope for this class. When a message
+ * is NOT matched, that means nothing about whether it was actually safe — it just means this cheap matcher had no
+ * opinion, and the message is mentored normally.
+ *
+ * <p>Registered as the default {@code @ConditionalOnMissingBean} in {@link SlackSeamDefaultsConfiguration}. The
+ * intended production posture is to replace it with a model-backed moderation/classification bean via that seam;
+ * this fast-path is the fallback so the flow is never wired with a null classifier. It is NOT a component-scanned
+ * bean: {@code @ConditionalOnMissingBean} is only reliable on a {@code @Bean} factory method, not on a scanned
  * {@code @Component} (where evaluation order left the default unregistered and broke context startup).
  */
-public class HeuristicSlackSafetyClassifier implements SlackSafetyClassifier {
+public class ObviousAbuseFastPathSlackSafetyClassifier implements SlackSafetyClassifier {
 
     private static final List<String> SELF_HARM_CUES = List.of(
         "kill myself",

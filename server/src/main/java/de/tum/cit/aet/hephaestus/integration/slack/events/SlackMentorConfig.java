@@ -8,7 +8,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * The bounded worker pool the {@link SlackEventDispatcher} hands its post-ACK Slack work to. A DM, for example,
- * drives a remote Slack {@code assistant.threads.setStatus} call (and possibly a canned duty-of-care / not-linked / over-cap
+ * drives a remote Slack {@code assistant.threads.setStatus} call (and possibly a canned classifier / not-linked / over-cap
  * {@code chat.postMessage}) before the mentor turn is dispatched, so running it on the request thread would risk
  * breaching Slack's 3&nbsp;s Events-API ACK window (→ Slack marks the delivery failed and retries, a retry storm).
  *

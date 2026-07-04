@@ -21,10 +21,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Mentor-flow safety unit tests: duty-of-care diversion (self-harm / harassment) short-circuits before any
- * developer lookup or turn, and the per-user turn cap posts a friendly message instead of running a second turn.
- * Uses the real {@link HeuristicSlackSafetyClassifier} and a real {@link SlackMentorQuotaGuard} so the observable
- * behaviour — not mock wiring — is under test.
+ * Mentor-flow classification unit tests: an obvious-abuse diversion (self-harm / harassment) short-circuits before
+ * any developer lookup or turn, and the per-user turn cap posts a friendly message instead of running a second turn.
+ * Uses the real {@link ObviousAbuseFastPathSlackSafetyClassifier} and a real {@link SlackMentorQuotaGuard} so the
+ * observable behaviour — not mock wiring — is under test.
  */
 class SlackMentorServiceTest extends BaseUnitTest {
 
@@ -56,7 +56,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
             slackMessageService,
             identityResolver,
             quotaGuard,
-            new HeuristicSlackSafetyClassifier()
+            new ObviousAbuseFastPathSlackSafetyClassifier()
         );
     }
 
@@ -71,10 +71,10 @@ class SlackMentorServiceTest extends BaseUnitTest {
             eq(WORKSPACE),
             eq(CHANNEL),
             eq(List.of()),
-            eq(HeuristicSlackSafetyClassifier.SELF_HARM_RESPONSE)
+            eq(ObviousAbuseFastPathSlackSafetyClassifier.SELF_HARM_RESPONSE)
         );
         verify(mentorTurnRunner, never()).run(any(), any(), any());
-        // Diverted before any identity resolution — duty of care applies even to an unlinked sender.
+        // Diverted before any identity resolution — the classifier applies even to an unlinked sender.
         verifyNoInteractions(identityResolver);
     }
 

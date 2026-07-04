@@ -81,13 +81,15 @@ public class SlackMentorService {
             return;
         }
         long workspaceId = workspaceOpt.get();
-        // Duty of care: divert harassment / self-harm / out-of-scope messages to a safe canned response before any
-        // mentor turn runs. The classifier is a seam (default heuristic); a non-OK verdict never mentors.
+        // Message classification: divert obvious harassment / self-harm / out-of-scope messages to a canned
+        // response before any mentor turn runs. The classifier is a seam; the shipped default is only an
+        // obvious-abuse keyword fast-path (NOT crisis detection) — a non-OK verdict never mentors, but an OK
+        // verdict only means "no cheap signal", not a safety guarantee.
         SlackSafetyClassifier.Verdict verdict = safetyClassifier.classify(text);
         if (!verdict.safeToMentor()) {
             slackMessageService.sendForWorkspace(workspaceId, channelId, List.of(), verdict.cannedResponse());
             log.info(
-                "Slack DM diverted by duty-of-care posture: workspace={} category={}",
+                "Slack DM diverted by safety classifier: workspace={} category={}",
                 workspaceId,
                 verdict.category()
             );

@@ -39,10 +39,12 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     // are rejected at finalize until the token-rotation refresher ships.
     //
     // NOTE — deliberately EXCLUDED: channels:history / groups:history. Those authorize delivery of public/private
-    // channel `message` events, which only the PARKED channel-ingestion subsystem consumes
-    // (SlackIngestService.ingestChannelMessage, gated off by hephaestus.integration.slack.conversation-ingest
-    // .enabled=false). Requesting them here would grant read access to every monitored channel's traffic before
-    // channel activation is a deliberate, consent-designed operator decision — so they stay off until that ships.
+    // channel `message` events, which only the channel-ingestion subsystem consumes
+    // (SlackIngestService.ingestChannelMessage). That subsystem's capability flag
+    // (hephaestus.integration.slack.conversation-ingest.enabled) is available by default, but these OAuth scopes are
+    // a separate, still-excluded gate: without them Slack delivers no channel `message` events, so no channel
+    // traffic reaches the bot regardless of the flag. Requesting them is a deliberate, consent-designed rollout
+    // step (paired with the per-channel activation UX) — so they stay off until that scope request ships.
     static final Set<String> DEFAULT_SCOPES = Set.of(
         // chat.postMessage + chat.startStream/appendStream/stopStream: canned replies and the streamed mentor DM
         // reply (SlackMessageService).

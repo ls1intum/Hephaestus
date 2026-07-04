@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack;
 
-import de.tum.cit.aet.hephaestus.integration.slack.events.HeuristicSlackSafetyClassifier;
+import de.tum.cit.aet.hephaestus.integration.slack.events.ObviousAbuseFastPathSlackSafetyClassifier;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSafetyClassifier;
 import de.tum.cit.aet.hephaestus.integration.slack.health.NoopSlackAuthLivenessClient;
 import de.tum.cit.aet.hephaestus.integration.slack.health.SlackAuthLivenessClient;
@@ -10,10 +10,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Registers the overridable default beans for the Slack duty-of-care and token-liveness seams.
+ * Registers the overridable default beans for the Slack message-classification and token-liveness seams.
  *
  * <p>Both defaults use {@code @ConditionalOnMissingBean} so a richer implementation (a model-backed
- * safety classifier, a live {@code auth.test} client) can replace them without touching the mentor flow.
+ * moderation/safety classifier, a live {@code auth.test} client) can replace them without touching the mentor flow.
+ * The default classifier is only an obvious-abuse keyword fast-path — see {@link ObviousAbuseFastPathSlackSafetyClassifier}
+ * for why it is not, on its own, crisis/safety detection.
  * They live here, on {@code @Bean} factory methods, rather than as component-scanned {@code @Component}s:
  * {@code @ConditionalOnMissingBean} is only evaluated deterministically for {@code @Bean} methods, so on a
  * scanned component it left the default unregistered and broke context startup ({@code SlackMentorService}
@@ -25,8 +27,8 @@ class SlackSeamDefaultsConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(SlackSafetyClassifier.class)
-    SlackSafetyClassifier heuristicSlackSafetyClassifier() {
-        return new HeuristicSlackSafetyClassifier();
+    SlackSafetyClassifier obviousAbuseFastPathSlackSafetyClassifier() {
+        return new ObviousAbuseFastPathSlackSafetyClassifier();
     }
 
     @Bean

@@ -21,14 +21,14 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
  * Idempotent on {@code (workspace, channel, ts)}.
  *
- * <p><strong>Capability flag (fail-closed layer 1).</strong> Channel/group message ingestion is a deliberate,
- * privacy-sensitive capability that is <em>off by default</em>: it only runs when
- * {@code hephaestus.integration.slack.conversation-ingest.enabled=true}. While the flag is off (the shipped
- * default), {@link #ingestChannelMessage} returns immediately — no discovery row, no store — so the whole
- * channel-ingest → conversation-detection → conversation-feedback subsystem stays inert. Turning it on is a
- * conscious operator decision that presupposes an explicit channel-activation/consent design (which sets a
- * channel's {@code ACTIVE} state); it is not built here. The DM/mentor path and everything else in the Slack
- * integration are unaffected by this flag.
+ * <p><strong>Capability flag (fail-closed layer 1).</strong> Channel/group message ingestion is gated by
+ * {@code hephaestus.integration.slack.conversation-ingest.enabled}. The capability is <em>available by default</em>
+ * so each workspace can self-serve, but availability alone reads nothing — while the flag is off,
+ * {@link #ingestChannelMessage} returns immediately (no discovery row, no store) and the whole channel-ingest →
+ * conversation-detection → conversation-feedback subsystem is inert; setting it to {@code false} hard-disables the
+ * subsystem fleet-wide. Even with the flag on, ingestion still requires the per-channel consent gate ({@code ACTIVE})
+ * and the per-person opt-out firewall below, and is forward-only, so nothing is read until a channel is deliberately
+ * activated. The DM/mentor path and everything else in the Slack integration are unaffected by this flag.
  *
  * <p><strong>Consent gate (fail-closed layer 2).</strong> Even with the capability flag on, seeing a message on a
  * channel auto-creates the allow-list row in {@code PENDING} (discovery: the bot only receives events for channels
@@ -60,10 +60,11 @@ public class SlackIngestService {
     private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     /**
-     * Off by default. Gates the channel-ingest entry point ({@link #ingestChannelMessage}) as a second fail-closed
-     * layer in front of the per-channel consent gate: while this is {@code false}, channel/group messages are never
-     * ingested at all, so the conversation-detection/feedback subsystem downstream of it stays completely dormant.
-     * Bound from {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+     * Capability flag, available by default. Gates the channel-ingest entry point ({@link #ingestChannelMessage})
+     * as the first fail-closed layer in front of the per-channel consent gate and the per-person firewall: while
+     * this is {@code false}, channel/group messages are never ingested at all, so the conversation-detection/feedback
+     * subsystem downstream of it stays completely dormant. Bound from
+     * {@code hephaestus.integration.slack.conversation-ingest.enabled}.
      */
     private final boolean conversationIngestEnabled;
 
@@ -76,7 +77,7 @@ public class SlackIngestService {
         SlackThreadRepository threadRepository,
         SlackMentorIdentityResolver identityResolver,
         ConversationFeedbackErasure conversationFeedbackErasure,
-        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:false}") boolean conversationIngestEnabled
+        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean conversationIngestEnabled
     ) {
         this.workspaceResolver = workspaceResolver;
         this.monitoredChannelRepository = monitoredChannelRepository;
@@ -98,8 +99,8 @@ public class SlackIngestService {
         @Nullable String authorSlackUserId,
         @Nullable String text
     ) {
-        // Fail-closed layer 1: channel ingestion is a deliberate, privacy-sensitive capability that is off by
-        // default. While disabled, nothing is discovered, gated, or stored — the subsystem is fully dormant.
+        // Fail-closed layer 1: the channel-ingest capability flag. Available by default, but when disabled nothing
+        // is discovered, gated, or stored — the subsystem is fully dormant regardless of channel/person consent.
         if (!conversationIngestEnabled) {
             return;
         }

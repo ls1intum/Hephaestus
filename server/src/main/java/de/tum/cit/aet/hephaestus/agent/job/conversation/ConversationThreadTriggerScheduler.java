@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  *
  * <p><b>Capability flag.</b> This scheduler is the second entry point of the channel-ingest → conversation-feedback
- * subsystem, so it is gated by the same off-by-default capability flag as {@code SlackIngestService}:
+ * subsystem, so it is gated by the same capability flag as {@code SlackIngestService} (available by default):
  * {@code hephaestus.integration.slack.conversation-ingest.enabled}. The bean is always created (so it stays wired
  * and unit-testable), but {@link #detectNow()} no-ops while the flag is off. With ingestion disabled there is no
  * {@code ACTIVE} channel and hence no candidate thread anyway; the flag makes that dormancy explicit rather than
@@ -74,16 +74,17 @@ public class ConversationThreadTriggerScheduler {
     private final AgentJobService agentJobService;
 
     /**
-     * Off by default. When {@code false} the sweep no-ops, keeping the conversation-detection subsystem dormant in
-     * lockstep with {@link de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService}'s channel-ingest
-     * gate. Bound from {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+     * Capability flag, available by default. When {@code false} the sweep no-ops, keeping the conversation-detection
+     * subsystem dormant in lockstep with
+     * {@link de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService}'s channel-ingest gate. Bound from
+     * {@code hephaestus.integration.slack.conversation-ingest.enabled}.
      */
     private final boolean conversationIngestEnabled;
 
     public ConversationThreadTriggerScheduler(
         ConversationCandidateSource candidateSource,
         AgentJobService agentJobService,
-        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:false}") boolean conversationIngestEnabled
+        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean conversationIngestEnabled
     ) {
         this.candidateSource = candidateSource;
         this.agentJobService = agentJobService;
