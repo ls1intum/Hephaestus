@@ -881,6 +881,11 @@ erDiagram
         TIMESTAMPTZ expires_at "NOT NULL"
     }
 
+    SlackMentorDailyBudget {
+        DATE day PK
+        INTEGER used "NOT NULL"
+    }
+
     SlackMessage {
         BIGINT id PK
         BIGINT workspace_id UK "NOT NULL"
