@@ -43,15 +43,8 @@ class SlackParticipantConsentGateTest extends BaseUnitTest {
 
         assertThat(gate.ingestionAllowed(7L, "U1")).isTrue();
     }
-
-    @Test
-    void absentRow_failsOpen_isAllowed() {
-        // No consent row ⇒ the exists-query is false ⇒ the person never opted out ⇒ allowed. (The capability flag
-        // and channel gate are the fail-closed layers; the person layer fails open on "no decision".)
-        when(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(7L, "U2")
-        ).thenReturn(false);
-
-        assertThat(gate.ingestionAllowed(7L, "U2")).isTrue();
-    }
+    // NOTE: an "absent row fails open" case was intentionally removed — under the mock it is byte-identical to
+    // personWithNoOptOut_isAllowed (both stub existsBy…OptedOutTrue→false against the pure `return !exists(...)`), so
+    // it kills no unique mutant. The real absent-row-vs-opted_out=false SQL distinction is exercised on Postgres in
+    // SlackParticipantConsentFirewallIntegrationTest.
 }
