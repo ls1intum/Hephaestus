@@ -13,11 +13,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
@@ -88,6 +92,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private MentorSlackThreadRepository mentorSlackThreadRepository;
+
+    @Autowired
+    private MentorTurnRatingRepository mentorTurnRatingRepository;
+
+    @Autowired
+    private SlackParticipantConsentRepository slackParticipantConsentRepository;
 
     @Autowired
     private SlackRetentionSweeper slackRetentionSweeper;
@@ -521,6 +531,19 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             mentorThread.setSlackChannelId(channelId);
             mentorThread.setSlackUserId("U1");
             mentorSlackThreadRepository.save(mentorThread);
+
+            // The other two Slack-owned, workspace-scoped tables the purge adapter clears but no test asserted:
+            // a feedback-button rating and a per-person ingestion opt-out. Both must be dropped with the tenant.
+            mentorTurnRatingRepository.save(
+                MentorTurnRating.builder()
+                    .workspaceId(workspaceId)
+                    .raterUserId(owner.getId())
+                    .channelId(channelId)
+                    .slackMessageTs(threadTs)
+                    .rating(TurnRating.HELPFUL)
+                    .build()
+            );
+            slackParticipantConsentRepository.upsert(workspaceId, "U1", true, true, "SLACK_APP_HOME");
         }
 
         @Test
@@ -559,16 +582,24 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             // Act
             workspaceLifecycleService.purgeWorkspace(a.getWorkspaceSlug());
 
-            // Assert — A's four Slack tables are empty; B's rows are untouched.
+            // Assert — A's six Slack tables are empty; B's rows are untouched.
             assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(slackThreadRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(slackMonitoredChannelRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(mentorSlackThreadRepository.countByWorkspaceId(a.getId())).isZero();
+            assertThat(mentorTurnRatingRepository.countByWorkspaceId(a.getId())).isZero();
+            assertThat(
+                slackParticipantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(a.getId())
+            ).isZero();
 
             assertThat(slackMessageRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
             assertThat(slackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
             assertThat(slackMonitoredChannelRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
             assertThat(mentorSlackThreadRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+            assertThat(mentorTurnRatingRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
+            assertThat(
+                slackParticipantConsentRepository.countByWorkspaceIdAndIngestionOptedOutTrue(b.getId())
+            ).isEqualTo(1);
         }
 
         @Test

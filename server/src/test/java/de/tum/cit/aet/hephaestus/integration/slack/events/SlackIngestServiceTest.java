@@ -212,6 +212,34 @@ class SlackIngestServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void activeChannel_messageTsEqualsAnnouncement_isNotStored_forwardOnlyIsStrict() {
+        // Forward-only is STRICT (ts > announced), not ts >= announced. A message posted at the exact instant of the
+        // announcement (ts == consent_announced_at) is pre-consent and must NOT be stored. Every other test uses a ts
+        // strictly below or above the stamp, so only this equality cell pins the boundary: flip `>` to `>=` in
+        // isAfterAnnouncement and this test fails (the message would be stored, and the person gate consulted).
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
+        when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
+        // Announcement stamped at epoch-second 100; the message ts "100.0" parses to the same fractional epoch.
+        when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(
+            Optional.of(Instant.ofEpochSecond(100))
+        );
+
+        service.ingestChannelMessage("T1", "C1", "100.0", null, "U1", "at the announcement instant");
+
+        verifyNoInteractions(participantConsentGate);
+        verify(messageRepository, never()).insertIfAbsent(
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
+
+    @Test
     void activeChannel_missingAnnouncementStamp_failsClosed() {
         // An ACTIVE channel is always stamped at activation; a missing stamp is an inconsistency and must fail closed
         // (store nothing) rather than fall through to ingest unbounded history.

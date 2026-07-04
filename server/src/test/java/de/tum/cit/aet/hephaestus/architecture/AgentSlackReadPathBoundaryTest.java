@@ -48,6 +48,24 @@ class AgentSlackReadPathBoundaryTest extends HephaestusArchitectureTest {
     );
 
     @Test
+    @DisplayName("the slack_* SQL detector matches real tunnels and ignores JSON-key / javadoc lookalikes")
+    void patternMatchesTunnelsAndIgnoresLookalikes() {
+        // Self-test of the guard's regex: if a future weakening made it match nothing (or match the lookalikes
+        // vacuously), agentSourcesDoNotNameSlackTablesInSql would silently pass forever. This pins that the detector
+        // still fires on a reintroduced raw-SQL Slack tunnel and still ignores the two things that must NOT trip it.
+        assertThat(SLACK_TABLE_IN_SQL.matcher("SELECT 1 FROM slack_thread WHERE workspace_id = ?").find()).isTrue();
+        assertThat(SLACK_TABLE_IN_SQL.matcher("... JOIN slack_message m ON ...").find()).isTrue();
+        assertThat(
+            SLACK_TABLE_IN_SQL.matcher("UPDATE slack_monitored_channel SET consent_state = 'ACTIVE'").find()
+        ).isTrue();
+        assertThat(SLACK_TABLE_IN_SQL.matcher("INSERT INTO slack_message (workspace_id) VALUES (?)").find()).isTrue();
+
+        // Lookalikes that must NOT match: a JSON metadata key and a javadoc {@code} mention.
+        assertThat(SLACK_TABLE_IN_SQL.matcher("payload.path(\"slack_thread_ts\").asString()").find()).isFalse();
+        assertThat(SLACK_TABLE_IN_SQL.matcher(" * reads the {@code slack_thread} aggregate.").find()).isFalse();
+    }
+
+    @Test
     @DisplayName("agent must not import any integration.slack type")
     void agentDoesNotImportSlack() {
         ArchRule rule = noClasses()

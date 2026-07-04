@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 
 /**
@@ -35,16 +37,16 @@ class SlackChannelConsentGateTest extends BaseUnitTest {
         assertThat(gate.ingestAllowed(7L, "C1")).isTrue();
     }
 
-    @Test
-    void pendingChannel_blocksIngest() {
-        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(ConsentState.PENDING));
-
-        assertThat(gate.ingestAllowed(7L, "C1")).isFalse();
-    }
-
-    @Test
-    void revokedChannel_blocksIngest() {
-        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(ConsentState.REVOKED));
+    /**
+     * Every non-ACTIVE state blocks ingestion. PAUSED is the cell that distinguishes the correct {@code == ACTIVE}
+     * rule from a plausible blacklist rewrite ({@code state != PENDING && state != REVOKED}), which would silently
+     * leak PAUSED content; folding all three blocked states here pins it. Flip the gate to a blacklist and the
+     * PAUSED case fails.
+     */
+    @ParameterizedTest
+    @EnumSource(value = ConsentState.class, names = { "PENDING", "PAUSED", "REVOKED" })
+    void nonActiveChannel_blocksIngest(ConsentState blockedState) {
+        when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(blockedState));
 
         assertThat(gate.ingestAllowed(7L, "C1")).isFalse();
     }

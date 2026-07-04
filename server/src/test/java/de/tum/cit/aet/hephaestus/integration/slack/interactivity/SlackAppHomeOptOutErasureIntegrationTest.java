@@ -14,16 +14,21 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
+import de.tum.cit.aet.hephaestus.mentor.ChatThread;
+import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -100,6 +105,12 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private MentorTurnRatingRepository mentorTurnRatingRepository;
+
+    @Autowired
+    private ChatThreadRepository chatThreadRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -203,6 +214,52 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
         // 5) The unrelated PR observation (a different artifact type) is untouched — no over-reach.
         assertThat(observationRepository.findById(prObs)).isPresent();
+    }
+
+    @Test
+    @DisplayName(
+        "opt-out is channel-ingestion scoped: erases the person's CHANNEL data but keeps their own mentor DM + rating"
+    )
+    void optOut_channelIngestionScoped_keepsOwnMentorDmAndRating() {
+        // Channel-derived data the person authored (must be erased by the opt-out).
+        insertMessage("me.1", meMemberId, OPTING_OUT_SLACK_USER);
+        long threadId = insertThreadWithParticipants("root.1", meMemberId, otherMemberId);
+        UUID meConvObs = seedBoundConversation(threadId, meMemberId);
+
+        // The person's OWN mentor interactions — NOT channel ingestion. A DM opt-out is an ingestion opt-out; it must
+        // NOT delete the person's own mentor DM thread or the feedback-button ratings they gave the mentor. This pins
+        // the decided boundary (channel-ingestion only) so a future broadened erase that swept these would fail here.
+        MentorTurnRating myRating = mentorTurnRatingRepository.save(
+            MentorTurnRating.builder()
+                .workspaceId(workspaceId)
+                .raterUserId(meMemberId)
+                .channelId(CHANNEL)
+                .slackMessageTs("mentor-reply.1")
+                .rating(TurnRating.HELPFUL)
+                .build()
+        );
+        User me = userRepository.findById(meMemberId).orElseThrow();
+        Workspace ws = workspaceRepository.findById(workspaceId).orElseThrow();
+        ChatThread myDm = new ChatThread();
+        myDm.setId(UUID.randomUUID());
+        myDm.setTitle("My Slack DM");
+        myDm.setUser(me);
+        myDm.setWorkspace(ws);
+        myDm.setSurface(ThreadSurface.SLACK_DM);
+        UUID myDmId = chatThreadRepository.save(myDm).getId();
+
+        handler.handleBlockActions(optOut(OPTING_OUT_SLACK_USER));
+
+        // Channel-ingestion data erased …
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "me.1")
+        ).isFalse();
+        assertThat(observationRepository.findById(meConvObs)).isEmpty();
+        assertThat(participantIds(threadId)).containsExactly(otherMemberId);
+
+        // … but the person's OWN mentor DM thread and mentor_turn_rating are left intact (out of ingestion scope).
+        assertThat(mentorTurnRatingRepository.findById(myRating.getId())).isPresent();
+        assertThat(chatThreadRepository.findById(myDmId)).isPresent();
     }
 
     // --- payload + fixtures ---
