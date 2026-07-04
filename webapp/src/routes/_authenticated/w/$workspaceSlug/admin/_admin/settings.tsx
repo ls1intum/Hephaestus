@@ -3,15 +3,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	addRepositoryToMonitorMutation,
+	deleteSlackChannelMutation,
 	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
+	listSlackChannelsOptions,
 	listWorkspacesQueryKey,
+	registerSlackChannelMutation,
 	removeRepositoryToMonitorMutation,
 	resetAndRecalculateLeaguesMutation,
 	updateFeaturesMutation,
+	updateSlackChannelConsentMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
+import type { SlackConsentState } from "@/components/admin/AdminSlackChannelsSettings";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
@@ -114,6 +119,62 @@ function AdminSettings() {
 		},
 	});
 
+	// Slack monitored channels query
+	const slackChannelsQueryOptions = listSlackChannelsOptions({
+		path: { workspaceSlug: workspaceSlug ?? "" },
+	});
+	const { data: slackChannels, isLoading: isLoadingSlackChannels } = useQuery({
+		...slackChannelsQueryOptions,
+		enabled: Boolean(workspaceSlug),
+	});
+
+	const invalidateSlackChannels = () => {
+		queryClient.invalidateQueries({ queryKey: slackChannelsQueryOptions.queryKey });
+	};
+
+	// Register (allow-list) a Slack channel — lands PENDING.
+	const registerSlackChannel = useMutation({
+		...registerSlackChannelMutation(),
+		onSuccess: () => {
+			toast.success("Channel added");
+			invalidateSlackChannels();
+		},
+		onError: (e) => {
+			toast.error("Failed to add channel", {
+				description: e instanceof Error ? e.message : undefined,
+			});
+		},
+	});
+
+	// Drive activate / pause / resume (and reason-carrying revoke) through the consent PATCH.
+	const updateSlackChannelConsent = useMutation({
+		...updateSlackChannelConsentMutation(),
+		onSuccess: () => {
+			toast.success("Channel updated");
+			invalidateSlackChannels();
+		},
+		onError: (e) => {
+			// The 409 ProblemDetail.detail for an illegal transition surfaces here.
+			toast.error("Failed to update channel", {
+				description: e instanceof Error ? e.message : undefined,
+			});
+		},
+	});
+
+	// Terminal revoke + erase.
+	const deleteSlackChannel = useMutation({
+		...deleteSlackChannelMutation(),
+		onSuccess: () => {
+			toast.success("Channel removed and its data erased");
+			invalidateSlackChannels();
+		},
+		onError: (e) => {
+			toast.error("Failed to remove channel", {
+				description: e instanceof Error ? e.message : undefined,
+			});
+		},
+	});
+
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
 	}
@@ -155,6 +216,65 @@ function AdminSettings() {
 	const formattedRepositories: RepositoryItem[] = (repositories || []).map((repo: string) => ({
 		nameWithOwner: repo,
 	}));
+
+	// Slack channel handlers. mutateAsync lets the dialogs await the result and only close
+	// on success (pessimistic), while onError still surfaces a toast from the mutation above.
+	const handleRegisterSlackChannel = async ({
+		slackChannelId,
+		channelName,
+	}: {
+		slackChannelId: string;
+		channelName?: string;
+	}) => {
+		if (!workspaceSlug) {
+			return;
+		}
+		await registerSlackChannel.mutateAsync({
+			path: { workspaceSlug },
+			body: { slackChannelId, channelName },
+		});
+	};
+
+	const handleUpdateSlackChannelConsent = async ({
+		slackChannelId,
+		consentState,
+		reason,
+	}: {
+		slackChannelId: string;
+		consentState: SlackConsentState;
+		reason?: string;
+	}) => {
+		if (!workspaceSlug) {
+			return;
+		}
+		await updateSlackChannelConsent.mutateAsync({
+			path: { workspaceSlug, slackChannelId },
+			body: { consentState, reason },
+		});
+	};
+
+	const handleRemoveSlackChannel = async ({
+		slackChannelId,
+		reason,
+	}: {
+		slackChannelId: string;
+		reason?: string;
+	}) => {
+		if (!workspaceSlug) {
+			return;
+		}
+		// The DELETE endpoint carries no body, so a supplied reason is recorded through the
+		// consent PATCH to REVOKED (same terminal erase server-side); the reason-less path
+		// uses the dedicated DELETE.
+		if (reason && reason.trim().length > 0) {
+			await updateSlackChannelConsent.mutateAsync({
+				path: { workspaceSlug, slackChannelId },
+				body: { consentState: "REVOKED", reason },
+			});
+			return;
+		}
+		await deleteSlackChannel.mutateAsync({ path: { workspaceSlug, slackChannelId } });
+	};
 
 	return (
 		<AdminSettingsPage
@@ -198,6 +318,11 @@ function AdminSettings() {
 			onSlackSaved={() =>
 				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
 			}
+			slackChannels={slackChannels ?? []}
+			isLoadingSlackChannels={isWorkspaceLoading || isLoadingSlackChannels || !workspaceSlug}
+			onRegisterSlackChannel={handleRegisterSlackChannel}
+			onUpdateSlackChannelConsent={handleUpdateSlackChannelConsent}
+			onRemoveSlackChannel={handleRemoveSlackChannel}
 		/>
 	);
 }

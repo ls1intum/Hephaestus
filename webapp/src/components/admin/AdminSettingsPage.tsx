@@ -1,3 +1,4 @@
+import type { SlackMonitoredChannel } from "@/api/types.gen";
 import {
 	AdminFeaturesSettings,
 	type FeatureKey,
@@ -5,6 +6,7 @@ import {
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
+import { AdminSlackChannelsSettings, type SlackConsentState } from "./AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 type RepositoryItem = {
@@ -38,6 +40,22 @@ export interface AdminSettingsPageProps {
 	slackScheduleDay?: number;
 	slackScheduleTime?: string;
 	onSlackSaved: () => void;
+	// Slack channel-monitoring section (rendered directly below the notifications card).
+	slackChannels: SlackMonitoredChannel[];
+	isLoadingSlackChannels: boolean;
+	onRegisterSlackChannel: (input: {
+		slackChannelId: string;
+		channelName?: string;
+	}) => Promise<void> | void;
+	onUpdateSlackChannelConsent: (input: {
+		slackChannelId: string;
+		consentState: SlackConsentState;
+		reason?: string;
+	}) => Promise<void> | void;
+	onRemoveSlackChannel: (input: {
+		slackChannelId: string;
+		reason?: string;
+	}) => Promise<void> | void;
 }
 
 export function AdminSettingsPage({
@@ -64,6 +82,11 @@ export function AdminSettingsPage({
 	slackScheduleDay,
 	slackScheduleTime,
 	onSlackSaved,
+	slackChannels,
+	isLoadingSlackChannels,
+	onRegisterSlackChannel,
+	onUpdateSlackChannelConsent,
+	onRemoveSlackChannel,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -107,6 +130,18 @@ export function AdminSettingsPage({
 						scheduleDay={slackScheduleDay}
 						scheduleTime={slackScheduleTime}
 						onSaved={onSlackSaved}
+					/>
+				)}
+
+				{workspaceSlug != null && (
+					<AdminSlackChannelsSettings
+						workspaceSlug={workspaceSlug}
+						hasSlackConnection={hasSlackConnection}
+						channels={slackChannels}
+						isLoading={isLoadingSlackChannels}
+						onRegisterChannel={onRegisterSlackChannel}
+						onUpdateConsent={onUpdateSlackChannelConsent}
+						onRemoveChannel={onRemoveSlackChannel}
 					/>
 				)}
 			</div>

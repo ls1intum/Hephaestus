@@ -41,6 +41,11 @@ const meta = {
 		hasSlackConnection: false,
 		slackNotificationsEnabled: false,
 		onSlackSaved: fn(),
+		slackChannels: [],
+		isLoadingSlackChannels: false,
+		onRegisterSlackChannel: fn(),
+		onUpdateSlackChannelConsent: fn(),
+		onRemoveSlackChannel: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
