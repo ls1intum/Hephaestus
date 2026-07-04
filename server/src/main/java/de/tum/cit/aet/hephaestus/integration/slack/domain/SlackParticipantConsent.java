@@ -11,6 +11,7 @@ import java.util.Objects;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.Nullable;
 
@@ -50,10 +51,12 @@ public class SlackParticipantConsent {
 
     /** {@code true} ⇒ this person's channel messages are never ingested (the mentoring-purpose firewall). */
     @Column(name = "ingestion_opted_out", nullable = false)
+    @ColumnDefault("false")
     private boolean ingestionOptedOut;
 
     /** Persisted research opt-out bit (written by the App Home toggle); research-eligibility semantics unchanged. */
     @Column(name = "research_opted_out", nullable = false)
+    @ColumnDefault("false")
     private boolean researchOptedOut;
 
     /** Where the decision originated (e.g. {@code SLACK_APP_HOME}); nullable for historical/backfilled rows. */

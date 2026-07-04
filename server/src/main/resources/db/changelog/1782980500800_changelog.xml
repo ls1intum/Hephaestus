@@ -53,12 +53,12 @@
         <addForeignKeyConstraint
             baseTableName="feedback_placement"
             baseColumnNames="chat_message_id"
-            constraintName="fk_feedback_placement_chat_message"
+            constraintName="sfk_feedback_placement_chat_message"
             referencedTableName="chat_message"
             referencedColumnNames="id"
             onDelete="SET NULL"/>
         <rollback>
-            <dropForeignKeyConstraint baseTableName="feedback_placement" constraintName="fk_feedback_placement_chat_message"/>
+            <dropForeignKeyConstraint baseTableName="feedback_placement" constraintName="sfk_feedback_placement_chat_message"/>
             <dropColumn tableName="feedback_placement" columnName="chat_message_id"/>
         </rollback>
     </changeSet>
@@ -152,7 +152,7 @@
             CREATE TABLE mentor_slack_thread (
                 id UUID PRIMARY KEY,
                 workspace_id BIGINT NOT NULL,
-                chat_thread_id UUID NOT NULL REFERENCES chat_thread(id) ON DELETE CASCADE,
+                chat_thread_id UUID NOT NULL CONSTRAINT sfk_mentor_slack_thread_chat_thread REFERENCES chat_thread(id) ON DELETE CASCADE,
                 slack_team_id VARCHAR(32) NOT NULL,
                 slack_channel_id VARCHAR(32) NOT NULL,
                 slack_thread_ts VARCHAR(32),
@@ -378,7 +378,7 @@
                 channel_id VARCHAR(32) NOT NULL,
                 thread_ts VARCHAR(32),
                 slack_message_ts VARCHAR(32) NOT NULL,
-                feedback_id UUID REFERENCES feedback(id) ON DELETE SET NULL,
+                feedback_id UUID CONSTRAINT sfk_mentor_turn_rating_feedback REFERENCES feedback(id) ON DELETE SET NULL,
                 rating VARCHAR(16) NOT NULL,
                 source VARCHAR(16) NOT NULL DEFAULT 'BUTTON',
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -490,7 +490,7 @@
                 research_opted_out BOOLEAN NOT NULL DEFAULT false,
                 source VARCHAR(32),
                 decided_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                CONSTRAINT pk_slack_participant_consent PRIMARY KEY (workspace_id, slack_user_id)
+                CONSTRAINT pk_slack_participant_consent PRIMARY KEY (slack_user_id, workspace_id)
             );
         </sql>
         <rollback><sql>DROP TABLE IF EXISTS slack_participant_consent;</sql></rollback>

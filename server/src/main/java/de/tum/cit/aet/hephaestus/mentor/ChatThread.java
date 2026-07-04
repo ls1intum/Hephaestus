@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.NonNull;
 
@@ -51,6 +52,7 @@ public class ChatThread {
     @NonNull
     @Enumerated(EnumType.STRING)
     @Column(name = "surface", nullable = false, length = 16)
+    @ColumnDefault("'WEB'")
     private ThreadSurface surface = ThreadSurface.WEB;
 
     /**

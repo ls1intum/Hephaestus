@@ -11,7 +11,10 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -52,7 +55,27 @@ public class SlackThread {
     private @Nullable String lastTs;
 
     @Column(name = "message_count", nullable = false)
+    @ColumnDefault("0")
     private int messageCount = 0;
+
+    /**
+     * Conversation-detection watermark: the Slack {@code ts} through which this thread was last analysed
+     * (changelog {@code 1782980500800-13}). Written and read by the raw-JDBC detection lane; mapped here only so the
+     * JPA model matches the changelog column and the schema-drift gate stays empty — the raw SQL path is unaffected.
+     */
+    @Column(name = "last_reviewed_ts", length = 32)
+    private @Nullable String lastReviewedTs;
+
+    /**
+     * Resolved participant member ids for the mentor-context participant firewall ({@code bigint[]}, changelog
+     * {@code 1782980500800-12}; a GIN index backs the {@code = ANY(...)} membership lookup). Written and read by the
+     * raw-JDBC ingest/projector path; mapped here only so the JPA model matches the changelog column and the
+     * schema-drift gate stays empty. {@code NOT NULL DEFAULT '{}'} — never null, empty until participants resolve.
+     */
+    @Column(name = "participant_member_ids", nullable = false)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @ColumnDefault("'{}'::bigint[]")
+    private long[] participantMemberIds = new long[0];
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

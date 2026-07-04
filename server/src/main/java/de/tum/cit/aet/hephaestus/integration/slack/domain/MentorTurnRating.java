@@ -15,6 +15,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Immutable;
 import org.jspecify.annotations.Nullable;
 
@@ -77,6 +78,7 @@ public class MentorTurnRating {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 16)
+    @ColumnDefault("'BUTTON'")
     private RatingSource source;
 
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * Shared, fleet-wide daily draw-down counter for the Slack mentor DM path. One row per UTC day holds the number of
@@ -40,5 +41,6 @@ public class SlackMentorDailyBudget {
 
     /** Mentor turns consumed against the fleet budget on {@link #day} so far. */
     @Column(name = "used", nullable = false)
+    @ColumnDefault("0")
     private int used;
 }

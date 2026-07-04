@@ -13,6 +13,7 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.Nullable;
 
@@ -70,6 +71,7 @@ public class SlackMonitoredChannel {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "consent_state", nullable = false, length = 16)
+    @ColumnDefault("'PENDING'")
     private ConsentState consentState = ConsentState.PENDING;
 
     @Column(name = "consent_announced_at")

@@ -144,8 +144,9 @@ public class FeedbackPlacement {
     /**
      * Typed link to the mentor assistant {@code chat_message} that delivered this placement — set only for a
      * {@code CONVERSATION_TURN} placement (changelog {@code 1782980500800-2}). Kept as a raw scalar (not a
-     * {@code @ManyToOne}) because {@code chat_message} lives in the {@code mentor} module; the DB carries the FK
-     * {@code fk_feedback_placement_chat_message} with {@code ON DELETE SET NULL}, so the placement survives the
+     * {@code @ManyToOne}) because {@code chat_message} lives in the {@code mentor} module; the DB carries the scalar
+     * FK {@code sfk_feedback_placement_chat_message} (ADR 0017 {@code sfk_*} naming, excluded from the JPA-vs-DB
+     * drift gate) with {@code ON DELETE SET NULL}, so the placement survives the
      * message being deleted while the temporal record is preserved. NULL for SUMMARY / INLINE placements.
      */
     @Column(name = "chat_message_id", columnDefinition = "UUID")
