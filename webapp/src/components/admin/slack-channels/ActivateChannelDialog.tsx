@@ -39,6 +39,9 @@ export function ActivateChannelDialog({
 		try {
 			await onConfirm(channel);
 			onOpenChange(false);
+		} catch {
+			// Rejection = keep the dialog open. The mutation's onError already surfaced the
+			// toast, so swallow here rather than let it escape as an unhandled rejection.
 		} finally {
 			setSubmitting(false);
 		}
