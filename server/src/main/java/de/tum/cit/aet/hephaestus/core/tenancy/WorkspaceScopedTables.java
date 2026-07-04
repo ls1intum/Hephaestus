@@ -72,6 +72,9 @@ public class WorkspaceScopedTables {
         // Slack Events API dedup keyed on the raw event_id — workspace-independent (the controller dedups
         // before it resolves the team's workspace); carries no workspace content.
         "slack_event_dedup",
+        // Fleet-wide Slack mentor daily LLM-spend budget counter, keyed by UTC day — a single global budget
+        // across all replicas, not workspace-scoped; carries no workspace content.
+        "slack_mentor_daily_budget",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

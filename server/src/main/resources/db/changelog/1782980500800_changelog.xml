@@ -529,4 +529,28 @@
         <rollback><sql>DROP TABLE IF EXISTS slack_channel_consent_event;</sql></rollback>
     </changeSet>
 
+    <!--
+        Shared-state fleet daily LLM-spend budget for the Slack mentor DM path. The per-user turn cap tolerates
+        per-replica drift, but the daily mentor-cost cap must be ONE budget across the whole fleet: an in-memory
+        counter per pod makes the effective cap N× the budget with N replicas. One row per UTC day holds the turns
+        consumed so far; SlackMentorQuotaGuard advances it atomically via INSERT … ON CONFLICT (day) DO UPDATE …
+        WHERE used < :budget, so concurrent replicas serialize on the row and the combined draw-down is exactly the
+        budget. Workspace-INDEPENDENT by construction (a fleet operational budget, not tenant data) → no workspace_id
+        column, listed in WorkspaceScopedTables.GLOBAL_TABLES, and NOT cascaded by the Slack workspace-purge adapter
+        (it carries no workspace content). Old days' rows are harmless residue never read after their day.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-22">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_mentor_daily_budget already present">
+            <not><tableExists tableName="slack_mentor_daily_budget"/></not>
+        </preConditions>
+        <comment>Fleet-wide Slack mentor daily LLM-spend budget counter, keyed by UTC day.</comment>
+        <sql>
+            CREATE TABLE slack_mentor_daily_budget (
+                day DATE PRIMARY KEY,
+                used INTEGER NOT NULL DEFAULT 0
+            );
+        </sql>
+        <rollback><sql>DROP TABLE IF EXISTS slack_mentor_daily_budget;</sql></rollback>
+    </changeSet>
+
 </databaseChangeLog>

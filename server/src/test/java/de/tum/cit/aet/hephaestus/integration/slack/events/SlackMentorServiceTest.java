@@ -48,6 +48,13 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Mock
     private SlackMentorIdentityResolver identityResolver;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMentorDailyBudgetRepository dailyBudgetRepository;
+
+    private SlackMentorQuotaGuard quotaGuard(int perUserCap) {
+        return new SlackMentorQuotaGuard(dailyBudgetRepository, perUserCap, 1000, Clock.systemUTC());
+    }
+
     private SlackMentorService service(SlackMentorQuotaGuard quotaGuard) {
         return new SlackMentorService(
             workspaceResolver,
@@ -63,7 +70,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Test
     void selfHarmMessage_postsSupportResponse_andNeverMentors() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        SlackMentorService service = service(new SlackMentorQuotaGuard(50, 1000, Clock.systemUTC()));
+        SlackMentorService service = service(quotaGuard(50));
 
         service.handleDm(TEAM, CHANNEL, USER, "I want to kill myself", "100.1");
 
@@ -83,8 +90,12 @@ class SlackMentorServiceTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         when(identityResolver.resolveDeveloperLogin(WORKSPACE, TEAM, USER)).thenReturn(Optional.of("alice"));
         when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, USER, "alice")).thenReturn(UUID.randomUUID());
+        // Shared fleet budget always has room here; the per-user cap of 1 is what caps the second turn.
+        when(
+            dailyBudgetRepository.tryConsume(any(java.time.LocalDate.class), org.mockito.ArgumentMatchers.anyInt())
+        ).thenReturn(1);
 
-        SlackMentorService service = service(new SlackMentorQuotaGuard(1, 1000, Clock.systemUTC()));
+        SlackMentorService service = service(quotaGuard(1));
 
         service.handleDm(TEAM, CHANNEL, USER, "how is my review practice?", "100.1");
         service.handleDm(TEAM, CHANNEL, USER, "and my PR practice?", "100.2");
