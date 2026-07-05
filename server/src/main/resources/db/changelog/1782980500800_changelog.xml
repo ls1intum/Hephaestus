@@ -390,31 +390,6 @@
         <rollback><sql>DROP TABLE IF EXISTS mentor_turn_rating;</sql></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-slack" id="1782980500800-17">
-        <preConditions onFail="MARK_RAN" onFailMessage="slack_event_dedup already present">
-            <not><tableExists tableName="slack_event_dedup"/></not>
-        </preConditions>
-        <comment>
-            Durable, multi-replica dedup for the Slack Events API. Slack redelivers un-acked events, and in a
-            multi-pod deployment two replicas can each receive the same delivery — an in-memory Set on one controller
-            instance cannot suppress that. A row here, written first-writer-wins via INSERT … ON CONFLICT (event_id)
-            DO NOTHING, lets exactly one replica claim an event. Workspace-INDEPENDENT by construction (the controller
-            dedups on the raw event_id before it has resolved the team's workspace) → no workspace_id column, listed
-            in WorkspaceScopedTables.GLOBAL_TABLES, and NOT cascaded by the Slack workspace-purge adapter (it carries
-            no workspace content). expires_at bounds each marker's lifetime; a daily sweep drops expired rows well
-            beyond Slack's retry horizon. The btree index on expires_at keeps that sweep a cheap range delete.
-        </comment>
-        <sql>
-            CREATE TABLE slack_event_dedup (
-                event_id VARCHAR(64) PRIMARY KEY,
-                received_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                expires_at TIMESTAMP WITH TIME ZONE NOT NULL
-            );
-            CREATE INDEX idx_slack_event_dedup_expires_at ON slack_event_dedup (expires_at);
-        </sql>
-        <rollback><sql>DROP TABLE IF EXISTS slack_event_dedup;</sql></rollback>
-    </changeSet>
-
     <!--
         Make CONVERSATION_THREAD a first-class detection artifact at the schema level. The WorkArtifact enum
         already carries CONVERSATION_THREAD, but the observation/feedback artifact_type CHECKs still admit only

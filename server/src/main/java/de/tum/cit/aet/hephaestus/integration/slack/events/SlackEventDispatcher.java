@@ -26,10 +26,10 @@ import tools.jackson.databind.JsonNode;
  * best-effort: a dropped Home render or prompt seed re-fires on the next open, and a saturated pool drops the task
  * (logged) without holding the ACK.
  *
- * <p>Uninstall / token-revocation and channel-message ingest stay synchronous so they commit before the ACK.
- * Channel ingest is only <em>best-effort</em> end-to-end though: {@link SlackEventsController} logs-and-200s a
- * claimed event whose dispatch throws, and Slack does not redeliver after a 200 — so a channel message is not
- * guaranteed at-least-once.
+ * <p>This dispatcher handles only the INTERACTIVE branches. PASSIVE monitored-channel {@code message} events
+ * (plain/edit/delete on a channel or group) are NOT routed here — {@link SlackEventsController} republishes them
+ * onto the durable NATS transport and {@code SlackChannelMessageHandler} persists them off the ACK thread with
+ * at-least-once semantics. Uninstall / token-revocation stays synchronous so it commits before the ACK.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -38,7 +38,6 @@ public class SlackEventDispatcher {
     private static final Logger log = LoggerFactory.getLogger(SlackEventDispatcher.class);
 
     private final SlackMentorService mentorService;
-    private final SlackIngestService ingestService;
     private final SlackOnboardingService onboardingService;
     private final SlackAppHomeService appHomeService;
     private final SlackAssistantEventHandler assistantEventHandler;
@@ -48,7 +47,6 @@ public class SlackEventDispatcher {
 
     public SlackEventDispatcher(
         SlackMentorService mentorService,
-        SlackIngestService ingestService,
         SlackOnboardingService onboardingService,
         SlackAppHomeService appHomeService,
         SlackAssistantEventHandler assistantEventHandler,
@@ -57,7 +55,6 @@ public class SlackEventDispatcher {
         @Qualifier("slackHomeExecutor") Executor homeExecutor
     ) {
         this.mentorService = mentorService;
-        this.ingestService = ingestService;
         this.onboardingService = onboardingService;
         this.appHomeService = appHomeService;
         this.assistantEventHandler = assistantEventHandler;
@@ -109,39 +106,19 @@ public class SlackEventDispatcher {
         if (!"message".equals(eventType)) {
             return;
         }
-        // Edits/deletes arrive as message SUBTYPES, so they MUST be routed before the subtype early-return below
-        // (which otherwise drops every subtyped message). Slack carries the changed/deleted payload nested under
-        // event.message / event.previous_message, so the outer bot_id guard does not apply to these — a bot-authored
-        // message we never stored simply no-ops the scoped UPDATE.
+        // Passive monitored-channel messages (channel/group, including message_changed/message_deleted subtypes)
+        // never reach the dispatcher — SlackEventsController publishes them to the durable transport before this
+        // runs. Only the interactive DM (im) mentor turn is handled here. A subtyped or bot-authored message with
+        // no im mentor semantics is dropped.
         String subtype = event.path("subtype").asString("");
-        String channelId = event.path("channel").asString("");
-        if ("message_deleted".equals(subtype)) {
-            // Tombstone keys on the DELETED message's ts (deleted_ts, fallback previous_message.ts), never event.ts.
-            String deletedTs = event
-                .path("deleted_ts")
-                .asString(event.path("previous_message").path("ts").asString(""));
-            ingestService.tombstoneMessage(teamId, channelId, deletedTs);
-            return;
-        }
-        if ("message_changed".equals(subtype)) {
-            JsonNode changed = event.path("message");
-            ingestService.editMessage(
-                teamId,
-                channelId,
-                changed.path("ts").asString(""),
-                changed.path("text").asString("")
-            );
-            return;
-        }
-        // Never react to our own bot's messages, or to any other subtype (joins, channel_topic, thread_broadcast…).
         if (event.has("bot_id") || !subtype.isEmpty()) {
             return;
         }
         String channelType = event.path("channel_type").asString("");
-        String slackUserId = event.path("user").asString("");
-        String text = event.path("text").asString("");
-
         if ("im".equals(channelType)) {
+            String channelId = event.path("channel").asString("");
+            String slackUserId = event.path("user").asString("");
+            String text = event.path("text").asString("");
             // A DM mentor turn makes a remote Slack call (setStatus + any canned reply) before the turn runs, so
             // run it off the ACK thread — the 200 must return inside Slack's 3s window. Best-effort: a crash before
             // completion loses at most one mentor reply, which the member can re-request.
@@ -150,15 +127,6 @@ public class SlackEventDispatcher {
                 mentorDmExecutor,
                 () -> mentorService.handleDm(teamId, channelId, slackUserId, text, messageTs),
                 "mentor DM"
-            );
-        } else if ("channel".equals(channelType) || "group".equals(channelType)) {
-            ingestService.ingestChannelMessage(
-                teamId,
-                channelId,
-                event.path("ts").asString(""),
-                event.path("thread_ts").asString(null),
-                slackUserId,
-                text
             );
         }
     }

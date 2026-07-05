@@ -49,14 +49,18 @@ import org.jspecify.annotations.Nullable;
 public final class ConsumerSubjectMath {
 
     /**
-     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack is
-     * messaging-only (no stream) and is deliberately absent.
+     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack joined the
+     * list once its monitored-channel {@code message} events were routed through the durable
+     * transport ({@code slack.<team>.<channel>.message}); its interactive paths (DM mentor,
+     * buttons, App Home) still stay in-process and carry no subject.
      */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
         "github",
         IntegrationKind.GITHUB,
         "gitlab",
-        IntegrationKind.GITLAB
+        IntegrationKind.GITLAB,
+        "slack",
+        IntegrationKind.SLACK
     );
 
     private ConsumerSubjectMath() {
@@ -170,9 +174,8 @@ public final class ConsumerSubjectMath {
      * (GitHub → {@code "github"}, GitLab → {@code "gitlab"}); kinds without a stream return
      * {@link Optional#empty()} so callers can short-circuit without exceptions on the path.
      *
-     * <p>Messaging kinds (Slack) do not have JetStream subscriptions in
-     * this slice — their events flow through other channels. The empty return is the signal
-     * to skip, not an error.
+     * <p>Slack maps to the {@code "slack"} stream (monitored-channel {@code message} ingest).
+     * A null kind returns {@link Optional#empty()} so callers can short-circuit on the path.
      */
     public static Optional<String> streamNameFor(@Nullable IntegrationKind kind) {
         if (kind == null) {
@@ -181,7 +184,7 @@ public final class ConsumerSubjectMath {
         return switch (kind) {
             case GITHUB -> Optional.of("github");
             case GITLAB -> Optional.of("gitlab");
-            case SLACK -> Optional.empty();
+            case SLACK -> Optional.of("slack");
         };
     }
 
@@ -225,5 +228,34 @@ public final class ConsumerSubjectMath {
             throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
         }
         return baseConsumerName + "-installation";
+    }
+
+    /**
+     * Builds the durable consumer name for a fleet-wide flat-stream consumer:
+     * {@code <base>-<stream>}. A flat-stream kind is not repository-scoped, so a single
+     * fleet-wide consumer subscribes to {@link #flatStreamSubjectFilter(IntegrationKind)} and
+     * resolves the tenant inside the handler (mirroring the installation-wide consumer's shape;
+     * today only the messaging kinds, e.g. Slack).
+     */
+    public static String flatStreamConsumerName(String baseConsumerName, IntegrationKind kind) {
+        if (baseConsumerName == null || baseConsumerName.isBlank()) {
+            throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
+        }
+        return baseConsumerName + "-" + resolveStream(kind);
+    }
+
+    /**
+     * Wildcard subject filter matching every event on a flat-stream kind's stream
+     * ({@code <stream>.>}). One fleet-wide filter — a flat-stream kind has no per-scope
+     * repository fan-out (today only the messaging kinds, e.g. Slack).
+     */
+    public static String flatStreamSubjectFilter(IntegrationKind kind) {
+        return resolveStream(kind) + ".>";
+    }
+
+    private static String resolveStream(IntegrationKind kind) {
+        return streamNameFor(kind).orElseThrow(() ->
+            new IllegalArgumentException("No NATS stream resolved for kind=" + kind)
+        );
     }
 }

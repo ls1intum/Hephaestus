@@ -578,11 +578,10 @@ hephaestus:
                 # firewall, and is forward-only (never pre-announcement history). Nothing is read until a channel
                 # is deliberately activated. Set to false to hard-disable the whole subsystem fleet-wide.
                 enabled: ${HEPHAESTUS_INTEGRATION_SLACK_CONVERSATION_INGEST_ENABLED:true}
-            # S9 adversarial-safety hardening.
-            dedup:
-                # How long a durable Slack event_id dedup marker is retained before the daily sweep prunes it.
-                # Generous relative to Slack's retry horizon so a pruned row can never resurrect a duplicate.
-                ttl: ${HEPHAESTUS_INTEGRATION_SLACK_DEDUP_TTL:PT48H}
+                # Durable channel-message ingest now rides the core NATS/JetStream framework (subject
+                # slack.<team>.<channel>.message, Nats-Msg-Id = slack-<event_id>). It therefore requires
+                # hephaestus.sync.nats.enabled=true; with NATS off the events endpoint replies 503 on the channel
+                # branch so Slack redelivers (never a silent drop). The mentor DM path stays in-process and needs no NATS.
             mentor:
                 # Per-user cap on mentor DM turns per (UTC) day — a friendly message is sent over-cap, never an error.
                 turns-per-user-per-day: ${HEPHAESTUS_INTEGRATION_SLACK_MENTOR_TURNS_PER_USER_PER_DAY:50}

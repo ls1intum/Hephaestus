@@ -78,6 +78,15 @@ public class IntegrationNatsConsumer {
      */
     private static final IntegrationKind INSTALLATION_AWARE_KIND = IntegrationKind.GITHUB;
 
+    /**
+     * Kind whose stream backs the fleet-wide flat (non-repository-scoped) consumer. Today only
+     * the messaging kind (Slack) publishes to a flat {@code <stream>.>} subject space; we go
+     * through {@link ConsumerSubjectMath#streamNameFor} so the field name and wiring stay
+     * vendor-neutral while the singular supported value stays explicit (mirrors
+     * {@link #INSTALLATION_AWARE_KIND}). New flat-stream vendors will need a sibling consumer.
+     */
+    private static final IntegrationKind FLAT_STREAM_KIND = IntegrationKind.SLACK;
+
     /** NATS client connection timeout — keep short; reconnect handles long outages. */
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(10);
 
@@ -105,6 +114,14 @@ public class IntegrationNatsConsumer {
     /** Installation consumer — single-instance, mutable across restarts. */
     private volatile ScopeConsumer installationConsumer;
 
+    /**
+     * Fleet-wide flat-stream consumer — single-instance, subscribes to {@code <stream>.>} for
+     * {@link #FLAT_STREAM_KIND}. Flat-stream subjects are not repository-scoped, so (like the
+     * installation consumer) one consumer resolves the tenant inside its handler. Null unless the
+     * flat-stream kind is enabled.
+     */
+    private volatile ScopeConsumer flatStreamConsumer;
+
     /** Virtual-thread executor for scope setup and installation kicks. */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -117,13 +134,24 @@ public class IntegrationNatsConsumer {
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
 
+    /**
+     * Whether the fleet-wide flat-stream consumer should be started. Gated on
+     * {@code hephaestus.integration.slack.enabled} (the only flat-stream kind today) so
+     * deployments without it never create a consumer on the flat stream (which they also never
+     * bootstrap).
+     */
+    private final boolean flatStreamConsumerEnabled;
+
     public IntegrationNatsConsumer(
         NatsConnectionProperties connectionProperties,
         NatsConsumerProperties consumerProperties,
         NatsSubscriptionProvider subscriptionProvider,
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats
+        IntegrationConsumerStats stats,
+        @org.springframework.beans.factory.annotation.Value(
+            "${hephaestus.integration.slack.enabled:false}"
+        ) boolean flatStreamConsumerEnabled
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
@@ -131,6 +159,7 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
+        this.flatStreamConsumerEnabled = flatStreamConsumerEnabled;
     }
 
     // Lifecycle
@@ -179,6 +208,16 @@ public class IntegrationNatsConsumer {
                 log.error("Failed to start installation consumer", e);
             }
         });
+        if (flatStreamConsumerEnabled) {
+            virtualThreadExecutor.submit(() -> {
+                try {
+                    ensureNatsConnectionEstablished();
+                    setupFlatStreamConsumer();
+                } catch (Exception e) {
+                    log.error("Failed to start flat-stream consumer", e);
+                }
+            });
+        }
     }
 
     @PreDestroy
@@ -210,6 +249,16 @@ public class IntegrationNatsConsumer {
             }
             installationConsumer = null;
             stats.setInstallationConsumerActive(false);
+        }
+
+        ScopeConsumer flatStream = flatStreamConsumer;
+        if (flatStream != null) {
+            try {
+                flatStream.stop();
+            } catch (Exception e) {
+                log.debug("Failed to stop flat-stream consumer", e);
+            }
+            flatStreamConsumer = null;
         }
 
         virtualThreadExecutor.shutdown();
@@ -399,6 +448,37 @@ public class IntegrationNatsConsumer {
             log.info("Started installation consumer: consumerName={}", consumerName);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to set up installation consumer", e);
+        }
+    }
+
+    private void setupFlatStreamConsumer() throws IOException {
+        String streamName = ConsumerSubjectMath.streamNameFor(FLAT_STREAM_KIND).orElseThrow(() ->
+            new IllegalStateException("No NATS stream resolved for flat-stream kind=" + FLAT_STREAM_KIND)
+        );
+        String[] subjects = new String[] { ConsumerSubjectMath.flatStreamSubjectFilter(FLAT_STREAM_KIND) };
+        String consumerName = ConsumerSubjectMath.flatStreamConsumerName(durableBaseName(), FLAT_STREAM_KIND);
+
+        try {
+            JetStreamOptions jsOptions = JetStreamOptions.builder()
+                .requestTimeout(connectionProperties.consumer().requestTimeout())
+                .build();
+            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
+            ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
+
+            ScopeConsumer flatStream = new ScopeConsumer(
+                null,
+                consumerName,
+                streamName,
+                consumerContext,
+                streamContext,
+                subjects,
+                this::handleMessage
+            );
+            flatStream.start();
+            flatStreamConsumer = flatStream;
+            log.info("Started flat-stream consumer: consumerName={}", consumerName);
+        } catch (JetStreamApiException e) {
+            throw new IOException("Failed to set up flat-stream consumer", e);
         }
     }
 

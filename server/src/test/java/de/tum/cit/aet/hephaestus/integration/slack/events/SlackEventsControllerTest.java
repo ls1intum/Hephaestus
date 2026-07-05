@@ -3,12 +3,14 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
+import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackChannelEventPublisher;
+import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackChannelEventPublisher.PublishOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -17,14 +19,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Event-routing unit tests. The signature verifier is mocked to pass, so these lock the dispatch of the
- * {@code message} subtypes — in particular that {@code message_deleted}/{@code message_changed} are routed to the
- * tombstone/edit path BEFORE the subtype early-return that drops every other subtyped message, and key on the
- * deleted/changed message's own ts (not the event ts).
+ * Controller-level classification tests. The signature verifier is mocked to pass. The controller's job now is a
+ * thin verify → fast-classify: a monitored-channel message goes to {@link SlackChannelEventPublisher} (durable
+ * transport) while every interactive event flows in-process through {@link SlackEventDispatcher}. The
+ * channel-message SUBTYPE routing (edit/delete/plain) moved to {@code SlackChannelMessageHandler} and is tested
+ * there.
  */
 class SlackEventsControllerTest extends BaseUnitTest {
 
@@ -33,9 +37,6 @@ class SlackEventsControllerTest extends BaseUnitTest {
 
     @Mock
     private SlackMentorService mentorService;
-
-    @Mock
-    private SlackIngestService ingestService;
 
     @Mock
     private SlackOnboardingService onboardingService;
@@ -47,22 +48,20 @@ class SlackEventsControllerTest extends BaseUnitTest {
     private SlackAssistantEventHandler assistantEventHandler;
 
     @Mock
-    private SlackEventDedupService dedupService;
+    private SlackUninstallService uninstallService;
 
     @Mock
-    private SlackUninstallService uninstallService;
+    private SlackChannelEventPublisher channelEventPublisher;
 
     private SlackEventsController controller;
 
     @BeforeEach
     void setUp() {
-        // Real dispatcher over the mocked handlers so the HTTP path still exercises end-to-end event routing;
-        // the controller itself is now a thin signature-verify + dedup + ACK entry point.
-        // Same-thread executor so the existing routing assertions can verify handleDm synchronously; the
-        // ack-before-work ordering is proven separately with a capturing executor.
+        // Real dispatcher over the mocked interactive handlers; same-thread executors so routing asserts run
+        // synchronously. The publisher is mocked; default NOT_CHANNEL_MESSAGE routes everything to the dispatcher,
+        // and individual tests override it for the channel-message path.
         SlackEventDispatcher dispatcher = new SlackEventDispatcher(
             mentorService,
-            ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
@@ -70,8 +69,16 @@ class SlackEventsControllerTest extends BaseUnitTest {
             Runnable::run,
             Runnable::run
         );
-        controller = new SlackEventsController(verifier, dispatcher, dedupService, JsonMapper.builder().build());
+        controller = new SlackEventsController(
+            verifier,
+            dispatcher,
+            channelEventPublisher,
+            JsonMapper.builder().build()
+        );
         when(verifier.verify(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+        lenient()
+            .when(channelEventPublisher.publishIfChannelMessage(any(), any()))
+            .thenReturn(PublishOutcome.NOT_CHANNEL_MESSAGE);
     }
 
     private ResponseEntity<String> post(String body) {
@@ -82,15 +89,49 @@ class SlackEventsControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void channelMessage_isIngested() {
-        post(
+    void channelMessage_isPublishedToDurableTransport_notDispatchedInProcess() {
+        when(channelEventPublisher.publishIfChannelMessage(any(), any())).thenReturn(PublishOutcome.PUBLISHED);
+
+        ResponseEntity<String> res = post(
             """
             {"type":"event_callback","team_id":"T1","event":{
               "type":"message","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1","thread_ts":"100.0","text":"hello"}}
             """
         );
 
-        verify(ingestService).ingestChannelMessage("T1", "C1", "100.1", "100.0", "U1", "hello");
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        // Passive channel content never touches the in-process interactive handlers.
+        verifyNoInteractions(mentorService);
+    }
+
+    @Test
+    void channelMessage_whenPublisherUnavailable_returns503_soSlackRedelivers() {
+        when(channelEventPublisher.publishIfChannelMessage(any(), any())).thenReturn(
+            PublishOutcome.PUBLISHER_UNAVAILABLE
+        );
+
+        ResponseEntity<String> res = post(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1","text":"hello"}}
+            """
+        );
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void channelMessage_whenPublishFailed_returns503_soSlackRedelivers() {
+        when(channelEventPublisher.publishIfChannelMessage(any(), any())).thenReturn(PublishOutcome.PUBLISH_FAILED);
+
+        ResponseEntity<String> res = post(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1","text":"hello"}}
+            """
+        );
+
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     @Test
@@ -99,7 +140,6 @@ class SlackEventsControllerTest extends BaseUnitTest {
         List<Runnable> queued = new ArrayList<>();
         SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
             mentorService,
-            ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
@@ -110,7 +150,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
         SlackEventsController asyncController = new SlackEventsController(
             verifier,
             asyncDispatcher,
-            dedupService,
+            channelEventPublisher,
             JsonMapper.builder().build()
         );
 
@@ -137,13 +177,9 @@ class SlackEventsControllerTest extends BaseUnitTest {
 
     @Test
     void appHomeOpened_isOffloaded_soNoSlackApiCallPrecedesThe200() {
-        // App Home publishes go through the rate-limit-honoring path (up to 30s Retry-After budget); running them
-        // on the ACK thread would blow Slack's 3s window. A capturing executor proves they are queued, not run,
-        // before the 200 — then draining it runs both the Home render and the onboarding CTA.
         List<Runnable> queued = new ArrayList<>();
         SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
             mentorService,
-            ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
@@ -154,7 +190,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
         SlackEventsController asyncController = new SlackEventsController(
             verifier,
             asyncDispatcher,
-            dedupService,
+            channelEventPublisher,
             JsonMapper.builder().build()
         );
         HttpHeaders headers = new HttpHeaders();
@@ -183,7 +219,6 @@ class SlackEventsControllerTest extends BaseUnitTest {
         List<Runnable> queued = new ArrayList<>();
         SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
             mentorService,
-            ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
@@ -194,7 +229,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
         SlackEventsController asyncController = new SlackEventsController(
             verifier,
             asyncDispatcher,
-            dedupService,
+            channelEventPublisher,
             JsonMapper.builder().build()
         );
         HttpHeaders headers = new HttpHeaders();
@@ -219,11 +254,9 @@ class SlackEventsControllerTest extends BaseUnitTest {
 
     @Test
     void appHomeOpened_onMessagesTab_isIgnored() {
-        // The Messages-tab open fires the same event with tab=messages and must NOT re-render or offload anything.
         List<Runnable> queued = new ArrayList<>();
         SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
             mentorService,
-            ingestService,
             onboardingService,
             appHomeService,
             assistantEventHandler,
@@ -234,7 +267,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
         SlackEventsController asyncController = new SlackEventsController(
             verifier,
             asyncDispatcher,
-            dedupService,
+            channelEventPublisher,
             JsonMapper.builder().build()
         );
         HttpHeaders headers = new HttpHeaders();
@@ -263,58 +296,6 @@ class SlackEventsControllerTest extends BaseUnitTest {
         );
 
         verify(mentorService).handleDm("T1", "D9", "U1", "hi heph", "100.1");
-        verify(ingestService, never()).ingestChannelMessage(any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void messageDeleted_tombstonesOnDeletedTs_notEventTs() {
-        ResponseEntity<String> res = post(
-            """
-            {"type":"event_callback","team_id":"T1","event":{
-              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
-            """
-        );
-
-        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
-        verify(ingestService).tombstoneMessage("T1", "C1", "100.1");
-        verify(ingestService, never()).ingestChannelMessage(any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void messageDeleted_fallsBackToPreviousMessageTs() {
-        post(
-            """
-            {"type":"event_callback","team_id":"T1","event":{
-              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","previous_message":{"ts":"150.2"}}}
-            """
-        );
-
-        verify(ingestService).tombstoneMessage("T1", "C1", "150.2");
-    }
-
-    @Test
-    void messageChanged_editsFromNestedMessage() {
-        post(
-            """
-            {"type":"event_callback","team_id":"T1","event":{
-              "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
-              "message":{"ts":"100.1","text":"edited body"}}}
-            """
-        );
-
-        verify(ingestService).editMessage("T1", "C1", "100.1", "edited body");
-    }
-
-    @Test
-    void otherSubtype_isDropped() {
-        post(
-            """
-            {"type":"event_callback","team_id":"T1","event":{
-              "type":"message","subtype":"channel_join","channel":"C1","user":"U1","ts":"100.1","text":"joined"}}
-            """
-        );
-
-        verifyNoInteractions(ingestService, mentorService);
     }
 
     @Test
@@ -322,35 +303,6 @@ class SlackEventsControllerTest extends BaseUnitTest {
         ResponseEntity<String> res = post("{\"type\":\"url_verification\",\"challenge\":\"abc123\"}");
 
         assertThat(res.getBody()).isEqualTo("abc123");
-    }
-
-    @Test
-    void duplicateEvent_isDroppedWhenDedupClaimFails() {
-        when(dedupService.claim("Ev123")).thenReturn(false);
-
-        ResponseEntity<String> res = post(
-            """
-            {"type":"event_callback","event_id":"Ev123","team_id":"T1","event":{
-              "type":"message","channel_type":"im","channel":"D9","user":"U1","ts":"100.1","text":"hi heph"}}
-            """
-        );
-
-        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
-        verifyNoInteractions(mentorService, ingestService);
-    }
-
-    @Test
-    void firstDeliveryOfEvent_isProcessedWhenDedupClaimSucceeds() {
-        when(dedupService.claim("Ev123")).thenReturn(true);
-
-        post(
-            """
-            {"type":"event_callback","event_id":"Ev123","team_id":"T1","event":{
-              "type":"message","channel_type":"im","channel":"D9","user":"U1","ts":"100.1","text":"hi heph"}}
-            """
-        );
-
-        verify(mentorService).handleDm("T1", "D9", "U1", "hi heph", "100.1");
     }
 
     @Test
@@ -362,7 +314,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
         );
 
         verify(uninstallService).onUninstall("T1", "app_uninstalled");
-        verifyNoInteractions(mentorService, ingestService);
+        verifyNoInteractions(mentorService);
     }
 
     @Test

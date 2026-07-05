@@ -13,14 +13,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Rejects oversized webhook POSTs before Spring buffers the body. Tomcat's
+ * Rejects oversized inbound POSTs before Spring buffers the body. Tomcat's
  * {@code max-http-post-size} only enforces on form bodies, so JSON webhooks would
  * otherwise be unconstrained. Missing {@code Content-Length} is rejected with 411.
- * Bound to {@code /webhooks/<kind>}.
+ *
+ * <p>Prefix-aware over the public, unauthenticated ingest surfaces: {@code /webhooks/<kind>}
+ * (GitHub/GitLab HMAC receiver) and {@code /slack/*} (the Slack Events endpoint, which reads an
+ * unauthenticated {@code @RequestBody byte[]} before its v0 HMAC check). The Slack tunnel is on
+ * the same {@code HIGHEST_PRECEDENCE} guard so it cannot buffer an unbounded body before
+ * verification. Any other URI falls through untouched.
  */
 public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 
     private static final String UNIFIED_WEBHOOK_PREFIX = "/webhooks/";
+    private static final String SLACK_PREFIX = "/slack/";
+    private static final String[] GUARDED_PREFIXES = { UNIFIED_WEBHOOK_PREFIX, SLACK_PREFIX };
 
     private final long maxPayloadBytes;
     private final MeterRegistry meterRegistry;
@@ -36,7 +43,16 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
-        return !request.getRequestURI().startsWith(UNIFIED_WEBHOOK_PREFIX);
+        return !isGuardedUri(request.getRequestURI());
+    }
+
+    private static boolean isGuardedUri(String uri) {
+        for (String prefix : GUARDED_PREFIXES) {
+            if (uri.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -58,7 +74,11 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
     }
 
     private static String providerTag(String uri) {
-        // Filter only binds to /webhooks/*, so the prefix is guaranteed here.
+        // The filter only runs for guarded prefixes (see shouldNotFilter). /webhooks/<kind> tags on <kind>;
+        // /slack/<...> tags "slack" so the rejection counter stays a stable, low-cardinality provider label.
+        if (uri.startsWith(SLACK_PREFIX)) {
+            return "slack";
+        }
         String tail = uri.substring(UNIFIED_WEBHOOK_PREFIX.length());
         int slash = tail.indexOf('/');
         return slash >= 0 ? tail.substring(0, slash) : tail;

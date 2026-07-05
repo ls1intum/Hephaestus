@@ -118,7 +118,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
         "LoginProvider", // Instance-scoped OAuth login provider (sign-in option); not workspace-scoped
         "WorkerRegistry", // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
-        "SlackEventDedup", // Slack Events API dedup keyed on the raw event_id; workspace-independent
         "SlackMentorDailyBudget" // Fleet-wide Slack mentor daily LLM-spend budget counter; workspace-independent
     );
 

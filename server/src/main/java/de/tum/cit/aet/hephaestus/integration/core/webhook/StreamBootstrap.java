@@ -22,14 +22,16 @@ import org.slf4j.LoggerFactory;
  *       Operators handle drift explicitly via {@code nats stream edit}.</li>
  * </ul>
  *
- * <p>Streams are created only for kinds that flow over NATS. {@code IntegrationKindRouting.ROUTES}
- * is a superset: it also carries {@code slack}, which is routed for the OAuth callback only and has
- * no publisher or consumer on any NATS subject, so it gets no stream here.
+ * <p>Streams are created only for kinds that flow over NATS: {@code github} and {@code gitlab}
+ * (HMAC webhook receiver) and {@code slack} (monitored-channel {@code message} ingest, published
+ * by {@code SlackChannelEventPublisher} and consumed by the {@code IntegrationNatsConsumer} slack
+ * consumer). Slack's interactive paths (DM mentor, buttons, App Home) stay in-process and have no
+ * subject.
  */
 public class StreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(StreamBootstrap.class);
-    private static final String[] STREAMS = { "gitlab", "github" };
+    private static final String[] STREAMS = { "gitlab", "github", "slack" };
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;

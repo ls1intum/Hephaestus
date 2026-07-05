@@ -109,6 +109,37 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     }
 
     @Test
+    void rejectsOversizedSlackEventsPostWith413() throws Exception {
+        // The Slack events endpoint is outside /webhooks/ but reads an unauthenticated byte[] body before its HMAC
+        // check, so the same HIGHEST_PRECEDENCE guard must cap it (tagged provider=slack).
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/slack/events");
+        request.setContentType("application/json");
+        request.setContent(new byte[2048]);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+        verify(chain, never()).doFilter(request, response);
+        assertCounter("slack", "payload-too-large", 1);
+    }
+
+    @Test
+    void allowsSlackEventsBodyAtMaxSize() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/slack/events");
+        request.setContentType("application/json");
+        request.setContent(new byte[(int) MAX]);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+        verify(chain, times(1)).doFilter(request, response);
+    }
+
+    @Test
     void bypassesNonWebhookPaths() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/some-other-endpoint");
         MockHttpServletResponse response = new MockHttpServletResponse();
