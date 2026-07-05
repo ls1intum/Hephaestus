@@ -109,6 +109,7 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITLAB)).contains("gitlab");
             // Slack maps to the "slack" stream (monitored-channel message ingest).
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).contains("slack");
+            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.OUTLINE)).contains("outline");
         }
 
         @Test
@@ -116,6 +117,29 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
             // Returning Optional.empty() (rather than throwing) lets callers short-circuit without a
             // surrounding try/catch on the hot path.
             assertThat(ConsumerSubjectMath.streamNameFor(null)).isEmpty();
+        }
+    }
+
+    @Nested
+    class SubscriptionFilter {
+
+        @Test
+        void wrapsSubscriptionIdInAWildcardFilter() {
+            assertThat(ConsumerSubjectMath.subscriptionFilter("outline", "sub-abc")).isEqualTo("outline.sub-abc.>");
+        }
+
+        @Test
+        void rejectsBlankSubscriptionId() {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                ConsumerSubjectMath.subscriptionFilter("outline", "  ")
+            ).isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void outlinePrefixResolvesToKind() {
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("outline.sub.documents~update")).contains(
+                IntegrationKind.OUTLINE
+            );
         }
     }
 

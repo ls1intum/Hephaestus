@@ -204,7 +204,29 @@ public class ConnectionAdminService {
                 /* retentionDays */ null,
                 enabledStreams
             );
+            case OUTLINE -> new ConnectionConfig.OutlineConfig(
+                userInput.getOrDefault("server_url", null),
+                parseCsv(userInput.get("collection_allow_list")),
+                /* webhookSubscriptionId */ null,
+                /* webhookSecret */ null,
+                enabledStreams
+            );
         };
+    }
+
+    /** Parses a comma-separated list into a trimmed, non-blank set (empty when absent). */
+    private static Set<String> parseCsv(@Nullable String raw) {
+        Set<String> values = new HashSet<>();
+        if (raw == null || raw.isBlank()) {
+            return values;
+        }
+        for (String part : raw.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                values.add(trimmed);
+            }
+        }
+        return values;
     }
 
     private static @Nullable Long parseGroupId(@Nullable String instanceKey) {

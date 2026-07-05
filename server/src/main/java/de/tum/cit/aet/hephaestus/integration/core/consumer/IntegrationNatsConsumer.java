@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHand
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
+import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -23,8 +24,11 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -102,8 +106,12 @@ public class IntegrationNatsConsumer {
     private final Object connectionLock = new Object();
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    /** One JetStream {@link ScopeConsumer} per scope ID. */
-    private final Map<Long, ScopeConsumer> scopeConsumers = new ConcurrentHashMap<>();
+    /**
+     * JetStream consumers per scope ID. A scope may bind to more than one stream (an SCM stream plus
+     * the {@code outline} stream), so each scope maps to a list of {@link ScopeConsumer}s — one per
+     * (scope, stream) with a stream-suffixed durable name so SCM and Outline durables never collide.
+     */
+    private final Map<Long, List<ScopeConsumer>> scopeConsumers = new ConcurrentHashMap<>();
 
     /**
      * Atomic placeholder set guarding against duplicate setup. Holding the scope ID
@@ -229,10 +237,12 @@ public class IntegrationNatsConsumer {
         log.info("Shutting down integration NATS consumer fleet");
 
         for (var entry : scopeConsumers.entrySet()) {
-            try {
-                entry.getValue().stop();
-            } catch (Exception e) {
-                log.debug("Failed to stop scope consumer: scopeId={}", entry.getKey(), e);
+            for (ScopeConsumer consumer : entry.getValue()) {
+                try {
+                    consumer.stop();
+                } catch (Exception e) {
+                    log.debug("Failed to stop scope consumer: scopeId={}", entry.getKey(), e);
+                }
             }
         }
         scopeConsumers.clear();
@@ -304,7 +314,7 @@ public class IntegrationNatsConsumer {
         virtualThreadExecutor.submit(() -> {
             try {
                 ensureNatsConnectionEstablished();
-                setupScopeConsumer(scopeId);
+                reconcileScope(scopeId);
             } catch (Exception e) {
                 log.error("Failed to start scope consumer: scopeId={}", scopeId, e);
             } finally {
@@ -314,29 +324,22 @@ public class IntegrationNatsConsumer {
     }
 
     /**
-     * Update the filter subjects on an already-running scope consumer. No-op if no
-     * consumer exists yet for the scope — scope startup will pick up the latest
-     * subscription info when {@link #startConsumingScope(Long)} fires.
+     * Reconcile the filter subjects of an already-running scope. No-op if the scope has no consumers
+     * yet — scope startup picks up the latest subscription info when {@link #startConsumingScope(Long)}
+     * fires. When a scope gains a stream (e.g. Outline is connected after boot) the reconcile creates
+     * the additional consumer; when it loses one the reconcile tears that consumer down.
      */
     public void updateScopeConsumer(Long scopeId) {
         if (!connectionProperties.enabled() || shuttingDown.get() || scopeId == null) {
             return;
         }
-        ScopeConsumer existing = scopeConsumers.get(scopeId);
-        if (existing == null) {
+        if (!scopeConsumers.containsKey(scopeId)) {
             log.debug("Skipped consumer update: reason=notRunning, scopeId={}", scopeId);
             return;
         }
         virtualThreadExecutor.submit(() -> {
             try {
-                Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
-                if (infoOpt.isEmpty()) {
-                    log.warn("No subscription info available during update: scopeId={}", scopeId);
-                    return;
-                }
-                String[] newSubjects = buildScopeSubjects(infoOpt.get());
-                existing.updateSubjects(newSubjects);
-                log.info("Updated scope consumer subjects: scopeId={}, subjectCount={}", scopeId, newSubjects.length);
+                reconcileScope(scopeId);
             } catch (Exception e) {
                 log.error("Failed to update scope consumer: scopeId={}", scopeId, e);
             }
@@ -344,48 +347,85 @@ public class IntegrationNatsConsumer {
     }
 
     /**
-     * Stop and delete the JetStream consumer for the given scope. After this returns,
-     * the server-side durable is gone — a subsequent {@link #startConsumingScope(Long)}
-     * will create a fresh one.
+     * Stop and delete every JetStream consumer for the given scope. After this returns, the
+     * server-side durables are gone — a subsequent {@link #startConsumingScope(Long)} recreates them.
      */
     public void stopConsumingScope(Long scopeId) {
         if (scopeId == null) {
             return;
         }
-        ScopeConsumer consumer = scopeConsumers.remove(scopeId);
-        if (consumer == null) {
+        List<ScopeConsumer> consumers = scopeConsumers.remove(scopeId);
+        if (consumers == null || consumers.isEmpty()) {
             log.debug("No scope consumer to stop: scopeId={}", scopeId);
             return;
         }
-        stats.setActiveScopeConsumerCount(scopeConsumers.size());
+        stats.setActiveScopeConsumerCount(totalConsumerCount());
         virtualThreadExecutor.submit(() -> {
-            try {
-                consumer.stop();
-                cleanupConsumer(consumer.streamName(), consumer.consumerName());
-                log.info("Stopped scope consumer: scopeId={}", scopeId);
-            } catch (Exception e) {
-                log.error("Failed to stop scope consumer: scopeId={}", scopeId, e);
+            for (ScopeConsumer consumer : consumers) {
+                stopAndCleanup(consumer);
             }
+            log.info("Stopped scope consumers: scopeId={}, count={}", scopeId, consumers.size());
         });
     }
 
     // JetStream setup
 
-    private void setupScopeConsumer(Long scopeId) throws IOException {
+    /**
+     * Bring the scope's set of JetStream consumers in line with its current subscription info: one
+     * consumer per (scope, stream), keyed by stream name with a stream-suffixed durable so SCM and
+     * Outline durables never collide. Existing consumers whose stream is still desired are updated
+     * in place; new streams create a fresh consumer; streams no longer desired are torn down.
+     */
+    private void reconcileScope(Long scopeId) throws IOException {
         Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
         if (infoOpt.isEmpty()) {
             log.warn("No subscription info available: scopeId={}", scopeId);
             return;
         }
-        NatsSubscriptionInfo info = infoOpt.get();
-        String[] subjects = buildScopeSubjects(info);
-        if (subjects.length == 0) {
-            log.info("Skipped scope consumer setup (no subjects): scopeId={}", scopeId);
-            return;
+        Map<String, StreamSubscription> desired = new LinkedHashMap<>();
+        for (StreamSubscription sub : infoOpt.get().streamSubscriptions()) {
+            if (!sub.subjects().isEmpty()) {
+                desired.put(sub.streamName(), sub);
+            }
         }
-        String streamName = info.natsStreamName();
-        String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId);
 
+        List<ScopeConsumer> current = scopeConsumers.getOrDefault(scopeId, List.of());
+        List<ScopeConsumer> next = new ArrayList<>();
+        Set<String> kept = new HashSet<>();
+        for (ScopeConsumer existing : current) {
+            StreamSubscription want = desired.get(existing.streamName());
+            if (want == null) {
+                stopAndCleanup(existing);
+                continue;
+            }
+            try {
+                existing.updateSubjects(want.subjects().toArray(String[]::new));
+            } catch (JetStreamApiException e) {
+                throw new IOException("Failed to update scope consumer for scopeId=" + scopeId, e);
+            }
+            next.add(existing);
+            kept.add(existing.streamName());
+        }
+        for (StreamSubscription want : desired.values()) {
+            if (!kept.contains(want.streamName())) {
+                next.add(createScopeConsumer(scopeId, want));
+            }
+        }
+
+        if (next.isEmpty()) {
+            scopeConsumers.remove(scopeId);
+            log.info("Skipped scope consumer setup (no subjects): scopeId={}", scopeId);
+        } else {
+            scopeConsumers.put(scopeId, next);
+        }
+        stats.setActiveScopeConsumerCount(totalConsumerCount());
+    }
+
+    private ScopeConsumer createScopeConsumer(Long scopeId, StreamSubscription subscription) throws IOException {
+        String streamName = subscription.streamName();
+        String[] subjects = subscription.subjects().toArray(String[]::new);
+        // Stream-suffixed durable so a scope's SCM and Outline consumers never share a durable name.
+        String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId) + "-" + streamName;
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(connectionProperties.consumer().requestTimeout())
@@ -403,17 +443,36 @@ public class IntegrationNatsConsumer {
                 this::handleMessage
             );
             scope.start();
-            scopeConsumers.put(scopeId, scope);
-            stats.setActiveScopeConsumerCount(scopeConsumers.size());
             log.info(
                 "Started scope consumer: scopeId={}, stream={}, subjectCount={}",
                 scopeId,
                 streamName,
                 subjects.length
             );
+            return scope;
         } catch (JetStreamApiException e) {
-            throw new IOException("Failed to set up scope consumer for scopeId=" + scopeId, e);
+            throw new IOException(
+                "Failed to set up scope consumer for scopeId=" + scopeId + " stream=" + streamName,
+                e
+            );
         }
+    }
+
+    private void stopAndCleanup(ScopeConsumer consumer) {
+        try {
+            consumer.stop();
+            cleanupConsumer(consumer.streamName(), consumer.consumerName());
+        } catch (Exception e) {
+            log.error("Failed to stop scope consumer: consumerName={}", consumer.consumerName(), e);
+        }
+    }
+
+    private int totalConsumerCount() {
+        int total = 0;
+        for (List<ScopeConsumer> list : scopeConsumers.values()) {
+            total += list.size();
+        }
+        return total;
     }
 
     private void setupInstallationConsumer() throws IOException {
@@ -550,18 +609,6 @@ public class IntegrationNatsConsumer {
             builder.durable(durableName);
         }
         return builder.build();
-    }
-
-    private String[] buildScopeSubjects(NatsSubscriptionInfo info) {
-        String streamName = info.natsStreamName();
-        Set<String> subjects = new HashSet<>();
-        for (String nameWithOwner : info.repositoryNamesWithOwner()) {
-            subjects.add(ConsumerSubjectMath.repositoryFilter(streamName, nameWithOwner));
-        }
-        if (info.hasOrganization()) {
-            subjects.add(ConsumerSubjectMath.organizationFilter(streamName, info.organizationLogin()));
-        }
-        return subjects.toArray(String[]::new);
     }
 
     private String durableBaseName() {

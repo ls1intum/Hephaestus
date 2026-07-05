@@ -195,7 +195,7 @@ public class WorkspaceActivationService {
                 }
                 yield false;
             }
-            case SLACK -> false;
+            case SLACK, OUTLINE -> false;
         };
     }
 

@@ -22,13 +22,15 @@ import org.slf4j.LoggerFactory;
  *       Operators handle drift explicitly via {@code nats stream edit}.</li>
  * </ul>
  *
- * <p>Streams are created only for kinds that flow over NATS: {@code github}, {@code gitlab}, and
- * {@code slack}. Slack interactivity uses a separate signed HTTP endpoint and is not published here.
+ * <p>Streams are created only for kinds that flow over NATS: {@code github} and {@code gitlab}
+ * (HMAC webhook receiver), {@code slack} (monitored-channel {@code message} ingest), and
+ * {@code outline} (change-notification webhook). Slack interactivity uses a separate signed HTTP
+ * endpoint and is not published here.
  */
 public class WebhookJetStreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookJetStreamBootstrap.class);
-    static final String[] STREAMS = { "gitlab", "github", "slack" };
+    static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;

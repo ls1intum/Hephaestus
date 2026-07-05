@@ -1,0 +1,301 @@
+package de.tum.cit.aet.hephaestus.integration.outline.client;
+
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
+import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineAuthInfoResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineExportResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionResponse;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.retry.Retry;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+/**
+ * Thin client for the handful of Outline API calls the integration makes. Outline is RPC-over-POST:
+ * every call is {@code POST {serverUrl}/api/<resource>.<action>} with a JSON body and a bearer token.
+ *
+ * <p>The server URL is admin-supplied, so every request goes through the SSRF-guarded connector
+ * ({@link WebClientConnectors#ssrfGuarded()}, which blocks hostnames that resolve to private ranges
+ * and closes the DNS-rebind bypass) and the URL is validated up front with {@link ServerUrlValidator}
+ * (which rejects literal private/loopback/metadata addresses). The two together are the SSRF posture.
+ *
+ * <p>Every remote call runs through the {@code outlineRestApi} circuit breaker so repeated outages fail
+ * fast rather than stalling the sync cycle, wrapped in the {@code outlineRestApiRetry} decorator that
+ * retries transient failures (5xx, transport errors, 429) with bounded backoff — a 429 waits out its
+ * {@code Retry-After} hint. An HTTP 429 that survives the retries surfaces as
+ * {@link OutlineRateLimitedException} so the sync pauses and resumes next cycle instead of aborting.
+ */
+@Component
+@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
+public class OutlineApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(OutlineApiClient.class);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+
+    /** Outline caps list endpoints at 100 rows per page; 25 keeps each response small and bounded. */
+    private static final int PAGE_LIMIT = 25;
+
+    /** Guards against a malformed {@code pagination} block looping forever. */
+    private static final int MAX_PAGES = 1000;
+
+    private final WebClient webClient;
+    private final CircuitBreaker circuitBreaker;
+    private final Retry retry;
+
+    public OutlineApiClient(
+        @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,
+        @Qualifier("outlineRestApiRetry") Retry retry
+    ) {
+        this.webClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
+        this.circuitBreaker = circuitBreaker;
+        this.retry = retry;
+    }
+
+    /**
+     * Identity resolved from Outline's {@code auth.info}: the team the token belongs to and the
+     * calling user. The team id is stable per Outline instance and becomes the Connection's
+     * instance key.
+     */
+    public record OutlineIdentity(String teamId, String teamName, String userId) {}
+
+    /**
+     * Validates an Outline API token by calling {@code auth.info} against the given server, returning
+     * the resolved identity. Throws {@link OutlineApiException} on an unreachable host, a rejected
+     * token, or a response without a team — the connect flow turns that into a structured error.
+     */
+    public OutlineIdentity validateToken(String serverUrl, String token) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        OutlineAuthInfoResponse response = post(
+            resolvedUrl,
+            token,
+            "/api/auth.info",
+            Map.of(),
+            OutlineAuthInfoResponse.class
+        );
+        if (
+            response == null ||
+            response.data() == null ||
+            response.data().team() == null ||
+            response.data().team().id() == null
+        ) {
+            throw new OutlineApiException("Outline auth.info returned no team for this token");
+        }
+        OutlineAuthInfoResponse.Team team = response.data().team();
+        OutlineAuthInfoResponse.User user = response.data().user();
+        return new OutlineIdentity(team.id(), team.name(), user == null ? null : user.id());
+    }
+
+    /**
+     * Lists the collections the token can see ({@code collections.list}, offset/limit paged). Used to
+     * resolve an allow-list entry to a concrete collection id and slug.
+     */
+    public List<OutlineCollectionListResponse.Collection> listCollections(String serverUrl, String token) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        List<OutlineCollectionListResponse.Collection> all = new ArrayList<>();
+        for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
+            OutlineCollectionListResponse body = post(
+                resolvedUrl,
+                token,
+                "/api/collections.list",
+                Map.of("offset", offset, "limit", PAGE_LIMIT),
+                OutlineCollectionListResponse.class
+            );
+            List<OutlineCollectionListResponse.Collection> pageData = body == null ? null : body.data();
+            if (pageData == null || pageData.isEmpty()) {
+                break;
+            }
+            all.addAll(pageData);
+            if (pageData.size() < PAGE_LIMIT) {
+                break;
+            }
+        }
+        return all;
+    }
+
+    /**
+     * Fetches a collection's document tree ({@code collections.documents}). Returns the root nodes; each
+     * node's {@code children} carry the nesting the sync flattens into parent relationships.
+     */
+    public List<OutlineCollectionDocumentsResponse.Node> listCollectionDocuments(
+        String serverUrl,
+        String token,
+        String collectionId
+    ) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        OutlineCollectionDocumentsResponse body = post(
+            resolvedUrl,
+            token,
+            "/api/collections.documents",
+            Map.of("id", collectionId),
+            OutlineCollectionDocumentsResponse.class
+        );
+        List<OutlineCollectionDocumentsResponse.Node> data = body == null ? null : body.data();
+        return data == null ? List.of() : data;
+    }
+
+    /**
+     * Lists per-document metadata for a collection ({@code documents.list}, offset/limit paged). The
+     * {@code updatedAt} field is the incremental cursor the sync diffs against.
+     */
+    public List<OutlineDocumentListResponse.Meta> listDocuments(String serverUrl, String token, String collectionId) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        List<OutlineDocumentListResponse.Meta> all = new ArrayList<>();
+        for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
+            OutlineDocumentListResponse body = post(
+                resolvedUrl,
+                token,
+                "/api/documents.list",
+                Map.of("collectionId", collectionId, "offset", offset, "limit", PAGE_LIMIT),
+                OutlineDocumentListResponse.class
+            );
+            List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
+            if (pageData == null || pageData.isEmpty()) {
+                break;
+            }
+            all.addAll(pageData);
+            if (pageData.size() < PAGE_LIMIT) {
+                break;
+            }
+        }
+        return all;
+    }
+
+    /**
+     * Exports a document's body as Markdown ({@code documents.export}). Returns {@code null} when Outline
+     * responds without a body.
+     */
+    public String exportDocument(String serverUrl, String token, String documentId) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        OutlineExportResponse body = post(
+            resolvedUrl,
+            token,
+            "/api/documents.export",
+            Map.of("id", documentId),
+            OutlineExportResponse.class
+        );
+        return body == null ? null : body.data();
+    }
+
+    /**
+     * Registers a change-notification subscription ({@code webhookSubscriptions.create}) that posts the given
+     * document events to {@code deliveryUrl}, signed with {@code signingSecret}. Returns the created
+     * subscription's id, or {@code null} when Outline responds without one.
+     */
+    public String createWebhookSubscription(
+        String serverUrl,
+        String token,
+        String name,
+        String deliveryUrl,
+        String signingSecret,
+        List<String> events
+    ) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        OutlineWebhookSubscriptionResponse body = post(
+            resolvedUrl,
+            token,
+            "/api/webhookSubscriptions.create",
+            Map.of("name", name, "url", deliveryUrl, "secret", signingSecret, "events", events),
+            OutlineWebhookSubscriptionResponse.class
+        );
+        return body == null || body.data() == null ? null : body.data().id();
+    }
+
+    /** Deletes a change-notification subscription ({@code webhookSubscriptions.delete}) by its id. */
+    public void deleteWebhookSubscription(String serverUrl, String token, String subscriptionId) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        post(resolvedUrl, token, "/api/webhookSubscriptions.delete", Map.of("id", subscriptionId), Void.class);
+    }
+
+    /**
+     * Issues one {@code POST {resolvedUrl}{path}}, retried by the {@code outlineRestApiRetry} decorator for
+     * transient failures (5xx, transport errors, 429 — the last waiting out its {@code Retry-After}). The
+     * inner call goes through the circuit breaker on every attempt, so each failure counts toward the
+     * failure rate. Permanent failures (4xx, an open breaker) are not retried.
+     */
+    private <T> T post(String resolvedUrl, String token, String path, Object requestBody, Class<T> responseType) {
+        return retry.executeSupplier(() -> executeOnce(resolvedUrl, token, path, requestBody, responseType));
+    }
+
+    /**
+     * A single attempt through the circuit breaker. Translates the raw wire failures: HTTP 429 →
+     * {@link OutlineRateLimitedException} (with {@code Retry-After}), a 5xx / transport failure →
+     * retryable {@link OutlineApiException}, a 4xx → permanent {@link OutlineApiException}, an open breaker
+     * → a distinct permanent {@link OutlineApiException}.
+     */
+    private <T> T executeOnce(
+        String resolvedUrl,
+        String token,
+        String path,
+        Object requestBody,
+        Class<T> responseType
+    ) {
+        Supplier<T> call = () ->
+            webClient
+                .post()
+                .uri(resolvedUrl + path)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(responseType)
+                .block(REQUEST_TIMEOUT);
+        try {
+            return circuitBreaker.executeSupplier(call);
+        } catch (WebClientResponseException.TooManyRequests e) {
+            throw new OutlineRateLimitedException(parseRetryAfter(e), e);
+        } catch (WebClientResponseException e) {
+            int status = e.getStatusCode().value();
+            log.debug("Outline {} failed: status={}, serverUrl={}", path, status, resolvedUrl);
+            throw new OutlineApiException(
+                "Outline " + path + " failed (HTTP " + status + ")",
+                e,
+                e.getStatusCode().is5xxServerError()
+            );
+        } catch (CallNotPermittedException e) {
+            throw new OutlineApiException("Outline API is temporarily unavailable (circuit open)", e);
+        } catch (OutlineApiException e) {
+            throw e;
+        } catch (Exception e) {
+            log.debug("Outline {} failed: serverUrl={}, error={}", path, resolvedUrl, e.getMessage());
+            throw new OutlineApiException("Could not reach the Outline server", e, /* retryable */ true);
+        }
+    }
+
+    /** Reads the {@code Retry-After} header (delta-seconds) from a 429, or {@code null} when absent/unparseable. */
+    private static Duration parseRetryAfter(WebClientResponseException e) {
+        String header = e.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+        if (header == null || header.isBlank()) {
+            return null;
+        }
+        try {
+            return Duration.ofSeconds(Long.parseLong(header.trim()));
+        } catch (NumberFormatException nfe) {
+            return null;
+        }
+    }
+
+    private String resolveAndValidateServerUrl(String serverUrl) {
+        if (serverUrl == null || serverUrl.isBlank()) {
+            throw new OutlineApiException("An Outline server URL is required");
+        }
+        String trimmed = serverUrl.trim();
+        String normalized = trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+        // Throws IllegalArgumentException on a private/loopback/metadata target; the connect flow maps that to 400.
+        ServerUrlValidator.validate(normalized);
+        return normalized;
+    }
+}

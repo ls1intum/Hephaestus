@@ -5,6 +5,7 @@ import {
 	type FeatureValues,
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
+import { AdminOutlineSettings } from "./AdminOutlineSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import {
 	AdminSlackChannelsSettings,
@@ -158,6 +159,8 @@ export function AdminSettingsPage({
 						onRemoveChannel={onRemoveSlackChannel}
 					/>
 				)}
+
+				{workspaceSlug != null && <AdminOutlineSettings workspaceSlug={workspaceSlug} />}
 			</div>
 		</div>
 	);

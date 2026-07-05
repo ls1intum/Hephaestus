@@ -75,6 +75,33 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("verified Outline webhook body → outline.<sub>.<event> subject on JetStream")
+    void publishesOutlineOnVerified() {
+        // Real Outline deriver so the body → subject/dedup derivation is exercised end to end through
+        // the pipeline, mirroring the GitLab webhook→NATS path.
+        WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
+            List.of(stubVerifier(IntegrationKind.OUTLINE, new VerificationResult.Verified())),
+            List.of(new de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineSubjectKeyDeriver(objectMapper)),
+            publisher,
+            objectMapper
+        );
+
+        byte[] body =
+            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\",\"payload\":{\"id\":\"doc-9\"}}".getBytes(
+                StandardCharsets.UTF_8
+            );
+        ResponseEntity<?> resp = pipeline.handle(IntegrationKind.OUTLINE, body, headers());
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        ArgumentCaptor<PublishRequest> captor = ArgumentCaptor.forClass(PublishRequest.class);
+        verify(publisher).publish(captor.capture());
+        PublishRequest pr = captor.getValue();
+        assertThat(pr.subject()).isEqualTo("outline.sub-1.documents~update");
+        assertThat(pr.dedupId()).startsWith("outline-");
+        assertThat(pr.headers()).containsEntry("Nats-Msg-Id", pr.dedupId());
+    }
+
+    @Test
     void invalidSignatureBlocksPublish() {
         WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
             List.of(stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Invalid("signature-mismatch"))),

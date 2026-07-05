@@ -1,11 +1,18 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.ConsumerSubjectMath;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,26 +43,61 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
     }
 
     private NatsSubscriptionInfo toSubscriptionInfo(Workspace workspace) {
+        List<StreamSubscription> subscriptions = new ArrayList<>();
+        addScmSubscription(workspace, subscriptions);
+        addOutlineSubscription(workspace, subscriptions);
+        return new NatsSubscriptionInfo(workspace.getId(), subscriptions);
+    }
+
+    /**
+     * The SCM stream subscription (repository + organization filters). Added only when the workspace
+     * has an ACTIVE SCM connection: without one there is no stream to bind, so an Outline-only
+     * workspace is never mislabeled onto the {@code github} stream.
+     */
+    private void addScmSubscription(Workspace workspace, List<StreamSubscription> out) {
+        Optional<IntegrationKind> scmKind = connectionService.findActiveProviderKind(workspace.getId());
+        if (scmKind.isEmpty()) {
+            return;
+        }
+        String streamName = ConsumerSubjectMath.streamNameFor(scmKind.get()).orElseThrow(() ->
+            new IllegalStateException("No NATS stream for SCM kind=" + scmKind.get())
+        );
+
+        Set<String> subjects = new HashSet<>();
         Set<String> repositoryNames = workspace
             .getRepositoriesToMonitor()
             .stream()
             .map(RepositoryToMonitor::getNameWithOwner)
             .filter(workspaceScopeFilter::isRepositoryAllowed)
             .collect(Collectors.toSet());
+        for (String nameWithOwner : repositoryNames) {
+            subjects.add(ConsumerSubjectMath.repositoryFilter(streamName, nameWithOwner));
+        }
+        String organizationLogin = workspace.getAccountLogin();
+        if (organizationLogin != null && !organizationLogin.isBlank()) {
+            subjects.add(ConsumerSubjectMath.organizationFilter(streamName, organizationLogin));
+        }
+        if (!subjects.isEmpty()) {
+            out.add(new StreamSubscription(streamName, subjects));
+        }
+    }
 
-        // No active SCM connection → default to "github" stream for the same back-compat
-        // shape the old getProviderType() fallback produced.
-        String streamName = connectionService
-            .findActiveProviderKind(workspace.getId())
-            .map(kind ->
-                switch (kind) {
-                    case GITHUB -> "github";
-                    case GITLAB -> "gitlab";
-                    case SLACK -> "github";
-                }
-            )
-            .orElse("github");
-
-        return new NatsSubscriptionInfo(workspace.getId(), repositoryNames, workspace.getAccountLogin(), streamName);
+    /**
+     * The Outline stream subscription. Added when the workspace has an ACTIVE Outline connection with
+     * a registered change-notification subscription id, filtered to {@code outline.<subId>.>}.
+     */
+    private void addOutlineSubscription(Workspace workspace, List<StreamSubscription> out) {
+        connectionService
+            .findActiveOutlineConfig(workspace.getId())
+            .map(ConnectionConfig.OutlineConfig::webhookSubscriptionId)
+            .filter(subscriptionId -> subscriptionId != null && !subscriptionId.isBlank())
+            .ifPresent(subscriptionId ->
+                out.add(
+                    new StreamSubscription(
+                        "outline",
+                        Set.of(ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId))
+                    )
+                )
+            );
     }
 }

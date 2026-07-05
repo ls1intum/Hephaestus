@@ -96,6 +96,19 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("stages the runner's relative-import sidecars beside the runner (pi-finding-normalize.mjs)")
+        void stagesRunnerSidecars() {
+            var inputs = factory.build(proxySpec(LlmProvider.OPENAI, "m")).inputFiles();
+            // pi-runner.mjs does `import ... from "./pi-finding-normalize.mjs"`; without staging it the
+            // sandbox exits 1 with ERR_MODULE_NOT_FOUND and no detection runs.
+            for (String sidecar : PRACTICE.sidecarScripts()) {
+                assertThat(inputs).containsKey(sidecar);
+                assertThat(inputs.get(sidecar)).isNotEmpty();
+            }
+            assertThat(PRACTICE.sidecarScripts()).contains("pi-finding-normalize.mjs");
+        }
+
+        @Test
         void extraInputsMerge() {
             byte[] payload = "deadbeef".getBytes(StandardCharsets.UTF_8);
             PiPlanSpec spec = new PiPlanSpec(

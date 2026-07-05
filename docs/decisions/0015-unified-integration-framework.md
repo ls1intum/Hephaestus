@@ -18,6 +18,9 @@ Outline integration was an out-of-scope non-goal for this epic and does not exis
 in the shipped tree (deferred to #1203). No `OUTLINE` value ships in
 `IntegrationKind` today — the enum is `GITHUB`, `GITLAB`, `SLACK`.
 
+> Superseded for `OUTLINE` by [ADR 0023](0023-outline-documentation-integration.md): `IntegrationKind`
+> now also carries `OUTLINE` (family `DOCUMENTATION`). This enumeration is left as-of-writing.
+
 ## Decision drivers
 
 - New-vendor cost has to scale flat, not linearly.

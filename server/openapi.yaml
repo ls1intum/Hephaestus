@@ -4433,6 +4433,7 @@ components:
           enum:
           - SCM
           - MESSAGING
+          - DOCUMENTATION
         id:
           type: integer
           format: int64
@@ -4444,6 +4445,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         state:
           type: string
           enum:
@@ -4486,6 +4488,7 @@ components:
           enum:
           - SCM
           - MESSAGING
+          - DOCUMENTATION
         id:
           type: integer
           format: int64
@@ -4497,6 +4500,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         state:
           type: string
           enum:
@@ -5105,6 +5109,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         userInput:
           type: object
           additionalProperties:

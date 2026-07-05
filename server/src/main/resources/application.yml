@@ -607,8 +607,19 @@ hephaestus:
                 # Slack Events API ingest rides the core /webhooks/slack + NATS/JetStream framework
                 # (subjects slack.<team>.<scope>.<event>, Nats-Msg-Id = slack-<event_id>).
                 # The mentor response stream itself is direct Slack Web API output, not NATS.
-    #     outline:
-    #         enabled: false
+        outline:
+            # Master switch for the Outline documentation integration (install, sync, content projection).
+            # Off by default; a workspace admin still installs per-workspace with a base URL + token.
+            enabled: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:false}
+            sync:
+                # Reconcile schedule for the per-workspace document mirror (default every six hours).
+                cron: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CRON:0 0 */6 * * *}
+            cache:
+                # Per-workspace cap on the total size of mirrored Markdown bodies; least-recently-materialized
+                # bodies are evicted (the row survives as a directory marker) once the mirror grows past it.
+                max-size-mb: ${HEPHAESTUS_INTEGRATION_OUTLINE_CACHE_MAX_SIZE_MB:200}
+            # How long a document that has vanished upstream is kept as a tombstone before its row is dropped.
+            staleness: ${HEPHAESTUS_INTEGRATION_OUTLINE_STALENESS:30d}
 
     sentry:
         dsn: ${SENTRY_DSN:}

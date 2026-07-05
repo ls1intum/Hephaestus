@@ -41,4 +41,15 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     @Query("SELECT c FROM Connection c WHERE c.workspace.id = :workspaceId")
     List<Connection> findByWorkspaceId(@Param("workspaceId") long workspaceId);
+
+    /**
+     * Ids of every workspace holding a Connection of the given kind in the given state — the cross-workspace
+     * fan-out a periodic sync scheduler enumerates. The emitted SQL selects {@code workspace_id}, so it
+     * satisfies the tenancy inspector without a bypass.
+     */
+    @Query("SELECT DISTINCT c.workspace.id FROM Connection c WHERE c.kind = :kind AND c.state = :state")
+    List<Long> findWorkspaceIdsByKindAndState(
+        @Param("kind") IntegrationKind kind,
+        @Param("state") IntegrationState state
+    );
 }

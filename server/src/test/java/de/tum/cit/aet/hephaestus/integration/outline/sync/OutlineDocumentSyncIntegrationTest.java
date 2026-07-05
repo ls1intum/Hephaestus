@@ -1,0 +1,205 @@
+package de.tum.cit.aet.hephaestus.integration.outline.sync;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+/**
+ * Real-Postgres proof of the Outline document reconcile with the HTTP wire mocked at the client boundary
+ * (the SSRF-guarded client cannot be pointed at a loopback mock server, so the seam under the network is
+ * stubbed while the whole sync/mapping/persistence path runs for real).
+ *
+ * <p>Three properties are pinned: an initial sync mirrors every allow-listed document; a second sync with
+ * one changed {@code updatedAt} re-exports only the changed document (the unchanged one is served from the
+ * cache); and a document removed upstream is tombstoned — its body dropped and {@code deleted_at} stamped.
+ */
+@TestPropertySource(properties = "hephaestus.integration.outline.enabled=true")
+class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
+
+    private static final String SERVER_URL = "https://outline.example.test";
+    private static final String COLLECTION_ID = "col-1";
+    private static final String DOC_ONE = "doc-1";
+    private static final String DOC_TWO = "doc-2";
+    private static final Instant T1 = Instant.parse("2026-01-01T00:00:00Z");
+    private static final Instant T2 = Instant.parse("2026-02-01T00:00:00Z");
+
+    @MockitoBean
+    private OutlineApiClient outlineApiClient;
+
+    @Autowired
+    private OutlineDocumentSyncScheduler scheduler;
+
+    @Autowired
+    private OutlineDocumentRepository documentRepository;
+
+    @Autowired
+    private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private CredentialBundleConverter credentialConverter;
+
+    private long workspaceId;
+
+    @BeforeEach
+    void setUp() {
+        databaseTestUtils.cleanDatabase();
+        Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("outline-sync"));
+        workspaceId = workspace.getId();
+
+        Connection connection = new Connection(
+            workspace,
+            IntegrationKind.OUTLINE,
+            "team-1",
+            new ConnectionConfig.OutlineConfig(SERVER_URL, Set.of(COLLECTION_ID), null, null, Set.of())
+        );
+        connection.setCredentials(new BearerToken("outline-token", null), credentialConverter);
+        connection.setState(IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
+
+        // The one allow-listed collection is always resolvable.
+        lenient()
+            .when(outlineApiClient.listCollections(anyString(), anyString()))
+            .thenReturn(List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1")));
+        lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha");
+        lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta");
+    }
+
+    private void stubCollection(List<String> docIds, Instant docOneUpdatedAt, Instant docTwoUpdatedAt) {
+        List<OutlineCollectionDocumentsResponse.Node> tree = docIds
+            .stream()
+            .map(id ->
+                new OutlineCollectionDocumentsResponse.Node(
+                    id,
+                    id.toUpperCase(java.util.Locale.ROOT),
+                    "/doc/" + id,
+                    List.of()
+                )
+            )
+            .toList();
+        when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(tree);
+
+        List<OutlineDocumentListResponse.Meta> metas = docIds
+            .stream()
+            .map(id ->
+                new OutlineDocumentListResponse.Meta(
+                    id,
+                    id,
+                    id.equals(DOC_ONE) ? docOneUpdatedAt : docTwoUpdatedAt,
+                    id,
+                    null,
+                    COLLECTION_ID
+                )
+            )
+            .toList();
+        when(outlineApiClient.listDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(metas);
+    }
+
+    @Test
+    void initialSync_mirrorsEveryAllowListedDocument() {
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
+
+        scheduler.syncAllNow();
+
+        List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(
+            workspaceId,
+            onlyConnectionId()
+        );
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.getBodyMarkdown()).isNotBlank();
+            assertThat(r.getContentHash()).isNotBlank();
+            assertThat(r.isDeleted()).isFalse();
+            assertThat(r.getCollectionId()).isEqualTo(COLLECTION_ID);
+        });
+        verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_ONE));
+        verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_TWO));
+    }
+
+    @Test
+    void secondSync_reExportsOnlyTheChangedDocument() {
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
+        scheduler.syncAllNow();
+        clearInvocations(outlineApiClient);
+
+        // doc-2's updatedAt moves; doc-1 stays put.
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T2);
+        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta v2");
+
+        scheduler.syncAllNow();
+
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), eq(DOC_ONE));
+        verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_TWO));
+
+        OutlineDocument docTwo = documentById(DOC_TWO);
+        assertThat(docTwo.getBodyMarkdown()).isEqualTo("# Beta v2");
+    }
+
+    @Test
+    void documentRemovedUpstream_isTombstoned() {
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
+        scheduler.syncAllNow();
+
+        // doc-2 vanishes upstream: only doc-1 remains in the tree + metadata.
+        stubCollection(List.of(DOC_ONE), T1, T1);
+        scheduler.syncAllNow();
+
+        OutlineDocument docTwo = documentById(DOC_TWO);
+        assertThat(docTwo.isDeleted()).isTrue();
+        assertThat(docTwo.getDeletedAt()).isNotNull();
+        assertThat(docTwo.getBodyMarkdown()).isNull();
+
+        OutlineDocument docOne = documentById(DOC_ONE);
+        assertThat(docOne.isDeleted()).isFalse();
+        assertThat(docOne.getBodyMarkdown()).isNotBlank();
+    }
+
+    private long onlyConnectionId() {
+        List<Connection> connections = connectionRepository.findAll();
+        assertThat(connections).hasSize(1);
+        return connections.get(0).getId();
+    }
+
+    private OutlineDocument documentById(String documentId) {
+        return documentRepository
+            .findByWorkspaceIdAndConnectionId(workspaceId, onlyConnectionId())
+            .stream()
+            .filter(d -> d.getDocumentId().equals(documentId))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("No mirrored row for " + documentId));
+    }
+}

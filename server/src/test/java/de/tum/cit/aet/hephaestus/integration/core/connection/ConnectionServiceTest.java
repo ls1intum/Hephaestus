@@ -231,6 +231,67 @@ class ConnectionServiceTest extends BaseUnitTest {
         verify(connectionRepository, never()).save(any());
     }
 
+    @org.junit.jupiter.api.Nested
+    class FindOutlineSubscription {
+
+        private Connection outlineConnection(String subscriptionId, String secret) {
+            return new Connection(
+                workspace,
+                IntegrationKind.OUTLINE,
+                "team-x",
+                new ConnectionConfig.OutlineConfig("https://o.test", Set.of(), subscriptionId, secret, Set.of())
+            );
+        }
+
+        private void stubActiveOutline(long workspaceId, Connection connection) {
+            when(
+                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                    workspaceId,
+                    IntegrationKind.OUTLINE,
+                    IntegrationState.ACTIVE
+                )
+            ).thenReturn(java.util.Optional.of(connection));
+        }
+
+        @Test
+        void resolvesTheMatchingSubscriptionToItsWorkspaceAndSecret() {
+            when(
+                connectionRepository.findWorkspaceIdsByKindAndState(IntegrationKind.OUTLINE, IntegrationState.ACTIVE)
+            ).thenReturn(java.util.List.of(1L, 2L));
+            stubActiveOutline(1L, outlineConnection("sub-a", "secret-a"));
+            stubActiveOutline(2L, outlineConnection("sub-b", "secret-b"));
+
+            var resolved = service.findOutlineSubscription("sub-b");
+
+            assertThat(resolved).isPresent();
+            assertThat(resolved.get().workspaceId()).isEqualTo(2L);
+            assertThat(resolved.get().signingSecret()).isEqualTo("secret-b");
+        }
+
+        @Test
+        void isEmptyWhenTheSubscriptionMatchesButNoSecretIsStored() {
+            when(
+                connectionRepository.findWorkspaceIdsByKindAndState(IntegrationKind.OUTLINE, IntegrationState.ACTIVE)
+            ).thenReturn(java.util.List.of(1L));
+            stubActiveOutline(1L, outlineConnection("sub-a", null));
+
+            assertThat(service.findOutlineSubscription("sub-a")).isEmpty();
+        }
+
+        @Test
+        void isEmptyForABlankOrUnknownSubscription() {
+            assertThat(service.findOutlineSubscription(null)).isEmpty();
+            assertThat(service.findOutlineSubscription("  ")).isEmpty();
+
+            when(
+                connectionRepository.findWorkspaceIdsByKindAndState(IntegrationKind.OUTLINE, IntegrationState.ACTIVE)
+            ).thenReturn(java.util.List.of(1L));
+            stubActiveOutline(1L, outlineConnection("sub-a", "secret-a"));
+
+            assertThat(service.findOutlineSubscription("does-not-exist")).isEmpty();
+        }
+    }
+
     private Connection pendingConnection() {
         return connectionInState(IntegrationState.PENDING);
     }

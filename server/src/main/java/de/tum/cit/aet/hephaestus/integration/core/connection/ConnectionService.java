@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Cred
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
@@ -46,6 +47,15 @@ public class ConnectionService {
             kind,
             IntegrationState.ACTIVE
         );
+    }
+
+    /**
+     * Ids of every workspace with an ACTIVE Connection of the given kind — the fan-out a periodic sync
+     * scheduler iterates so a freshly connected workspace is picked up even before it has mirrored any data.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findWorkspaceIdsWithActiveConnection(IntegrationKind kind) {
+        return connectionRepository.findWorkspaceIdsByKindAndState(kind, IntegrationState.ACTIVE);
     }
 
     /**
@@ -100,6 +110,46 @@ public class ConnectionService {
             .filter(c -> c instanceof ConnectionConfig.SlackConfig)
             .map(c -> (ConnectionConfig.SlackConfig) c);
     }
+
+    @Transactional(readOnly = true)
+    public Optional<ConnectionConfig.OutlineConfig> findActiveOutlineConfig(long workspaceId) {
+        return findActive(workspaceId, IntegrationKind.OUTLINE)
+            .map(Connection::getConfig)
+            .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
+            .map(c -> (ConnectionConfig.OutlineConfig) c);
+    }
+
+    /**
+     * Resolves the ACTIVE Outline Connection that registered the given change-notification
+     * subscription id, returning its workspace and stored signing secret. The subscription id
+     * arrives in an inbound webhook body as an <em>untrusted routing key</em> — it only selects
+     * which stored secret to verify against, so a forged id simply matches nothing. Empty when no
+     * ACTIVE Outline connection carries that subscription (or it has no stored secret).
+     */
+    @Transactional(readOnly = true)
+    public Optional<OutlineSubscription> findOutlineSubscription(@Nullable String subscriptionId) {
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            return Optional.empty();
+        }
+        for (Long workspaceId : findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE)) {
+            Optional<ConnectionConfig.OutlineConfig> config = findActiveOutlineConfig(workspaceId);
+            if (config.isEmpty()) {
+                continue;
+            }
+            ConnectionConfig.OutlineConfig outline = config.get();
+            if (
+                subscriptionId.equals(outline.webhookSubscriptionId()) &&
+                outline.webhookSecret() != null &&
+                !outline.webhookSecret().isBlank()
+            ) {
+                return Optional.of(new OutlineSubscription(workspaceId, outline.webhookSecret()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The workspace a change-notification subscription belongs to and its signing secret. */
+    public record OutlineSubscription(long workspaceId, String signingSecret) {}
 
     /**
      * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,

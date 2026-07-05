@@ -1,0 +1,68 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Outline integration: the mirror of allow-listed Outline documents (outline_document).
+        Workspace-scoped (scalar workspace_id); the body is nullable so a tombstoned or evicted
+        document survives as a directory marker rather than a missing row.
+    -->
+
+    <changeSet author="hephaestus-outline" id="1783164846747-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document already present">
+            <not>
+                <tableExists tableName="outline_document"/>
+            </not>
+        </preConditions>
+        <comment>Local mirror of one Outline document per (workspace, connection, document_id).</comment>
+        <createTable tableName="outline_document">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="outline_document_pkey"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="connection_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="document_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_slug" type="VARCHAR(512)"/>
+            <column name="parent_document_id" type="VARCHAR(64)"/>
+            <column name="title" type="VARCHAR(1024)"/>
+            <column name="slug" type="VARCHAR(512)"/>
+            <column name="body_markdown" type="TEXT"/>
+            <column name="content_hash" type="VARCHAR(64)"/>
+            <column name="outline_updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="deleted_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_materialized_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addUniqueConstraint
+            tableName="outline_document"
+            columnNames="workspace_id, connection_id, document_id"
+            constraintName="uk_outline_document"/>
+        <createIndex tableName="outline_document" indexName="ix_outline_document_collection">
+            <column name="workspace_id"/>
+            <column name="collection_id"/>
+        </createIndex>
+        <createIndex tableName="outline_document" indexName="ix_outline_document_updated">
+            <column name="workspace_id"/>
+            <column name="outline_updated_at"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="outline_document"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

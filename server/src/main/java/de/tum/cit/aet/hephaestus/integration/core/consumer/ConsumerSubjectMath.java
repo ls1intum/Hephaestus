@@ -9,8 +9,13 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Pure subject helpers for NATS consumers. Repository integrations use scoped wildcard filters such as
- * {@code github.owner.repo.>}; Slack Events API callbacks use the flat {@code slack.>} consumer. Slack
- * interactivity/button postbacks stay on the separate signed HTTP endpoint.
+ * {@code github.owner.repo.>}; Slack Events API callbacks use the flat {@code slack.>} consumer (Slack
+ * interactivity/button postbacks stay on the separate signed HTTP endpoint); Outline change notifications
+ * use per-subscription filters {@code outline.<subscriptionId>.>}.
+ *
+ * <p>{@link #kindFromSubjectPrefix(String)} is the single source of truth for NATS-subject routing. It
+ * lists the kinds that publish to JetStream (GitHub, GitLab, Slack, Outline) and never calls
+ * {@link IntegrationKind#valueOf(String)} on subject-derived input.
  *
  * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP-path router
  */
@@ -26,7 +31,9 @@ public final class ConsumerSubjectMath {
         "gitlab",
         IntegrationKind.GITLAB,
         "slack",
-        IntegrationKind.SLACK
+        IntegrationKind.SLACK,
+        "outline",
+        IntegrationKind.OUTLINE
     );
 
     private ConsumerSubjectMath() {
@@ -127,7 +134,7 @@ public final class ConsumerSubjectMath {
         }
         return switch (kind) {
             case GITHUB -> buildSubjectPrefix("github", "?/?") + ".>";
-            case GITLAB, SLACK -> throw new UnsupportedOperationException(
+            case GITLAB, SLACK, OUTLINE -> throw new UnsupportedOperationException(
                 "Installation-aware subject filter not yet supported for kind=" +
                     kind +
                     " (only GITHUB publishes installation events today)"
@@ -150,8 +157,24 @@ public final class ConsumerSubjectMath {
         return switch (kind) {
             case GITHUB -> Optional.of("github");
             case GITLAB -> Optional.of("gitlab");
+            case OUTLINE -> Optional.of("outline");
             case SLACK -> Optional.of("slack");
         };
+    }
+
+    /**
+     * Wildcard subject filter matching every event for a single subscription-scoped stream. Format:
+     * {@code <stream>.<subscriptionId>.>}. Used by the documentation family (Outline today), where a
+     * workspace subscribes to exactly one change-notification subscription whose id is a dot-free UUID.
+     */
+    public static String subscriptionFilter(String streamName, String subscriptionId) {
+        if (streamName == null || streamName.isBlank()) {
+            throw new IllegalArgumentException("Stream name cannot be null or empty.");
+        }
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            throw new IllegalArgumentException("Subscription id cannot be null or empty.");
+        }
+        return streamName + "." + subscriptionId.trim() + ".>";
     }
 
     // Subject → kind

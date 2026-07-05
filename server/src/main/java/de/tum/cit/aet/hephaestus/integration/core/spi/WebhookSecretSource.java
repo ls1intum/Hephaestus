@@ -30,6 +30,16 @@ public interface WebhookSecretSource {
         SUBSCRIPTION,
     }
 
-    /** Best-effort identification of the request before signature verification. */
-    record SecretLookup(Map<String, String> headers) {}
+    /**
+     * Best-effort identification of the request before signature verification. Carries the
+     * request headers and raw body: header-scoped vendors (GitHub/GitLab) read only
+     * {@link #headers()} and ignore the body, while subscription-scoped vendors (Outline)
+     * parse a subscription id out of {@link #body()} to select the stored secret.
+     */
+    record SecretLookup(Map<String, String> headers, byte[] body) {
+        /** Header-only lookup — the body is empty for vendors that scope by header alone. */
+        public SecretLookup(Map<String, String> headers) {
+            this(headers, new byte[0]);
+        }
+    }
 }

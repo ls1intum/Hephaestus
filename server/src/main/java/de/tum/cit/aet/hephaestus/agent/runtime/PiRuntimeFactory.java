@@ -77,6 +77,11 @@ public class PiRuntimeFactory {
             SandboxLayout.RUNNER_SCRIPT_FILENAME,
             loadClasspathResource(spec.runnerProfile().runnerScript())
         );
+        // Sibling ES-modules the runner imports relatively (e.g. pi-finding-normalize.mjs), staged at the
+        // workspace root next to .run-pi.mjs so the relative import resolves inside the sandbox.
+        for (String sidecar : spec.runnerProfile().sidecarScripts()) {
+            inputFiles.put(sidecar, loadClasspathResource(sidecar));
+        }
         inputFiles.putAll(spec.extraInputs());
 
         long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);

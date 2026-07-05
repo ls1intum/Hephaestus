@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
         @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
         @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
         @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
+        @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
     }
 )
 public sealed interface ConnectionConfig
@@ -24,7 +25,8 @@ public sealed interface ConnectionConfig
         ConnectionConfig.GitHubAppConfig,
         ConnectionConfig.GitHubPatConfig,
         ConnectionConfig.GitLabConfig,
-        ConnectionConfig.SlackConfig
+        ConnectionConfig.SlackConfig,
+        ConnectionConfig.OutlineConfig
 {
     /** Enabled sync streams (subset of the source's catalog). */
     Set<String> enabledStreams();
@@ -90,6 +92,32 @@ public sealed interface ConnectionConfig
         /** The configured retention window, or {@link #DEFAULT_RETENTION_DAYS} when unset. */
         public int retentionDaysOrDefault() {
             return retentionDays != null ? retentionDays : DEFAULT_RETENTION_DAYS;
+        }
+    }
+
+    /**
+     * Outline — the server host, the allow-list of collections whose documents are mirrored,
+     * and (when the change-notification subscription is registered) its id plus signing secret.
+     *
+     * <p>{@code serverUrl} is validated against the SSRF guard before any request is made.
+     * {@code collectionAllowList} scopes ingestion: only documents in these collections are
+     * mirrored into {@code outline_document}. The webhook fields stay {@code null} until a
+     * change-notification subscription is registered.
+     */
+    record OutlineConfig(
+        @Nullable String serverUrl,
+        Set<String> collectionAllowList,
+        @Nullable String webhookSubscriptionId,
+        @Nullable String webhookSecret,
+        Set<String> enabledStreams
+    ) implements ConnectionConfig {
+        /**
+         * Returns a copy with the change-notification subscription id and signing secret
+         * replaced, stamped after the subscription is registered. Pair with
+         * {@code connectionService.updateConfig(...)} to persist the swap atomically.
+         */
+        public OutlineConfig withWebhookSubscription(@Nullable String subscriptionId, @Nullable String signingSecret) {
+            return new OutlineConfig(serverUrl, collectionAllowList, subscriptionId, signingSecret, enabledStreams);
         }
     }
 }

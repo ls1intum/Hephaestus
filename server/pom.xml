@@ -820,6 +820,7 @@
                                         <include>de.tum.cit.aet.hephaestus.integration.scm.github.webhook</include>
                                         <include>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook</include>
                                         <include>de.tum.cit.aet.hephaestus.integration.slack.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.outline.webhook</include>
                                     </includes>
                                     <excludes>
                                         <exclude>*WebhookSecretSource</exclude>

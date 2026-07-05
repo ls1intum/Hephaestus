@@ -592,6 +592,25 @@ erDiagram
         VARCHAR(32) role "NOT NULL"
     }
 
+    OutlineDocument {
+        BIGINT id PK
+        BIGINT workspace_id UK "NOT NULL"
+        BIGINT connection_id UK "NOT NULL"
+        VARCHAR(64) document_id UK "NOT NULL"
+        VARCHAR(64) collection_id "NOT NULL"
+        VARCHAR(512) collection_slug
+        VARCHAR(64) parent_document_id
+        VARCHAR(1024) title
+        VARCHAR(512) slug
+        TEXT body_markdown
+        VARCHAR(64) content_hash
+        TIMESTAMPTZ outline_updated_at
+        TIMESTAMPTZ deleted_at
+        TIMESTAMPTZ last_materialized_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
     Practice {
         BIGINT id PK
         BIGINT workspace_id FK,UK "NOT NULL"
