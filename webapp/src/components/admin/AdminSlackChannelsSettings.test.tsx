@@ -166,7 +166,15 @@ describe("AdminSlackChannelsSettings — opted-out signal", () => {
 	it("shows the opt-out count for a channel with opt-outs and a muted 0 otherwise", () => {
 		setup({ channels: [pending, active] });
 		// active has 2 opt-outs; pending has 0 rendered as a visible trust signal.
-		expect(screen.getByText("2")).toBeTruthy();
-		expect(screen.getByText("0")).toBeTruthy();
+		// Scope each assertion to its own row (via the deterministic action-button label) so a
+		// stray "2"/"0" rendered elsewhere in the table can't satisfy a bare getByText.
+		const activeRow = screen
+			.getByRole("button", { name: "Actions for team-standup" })
+			.closest("tr");
+		const pendingRow = screen.getByRole("button", { name: "Actions for team-intro" }).closest("tr");
+		expect(activeRow).not.toBeNull();
+		expect(pendingRow).not.toBeNull();
+		expect(within(activeRow as HTMLElement).getByText("2")).toBeTruthy();
+		expect(within(pendingRow as HTMLElement).getByText("0")).toBeTruthy();
 	});
 });
