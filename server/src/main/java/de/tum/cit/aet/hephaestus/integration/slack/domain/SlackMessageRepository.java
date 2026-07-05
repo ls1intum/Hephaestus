@@ -32,9 +32,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     /**
      * Person erasure (opt-out / account hard-delete): delete every message this workspace stored that is authored by
      * one member — matched on the {@code author_member_id} firewall stamp, so only that individual's messages go and
-     * co-authors on the same channels/threads are untouched. Native because {@code author_member_id} is unmapped on
-     * the {@link SlackMessage} entity (written only via the native ingest insert); carries the {@code workspace_id}
-     * predicate and is idempotent (0 when the member authored nothing).
+     * co-authors on the same channels/threads are untouched. A native bulk delete that carries the
+     * {@code workspace_id} predicate and is idempotent (0 when the member authored nothing).
      *
      * @return the number of message rows deleted
      */

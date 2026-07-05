@@ -37,6 +37,10 @@ public class SlackMentorConfig {
         executor.setQueueCapacity(256);
         executor.setThreadNamePrefix("slack-mentor-dm-");
         executor.setDaemon(true);
+        // Let an in-flight interactive turn finish on deploy rather than dropping it mid-flight (bounded grace,
+        // consistent with the webhook shutdown window).
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(15);
         executor.initialize();
         return executor;
     }
@@ -55,6 +59,9 @@ public class SlackMentorConfig {
         executor.setQueueCapacity(64);
         executor.setThreadNamePrefix("slack-home-");
         executor.setDaemon(true);
+        // Drain in-flight Home renders on deploy (bounded grace, consistent with the webhook shutdown window).
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(15);
         executor.initialize();
         return executor;
     }

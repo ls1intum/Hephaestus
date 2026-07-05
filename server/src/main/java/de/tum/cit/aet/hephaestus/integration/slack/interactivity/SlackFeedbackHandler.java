@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.RatingSource;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
@@ -308,7 +307,6 @@ public class SlackFeedbackHandler {
             .slackMessageTs(messageTs)
             .feedbackId(feedbackId)
             .rating(rating)
-            .source(RatingSource.BUTTON)
             .build();
         ratingRepository.save(row);
 

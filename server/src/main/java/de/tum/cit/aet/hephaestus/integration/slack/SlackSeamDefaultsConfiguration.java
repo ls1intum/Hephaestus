@@ -2,24 +2,22 @@ package de.tum.cit.aet.hephaestus.integration.slack;
 
 import de.tum.cit.aet.hephaestus.integration.slack.events.ObviousAbuseFastPathSlackSafetyClassifier;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSafetyClassifier;
-import de.tum.cit.aet.hephaestus.integration.slack.health.NoopSlackAuthLivenessClient;
-import de.tum.cit.aet.hephaestus.integration.slack.health.SlackAuthLivenessClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Registers the overridable default beans for the Slack message-classification and token-liveness seams.
+ * Registers the overridable default bean for the Slack message-classification seam.
  *
- * <p>Both defaults use {@code @ConditionalOnMissingBean} so a richer implementation (a model-backed
- * moderation/safety classifier, a live {@code auth.test} client) can replace them without touching the mentor flow.
- * The default classifier is only an obvious-abuse keyword fast-path — see {@link ObviousAbuseFastPathSlackSafetyClassifier}
- * for why it is not, on its own, crisis/safety detection.
- * They live here, on {@code @Bean} factory methods, rather than as component-scanned {@code @Component}s:
+ * <p>The default uses {@code @ConditionalOnMissingBean} so a richer implementation (a model-backed
+ * moderation/safety classifier) can replace it without touching the mentor flow. The default classifier is only an
+ * obvious-abuse keyword fast-path — see {@link ObviousAbuseFastPathSlackSafetyClassifier} for why it is not, on its
+ * own, crisis/safety detection.
+ * It lives here, on a {@code @Bean} factory method, rather than as a component-scanned {@code @Component}:
  * {@code @ConditionalOnMissingBean} is only evaluated deterministically for {@code @Bean} methods, so on a
  * scanned component it left the default unregistered and broke context startup ({@code SlackMentorService}
- * and {@code SlackTokenHealthProbe} both require these seams at construction).
+ * requires this seam at construction).
  */
 @Configuration
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -29,11 +27,5 @@ class SlackSeamDefaultsConfiguration {
     @ConditionalOnMissingBean(SlackSafetyClassifier.class)
     SlackSafetyClassifier obviousAbuseFastPathSlackSafetyClassifier() {
         return new ObviousAbuseFastPathSlackSafetyClassifier();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(SlackAuthLivenessClient.class)
-    SlackAuthLivenessClient noopSlackAuthLivenessClient() {
-        return new NoopSlackAuthLivenessClient();
     }
 }

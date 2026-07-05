@@ -15,7 +15,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Immutable;
 import org.jspecify.annotations.Nullable;
 
@@ -76,11 +75,6 @@ public class MentorTurnRating {
     @Column(name = "rating", nullable = false, length = 16)
     private TurnRating rating;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "source", nullable = false, length = 16)
-    @ColumnDefault("'BUTTON'")
-    private RatingSource source;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -91,9 +85,6 @@ public class MentorTurnRating {
         }
         if (createdAt == null) {
             createdAt = Instant.now();
-        }
-        if (source == null) {
-            source = RatingSource.BUTTON;
         }
     }
 }

@@ -58,7 +58,7 @@ public interface AccountIdentityQuery {
      * (not a {@code IdentityProvider} entity) so {@code core.auth} stays free of integration imports.
      *
      * @param identityLinkId  the link row id (needed to call {@link #linkExternalActor})
-     * @param gitProviderId   FK into the integration-owned {@code git_provider} row
+     * @param gitProviderId   FK into the integration-owned {@code identity_provider} row
      * @param subject         the IdP-stable numeric provider user id (GitLab / GitHub numeric id)
      * @param usernameAtSignup the provider login captured at link time (maps to {@code User.login})
      * @param displayName     the provider display name at link time

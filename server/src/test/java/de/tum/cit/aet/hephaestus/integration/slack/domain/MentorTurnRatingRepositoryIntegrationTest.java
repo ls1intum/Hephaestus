@@ -34,7 +34,6 @@ class MentorTurnRatingRepositoryIntegrationTest extends BaseIntegrationTest {
             .threadTs("100.0")
             .slackMessageTs(ts)
             .rating(verdict)
-            .source(RatingSource.BUTTON)
             .createdAt(createdAt)
             .build();
     }

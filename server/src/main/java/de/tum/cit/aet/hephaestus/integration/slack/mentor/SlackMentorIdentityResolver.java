@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Resolves a Slack sender {@code (team_id, user_id)} to the SCM developer login the mentor should draw its
- * practice history from — the P2 identity bridge that replaces the former {@code resolveDeveloper} stub.
+ * practice history from.
  *
  * <p>The chain is deliberately SPI-only so this adapter never imports {@code core.auth} domain types:
  * <ol>

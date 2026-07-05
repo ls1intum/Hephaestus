@@ -30,11 +30,11 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     }
 
     /**
-     * Get-or-create the {@code git_provider} row, committing in its OWN transaction
+     * Get-or-create the {@code identity_provider} row, committing in its OWN transaction
      * ({@link Propagation#REQUIRES_NEW}). This is required for correctness, not just isolation: account
-     * provisioning inserts the {@code identity_link} (FK {@code sfk_identity_link_git_provider}) inside
+     * provisioning inserts the {@code identity_link} (FK {@code sfk_identity_link_provider}) inside
      * {@code AccountJitCreator}'s {@code REQUIRES_NEW} transaction, which under READ_COMMITTED cannot see
-     * an uncommitted {@code git_provider} row. The first login on a not-yet-seen instance (e.g. a
+     * an uncommitted {@code identity_provider} row. The first login on a not-yet-seen instance (e.g. a
      * self-hosted gitlab.lrz.de) would otherwise create the row in the outer login transaction and then
      * fail the FK from the inner JIT transaction. The provider row is idempotent reference data (an SCM
      * instance registration, reused across logins — exactly like the env-seeded github.com / gitlab.com

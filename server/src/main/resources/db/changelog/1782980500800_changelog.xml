@@ -380,10 +380,8 @@
                 slack_message_ts VARCHAR(32) NOT NULL,
                 feedback_id UUID CONSTRAINT sfk_mentor_turn_rating_feedback REFERENCES feedback(id) ON DELETE SET NULL,
                 rating VARCHAR(16) NOT NULL,
-                source VARCHAR(16) NOT NULL DEFAULT 'BUTTON',
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                CONSTRAINT chk_mentor_turn_rating_rating CHECK (rating IN ('HELPFUL', 'UNHELPFUL')),
-                CONSTRAINT chk_mentor_turn_rating_source CHECK (source IN ('BUTTON'))
+                CONSTRAINT chk_mentor_turn_rating_rating CHECK (rating IN ('HELPFUL', 'UNHELPFUL'))
             );
             CREATE INDEX idx_mentor_turn_rating_rater_created ON mentor_turn_rating (rater_user_id, created_at DESC);
         </sql>

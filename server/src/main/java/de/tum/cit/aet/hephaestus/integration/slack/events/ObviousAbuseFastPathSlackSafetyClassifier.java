@@ -17,11 +17,9 @@ import java.util.Locale;
  * is NOT matched, that means nothing about whether it was actually safe — it just means this cheap matcher had no
  * opinion, and the message is mentored normally.
  *
- * <p>Registered as the default {@code @ConditionalOnMissingBean} in {@link SlackSeamDefaultsConfiguration}. The
- * intended production posture is to replace it with a model-backed moderation/classification bean via that seam;
- * this fast-path is the fallback so the flow is never wired with a null classifier. It is NOT a component-scanned
- * bean: {@code @ConditionalOnMissingBean} is only reliable on a {@code @Bean} factory method, not on a scanned
- * {@code @Component} (where evaluation order left the default unregistered and broke context startup).
+ * <p>Registered as the default classifier in {@link SlackSeamDefaultsConfiguration}. The intended production
+ * posture is to replace it with a model-backed moderation/classification bean via that seam; this fast-path is the
+ * fallback so the flow is never wired with a null classifier.
  */
 public class ObviousAbuseFastPathSlackSafetyClassifier implements SlackSafetyClassifier {
 
