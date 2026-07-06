@@ -36,8 +36,9 @@ import tools.jackson.databind.JsonNode;
  * via {@code ON CONFLICT DO NOTHING}, so a duplicate redelivery applies once — no double-apply.
  * Deletes are durable against reorder: {@code tombstoneMessage} UPSERTs a contentless tombstone, so a
  * delete that races ahead of a NAK-redelivered base insert still wins (the later insert cannot
- * resurrect the deleted content). An edit is a scoped UPDATE that no-ops on a not-yet-ingested row (a
- * rare edit-before-insert reorder loses the edit, leaving the base text). The base class wraps
+ * resurrect the deleted content). Edits are reorder-durable too: {@code editMessage} swaps the text on the
+ * ingested row, and on a not-yet-ingested row (an edit-before-insert reorder) it re-ingests the edited body
+ * through the full consent stack, so the edit is never lost and never bypasses consent. The base class wraps
  * {@link #handleEvent} in a {@link TransactionTemplate}; any exception rolls back and propagates so
  * the consumer NAKs and JetStream redelivers.
  */
@@ -70,8 +71,9 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
         String channelId = event.path("channel").asString("");
 
         // Edits/deletes arrive as message SUBTYPES; route them before the subtype no-op below (which drops every
-        // other subtyped message). Slack nests the changed/deleted payload under event.message / previous_message,
-        // so the bot_id guard does not apply — a message we never stored simply no-ops the scoped UPDATE.
+        // other subtyped message). Slack nests the changed/deleted payload under event.message / previous_message.
+        // The top-level bot_id guard does not fire here, but the edit branch re-checks event.message.bot_id itself
+        // because a message_changed can now re-ingest content (see below).
         if ("message_deleted".equals(subtype)) {
             String deletedTs = event
                 .path("deleted_ts")
@@ -81,10 +83,17 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
         }
         if ("message_changed".equals(subtype)) {
             JsonNode changed = event.path("message");
+            // Now that an edit can re-ingest content, a bot-authored edited message (e.g. an unfurl rewrite) must be
+            // excluded like a plain bot message.
+            if (changed.has("bot_id")) {
+                return;
+            }
             ingestService.editMessage(
                 teamId,
                 channelId,
                 changed.path("ts").asString(""),
+                changed.path("thread_ts").asString(null),
+                changed.path("user").asString(""),
                 changed.path("text").asString("")
             );
             return;

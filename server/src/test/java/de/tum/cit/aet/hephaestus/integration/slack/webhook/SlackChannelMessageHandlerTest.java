@@ -100,6 +100,33 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         handler = new SlackChannelMessageHandler(ingestService, deserializer, transactionTemplate);
     }
 
+    /** A handler whose ingest service has the conversation-ingest kill switch OFF (fail-closed layer 1). */
+    private SlackChannelMessageHandler handlerWithIngestDisabled() {
+        SlackIngestService ingestService = new SlackIngestService(
+            workspaceResolver,
+            monitoredChannelRepository,
+            consentGate,
+            participantConsentGate,
+            messageRepository,
+            threadRepository,
+            identityResolver,
+            conversationFeedbackErasure,
+            false // conversation-ingest capability OFF
+        );
+        NatsMessageDeserializer deserializer = new NatsMessageDeserializer(JsonMapper.builder().build());
+        TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
+        lenient()
+            .doAnswer(invocation -> {
+                @SuppressWarnings("unchecked")
+                Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                callback.accept(null);
+                return null;
+            })
+            .when(transactionTemplate)
+            .executeWithoutResult(any());
+        return new SlackChannelMessageHandler(ingestService, deserializer, transactionTemplate);
+    }
+
     private static Message natsMessage(String body) {
         Message m = mock(Message.class);
         when(m.getSubject()).thenReturn("slack.T1.C1.message");
@@ -259,13 +286,17 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     @Test
     void messageChanged_editsStoredText() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        // Row-exists happy path: the scoped UPDATE touches 1 row, so editMessage returns without re-ingesting.
+        when(
+            messageRepository.applyEdit(eq(WORKSPACE), eq("C1"), eq("100.1"), eq("edited body"), any(Instant.class))
+        ).thenReturn(1);
 
         handler.onMessage(
             natsMessage(
                 """
                 {"type":"event_callback","team_id":"T1","event":{
                   "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
-                  "message":{"ts":"100.1","text":"edited body"}}}
+                  "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
                 """
             )
         );
@@ -277,6 +308,99 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
             eq("edited body"),
             any(Instant.class)
         );
+        // Row existed → no re-ingest.
+        verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void messageChanged_beforeBaseInsert_isDurable() {
+        stubActiveConsentedChannel();
+        // The base insert has not arrived: the scoped UPDATE touches 0 rows and the row is genuinely absent, so the
+        // edited body is routed back through the full consent stack (re-ingest), storing the EDITED text durably.
+        when(
+            messageRepository.applyEdit(eq(WORKSPACE), eq("C1"), eq("100.1"), eq("edited body"), any(Instant.class))
+        ).thenReturn(0);
+        when(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(WORKSPACE, "C1", "100.1")).thenReturn(
+            false
+        );
+        when(
+            messageRepository.insertIfAbsent(eq(WORKSPACE), any(), any(), any(), any(), any(), any(), any())
+        ).thenReturn(1);
+
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+                  "message":{"ts":"100.1","user":"U1","thread_ts":"100.0","text":"edited body"}}}
+                """
+            )
+        );
+
+        // Re-ingest ran through the gated path and persisted the EDITED text under the resolved workspace + member id.
+        verify(messageRepository).insertIfAbsent(WORKSPACE, "T1", "C1", "100.1", "100.0", "U1", 7L, "edited body");
+    }
+
+    @Test
+    void messageChanged_afterTombstone_staysTombstoned() {
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        // The row exists but is tombstoned: applyEdit no-ops (deleted_at IS NULL guard) AND existsBy is true, so the
+        // edit must NOT re-ingest — a tombstone is never resurrected by a late edit.
+        when(messageRepository.applyEdit(eq(WORKSPACE), eq("C1"), eq("100.1"), any(), any(Instant.class))).thenReturn(
+            0
+        );
+        when(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(WORKSPACE, "C1", "100.1")).thenReturn(
+            true
+        );
+
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+                  "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
+                """
+            )
+        );
+
+        verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void flagOff_editMessage_doesNothing() {
+        handler = handlerWithIngestDisabled();
+
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+                  "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
+                """
+            )
+        );
+
+        // Kill switch off: the edit path short-circuits before resolving the tenant or touching persistence.
+        verify(workspaceResolver, never()).resolveWorkspaceId(any());
+        verify(messageRepository, never()).applyEdit(anyLong(), any(), any(), any(), any(Instant.class));
+        verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void flagOff_tombstone_doesNothing() {
+        handler = handlerWithIngestDisabled();
+
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+                """
+            )
+        );
+
+        verify(workspaceResolver, never()).resolveWorkspaceId(any());
+        verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
     }
 
     /** The tombstone path gates on the SAME channel-consent + forward-only rules as ingest (no participant gate). */

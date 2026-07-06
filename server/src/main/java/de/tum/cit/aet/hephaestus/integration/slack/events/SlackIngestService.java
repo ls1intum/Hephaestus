@@ -213,17 +213,49 @@ public class SlackIngestService {
 
     /**
      * Slack {@code message_changed}: replace the stored text with the edited body ({@code event.message}) and
-     * stamp {@code edited_at}. A no-op when the message was never ingested (e.g. the channel was not ACTIVE at the
-     * time) or is already tombstoned.
+     * stamp {@code edited_at}. Durable against out-of-order delivery, at parity with the tombstone: when the base
+     * insert has not yet arrived (a NAK-redelivered reorder), the edited body is routed back through the fully-gated
+     * {@link #ingestChannelMessage} so it is stored durably AND consent-safely (consent + forward-only watermark +
+     * participant firewall + identity stamp), rather than lost. A no-op only when the row is already tombstoned
+     * (never resurrected). Honors the channel-ingest kill switch, like ingest and tombstone.
      */
     @Transactional
-    public void editMessage(String teamId, String channelId, String ts, @Nullable String text) {
-        if (channelId.isEmpty() || ts.isEmpty()) {
+    public void editMessage(
+        String teamId,
+        String channelId,
+        String ts,
+        @Nullable String threadTs,
+        @Nullable String authorSlackUserId,
+        @Nullable String text
+    ) {
+        // Fail-closed layer 1: honor the channel-ingest kill switch (ingest + tombstone both do). editMessage can now
+        // INSERT via re-ingest, so this guard is load-bearing, not cosmetic.
+        if (!conversationIngestEnabled || channelId.isEmpty() || ts.isEmpty()) {
             return;
         }
-        workspaceResolver
-            .resolveWorkspaceId(teamId)
-            .ifPresent(workspaceId -> messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now()));
+        Optional<Long> workspaceOpt = workspaceResolver.resolveWorkspaceId(teamId);
+        if (workspaceOpt.isEmpty()) {
+            return;
+        }
+        long workspaceId = workspaceOpt.get();
+
+        // Normal case: the base row exists -> scoped UPDATE swaps in the edited text. The deleted_at IS NULL guard in
+        // applyEdit means a delete-then-edit reorder no-ops (updated == 0, row present) and never resurrects a tombstone.
+        int updated = messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now());
+        if (updated > 0) {
+            return;
+        }
+        // Durable edit-before-insert: the edit raced ahead of a NAK-redelivered base insert (row absent). Route the
+        // edited body through the SAME fail-closed ingest stack (consent + forward-only watermark + participant firewall
+        // + identity stamp) so it is stored durably AND consent-safely; the later insertIfAbsent (ON CONFLICT DO NOTHING)
+        // then no-ops. existsBy distinguishes a TOMBSTONED row (updated == 0 but present -> skip, no resurrection) from a
+        // genuinely-absent one (re-ingest).
+        if (!messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, channelId, ts)) {
+            ingestChannelMessage(teamId, channelId, ts, threadTs, authorSlackUserId, text);
+            // Stamp edited_at (insertIfAbsent does not): a row born from message_changed genuinely is an edited message,
+            // so the projector's `edited` flag reads true. Idempotent second write on the now-present row.
+            messageRepository.applyEdit(workspaceId, channelId, ts, text, Instant.now());
+        }
     }
 
     /**

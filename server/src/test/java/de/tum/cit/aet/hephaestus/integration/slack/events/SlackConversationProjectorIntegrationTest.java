@@ -178,4 +178,38 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         assertThat(row.get("text")).isNull();
         assertThat(row.get("deleted_at")).isNotNull();
     }
+
+    @Test
+    @DisplayName(
+        "durable edit: an edit arriving before its base insert re-ingests the EDITED text; the reordered base insert cannot clobber it"
+    )
+    void editBeforeInsert_isDurable() {
+        long ws = newWorkspace();
+        seedChannel(ws, "C1", "ACTIVE");
+        seedThread(ws, "C1", "100.0", "100.9", "{100}");
+
+        // JetStream reorder: message_changed for ts 100.9 is processed BEFORE its base insert. The scoped UPDATE finds
+        // no row (returns 0) and the row is genuinely absent — the durability primitive the service branches on.
+        assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", java.time.Instant.now())).isZero();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(ws, "C1", "100.9")).isFalse();
+
+        // The service's durable branch re-ingests the EDITED body (through the full consent stack) and stamps edited_at.
+        assertThat(
+            messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "EDITED body")
+        ).isEqualTo(1);
+        assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", java.time.Instant.now())).isEqualTo(1);
+
+        // The reordered base insert now arrives carrying the ORIGINAL text — ON CONFLICT DO NOTHING must NOT clobber
+        // the durably-stored edited body (this is the invariant that fails if edits regress to lossy).
+        assertThat(
+            messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "original base text")
+        ).isZero();
+
+        // The projector shows the edited text with the edited flag set — the edit survived the reorder.
+        ObjectNode payload = projector.buildPayload(ws, 100L);
+        ArrayNode messages = (ArrayNode) conversations(payload).get(0).get("messages");
+        assertThat(messages).hasSize(1);
+        assertThat(messages.get(0).get("text").asString()).isEqualTo("EDITED body");
+        assertThat(messages.get(0).get("edited").asBoolean()).isTrue();
+    }
 }

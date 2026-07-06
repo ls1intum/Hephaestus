@@ -112,7 +112,10 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     /**
      * Slack {@code message_changed}: replace the rendered {@code text} with the edited body and stamp
      * {@code edited_at}. Scoped JPQL UPDATE carrying the {@code workspace_id} predicate. Never resurrects a
-     * tombstoned row ({@code deleted_at IS NULL} guard). Returns rows affected.
+     * tombstoned row ({@code deleted_at IS NULL} guard). Returns rows affected — a {@code 0} lets
+     * {@code SlackIngestService.editMessage} tell an already-tombstoned row (present, skip) from a not-yet-ingested
+     * one (re-ingest the edited body through the full consent stack), making edits durable against out-of-order
+     * delivery at parity with the tombstone.
      */
     @Modifying
     @Transactional
