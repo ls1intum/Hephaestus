@@ -33,13 +33,13 @@ import tools.jackson.databind.JsonNode;
  * </ul>
  *
  * <p><strong>Idempotency.</strong> {@code insertIfAbsent} keys on {@code (workspace, channel, ts)}
- * via {@code ON CONFLICT DO NOTHING}, so a duplicate redelivery of the same event re-runs the exact
- * resolve/gate/store and applies once — no double-apply. Edits/deletes are scoped UPDATEs that no-op
- * on a not-yet-ingested row; JetStream's in-order per-subject delivery normally orders the base
- * insert first, so the one case this per-message path does not self-heal is a pathological reorder
- * (a NAK'd base insert redelivered after its own delete). The base class wraps {@link #handleEvent}
- * in a {@link TransactionTemplate}; any exception rolls back and propagates so the consumer NAKs and
- * JetStream redelivers.
+ * via {@code ON CONFLICT DO NOTHING}, so a duplicate redelivery applies once — no double-apply.
+ * Deletes are durable against reorder: {@code tombstoneMessage} UPSERTs a contentless tombstone, so a
+ * delete that races ahead of a NAK-redelivered base insert still wins (the later insert cannot
+ * resurrect the deleted content). An edit is a scoped UPDATE that no-ops on a not-yet-ingested row (a
+ * rare edit-before-insert reorder loses the edit, leaving the base text). The base class wraps
+ * {@link #handleEvent} in a {@link TransactionTemplate}; any exception rolls back and propagates so
+ * the consumer NAKs and JetStream redelivers.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

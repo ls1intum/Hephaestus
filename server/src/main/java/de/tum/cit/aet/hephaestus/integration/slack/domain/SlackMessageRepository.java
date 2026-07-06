@@ -84,18 +84,26 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     );
 
     /**
-     * Slack {@code message_deleted} tombstone (GDPR Art. 17): stamp {@code deleted_at} and null the stored
-     * {@code text} so a deleted message's content no longer lingers or surfaces to the mentor. Scoped JPQL UPDATE
-     * carrying the {@code workspace_id} predicate. Returns rows affected (0 when the message was never ingested).
+     * Slack {@code message_deleted} tombstone (GDPR Art. 17), durable against out-of-order delivery: UPSERT a
+     * contentless tombstone (stamp {@code deleted_at}, {@code text = NULL}). On an already-ingested row it tombstones
+     * it in place; if the delete raced ahead of a NAK-redelivered base insert, it writes the tombstone first so the
+     * later {@link #insertIfAbsent} ({@code ON CONFLICT DO NOTHING}) cannot resurrect the deleted content. INSERTs are
+     * exempt from the tenancy predicate check; the caller applies the same channel-consent + forward-only gates as
+     * ingest, so this only ever writes for an ACTIVE, in-window channel. Returns rows affected (always 1).
      */
     @Modifying
     @Transactional
     @Query(
-        "UPDATE SlackMessage m SET m.deletedAt = :now, m.text = NULL " +
-            "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs"
+        value = """
+        INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, text, deleted_at, ingested_at)
+        VALUES (:workspaceId, :slackTeamId, :slackChannelId, :slackTs, NULL, :now, now())
+        ON CONFLICT (workspace_id, slack_channel_id, slack_ts) DO UPDATE SET deleted_at = :now, text = NULL
+        """,
+        nativeQuery = true
     )
     int tombstone(
-        @Param("workspaceId") Long workspaceId,
+        @Param("workspaceId") long workspaceId,
+        @Param("slackTeamId") String slackTeamId,
         @Param("slackChannelId") String slackChannelId,
         @Param("slackTs") String slackTs,
         @Param("now") Instant now

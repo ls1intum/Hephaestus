@@ -140,9 +140,9 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         seedMessage(ws, "C1", "100.0", null, "root will be edited");
         seedMessage(ws, "C1", "100.5", "100.0", "reply will be deleted");
 
-        // Edit the root, tombstone the reply (both via the scoped repository UPDATEs the ingest path drives).
+        // Edit the root, tombstone the reply (both via the scoped repository writes the ingest path drives).
         assertThat(messageRepository.applyEdit(ws, "C1", "100.0", "root EDITED", java.time.Instant.now())).isEqualTo(1);
-        assertThat(messageRepository.tombstone(ws, "C1", "100.5", java.time.Instant.now())).isEqualTo(1);
+        assertThat(messageRepository.tombstone(ws, "T1", "C1", "100.5", java.time.Instant.now())).isEqualTo(1);
 
         ObjectNode payload = projector.buildPayload(ws, 100L);
         ArrayNode messages = (ArrayNode) conversations(payload).get(0).get("messages");
@@ -151,5 +151,31 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0).get("text").asString()).isEqualTo("root EDITED");
         assertThat(messages.get(0).get("edited").asBoolean()).isTrue();
+    }
+
+    @Test
+    @DisplayName("durable tombstone: a delete arriving before its base insert cannot be resurrected by the reorder")
+    void tombstoneBeforeInsert_isNotResurrected() {
+        long ws = newWorkspace();
+        seedChannel(ws, "C1", "ACTIVE");
+
+        // JetStream reorder: the message_deleted for ts 100.9 is processed BEFORE its base insert (e.g. the insert
+        // was NAK'd and redelivered later). The durable upsert writes a contentless tombstone for that ts.
+        assertThat(messageRepository.tombstone(ws, "T1", "C1", "100.9", java.time.Instant.now())).isEqualTo(1);
+
+        // The reordered base insert now arrives — ON CONFLICT DO NOTHING must NOT bring the deleted content back.
+        assertThat(
+            messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "resurrected?")
+        ).isZero();
+
+        // The row stays a contentless tombstone: text NULL, deleted_at set.
+        java.util.Map<String, Object> row = jdbc.queryForMap(
+            "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND slack_ts = ?",
+            ws,
+            "C1",
+            "100.9"
+        );
+        assertThat(row.get("text")).isNull();
+        assertThat(row.get("deleted_at")).isNotNull();
     }
 }

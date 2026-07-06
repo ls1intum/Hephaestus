@@ -163,6 +163,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 // Native INSERT ... ON CONFLICT DO NOTHING for an ingested Slack message; each column
                 // (workspace/team/channel/ts/thread_ts/author/member/text) is a distinct @Param.
                 "SlackMessageRepository.insertIfAbsent",
+                // Native durable-tombstone UPSERT (INSERT ... ON CONFLICT DO UPDATE); each column is a distinct @Param.
+                "SlackMessageRepository.tombstone",
                 // JPQL admin-audit query: each nullable filter needs its own @Param for the
                 // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
                 "AuthEventRepository.findForAdmin"

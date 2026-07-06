@@ -279,9 +279,18 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         );
     }
 
+    /** The tombstone path gates on the SAME channel-consent + forward-only rules as ingest (no participant gate). */
+    private void stubActiveConsentedChannelForTombstone() {
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        when(consentGate.ingestAllowed(WORKSPACE, "C1")).thenReturn(true);
+        when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1")).thenReturn(
+            Optional.of(ANNOUNCED_BEFORE)
+        );
+    }
+
     @Test
     void messageDeleted_tombstonesOnDeletedTs_notEventTs() {
-        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        stubActiveConsentedChannelForTombstone();
 
         handler.onMessage(
             natsMessage(
@@ -292,12 +301,13 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
             )
         );
 
-        verify(messageRepository).tombstone(eq(WORKSPACE), eq("C1"), eq("100.1"), any(Instant.class));
+        // Keyed on the deleted message's ts (100.1), carrying the team id for the durable upsert.
+        verify(messageRepository).tombstone(eq(WORKSPACE), eq("T1"), eq("C1"), eq("100.1"), any(Instant.class));
     }
 
     @Test
     void messageDeleted_fallsBackToPreviousMessageTs() {
-        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        stubActiveConsentedChannelForTombstone();
 
         handler.onMessage(
             natsMessage(
@@ -308,7 +318,25 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
             )
         );
 
-        verify(messageRepository).tombstone(eq(WORKSPACE), eq("C1"), eq("150.2"), any(Instant.class));
+        verify(messageRepository).tombstone(eq(WORKSPACE), eq("T1"), eq("C1"), eq("150.2"), any(Instant.class));
+    }
+
+    @Test
+    void messageDeleted_onNonActiveChannel_tombstonesNothing() {
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        when(consentGate.ingestAllowed(WORKSPACE, "C1")).thenReturn(false); // PENDING/PAUSED/REVOKED
+
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+                """
+            )
+        );
+
+        // A delete on a channel we don't ingest must not create a (contentless) tombstone row.
+        verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
     }
 
     @Test

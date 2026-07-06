@@ -189,12 +189,26 @@ public class SlackIngestService {
      */
     @Transactional
     public void tombstoneMessage(String teamId, String channelId, String deletedTs) {
-        if (channelId.isEmpty() || deletedTs.isEmpty()) {
+        if (!conversationIngestEnabled || channelId.isEmpty() || deletedTs.isEmpty()) {
             return;
         }
-        workspaceResolver
-            .resolveWorkspaceId(teamId)
-            .ifPresent(workspaceId -> messageRepository.tombstone(workspaceId, channelId, deletedTs, Instant.now()));
+        Optional<Long> workspaceOpt = workspaceResolver.resolveWorkspaceId(teamId);
+        if (workspaceOpt.isEmpty()) {
+            return;
+        }
+        long workspaceId = workspaceOpt.get();
+        // Tombstone under the SAME channel-consent + forward-only gates as ingest: a delete on a non-ACTIVE channel,
+        // or of a pre-announcement message, tombstones nothing (we never stored it). On an ACTIVE, in-window delete
+        // the durable upsert both tombstones an ingested row AND blocks a later out-of-order base insert from
+        // resurrecting the content. No participant-firewall check: a tombstone is contentless (text NULL).
+        if (!consentGate.ingestAllowed(workspaceId, channelId)) {
+            return;
+        }
+        Instant announcedAt = monitoredChannelRepository.findConsentAnnouncedAt(workspaceId, channelId).orElse(null);
+        if (announcedAt == null || !isAfterAnnouncement(deletedTs, announcedAt)) {
+            return;
+        }
+        messageRepository.tombstone(workspaceId, teamId, channelId, deletedTs, Instant.now());
     }
 
     /**
