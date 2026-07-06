@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMes
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService;
+import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -14,9 +15,7 @@ import tools.jackson.databind.JsonNode;
  * ({@code slack.<team>.<channel>.message}). Registered on the unified
  * {@code IntegrationMessageHandlerRegistry} via {@code EventTypeKey(SLACK, "message")};
  * the {@code IntegrationNatsConsumer} slack consumer feeds it off the ACK thread, so this runs
- * with the framework's at-least-once + poison/DLQ + backpressure + graceful-drain guarantees —
- * the durability the previous synchronous, log-and-200 ingest lacked (a pod-kill between the
- * old dedup-claim and the ingest permanently lost the event).
+ * with the framework's at-least-once + poison/DLQ + backpressure + graceful-drain guarantees.
  *
  * <p>The whole {@code event_callback} envelope is republished onto JetStream by
  * {@link SlackChannelEventPublisher}, so this handler re-derives the message subtype from the
@@ -29,19 +28,28 @@ import tools.jackson.databind.JsonNode;
  *   <li>{@code message_deleted} → {@code tombstoneMessage} (GDPR Art. 17 tombstone), keyed on
  *       the deleted message's {@code ts} ({@code deleted_ts}, fallback
  *       {@code previous_message.ts}), never the delivery's own {@code ts};
- *   <li>a bot-authored message or any other subtype (joins, topic changes, …) → no-op.
+ *   <li>a content-bearing subtype ({@code thread_broadcast}, {@code me_message}) → ingested like a
+ *       plain message; a bot-authored message or a non-content subtype (joins, topic changes, …) → no-op.
  * </ul>
  *
- * <p><strong>Idempotency</strong> is the committed effect: {@code insertIfAbsent} keys on
- * {@code (workspace, channel, ts)} via {@code ON CONFLICT DO NOTHING}, so a JetStream
- * redelivery (or a duplicate Slack delivery that slipped the {@code Nats-Msg-Id} window)
- * re-runs the exact same resolve/gate/store and applies once — no double-apply, no loss. The
- * base class wraps {@link #handleEvent} in a {@link TransactionTemplate}; any exception rolls
- * the transaction back and propagates so the consumer NAKs and JetStream redelivers.
+ * <p><strong>Idempotency.</strong> {@code insertIfAbsent} keys on {@code (workspace, channel, ts)}
+ * via {@code ON CONFLICT DO NOTHING}, so a duplicate redelivery of the same event re-runs the exact
+ * resolve/gate/store and applies once — no double-apply. Edits/deletes are scoped UPDATEs that no-op
+ * on a not-yet-ingested row; JetStream's in-order per-subject delivery normally orders the base
+ * insert first, so the one case this per-message path does not self-heal is a pathological reorder
+ * (a NAK'd base insert redelivered after its own delete). The base class wraps {@link #handleEvent}
+ * in a {@link TransactionTemplate}; any exception rolls back and propagates so the consumer NAKs and
+ * JetStream redelivers.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandler<JsonNode> {
+
+    /**
+     * Subtypes that still carry a real author + {@code ts} + {@code text} and must ingest like a plain
+     * message. Everything else with a non-empty subtype (channel_join, channel_topic, …) is metadata.
+     */
+    private static final Set<String> CONTENT_BEARING_SUBTYPES = Set.of("thread_broadcast", "me_message");
 
     private final SlackIngestService ingestService;
 
@@ -81,8 +89,12 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
             );
             return;
         }
-        // Never react to our own bot's messages, or to any other subtype (joins, channel_topic, thread_broadcast…).
-        if (event.has("bot_id") || !subtype.isEmpty()) {
+        // Never react to our own bot's messages.
+        if (event.has("bot_id")) {
+            return;
+        }
+        // A plain message (empty subtype) or a content-bearing subtype ingests; other subtypes are metadata.
+        if (!subtype.isEmpty() && !CONTENT_BEARING_SUBTYPES.contains(subtype)) {
             return;
         }
         ingestService.ingestChannelMessage(

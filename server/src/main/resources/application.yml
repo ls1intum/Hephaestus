@@ -512,6 +512,11 @@ hephaestus:
     # inert. Flip `enabled` to `true` once client-id + client-secret + redirect-uri
     # are configured.
     integration:
+        # Generic gate for the fleet-wide flat-stream NATS consumer (IntegrationNatsConsumer stays
+        # vendor-neutral in core). Driven by the messaging integrations; today only Slack publishes a
+        # flat (non-repository-scoped) stream, so it tracks the same env var as slack.enabled.
+        flat-stream:
+            enabled: ${hephaestus.integration.slack.enabled:false}
         # ─── GitHub authentication (GitHubProperties) ───
         # Can be any OAuth token, such as the PAT.
         github:

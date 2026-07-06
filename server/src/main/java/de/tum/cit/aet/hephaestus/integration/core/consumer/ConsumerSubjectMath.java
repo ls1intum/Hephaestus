@@ -38,11 +38,11 @@ import org.jspecify.annotations.Nullable;
  * routing; {@link IntegrationMessageDispatcher} delegates to it rather than keeping its
  * own copy. The map is pure (no Spring), can be called from anywhere on the hot path, and
  * never calls {@link IntegrationKind#valueOf(String)} on subject-derived input
- * (reflection-on-user-input is the bug class we are precluding). It lists only the kinds
- * that publish to JetStream (GitHub, GitLab); Slack is messaging-only and has no NATS
- * stream. The HTTP-path router {@code IntegrationKindRouting} is intentionally separate —
- * it additionally routes {@code slack} for the OAuth-callback endpoint, a membership the
- * NATS map must not share.
+ * (reflection-on-user-input is the bug class we are precluding). It lists the kinds that
+ * publish to JetStream — GitHub, GitLab, and Slack (whose monitored-channel {@code message}
+ * events ride the durable transport; the interactive Slack paths stay in-process). The
+ * HTTP-path router {@code IntegrationKindRouting} (the {@code POST /webhooks/{kind}} map) is a
+ * separate concern, maintained independently.
  *
  * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP-path router
  */
@@ -247,7 +247,7 @@ public final class ConsumerSubjectMath {
     /**
      * Wildcard subject filter matching every event on a flat-stream kind's stream
      * ({@code <stream>.>}). One fleet-wide filter — a flat-stream kind has no per-scope
-     * repository fan-out (today only the messaging kinds, e.g. Slack).
+     * repository fan-out.
      */
     public static String flatStreamSubjectFilter(IntegrationKind kind) {
         return resolveStream(kind) + ".>";

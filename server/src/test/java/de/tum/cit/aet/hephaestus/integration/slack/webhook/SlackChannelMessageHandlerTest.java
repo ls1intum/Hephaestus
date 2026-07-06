@@ -234,6 +234,29 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
+    void threadBroadcast_isIngestedLikeAPlainMessage() {
+        stubActiveConsentedChannel();
+        when(
+            messageRepository.insertIfAbsent(eq(WORKSPACE), any(), any(), any(), any(), any(), any(), any())
+        ).thenReturn(1);
+
+        // A thread reply also broadcast to the channel arrives with subtype "thread_broadcast" but carries a real
+        // author + ts + text, so it must ingest — not be dropped by the non-content subtype no-op.
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"thread_broadcast","channel_type":"channel","channel":"C1",
+                  "user":"U1","ts":"100.1","thread_ts":"100.0","text":"broadcast reply"}}
+                """
+            )
+        );
+
+        verify(messageRepository).insertIfAbsent(WORKSPACE, "T1", "C1", "100.1", "100.0", "U1", 7L, "broadcast reply");
+        verify(threadRepository).upsertOnMessage(WORKSPACE, "C1", "100.0", "100.1", 7L);
+    }
+
+    @Test
     void messageChanged_editsStoredText() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
 

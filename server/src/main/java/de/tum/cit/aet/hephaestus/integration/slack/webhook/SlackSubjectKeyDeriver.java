@@ -9,8 +9,6 @@ import java.util.HexFormat;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Slack adapter for {@link SubjectKeyDeriver}. Produces JetStream subjects of the shape
@@ -20,8 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code ~} and a blank token collapses to the literal {@code ?} placeholder, exactly as the
  * SCM derivers do, so the four-segment dot-delimited subject contract that
  * {@link de.tum.cit.aet.hephaestus.integration.core.consumer.ConsumerSubjectMath#buildSubjectPrefix}
- * subscribes to always holds. The {@link SubjectGrammarRoundTripTest round-trip test} pins the
- * producer↔consumer agreement.
+ * subscribes to always holds. The Slack subject round-trip test pins the producer↔consumer agreement.
  *
  * <p>The {@code Nats-Msg-Id} dedup key is {@code slack-<event_id>} — Slack stamps a globally
  * unique {@code event_id} on every {@code event_callback} and redelivers the SAME id when a
@@ -29,15 +26,15 @@ import tools.jackson.databind.json.JsonMapper;
  * duplicate deliveries with zero per-request state — Slack ingest needs no bespoke dedup table.
  * When {@code event_id} is absent the key falls back to a SHA-256 digest of {@code team|channel|ts}.
  *
- * <p>Slack ingest does NOT flow through {@code /webhooks/{kind}} (the events endpoint verifies
- * its own v0 HMAC and must fast-classify DM vs channel), so the {@code SubjectKeyDeriver} SPI
- * methods here are exercised by {@code SlackChannelEventPublisher} via the {@code JsonNode}
- * overloads; the {@code byte[]} SPI method is provided for contract-completeness.
+ * <p>Slack ingest does NOT flow through {@code /webhooks/{kind}} (the events endpoint verifies its
+ * own v0 HMAC and must fast-classify DM vs channel), so the live path is the producer
+ * ({@code SlackChannelEventPublisher}) calling the concrete {@code subjectFor}/{@code dedupIdFor}
+ * directly. The {@link SubjectKeyDeriver} SPI methods are implemented for contract-completeness (a
+ * future unified {@code /webhooks/slack}) and are not on the live ingest path.
  */
 @Component
 public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final String PLACEHOLDER = "?";
     private static final String SUBJECT_PREFIX = "slack.";
     private static final String EVENT_SEGMENT = "message";
@@ -54,13 +51,9 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
 
     @Override
     public String deriveDedupKey(byte[] body, Map<String, String> headers) {
-        JsonNode root;
-        try {
-            root = MAPPER.readTree(body);
-        } catch (RuntimeException e) {
-            return "slack-" + sha256TruncatedHex(body);
-        }
-        return dedupIdFor(root);
+        // Contract-completeness only (see class doc): the live path uses dedupIdFor(JsonNode). A raw-body
+        // digest is a stable dedup key here without re-parsing (the body is byte-identical across redeliveries).
+        return "slack-" + sha256TruncatedHex(body);
     }
 
     /**

@@ -25,6 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
  *       ({@link ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}, {@code about_user_id}).</li>
  * </ol>
  *
+ * <p><strong>Scope: channel-ingestion data only.</strong> A person opt-out withdraws consent for the app to
+ * read that person's CHANNEL messages, so this erases exactly that surface. It deliberately does NOT touch the
+ * person's mentor-DM data ({@code mentor_slack_thread}/{@code chat_thread}, {@code mentor_turn_rating},
+ * {@code slack_mentor_daily_budget}): a DM to the mentor is a distinct, voluntary interaction under a separate
+ * consent basis, and that history is the person's own benefit, not channel data. Those mentor-DM surfaces are
+ * erased on account/workspace teardown via {@code SlackWorkspacePurgeAdapter}.
+ *
  * <p><strong>Account hard-delete.</strong> This is the exact method an account hard-delete would call per
  * workspace the account is a member of. It is intentionally NOT wired into {@code AccountPurger} yet: that path is
  * account-global (raw-JDBC child deletes, no per-workspace member resolution and no purge-contributor SPI), so

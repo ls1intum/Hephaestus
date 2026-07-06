@@ -135,10 +135,10 @@ public class IntegrationNatsConsumer {
     private final IntegrationConsumerStats stats;
 
     /**
-     * Whether the fleet-wide flat-stream consumer should be started. Gated on
-     * {@code hephaestus.integration.slack.enabled} (the only flat-stream kind today) so
-     * deployments without it never create a consumer on the flat stream (which they also never
-     * bootstrap).
+     * Whether the fleet-wide flat-stream consumer should be started. Gated on the vendor-neutral
+     * {@code hephaestus.integration.flat-stream.enabled} (driven by the messaging integrations —
+     * today only Slack) so deployments without a flat-stream kind never create a consumer on the
+     * flat stream (which they also never bootstrap).
      */
     private final boolean flatStreamConsumerEnabled;
 
@@ -150,7 +150,7 @@ public class IntegrationNatsConsumer {
         IntegrationPoisonHandler poisonHandler,
         IntegrationConsumerStats stats,
         @org.springframework.beans.factory.annotation.Value(
-            "${hephaestus.integration.slack.enabled:false}"
+            "${hephaestus.integration.flat-stream.enabled:false}"
         ) boolean flatStreamConsumerEnabled
     ) {
         this.connectionProperties = connectionProperties;
