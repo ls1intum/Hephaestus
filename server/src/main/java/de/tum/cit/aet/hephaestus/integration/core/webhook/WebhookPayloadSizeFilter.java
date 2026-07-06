@@ -18,10 +18,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * otherwise be unconstrained. Missing {@code Content-Length} is rejected with 411.
  *
  * <p>Prefix-aware over the public, unauthenticated ingest surfaces: {@code /webhooks/<kind>}
- * (GitHub/GitLab HMAC receiver) and {@code /slack/*} (the Slack Events endpoint, which reads an
- * unauthenticated {@code @RequestBody byte[]} before its v0 HMAC check). The Slack tunnel is on
- * the same {@code HIGHEST_PRECEDENCE} guard so it cannot buffer an unbounded body before
- * verification. Any other URI falls through untouched.
+ * (GitHub/GitLab HMAC receiver) and {@code /slack/*} (the Slack Events and Interactivity endpoints,
+ * which read an unauthenticated {@code @RequestBody byte[]} before their v0 HMAC check). The Slack
+ * tunnel is on the same {@code HIGHEST_PRECEDENCE} guard so it cannot buffer an unbounded body before
+ * verification. Any other URI falls through untouched. Registration of the {@code /webhooks/*} and
+ * {@code /slack/*} patterns is split across configs so the Slack guard survives even the NATS-off
+ * topology (see {@code SlackWebSecurityConfiguration}).
  */
 public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 
