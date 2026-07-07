@@ -51,7 +51,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -228,8 +227,6 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             mock(de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository.class),
             workspaceResolver,
             identityResolver,
-            mock(ReactionService.class),
-            mock(SlackMessageService.class),
             mock(ResearchParticipationCommand.class),
             mock(SlackAppHomeService.class),
             new SlackParticipantConsentService(participantConsentRepository),

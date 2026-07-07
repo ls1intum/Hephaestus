@@ -115,18 +115,4 @@ class SlackInteractivityControllerTest extends BaseUnitTest {
         assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
         verifyNoInteractions(handler); // the task never ran, but the ACK still went out
     }
-
-    @Test
-    void signedViewSubmission_dispatchesToViewHandler() {
-        byte[] body = formBody("{\"type\":\"view_submission\",\"view\":{}}").getBytes(StandardCharsets.UTF_8);
-        String ts = Long.toString(Instant.now().getEpochSecond());
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Slack-Request-Timestamp", ts);
-        headers.add("X-Slack-Signature", sign(ts, body));
-
-        ResponseEntity<String> res = controller.interactivity(body, headers);
-
-        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
-        verify(handler).handleViewSubmission(any());
-    }
 }

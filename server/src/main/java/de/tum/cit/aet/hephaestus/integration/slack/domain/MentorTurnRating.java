@@ -26,12 +26,6 @@ import org.jspecify.annotations.Nullable;
  * <p><strong>Append-only.</strong> {@code @Immutable}: each click writes a fresh row. The newest row per
  * {@code (rater, turn)} is the current rating — "latest wins" is a read ordering, never an in-place update — which
  * keeps the full temporal record for research without a mutable state column.
- *
- * <p><strong>A thumb is not a Reaction.</strong> {@link #feedbackId} is a soft link (nullable FK to {@code feedback},
- * {@code ON DELETE SET NULL}) to the delivered conversational feedback the turn raised, present only on a bound
- * turn. A thumb never writes an {@code ADDRESSED}/{@code NOT_APPLICABLE}/{@code DISPUTED} reaction; those come only
- * from the explicit uptake block. A thumbs-down on a bound turn opens a dispute modal whose submission is what
- * routes into {@code Reaction} as {@code DISPUTED}.
  */
 @Entity
 @Immutable
@@ -66,10 +60,6 @@ public class MentorTurnRating {
     /** The {@code ts} of the mentor reply the thumb was attached to (the button value carries it). */
     @Column(name = "slack_message_ts", nullable = false, length = 32)
     private String slackMessageTs;
-
-    /** The delivered conversational feedback the turn raised, or {@code null} on an unbound turn. */
-    @Column(name = "feedback_id", columnDefinition = "UUID")
-    private @Nullable UUID feedbackId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "rating", nullable = false, length = 16)

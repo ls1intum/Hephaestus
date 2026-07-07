@@ -7,9 +7,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * The bounded worker pool the {@link SlackInteractivityController} hands post-ACK interactivity work to (modal
- * opens, rating writes, reaction routing). Kept small — Slack interactivity is bursty but low-volume, and the ACK
- * has already been sent, so a brief queue is preferable to holding the request thread.
+ * The bounded worker pool the {@link SlackInteractivityController} hands post-ACK interactivity work to (rating
+ * writes, App Home consent toggles). Kept small — Slack interactivity is bursty but low-volume, and the ACK has
+ * already been sent, so a brief queue is preferable to holding the request thread.
  */
 @Configuration
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

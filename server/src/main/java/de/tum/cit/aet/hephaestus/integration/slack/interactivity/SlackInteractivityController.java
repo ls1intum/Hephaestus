@@ -24,8 +24,8 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Inbound Slack interactivity entry ({@code POST /slack/interactivity}), reached over the public tunnel on a
  * SEPARATE Slack Request URL from {@code /slack/events}. Slack posts interactive-component payloads
- * (block_actions from the feedback buttons / uptake block, view_submission from the dispute modal) as a
- * {@code application/x-www-form-urlencoded} body with a single {@code payload=<url-encoded-json>} field.
+ * (block_actions from the feedback buttons) as a {@code application/x-www-form-urlencoded} body with a single
+ * {@code payload=<url-encoded-json>} field.
  *
  * <p>Verifies the request signature over the RAW body bytes (the same HMAC scheme as the events endpoint), then
  * ACKs 200 within Slack's 3&nbsp;s window and does the actual work asynchronously — a modal open or a DB write must
@@ -92,7 +92,7 @@ public class SlackInteractivityController {
         } catch (RuntimeException rejected) {
             log.warn("Slack interactivity dropped: executor rejected the task ({})", rejected.getMessage());
         }
-        // An empty 200 both ACKs an action and closes a submitted modal.
+        // An empty 200 ACKs the action within Slack's 3s window.
         return ResponseEntity.ok().build();
     }
 
@@ -100,7 +100,6 @@ public class SlackInteractivityController {
         try {
             switch (type) {
                 case "block_actions" -> handler.handleBlockActions(payload);
-                case "view_submission" -> handler.handleViewSubmission(payload);
                 default -> log.debug("slack.interactivity: ignoring payload type {}", type);
             }
         } catch (Exception e) {

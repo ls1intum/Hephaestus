@@ -368,9 +368,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         try {
             String ts = streamTs.get();
             if (ts != null && !clientGone.get()) {
-                // Attach the feedback buttons (👍/👎, anchored to this turn's ts) as terminal blocks. The DM mentor
-                // turn is pure chat and delivers no conversation-feedback unit, so the thumbs carry no feedback id.
-                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(ts, null);
+                // Attach the feedback buttons (👍/👎, anchored to this turn's ts) as terminal blocks.
+                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(ts);
                 slack.stopStream(workspaceId, channel, ts, blocks);
             }
         } catch (Exception e) {

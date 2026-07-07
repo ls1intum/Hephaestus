@@ -1,12 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
-import static com.slack.api.model.block.Blocks.input;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
-import static com.slack.api.model.block.element.BlockElements.plainTextInput;
-
-import com.slack.api.model.view.View;
-import com.slack.api.model.view.ViewClose;
-import com.slack.api.model.view.ViewSubmit;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
@@ -17,16 +10,10 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureServ
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
-import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
-import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,13 +25,7 @@ import tools.jackson.databind.JsonNode;
  *
  * <ul>
  *   <li><strong>Thumbs</strong> ({@code turn_helpful}/{@code turn_unhelpful}) append a {@link MentorTurnRating}.
- *       A thumb is a satisfaction signal, NEVER a {@code Reaction} — it never writes {@code ADDRESSED}.
  *       "Latest wins" is a read ordering over the append-only rows, so a re-click just adds a newer row.</li>
- *   <li><strong>Uptake</strong> ({@code uptake_addressed}/{@code uptake_not_applicable}) write a
- *       {@code Reaction} via {@link ReactionService}. This is the ONLY path into {@code Reaction}.</li>
- *   <li><strong>Dispute</strong> — a thumbs-down on a bound turn, or the uptake "Disagree", opens a modal that
- *       collects the required reason; the modal's {@code view_submission} routes into {@code Reaction} as
- *       {@code DISPUTED} with that reason.</li>
  *   <li><strong>App Home consent</strong> ({@code research_opt_out}/{@code research_opt_in}) drives BOTH purposes
  *       from one toggle: it persists the person-level ingestion opt-out/-in ({@code slack_participant_consent},
  *       member-optional), on opt-out ERASES that person's already-stored Slack data
@@ -53,7 +34,7 @@ import tools.jackson.databind.JsonNode;
  *       re-publishes the Home tab. Handled outside the member-id guard so an unlinked user can still opt out.</li>
  * </ul>
  *
- * <p>The reactor is resolved from the verified Slack identity ({@code (team, user)} → workspace member), so this
+ * <p>The rater is resolved from the verified Slack identity ({@code (team, user)} → workspace member), so this
  * runs with no HTTP {@code SecurityContext}. Every branch is best-effort: a Slack failure or an invalid target is
  * logged and swallowed (the controller already ACKed within Slack's 3s window).
  */
@@ -63,15 +44,9 @@ public class SlackFeedbackHandler {
 
     private static final Logger log = LoggerFactory.getLogger(SlackFeedbackHandler.class);
 
-    static final String DISPUTE_CALLBACK_ID = "mentor_dispute";
-    static final String DISPUTE_BLOCK_ID = "dispute_reason";
-    static final String DISPUTE_INPUT_ACTION_ID = "reason";
-
     private final MentorTurnRatingRepository ratingRepository;
     private final SlackWorkspaceResolver workspaceResolver;
     private final SlackMentorIdentityResolver identityResolver;
-    private final ReactionService reactionService;
-    private final SlackMessageService messageService;
     private final ResearchParticipationCommand researchParticipationCommand;
     private final SlackAppHomeService appHomeService;
     private final SlackParticipantConsentService participantConsentService;
@@ -81,8 +56,6 @@ public class SlackFeedbackHandler {
         MentorTurnRatingRepository ratingRepository,
         SlackWorkspaceResolver workspaceResolver,
         SlackMentorIdentityResolver identityResolver,
-        ReactionService reactionService,
-        SlackMessageService messageService,
         ResearchParticipationCommand researchParticipationCommand,
         SlackAppHomeService appHomeService,
         SlackParticipantConsentService participantConsentService,
@@ -91,8 +64,6 @@ public class SlackFeedbackHandler {
         this.ratingRepository = ratingRepository;
         this.workspaceResolver = workspaceResolver;
         this.identityResolver = identityResolver;
-        this.reactionService = reactionService;
-        this.messageService = messageService;
         this.researchParticipationCommand = researchParticipationCommand;
         this.appHomeService = appHomeService;
         this.participantConsentService = participantConsentService;
@@ -104,7 +75,6 @@ public class SlackFeedbackHandler {
         String teamId = payload.path("team").path("id").asString("");
         String slackUserId = payload.path("user").path("id").asString("");
         String channelId = payload.path("channel").path("id").asString("");
-        String triggerId = payload.path("trigger_id").asString("");
 
         Optional<Long> workspaceOpt = workspaceResolver.resolveWorkspaceId(teamId);
         if (workspaceOpt.isEmpty()) {
@@ -114,7 +84,7 @@ public class SlackFeedbackHandler {
 
         // App Home consent toggles are handled FIRST and OUTSIDE the member-id guard below: they key on the Slack
         // user id and are member-optional by design, so an unlinked user can still opt out (the decision is recorded
-        // and takes effect once they later link). Everything else (thumbs/uptake/dispute) needs a resolved member id.
+        // and takes effect once they later link). Everything else (the thumbs) needs a resolved member id.
         List<JsonNode> memberGatedActions = new ArrayList<>();
         for (JsonNode action : payload.path("actions")) {
             String actionId = action.path("action_id").asString("");
@@ -155,8 +125,7 @@ public class SlackFeedbackHandler {
                     payload,
                     channelId,
                     value,
-                    TurnRating.HELPFUL,
-                    triggerId
+                    TurnRating.HELPFUL
                 );
                 case SlackFeedbackBlocks.ACTION_TURN_UNHELPFUL -> recordRating(
                     workspaceId,
@@ -164,62 +133,12 @@ public class SlackFeedbackHandler {
                     payload,
                     channelId,
                     value,
-                    TurnRating.UNHELPFUL,
-                    triggerId
-                );
-                case SlackFeedbackBlocks.ACTION_UPTAKE_ADDRESSED -> routeReaction(
-                    workspaceId,
-                    raterUserId,
-                    parseFid(value),
-                    ReactionAction.ADDRESSED
-                );
-                case SlackFeedbackBlocks.ACTION_UPTAKE_NOT_APPLICABLE -> routeReaction(
-                    workspaceId,
-                    raterUserId,
-                    parseFid(value),
-                    ReactionAction.NOT_APPLICABLE
-                );
-                case SlackFeedbackBlocks.ACTION_UPTAKE_DISPUTED -> openDisputeModal(
-                    workspaceId,
-                    triggerId,
-                    parseFid(value)
+                    TurnRating.UNHELPFUL
                 );
                 // Defensive fallback for any action_id we do not (yet) route — logged and ignored.
                 default -> log.debug("slack.interactivity: unhandled action_id {}", actionId);
             }
         }
-    }
-
-    /** Handle a {@code view_submission}: the dispute modal collects the reason and writes a DISPUTED reaction. */
-    public void handleViewSubmission(JsonNode payload) {
-        JsonNode view = payload.path("view");
-        if (!DISPUTE_CALLBACK_ID.equals(view.path("callback_id").asString(""))) {
-            return;
-        }
-        UUID feedbackId = parseUuid(view.path("private_metadata").asString(""));
-        if (feedbackId == null) {
-            return;
-        }
-        String reason = view
-            .path("state")
-            .path("values")
-            .path(DISPUTE_BLOCK_ID)
-            .path(DISPUTE_INPUT_ACTION_ID)
-            .path("value")
-            .asString("");
-
-        String teamId = payload.path("team").path("id").asString("");
-        String slackUserId = payload.path("user").path("id").asString("");
-        Optional<Long> workspaceOpt = workspaceResolver.resolveWorkspaceId(teamId);
-        if (workspaceOpt.isEmpty()) {
-            return;
-        }
-        long workspaceId = workspaceOpt.get();
-        identityResolver
-            .resolveMemberId(workspaceId, teamId, slackUserId)
-            .ifPresent(raterUserId ->
-                routeReaction(workspaceId, raterUserId, feedbackId, ReactionAction.DISPUTED, reason)
-            );
     }
 
     /**
@@ -286,8 +205,7 @@ public class SlackFeedbackHandler {
         JsonNode payload,
         String channelId,
         String value,
-        TurnRating rating,
-        String triggerId
+        TurnRating rating
     ) {
         String messageTs = parseTs(value);
         if (messageTs.isEmpty()) {
@@ -297,7 +215,6 @@ public class SlackFeedbackHandler {
         if (threadTs.isEmpty()) {
             threadTs = payload.path("message").path("thread_ts").asString(messageTs);
         }
-        UUID feedbackId = parseFid(value);
 
         MentorTurnRating row = MentorTurnRating.builder()
             .workspaceId(workspaceId)
@@ -305,79 +222,15 @@ public class SlackFeedbackHandler {
             .channelId(channelId)
             .threadTs(threadTs.isEmpty() ? null : threadTs)
             .slackMessageTs(messageTs)
-            .feedbackId(feedbackId)
             .rating(rating)
             .build();
         ratingRepository.save(row);
-
-        // A thumbs-down on a turn that raised a piece of feedback opens the dispute path (reasoned rejection).
-        if (rating == TurnRating.UNHELPFUL && feedbackId != null) {
-            openDisputeModal(workspaceId, triggerId, feedbackId);
-        }
-    }
-
-    private void routeReaction(long workspaceId, long raterUserId, @Nullable UUID feedbackId, ReactionAction action) {
-        routeReaction(workspaceId, raterUserId, feedbackId, action, null);
-    }
-
-    private void routeReaction(
-        long workspaceId,
-        long raterUserId,
-        @Nullable UUID feedbackId,
-        ReactionAction action,
-        @Nullable String explanation
-    ) {
-        if (feedbackId == null) {
-            log.debug("slack.interactivity: {} on an unbound turn — no feedback to react to", action);
-            return;
-        }
-        try {
-            reactionService.submitReactionForRecipient(workspaceId, feedbackId, raterUserId, action, explanation);
-        } catch (RuntimeException e) {
-            // Not the recipient / not delivered / missing reason — best-effort, the ACK already went out.
-            log.debug("slack.interactivity: reaction {} on {} rejected: {}", action, feedbackId, e.getMessage());
-        }
-    }
-
-    private void openDisputeModal(long workspaceId, String triggerId, @Nullable UUID feedbackId) {
-        if (feedbackId == null || triggerId.isBlank()) {
-            return;
-        }
-        View modal = View.builder()
-            .type("modal")
-            .callbackId(DISPUTE_CALLBACK_ID)
-            .privateMetadata(feedbackId.toString())
-            .title(ViewTitleFactory.title("Disagree with feedback"))
-            .submit(ViewSubmit.builder().type("plain_text").text("Submit").build())
-            .close(ViewClose.builder().type("plain_text").text("Cancel").build())
-            .blocks(
-                List.of(
-                    input(i ->
-                        i
-                            .blockId(DISPUTE_BLOCK_ID)
-                            .label(plainText("Why doesn't this feedback apply?"))
-                            .element(
-                                plainTextInput(pt -> pt.actionId(DISPUTE_INPUT_ACTION_ID).multiline(true).minLength(1))
-                            )
-                    )
-                )
-            )
-            .build();
-        try {
-            messageService.openModal(workspaceId, triggerId, modal);
-        } catch (SlackSendException e) {
-            log.debug("slack.interactivity: dispute modal open failed: {}", e.slackError());
-        }
     }
 
     // --- value parsing (compact JSON produced by SlackFeedbackBlocks) ---
 
     private static String parseTs(String value) {
         return extract(value, "ts");
-    }
-
-    private static @Nullable UUID parseFid(String value) {
-        return parseUuid(extract(value, "fid"));
     }
 
     /** Minimal, dependency-free extraction of a string field from the trusted compact JSON we authored. */
@@ -393,24 +246,5 @@ public class SlackFeedbackHandler {
         start += needle.length();
         int end = json.indexOf('"', start);
         return end < 0 ? "" : json.substring(start, end);
-    }
-
-    private static @Nullable UUID parseUuid(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    /** Tiny helper so the modal title stays a one-liner (Slack view titles are plain_text objects). */
-    private static final class ViewTitleFactory {
-
-        private static com.slack.api.model.view.ViewTitle title(String text) {
-            return com.slack.api.model.view.ViewTitle.builder().type("plain_text").text(text).build();
-        }
     }
 }

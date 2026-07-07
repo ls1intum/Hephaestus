@@ -522,7 +522,6 @@ erDiagram
         VARCHAR(32) channel_id "NOT NULL"
         VARCHAR(32) thread_ts
         VARCHAR(32) slack_message_ts "NOT NULL"
-        UUID feedback_id FK
         VARCHAR(16) rating "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
     }
@@ -1162,7 +1161,6 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     ChatThread ||--o{ MentorSlackThread : has
-    Feedback ||--o{ MentorTurnRating : has
     User ||--o{ Milestone : created_by
     Practice ||--o{ Observation : has
     User ||--o{ Observation : has

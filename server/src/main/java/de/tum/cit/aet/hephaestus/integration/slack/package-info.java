@@ -58,11 +58,6 @@
         // runs one way (integration.slack -> agent), the same direction as the mentor-chat and practices::spi
         // inversions, so no bounded-context cycle forms.
         "agent::conversation-source",
-        // SlackFeedbackHandler (integration.slack.interactivity) writes developer reactions
-        // (ADDRESSED / NOT_APPLICABLE / DISPUTED) against a delivered observation via the practices
-        // reaction port — the uptake buttons + dispute modal are the Slack surface of the closed-loop
-        // research signal, mirroring how the agent delivery layer reads the same named interface.
-        "practices::reaction",
         // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the CONVERSATION_THREAD-derived
         // observations/feedback via the practices-owned ConversationFeedbackErasure port (implementation lives
         // inside practices, so this one-way integration.slack → practices::spi edge forms no module cycle).

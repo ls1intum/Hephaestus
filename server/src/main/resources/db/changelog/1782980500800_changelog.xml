@@ -364,11 +364,8 @@
             Binary thumbs on a mentor turn. Workspace-scoped (carries workspace_id, absent from
             WorkspaceScopedTables.GLOBAL_TABLES) → a tenancy predicate rides every query. Append-only (@Immutable
             entity): a click writes a new row, and the newest row per (rater, turn) is the current rating —
-            "latest wins" is read-side, never an in-place update. feedback_id is a nullable FK to the delivered
-            conversational feedback the turn raised (ON DELETE SET NULL keeps the research signal after the
-            per-run feedback row is purged); an unbound turn (pure "was this helpful?") leaves it NULL. Thumbs
-            never write a Reaction — ADDRESSED/NOT_APPLICABLE/DISPUTED are the uptake block's job. The
-            (rater_user_id, created_at DESC) index serves the per-user recency scan.
+            "latest wins" is read-side, never an in-place update. The (rater_user_id, created_at DESC) index
+            serves the per-user recency scan.
         </comment>
         <sql>
             CREATE TABLE mentor_turn_rating (
@@ -378,7 +375,6 @@
                 channel_id VARCHAR(32) NOT NULL,
                 thread_ts VARCHAR(32),
                 slack_message_ts VARCHAR(32) NOT NULL,
-                feedback_id UUID CONSTRAINT sfk_mentor_turn_rating_feedback REFERENCES feedback(id) ON DELETE SET NULL,
                 rating VARCHAR(16) NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
                 CONSTRAINT chk_mentor_turn_rating_rating CHECK (rating IN ('HELPFUL', 'UNHELPFUL'))
