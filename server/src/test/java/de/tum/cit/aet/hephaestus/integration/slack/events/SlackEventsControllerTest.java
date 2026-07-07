@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -315,6 +316,23 @@ class SlackEventsControllerTest extends BaseUnitTest {
 
         verify(uninstallService).onUninstall("T1", "app_uninstalled");
         verifyNoInteractions(mentorService);
+    }
+
+    @Test
+    void interactiveDispatchFailure_isSwallowed_returns200_soSlackDoesNotRedeliver() {
+        // Uninstall is the one interactive branch that runs SYNCHRONOUSLY (not offloaded), so a throw
+        // propagates to the controller's try/catch. The controller must still ACK 200 — Slack does not
+        // redeliver after a 200, and a 5xx here would provoke a pointless retry storm.
+        doThrow(new RuntimeException("boom")).when(uninstallService).onUninstall(eq("T1"), eq("app_uninstalled"));
+
+        ResponseEntity<String> res = post(
+            """
+            {"type":"event_callback","team_id":"T1","event":{"type":"app_uninstalled"}}
+            """
+        );
+
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verify(uninstallService).onUninstall("T1", "app_uninstalled");
     }
 
     @Test
