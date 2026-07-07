@@ -42,6 +42,7 @@ public class SlackEventDispatcher {
     private final SlackAppHomeService appHomeService;
     private final SlackAssistantEventHandler assistantEventHandler;
     private final SlackUninstallService uninstallService;
+    private final SlackChannelJoinNoticeHandler joinNoticeHandler;
     private final Executor mentorDmExecutor;
     private final Executor homeExecutor;
 
@@ -51,6 +52,7 @@ public class SlackEventDispatcher {
         SlackAppHomeService appHomeService,
         SlackAssistantEventHandler assistantEventHandler,
         SlackUninstallService uninstallService,
+        SlackChannelJoinNoticeHandler joinNoticeHandler,
         @Qualifier("slackMentorDmExecutor") Executor mentorDmExecutor,
         @Qualifier("slackHomeExecutor") Executor homeExecutor
     ) {
@@ -59,6 +61,7 @@ public class SlackEventDispatcher {
         this.appHomeService = appHomeService;
         this.assistantEventHandler = assistantEventHandler;
         this.uninstallService = uninstallService;
+        this.joinNoticeHandler = joinNoticeHandler;
         this.mentorDmExecutor = mentorDmExecutor;
         this.homeExecutor = homeExecutor;
     }
@@ -101,6 +104,19 @@ public class SlackEventDispatcher {
         // purge the Slack data.
         if ("app_uninstalled".equals(eventType) || "tokens_revoked".equals(eventType)) {
             uninstallService.onUninstall(teamId, eventType);
+            return;
+        }
+        if ("member_joined_channel".equals(eventType)) {
+            // Just-in-time consent notice for a member who joins an already-active monitored channel — the one-time
+            // activation announcement never reaches a later joiner (ICO ongoing + just-in-time transparency). The
+            // handler resolves the workspace + channel consent and posts an EPHEMERAL notice (all DB/remote work),
+            // so offload onto the dedicated Home pool (the privacy/consent surface pool), best-effort like the App
+            // Home render — a dropped notice does not block anything.
+            offload(
+                homeExecutor,
+                () -> joinNoticeHandler.onMemberJoined(teamId, event),
+                "member-joined consent notice"
+            );
             return;
         }
         if (!"message".equals(eventType)) {

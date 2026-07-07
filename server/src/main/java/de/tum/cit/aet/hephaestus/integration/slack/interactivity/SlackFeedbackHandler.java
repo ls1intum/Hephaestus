@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
+import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackConsentBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
@@ -10,6 +11,8 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureServ
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +54,7 @@ public class SlackFeedbackHandler {
     private final SlackAppHomeService appHomeService;
     private final SlackParticipantConsentService participantConsentService;
     private final SlackPersonErasureService personErasureService;
+    private final SlackMessageService messageService;
 
     public SlackFeedbackHandler(
         MentorTurnRatingRepository ratingRepository,
@@ -59,7 +63,8 @@ public class SlackFeedbackHandler {
         ResearchParticipationCommand researchParticipationCommand,
         SlackAppHomeService appHomeService,
         SlackParticipantConsentService participantConsentService,
-        SlackPersonErasureService personErasureService
+        SlackPersonErasureService personErasureService,
+        SlackMessageService messageService
     ) {
         this.ratingRepository = ratingRepository;
         this.workspaceResolver = workspaceResolver;
@@ -68,6 +73,7 @@ public class SlackFeedbackHandler {
         this.appHomeService = appHomeService;
         this.participantConsentService = participantConsentService;
         this.personErasureService = personErasureService;
+        this.messageService = messageService;
     }
 
     /** Handle a {@code block_actions} payload: each element routes by its {@code action_id}. */
@@ -101,6 +107,17 @@ public class SlackFeedbackHandler {
                     slackUserId,
                     true
                 );
+                // The one-click in-message opt-out (from the channel consent announcement / the just-in-time join
+                // notice): reuse the SAME path as the App Home "Opt out" button, then confirm ephemerally. Kept
+                // OUTSIDE the member-id guard for the same reason as the App Home toggle — member-optional by design.
+                case SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT -> handleInMessageOptOut(
+                    workspaceId,
+                    teamId,
+                    slackUserId,
+                    channelId
+                );
+                // Defensive: a pointer back to the App Home privacy tab just re-renders the Home view (best-effort).
+                case SlackConsentBlocks.ACTION_OPEN_PRIVACY_HOME -> appHomeService.onHomeOpened(teamId, slackUserId);
                 default -> memberGatedActions.add(action);
             }
         }
@@ -177,6 +194,36 @@ public class SlackFeedbackHandler {
 
         // 3) Pre-existing research-participation flag write (+ Home-tab re-render), unchanged.
         setResearchParticipation(workspaceId, teamId, slackUserId, optIn);
+    }
+
+    /**
+     * Handle the in-message {@code "Opt me out"} button. Delegates to the EXACT App Home opt-out path
+     * ({@link #handleConsentToggle} with {@code optIn = false}) — person ingestion opt-out + erase of already-collected
+     * data + research flag + Home re-render — so there is one opt-out implementation, not two. Then confirms to the
+     * actor with an ephemeral message in the channel the button was clicked in. Lenient: this runs on the already-ACKed
+     * thread, so a Slack failure on the confirmation is logged and swallowed (the opt-out itself already took effect).
+     */
+    private void handleInMessageOptOut(long workspaceId, String teamId, String slackUserId, String channelId) {
+        handleConsentToggle(workspaceId, teamId, slackUserId, false);
+        if (channelId == null || channelId.isBlank()) {
+            return; // no channel context to confirm into (should not happen for a channel-posted button)
+        }
+        try {
+            messageService.sendEphemeralForWorkspace(
+                workspaceId,
+                channelId,
+                slackUserId,
+                SlackConsentBlocks.optOutConfirmation(),
+                SlackConsentBlocks.CONFIRMATION_TEXT
+            );
+        } catch (SlackSendException e) {
+            log.debug(
+                "slack.interactivity: opt-out confirmation ephemeral failed for user {} in channel {}: {}",
+                slackUserId,
+                channelId,
+                e.slackError()
+            );
+        }
     }
 
     /**

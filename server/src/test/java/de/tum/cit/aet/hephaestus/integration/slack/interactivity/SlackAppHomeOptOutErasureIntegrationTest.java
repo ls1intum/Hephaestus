@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
@@ -164,7 +165,8 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
             mock(ResearchParticipationCommand.class),
             mock(SlackAppHomeService.class),
             new SlackParticipantConsentService(participantConsentRepository),
-            new SlackPersonErasureService(messageRepository, threadRepository, conversationFeedbackErasure)
+            new SlackPersonErasureService(messageRepository, threadRepository, conversationFeedbackErasure),
+            mock(SlackMessageService.class)
         );
     }
 

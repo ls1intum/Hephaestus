@@ -3,8 +3,11 @@ package de.tum.cit.aet.hephaestus.integration.slack.messaging;
 import com.slack.api.Slack;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
+import com.slack.api.methods.request.chat.ChatPostEphemeralRequest;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
+import com.slack.api.methods.response.auth.AuthTestResponse;
 import com.slack.api.methods.response.chat.ChatAppendStreamResponse;
+import com.slack.api.methods.response.chat.ChatPostEphemeralResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatStartStreamResponse;
 import com.slack.api.methods.response.chat.ChatStopStreamResponse;
@@ -89,6 +92,79 @@ public class SlackMessageService {
                 e.getMessage()
             );
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
+        }
+    }
+
+    /**
+     * Post an <strong>ephemeral</strong> message via {@code chat.postEphemeral} — visible only to {@code slackUserId}
+     * in {@code channelId}, seen by no one else and gone on reload. The seam the just-in-time consent notice (shown
+     * to a member who joins an already-active channel) and the in-message opt-out confirmation render through.
+     * Mirrors {@link #sendForWorkspace}: throws {@link SlackSendException} carrying the Slack error so the caller can
+     * log-and-swallow (the notice is best-effort).
+     */
+    public void sendEphemeralForWorkspace(
+        long workspaceId,
+        String channelId,
+        String slackUserId,
+        List<LayoutBlock> blocks,
+        String fallback
+    ) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
+        );
+        ChatPostEphemeralRequest request = ChatPostEphemeralRequest.builder()
+            .channel(channelId)
+            .user(slackUserId)
+            .blocks(blocks)
+            .text(fallback) // fallback text shown in notifications + accessibility tools
+            .build();
+        try {
+            ChatPostEphemeralResponse response = callHonoringRateLimit(() ->
+                slack.methods(token).chatPostEphemeral(request)
+            );
+            if (!response.isOk()) {
+                String error = response.getError() == null ? "unknown" : response.getError();
+                log.warn(
+                    "Slack chat.postEphemeral failed: workspaceId={}, channelId={}, userId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    slackUserId,
+                    error
+                );
+                throw new SlackSendException(workspaceId, channelId, error);
+            }
+        } catch (SlackApiException | IOException e) {
+            log.warn(
+                "Slack chat.postEphemeral transport failure: workspaceId={}, channelId={}, error={}",
+                workspaceId,
+                channelId,
+                e.getMessage()
+            );
+            throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
+        }
+    }
+
+    /**
+     * The app's own bot user id ({@code U…}) for this workspace via {@code auth.test}, or empty when it cannot be
+     * resolved (no active connection / Slack failure). Best-effort and never throws — used only to skip the bot's
+     * OWN {@code member_joined_channel} event (adding the app to a channel fires that event too), so an unresolved
+     * id degrades to "cannot confirm it's the bot" rather than blocking the caller.
+     */
+    public Optional<String> resolveBotUserId(long workspaceId) {
+        Optional<String> token = resolveToken(workspaceId);
+        if (token.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            AuthTestResponse r = slack.methods(token.get()).authTest(req -> req);
+            if (r.isOk() && r.getUserId() != null && !r.getUserId().isBlank()) {
+                return Optional.of(r.getUserId());
+            }
+            log.debug("Slack auth.test not ok for workspaceId={}: error={}", workspaceId, r.getError());
+            return Optional.empty();
+        } catch (SlackApiException | IOException e) {
+            log.debug("Slack auth.test failed for workspaceId={}: {}", workspaceId, e.getMessage());
+            return Optional.empty();
         }
     }
 

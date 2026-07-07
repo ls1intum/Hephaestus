@@ -52,6 +52,9 @@ class SlackEventsControllerTest extends BaseUnitTest {
     private SlackUninstallService uninstallService;
 
     @Mock
+    private SlackChannelJoinNoticeHandler joinNoticeHandler;
+
+    @Mock
     private SlackChannelEventPublisher channelEventPublisher;
 
     private SlackEventsController controller;
@@ -67,6 +70,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            joinNoticeHandler,
             Runnable::run,
             Runnable::run
         );
@@ -145,6 +149,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            joinNoticeHandler,
             queued::add,
             queued::add
         );
@@ -185,6 +190,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            joinNoticeHandler,
             queued::add,
             queued::add
         );
@@ -224,6 +230,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            joinNoticeHandler,
             queued::add,
             queued::add
         );
@@ -254,6 +261,46 @@ class SlackEventsControllerTest extends BaseUnitTest {
     }
 
     @Test
+    void memberJoinedChannel_isOffloaded_toJoinNoticeHandler() {
+        List<Runnable> queued = new ArrayList<>();
+        SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
+            mentorService,
+            onboardingService,
+            appHomeService,
+            assistantEventHandler,
+            uninstallService,
+            joinNoticeHandler,
+            queued::add,
+            queued::add
+        );
+        SlackEventsController asyncController = new SlackEventsController(
+            verifier,
+            asyncDispatcher,
+            channelEventPublisher,
+            JsonMapper.builder().build()
+        );
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", "1");
+        headers.add("X-Slack-Signature", "v0=deadbeef");
+
+        ResponseEntity<String> res = asyncController.events(
+            """
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"member_joined_channel","user":"U1","channel":"C1","channel_type":"C"}}
+            """.getBytes(StandardCharsets.UTF_8),
+            headers
+        );
+
+        // The just-in-time consent notice (DB read + remote Slack calls) runs off the ACK thread — only QUEUED here.
+        assertThat(res.getStatusCode().is2xxSuccessful()).isTrue();
+        verifyNoInteractions(joinNoticeHandler);
+        assertThat(queued).hasSize(1);
+
+        queued.forEach(Runnable::run);
+        verify(joinNoticeHandler).onMemberJoined(eq("T1"), any());
+    }
+
+    @Test
     void appHomeOpened_onMessagesTab_isIgnored() {
         List<Runnable> queued = new ArrayList<>();
         SlackEventDispatcher asyncDispatcher = new SlackEventDispatcher(
@@ -262,6 +309,7 @@ class SlackEventsControllerTest extends BaseUnitTest {
             appHomeService,
             assistantEventHandler,
             uninstallService,
+            joinNoticeHandler,
             queued::add,
             queued::add
         );

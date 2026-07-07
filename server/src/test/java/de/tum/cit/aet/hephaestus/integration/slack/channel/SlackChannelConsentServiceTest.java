@@ -109,8 +109,18 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         SlackMonitoredChannelDTO dto = service().transition(WS, CHANNEL, ConsentState.ACTIVE, "pilot go");
 
-        // Announcement posted + forward-only boundary stamped + state advanced.
-        verify(slackMessageService).sendForWorkspace(eq(WS), eq(CHANNEL), anyList(), anyString());
+        // Announcement posted as non-empty Block Kit (the one-click opt-out) with the plain-language fallback +
+        // forward-only boundary stamped + state advanced.
+        ArgumentCaptor<java.util.List<com.slack.api.model.block.LayoutBlock>> blocksCaptor = ArgumentCaptor.forClass(
+            java.util.List.class
+        );
+        verify(slackMessageService).sendForWorkspace(
+            eq(WS),
+            eq(CHANNEL),
+            blocksCaptor.capture(),
+            eq(SlackConsentBlocks.FALLBACK_TEXT)
+        );
+        assertThat(blocksCaptor.getValue()).isNotEmpty();
         assertThat(c.getConsentAnnouncedAt()).isNotNull();
         assertThat(c.getConsentState()).isEqualTo(ConsentState.ACTIVE);
         verify(monitoredChannelRepository).save(c);

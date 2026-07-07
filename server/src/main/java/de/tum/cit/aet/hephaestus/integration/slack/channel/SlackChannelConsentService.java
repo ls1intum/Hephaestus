@@ -37,8 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  *      └────────── any → REVOKED (terminal: stop + ERASE) ──────────┘
  * </pre>
  * <ul>
- *   <li>{@code PENDING → ACTIVE}: post the announcement (what is read, purpose = AI practice mentoring, how to opt
- *       out via App Home) and stamp {@code consent_announced_at = now()}. Ingestion is forward-only —
+ *   <li>{@code PENDING → ACTIVE}: post the announcement (what is read, why = practice feedback, and a one-click
+ *       opt-out; see {@link SlackConsentBlocks}) and stamp {@code consent_announced_at = now()}. Ingestion is
+ *       forward-only —
  *       {@code SlackIngestService} only stores messages whose {@code ts} is strictly after this stamp.</li>
  *   <li>{@code ACTIVE ⇄ PAUSED}: stop / resume ingestion, keeping stored data. Resuming an already-announced
  *       channel does NOT re-announce or re-stamp (the original boundary stands).</li>
@@ -54,15 +55,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SlackChannelConsentService {
 
     private static final Logger log = LoggerFactory.getLogger(SlackChannelConsentService.class);
-
-    /**
-     * The in-channel consent notice posted on activation. States what is read, the purpose, and how to opt out — the
-     * transparency step members see before any of their (forward-only) messages are processed.
-     */
-    private static final String ANNOUNCEMENT_TEXT =
-        "Hephaestus is now reading new messages in this channel to provide AI-powered software-practice mentoring. " +
-        "Only messages sent from now on are used — earlier history is never read. If you would prefer your own " +
-        "messages not be included, open the Hephaestus app, go to the *Home* tab, and choose *Opt out of ingestion*.";
 
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final SlackChannelConsentEventRepository consentEventRepository;
@@ -216,7 +208,12 @@ public class SlackChannelConsentService {
 
     private void postAnnouncement(long workspaceId, String channelId) {
         try {
-            slackMessageService.sendForWorkspace(workspaceId, channelId, List.of(), ANNOUNCEMENT_TEXT);
+            slackMessageService.sendForWorkspace(
+                workspaceId,
+                channelId,
+                SlackConsentBlocks.consentNotice(),
+                SlackConsentBlocks.FALLBACK_TEXT
+            );
         } catch (SlackSendException e) {
             // Best-effort: a Slack-side failure (e.g. not_in_channel, no token) must not block activation. The
             // announcement can be re-driven, and forward-only ingestion is anchored by the stamped timestamp.

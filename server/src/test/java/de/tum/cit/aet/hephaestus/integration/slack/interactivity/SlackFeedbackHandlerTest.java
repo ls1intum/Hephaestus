@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -8,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
+import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackConsentBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
@@ -16,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureServ
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackFeedbackBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
@@ -64,6 +68,9 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
     @Mock
     private SlackPersonErasureService personErasureService;
 
+    @Mock
+    private SlackMessageService messageService;
+
     private SlackFeedbackHandler handler;
 
     @BeforeEach
@@ -75,7 +82,8 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
             researchParticipationCommand,
             appHomeService,
             participantConsentService,
-            personErasureService
+            personErasureService,
+            messageService
         );
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
         // The App Home opt-IN path no longer resolves a member id (only opt-out, for erasure), so this shared
@@ -181,6 +189,39 @@ class SlackFeedbackHandlerTest extends BaseUnitTest {
 
         verify(participantConsentService).recordAppHomeDecision(WORKSPACE_ID, USER, false);
         verifyNoInteractions(personErasureService, researchParticipationCommand, appHomeService);
+    }
+
+    @Test
+    void inMessageOptOut_reusesAppHomeOptOutPath_erasesData_andConfirmsEphemerally() {
+        // The one-click "Opt me out" button on the channel notice must drive the SAME opt-out path as App Home:
+        // person ingestion opt-out + erase already-collected data + research flag, then an ephemeral confirmation.
+        when(identityResolver.resolveDeveloperLogin(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of("octocat"));
+
+        handler.handleBlockActions(blockActions(SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT, ""));
+
+        // Reused opt-out path (identical to appHomeOptOut) — proves it is not a second implementation.
+        verify(participantConsentService).recordAppHomeDecision(WORKSPACE_ID, USER, false);
+        verify(personErasureService).eraseMember(WORKSPACE_ID, RATER_ID, USER);
+        verify(researchParticipationCommand).setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME);
+        // Ephemeral confirmation to the acting user, in the channel the button was clicked in.
+        verify(messageService).sendEphemeralForWorkspace(
+            eq(WORKSPACE_ID),
+            eq(CHANNEL),
+            eq(USER),
+            anyList(),
+            eq(SlackConsentBlocks.CONFIRMATION_TEXT)
+        );
+        // An opt-out is not a rating.
+        verifyNoInteractions(ratingRepository);
+    }
+
+    @Test
+    void openPrivacyHome_reRendersHomeView_only() {
+        handler.handleBlockActions(blockActions(SlackConsentBlocks.ACTION_OPEN_PRIVACY_HOME, ""));
+
+        verify(appHomeService).onHomeOpened(TEAM, USER);
+        // The pointer button is a pure navigation nicety — it records no consent decision and posts no message.
+        verifyNoInteractions(ratingRepository, participantConsentService, personErasureService, messageService);
     }
 
     @Test
