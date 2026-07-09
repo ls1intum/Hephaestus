@@ -461,4 +461,22 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             org.mockito.ArgumentMatchers.any()
         );
     }
+
+    @Test
+    void pausedToActive_stampsTheHistoryWatermark_soThePausedGapIsNeverBackfilled() {
+        // Messages sent while paused were written under "monitoring is off"; moving the reconciliation watermark to
+        // the resume instant keeps the nightly history sync from ever fetching them.
+        SlackMonitoredChannel c = channel(ConsentState.PAUSED, Instant.parse("2026-07-01T00:00:00Z"));
+        c.setLastHistorySyncedTs(null);
+        stubChannel(c);
+        stubActor(5L);
+
+        service().transition(WS, CHANNEL, ConsentState.ACTIVE, null);
+
+        assertThat(c.getConsentState()).isEqualTo(ConsentState.ACTIVE);
+        assertThat(c.getLastHistorySyncedTs()).isNotNull();
+        assertThat(
+            de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs.toEpochMicros(c.getLastHistorySyncedTs())
+        ).isNotNull();
+    }
 }

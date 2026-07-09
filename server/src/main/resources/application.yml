@@ -276,6 +276,20 @@ hephaestus:
             batch-size: 25
             rate-limit-threshold: 500
             interval-seconds: 60
+        # Nightly Slack reconciliation (SlackSyncProperties): heal channel metadata and replay
+        # conversations.history for ACTIVE monitored channels through the consent-gated ingest stack
+        # (Slack retries a dropped event only 3x within ~6 minutes; this closes longer outages).
+        # Budgets/pacing assume Slack's non-Marketplace clamp of 1 request/minute and 15 objects per
+        # request on conversations.history/replies (May 2025); Marketplace-approved and internal apps
+        # keep the old tiers — raise the budgets and shrink the interval for those installs.
+        slack:
+            cron: "0 0 4 * * *" # offset from the SCM sync (3:00) and the Slack retention sweep (3:30)
+            history-request-budget: 120
+            history-page-limit: 15
+            history-request-interval: 60s
+            replies-enabled: true
+            replies-request-budget: 30
+            metadata-enabled: true
         # filters.allowed-organizations / allowed-repositories are intentionally unset here so
         # each profile can override; set them in application-local.yml to scope dev syncs.
         nats:

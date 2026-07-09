@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService.SlackConversationInfo;
@@ -249,6 +250,12 @@ public class SlackChannelConsentService {
                 case ACTIVE -> {
                     if (channel.getConsentAnnouncedAt() == null && announcedAt != null) {
                         channel.setConsentAnnouncedAt(announcedAt);
+                    }
+                    if (from == ConsentState.PAUSED) {
+                        // The paused gap was written under "monitoring is off" and must never be backfilled: move
+                        // the reconciliation watermark to the resume instant so the nightly history sync's fetch
+                        // floor excludes everything sent while paused.
+                        channel.setLastHistorySyncedTs(SlackTs.ofInstant(Instant.now()));
                     }
                     channel.setConsentState(ConsentState.ACTIVE);
                     monitoredChannelRepository.save(channel);

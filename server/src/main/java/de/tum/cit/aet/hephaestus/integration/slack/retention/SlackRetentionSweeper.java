@@ -38,7 +38,7 @@ public class SlackRetentionSweeper {
     private static final Logger log = LoggerFactory.getLogger(SlackRetentionSweeper.class);
 
     /** Hard privacy ceiling: Slack content is never retained beyond this many days, whatever the config says. */
-    static final int MAX_RETENTION_DAYS = 180;
+    public static final int MAX_RETENTION_DAYS = 180;
 
     private final SlackMessageRepository slackMessageRepository;
     private final ConnectionService connectionService;

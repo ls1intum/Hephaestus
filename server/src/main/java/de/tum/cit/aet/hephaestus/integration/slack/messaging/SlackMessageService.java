@@ -65,6 +65,15 @@ public class SlackMessageService {
     /** Never honor a single {@code Retry-After} longer than this — defends against an absurd/hostile header. */
     private static final long RATE_LIMIT_MAX_WAIT_MS = 20_000L;
 
+    /**
+     * Wider bounds for the nightly history reconciliation only: Slack's non-Marketplace clamp on
+     * {@code conversations.history}/{@code conversations.replies} (1 req/min since May 2025) answers with
+     * {@code Retry-After: 60}, which the interactive 20s cap would retry too early and waste.
+     */
+    private static final long SYNC_RATE_LIMIT_MAX_WAIT_MS = 90_000L;
+
+    private static final long SYNC_RATE_LIMIT_TOTAL_BUDGET_MS = 150_000L;
+
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
     private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
@@ -425,6 +434,154 @@ public class SlackMessageService {
         }
     }
 
+    /**
+     * {@code conversations.info} with the failure mode preserved: the metadata refresher must distinguish a
+     * DEFINITIVE "this channel is gone" ({@code channel_not_found}) from a transient transport problem — pausing a
+     * healthy channel on a network blip would be a consent-state lie in the other direction.
+     */
+    public ConversationLookup lookupConversationDetailed(long workspaceId, String channelId) {
+        Optional<String> token = resolveToken(workspaceId);
+        if (token.isEmpty()) {
+            return new ConversationLookup.Unavailable("no_active_slack_connection");
+        }
+        try {
+            ConversationsInfoResponse response = callHonoringRateLimit(() ->
+                slack.methods(token.get()).conversationsInfo(req -> req.channel(channelId))
+            );
+            if (!response.isOk()) {
+                String error = response.getError() == null ? "unknown" : response.getError();
+                return "channel_not_found".equals(error)
+                    ? new ConversationLookup.NotFound(error)
+                    : new ConversationLookup.Unavailable(error);
+            }
+            Conversation channel = response.getChannel();
+            if (channel == null) {
+                return new ConversationLookup.Unavailable("empty_response");
+            }
+            return new ConversationLookup.Found(toConversationInfo(channel));
+        } catch (SlackApiException | IOException e) {
+            log.debug(
+                "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
+                workspaceId,
+                channelId,
+                e.getMessage()
+            );
+            return new ConversationLookup.Unavailable("transport_failure");
+        }
+    }
+
+    /** The three distinguishable outcomes of {@link #lookupConversationDetailed}. */
+    public sealed interface ConversationLookup {
+        record Found(SlackConversationInfo info) implements ConversationLookup {}
+
+        /** Slack answered definitively: the channel no longer exists. */
+        record NotFound(String slackError) implements ConversationLookup {}
+
+        /** No definitive answer (transport failure, missing scope, no token) — callers must not act on this. */
+        record Unavailable(String slackError) implements ConversationLookup {}
+    }
+
+    /**
+     * One page of {@code conversations.history} for the nightly reconciliation. {@code oldest}/{@code latest} are
+     * EXCLUSIVE Slack ts bounds (matching the forward-only "strictly after" invariant); results are newest-first and
+     * contain thread parents only (replies live behind {@code conversations.replies}). Throws
+     * {@link SlackSendException} on any failure so the sync can abandon the channel without advancing its watermark.
+     */
+    public HistoryPage fetchHistoryPage(
+        long workspaceId,
+        String channelId,
+        String oldest,
+        String latest,
+        @Nullable String cursor,
+        int limit
+    ) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
+        );
+        try {
+            var response = callHonoringRateLimit(
+                () ->
+                    slack
+                        .methods(token)
+                        .conversationsHistory(req ->
+                            req
+                                .channel(channelId)
+                                .oldest(oldest)
+                                .latest(latest)
+                                .cursor(cursor == null || cursor.isBlank() ? null : cursor)
+                                .limit(limit)
+                        ),
+                SYNC_RATE_LIMIT_MAX_WAIT_MS,
+                SYNC_RATE_LIMIT_TOTAL_BUDGET_MS
+            );
+            if (!response.isOk()) {
+                throw new SlackSendException(
+                    workspaceId,
+                    channelId,
+                    response.getError() == null ? "unknown" : response.getError()
+                );
+            }
+            List<com.slack.api.model.Message> messages =
+                response.getMessages() == null ? List.of() : response.getMessages();
+            String nextCursor =
+                response.getResponseMetadata() == null ? null : response.getResponseMetadata().getNextCursor();
+            return new HistoryPage(messages, nextCursor == null || nextCursor.isBlank() ? null : nextCursor);
+        } catch (SlackApiException | IOException e) {
+            throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
+        }
+    }
+
+    /**
+     * One page of {@code conversations.replies} for a thread with a detected reply gap. Same contract as
+     * {@link #fetchHistoryPage}; the parent message is included by Slack and must be filtered by the caller.
+     */
+    public HistoryPage fetchRepliesPage(
+        long workspaceId,
+        String channelId,
+        String threadTs,
+        String oldest,
+        @Nullable String cursor,
+        int limit
+    ) {
+        String token = resolveToken(workspaceId).orElseThrow(() ->
+            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
+        );
+        try {
+            var response = callHonoringRateLimit(
+                () ->
+                    slack
+                        .methods(token)
+                        .conversationsReplies(req ->
+                            req
+                                .channel(channelId)
+                                .ts(threadTs)
+                                .oldest(oldest)
+                                .cursor(cursor == null || cursor.isBlank() ? null : cursor)
+                                .limit(limit)
+                        ),
+                SYNC_RATE_LIMIT_MAX_WAIT_MS,
+                SYNC_RATE_LIMIT_TOTAL_BUDGET_MS
+            );
+            if (!response.isOk()) {
+                throw new SlackSendException(
+                    workspaceId,
+                    channelId,
+                    response.getError() == null ? "unknown" : response.getError()
+                );
+            }
+            List<com.slack.api.model.Message> messages =
+                response.getMessages() == null ? List.of() : response.getMessages();
+            String nextCursor =
+                response.getResponseMetadata() == null ? null : response.getResponseMetadata().getNextCursor();
+            return new HistoryPage(messages, nextCursor == null || nextCursor.isBlank() ? null : nextCursor);
+        } catch (SlackApiException | IOException e) {
+            throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
+        }
+    }
+
+    /** One page of channel history/replies: the raw SDK messages plus the pagination cursor (null when exhausted). */
+    public record HistoryPage(List<com.slack.api.model.Message> messages, @Nullable String nextCursor) {}
+
     public void joinPublicChannel(long workspaceId, String channelId) {
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
@@ -531,7 +688,18 @@ public class SlackMessageService {
      * the caller's existing error handling is preserved.
      */
     private <T> T callHonoringRateLimit(SlackCall<T> call) throws SlackApiException, IOException {
-        long budgetLeftMs = RATE_LIMIT_TOTAL_BUDGET_MS;
+        return callHonoringRateLimit(call, RATE_LIMIT_MAX_WAIT_MS, RATE_LIMIT_TOTAL_BUDGET_MS);
+    }
+
+    /**
+     * Variant with explicit wait/budget bounds. Interactive callers keep the tight defaults (a user is waiting);
+     * the nightly history reconciliation passes wider bounds because Slack's non-Marketplace clamp on
+     * {@code conversations.history} answers with {@code Retry-After: 60} — a 20s wait cap would retry early, eat
+     * another 429, and burn the request budget.
+     */
+    private <T> T callHonoringRateLimit(SlackCall<T> call, long maxWaitMs, long totalBudgetMs)
+        throws SlackApiException, IOException {
+        long budgetLeftMs = totalBudgetMs;
         int attempt = 0;
         while (true) {
             try {
@@ -541,7 +709,7 @@ public class SlackMessageService {
                 if (retryAfterMs == SlackSendException.NOT_RATE_LIMITED || budgetLeftMs <= 0) {
                     throw e; // not a rate-limit, or the retry budget is spent — let the caller map it
                 }
-                long waitMs = Math.min(backoffWithJitter(retryAfterMs, ++attempt), budgetLeftMs);
+                long waitMs = Math.min(Math.min(backoffWithJitter(retryAfterMs, ++attempt), maxWaitMs), budgetLeftMs);
                 log.warn(
                     "Slack rate-limited (429); backing off {} ms before retry (attempt {}, budget left {} ms)",
                     waitMs,
@@ -600,7 +768,6 @@ public class SlackMessageService {
      */
     private static long backoffWithJitter(long retryAfterMs, int attempt) {
         long base = retryAfterMs > 0 ? retryAfterMs : 1000L * (1L << Math.min(attempt - 1, 4));
-        base = Math.min(base, RATE_LIMIT_MAX_WAIT_MS);
         return base + ThreadLocalRandom.current().nextLong(0L, 250L);
     }
 

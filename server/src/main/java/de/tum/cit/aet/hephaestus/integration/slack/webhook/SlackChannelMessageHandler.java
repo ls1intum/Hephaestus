@@ -21,7 +21,7 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
      * practice detector needs; the file itself is dropped by construction (only {@code text} is ever persisted),
      * and a pure upload with no comment is skipped below.
      */
-    static final Set<String> CONTENT_BEARING_SUBTYPES = Set.of("thread_broadcast", "me_message", "file_share");
+    public static final Set<String> CONTENT_BEARING_SUBTYPES = Set.of("thread_broadcast", "me_message", "file_share");
 
     private final SlackIngestService ingestService;
 
