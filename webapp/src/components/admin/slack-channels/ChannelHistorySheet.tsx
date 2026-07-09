@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { ArrowRightIcon } from "lucide-react";
 import { listSlackChannelConsentEventsOptions } from "@/api/@tanstack/react-query.gen";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
+import { Button } from "@/components/ui/button";
 import {
 	Sheet,
 	SheetContent,
@@ -31,7 +32,7 @@ export function ChannelHistorySheet({
 	const open = channel != null;
 	const label = channel ? (channel.channelName ?? channel.slackChannelId) : "";
 
-	const { data, isLoading, error } = useQuery({
+	const { data, isLoading, error, refetch } = useQuery({
 		...listSlackChannelConsentEventsOptions({
 			path: { workspaceSlug, slackChannelId: channel?.slackChannelId ?? "" },
 		}),
@@ -58,7 +59,12 @@ export function ChannelHistorySheet({
 					)}
 
 					{!isLoading && error && (
-						<p className="text-destructive text-sm">Could not load the consent history.</p>
+						<div className="space-y-3">
+							<p className="text-destructive text-sm">Could not load the consent history.</p>
+							<Button variant="outline" size="sm" onClick={() => refetch()}>
+								Retry
+							</Button>
+						</div>
 					)}
 
 					{!isLoading && !error && (data?.length ?? 0) === 0 && (

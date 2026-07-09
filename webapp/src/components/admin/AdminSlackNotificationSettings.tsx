@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { CheckIcon, ExternalLinkIcon, LoaderIcon, LockIcon, SendIcon } from "lucide-react";
+import { CheckIcon, ExternalLinkIcon, LoaderIcon, SendIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -19,7 +19,6 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -40,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
+import { SlackChannelPicker } from "./slack-channels/SlackChannelPicker";
 
 export interface AdminSlackNotificationSettingsProps {
 	workspaceSlug: string;
@@ -282,46 +282,22 @@ export function AdminSlackNotificationSettings({
 									<Field data-invalid={channelInvalid || channelRequired}>
 										<FieldLabel htmlFor="slack-channel">Digest channel</FieldLabel>
 										{selectableDigestChannels.length > 0 && (
-											<div className="max-h-44 space-y-2 overflow-y-auto rounded-lg border p-2">
-												{selectableDigestChannels.map((candidate) => {
-													const selected = channelInput === candidate.slackChannelId;
-													const disabled = save.isPending || !candidate.member;
-													return (
-														<Button
-															key={candidate.slackChannelId}
-															type="button"
-															variant={selected ? "secondary" : "ghost"}
-															className="h-auto w-full justify-start gap-3 px-3 py-2 text-left"
-															disabled={disabled}
-															aria-pressed={selected}
-															onClick={() => setChannelInput(candidate.slackChannelId)}
-														>
-															<div className="min-w-0 flex-1">
-																<div className="flex flex-wrap items-center gap-2">
-																	<span className="truncate font-medium">
-																		#{candidate.channelName}
-																	</span>
-																	{candidate.privateChannel && (
-																		<LockIcon className="size-3.5" aria-label="Private" />
-																	)}
-																	{!candidate.member && (
-																		<Badge variant="outline">Needs invite</Badge>
-																	)}
-																</div>
-																<div className="text-muted-foreground font-mono text-xs">
-																	{candidate.slackChannelId}
-																</div>
-															</div>
-														</Button>
-													);
-												})}
-											</div>
+											<SlackChannelPicker
+												aria-label="Search digest Slack channels"
+												candidates={selectableDigestChannels}
+												disabled={save.isPending}
+												selectedChannelId={parsedChannel?.channelId}
+												getDisabledReason={(candidate) =>
+													candidate.member ? undefined : "Needs invite"
+												}
+												onSelect={(candidate) => setChannelInput(candidate.slackChannelId)}
+											/>
 										)}
 										<Input
 											id="slack-channel"
 											value={channelInput}
 											disabled={save.isPending}
-											onChange={(e) => setChannelInput(e.target.value.trim())}
+											onChange={(e) => setChannelInput(e.target.value)}
 											placeholder="https://…slack.com/archives/C0974LJBPBK"
 											autoComplete="off"
 											aria-invalid={channelInvalid}

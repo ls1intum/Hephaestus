@@ -111,6 +111,43 @@ describe("AdminSlackChannelsSettings — activation is guarded by a confirm dial
 	});
 });
 
+describe("AdminSlackChannelsSettings — reversible row actions swallow rejections", () => {
+	it("does not leak an unhandled rejection when Pause's consent update fails", async () => {
+		const onRejection = vi.fn();
+		process.on("unhandledRejection", onRejection);
+		try {
+			const onUpdateConsent = vi.fn().mockRejectedValue(new Error("boom"));
+			setup({ channels: [active], onUpdateConsent });
+			openRowMenu("team-standup");
+			fireEvent.click(await screen.findByRole("menuitem", { name: /^pause$/i }));
+
+			await waitFor(() => expect(onUpdateConsent).toHaveBeenCalledTimes(1));
+			// Flush the microtask queue — a genuinely unhandled rejection would have surfaced by now.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(onRejection).not.toHaveBeenCalled();
+		} finally {
+			process.off("unhandledRejection", onRejection);
+		}
+	});
+
+	it("does not leak an unhandled rejection when Set up again's re-register fails", async () => {
+		const onRejection = vi.fn();
+		process.on("unhandledRejection", onRejection);
+		try {
+			const onRegisterChannel = vi.fn().mockRejectedValue(new Error("boom"));
+			setup({ channels: [revoked], onRegisterChannel });
+			openRowMenu("team-legacy");
+			fireEvent.click(await screen.findByRole("menuitem", { name: /set up again/i }));
+
+			await waitFor(() => expect(onRegisterChannel).toHaveBeenCalledTimes(1));
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(onRejection).not.toHaveBeenCalled();
+		} finally {
+			process.off("unhandledRejection", onRejection);
+		}
+	});
+});
+
 describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
 	it("keeps the destructive action disabled until the stable channel ID is typed, then reports the reason", async () => {
 		const { props } = setup({ channels: [active] });
@@ -139,6 +176,27 @@ describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
 			reason: "left the course",
 		});
 	});
+
+	it("does not demand type-to-confirm for a PENDING channel — nothing has been collected yet", async () => {
+		const { props } = setup({ channels: [pending] });
+		openRowMenu("team-intro");
+		fireEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
+
+		const dialog = await screen.findByRole("alertdialog");
+		// No "type the channel ID" gate for a channel that never got past PENDING.
+		expect(within(dialog).queryByLabelText(/to confirm/i)).toBeNull();
+		expect(within(dialog).getByText(/nothing has been collected/i)).toBeTruthy();
+
+		const confirm = within(dialog).getByRole("button", { name: /^remove$/i }) as HTMLButtonElement;
+		expect(confirm.disabled).toBe(false);
+
+		fireEvent.click(confirm);
+		await waitFor(() => expect(props.onRemoveChannel).toHaveBeenCalledTimes(1));
+		expect(props.onRemoveChannel).toHaveBeenCalledWith({
+			slackChannelId: pending.slackChannelId,
+			reason: undefined,
+		});
+	});
 });
 
 describe("AdminSlackChannelsSettings — add-channel gating & empty state", () => {
@@ -153,6 +211,19 @@ describe("AdminSlackChannelsSettings — add-channel gating & empty state", () =
 		expect(screen.getByText(/no channels monitored yet/i)).toBeTruthy();
 		// Both the header button and the empty-state CTA are labelled "Add channel".
 		expect(screen.getAllByRole("button", { name: /add channel/i }).length).toBeGreaterThan(1);
+	});
+});
+
+describe("AdminSlackChannelsSettings — query failure is a distinct error panel, not the empty state", () => {
+	it("shows a Retry panel instead of the friendly empty state when the list failed to load", () => {
+		const onRetry = vi.fn();
+		setup({ channels: [], isError: true, onRetry });
+
+		expect(screen.queryByText(/no channels monitored yet/i)).toBeNull();
+		expect(screen.getByRole("alert").textContent).toMatch(/couldn't load the monitored channels/i);
+
+		fireEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+		expect(onRetry).toHaveBeenCalledOnce();
 	});
 });
 
@@ -190,7 +261,7 @@ describe("AdminSlackChannelsSettings — Slack channel picker", () => {
 
 		fireEvent.click(screen.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");
-		fireEvent.click(within(dialog).getByRole("button", { name: /#general/i }));
+		fireEvent.click(within(dialog).getByRole("option", { name: /#general/i }));
 		fireEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
 
 		await waitFor(() => expect(props.onRegisterChannel).toHaveBeenCalledTimes(1));

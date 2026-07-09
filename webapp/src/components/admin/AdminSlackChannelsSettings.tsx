@@ -33,6 +33,10 @@ export interface AdminSlackChannelsSettingsProps {
 	channels: SlackMonitoredChannel[];
 	channelCandidates?: SlackChannelCandidate[];
 	isLoading: boolean;
+	/** The channel list query failed — show a retry panel instead of the empty state. */
+	isError?: boolean;
+	/** Re-run the failed channel list query. */
+	onRetry?: () => void;
 	/** Allow-list a new channel (lands PENDING). Resolves on success, rejects to keep the dialog open. */
 	onRegisterChannel: (input: {
 		slackChannelId: string;
@@ -49,6 +53,15 @@ export interface AdminSlackChannelsSettingsProps {
 }
 
 /**
+ * Fire a route-handler mutation without awaiting it (reversible, no-confirm transitions) while
+ * swallowing rejections — the mutation's own onError already surfaced a toast, so leaving the
+ * promise unhandled here would otherwise reject into the void.
+ */
+function swallow(result: Promise<void> | void): void {
+	Promise.resolve(result).catch(() => {});
+}
+
+/**
  * Admin surface to allow-list Slack channels and drive their per-channel consent lifecycle
  * (PENDING → ACTIVE ⇄ PAUSED → REVOKED + erase). Self-contained section so promoting it to a
  * dedicated /admin/slack route later is a move, not a rewrite. Pure: all data + mutations
@@ -60,6 +73,8 @@ export function AdminSlackChannelsSettings({
 	channels,
 	channelCandidates = [],
 	isLoading,
+	isError = false,
+	onRetry,
 	onRegisterChannel,
 	onUpdateConsent,
 	onRemoveChannel,
@@ -109,6 +124,17 @@ export function AdminSlackChannelsSettings({
 								<Skeleton className="h-10 w-full" />
 								<Skeleton className="h-10 w-full" />
 							</div>
+						) : isError ? (
+							<div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+								<p className="text-sm text-destructive" role="alert">
+									We couldn't load the monitored channels.
+								</p>
+								{onRetry && (
+									<Button variant="outline" size="sm" onClick={onRetry}>
+										Retry
+									</Button>
+								)}
+							</div>
 						) : hasChannels ? (
 							<Table>
 								<TableHeader>
@@ -129,23 +155,29 @@ export function AdminSlackChannelsSettings({
 											channel={channel}
 											onActivate={setActivateChannel}
 											onPause={(c) =>
-												onUpdateConsent({
-													slackChannelId: c.slackChannelId,
-													consentState: "PAUSED",
-												})
+												swallow(
+													onUpdateConsent({
+														slackChannelId: c.slackChannelId,
+														consentState: "PAUSED",
+													}),
+												)
 											}
 											onResume={(c) =>
-												onUpdateConsent({
-													slackChannelId: c.slackChannelId,
-													consentState: "ACTIVE",
-												})
+												swallow(
+													onUpdateConsent({
+														slackChannelId: c.slackChannelId,
+														consentState: "ACTIVE",
+													}),
+												)
 											}
 											onRemove={setRemoveChannel}
 											onSetUpAgain={(c) =>
-												onRegisterChannel({
-													slackChannelId: c.slackChannelId,
-													channelName: c.channelName,
-												})
+												swallow(
+													onRegisterChannel({
+														slackChannelId: c.slackChannelId,
+														channelName: c.channelName,
+													}),
+												)
 											}
 											onViewHistory={setHistoryChannel}
 										/>
@@ -177,7 +209,6 @@ export function AdminSlackChannelsSettings({
 			</div>
 
 			<AddChannelDialog
-				key={addOpen ? "add-open" : "add-closed"}
 				open={addOpen}
 				onOpenChange={setAddOpen}
 				candidates={channelCandidates}
@@ -195,7 +226,6 @@ export function AdminSlackChannelsSettings({
 			/>
 
 			<RemoveChannelAlertDialog
-				key={removeChannel?.slackChannelId ?? "remove-closed"}
 				channel={removeChannel}
 				onOpenChange={(open) => {
 					if (!open) setRemoveChannel(null);

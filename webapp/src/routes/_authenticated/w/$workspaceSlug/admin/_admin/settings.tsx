@@ -124,7 +124,12 @@ function AdminSettings() {
 	const slackChannelsQueryOptions = listSlackChannelsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
-	const { data: slackChannels, isLoading: isLoadingSlackChannels } = useQuery({
+	const {
+		data: slackChannels,
+		isLoading: isLoadingSlackChannels,
+		isError: isSlackChannelsError,
+		refetch: refetchSlackChannels,
+	} = useQuery({
 		...slackChannelsQueryOptions,
 		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
 	});
@@ -157,17 +162,29 @@ function AdminSettings() {
 	});
 
 	// Drive activate / pause / resume (and reason-carrying revoke) through the consent PATCH.
+	// A REVOKED target is the same user-facing action as the dedicated DELETE below — removal
+	// + erase — so it gets that toast copy instead of the generic "Channel updated".
 	const updateSlackChannelConsent = useMutation({
 		...updateSlackChannelConsentMutation(),
-		onSuccess: () => {
-			toast.success("Channel updated");
+		onSuccess: (_data, variables) => {
+			if (variables.body?.consentState === "REVOKED") {
+				toast.success("Channel removed and its data erased");
+			} else {
+				toast.success("Channel updated");
+			}
 			invalidateSlackChannels();
 		},
-		onError: (e) => {
+		onError: (e, variables) => {
 			// The 409 ProblemDetail.detail for an illegal transition surfaces here.
-			toast.error("Failed to update channel", {
-				description: e instanceof Error ? e.message : undefined,
-			});
+			if (variables.body?.consentState === "REVOKED") {
+				toast.error("Failed to remove channel", {
+					description: e instanceof Error ? e.message : undefined,
+				});
+			} else {
+				toast.error("Failed to update channel", {
+					description: e instanceof Error ? e.message : undefined,
+				});
+			}
 		},
 	});
 
@@ -275,7 +292,10 @@ function AdminSettings() {
 		}
 		// The DELETE endpoint carries no body, so a supplied reason is recorded through the
 		// consent PATCH to REVOKED (same terminal erase server-side); the reason-less path
-		// uses the dedicated DELETE.
+		// uses the dedicated DELETE. Both are the same user-facing action — removal — so both
+		// must surface the removal toast; `updateSlackChannelConsent`'s own onSuccess/onError
+		// (below) branch on the REVOKED consent state to avoid the generic "Channel updated"
+		// copy leaking onto this destructive path.
 		if (reason && reason.trim().length > 0) {
 			await updateSlackChannelConsent.mutateAsync({
 				path: { workspaceSlug, slackChannelId },
@@ -337,6 +357,10 @@ function AdminSettings() {
 					(isLoadingSlackChannels || isLoadingSlackChannelCandidates)) ||
 				!workspaceSlug
 			}
+			isSlackChannelsError={Boolean(workspaceData?.hasSlackToken) && isSlackChannelsError}
+			onRetrySlackChannels={() => {
+				refetchSlackChannels();
+			}}
 			onRegisterSlackChannel={handleRegisterSlackChannel}
 			onUpdateSlackChannelConsent={handleUpdateSlackChannelConsent}
 			onRemoveSlackChannel={handleRemoveSlackChannel}

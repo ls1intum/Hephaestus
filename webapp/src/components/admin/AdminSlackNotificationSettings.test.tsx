@@ -32,13 +32,10 @@ describe("AdminSlackNotificationSettings — digest channel picker", () => {
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: /#general/i }));
+		fireEvent.click(screen.getByRole("option", { name: /#general/i }));
 
 		const input = screen.getByLabelText(/digest channel/i) as HTMLInputElement;
 		expect(input.value).toBe("C01GENERAL01");
-		expect(screen.getByRole("button", { name: /#general/i }).getAttribute("aria-pressed")).toBe(
-			"true",
-		);
 	});
 
 	it("requires a channel before enabling the digest", () => {
@@ -78,9 +75,46 @@ describe("AdminSlackNotificationSettings — digest channel picker", () => {
 			/>,
 		);
 
-		const privateChannel = screen.getByRole("button", {
-			name: /#private-team/i,
-		}) as HTMLButtonElement;
-		expect(privateChannel.disabled).toBe(true);
+		const privateChannel = screen.getByRole("option", { name: /#private-team/i });
+		expect(privateChannel.getAttribute("aria-disabled")).toBe("true");
+		expect(screen.getByText(/needs invite/i)).toBeTruthy();
+	});
+
+	it("filters the channel picker via the search input", () => {
+		renderWithClient(
+			<AdminSlackNotificationSettings
+				workspaceSlug="demo"
+				hasSlackConnection
+				slackConnectionId={1}
+				enabled={false}
+				channelCandidates={[
+					{
+						slackChannelId: "C01GENERAL01",
+						channelName: "general",
+						privateChannel: false,
+						member: true,
+						archived: false,
+					},
+					{
+						slackChannelId: "C02STANDUP2",
+						channelName: "team-standup",
+						privateChannel: false,
+						member: true,
+						archived: false,
+					},
+				]}
+				onSaved={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByRole("option", { name: /#general/i })).toBeTruthy();
+		expect(screen.getByRole("option", { name: /#team-standup/i })).toBeTruthy();
+
+		fireEvent.change(screen.getByRole("combobox", { name: /search digest slack channels/i }), {
+			target: { value: "standup" },
+		});
+
+		expect(screen.queryByRole("option", { name: /#general/i })).toBeNull();
+		expect(screen.getByRole("option", { name: /#team-standup/i })).toBeTruthy();
 	});
 });

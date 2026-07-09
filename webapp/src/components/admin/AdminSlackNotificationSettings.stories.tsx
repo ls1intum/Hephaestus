@@ -80,7 +80,11 @@ export const ToggleDigestOff: Story = {
 	},
 };
 
-/** Slack-discovered channels can be selected without manual ID entry. */
+/**
+ * Slack-discovered channels can be searched and selected without manual ID entry — a
+ * searchable combobox (roving keyboard focus, no scrollable `aria-pressed` button list), with
+ * disabled options carrying a visible reason instead of vanishing from the list.
+ */
 export const WithChannelPicker: Story = {
 	args: {
 		hasSlackConnection: true,
@@ -103,11 +107,21 @@ export const WithChannelPicker: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const general = canvas.getByRole("button", { name: /#general/i });
-		const privateTeam = canvas.getByRole("button", { name: /#private-team/i });
-		await expect(privateTeam).toBeDisabled();
+		const general = canvas.getByRole("option", { name: /#general/i });
+		const privateTeam = canvas.getByRole("option", { name: /#private-team/i });
+		await expect(privateTeam).toHaveAttribute("aria-disabled", "true");
+		await expect(canvas.getByText(/needs invite/i)).toBeInTheDocument();
+
+		// Search narrows the option list to the match. Scope by name — the schedule Day <Select>
+		// on the same page is also exposed as role="combobox".
+		await userEvent.type(
+			canvas.getByRole("combobox", { name: /search digest slack channels/i }),
+			"gen",
+		);
+		await expect(canvas.getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expect(canvas.queryByRole("option", { name: /#private-team/i })).not.toBeInTheDocument();
+
 		await userEvent.click(general);
-		await expect(general).toHaveAttribute("aria-pressed", "true");
 		await expect(canvas.getByLabelText(/digest channel/i)).toHaveValue("C01GENERAL01");
 	},
 };

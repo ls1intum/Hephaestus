@@ -21,7 +21,19 @@ describe("parseSlackChannelReference", () => {
 		});
 	});
 
+	it("extracts ids from an archive URL pasted alongside other text", () => {
+		expect(
+			parseSlackChannelReference("here it is: https://example.slack.com/archives/G0974LJBPBK/p123"),
+		).toEqual({ channelId: "G0974LJBPBK" });
+	});
+
 	it("rejects names that do not carry the stable Slack id", () => {
 		expect(parseSlackChannelReference("#team-standup")).toBeNull();
+	});
+
+	it("does not mistake a shouted, all-caps prose word for a channel id", () => {
+		// Starts with C and is 11 uppercase/digit chars — matches the old unanchored pattern,
+		// but it is not a Slack archive URL, so it must not be extracted.
+		expect(parseSlackChannelReference("See CHANNELS123 for details")).toBeNull();
 	});
 });

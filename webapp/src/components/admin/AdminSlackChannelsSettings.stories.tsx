@@ -185,6 +185,79 @@ export const Loading: Story = {
 	},
 };
 
+/** The channel-list query failed — a distinct error panel with Retry, not the friendly empty state. */
+export const LoadError: Story = {
+	args: { channels: [], isError: true, onRetry: fn() },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText(/no channels monitored yet/i)).not.toBeInTheDocument();
+		await expect(canvas.getByText(/couldn't load the monitored channels/i)).toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+	},
+};
+
+/** Removing a PENDING channel that never got past setup: no type-to-confirm, accurate copy. */
+export const RemovePendingNothingCollected: Story = {
+	args: { channels: [pending] },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
+		const dialog = await screen.findByRole("alertdialog");
+		await expect(within(dialog).getByText(/nothing has been collected/i)).toBeInTheDocument();
+		await expect(within(dialog).queryByLabelText(/to confirm/i)).not.toBeInTheDocument();
+		await expect(within(dialog).getByRole("button", { name: /^remove$/i })).toBeEnabled();
+	},
+};
+
+/** The searchable channel picker: search filters the list, and a selection registers without
+ * manual id entry. */
+export const AddChannelPicker: Story = {
+	args: {
+		channels: [],
+		channelCandidates: [
+			{
+				slackChannelId: "C05GENERAL5",
+				channelName: "general",
+				privateChannel: false,
+				member: true,
+				archived: false,
+			},
+			{
+				slackChannelId: "C06STANDUP6",
+				channelName: "team-standup",
+				privateChannel: true,
+				member: true,
+				archived: true,
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
+		const dialog = await screen.findByRole("dialog");
+
+		// The archived channel is a disabled option with a reason, not silently missing from
+		// the list.
+		const archived = within(dialog).getByRole("option", { name: /#team-standup/i });
+		await expect(archived).toHaveAttribute("aria-disabled", "true");
+		await expect(within(dialog).getByText(/^archived$/i)).toBeInTheDocument();
+
+		// Searching narrows the option list instead of scrolling a flat button list.
+		await userEvent.type(
+			within(dialog).getByRole("combobox", { name: /search available slack channels/i }),
+			"general",
+		);
+		await expect(within(dialog).getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expect(
+			within(dialog).queryByRole("option", { name: /#team-standup/i }),
+		).not.toBeInTheDocument();
+
+		await userEvent.click(within(dialog).getByRole("option", { name: /#general/i }));
+		await userEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
+	},
+};
+
 /** Mutation error — a rejected register keeps the dialog open so the admin can retry. */
 export const MutationError: Story = {
 	args: {

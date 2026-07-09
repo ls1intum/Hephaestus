@@ -83,4 +83,20 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 		expect(screen.getByRole("heading", { name: /slack channel monitoring/i })).toBeTruthy();
 		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});
+
+	it("threads the channel-list query failure into a retry panel, not the empty state", () => {
+		const onRetrySlackChannels = vi.fn();
+		setup({
+			hasSlackConnection: true,
+			slackChannels: [],
+			isSlackChannelsError: true,
+			onRetrySlackChannels,
+		});
+
+		expect(screen.queryByText(/no channels monitored yet/i)).toBeNull();
+		expect(screen.getByText(/couldn't load the monitored channels/i)).toBeTruthy();
+
+		screen.getByRole("button", { name: /^retry$/i }).click();
+		expect(onRetrySlackChannels).toHaveBeenCalledOnce();
+	});
 });

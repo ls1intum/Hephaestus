@@ -48,6 +48,8 @@ export interface AdminSettingsPageProps {
 	slackChannels: SlackMonitoredChannel[];
 	slackChannelCandidates: SlackChannelCandidate[];
 	isLoadingSlackChannels: boolean;
+	isSlackChannelsError?: boolean;
+	onRetrySlackChannels?: () => void;
 	onRegisterSlackChannel: (input: {
 		slackChannelId: string;
 		channelName?: string;
@@ -90,6 +92,8 @@ export function AdminSettingsPage({
 	slackChannels,
 	slackChannelCandidates,
 	isLoadingSlackChannels,
+	isSlackChannelsError = false,
+	onRetrySlackChannels,
 	onRegisterSlackChannel,
 	onUpdateSlackChannelConsent,
 	onRemoveSlackChannel,
@@ -147,6 +151,8 @@ export function AdminSettingsPage({
 						channels={slackChannels}
 						channelCandidates={slackChannelCandidates}
 						isLoading={isLoadingSlackChannels}
+						isError={isSlackChannelsError}
+						onRetry={onRetrySlackChannels}
 						onRegisterChannel={onRegisterSlackChannel}
 						onUpdateConsent={onUpdateSlackChannelConsent}
 						onRemoveChannel={onRemoveSlackChannel}

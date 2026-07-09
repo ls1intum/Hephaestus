@@ -114,13 +114,11 @@ export function SlackChannelRow({
 			<TableCell>
 				{channel.optedOutMemberCount > 0 ? (
 					<Tooltip>
-						<TooltipTrigger
-							render={
-								<span className="cursor-help underline decoration-dotted underline-offset-2">
-									{channel.optedOutMemberCount}
-								</span>
-							}
-						/>
+						{/* Default TooltipTrigger renders a real <button>, so it's reachable by keyboard
+						and screen-reader users — a bare <span> trigger has no focus stop. */}
+						<TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">
+							{channel.optedOutMemberCount}
+						</TooltipTrigger>
 						<TooltipContent>
 							{channel.optedOutMemberCount} workspace member
 							{channel.optedOutMemberCount === 1 ? "" : "s"} opted out (App Home)

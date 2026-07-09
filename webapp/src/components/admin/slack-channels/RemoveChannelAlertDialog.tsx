@@ -23,8 +23,10 @@ export interface RemoveChannelAlertDialogProps {
 }
 
 /**
- * Destructive confirmation for a terminal erase. The confirm action stays disabled until the admin
- * types the stable Slack channel ID.
+ * Destructive confirmation for a terminal erase. A channel that never got past PENDING has
+ * nothing collected yet (no announcement was ever posted), so it gets a lighter variant:
+ * accurate copy and no type-to-confirm gate. Every other state has real collected data, so the
+ * confirm action stays disabled until the admin types the stable Slack channel ID.
  */
 export function RemoveChannelAlertDialog({
 	channel,
@@ -37,7 +39,21 @@ export function RemoveChannelAlertDialog({
 
 	const label = channel ? (channel.channelName ?? channel.slackChannelId) : "";
 	const channelId = channel?.slackChannelId ?? "";
-	const matches = confirmText.trim() === channelId;
+	// Nothing has been collected from a channel that never got past PENDING — the consent
+	// announcement (and therefore any reading) only happens on first activation.
+	const nothingCollected = channel?.consentState === "PENDING";
+	const matches = nothingCollected || confirmText.trim() === channelId;
+
+	// Reset the form fields on close instead of remounting via a changing `key` (which killed
+	// the AlertDialog's exit animation). The next open always starts from a clean slate.
+	function handleOpenChange(next: boolean) {
+		if (!next) {
+			setConfirmText("");
+			setReason("");
+			setSubmitting(false);
+		}
+		onOpenChange(next);
+	}
 
 	async function confirm() {
 		if (!channel || !matches) return;
@@ -47,7 +63,7 @@ export function RemoveChannelAlertDialog({
 				slackChannelId: channel.slackChannelId,
 				reason: reason.trim().length > 0 ? reason.trim() : undefined,
 			});
-			onOpenChange(false);
+			handleOpenChange(false);
 		} catch {
 			// Rejection = keep the dialog open. The mutation's onError already surfaced the
 			// toast, so swallow here rather than let it escape as an unhandled rejection.
@@ -57,32 +73,45 @@ export function RemoveChannelAlertDialog({
 	}
 
 	return (
-		<AlertDialog open={channel != null} onOpenChange={onOpenChange}>
+		<AlertDialog open={channel != null} onOpenChange={handleOpenChange}>
 			<AlertDialogContent>
 				<AlertDialogHeader>
-					<AlertDialogTitle>Remove #{label} and erase its data?</AlertDialogTitle>
+					<AlertDialogTitle>
+						{nothingCollected ? `Remove #${label}?` : `Remove #${label} and erase its data?`}
+					</AlertDialogTitle>
 					<AlertDialogDescription>
-						This permanently deletes <strong>all messages collected</strong> from this channel and
-						every practice observation derived from them. This cannot be undone.
+						{nothingCollected ? (
+							<>
+								This stops the setup for this channel. Nothing has been collected from it yet — no
+								announcement was ever posted. This cannot be undone.
+							</>
+						) : (
+							<>
+								This permanently deletes <strong>all messages collected</strong> from this channel
+								and every practice observation derived from them. This cannot be undone.
+							</>
+						)}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 
 				<div className="space-y-4">
-					<Field>
-						<FieldLabel htmlFor="remove-slack-confirm">
-							Type the channel ID <span className="font-mono font-medium">{channelId}</span> to
-							confirm
-						</FieldLabel>
-						<Input
-							id="remove-slack-confirm"
-							value={confirmText}
-							disabled={submitting}
-							onChange={(e) => setConfirmText(e.target.value)}
-							autoComplete="off"
-							autoCapitalize="off"
-							spellCheck={false}
-						/>
-					</Field>
+					{!nothingCollected && (
+						<Field>
+							<FieldLabel htmlFor="remove-slack-confirm">
+								Type the channel ID <span className="font-mono font-medium">{channelId}</span> to
+								confirm
+							</FieldLabel>
+							<Input
+								id="remove-slack-confirm"
+								value={confirmText}
+								disabled={submitting}
+								onChange={(e) => setConfirmText(e.target.value)}
+								autoComplete="off"
+								autoCapitalize="off"
+								spellCheck={false}
+							/>
+						</Field>
+					)}
 
 					<Field>
 						<FieldLabel htmlFor="remove-slack-reason">Reason (optional)</FieldLabel>
@@ -104,7 +133,7 @@ export function RemoveChannelAlertDialog({
 						disabled={!matches || submitting}
 						onClick={confirm}
 					>
-						{submitting ? "Removing…" : "Remove & erase"}
+						{submitting ? "Removing…" : nothingCollected ? "Remove" : "Remove & erase"}
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>
