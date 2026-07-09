@@ -9,17 +9,22 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 
 class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
 
     @Test
     void manifestWithNoCapabilitiesValidatesCleanly() {
-        // Regression: an outbound-only kind (e.g. Slack) declares zero capabilities. The universal
+        // Regression: an outbound-only kind declares zero capabilities. The universal
         // credential-provider + lifecycle-listener beans are still required, but the per-capability
         // checks must be a no-op — and must not trip EnumSet.copyOf on the empty declared set.
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
@@ -51,23 +56,110 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
             .hasMessageContaining("WebhookSignatureVerifier");
     }
 
+    @Test
+    void webhookIngestDoesNotRequireASeparateSecretSourceBean() {
+        IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
+            List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST)))
+        );
+        IntegrationFrameworkBootstrap bootstrap = bootstrap(
+            registry,
+            List.of(credentialProvider(IntegrationKind.SLACK)),
+            List.of(lifecycleListener(IntegrationKind.SLACK)),
+            List.of(webhookSignatureVerifier(IntegrationKind.SLACK)),
+            List.of(subjectKeyDeriver(IntegrationKind.SLACK)),
+            List.of(subjectParser(IntegrationKind.SLACK))
+        );
+
+        assertThatCode(bootstrap::validate).doesNotThrowAnyException();
+    }
+
+    @Test
+    void webhookIngestDoesNotRequireWebhookBeansWhenWebhookRoleIsDisabled() {
+        IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
+            List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST)))
+        );
+        IntegrationFrameworkBootstrap bootstrap = bootstrap(
+            registry,
+            List.of(credentialProvider(IntegrationKind.SLACK)),
+            List.of(lifecycleListener(IntegrationKind.SLACK)),
+            List.of(),
+            List.of(),
+            List.of(subjectParser(IntegrationKind.SLACK)),
+            false
+        );
+
+        assertThatCode(bootstrap::validate).doesNotThrowAnyException();
+    }
+
+    @Test
+    void webhookIngestStillRequiresSubjectParserWhenWebhookRoleIsDisabled() {
+        IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
+            List.of(manifest(IntegrationKind.SLACK, Set.of(Capability.WEBHOOK_INGEST)))
+        );
+        IntegrationFrameworkBootstrap bootstrap = bootstrap(
+            registry,
+            List.of(credentialProvider(IntegrationKind.SLACK)),
+            List.of(lifecycleListener(IntegrationKind.SLACK)),
+            List.of(),
+            List.of(),
+            List.of(),
+            false
+        );
+
+        assertThatThrownBy(bootstrap::validate)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("SubjectParser");
+    }
+
     private static IntegrationFrameworkBootstrap bootstrap(
         IntegrationManifestRegistry registry,
         List<ApiCredentialProvider> credentialProviders,
         List<IntegrationLifecycleListener> lifecycleListeners
     ) {
+        return bootstrap(registry, credentialProviders, lifecycleListeners, List.of(), List.of(), List.of());
+    }
+
+    private static IntegrationFrameworkBootstrap bootstrap(
+        IntegrationManifestRegistry registry,
+        List<ApiCredentialProvider> credentialProviders,
+        List<IntegrationLifecycleListener> lifecycleListeners,
+        List<WebhookSignatureVerifier> signatureVerifiers,
+        List<SubjectKeyDeriver> subjectKeyDerivers,
+        List<SubjectParser> subjectParsers
+    ) {
+        return bootstrap(
+            registry,
+            credentialProviders,
+            lifecycleListeners,
+            signatureVerifiers,
+            subjectKeyDerivers,
+            subjectParsers,
+            true
+        );
+    }
+
+    private static IntegrationFrameworkBootstrap bootstrap(
+        IntegrationManifestRegistry registry,
+        List<ApiCredentialProvider> credentialProviders,
+        List<IntegrationLifecycleListener> lifecycleListeners,
+        List<WebhookSignatureVerifier> signatureVerifiers,
+        List<SubjectKeyDeriver> subjectKeyDerivers,
+        List<SubjectParser> subjectParsers,
+        boolean webhookRoleEnabled
+    ) {
         return new IntegrationFrameworkBootstrap(
             registry,
-            List.of(), // signatureVerifiers
+            signatureVerifiers,
             List.of(), // secretSources
-            List.of(), // subjectKeyDerivers
-            List.of(), // subjectParsers
+            subjectKeyDerivers,
+            subjectParsers,
             credentialProviders,
             List.of(), // tokenRefreshers
             List.of(), // feedbackChannels
             List.of(), // inlineFindingChannels
             List.of(), // approvalChannels
-            lifecycleListeners
+            lifecycleListeners,
+            webhookRoleEnabled
         );
     }
 
@@ -106,5 +198,52 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
 
     private static IntegrationLifecycleListener lifecycleListener(IntegrationKind kind) {
         return () -> kind;
+    }
+
+    private static WebhookSignatureVerifier webhookSignatureVerifier(IntegrationKind kind) {
+        return new WebhookSignatureVerifier() {
+            @Override
+            public IntegrationKind kind() {
+                return kind;
+            }
+
+            @Override
+            public VerificationResult verify(WebhookRequest request) {
+                return new VerificationResult.Verified();
+            }
+        };
+    }
+
+    private static SubjectKeyDeriver subjectKeyDeriver(IntegrationKind kind) {
+        return new SubjectKeyDeriver() {
+            @Override
+            public IntegrationKind kind() {
+                return kind;
+            }
+
+            @Override
+            public String deriveSubject(JsonNode payload, Map<String, String> headers) {
+                return kind.name().toLowerCase(java.util.Locale.ROOT) + ".test";
+            }
+
+            @Override
+            public String deriveDedupKey(byte[] body, Map<String, String> headers) {
+                return "test";
+            }
+        };
+    }
+
+    private static SubjectParser subjectParser(IntegrationKind kind) {
+        return new SubjectParser() {
+            @Override
+            public IntegrationKind kind() {
+                return kind;
+            }
+
+            @Override
+            public de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey parse(String fullSubject) {
+                return new de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey(kind, "test");
+            }
+        };
     }
 }

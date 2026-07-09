@@ -10,35 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Erases one person's already-stored Slack data within one workspace — the GDPR Art. 17 half of a person opt-out
- * (and the future account hard-delete). Symmetric to {@link SlackIngestService#eraseChannel}, but person-scoped
- * rather than channel-scoped. Transactional, idempotent, and strictly tenant + person scoped: it never touches
- * another user's rows, another workspace's rows, or the PR/ISSUE surface.
- *
- * <p>Three deletes, all keyed by the resolved workspace member id:
- * <ol>
- *   <li>the person's raw {@code slack_message} rows (keyed by the {@code author_member_id} firewall stamp);</li>
- *   <li>the person's id pruned out of every thread's {@code participant_member_ids} array
- *       ({@link SlackThreadRepository#pruneParticipant} — {@code array_remove}, leaving co-participants intact);</li>
- *   <li>the derived {@code CONVERSATION_THREAD} observations/feedback the person is the subject of
- *       ({@link ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}, {@code about_user_id}).</li>
- * </ol>
- *
- * <p><strong>Scope: channel-ingestion data only.</strong> A person opt-out withdraws consent for the app to
- * read that person's CHANNEL messages, so this erases exactly that surface. It deliberately does NOT touch the
- * person's mentor-DM data ({@code mentor_slack_thread}/{@code chat_thread}, {@code mentor_turn_rating},
- * {@code slack_mentor_daily_budget}): a DM to the mentor is a distinct, voluntary interaction under a separate
- * consent basis, and that history is the person's own benefit, not channel data. Those mentor-DM surfaces are
- * erased on account/workspace teardown via {@code SlackWorkspacePurgeAdapter}.
- *
- * <p><strong>Account hard-delete.</strong> This is the exact method an account hard-delete would call per
- * workspace the account is a member of. It is intentionally NOT wired into {@code AccountPurger} yet: that path is
- * account-global (raw-JDBC child deletes, no per-workspace member resolution and no purge-contributor SPI), so
- * resolving an account's {@code (workspaceId, memberId, slackUserId)} tuples there requires a new cross-module SPI —
- * a separate slice. Until then, whole-workspace teardown (workspace purge / app uninstall, via
- * {@code SlackWorkspacePurgeAdapter}) remains the account-delete backstop for Slack-derived data.
- */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackPersonErasureService {
@@ -59,20 +30,29 @@ public class SlackPersonErasureService {
         this.conversationFeedbackErasure = conversationFeedbackErasure;
     }
 
-    /**
-     * Erase everything this workspace stores about one member. Idempotent (a member with nothing stored deletes 0
-     * rows); every statement carries the {@code workspace_id} predicate and is narrowed to this member, so a
-     * co-participant's messages, another workspace's rows, and PR/ISSUE feedback are all left intact.
-     *
-     * @param workspaceId the tenant the erasure is scoped to
-     * @param memberId    the resolved workspace {@code User} id (the {@code author_member_id} / participant id)
-     * @param slackUserId the person's Slack id (for the audit log; the deletes key on {@code memberId})
-     */
     @Transactional
     public void eraseMember(long workspaceId, long memberId, @Nullable String slackUserId) {
-        int messages = messageRepository.deleteByWorkspaceIdAndAuthorMemberId(workspaceId, memberId);
-        int threadsPruned = threadRepository.pruneParticipant(workspaceId, memberId);
-        int derived = conversationFeedbackErasure.eraseConversationFeedbackAboutUser(workspaceId, memberId);
+        erasePerson(workspaceId, memberId, slackUserId);
+    }
+
+    /**
+     * Erases channel-ingestion data only. Slack user id handles unlinked users; member id additionally erases
+     * derived conversation feedback for linked users.
+     */
+    @Transactional
+    public void erasePerson(long workspaceId, @Nullable Long memberId, @Nullable String slackUserId) {
+        int messagesBySlackId = 0;
+        if (slackUserId != null && !slackUserId.isBlank()) {
+            messagesBySlackId = messageRepository.deleteByWorkspaceIdAndAuthorSlackUserId(workspaceId, slackUserId);
+        }
+        int messagesByMemberId =
+            memberId == null ? 0 : messageRepository.deleteByWorkspaceIdAndAuthorMemberId(workspaceId, memberId);
+        int threadsPruned = memberId == null ? 0 : threadRepository.pruneParticipant(workspaceId, memberId);
+        int derived =
+            memberId == null
+                ? 0
+                : conversationFeedbackErasure.eraseConversationFeedbackAboutUser(workspaceId, memberId);
+        int messages = messagesBySlackId + messagesByMemberId;
         log.info(
             "Slack person erasure: workspace={} member={} slackUser={} → messages={} threadsPruned={} derivedRows={}",
             workspaceId,

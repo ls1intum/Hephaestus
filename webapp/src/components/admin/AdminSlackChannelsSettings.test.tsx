@@ -1,9 +1,3 @@
-// Behavioral tests for the Slack channel-monitoring admin surface. The component is
-// presentational: mutations are mocked callbacks, so we assert on delegated intent and on
-// the two safeguards — activation is guarded by a confirm dialog, and revoke is gated behind
-// a type-to-confirm AlertDialog. jest-dom matchers and user-event are NOT set up in this
-// repo's vitest, so assertions use plain DOM (`.disabled`, `queryByRole`) and `fireEvent`.
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -118,7 +112,7 @@ describe("AdminSlackChannelsSettings — activation is guarded by a confirm dial
 });
 
 describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
-	it("keeps the destructive action disabled until the channel name is typed, then reports the reason", async () => {
+	it("keeps the destructive action disabled until the stable channel ID is typed, then reports the reason", async () => {
 		const { props } = setup({ channels: [active] });
 		openRowMenu("team-standup");
 		fireEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
@@ -130,7 +124,7 @@ describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
 		expect(confirm.disabled).toBe(true);
 
 		fireEvent.change(within(dialog).getByLabelText(/to confirm/i), {
-			target: { value: "team-standup" },
+			target: { value: active.slackChannelId },
 		});
 		expect(confirm.disabled).toBe(false);
 
@@ -176,5 +170,45 @@ describe("AdminSlackChannelsSettings — opted-out signal", () => {
 		expect(pendingRow).not.toBeNull();
 		expect(within(activeRow as HTMLElement).getByText("2")).toBeTruthy();
 		expect(within(pendingRow as HTMLElement).getByText("0")).toBeTruthy();
+	});
+});
+
+describe("AdminSlackChannelsSettings — Slack channel picker", () => {
+	it("registers a selected Slack channel without manual id entry", async () => {
+		const { props } = setup({
+			channels: [],
+			channelCandidates: [
+				{
+					slackChannelId: "C04GENERAL4",
+					channelName: "general",
+					privateChannel: false,
+					member: false,
+					archived: false,
+				},
+			],
+		});
+
+		fireEvent.click(screen.getAllByRole("button", { name: /add channel/i })[0]);
+		const dialog = await screen.findByRole("dialog");
+		fireEvent.click(within(dialog).getByRole("button", { name: /#general/i }));
+		fireEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
+
+		await waitFor(() => expect(props.onRegisterChannel).toHaveBeenCalledTimes(1));
+		expect(props.onRegisterChannel).toHaveBeenCalledWith({
+			slackChannelId: "C04GENERAL4",
+			channelName: "general",
+		});
+	});
+
+	it("lets admins set up a revoked channel again", async () => {
+		const { props } = setup({ channels: [revoked] });
+		openRowMenu("team-legacy");
+
+		fireEvent.click(await screen.findByRole("menuitem", { name: /set up again/i }));
+
+		expect(props.onRegisterChannel).toHaveBeenCalledWith({
+			slackChannelId: revoked.slackChannelId,
+			channelName: revoked.channelName,
+		});
 	});
 });

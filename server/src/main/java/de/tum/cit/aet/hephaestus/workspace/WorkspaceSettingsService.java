@@ -37,7 +37,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class WorkspaceSettingsService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSettingsService.class);
-    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
+    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CG][A-Z0-9]{8,}$");
 
     private final WorkspaceRepository workspaceRepository;
     private final ConnectionService connectionService;

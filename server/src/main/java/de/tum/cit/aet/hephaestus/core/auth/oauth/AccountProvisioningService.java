@@ -83,12 +83,16 @@ public class AccountProvisioningService {
         OAuth2User principal,
         AuthIntentCookie.Intent intent
     ) {
-        long providerId = resolveProviderId(registrationId);
-        // Multi-instance IdP disambiguation: a Slack subject (U…) is only unique WITHIN its workspace (T…),
-        // so the login key is (provider, subject, team). teamId is null for single-tenant IdPs (GitHub/GitLab)
-        // — the COALESCE(team_id,'') in the lookup + unique index keeps their behaviour identical.
-        String teamId = teamIdOf(principal);
+        LoginProvider provider = requireLoginProvider(registrationId);
+        long providerId = gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
         AuthIntentCookie.Intent.Mode mode = (intent != null) ? intent.mode() : AuthIntentCookie.Intent.Mode.LOGIN;
+        if (provider.getType() == LoginProvider.ProviderType.SLACK && mode != AuthIntentCookie.Intent.Mode.LINK) {
+            throw new LinkOnlyProviderLoginException(registrationId);
+        }
+        String teamId = teamIdOf(principal);
+        if (provider.getType() == LoginProvider.ProviderType.SLACK && (teamId == null || teamId.isBlank())) {
+            throw new IllegalStateException("Slack identity is missing team_id");
+        }
 
         IdentityLink link = identityLinkRepository
             .findActiveByProviderSubject(providerId, subject, teamId)
@@ -105,14 +109,7 @@ public class AccountProvisioningService {
                 intent.linkingAccountId() != null &&
                 !link.getAccount().getId().equals(intent.linkingAccountId())
             ) {
-                throw new IllegalStateException(
-                    "auth.link: identity (provider=" +
-                        registrationId +
-                        ", subject=" +
-                        subject +
-                        ") is already linked to a different accountId=" +
-                        link.getAccount().getId()
-                );
+                throw new AccountLinkConflictException(registrationId, subject, link.getAccount().getId());
             }
             identityLinkRepository.touchLastLogin(link.getId(), clock.instant());
             log.info(
@@ -220,11 +217,10 @@ public class AccountProvisioningService {
      * {@code login_provider} row (this module owns it), then let the integration-side registry upsert
      * the provider row from its {@code (type, baseUrl)} — keeping the IdentityProvider entity out of auth.
      */
-    private long resolveProviderId(String registrationId) {
-        LoginProvider provider = loginProviderRepository
+    private LoginProvider requireLoginProvider(String registrationId) {
+        return loginProviderRepository
             .findByRegistrationId(registrationId)
             .orElseThrow(() -> new IllegalArgumentException("unknown login registrationId: " + registrationId));
-        return gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
     }
 
     /**

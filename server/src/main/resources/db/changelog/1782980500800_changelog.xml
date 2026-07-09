@@ -356,34 +356,6 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-slack" id="1782980500800-16">
-        <preConditions onFail="MARK_RAN" onFailMessage="mentor_turn_rating already present">
-            <not><tableExists tableName="mentor_turn_rating"/></not>
-        </preConditions>
-        <comment>
-            Binary thumbs on a mentor turn. Workspace-scoped (carries workspace_id, absent from
-            WorkspaceScopedTables.GLOBAL_TABLES) → a tenancy predicate rides every query. Append-only (@Immutable
-            entity): a click writes a new row, and the newest row per (rater, turn) is the current rating —
-            "latest wins" is read-side, never an in-place update. The (rater_user_id, created_at DESC) index
-            serves the per-user recency scan.
-        </comment>
-        <sql>
-            CREATE TABLE mentor_turn_rating (
-                id UUID PRIMARY KEY,
-                workspace_id BIGINT NOT NULL,
-                rater_user_id BIGINT NOT NULL,
-                channel_id VARCHAR(32) NOT NULL,
-                thread_ts VARCHAR(32),
-                slack_message_ts VARCHAR(32) NOT NULL,
-                rating VARCHAR(16) NOT NULL,
-                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                CONSTRAINT chk_mentor_turn_rating_rating CHECK (rating IN ('HELPFUL', 'UNHELPFUL'))
-            );
-            CREATE INDEX idx_mentor_turn_rating_rater_created ON mentor_turn_rating (rater_user_id, created_at DESC);
-        </sql>
-        <rollback><sql>DROP TABLE IF EXISTS mentor_turn_rating;</sql></rollback>
-    </changeSet>
-
     <!--
         Make CONVERSATION_THREAD a first-class detection artifact at the schema level. The WorkArtifact enum
         already carries CONVERSATION_THREAD, but the observation/feedback artifact_type CHECKs still admit only
@@ -498,28 +470,77 @@
         <rollback><sql>DROP TABLE IF EXISTS slack_channel_consent_event;</sql></rollback>
     </changeSet>
 
-    <!--
-        Shared-state fleet daily LLM-spend budget for the Slack mentor DM path. The per-user turn cap tolerates
-        per-replica drift, but the daily mentor-cost cap must be ONE budget across the whole fleet: an in-memory
-        counter per pod makes the effective cap N× the budget with N replicas. One row per UTC day holds the turns
-        consumed so far; SlackMentorQuotaGuard advances it atomically via INSERT … ON CONFLICT (day) DO UPDATE …
-        WHERE used < :budget, so concurrent replicas serialize on the row and the combined draw-down is exactly the
-        budget. Workspace-INDEPENDENT by construction (a fleet operational budget, not tenant data) → no workspace_id
-        column, listed in WorkspaceScopedTables.GLOBAL_TABLES, and NOT cascaded by the Slack workspace-purge adapter
-        (it carries no workspace content). Old days' rows are harmless residue never read after their day.
-    -->
-    <changeSet author="hephaestus-slack" id="1782980500800-22">
-        <preConditions onFail="MARK_RAN" onFailMessage="slack_mentor_daily_budget already present">
-            <not><tableExists tableName="slack_mentor_daily_budget"/></not>
+    <changeSet author="hephaestus-slack" id="1782980500800-23">
+        <preConditions onFail="MARK_RAN" onFailMessage="login_provider.type CHECK already admits SLACK">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_login_provider_type'
+                AND pg_get_constraintdef(oid) LIKE '%SLACK%'
+            </sqlCheck>
         </preConditions>
-        <comment>Fleet-wide Slack mentor daily LLM-spend budget counter, keyed by UTC day.</comment>
+        <comment>Allow Slack as a link-only OAuth login provider for account linking.</comment>
         <sql>
-            CREATE TABLE slack_mentor_daily_budget (
-                day DATE PRIMARY KEY,
-                used INTEGER NOT NULL DEFAULT 0
-            );
+            ALTER TABLE login_provider DROP CONSTRAINT IF EXISTS ck_login_provider_type;
+            ALTER TABLE login_provider
+            ADD CONSTRAINT ck_login_provider_type CHECK (type IN ('GITHUB', 'GITLAB', 'SLACK'));
         </sql>
-        <rollback><sql>DROP TABLE IF EXISTS slack_mentor_daily_budget;</sql></rollback>
+        <rollback>
+            ALTER TABLE login_provider DROP CONSTRAINT IF EXISTS ck_login_provider_type;
+            ALTER TABLE login_provider
+            ADD CONSTRAINT ck_login_provider_type CHECK (type IN ('GITHUB', 'GITLAB'));
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-24">
+        <preConditions onFail="MARK_RAN" onFailMessage="mentor_slack_thread already keyed by Slack thread">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'uk_mentor_slack_thread'
+                AND pg_get_constraintdef(oid) LIKE '%slack_thread_ts%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Key Slack mentor mappings by Slack DM thread, not just by channel, so independent Slack threads never share an in-flight guard.</comment>
+        <sql>
+            UPDATE mentor_slack_thread
+               SET slack_thread_ts = slack_channel_id
+             WHERE slack_thread_ts IS NULL OR slack_thread_ts = '';
+            ALTER TABLE mentor_slack_thread ALTER COLUMN slack_thread_ts SET NOT NULL;
+            ALTER TABLE mentor_slack_thread DROP CONSTRAINT IF EXISTS uk_mentor_slack_thread;
+            ALTER TABLE mentor_slack_thread
+              ADD CONSTRAINT uk_mentor_slack_thread UNIQUE (workspace_id, slack_channel_id, slack_thread_ts);
+        </sql>
+        <rollback>
+            ALTER TABLE mentor_slack_thread DROP CONSTRAINT IF EXISTS uk_mentor_slack_thread;
+            ALTER TABLE mentor_slack_thread ALTER COLUMN slack_thread_ts DROP NOT NULL;
+            ALTER TABLE mentor_slack_thread
+              ADD CONSTRAINT uk_mentor_slack_thread UNIQUE (workspace_id, slack_channel_id);
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-slack" id="1782980500800-25">
+        <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_one_active_slack_per_workspace already present">
+            <not><indexExists indexName="uq_connection_one_active_slack_per_workspace"/></not>
+        </preConditions>
+        <comment>Slack bot-token resolution is workspace-scoped, so the schema must allow at most one ACTIVE Slack connection per workspace.</comment>
+        <sql>
+            UPDATE connection c
+               SET state = 'SUSPENDED',
+                   state_reason = 'superseded by newer active Slack connection (uq_connection_one_active_slack_per_workspace backfill)'
+             WHERE c.state = 'ACTIVE'
+               AND c.kind = 'SLACK'
+               AND c.id NOT IN (
+                    SELECT DISTINCT ON (workspace_id) id
+                    FROM connection
+                    WHERE state = 'ACTIVE' AND kind = 'SLACK'
+                    ORDER BY workspace_id, created_at DESC, id DESC
+               );
+            CREATE UNIQUE INDEX uq_connection_one_active_slack_per_workspace
+                ON connection (workspace_id)
+                WHERE state = 'ACTIVE' AND kind = 'SLACK';
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_connection_one_active_slack_per_workspace;</sql>
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>

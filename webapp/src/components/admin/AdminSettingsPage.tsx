@@ -6,7 +6,11 @@ import {
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
-import { AdminSlackChannelsSettings, type SlackConsentState } from "./AdminSlackChannelsSettings";
+import {
+	AdminSlackChannelsSettings,
+	type SlackChannelCandidate,
+	type SlackConsentState,
+} from "./AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 type RepositoryItem = {
@@ -29,8 +33,8 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	// Slack notification card props (rendered for any workspace with a slug — the weekly
-	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
+	// Slack integration card props. The card owns connection state and the weekly digest
+	// controls; channel monitoring is shown only while Slack is connected.
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
 	slackConnectionId?: number;
@@ -42,6 +46,7 @@ export interface AdminSettingsPageProps {
 	onSlackSaved: () => void;
 	// Slack channel-monitoring section (rendered directly below the notifications card).
 	slackChannels: SlackMonitoredChannel[];
+	slackChannelCandidates: SlackChannelCandidate[];
 	isLoadingSlackChannels: boolean;
 	onRegisterSlackChannel: (input: {
 		slackChannelId: string;
@@ -83,6 +88,7 @@ export function AdminSettingsPage({
 	slackScheduleTime,
 	onSlackSaved,
 	slackChannels,
+	slackChannelCandidates,
 	isLoadingSlackChannels,
 	onRegisterSlackChannel,
 	onUpdateSlackChannelConsent,
@@ -129,15 +135,17 @@ export function AdminSettingsPage({
 						enabled={slackNotificationsEnabled}
 						scheduleDay={slackScheduleDay}
 						scheduleTime={slackScheduleTime}
+						channelCandidates={slackChannelCandidates}
 						onSaved={onSlackSaved}
 					/>
 				)}
 
-				{workspaceSlug != null && (
+				{workspaceSlug != null && hasSlackConnection && (
 					<AdminSlackChannelsSettings
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
 						channels={slackChannels}
+						channelCandidates={slackChannelCandidates}
 						isLoading={isLoadingSlackChannels}
 						onRegisterChannel={onRegisterSlackChannel}
 						onUpdateConsent={onUpdateSlackChannelConsent}

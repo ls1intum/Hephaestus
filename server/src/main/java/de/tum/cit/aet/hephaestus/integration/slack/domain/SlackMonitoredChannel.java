@@ -43,8 +43,8 @@ public class SlackMonitoredChannel {
      * {@code PENDING → ACTIVE → (PAUSED ⇄ ACTIVE) → REVOKED}. Discovery lands a channel in {@code PENDING};
      * a workspace admin activates it ({@code SlackChannelConsentService.transition}), which posts the in-channel
      * consent announcement and stamps {@code consentAnnouncedAt} so ingestion is forward-only (only messages after
-     * the announcement flow). {@code PAUSED} stops ingestion but keeps stored data; {@code REVOKED} is terminal and
-     * additionally erases the channel's raw + derived data.
+     * the announcement flow). {@code PAUSED} stops ingestion but keeps stored data; {@code REVOKED} erases the
+     * channel's raw + derived data and can only be set up again through a new registration.
      */
     public enum ConsentState {
         PENDING,

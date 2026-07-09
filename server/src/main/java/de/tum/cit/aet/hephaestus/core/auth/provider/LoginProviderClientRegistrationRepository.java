@@ -75,13 +75,9 @@ public class LoginProviderClientRegistrationRepository
 
     @Override
     public List<ClientRegistration> listRegistrations() {
-        // SLACK is a link-only (secondary) provider: it never appears on the public sign-in picker. It is
-        // still resolvable by registration id via findByRegistrationId (the authenticated account-linking
-        // flow), just not advertised for a fresh login.
         return loginProviderRepository
             .findByEnabledTrueOrderByDisplayNameAsc()
             .stream()
-            .filter(p -> p.getType() != LoginProvider.ProviderType.SLACK)
             .map(this::toRegistration)
             .toList();
     }

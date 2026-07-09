@@ -69,9 +69,6 @@ public class WorkspaceScopedTables {
         "worker_registry",
         // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
         "login_provider",
-        // Fleet-wide Slack mentor daily LLM-spend budget counter, keyed by UTC day — a single global budget
-        // across all replicas, not workspace-scoped; carries no workspace content.
-        "slack_mentor_daily_budget",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

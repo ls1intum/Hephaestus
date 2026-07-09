@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackStreamingMentorChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,8 +38,8 @@ public class SlackMentorService {
     private final MentorTurnRunner mentorTurnRunner;
     private final SlackMessageService slackMessageService;
     private final SlackMentorIdentityResolver identityResolver;
-    private final SlackMentorQuotaGuard quotaGuard;
-    private final SlackSafetyClassifier safetyClassifier;
+    private final SlackMentorInputGuard inputGuard;
+    private final SlackOnboardingService onboardingService;
 
     public SlackMentorService(
         SlackWorkspaceResolver workspaceResolver,
@@ -45,16 +47,16 @@ public class SlackMentorService {
         MentorTurnRunner mentorTurnRunner,
         SlackMessageService slackMessageService,
         SlackMentorIdentityResolver identityResolver,
-        SlackMentorQuotaGuard quotaGuard,
-        SlackSafetyClassifier safetyClassifier
+        SlackMentorInputGuard inputGuard,
+        SlackOnboardingService onboardingService
     ) {
         this.workspaceResolver = workspaceResolver;
         this.threadLinker = threadLinker;
         this.mentorTurnRunner = mentorTurnRunner;
         this.slackMessageService = slackMessageService;
         this.identityResolver = identityResolver;
-        this.quotaGuard = quotaGuard;
-        this.safetyClassifier = safetyClassifier;
+        this.inputGuard = inputGuard;
+        this.onboardingService = onboardingService;
     }
 
     private record Developer(String login) {}
@@ -69,9 +71,16 @@ public class SlackMentorService {
 
     /**
      * Handle one inbound DM message: resolve → run a mentor turn that streams its reply back into
-     * {@code messageTs}'s thread on {@code channelId}.
+     * {@code threadTs}'s thread on {@code channelId}.
      */
-    public void handleDm(String teamId, String channelId, String slackUserId, String text, String messageTs) {
+    public void handleDm(
+        String teamId,
+        String channelId,
+        String slackUserId,
+        String text,
+        String messageTs,
+        String threadTs
+    ) {
         if (text == null || text.isBlank()) {
             return;
         }
@@ -81,18 +90,18 @@ public class SlackMentorService {
             return;
         }
         long workspaceId = workspaceOpt.get();
-        // Message classification: divert obvious harassment / self-harm / out-of-scope messages to a canned
-        // response before any mentor turn runs. The classifier is a seam; the shipped default is only an
-        // obvious-abuse keyword fast-path (NOT crisis detection) — a non-OK verdict never mentors, but an OK
-        // verdict only means "no cheap signal", not a safety guarantee.
-        SlackSafetyClassifier.Verdict verdict = safetyClassifier.classify(text);
-        if (!verdict.safeToMentor()) {
-            slackMessageService.sendForWorkspace(workspaceId, channelId, List.of(), verdict.cannedResponse());
-            log.info(
-                "Slack DM diverted by safety classifier: workspace={} category={}",
-                workspaceId,
-                verdict.category()
-            );
+        SlackMentorInputGuard.Verdict verdict = inputGuard.decide(text);
+        if (!verdict.allowsMentorTurn()) {
+            if (verdict.responseText() != null && !verdict.responseText().isBlank()) {
+                slackMessageService.sendForWorkspace(
+                    workspaceId,
+                    channelId,
+                    threadTs,
+                    List.of(),
+                    verdict.responseText()
+                );
+            }
+            log.info("Slack DM diverted by input guard: workspace={} action={}", workspaceId, verdict.action());
             return;
         }
         Optional<Developer> devOpt = resolveDeveloper(workspaceId, teamId, slackUserId);
@@ -100,49 +109,47 @@ public class SlackMentorService {
             slackMessageService.sendForWorkspace(
                 workspaceId,
                 channelId,
-                List.of(),
-                "Your Slack account isn't linked to a Hephaestus developer yet, so I can't pull up your practice history. Ask an admin to link you."
+                threadTs,
+                onboardingService.linkCtaBlocks(),
+                "Connect your Slack account to Hephaestus so the mentor can find your work."
             );
             return;
         }
         Developer dev = devOpt.get();
-        // Per-user turn/day + fleet daily-budget caps (this path is not covered by the HTTP-auth rate-limit
-        // filter). Over-cap posts a friendly message rather than throwing.
-        SlackMentorQuotaGuard.Decision quota = quotaGuard.tryAcquire(workspaceId + ":" + dev.login());
-        if (quota != SlackMentorQuotaGuard.Decision.ALLOWED) {
-            slackMessageService.sendForWorkspace(workspaceId, channelId, List.of(), overCapMessage(quota));
-            log.info(
-                "Slack mentor turn over cap: workspace={} developer={} decision={}",
-                workspaceId,
-                dev.login(),
-                quota
-            );
-            return;
-        }
         // Find-or-create the Slack↔mentor thread mapping in its own atomic transaction (a real proxy hop), before
         // any remote Slack streaming — handleDm itself stays outside any transaction.
-        UUID threadId = threadLinker.findOrCreateThread(workspaceId, teamId, channelId, slackUserId, dev.login());
+        UUID threadId = threadLinker.findOrCreateThread(
+            workspaceId,
+            teamId,
+            channelId,
+            threadTs,
+            slackUserId,
+            dev.login()
+        );
         // First feedback to the member on turn receipt, before any token streams (superseded by the first append).
-        slackMessageService.setStatus(workspaceId, channelId, messageTs, "Reviewing your recent feedback…");
-        // Stream the reply into the DM thread rooted at the user's message.
+        slackMessageService.setStatus(workspaceId, channelId, threadTs, "Reviewing recent feedback...");
+        // Stream the reply into the active Slack DM thread (event.thread_ts when present, else the user's message ts).
         SlackStreamingMentorChannel channel = new SlackStreamingMentorChannel(
             slackMessageService,
             workspaceId,
             channelId,
-            messageTs
+            threadTs
         );
-        mentorTurnRunner.run(MentorTurnRequest.slackDm(workspaceId, threadId, text), channel, dev.login());
-        log.info("Started Slack mentor turn: workspace={} thread={} developer={}", workspaceId, threadId, dev.login());
+        mentorTurnRunner.run(
+            MentorTurnRequest.slackDm(
+                workspaceId,
+                threadId,
+                text,
+                deterministicSlackMessageId(teamId, channelId, messageTs)
+            ),
+            channel,
+            dev.login()
+        );
+        log.info("Accepted Slack mentor turn: workspace={} thread={} developer={}", workspaceId, threadId, dev.login());
     }
 
-    /** The friendly, non-throwing reply shown when a DM is over a mentor quota. */
-    private static String overCapMessage(SlackMentorQuotaGuard.Decision decision) {
-        return switch (decision) {
-            case USER_CAP_EXCEEDED -> "You've reached your mentor limit for today — let's pick this back up tomorrow. " +
-            "In the meantime, take a look at the feedback already on your recent PRs and issues.";
-            case DAILY_BUDGET_EXCEEDED -> "The mentor is at capacity for today and can't take new questions right now. " +
-            "Please try again tomorrow.";
-            case ALLOWED -> ""; // unreachable — ALLOWED never routes here
-        };
+    private static UUID deterministicSlackMessageId(String teamId, String channelId, String messageTs) {
+        String key = "slack:" + teamId + ":" + channelId + ":" + messageTs;
+        return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
     }
 }

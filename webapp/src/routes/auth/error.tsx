@@ -28,6 +28,21 @@ const ERROR_COPY: Record<string, { title: string; description: string }> = {
 		description:
 			"That provider identity is already linked to another account. Sign in with the original account instead.",
 	},
+	identity_already_linked: {
+		title: "Account already linked",
+		description:
+			"That provider identity is already linked to another account. Sign in with the original account instead.",
+	},
+	link_requires_auth: {
+		title: "Sign in before linking Slack",
+		description:
+			"Open Hephaestus, sign in with GitHub or GitLab, then connect Slack from Settings.",
+	},
+	unknown_provider: {
+		title: "Provider is not configured",
+		description:
+			"This Hephaestus instance does not have that sign-in provider configured. Ask an admin to check the login provider settings.",
+	},
 };
 
 function describe(code: string | undefined): { title: string; description: string } {

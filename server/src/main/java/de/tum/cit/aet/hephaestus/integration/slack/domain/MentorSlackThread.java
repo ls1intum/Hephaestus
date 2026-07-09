@@ -11,21 +11,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Maps a Slack DM to the mentor {@code chat_thread} it drives (P2/D7). Workspace-scoped (scalar
  * {@code workspaceId}); {@code chatThreadId} is a scalar cross-module reference (never a JPA association) into the
  * {@code agent}/{@code mentor} module — the {@code chat_thread} row itself is created inside that module via the
- * {@code mentor-chat} named interface. A DB-level FK (declared in the changelog) still enforces referential
- * integrity + {@code ON DELETE CASCADE}.
+ * {@code mentor-chat} named interface.
  */
 @Entity
 @Table(
     name = "mentor_slack_thread",
     uniqueConstraints = @UniqueConstraint(
         name = "uk_mentor_slack_thread",
-        columnNames = { "workspace_id", "slack_channel_id" }
+        columnNames = { "workspace_id", "slack_channel_id", "slack_thread_ts" }
     )
 )
 @Getter
@@ -50,8 +48,8 @@ public class MentorSlackThread {
     @Column(name = "slack_channel_id", nullable = false, length = 32)
     private String slackChannelId;
 
-    @Column(name = "slack_thread_ts", length = 32)
-    private @Nullable String slackThreadTs;
+    @Column(name = "slack_thread_ts", nullable = false, length = 32)
+    private String slackThreadTs;
 
     @Column(name = "slack_user_id", nullable = false, length = 32)
     private String slackUserId;

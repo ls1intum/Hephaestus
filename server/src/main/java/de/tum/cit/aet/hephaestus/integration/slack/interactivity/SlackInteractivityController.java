@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSignatureVerifier;
 import io.swagger.v3.oas.annotations.Hidden;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -21,19 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Inbound Slack interactivity entry ({@code POST /slack/interactivity}), reached over the public tunnel on a
- * SEPARATE Slack Request URL from {@code /slack/events}. Slack posts interactive-component payloads
- * (block_actions from the feedback buttons) as a {@code application/x-www-form-urlencoded} body with a single
- * {@code payload=<url-encoded-json>} field.
- *
- * <p>Verifies the request signature over the RAW body bytes (the same HMAC scheme as the events endpoint), then
- * ACKs 200 within Slack's 3&nbsp;s window and does the actual work asynchronously — a modal open or a DB write must
- * never hold the ACK. Auth is the signature (this path sits on the unauthenticated worker-hub security chain,
- * alongside {@code /slack/events}).
- */
+/** Slack Interactivity Request URL. Privacy-affecting actions complete before Slack is acknowledged. */
 @Hidden // inbound Slack webhook receiver — not part of the webapp API surface; excluded from the OpenAPI client
 @RestController
+@ConditionalOnWebhookRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 @WorkspaceAgnostic("Slack interactivity; the workspace is resolved from the payload's team_id, not the URL")
 public class SlackInteractivityController {
@@ -41,34 +32,47 @@ public class SlackInteractivityController {
     private static final Logger log = LoggerFactory.getLogger(SlackInteractivityController.class);
 
     private final SlackSignatureVerifier verifier;
-    private final SlackFeedbackHandler handler;
+    private final SlackInteractivityHandler handler;
     private final ObjectMapper objectMapper;
-    private final Executor executor;
 
     public SlackInteractivityController(
         SlackSignatureVerifier verifier,
-        SlackFeedbackHandler handler,
-        ObjectMapper objectMapper,
-        @Qualifier("slackInteractivityExecutor") Executor slackInteractivityExecutor
+        SlackInteractivityHandler handler,
+        ObjectMapper objectMapper
     ) {
         this.verifier = verifier;
         this.handler = handler;
         this.objectMapper = objectMapper;
-        this.executor = slackInteractivityExecutor;
     }
 
-    @PostMapping(value = "/slack/interactivity")
+    @PostMapping(value = "/webhooks/slack/interactivity")
     @PreAuthorize("permitAll()")
     public ResponseEntity<String> interactivity(
         @RequestBody(required = false) byte[] rawBody,
-        @RequestHeader HttpHeaders headers
+        @RequestHeader HttpHeaders headers,
+        HttpServletRequest request
     ) {
+        return interactivity(rawBodyFrom(request, rawBody), headers);
+    }
+
+    ResponseEntity<String> interactivity(byte[] rawBody, HttpHeaders headers) {
         if (rawBody == null) {
             return ResponseEntity.badRequest().build();
         }
         String timestamp = headers.getFirst("X-Slack-Request-Timestamp");
         String signature = headers.getFirst("X-Slack-Signature");
-        if (!verifier.verify(timestamp, signature, rawBody, Instant.now().getEpochSecond())) {
+        SlackSignatureVerifier.Verification verification = verifier.check(
+            timestamp,
+            signature,
+            rawBody,
+            Instant.now().getEpochSecond()
+        );
+        if (verification.status() != SlackSignatureVerifier.Verification.Status.VALID) {
+            log.warn(
+                "Slack interactivity rejected: status={}, driftSeconds={}",
+                verification.status(),
+                verification.driftSeconds()
+            );
             return ResponseEntity.status(401).build();
         }
 
@@ -84,30 +88,30 @@ public class SlackInteractivityController {
         }
 
         String type = payload.path("type").asString("");
-        // ACK immediately; run the handler off the request thread so a Slack round-trip never breaches the 3s ACK.
-        // A saturated pool rejects (default AbortPolicy) → log the drop and still ACK 200. Letting the rejection
-        // propagate would 500, surfacing an error dialog to the user and making Slack retry the interaction.
         try {
-            executor.execute(() -> dispatch(type, payload));
-        } catch (RuntimeException rejected) {
-            log.warn("Slack interactivity dropped: executor rejected the task ({})", rejected.getMessage());
+            dispatch(type, payload);
+        } catch (RuntimeException e) {
+            log.warn("slack.interactivity: failed to handle payload type {}: {}", type, e.toString());
+            return ResponseEntity.status(500).build();
         }
-        // An empty 200 ACKs the action within Slack's 3s window.
         return ResponseEntity.ok().build();
     }
 
+    private static byte[] rawBodyFrom(HttpServletRequest request, byte[] fallback) {
+        Object rawBody = request.getAttribute(SlackInteractivityRawBodyFilter.RAW_BODY_ATTRIBUTE);
+        if (rawBody instanceof byte[] bytes && bytes.length > 0) {
+            return bytes;
+        }
+        return fallback;
+    }
+
     private void dispatch(String type, JsonNode payload) {
-        try {
-            switch (type) {
-                case "block_actions" -> handler.handleBlockActions(payload);
-                default -> log.debug("slack.interactivity: ignoring payload type {}", type);
-            }
-        } catch (Exception e) {
-            log.warn("Slack interactivity handling failed: {}", e.getMessage(), e);
+        switch (type) {
+            case "block_actions" -> handler.handleBlockActions(payload);
+            default -> log.debug("slack.interactivity: ignoring payload type {}", type);
         }
     }
 
-    /** Pull the URL-decoded {@code payload} field out of a {@code application/x-www-form-urlencoded} body. */
     static String extractPayload(String body) {
         for (String pair : body.split("&")) {
             int eq = pair.indexOf('=');

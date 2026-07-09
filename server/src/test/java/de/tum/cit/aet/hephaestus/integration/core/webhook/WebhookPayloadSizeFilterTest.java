@@ -109,10 +109,9 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void rejectsOversizedSlackEventsPostWith413() throws Exception {
-        // The Slack events endpoint is outside /webhooks/ but reads an unauthenticated byte[] body before its HMAC
-        // check, so the same HIGHEST_PRECEDENCE guard must cap it (tagged provider=slack).
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/slack/events");
+    void rejectsOversizedSlackWebhookPostWith413() throws Exception {
+        // Slack Events API now uses the unified /webhooks/slack path and is tagged provider=slack.
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/slack");
         request.setContentType("application/json");
         request.setContent(new byte[2048]);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -126,17 +125,18 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void allowsSlackEventsBodyAtMaxSize() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/slack/events");
-        request.setContentType("application/json");
-        request.setContent(new byte[(int) MAX]);
+    void rejectsOversizedSlackInteractivityPostWithSlackProviderTag() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/slack/interactivity");
+        request.setContentType("application/x-www-form-urlencoded");
+        request.setContent(new byte[2048]);
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
         filter.doFilter(request, response, chain);
 
-        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-        verify(chain, times(1)).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+        verify(chain, never()).doFilter(request, response);
+        assertCounter("slack", "payload-too-large", 1);
     }
 
     @Test
@@ -159,21 +159,5 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
         filter.doFilter(request, response, chain);
 
         verify(chain, times(1)).doFilter(request, response);
-    }
-
-    @Test
-    void bypassesLegacyWebhookPaths() throws Exception {
-        // Legacy /gitlab and /github URLs are retired. The filter must NOT match them —
-        // they should fall through to a 404 rather than be accepted by the size filter.
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gitlab");
-        request.setContentType("application/json");
-        request.setContent(new byte[2048]);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = mock(FilterChain.class);
-
-        filter.doFilter(request, response, chain);
-
-        verify(chain, times(1)).doFilter(request, response);
-        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
     }
 }

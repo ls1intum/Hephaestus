@@ -28,7 +28,12 @@ public record MentorTurnRequest(
     }
 
     /** A turn from a Slack DM surface. Lets callers construct one without naming the {@code mentor}-module enum. */
-    public static MentorTurnRequest slackDm(long workspaceId, UUID threadId, String userMessage) {
-        return new MentorTurnRequest(workspaceId, threadId, userMessage, null, ThreadSurface.SLACK_DM);
+    public static MentorTurnRequest slackDm(
+        long workspaceId,
+        UUID threadId,
+        String userMessage,
+        @Nullable UUID clientUserMessageId
+    ) {
+        return new MentorTurnRequest(workspaceId, threadId, userMessage, clientUserMessageId, ThreadSurface.SLACK_DM);
     }
 }

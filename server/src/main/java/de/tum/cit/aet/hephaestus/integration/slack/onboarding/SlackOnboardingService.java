@@ -22,8 +22,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Owns the "Link Slack" call-to-action: when a workspace member who has not yet linked their identity opens
- * the Hephaestus App Home, deliver a single CTA to their DM (via {@link SlackMessageService}) that deep-links
+ * Owns the Hephaestus account-linking call-to-action: when a workspace member who has not yet linked their
+ * identity opens the Hephaestus App Home, deliver a single CTA to their DM (via {@link SlackMessageService}) that deep-links
  * into the authenticated account-linking flow ({@code /auth/login?provider=slack&mode=link}). Linking there
  * attaches a {@code SLACK} identity to the signed-in account, after which {@link SlackMentorIdentityResolver}
  * can resolve the member's SCM work. The CTA is idempotently gated on "not yet linked", so an already-linked
@@ -39,7 +39,7 @@ public class SlackOnboardingService {
 
     private static final Logger log = LoggerFactory.getLogger(SlackOnboardingService.class);
 
-    /** Distinct from the interactivity action_ids — this button only opens a URL, it posts no payload. */
+    /** Distinct from the interactivity action_ids: this button only opens a URL, it posts no payload. */
     private static final String LINK_ACTION_ID = "link_slack_identity";
     private static final String FALLBACK_TEXT = "Connect your account to Hephaestus";
 
@@ -47,23 +47,26 @@ public class SlackOnboardingService {
     private final SlackMentorIdentityResolver identityResolver;
     private final SlackMessageService messageService;
     private final String hostUrl;
+    private final String authBasePath;
 
     public SlackOnboardingService(
         SlackWorkspaceResolver workspaceResolver,
         SlackMentorIdentityResolver identityResolver,
         SlackMessageService messageService,
-        @Value("${hephaestus.host-url:}") String hostUrl
+        @Value("${hephaestus.webapp.url:}") String hostUrl,
+        @Value("${hephaestus.auth.api-base-path:}") String authBasePath
     ) {
         this.workspaceResolver = workspaceResolver;
         this.identityResolver = identityResolver;
         this.messageService = messageService;
         this.hostUrl = hostUrl;
+        this.authBasePath = authBasePath;
     }
 
     /**
-     * Handle an {@code app_home_opened} event: surface the link CTA to an unlinked member. Best-effort — a
+     * Handle an {@code app_home_opened} event: surface the link CTA to an unlinked member. Best-effort: a
      * missing connection, an already-linked member, or a Slack send failure is logged and swallowed, never
-     * thrown (the events controller ACKs Slack within 3s regardless).
+     * thrown.
      *
      * @param teamId      the Slack {@code T…} workspace id from the verified event envelope
      * @param slackUserId the {@code U…} member who opened the App Home
@@ -95,13 +98,14 @@ public class SlackOnboardingService {
     }
 
     /** The Block Kit CTA: one section + one URL button wired to the authenticated link-mode deep link. */
-    List<LayoutBlock> linkCtaBlocks() {
+    public List<LayoutBlock> linkCtaBlocks() {
         return asBlocks(
             section(s ->
                 s.text(
                     markdownText(
-                        "*Connect your account to Hephaestus.*\n" +
-                            "Link your Slack identity so the practice mentor can find your work and reply to you here."
+                        "*Link your Hephaestus account.*\n" +
+                            "Connect your Slack identity to your Hephaestus profile so the mentor can find your " +
+                            "repositories, reviews, and issues."
                     )
                 )
             ),
@@ -109,7 +113,11 @@ public class SlackOnboardingService {
                 a.elements(
                     asElements(
                         button(b ->
-                            b.text(plainText("Link Slack")).url(linkUrl()).actionId(LINK_ACTION_ID).style("primary")
+                            b
+                                .text(plainText("Link Hephaestus account"))
+                                .url(linkUrl())
+                                .actionId(LINK_ACTION_ID)
+                                .style("primary")
                         )
                     )
                 )
@@ -120,6 +128,8 @@ public class SlackOnboardingService {
     /** The authenticated link-mode deep link. Slack opens it in the browser where the session cookie lives. */
     String linkUrl() {
         String base = hostUrl == null ? "" : hostUrl.trim().replaceAll("/+$", "");
-        return base + "/auth/login?provider=slack&mode=link&returnTo=/settings";
+        String prefix = authBasePath == null ? "" : authBasePath.trim().replaceAll("^/+", "").replaceAll("/+$", "");
+        String apiPrefix = prefix.isBlank() ? "" : "/" + prefix;
+        return base + apiPrefix + "/auth/login?provider=slack&mode=link&returnTo=/settings";
     }
 }

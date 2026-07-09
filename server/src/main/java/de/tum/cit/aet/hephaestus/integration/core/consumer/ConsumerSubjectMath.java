@@ -8,51 +8,17 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Pure-function subject-arithmetic helpers for NATS consumers.
- *
- * <p>This class exists so the consumer wiring can build wildcard subject filters and parse
- * kind-from-prefix without touching either the NATS client or Spring. Every method is
- * static, side-effect-free, and deterministic — they are unit-testable in milliseconds and
- * can be composed in benchmarks.
- *
- * <h2>Filter shapes (consumer side)</h2>
- * <ul>
- *   <li><b>Repository filter</b> — {@code <stream>.<owner>.<repo>.>} matches every event for
- *       a single repository. Wildcards keep the filter set small (one entry per repo, not
- *       one entry per repo*eventType).</li>
- *   <li><b>Organization filter</b> — {@code <stream>.<owner>.?.>} matches every org-level
- *       event (the {@code ?} is the literal placeholder publishers emit when there is no
- *       repository context).</li>
- *   <li><b>Installation filter</b> — {@code github.?.?.>} matches every GitHub installation
- *       event. GitLab uses PAT-based auth so installation events are GitHub-only here.</li>
- * </ul>
- *
- * <h2>Why wildcards?</h2>
- * Without wildcards a scope with 200 repos and 12 event types creates 2,400 filter
- * subjects. NATS validates each subject against the stream when the consumer is
- * created or updated, so the cost is O(n*m) round-trips on large filter lists. Using
- * wildcards collapses this to O(n) repos.
- *
- * <h2>Subject-prefix → kind</h2>
- * {@link #kindFromSubjectPrefix(String)} is the single source of truth for NATS-subject
- * routing; {@link IntegrationMessageDispatcher} delegates to it rather than keeping its
- * own copy. The map is pure (no Spring), can be called from anywhere on the hot path, and
- * never calls {@link IntegrationKind#valueOf(String)} on subject-derived input
- * (reflection-on-user-input is the bug class we are precluding). It lists the kinds that
- * publish to JetStream — GitHub, GitLab, and Slack (whose monitored-channel {@code message}
- * events ride the durable transport; the interactive Slack paths stay in-process). The
- * HTTP-path router {@code IntegrationKindRouting} (the {@code POST /webhooks/{kind}} map) is a
- * separate concern, maintained independently.
+ * Pure subject helpers for NATS consumers. Repository integrations use scoped wildcard filters such as
+ * {@code github.owner.repo.>}; Slack Events API callbacks use the flat {@code slack.>} consumer. Slack
+ * interactivity/button postbacks stay on the separate signed HTTP endpoint.
  *
  * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP-path router
  */
 public final class ConsumerSubjectMath {
 
     /**
-     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack joined the
-     * list once its monitored-channel {@code message} events were routed through the durable
-     * transport ({@code slack.<team>.<channel>.message}); its interactive paths (DM mentor,
-     * buttons, App Home) still stay in-process and carry no subject.
+     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack Events API callbacks publish as
+     * {@code slack.<team>.<scope>.<event>}; Slack interactivity/button postbacks carry no subject.
      */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
         "github",

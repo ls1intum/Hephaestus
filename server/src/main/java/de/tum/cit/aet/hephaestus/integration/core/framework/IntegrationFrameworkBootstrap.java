@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -39,7 +40,6 @@ public class IntegrationFrameworkBootstrap {
 
     private final IntegrationManifestRegistry manifests;
     private final List<WebhookSignatureVerifier> signatureVerifiers;
-    private final List<WebhookSecretSource> secretSources;
     private final List<SubjectKeyDeriver> subjectKeyDerivers;
     private final List<SubjectParser> subjectParsers;
     private final List<ApiCredentialProvider> credentialProviders;
@@ -48,11 +48,12 @@ public class IntegrationFrameworkBootstrap {
     private final List<InlineFindingChannel> inlineFindingChannels;
     private final List<ApprovalChannel> approvalChannels;
     private final List<IntegrationLifecycleListener> lifecycleListeners;
+    private final boolean webhookRoleEnabled;
 
     public IntegrationFrameworkBootstrap(
         IntegrationManifestRegistry manifests,
         List<WebhookSignatureVerifier> signatureVerifiers,
-        List<WebhookSecretSource> secretSources,
+        @SuppressWarnings("unused") List<WebhookSecretSource> secretSources,
         List<SubjectKeyDeriver> subjectKeyDerivers,
         List<SubjectParser> subjectParsers,
         List<ApiCredentialProvider> credentialProviders,
@@ -60,11 +61,11 @@ public class IntegrationFrameworkBootstrap {
         List<FeedbackChannel> feedbackChannels,
         List<InlineFindingChannel> inlineFindingChannels,
         List<ApprovalChannel> approvalChannels,
-        List<IntegrationLifecycleListener> lifecycleListeners
+        List<IntegrationLifecycleListener> lifecycleListeners,
+        @Value("${" + RuntimeRole.WEBHOOK_PROPERTY + ":true}") boolean webhookRoleEnabled
     ) {
         this.manifests = manifests;
         this.signatureVerifiers = signatureVerifiers;
-        this.secretSources = secretSources;
         this.subjectKeyDerivers = subjectKeyDerivers;
         this.subjectParsers = subjectParsers;
         this.credentialProviders = credentialProviders;
@@ -73,6 +74,7 @@ public class IntegrationFrameworkBootstrap {
         this.inlineFindingChannels = inlineFindingChannels;
         this.approvalChannels = approvalChannels;
         this.lifecycleListeners = lifecycleListeners;
+        this.webhookRoleEnabled = webhookRoleEnabled;
     }
 
     @PostConstruct
@@ -105,14 +107,15 @@ public class IntegrationFrameworkBootstrap {
         );
 
         if (declared.contains(Capability.WEBHOOK_INGEST)) {
-            require(
-                kind,
-                "WebhookSignatureVerifier",
-                anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
-                violations
-            );
-            require(kind, "WebhookSecretSource", anyMatchKind(secretSources, s -> s.kind() == kind), violations);
-            require(kind, "SubjectKeyDeriver", anyMatchKind(subjectKeyDerivers, s -> s.kind() == kind), violations);
+            if (webhookRoleEnabled) {
+                require(
+                    kind,
+                    "WebhookSignatureVerifier",
+                    anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
+                    violations
+                );
+                require(kind, "SubjectKeyDeriver", anyMatchKind(subjectKeyDerivers, s -> s.kind() == kind), violations);
+            }
             require(kind, "SubjectParser", anyMatchKind(subjectParsers, s -> s.kind() == kind), violations);
         }
         if (declared.contains(Capability.TOKEN_REFRESH)) {
@@ -147,7 +150,7 @@ public class IntegrationFrameworkBootstrap {
         // Forward-compat: the moment a new Capability is added to the enum without a
         // matching check above, fail loud at boot instead of silently treating it as
         // satisfied. (Built via noneOf+addAll, not EnumSet.copyOf, because a manifest may
-        // legitimately declare no capabilities — e.g. outbound-only Slack — and
+        // legitimately declare no capabilities — e.g. a future outbound-only integration — and
         // EnumSet.copyOf rejects an empty collection.)
         Set<Capability> unmapped = EnumSet.noneOf(Capability.class);
         unmapped.addAll(declared);

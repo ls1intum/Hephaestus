@@ -99,13 +99,18 @@ class SlackConversationSchemaContractIntegrationTest {
     @DisplayName("production SPIs drive the real bigint[]/VARCHAR(32) columns: firewall, decode, and watermark")
     void productionSpisDriveTheMigratedColumnTypes() {
         SlackConversationTestSupport support = new SlackConversationTestSupport(jdbcTemplate);
-        // NOTE: deliberately NOT calling ensureUnmappedSlackThreadColumns() — on the real schema those columns already
-        // exist as the migrated types. Seed with the workspace FK web disabled (superuser Testcontainers role).
+        // Real schema already has the migrated column types. Replica mode keeps fixture seeding independent of
+        // unrelated workspace rows.
         jdbcTemplate.execute("SET session_replication_role = 'replica'");
         support.seedChannel(WS, CHANNEL, "ACTIVE");
         support.seedThread(WS, CHANNEL, ROOT_TS, LAST_TS, 4, "{100,101}");
         support.seedMessage(WS, CHANNEL, ROOT_TS, null, "root");
         support.seedMessage(WS, CHANNEL, LAST_TS, ROOT_TS, "reply");
+        jdbcTemplate.update(
+            "UPDATE slack_message SET author_member_id = 100 WHERE workspace_id = ? AND slack_channel_id = ?",
+            WS,
+            CHANNEL
+        );
         jdbcTemplate.execute("SET session_replication_role = 'origin'");
 
         long threadId = jdbcTemplate.queryForObject(
@@ -119,7 +124,11 @@ class SlackConversationSchemaContractIntegrationTest {
         // Hop 1 — participant firewall over the real GIN `? = ANY(participant_member_ids)`.
         ObjectNode forParticipant = projector.buildPayload(WS, 100L);
         assertThat(conversations(forParticipant)).as("a participant (100) sees the thread").hasSize(1);
+        assertThat(conversations(forParticipant).get(0).get("channelName").asString()).isEqualTo("engineering");
         assertThat(conversations(forParticipant).get(0).get("messages")).hasSize(2);
+        assertThat(
+            conversations(forParticipant).get(0).get("messages").get(0).get("authorMemberId").asLong()
+        ).isEqualTo(100L);
 
         ObjectNode forOutsider = projector.buildPayload(WS, 999L);
         assertThat(conversations(forOutsider)).as("a non-participant (999) sees nothing").isEmpty();

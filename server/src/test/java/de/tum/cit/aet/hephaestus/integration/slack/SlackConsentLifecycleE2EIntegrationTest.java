@@ -36,7 +36,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
-import de.tum.cit.aet.hephaestus.integration.slack.interactivity.SlackFeedbackHandler;
+import de.tum.cit.aet.hephaestus.integration.slack.interactivity.SlackInteractivityHandler;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
@@ -163,7 +163,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private SlackMessageService slackMessageService;
     private SlackChannelConsentService consentService;
     private SlackIngestService ingestService;
-    private SlackFeedbackHandler handler;
+    private SlackInteractivityHandler handler;
 
     private long workspaceId;
     private long u1MemberId;
@@ -221,10 +221,21 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             ingestService,
             slackMessageService,
             connectionService,
-            userRepository
+            userRepository,
+            new SlackHephaestusUiLinks(
+                workspaceId ->
+                    Optional.of(
+                        new de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery.WorkspaceSummary(
+                            workspaceId,
+                            "hephaestus",
+                            "Hephaestus",
+                            null
+                        )
+                    ),
+                "https://hephaestus.test"
+            )
         );
-        handler = new SlackFeedbackHandler(
-            mock(de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository.class),
+        handler = new SlackInteractivityHandler(
             workspaceResolver,
             identityResolver,
             mock(ResearchParticipationCommand.class),
@@ -361,7 +372,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         payload.putObject("channel").put("id", C1);
         ArrayNode actions = payload.putArray("actions");
         ObjectNode action = actions.addObject();
-        action.put("action_id", SlackAppHomeService.ACTION_RESEARCH_OPT_OUT);
+        action.put("action_id", SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT);
         action.put("value", "false");
         return payload;
     }

@@ -42,6 +42,7 @@ const meta = {
 		slackNotificationsEnabled: false,
 		onSlackSaved: fn(),
 		slackChannels: [],
+		slackChannelCandidates: [],
 		isLoadingSlackChannels: false,
 		onRegisterSlackChannel: fn(),
 		onUpdateSlackChannelConsent: fn(),

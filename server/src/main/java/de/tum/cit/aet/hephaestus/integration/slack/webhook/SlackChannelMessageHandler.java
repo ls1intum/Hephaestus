@@ -10,46 +10,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Consumer-side handler for durable Slack monitored-channel {@code message} events
- * ({@code slack.<team>.<channel>.message}). Registered on the unified
- * {@code IntegrationMessageHandlerRegistry} via {@code EventTypeKey(SLACK, "message")};
- * the {@code IntegrationNatsConsumer} slack consumer feeds it off the ACK thread, so this runs
- * with the framework's at-least-once + poison/DLQ + backpressure + graceful-drain guarantees.
- *
- * <p>The whole {@code event_callback} envelope is republished onto JetStream by
- * {@link SlackChannelEventPublisher}, so this handler re-derives the message subtype from the
- * payload and drives the persistence chain in {@link SlackIngestService}:
- * <ul>
- *   <li>plain channel/group message → {@code ingestChannelMessage} (resolve → BOTH consent
- *       gates fail-closed → forward-only watermark → participant firewall → idempotent
- *       {@code insertIfAbsent} + thread {@code upsertOnMessage} projection);
- *   <li>{@code message_changed} → {@code editMessage} (GDPR Art. 16 edit);
- *   <li>{@code message_deleted} → {@code tombstoneMessage} (GDPR Art. 17 tombstone), keyed on
- *       the deleted message's {@code ts} ({@code deleted_ts}, fallback
- *       {@code previous_message.ts}), never the delivery's own {@code ts};
- *   <li>a content-bearing subtype ({@code thread_broadcast}, {@code me_message}) → ingested like a
- *       plain message; a bot-authored message or a non-content subtype (joins, topic changes, …) → no-op.
- * </ul>
- *
- * <p><strong>Idempotency.</strong> {@code insertIfAbsent} keys on {@code (workspace, channel, ts)}
- * via {@code ON CONFLICT DO NOTHING}, so a duplicate redelivery applies once — no double-apply.
- * Deletes are durable against reorder: {@code tombstoneMessage} UPSERTs a contentless tombstone, so a
- * delete that races ahead of a NAK-redelivered base insert still wins (the later insert cannot
- * resurrect the deleted content). Edits are reorder-durable too: {@code editMessage} swaps the text on the
- * ingested row, and on a not-yet-ingested row (an edit-before-insert reorder) it re-ingests the edited body
- * through the full consent stack, so the edit is never lost and never bypasses consent. The base class wraps
- * {@link #handleEvent} in a {@link TransactionTemplate}; any exception rolls back and propagates so
- * the consumer NAKs and JetStream redelivers.
- */
+/** Durable consumer for monitored Slack channel/group message events. */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandler<JsonNode> {
 
-    /**
-     * Subtypes that still carry a real author + {@code ts} + {@code text} and must ingest like a plain
-     * message. Everything else with a non-empty subtype (channel_join, channel_topic, …) is metadata.
-     */
+    /** Message subtypes that still carry user-authored text. */
     private static final Set<String> CONTENT_BEARING_SUBTYPES = Set.of("thread_broadcast", "me_message");
 
     private final SlackIngestService ingestService;
@@ -65,15 +31,11 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
 
     @Override
     protected void handleEvent(JsonNode root) {
-        String teamId = root.path("team_id").asString("");
+        String teamId = AbstractSlackEnvelopeHandler.teamId(root);
         JsonNode event = root.path("event");
         String subtype = event.path("subtype").asString("");
         String channelId = event.path("channel").asString("");
 
-        // Edits/deletes arrive as message SUBTYPES; route them before the subtype no-op below (which drops every
-        // other subtyped message). Slack nests the changed/deleted payload under event.message / previous_message.
-        // The top-level bot_id guard does not fire here, but the edit branch re-checks event.message.bot_id itself
-        // because a message_changed can now re-ingest content (see below).
         if ("message_deleted".equals(subtype)) {
             String deletedTs = event
                 .path("deleted_ts")
@@ -83,8 +45,6 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
         }
         if ("message_changed".equals(subtype)) {
             JsonNode changed = event.path("message");
-            // Now that an edit can re-ingest content, a bot-authored edited message (e.g. an unfurl rewrite) must be
-            // excluded like a plain bot message.
             if (changed.has("bot_id")) {
                 return;
             }
@@ -98,11 +58,9 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
             );
             return;
         }
-        // Never react to our own bot's messages.
         if (event.has("bot_id")) {
             return;
         }
-        // A plain message (empty subtype) or a content-bearing subtype ingests; other subtypes are metadata.
         if (!subtype.isEmpty() && !CONTENT_BEARING_SUBTYPES.contains(subtype)) {
             return;
         }

@@ -47,11 +47,12 @@ public class MentorSlackThreadLinker {
         long workspaceId,
         String teamId,
         String channelId,
+        String threadTs,
         String slackUserId,
         String developerLogin
     ) {
         return mentorSlackThreadRepository
-            .findByWorkspaceIdAndSlackChannelId(workspaceId, channelId)
+            .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, channelId, threadTs)
             .map(MentorSlackThread::getChatThreadId)
             .orElseGet(() -> {
                 UUID chatThreadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, developerLogin);
@@ -61,6 +62,7 @@ public class MentorSlackThreadLinker {
                 mapping.setChatThreadId(chatThreadId);
                 mapping.setSlackTeamId(teamId);
                 mapping.setSlackChannelId(channelId);
+                mapping.setSlackThreadTs(threadTs);
                 mapping.setSlackUserId(slackUserId);
                 mentorSlackThreadRepository.save(mapping);
                 return chatThreadId;

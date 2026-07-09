@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
@@ -113,6 +114,9 @@ public class MentorPiAdapter {
                 throw new IllegalArgumentException(
                     "contextInputs key must begin with '" + CONTEXT_INPUT_PREFIX + "', got: " + key
                 );
+            }
+            if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(key)) {
+                throw new IllegalArgumentException("unsupported mentor context input key: " + key);
             }
             // Reject null bytes here so the failure names the offending key, rather than surfacing as an
             // opaque NPE deep inside PiPlanSpec's Map.copyOf(extraInputs), which rejects null values.

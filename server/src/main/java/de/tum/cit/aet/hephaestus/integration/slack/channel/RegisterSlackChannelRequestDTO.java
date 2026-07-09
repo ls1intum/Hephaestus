@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.NonNull;
 
@@ -13,8 +14,12 @@ import org.jspecify.annotations.NonNull;
 public record RegisterSlackChannelRequestDTO(
     @NonNull
     @NotBlank
+    @Pattern(regexp = "^[CG][A-Z0-9]{8,}$")
     @Size(max = 32)
-    @Schema(description = "Slack channel id (the stable C… id)", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(
+        description = "Slack public/private channel id (stable C… or G… id)",
+        requiredMode = Schema.RequiredMode.REQUIRED
+    )
     String slackChannelId,
 
     @Size(max = 256)

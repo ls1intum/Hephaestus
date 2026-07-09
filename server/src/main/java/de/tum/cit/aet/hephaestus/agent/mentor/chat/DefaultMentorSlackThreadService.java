@@ -53,8 +53,8 @@ class DefaultMentorSlackThreadService implements MentorSlackThreadService {
     @Override
     @Transactional
     public int purgeSlackThreads(long workspaceId) {
-        // Bulk DELETE of the SLACK_DM chat_thread rows; the DB ON DELETE CASCADE FKs drop the linked chat_message
-        // rows and the integration.slack mentor_slack_thread mapping. The WEB mentor history is left intact.
+        // Bulk DELETE of the SLACK_DM chat_thread rows; DB cascades drop linked chat_message rows. The Slack
+        // integration deletes its mentor_slack_thread mappings before calling this on uninstall.
         return chatThreadRepository.deleteByWorkspaceIdAndSurface(workspaceId, ThreadSurface.SLACK_DM);
     }
 }

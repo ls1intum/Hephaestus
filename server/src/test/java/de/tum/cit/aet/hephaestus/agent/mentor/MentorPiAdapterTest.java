@@ -74,7 +74,7 @@ class MentorPiAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a context-prefixed context key passes; a stray key is rejected")
+    @DisplayName("only whitelisted mentor context keys pass")
     void contextKeyValidation() {
         Map<String, byte[]> ok = Map.of(
             MentorPiAdapter.CONTEXT_INPUT_PREFIX + "recent_authored_work.json",
@@ -87,6 +87,14 @@ class MentorPiAdapterTest extends BaseUnitTest {
         assertThatThrownBy(() -> adapter.buildSandboxSpec(REQUEST, llmConfig(null), stray, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining(MentorPiAdapter.CONTEXT_INPUT_PREFIX);
+
+        Map<String, byte[]> unsupported = Map.of(
+            MentorPiAdapter.CONTEXT_INPUT_PREFIX + "future_unreviewed_context.json",
+            "{}".getBytes(StandardCharsets.UTF_8)
+        );
+        assertThatThrownBy(() -> adapter.buildSandboxSpec(REQUEST, llmConfig(null), unsupported, null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("unsupported mentor context input key");
     }
 
     @Test

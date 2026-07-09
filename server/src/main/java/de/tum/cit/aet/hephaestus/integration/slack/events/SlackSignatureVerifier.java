@@ -1,27 +1,21 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * Verifies inbound Slack Events API requests: HMAC-SHA256 over {@code "v0:{timestamp}:{rawBody}"} keyed by the
- * app signing secret, compared constant-time to the {@code X-Slack-Signature} header, with a 300&nbsp;s replay
- * window on {@code X-Slack-Request-Timestamp} (Slack's documented scheme). Inert (rejects everything) when no
- * signing secret is configured.
- */
+/** Verifies Slack's v0 request signatures with the app signing secret. */
 @Component
+@ConditionalOnWebhookRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackSignatureVerifier {
 
-    private static final Logger log = LoggerFactory.getLogger(SlackSignatureVerifier.class);
     private static final long MAX_SKEW_SECONDS = 300;
     private static final String HMAC_ALG = "HmacSHA256";
 
@@ -30,34 +24,31 @@ public class SlackSignatureVerifier {
 
     public SlackSignatureVerifier(@Value("${hephaestus.integration.slack.signing-secret:}") String signingSecret) {
         this.configured = signingSecret != null && !signingSecret.isBlank();
-        this.signingSecret = configured ? signingSecret.getBytes(StandardCharsets.UTF_8) : new byte[0];
         if (!configured) {
-            log.warn("Slack signing secret not set — inbound /slack/events will reject all requests.");
+            throw new IllegalStateException(
+                "Slack integration is enabled but hephaestus.integration.slack.signing-secret is blank"
+            );
         }
+        this.signingSecret = configured ? signingSecret.getBytes(StandardCharsets.UTF_8) : new byte[0];
     }
 
     public boolean isConfigured() {
         return configured;
     }
 
-    /**
-     * @param timestamp the {@code X-Slack-Request-Timestamp} header (unix seconds)
-     * @param signature the {@code X-Slack-Signature} header ({@code v0=<hex>})
-     * @param rawBody   the exact bytes of the request body (must not be re-serialized)
-     * @param nowEpochSeconds current time for the replay-window check
-     */
-    public boolean verify(String timestamp, String signature, byte[] rawBody, long nowEpochSeconds) {
+    public Verification check(String timestamp, String signature, byte[] rawBody, long nowEpochSeconds) {
         if (!configured || timestamp == null || signature == null || rawBody == null) {
-            return false;
+            return Verification.missingSignature();
         }
         final long ts;
         try {
             ts = Long.parseLong(timestamp.trim());
         } catch (NumberFormatException e) {
-            return false;
+            return Verification.invalid();
         }
-        if (Math.abs(nowEpochSeconds - ts) > MAX_SKEW_SECONDS) {
-            return false;
+        long driftSeconds = Math.abs(nowEpochSeconds - ts);
+        if (driftSeconds > MAX_SKEW_SECONDS) {
+            return Verification.staleTimestamp(driftSeconds);
         }
         try {
             Mac mac = Mac.getInstance(HMAC_ALG);
@@ -65,13 +56,42 @@ public class SlackSignatureVerifier {
             mac.update(("v0:" + timestamp + ":").getBytes(StandardCharsets.UTF_8));
             byte[] digest = mac.doFinal(rawBody);
             String expected = "v0=" + HexFormat.of().formatHex(digest);
-            return MessageDigest.isEqual(
+            boolean valid = MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.UTF_8),
                 signature.getBytes(StandardCharsets.UTF_8)
             );
+            return valid ? Verification.valid() : Verification.invalid();
         } catch (Exception e) {
-            log.warn("Slack signature verification error: {}", e.getMessage());
-            return false;
+            return Verification.invalid();
+        }
+    }
+
+    public boolean verify(String timestamp, String signature, byte[] rawBody, long nowEpochSeconds) {
+        return check(timestamp, signature, rawBody, nowEpochSeconds).status() == Verification.Status.VALID;
+    }
+
+    public record Verification(Status status, long driftSeconds) {
+        public enum Status {
+            VALID,
+            MISSING_SIGNATURE,
+            STALE_TIMESTAMP,
+            INVALID,
+        }
+
+        static Verification valid() {
+            return new Verification(Status.VALID, 0);
+        }
+
+        static Verification missingSignature() {
+            return new Verification(Status.MISSING_SIGNATURE, 0);
+        }
+
+        static Verification staleTimestamp(long driftSeconds) {
+            return new Verification(Status.STALE_TIMESTAMP, driftSeconds);
+        }
+
+        static Verification invalid() {
+            return new Verification(Status.INVALID, 0);
         }
     }
 }

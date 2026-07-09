@@ -8,8 +8,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.slack.api.model.block.LayoutBlock;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
@@ -24,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Pins the invariants that make the Slack stream feel live AND stay robust: the reply streams in more than
@@ -48,11 +52,12 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
             starts.incrementAndGet();
             return "1700000000.999999";
         });
-        doAnswer(inv -> {
-            delivered.add(inv.getArgument(3));
-            appends.incrementAndGet();
-            return null;
-        })
+        lenient()
+            .doAnswer(inv -> {
+                delivered.add(inv.getArgument(3));
+                appends.incrementAndGet();
+                return null;
+            })
             .when(slack)
             .appendStream(anyLong(), anyString(), anyString(), anyString());
         doAnswer(inv -> {
@@ -102,6 +107,115 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         assertThat(appends.get()).as("reply must stream in more than the initial open").isGreaterThanOrEqualTo(1);
         assertThat(stops.get()).isEqualTo(1);
         assertThat(String.join("", delivered)).isEqualTo(String.join("", words));
+        verify(slack).startStream(eq(WS), eq(CH), eq(THREAD), anyString());
+    }
+
+    @Test
+    @DisplayName("successful turns do not attach bulky feedback buttons")
+    void successfulTurnDoesNotAttachFeedbackButtons() {
+        SlackMessageService slack = slackThatStreamsOk();
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(delta("Try keeping review comments specific. "));
+        channel.completeWithDone();
+        waitUntil(() -> stops.get() >= 1, 4000);
+
+        ArgumentCaptor<List<LayoutBlock>> blocks = ArgumentCaptor.captor();
+        verify(slack).stopStream(eq(WS), eq(CH), anyString(), blocks.capture());
+        assertThat(blocks.getValue()).as("mentor answers should not add a bulky feedback row").isEmpty();
+    }
+
+    @Test
+    @DisplayName("collapses repeated model answer candidates before they reach Slack")
+    void repeatedModelAnswerCandidatesAreCollapsed() {
+        SlackMessageService slack = slackThatStreamsOk();
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(
+            delta("Hey! Which of the recent items - PR #12, PR #9, or issue #15 - do you want to look at next?")
+        );
+        channel.send(delta("Hey there! Which of the recent items - PR #12, PR #9, or issue #15 - should we focus on?"));
+
+        channel.completeWithDone();
+        waitUntil(() -> stops.get() >= 1, 4000);
+
+        assertThat(starts.get()).isEqualTo(1);
+        assertThat(stops.get()).isEqualTo(1);
+        assertThat(String.join("", delivered)).isEqualTo(
+            "Hey! Which of the recent items - PR #12, PR #9, or issue #15 - do you want to look at next?"
+        );
+    }
+
+    @Test
+    @DisplayName("normalizes non-ASCII punctuation before text reaches Slack")
+    void normalizesNonAsciiPunctuation() {
+        assertThat(SlackMentorTextFilter.normalize("Slack\u2011mentor — “review”…")).isEqualTo(
+            "Slack-mentor - \"review\"..."
+        );
+    }
+
+    @Test
+    @DisplayName("drops leaked internal analysis before streaming mentor text to Slack")
+    void leakedInternalAnalysisIsNotStreamed() {
+        SlackMessageService slack = slackThatStreamsOk();
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(
+            delta(
+                "User wants to see Slack messages in context. " +
+                    "We need to fetch inputs/context/slack_conversations.json. " +
+                    "I can use your recent Slack threads as context. Which thread should we look at?"
+            )
+        );
+        channel.completeWithDone();
+        waitUntil(() -> stops.get() >= 1, 4000);
+
+        assertThat(String.join("", delivered)).isEqualTo(
+            "I can use your recent Slack threads as context. Which thread should we look at?"
+        );
+    }
+
+    @Test
+    @DisplayName("keeps distinct adjacent guidance even when some words overlap")
+    void distinctAdjacentGuidanceIsNotCollapsed() {
+        SlackMessageService slack = slackThatStreamsOk();
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.send(delta("Your PR validation is stronger. "));
+        channel.send(delta("Your issue triage still needs tests."));
+        channel.completeWithDone();
+        waitUntil(() -> stops.get() >= 1, 4000);
+
+        assertThat(String.join("", delivered)).isEqualTo(
+            "Your PR validation is stronger. Your issue triage still needs tests."
+        );
+    }
+
+    @Test
+    @DisplayName("failed turns do not attach helpful/not helpful feedback buttons")
+    void failedTurnDoesNotAttachFeedbackButtons() {
+        SlackMessageService slack = slackThatStreamsOk();
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.completeWithError("Hephaestus is not ready to mentor in this workspace yet.");
+        waitUntil(() -> stops.get() >= 1, 4000);
+
+        ArgumentCaptor<List<LayoutBlock>> blocks = ArgumentCaptor.captor();
+        verify(slack).stopStream(eq(WS), eq(CH), anyString(), blocks.capture());
+        assertThat(blocks.getValue()).as("failed mentor turns should not ask for quality feedback").isEmpty();
+    }
+
+    @Test
+    @DisplayName("in-flight conflicts update assistant status without posting another message")
+    void conflictUpdatesStatusWithoutPostingMessage() {
+        SlackMessageService slack = mock(SlackMessageService.class);
+        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
+
+        channel.completeWithConflict();
+
+        verify(slack).setStatus(eq(WS), eq(CH), eq(THREAD), eq("Still working on the previous message..."));
+        verify(slack, never()).startStream(anyLong(), anyString(), anyString(), anyString());
+        verify(slack, never()).stopStream(anyLong(), anyString(), anyString(), any());
     }
 
     @Test

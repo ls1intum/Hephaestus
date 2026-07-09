@@ -82,7 +82,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - HMAC verification: `MessageDigest.isEqual` (constant-time, length-tolerant); hex via
   `java.util.HexFormat.of()` only — enforced by ArchUnit (`HexEncodingArchTest`). Case-folding
   uses `Locale.ROOT` everywhere — enforced by `LocaleSafetyArchTest`.
-- Spring beans (controllers, `JetStreamPublisher`, `StreamBootstrap`, health, lifecycle) gated by
+- Spring beans (controllers, `JetStreamPublisher`, `WebhookJetStreamBootstrap`, health, lifecycle) gated by
   `RuntimeRole.WEBHOOK_PROPERTY`. Production runs them in the dedicated `webhook-server`
   container (`SPRING_PROFILES_ACTIVE=prod,webhook`) for restart independence — see ADR 0008.
 - Configuration is shared with auto-registration: `core.webhook.WebhookProperties` bound to

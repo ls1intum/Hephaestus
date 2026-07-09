@@ -23,7 +23,6 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
@@ -259,6 +258,7 @@ public class IntegrationNatsConsumer {
                 log.debug("Failed to stop flat-stream consumer", e);
             }
             flatStreamConsumer = null;
+            stats.setFlatStreamConsumerActive(false);
         }
 
         virtualThreadExecutor.shutdown();
@@ -476,6 +476,7 @@ public class IntegrationNatsConsumer {
             );
             flatStream.start();
             flatStreamConsumer = flatStream;
+            stats.setFlatStreamConsumerActive(true);
             log.info("Started flat-stream consumer: consumerName={}", consumerName);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to set up flat-stream consumer", e);
@@ -515,9 +516,29 @@ public class IntegrationNatsConsumer {
             }
         }
 
+        ConsumerConfiguration configuration = newConsumerConfiguration(
+            subjects,
+            consumerProperties,
+            durable ? consumerName : null
+        );
+        log.info(
+            "Creating {} consumer: consumerName={}, subjectCount={}, deliverPolicy={}",
+            durable ? "durable" : "ephemeral",
+            durable ? consumerName : "(ephemeral)",
+            subjects.length,
+            configuration.getDeliverPolicy()
+        );
+        return streamContext.createOrUpdateConsumer(configuration);
+    }
+
+    static ConsumerConfiguration newConsumerConfiguration(
+        String[] subjects,
+        NatsConsumerProperties consumerProperties,
+        String durableName
+    ) {
         ConsumerConfiguration.Builder builder = ConsumerConfiguration.builder()
             .filterSubjects(subjects)
-            .deliverPolicy(DeliverPolicy.ByStartTime)
+            .deliverPolicy(DeliverPolicy.New)
             .ackWait(consumerProperties.ackWait())
             .maxAckPending(consumerProperties.maxAckPending())
             // Server-side cap on redeliveries. Without this, MaxDeliver=∞ would let a
@@ -525,19 +546,11 @@ public class IntegrationNatsConsumer {
             // by IntegrationPoisonHandler counting deliveredCount on our side, which
             // means a JetStream-side observability tool (`nats stream info`) cannot see
             // the policy. Mirrors the value the poison handler uses to ACK-terminate.
-            .maxDeliver(consumerProperties.poison().maxRedeliver())
-            .startTime(ZonedDateTime.now().minusDays(connectionProperties.replayTimeframeDays()));
-        if (durable) {
-            builder.durable(consumerName);
+            .maxDeliver(consumerProperties.poison().maxRedeliver());
+        if (!isBlank(durableName)) {
+            builder.durable(durableName);
         }
-        log.info(
-            "Creating {} consumer: consumerName={}, subjectCount={}, replayDays={}",
-            durable ? "durable" : "ephemeral",
-            durable ? consumerName : "(ephemeral)",
-            subjects.length,
-            connectionProperties.replayTimeframeDays()
-        );
-        return streamContext.createOrUpdateConsumer(builder.build());
+        return builder.build();
     }
 
     private String[] buildScopeSubjects(NatsSubscriptionInfo info) {

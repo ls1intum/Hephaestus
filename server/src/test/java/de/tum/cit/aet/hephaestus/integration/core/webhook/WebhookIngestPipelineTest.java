@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookPublishGate;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.WebhookRequest;
@@ -19,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -34,6 +36,7 @@ import tools.jackson.databind.ObjectMapper;
  * implementations — they validate the PIPELINE wiring, not the per-kind crypto.
  * The crypto adapters are covered in their own test classes.
  */
+@Tag("unit")
 class WebhookIngestPipelineTest extends BaseUnitTest {
 
     @Mock
@@ -177,6 +180,39 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
         );
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void publishGateCanDropVerifiedWebhookBeforeDurablePublish() {
+        WebhookPublishGate gate = new WebhookPublishGate() {
+            @Override
+            public IntegrationKind kind() {
+                return IntegrationKind.SLACK;
+            }
+
+            @Override
+            public Decision evaluate(tools.jackson.databind.JsonNode payload, Map<String, String> headers) {
+                return Decision.drop("not-consented");
+            }
+        };
+        WebhookIngestPipeline pipeline = new WebhookIngestPipeline(
+            List.of(stubVerifier(IntegrationKind.SLACK, new VerificationResult.Verified())),
+            List.of(stubDeriver(IntegrationKind.SLACK, "slack.T.C.message", "slack-Ev1")),
+            publisher,
+            objectMapper,
+            List.of(gate)
+        );
+
+        ResponseEntity<?> resp = pipeline.handle(
+            IntegrationKind.SLACK,
+            "{\"event\":{\"type\":\"message\"}}".getBytes(StandardCharsets.UTF_8),
+            headers()
+        );
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(resp.getBody()).isEqualTo(Map.of("status", "dropped"));
+        verify(publisher, never()).publishFast(any(), any());
         verify(publisher, never()).publish(any());
     }
 

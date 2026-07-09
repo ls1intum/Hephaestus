@@ -16,8 +16,25 @@ import org.springframework.transaction.annotation.Transactional;
 public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long> {
     boolean existsByWorkspaceIdAndSlackChannelIdAndSlackTs(Long workspaceId, String slackChannelId, String slackTs);
 
-    /** Bounded-retention sweep: delete every message ingested before {@code cutoff} for one workspace (D10). */
-    long deleteByWorkspaceIdAndIngestedAtBefore(Long workspaceId, Instant cutoff);
+    /** Retention sweep: delete messages only for thread aggregates selected as aged. */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        DELETE FROM slack_message m
+         USING slack_thread t
+         WHERE m.workspace_id = :workspaceId
+           AND t.workspace_id = :workspaceId
+           AND t.id IN (:threadIds)
+           AND m.slack_channel_id = t.slack_channel_id
+           AND COALESCE(m.slack_thread_ts, m.slack_ts) = t.slack_thread_ts
+        """,
+        nativeQuery = true
+    )
+    int deleteByWorkspaceIdAndThreadIds(
+        @Param("workspaceId") long workspaceId,
+        @Param("threadIds") java.util.Collection<Long> threadIds
+    );
 
     /** Workspace purge: delete every ingested message for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);
@@ -44,6 +61,17 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         nativeQuery = true
     )
     int deleteByWorkspaceIdAndAuthorMemberId(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
+
+    @Modifying
+    @Transactional
+    @Query(
+        value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_slack_user_id = :slackUserId",
+        nativeQuery = true
+    )
+    int deleteByWorkspaceIdAndAuthorSlackUserId(
+        @Param("workspaceId") long workspaceId,
+        @Param("slackUserId") String slackUserId
+    );
 
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
     long countByWorkspaceId(Long workspaceId);

@@ -15,7 +15,7 @@ import org.jspecify.annotations.NonNull;
 public record SlackMonitoredChannelDTO(
     @NonNull @Schema(description = "Internal allow-list row id") Long id,
     @NonNull @Schema(description = "Slack team (workspace) id the channel belongs to") String slackTeamId,
-    @NonNull @Schema(description = "Slack channel id (the stable C… id; the natural key)") String slackChannelId,
+    @NonNull @Schema(description = "Slack channel id (stable C…/G… id; the natural key)") String slackChannelId,
     @Schema(description = "Human-readable channel name, if known") String channelName,
     @NonNull @Schema(description = "Current per-channel consent lifecycle state") ConsentState consentState,
     @Schema(description = "When the in-channel consent announcement was posted (stamped on first activation)")

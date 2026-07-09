@@ -14,8 +14,10 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -151,8 +153,8 @@ public class JobTypeHandlerConfiguration {
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        org.springframework.context.ApplicationEventPublisher eventPublisher,
-        org.springframework.transaction.support.TransactionTemplate transactionTemplate
+        ApplicationEventPublisher eventPublisher,
+        TransactionTemplate transactionTemplate
     ) {
         return new ConversationReviewHandler(
             objectMapper,

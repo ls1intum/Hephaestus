@@ -93,23 +93,20 @@ const TURN_GRACE_MS = (() => {
     return Number.isFinite(raw) && raw > 0 ? raw : 30_000;
 })();
 
-// Context-key whitelist for the fetch_context tool. Any other path is rejected before the
-// callback even leaves the runner. This is a defence-in-depth check; the authoritative
-// whitelist lives Java-side in MentorContextKeys.ALLOWED_OUTPUT_KEYS (full-key match against
-// the content sources' OUTPUT_KEY constants). Keep this set aligned with the
-// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding,DeliveredFeedback,RecentAuthoredWork}ContentSource basenames.
+// Context-key whitelist for the fetch_context tool. Java remains authoritative and
+// re-checks against MentorContextKeys.ALLOWED_OUTPUT_KEYS.
 const FETCH_CONTEXT_ALLOWED = new Set([
-    "workspace.json",
-    "user.json",
-    "practice_catalog.json",
-    "findings_history.json",
-    "practice_standing.json",
-    "delivered_feedback.json",
-    "recent_authored_work.json",
-    "slack_conversations.json",
-    "prepared_conversation_feedback.json",
+    "inputs/context/workspace.json",
+    "inputs/context/user.json",
+    "inputs/context/practice_catalog.json",
+    "inputs/context/findings_history.json",
+    "inputs/context/practice_standing.json",
+    "inputs/context/delivered_feedback.json",
+    "inputs/context/recent_authored_work.json",
+    "inputs/context/slack_conversations.json",
+    "inputs/context/prepared_conversation_feedback.json",
+    "inputs/context/current_thread_history.json",
 ]);
-
 // JSON-RPC error codes
 const ERR = Object.freeze({
     INVALID_REQUEST: -32600,
@@ -325,15 +322,15 @@ async function ensureRuntime() {
                   })
                 : new DefaultResourceLoader({ cwd, agentDir: agentDir });
             await loader.reload();
-            // Built-in read/bash/grep let the mentor inspect the read-only context JSON
-            // under inputs/context/*.json (there is no repo checkout in the mentor sandbox).
-            // edit/write are denied — the mentor is an observer, not a code author.
+            // Least-privilege mentor surface: context is exposed through fetch_context, not
+            // filesystem spelunking. This keeps the model on the typed context contract and
+            // avoids path drift between mounted files and tool resource names.
             const result = await createAgentSessionFromServices({
                 services,
                 sessionManager,
                 sessionStartEvent,
                 customTools: [fetchContextTool, linkFindingTool],
-                tools: ["fetch_context", "link_finding", "read", "bash", "grep"],
+                tools: ["fetch_context", "link_finding"],
                 resourceLoader: loader,
             });
             return { ...result, services, diagnostics: services.diagnostics };
@@ -372,11 +369,10 @@ function defineFetchContextTool() {
         name: "fetch_context",
         label: "Fetch Context",
         description:
-            "Fetch a Hephaestus context resource (workspace state, user activity, practice catalog, finding history, " +
-            "prepared practice standing, delivered feedback, recent authored work) from the server. Returns JSON content. " +
-            "Allowed paths: " +
+            "Fetch a Hephaestus mentor context JSON resource from the server. Use the exact canonical path, " +
+            "for example inputs/context/recent_authored_work.json. Allowed paths: " +
             [...FETCH_CONTEXT_ALLOWED].join(", ") +
-            ". Names match the content source OUTPUT_KEY constants.",
+            ".",
         parameters: {
             type: "object",
             additionalProperties: false,

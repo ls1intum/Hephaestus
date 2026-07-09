@@ -10,10 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code (workspace, slack_user_id)} and member-optional by design: an unlinked user's opt-out is still stored so it
  * applies once they later link.
  *
- * <p>An App Home decision is a single toggle that drives BOTH consent bits — opting out sets
- * {@code ingestion_opted_out} (stops future ingestion) and {@code research_opted_out} (persisted alongside; research
- * semantics unchanged in this slice); opting back in clears both. It never un-erases already-collected data — the
- * opt-out's erasure of past data is a separate, irreversible act.
+ * <p>The two bits are intentionally separate: channel-message controls change {@code ingestion_opted_out}; research
+ * controls change {@code research_opted_out}. A channel-message opt-out may also erase already-collected channel
+ * data, but that erasure is performed by the caller through {@code SlackPersonErasureService}.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -22,6 +21,9 @@ public class SlackParticipantConsentService {
     /** Provenance stamped on an App Home consent decision (fits {@code source VARCHAR(32)}). */
     static final String SOURCE_SLACK_APP_HOME = "SLACK_APP_HOME";
 
+    /** Provenance stamped when a member uses the in-channel notice button. */
+    static final String SOURCE_SLACK_CHANNEL_NOTICE = "SLACK_CHANNEL_NOTICE";
+
     private final SlackParticipantConsentRepository participantConsentRepository;
 
     public SlackParticipantConsentService(SlackParticipantConsentRepository participantConsentRepository) {
@@ -29,8 +31,8 @@ public class SlackParticipantConsentService {
     }
 
     /**
-     * Persist an App Home consent decision for one Slack user in one workspace. {@code optIn == false} (opt out)
-     * sets both consent bits; {@code optIn == true} clears them. A blank Slack user id is a no-op.
+     * Legacy combined App Home decision. Kept only for older tests/callers; new UI should call the focused methods
+     * below so message use and research participation cannot drift from the labels.
      */
     @Transactional
     public void recordAppHomeDecision(long workspaceId, String slackUserId, boolean optIn) {
@@ -39,5 +41,33 @@ public class SlackParticipantConsentService {
         }
         boolean optedOut = !optIn;
         participantConsentRepository.upsert(workspaceId, slackUserId, optedOut, optedOut, SOURCE_SLACK_APP_HOME);
+    }
+
+    /**
+     * Persist an ingestion-only opt-out from the in-channel notice. This excludes the person's monitored-channel
+     * messages but deliberately does not change research participation.
+     */
+    @Transactional
+    public void recordChannelMessageOptOut(long workspaceId, String slackUserId) {
+        if (slackUserId == null || slackUserId.isBlank()) {
+            return;
+        }
+        participantConsentRepository.optOutOfIngestion(workspaceId, slackUserId, SOURCE_SLACK_CHANNEL_NOTICE);
+    }
+
+    @Transactional
+    public void recordChannelMessageOptIn(long workspaceId, String slackUserId) {
+        if (slackUserId == null || slackUserId.isBlank()) {
+            return;
+        }
+        participantConsentRepository.optInToIngestion(workspaceId, slackUserId, SOURCE_SLACK_APP_HOME);
+    }
+
+    @Transactional
+    public void recordResearchDecision(long workspaceId, String slackUserId, boolean participate) {
+        if (slackUserId == null || slackUserId.isBlank()) {
+            return;
+        }
+        participantConsentRepository.setResearchOptOut(workspaceId, slackUserId, !participate, SOURCE_SLACK_APP_HOME);
     }
 }

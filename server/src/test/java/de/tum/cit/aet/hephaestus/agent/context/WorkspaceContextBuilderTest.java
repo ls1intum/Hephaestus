@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -330,20 +331,17 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null repoKey requests (e.g. issue reviews) all collide on stripe 0 and serialise")
-        void serialisesOnNullRepoKey() throws Exception {
-            java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
-            java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
-            ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
-            ContentSource unboundedSecond = new LatchedProvider(null, null);
-            var builder = new WorkspaceContextBuilder(
-                List.of(gatedFirst, unboundedSecond),
-                new SimpleMeterRegistry(),
-                null
-            );
+        @DisplayName("null repoKey requests do not serialise globally")
+        void nullRepoKeyRequestsCanRunConcurrently() throws Exception {
+            java.util.concurrent.CountDownLatch bothInside = new java.util.concurrent.CountDownLatch(2);
+            java.util.concurrent.CountDownLatch mayFinish = new java.util.concurrent.CountDownLatch(1);
+            AtomicInteger inFlight = new AtomicInteger();
+            AtomicInteger maxInFlight = new AtomicInteger();
+            ContentSource concurrentProbe = new ConcurrentProbeProvider(bothInside, mayFinish, inFlight, maxInFlight);
+            var builder = new WorkspaceContextBuilder(List.of(concurrentProbe), new SimpleMeterRegistry(), null);
 
-            // IssueReviewRequest jobs WITHOUT repository_id metadata → repoKey() is null → stripe 0.
-            // A regression returning distinct stripes for null keys would let these de-serialise.
+            // IssueReviewRequest jobs without repository_id metadata have no git worktree to protect.
+            // Serialising all such requests behind stripe 0 would throttle Slack/web mentor context builds.
             AgentJob jobA = new AgentJob();
             jobA.setId(UUID.randomUUID());
             AgentJob jobB = new AgentJob();
@@ -352,22 +350,19 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Thread t1 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobA)), "t1-null");
             Thread t2 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobB)), "t2-null");
             t1.start();
-            assertThat(firstInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
-                .as("t1 should enter the critical section quickly")
-                .isTrue();
             t2.start();
-            // t2 must park on the same stripe-0 lock while t1 holds it — its `entered` latch is null,
-            // so reaching a wait/block state proves it could not run ahead.
-            awaitState(
-                t2,
-                java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
-                2_000
-            );
-            firstMayFinish.countDown();
+            try {
+                assertThat(bothInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("both null-repo builds should enter the provider concurrently")
+                    .isTrue();
+            } finally {
+                mayFinish.countDown();
+            }
             t1.join(2_000);
             t2.join(2_000);
             assertThat(t1.isAlive()).isFalse();
             assertThat(t2.isAlive()).isFalse();
+            assertThat(maxInFlight.get()).isEqualTo(2);
         }
     }
 
@@ -422,6 +417,52 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
+            }
+            files.put(OUTPUT_PREFIX + "marker-" + System.nanoTime() + ".txt", new byte[0]);
+        }
+    }
+
+    /** Provider that records whether two builds were allowed into the provider body at the same time. */
+    private static final class ConcurrentProbeProvider implements ContentSource {
+
+        private final java.util.concurrent.CountDownLatch bothInside;
+        private final java.util.concurrent.CountDownLatch mayFinish;
+        private final AtomicInteger inFlight;
+        private final AtomicInteger maxInFlight;
+
+        ConcurrentProbeProvider(
+            java.util.concurrent.CountDownLatch bothInside,
+            java.util.concurrent.CountDownLatch mayFinish,
+            AtomicInteger inFlight,
+            AtomicInteger maxInFlight
+        ) {
+            this.bothInside = bothInside;
+            this.mayFinish = mayFinish;
+            this.inFlight = inFlight;
+            this.maxInFlight = maxInFlight;
+        }
+
+        @Override
+        public String originId() {
+            return "test";
+        }
+
+        @Override
+        public boolean supports(ContextRequest request) {
+            return true;
+        }
+
+        @Override
+        public void contribute(ContextRequest request, Map<String, byte[]> files) {
+            int active = inFlight.incrementAndGet();
+            maxInFlight.accumulateAndGet(active, Math::max);
+            bothInside.countDown();
+            try {
+                mayFinish.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                inFlight.decrementAndGet();
             }
             files.put(OUTPUT_PREFIX + "marker-" + System.nanoTime() + ".txt", new byte[0]);
         }

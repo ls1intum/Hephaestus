@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -14,12 +16,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRating;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorTurnRatingRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.TurnRating;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
@@ -62,8 +61,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Real-Postgres proof that an App Home opt-out both STOPS future ingestion (records the person consent) and ERASES
- * that person's already-stored Slack data — driven end-to-end through {@link SlackFeedbackHandler} with the REAL
+ * Real-Postgres proof that a Slack channel-message opt-out both STOPS future ingestion (records the person consent) and ERASES
+ * that person's already-stored Slack data — driven end-to-end through {@link SlackInteractivityHandler} with the REAL
  * {@link SlackParticipantConsentService} + {@link SlackPersonErasureService} (only the pure resolvers/effects are
  * mocked). It asserts the erasure is person + tenant scoped: a co-participant's message, their id in the
  * {@code participant_member_ids} array, and their CONVERSATION feedback survive, and an unrelated PR observation
@@ -107,9 +106,6 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private MentorTurnRatingRepository mentorTurnRatingRepository;
-
-    @Autowired
     private ChatThreadRepository chatThreadRepository;
 
     @Autowired
@@ -123,7 +119,8 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 
-    private SlackFeedbackHandler handler;
+    private SlackInteractivityHandler handler;
+    private SlackMentorIdentityResolver identityResolver;
     private long workspaceId;
     private long meMemberId;
     private long otherMemberId;
@@ -152,14 +149,14 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         // Handler under test: REAL consent + erasure services; the resolvers/effects are pure and mocked.
         SlackWorkspaceResolver workspaceResolver = mock(SlackWorkspaceResolver.class);
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(workspaceId));
-        SlackMentorIdentityResolver identityResolver = mock(SlackMentorIdentityResolver.class);
+        identityResolver = mock(SlackMentorIdentityResolver.class);
+        when(identityResolver.resolveMemberId(anyLong(), anyString(), anyString())).thenReturn(Optional.empty());
         when(identityResolver.resolveMemberId(workspaceId, TEAM, OPTING_OUT_SLACK_USER)).thenReturn(
             Optional.of(meMemberId)
         );
         when(identityResolver.resolveDeveloperLogin(any(Long.class), any(), any())).thenReturn(Optional.empty());
 
-        handler = new SlackFeedbackHandler(
-            mock(MentorTurnRatingRepository.class),
+        handler = new SlackInteractivityHandler(
             workspaceResolver,
             identityResolver,
             mock(ResearchParticipationCommand.class),
@@ -171,7 +168,7 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("App Home opt-out records ingestion consent AND erases the person's data, sparing others + PR")
+    @DisplayName("Channel-message opt-out records ingestion consent AND erases the person's data, sparing others + PR")
     void optOut_recordsConsent_andErasesPersonScopedData() {
         // Stored content: a message from the opting-out member and one from a co-participant, a thread they both
         // joined, CONVERSATION feedback about each of them, and an unrelated PR observation about the opting-out user.
@@ -216,27 +213,37 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-        "opt-out is channel-ingestion scoped: erases the person's CHANNEL data but keeps their own mentor DM + rating"
-    )
-    void optOut_channelIngestionScoped_keepsOwnMentorDmAndRating() {
+    @DisplayName("unlinked Slack user opt-out deletes raw messages by Slack user id")
+    void optOut_unlinkedUser_erasesRawMessagesBySlackUserId() {
+        String unlinkedSlackUser = "UUNLINKED";
+        insertUnlinkedMessage("unlinked.1", unlinkedSlackUser);
+        insertMessage("other.1", otherMemberId, "UOTHER");
+
+        handler.handleBlockActions(optOut(unlinkedSlackUser));
+
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "unlinked.1")
+        ).isFalse();
+        assertThat(
+            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "other.1")
+        ).isTrue();
+        assertThat(
+            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                workspaceId,
+                unlinkedSlackUser
+            )
+        ).isTrue();
+    }
+
+    @Test
+    @DisplayName("opt-out is channel-ingestion scoped: erases channel data but keeps the person's mentor DM")
+    void optOut_channelIngestionScoped_keepsOwnMentorDm() {
         // Channel-derived data the person authored (must be erased by the opt-out).
         insertMessage("me.1", meMemberId, OPTING_OUT_SLACK_USER);
         long threadId = insertThreadWithParticipants("root.1", meMemberId, otherMemberId);
         UUID meConvObs = seedBoundConversation(threadId, meMemberId);
 
-        // The person's OWN mentor interactions — NOT channel ingestion. A DM opt-out is an ingestion opt-out; it must
-        // NOT delete the person's own mentor DM thread or the feedback-button ratings they gave the mentor. This pins
-        // the decided boundary (channel-ingestion only) so a future broadened erase that swept these would fail here.
-        MentorTurnRating myRating = mentorTurnRatingRepository.save(
-            MentorTurnRating.builder()
-                .workspaceId(workspaceId)
-                .raterUserId(meMemberId)
-                .channelId(CHANNEL)
-                .slackMessageTs("mentor-reply.1")
-                .rating(TurnRating.HELPFUL)
-                .build()
-        );
+        // The person's own mentor DM is not channel ingestion and is not erased by a channel-message opt-out.
         User me = userRepository.findById(meMemberId).orElseThrow();
         Workspace ws = workspaceRepository.findById(workspaceId).orElseThrow();
         ChatThread myDm = new ChatThread();
@@ -256,8 +263,7 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(observationRepository.findById(meConvObs)).isEmpty();
         assertThat(participantIds(threadId)).containsExactly(otherMemberId);
 
-        // … but the person's OWN mentor DM thread and mentor_turn_rating are left intact (out of ingestion scope).
-        assertThat(mentorTurnRatingRepository.findById(myRating.getId())).isPresent();
+        // … but the person's own mentor DM thread is left intact.
         assertThat(chatThreadRepository.findById(myDmId)).isPresent();
     }
 
@@ -271,7 +277,7 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         payload.putObject("channel").put("id", CHANNEL);
         ArrayNode actions = payload.putArray("actions");
         ObjectNode action = actions.addObject();
-        action.put("action_id", SlackAppHomeService.ACTION_RESEARCH_OPT_OUT);
+        action.put("action_id", SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT);
         action.put("value", "false");
         return payload;
     }
@@ -286,6 +292,18 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
             slackTs,
             authorSlackUserId,
             authorMemberId
+        );
+    }
+
+    private void insertUnlinkedMessage(String slackTs, String authorSlackUserId) {
+        jdbcTemplate.update(
+            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, author_slack_user_id, author_member_id, ingested_at) " +
+                "VALUES (?, ?, ?, ?, ?, NULL, now())",
+            workspaceId,
+            TEAM,
+            CHANNEL,
+            slackTs,
+            authorSlackUserId
         );
     }
 

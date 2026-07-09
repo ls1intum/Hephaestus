@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -217,6 +218,47 @@ class WorkspaceProvisioningServiceTest {
             admin.getId(),
             WorkspaceMembership.WorkspaceRole.ADMIN
         );
+        verify(workspaceService, never()).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
+    }
+
+    @Test
+    void gitLabBootstrapToleratesCaseDuplicateWhenActiveGitLabWorkspaceExists() {
+        Workspace gitlabWorkspace = new Workspace();
+        gitlabWorkspace.setId(10L);
+        gitlabWorkspace.setAccountLogin("hephaestustest");
+        Workspace githubDuplicate = new Workspace();
+        githubDuplicate.setId(11L);
+        githubDuplicate.setAccountLogin("HephaestusTest");
+
+        workspaceProperties = new WorkspaceProperties(
+            false,
+            new WorkspaceProperties.DefaultProperties("", "", List.of()),
+            true,
+            new WorkspaceProperties.GitLabDefaultProperties("hephaestustest", "pat-token", "https://gitlab.lrz.de"),
+            WorkspaceProperties.CreationPolicy.SELF_SERVICE
+        );
+        provisioningService = new WorkspaceProvisioningService(
+            workspaceProperties,
+            workspaceRepository,
+            repositoryToMonitorRepository,
+            workspaceService,
+            userRepository,
+            gitProviderRepository,
+            workspaceMembershipRepository,
+            workspaceMembershipService,
+            authenticatedGitProviderUserService,
+            connectionService,
+            List.of()
+        );
+        when(workspaceRepository.findAllByAccountLoginIgnoreCase("hephaestustest")).thenReturn(
+            List.of(gitlabWorkspace, githubDuplicate)
+        );
+        when(connectionService.findActive(10L, IntegrationKind.GITLAB)).thenReturn(
+            Optional.of(mock(de.tum.cit.aet.hephaestus.integration.core.connection.Connection.class))
+        );
+
+        provisioningService.bootstrapDefaultGitLabPatWorkspace();
+
         verify(workspaceService, never()).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
     }
 }

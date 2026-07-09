@@ -12,8 +12,7 @@ import org.springframework.modulith.NamedInterface;
  * <p>Implementations:
  * <ul>
  *   <li>{@link MentorSseChannel} — the webapp surface over an HTTP {@code text/event-stream}.</li>
- *   <li>(future) a Slack DM adapter that renders {@link UIMessageChunk}s to the Slack streaming API
- *       inside an Assistant thread — see {@code .ai/notes/slack-integration-design.md} (D5/D6).</li>
+ *   <li>Slack DM channel — renders {@link UIMessageChunk}s through Slack's streaming API inside an assistant thread.</li>
  * </ul>
  *
  * <h3>Contract every implementation must honour</h3>

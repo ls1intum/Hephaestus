@@ -36,6 +36,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,11 @@ import tools.jackson.databind.ObjectMapper;
  * announcement + stamps the forward-only boundary + writes an audit row; a non-admin is 403; an illegal edge is 409;
  * revoke erases raw + derived data; the audit trail lists chronologically; and another workspace's channel is 404.
  */
-@TestPropertySource(properties = "hephaestus.integration.slack.enabled=true")
+@TestPropertySource(
+    properties = {
+        "hephaestus.integration.slack.enabled=true", "hephaestus.integration.slack.signing-secret=test-signing-secret",
+    }
+)
 class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OM = new ObjectMapper();
@@ -157,11 +162,8 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
     @WithMentorUser
     @DisplayName("non-admin cannot activate a channel → 403, state unchanged")
     void activate_asNonAdmin_forbidden() {
-        // The 403 comes from @RequireAtLeastWorkspaceAdmin rejecting the (authenticated) @WithMentorUser principal —
-        // persistUser("mentor") is load-bearing so that principal resolves (without it the request is 401, not 403).
-        // The previous extra `member` + ensureWorkspaceMembership(...MEMBER) was dead and misleadingly implied it
-        // proved "member → 403"; it is removed.
-        persistUser("mentor");
+        User mentor = persistUser("mentor");
+        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
         seedChannel(workspace.getId(), "C1", ConsentState.PENDING, null);
 
         patchConsent("C1", ConsentState.ACTIVE, null).expectStatus().isForbidden();

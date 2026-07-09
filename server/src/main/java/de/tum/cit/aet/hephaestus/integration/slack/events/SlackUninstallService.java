@@ -15,21 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Routes inbound Slack {@code app_uninstalled} / {@code tokens_revoked} events into a clean teardown. These
- * arrive on {@code POST /slack/events} and were previously dropped by the controller's non-{@code message}
- * early-return, so a workspace that removed the app kept its ingested Slack content and a now-dead bot token.
- *
- * <p>The teardown, in one transaction: flip the Slack {@link Connection} to {@link IntegrationState#UNINSTALLED}
- * (which clears the stored credentials via {@link ConnectionService#transition}) <em>then</em> drop the Slack
- * content through {@link SlackWorkspacePurgeAdapter} <em>and</em> erase the Slack-originated mentor DM content
- * (the {@code SLACK_DM} {@code chat_thread}/{@code chat_message} rows) via
- * {@link MentorSlackThreadService#purgeSlackThreads} — the five {@code slack_*} tables alone leave the derived
- * mentor conversation behind, which an uninstall (a common GDPR-erasure trigger) should also remove. Ordering the
- * connection flip before/with the purge mirrors the workspace-purge chain, where {@code SlackWorkspacePurgeAdapter}
- * ({@code @Order -200}) already runs ahead of {@code ConnectionPurgeContributor} ({@code -100}).
- *
- * <p>The audit row's stable {@code correlationId} makes a Slack retry idempotent: the second delivery's transition
- * is a no-op and the content-purge is already empty.
+ * Handles Slack app removal: mark the connection uninstalled and purge Slack raw + derived data.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -58,14 +44,8 @@ public class SlackUninstallService {
         this.conversationFeedbackErasure = conversationFeedbackErasure;
     }
 
-    /**
-     * Handle an uninstall/revocation for the Slack {@code teamId}. No-op (logged) if no ACTIVE Slack connection
-     * maps to the team — the app is already gone, or a retry already tore it down.
-     *
-     * @param eventType the Slack event type that triggered this ({@code app_uninstalled} or {@code tokens_revoked})
-     */
     @Transactional
-    public void onUninstall(String teamId, String eventType) {
+    public void onUninstall(String teamId, String eventType, String eventId) {
         var workspaceOpt = workspaceResolver.resolveWorkspaceId(teamId);
         if (workspaceOpt.isEmpty()) {
             log.info("Slack {} for team {} — no ACTIVE connection, nothing to tear down", eventType, teamId);
@@ -84,19 +64,13 @@ public class SlackUninstallService {
                             : "TOKENS_REVOKED",
                         "SLACK",
                         teamId,
-                        "slack-uninstall-" + teamId,
+                        uninstallCorrelationId(teamId, eventType, eventId),
                         "Slack " + eventType + " received"
                     )
                 )
             );
-        // Erase the derived CONVERSATION_THREAD observations/feedback (composed over this workspace's Slack threads)
-        // BEFORE dropping the slack_* tables — those aggregates are the artifact the derived rows point at, and the
-        // five slack_* tables alone would leave the derived practice rows behind on an uninstall (a common GDPR
-        // erasure trigger). Scoped to CONVERSATION_THREAD + this workspace; idempotent, so a redelivery is a no-op.
         int erasedConversationRows = conversationFeedbackErasure.eraseAllConversationForWorkspace(workspaceId);
         purgeAdapter.deleteWorkspaceData(workspaceId);
-        // Also erase the derived Slack-originated mentor DM conversation (SLACK_DM chat_thread/chat_message rows);
-        // the slack_* tables alone would leave it behind. Idempotent, so a Slack uninstall redelivery is a no-op.
         int purgedThreads = mentorSlackThreadService.purgeSlackThreads(workspaceId);
         log.info(
             "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} conversation-derived practice rows erased, {} mentor DM threads erased)",
@@ -106,5 +80,10 @@ public class SlackUninstallService {
             erasedConversationRows,
             purgedThreads
         );
+    }
+
+    private static String uninstallCorrelationId(String teamId, String eventType, String eventId) {
+        String stableEventId = eventId == null || eventId.isBlank() ? teamId : eventId;
+        return "slack-" + eventType + "-" + stableEventId;
     }
 }

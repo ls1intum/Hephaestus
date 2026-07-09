@@ -22,7 +22,7 @@ import org.mockito.Mock;
 
 /**
  * App Home onboarding CTA. Deterministic: the Slack round-trip is mocked, so these lock the routing
- * decisions (unknown team / already-linked / unlinked) and the deep-link the "Link Slack" button carries.
+ * decisions (unknown team / already-linked / unlinked) and the deep-link the account-linking button carries.
  */
 class SlackOnboardingServiceTest extends BaseUnitTest {
 
@@ -43,7 +43,8 @@ class SlackOnboardingServiceTest extends BaseUnitTest {
             workspaceResolver,
             identityResolver,
             messageService,
-            "https://heph.example.com/"
+            "https://heph.example.com/",
+            ""
         );
     }
 
@@ -89,6 +90,21 @@ class SlackOnboardingServiceTest extends BaseUnitTest {
     void linkUrl_isTheAuthenticatedLinkModeDeepLink() {
         assertThat(service.linkUrl()).isEqualTo(
             "https://heph.example.com/auth/login?provider=slack&mode=link&returnTo=/settings"
+        );
+    }
+
+    @Test
+    void linkUrl_includesApiBasePathWhenAppServerIsMountedUnderApi() {
+        SlackOnboardingService apiMounted = new SlackOnboardingService(
+            workspaceResolver,
+            identityResolver,
+            messageService,
+            "https://heph.example.com/",
+            "/api"
+        );
+
+        assertThat(apiMounted.linkUrl()).isEqualTo(
+            "https://heph.example.com/api/auth/login?provider=slack&mode=link&returnTo=/settings"
         );
     }
 

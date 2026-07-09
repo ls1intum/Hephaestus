@@ -99,9 +99,9 @@ function AdminLoginProvidersPage() {
 						<h1 className="text-2xl font-semibold">Login providers</h1>
 					</div>
 					<p className="max-w-2xl text-sm text-muted-foreground">
-						Sign-in options offered on the login page. One provider per SCM instance — add a
-						self-hosted GitLab here so its users can sign in. Register the shown redirect URI on the
-						instance's OAuth application.
+						Configure OAuth providers for sign-in and account linking. Slack is link-only for
+						Settings and App Home account linking, so its redirect URI is separate from the Slack
+						app-install callback.
 					</p>
 				</div>
 				<Button onClick={openCreate}>

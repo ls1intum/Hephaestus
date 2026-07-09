@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.integration.slack.SlackHephaestusUiLinks;
+import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackConsentBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
@@ -31,7 +33,7 @@ import tools.jackson.databind.JsonNode;
  *       channel that is actually active.</li>
  * </ol>
  *
- * <p>Best-effort throughout: it runs off the ACK thread (offloaded by {@link SlackEventDispatcher}), and a Slack-side
+ * <p>Best-effort throughout: it runs from the Slack consumer, and a Slack-side
  * failure is logged and swallowed — a dropped notice does not block anything and forward-only ingestion is unaffected.
  */
 @Service
@@ -42,16 +44,25 @@ public class SlackChannelJoinNoticeHandler {
 
     private final SlackWorkspaceResolver workspaceResolver;
     private final SlackChannelConsentGate consentGate;
+    private final SlackParticipantConsentGate participantConsentGate;
     private final SlackMessageService messageService;
+    private final SlackHephaestusUiLinks uiLinks;
+    private final SlackChannelConsentService consentService;
 
     public SlackChannelJoinNoticeHandler(
         SlackWorkspaceResolver workspaceResolver,
         SlackChannelConsentGate consentGate,
-        SlackMessageService messageService
+        SlackParticipantConsentGate participantConsentGate,
+        SlackMessageService messageService,
+        SlackHephaestusUiLinks uiLinks,
+        SlackChannelConsentService consentService
     ) {
         this.workspaceResolver = workspaceResolver;
         this.consentGate = consentGate;
+        this.participantConsentGate = participantConsentGate;
         this.messageService = messageService;
+        this.uiLinks = uiLinks;
+        this.consentService = consentService;
     }
 
     /**
@@ -73,24 +84,29 @@ public class SlackChannelJoinNoticeHandler {
         }
         long workspaceId = workspaceOpt.get();
 
-        // Only disclose where we are actually reading. A cheap DB read that also spares the remote auth.test below
-        // for the common case of a join into a non-active channel.
-        if (!consentGate.ingestAllowed(workspaceId, channelId)) {
+        // Adding the app to a channel is Slack-native discovery. Register PENDING only; an admin still has to
+        // activate the channel before anything is read.
+        if (messageService.resolveBotUserId(workspaceId).filter(joinerUserId::equals).isPresent()) {
+            consentService.register(workspaceId, channelId, null);
             return;
         }
 
-        // Skip the bot's own join (adding the app to the channel fires this event too) — never notify ourselves.
-        if (messageService.resolveBotUserId(workspaceId).filter(joinerUserId::equals).isPresent()) {
+        // Only disclose where we are actually reading.
+        if (!consentGate.ingestAllowed(workspaceId, channelId)) {
+            return;
+        }
+        if (!participantConsentGate.ingestionAllowed(workspaceId, joinerUserId)) {
             return;
         }
 
         try {
+            String hephaestusUrl = uiLinks.workspaceHomeUrl(workspaceId);
             messageService.sendEphemeralForWorkspace(
                 workspaceId,
                 channelId,
                 joinerUserId,
-                SlackConsentBlocks.consentNotice(),
-                SlackConsentBlocks.FALLBACK_TEXT
+                SlackConsentBlocks.lateJoinNotice(hephaestusUrl),
+                SlackConsentBlocks.lateJoinFallbackText(hephaestusUrl)
             );
         } catch (SlackSendException e) {
             log.warn(

@@ -39,9 +39,9 @@ public final class RuntimeRole {
     public static final String WORKER_PROPERTY = PROPERTY_PREFIX + ".worker.enabled";
 
     /**
-     * Wired property key for the webhook-role gate. Gates {@code WebhookConfiguration} —
-     * the inbound HTTP webhook controllers, HMAC verifier, JetStream publisher, stream
-     * bootstrap, health indicator, and graceful-shutdown lifecycle. Setting to
+     * Wired property key for the webhook-role gate. Gates webhook HTTP ingress,
+     * inbound signature verification, JetStream publishing/bootstrap, health
+     * indicators, and graceful-shutdown lifecycle. Setting to
      * {@code false} removes those beans; the rest of the monolith continues to load.
      *
      * <p>The {@code webhook-server} production container deploys with this flag {@code true}

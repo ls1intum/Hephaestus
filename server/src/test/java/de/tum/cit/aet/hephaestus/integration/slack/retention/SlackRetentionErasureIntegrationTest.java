@@ -132,8 +132,8 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         UUID prObs = seedObservation(WorkArtifact.PULL_REQUEST, 7777L);
 
         // At least one message so the workspace is enumerated by the sweep; also proves message-grain pruning.
-        insertMessage("agedmsg.1", now.minus(Duration.ofDays(60)));
-        insertMessage("freshmsg.1", now);
+        insertMessage("agedmsg.1", "aged-root", now.minus(Duration.ofDays(60)));
+        insertMessage("freshmsg.1", "fresh-root", now);
 
         slackRetentionSweeper.sweepNow();
 
@@ -233,13 +233,14 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         return List.of(ids);
     }
 
-    private void insertMessage(String slackTs, Instant ingestedAt) {
+    private void insertMessage(String slackTs, String slackThreadTs, Instant ingestedAt) {
         jdbcTemplate.update(
-            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, ingested_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) VALUES (?, ?, ?, ?, ?, ?)",
             workspace.getId(),
             "T1",
             "C1",
             slackTs,
+            slackThreadTs,
             Timestamp.from(ingestedAt)
         );
     }

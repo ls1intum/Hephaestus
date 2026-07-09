@@ -11,6 +11,10 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.api.DiscardPolicy;
+import io.nats.client.api.RetentionPolicy;
+import io.nats.client.api.StorageType;
+import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
 import java.time.Duration;
 import org.junit.jupiter.api.Tag;
@@ -18,18 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-/**
- * Topology guard: across the {@code webhook}×{@code slack}×{@code nats} axes, at most ONE
- * {@link JetStreamPublisher} is ever wired. {@link WebhookConfiguration} (webhook role) and
- * {@link SlackNatsPublisherConfiguration} (server role, webhook off, slack on) both {@code @Import}
- * the shared {@link WebhookProducerBeans}, so a broadened condition that let both contribute would
- * yield a {@code NoUniqueBeanDefinitionException} at the single {@code @Nullable JetStreamPublisher}
- * injection. The load-bearing assertion is therefore "never &gt; 1 and the context still starts"; the
- * exact 0/1 counts pin which topology owns the producer cluster.
- *
- * <p>The {@code nats} axis is modeled as presence/absence of the {@code natsConnection} bean, matching
- * both configs' {@code @ConditionalOnBean(Connection.class)} gate.
- */
 @Tag("unit")
 class JetStreamPublisherTopologyTest {
 
@@ -43,30 +35,23 @@ class JetStreamPublisherTopologyTest {
         new WebhookProperties.Http(26_214_400L)
     );
 
-    /** Base runner with both producer host configs + the properties/registry they need. */
     private ApplicationContextRunner baseRunner() {
         return new ApplicationContextRunner()
-            .withUserConfiguration(WebhookConfiguration.class, SlackNatsPublisherConfiguration.class)
+            .withUserConfiguration(WebhookConfiguration.class)
             .withBean(WebhookProperties.class, () -> properties)
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
     }
 
-    /** NATS-on: register the {@code natsConnection} the producer beans inject via {@code @Qualifier}. */
     private ApplicationContextRunner withNats(ApplicationContextRunner runner) {
         return runner.withBean("natsConnection", Connection.class, this::newNatsConnection);
     }
 
-    /**
-     * A Connection whose JetStream management handle answers {@code getStreamInfo} with an existing
-     * stream, so {@link StreamBootstrap}'s {@code @PostConstruct} completes (no addStream, no NPE) and
-     * the context starts cleanly. Deep stubs give non-null (but harmlessly drifting) config fields.
-     */
     private Connection newNatsConnection() {
         try {
             Connection connection = mock(Connection.class);
             JetStream jetStream = mock(JetStream.class);
             JetStreamManagement jsm = mock(JetStreamManagement.class);
-            StreamInfo info = mock(StreamInfo.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+            StreamInfo info = streamInfoWithExpectedConfig();
             when(jsm.getStreamInfo(anyString())).thenReturn(info);
             when(connection.jetStream()).thenReturn(jetStream);
             when(connection.jetStreamManagement()).thenReturn(jsm);
@@ -76,11 +61,26 @@ class JetStreamPublisherTopologyTest {
         }
     }
 
+    private StreamInfo streamInfoWithExpectedConfig() {
+        WebhookProperties.Stream stream = properties.stream();
+        StreamConfiguration config = StreamConfiguration.builder()
+            .name("existing")
+            .subjects("existing.>")
+            .retentionPolicy(RetentionPolicy.Limits)
+            .discardPolicy(DiscardPolicy.Old)
+            .storageType(StorageType.File)
+            .duplicateWindow(stream.duplicateWindow())
+            .maxAge(stream.maxAge())
+            .maxMessages(stream.maxMessages())
+            .build();
+        StreamInfo info = mock(StreamInfo.class);
+        when(info.getConfiguration()).thenReturn(config);
+        return info;
+    }
+
     private void assertPublisherCount(AssertableApplicationContext context, int expected) {
         assertThat(context).hasNotFailed();
         assertThat(context.getBeanNamesForType(JetStreamPublisher.class)).hasSize(expected);
-        // The invariant, restated independently of the exact count: never a duplicate.
-        assertThat(context.getBeanNamesForType(JetStreamPublisher.class).length).isLessThanOrEqualTo(1);
     }
 
     @Test
@@ -98,10 +98,10 @@ class JetStreamPublisherTopologyTest {
     }
 
     @Test
-    void webhookOff_slackOn_natsOn_slackConfigOwnsTheSinglePublisher() {
+    void webhookOff_slackOn_natsOn_noPublisher() {
         withNats(baseRunner())
             .withPropertyValues("hephaestus.runtime.webhook.enabled=false", "hephaestus.integration.slack.enabled=true")
-            .run(context -> assertPublisherCount(context, 1));
+            .run(context -> assertPublisherCount(context, 0));
     }
 
     @Test

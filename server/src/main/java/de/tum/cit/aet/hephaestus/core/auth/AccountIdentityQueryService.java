@@ -65,7 +65,8 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
             link.getDisplayName(),
             link.getAvatarUrl(),
             link.getProfileUrl(),
-            link.getExternalActorId()
+            link.getExternalActorId(),
+            link.getTeamId()
         );
     }
 }

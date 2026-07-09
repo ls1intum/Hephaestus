@@ -180,11 +180,18 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
             .id(UUID.randomUUID())
             .title("Swallowed IOException")
             .practice(practiceBad)
+            .artifactType(de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST)
+            .artifactId(123L)
             .presence(Presence.PRESENT)
             .assessment(de.tum.cit.aet.hephaestus.practices.model.Assessment.BAD)
             .severity(Severity.MAJOR)
             .confidence(0.9f)
             .observedAt(observedBad)
+            .evidence(
+                objectMapper.readTree(
+                    "{\"locations\":[{\"path\":\"src/Retry.java\",\"startLine\":42}],\"snippets\":[\"catch (IOException ignored) {}\"]}"
+                )
+            )
             .reasoning("The retry block swallows the IOException.")
             .build();
 
@@ -242,6 +249,10 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         assertThat(bad.get("assessment").asString()).isEqualTo("BAD");
         assertThat(bad.get("severity").asString()).isEqualTo("MAJOR");
         assertThat(bad.get("observedAt").asString()).isEqualTo(observedBad.toString());
+        assertThat(bad.get("artifactType").asString()).isEqualTo("PULL_REQUEST");
+        assertThat(bad.get("artifactId").asLong()).isEqualTo(123L);
+        assertThat(bad.get("evidence").get("locations").get(0).get("path").asString()).isEqualTo("src/Retry.java");
+        assertThat(bad.get("evidence").get("snippets").get(0).asString()).contains("IOException");
 
         JsonNode na = obs.get(1);
         assertThat(na.get("presence").asString()).isEqualTo("NOT_APPLICABLE");

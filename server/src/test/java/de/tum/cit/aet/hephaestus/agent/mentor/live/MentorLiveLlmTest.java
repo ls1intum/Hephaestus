@@ -364,14 +364,27 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    void toolUse_agentExploresRepoWithReadOrBash() throws Exception {
+    void toolUse_agentFetchesRecentAuthoredWorkContext() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
         UUID assistantMessageId = UUID.randomUUID();
-        workspaceDir = stageWorkspaceWithRepo(creds);
+        workspaceDir = stageWorkspace(creds);
 
         sandbox = spawnRunner(creds, workspaceDir);
-        var driver = new RunnerDriver(sandbox);
+        var driver = new RunnerDriver(sandbox).withContext(
+            "inputs/context/recent_authored_work.json",
+            MAPPER.readTree(
+                """
+                {
+                  "user": {"login": "octo", "name": "Octo Example"},
+                  "pullRequests": [
+                    {"number": 12, "title": "Proposal: Slack mentor onboarding", "url": "https://example.invalid/pr/12", "state": "OPEN", "isDraft": false, "additions": 120, "deletions": 20}
+                  ],
+                  "issues": []
+                }
+                """
+            )
+        );
         driver.expectRunnerReady();
         driver.helloOk();
         driver.openThread(threadId);
@@ -391,8 +404,8 @@ class MentorLiveLlmTest {
 
         driver.prompt(
             threadId,
-            "Read the file at /workspace/repo/README.md and tell me what the project name is. " +
-                "You MUST use the read or bash tool to read the file. Do NOT guess."
+            "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and title. " +
+                "You MUST use fetch_context. Do NOT guess."
         );
         done.get(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
 
@@ -402,14 +415,10 @@ class MentorLiveLlmTest {
             .filter(UIMessageChunk.ToolInputStart.class::isInstance)
             .map(UIMessageChunk.ToolInputStart.class::cast)
             .toList();
-        assertThat(toolStarts)
-            .as("agent must invoke at least one tool (read or bash) to answer the question")
-            .isNotEmpty();
+        assertThat(toolStarts).as("agent must invoke fetch_context to answer the question").isNotEmpty();
 
         List<String> toolNames = toolStarts.stream().map(UIMessageChunk.ToolInputStart::toolName).toList();
-        assertThat(toolNames)
-            .as("tools used should include read, bash, or grep")
-            .anyMatch(name -> List.of("read", "bash", "grep").contains(name));
+        assertThat(toolNames).as("tools used should include fetch_context").contains("fetch_context");
         System.out.printf("[tool-use] tools invoked: %s%n", toolNames);
 
         // Tool produced output (not error).
@@ -428,9 +437,10 @@ class MentorLiveLlmTest {
             .map(UIMessageChunk.TextDelta::delta)
             .reduce("", String::concat);
         System.out.printf("[tool-use] LLM response (%d chars): %s%n", text.length(), trim(text, 300));
-        assertThat(text.toLowerCase())
-            .as("agent must reference the project name from README.md (Hephaestus-Fixture)")
-            .contains("hephaestus");
+        assertThat(text)
+            .as("agent must answer from recent_authored_work.json")
+            .contains("12")
+            .containsIgnoringCase("Slack mentor onboarding");
     }
 
     @Test
@@ -604,72 +614,6 @@ class MentorLiveLlmTest {
         return tmp;
     }
 
-    /**
-     * Like {@link #stageWorkspace}, but also creates a small git repo at {@code repo/} with a
-     * known README.md and uses the production system prompt so the agent knows about read/bash/grep.
-     */
-    private Path stageWorkspaceWithRepo(LiveLlmCredentials creds) throws IOException {
-        Path workspace = stageWorkspace(creds);
-
-        // Overwrite the minimal prompt with a small repo-aware one. NOTE: we deliberately do NOT
-        // copy the production system.md here — the production mentor sandbox has no repo checkout,
-        // so that prompt forbids /workspace/repo/. This test exercises the read/bash/grep tools
-        // against a staged repo, which requires a prompt that knows the repo exists.
-        Files.writeString(
-            workspace.resolve("agent").resolve("mentor").resolve("system.md"),
-            "You are a software engineering mentor. You have read/bash/grep tools and can explore " +
-                "the read-only repo checkout at /workspace/repo/ (file contents, git log, diffs). " +
-                "edit/write are denied. Answer concisely.\n"
-        );
-
-        // Stage a small git repo with a known file the agent can read.
-        Path repoDir = workspace.resolve("repo");
-        Files.createDirectories(repoDir);
-        Files.writeString(
-            repoDir.resolve("README.md"),
-            "# Hephaestus-Fixture\n\nA test project for validating mentor tool use.\n"
-        );
-        Files.writeString(
-            repoDir.resolve("Main.java"),
-            "public class Main {\n    public static void main(String[] args) {\n" +
-                "        System.out.println(\"Hello from Hephaestus-Fixture!\");\n    }\n}\n"
-        );
-
-        // Initialize as a git repo so `git log`, `git diff` etc. work.
-        runGit(repoDir, "init");
-        runGit(repoDir, "add", ".");
-        runGit(repoDir, "commit", "-m", "initial commit", "--allow-empty-message");
-        return workspace;
-    }
-
-    private static void runGit(Path cwd, String... args) throws IOException {
-        List<String> cmd = new ArrayList<>();
-        cmd.add("git");
-        cmd.addAll(List.of(args));
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.directory(cwd.toFile());
-        pb.environment().put("GIT_AUTHOR_NAME", "test");
-        pb.environment().put("GIT_AUTHOR_EMAIL", "test@test.local");
-        pb.environment().put("GIT_COMMITTER_NAME", "test");
-        pb.environment().put("GIT_COMMITTER_EMAIL", "test@test.local");
-        pb.redirectErrorStream(true);
-        Process p;
-        try {
-            p = pb.start();
-        } catch (IOException e) {
-            throw new IOException("git command failed to start: " + cmd, e);
-        }
-        try {
-            if (!p.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                throw new IOException("git command timed out: " + cmd);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("git command interrupted: " + cmd, e);
-        }
-    }
-
     private StdioAttachedSandbox spawnRunner(LiveLlmCredentials creds, Path workspace) throws IOException {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
@@ -720,6 +664,8 @@ class MentorLiveLlmTest {
         private final AttachedSandbox sandbox;
         private final ConcurrentLinkedQueue<JsonNode> responses = new ConcurrentLinkedQueue<>();
         private final ConcurrentLinkedQueue<JsonNode> readyNotifications = new ConcurrentLinkedQueue<>();
+        private final java.util.concurrent.ConcurrentMap<String, JsonNode> contextResponses =
+            new java.util.concurrent.ConcurrentHashMap<>();
         private final java.util.concurrent.atomic.AtomicInteger requestIdCounter =
             new java.util.concurrent.atomic.AtomicInteger();
 
@@ -728,6 +674,8 @@ class MentorLiveLlmTest {
             sandbox.subscribe(frame -> {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
+                } else if ("fetch_context".equals(frame.path("method").asString())) {
+                    respondToFetchContext(frame);
                 } else if (
                     "event".equals(frame.path("method").asString()) &&
                     "runner_ready".equals(frame.path("params").path("event").path("type").asString())
@@ -735,6 +683,11 @@ class MentorLiveLlmTest {
                     readyNotifications.add(frame);
                 }
             });
+        }
+
+        RunnerDriver withContext(String path, JsonNode content) {
+            contextResponses.put(path, content);
+            return this;
         }
 
         void expectRunnerReady() {
@@ -799,6 +752,23 @@ class MentorLiveLlmTest {
                 throw new IllegalStateException("RPC " + method + " failed: " + response.path("error").toString());
             }
             return response;
+        }
+
+        private void respondToFetchContext(JsonNode frame) {
+            String path = frame.path("params").path("path").asString("");
+            ObjectNode response = MAPPER.createObjectNode();
+            response.put("jsonrpc", "2.0");
+            response.set("id", frame.get("id"));
+            JsonNode content = contextResponses.get(path);
+            if (content == null) {
+                ObjectNode error = response.putObject("error");
+                error.put("code", -32000);
+                error.put("message", "test context missing: " + path);
+            } else {
+                ObjectNode result = response.putObject("result");
+                result.set("content", content);
+            }
+            sandbox.send(response);
         }
     }
 }

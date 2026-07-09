@@ -33,6 +33,7 @@ class SlackConsentBlocksTest extends BaseUnitTest {
             .orElseThrow(() -> new AssertionError("consent notice is missing the participant_opt_out button"));
 
         // Destructive action → danger style + a confirm dialog before the irreversible erase.
+        assertThat(optOut.getText().getText()).isEqualTo("Do not use my channel messages");
         assertThat(optOut.getStyle()).isEqualTo("danger");
         assertThat(optOut.getConfirm()).isNotNull();
     }
@@ -40,11 +41,40 @@ class SlackConsentBlocksTest extends BaseUnitTest {
     @Test
     void fallbackText_isPlainLanguage_noAiBuzzwords() {
         // Plain-language transparency: say what is read in concrete terms, not "AI-powered" marketing copy.
-        assertThat(SlackConsentBlocks.FALLBACK_TEXT).isNotBlank().doesNotContain("AI-powered", "AI-powered software");
+        assertThat(SlackConsentBlocks.fallbackText())
+            .isNotBlank()
+            .contains(
+                "Starting now",
+                "new messages and thread replies",
+                "context for private mentoring about software practices",
+                "It does not read earlier history and will not reply in this channel",
+                "deletes your already collected channel-message data",
+                "Do not use my channel messages"
+            )
+            .doesNotContain("AI-powered", "Opt me out", "Exclude my channel messages", "—", ";");
+    }
+
+    @Test
+    void activationNotice_doesNotLinkToWorkspaceDashboard() {
+        String url = "https://heph.example/w/team";
+
+        assertThat(SlackConsentBlocks.activationNotice(url).toString()).doesNotContain(
+            "Open Hephaestus",
+            "workspace dashboard",
+            url
+        );
+        assertThat(SlackConsentBlocks.activationFallbackText(url)).doesNotContain("Open Hephaestus", url);
     }
 
     @Test
     void optOutConfirmation_isNonEmpty() {
         assertThat(SlackConsentBlocks.optOutConfirmation()).isNotEmpty();
+    }
+
+    @Test
+    void lateJoinText_isSpecificToLateJoiner() {
+        assertThat(SlackConsentBlocks.lateJoinFallbackText())
+            .contains("You joined a Hephaestus-monitored channel", "From now on", "Manage this anytime from App Home")
+            .doesNotContain("Starting now");
     }
 }

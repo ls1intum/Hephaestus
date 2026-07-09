@@ -75,15 +75,7 @@ public sealed interface ConnectionConfig
         }
     }
 
-    /**
-     * Slack — single record holds bot identity AND notification config (D24 — resolves
-     * the prior plan's collision between separate SlackBotConfig + SlackNotificationConfig
-     * rows under {@code UNIQUE(workspace_id, kind)}).
-     *
-     * <p>{@code retentionDays} bounds how long ingested {@code slack_message} rows are kept
-     * before the transactional retention sweep purges them (GDPR Art. 5(1)(e), D10). {@code null}
-     * means "use the default"; read it through {@link #retentionDaysOrDefault()}.
-     */
+    /** Slack bot identity, notification channel, enabled streams, and message-retention configuration. */
     record SlackConfig(
         @Nullable String teamId,
         @Nullable String teamName,

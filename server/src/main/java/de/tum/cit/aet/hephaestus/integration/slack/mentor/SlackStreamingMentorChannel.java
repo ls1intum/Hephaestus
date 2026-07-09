@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.mentor;
 
-import com.slack.api.model.block.LayoutBlock;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -44,8 +43,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     private static final Logger log = LoggerFactory.getLogger(SlackStreamingMentorChannel.class);
 
-    /** Flush cadence. Slack animates between appends; ~600 ms feels live while staying inside the rate-limit tier. */
-    private static final long FLUSH_INTERVAL_MS = 600;
+    /** Flush cadence. Slack animates between appends; one append per second avoids noisy API churn. */
+    private static final long FLUSH_INTERVAL_MS = 1000;
     /** First flush shortly after the first delta, for a snappy first paint (well under the 2-minute status timeout). */
     private static final long INITIAL_DELAY_MS = 350;
     /** Cap a single append below Slack's 12k {@code markdown_text} limit; also bounds how long one giant token is held. */
@@ -76,6 +75,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final long workspaceId;
     private final String channel;
     private final String threadTs;
+    private final SlackMentorTextFilter textFilter = new SlackMentorTextFilter();
 
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "slack-mentor-stream");
@@ -126,7 +126,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     @Override
     public void startKeepAlive() {
         // Liveness while the sandbox warms up. Best-effort (assistant threads only); superseded by the first stream write.
-        slack.setStatus(workspaceId, channel, threadTs, "Thinking…");
+        slack.setStatus(workspaceId, channel, threadTs, "Thinking...");
         ensureFlushing();
     }
 
@@ -136,14 +136,14 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             return;
         }
         if (chunk instanceof UIMessageChunk.TextDelta delta) {
-            append(delta.delta());
+            append(textFilter.onDelta(delta.delta()));
             ensureFlushing();
         } else if (chunk instanceof UIMessageChunk.Error error) {
             // Surface mid-turn errors in the visible stream rather than dropping them.
-            append("\n\n⚠️ " + safeError(error.errorText()));
+            append(textFilter.finish() + "\n\n⚠️ " + SlackMentorTextFilter.normalize(safeError(error.errorText())));
             ensureFlushing();
         } else if (chunk instanceof UIMessageChunk.ToolInputStart) {
-            slack.setStatus(workspaceId, channel, threadTs, "Reviewing your practice history…");
+            slack.setStatus(workspaceId, channel, threadTs, "Reviewing your practice history...");
         }
         // Start/Reasoning/tool-output/Finish chunks are not part of the visible Slack stream; the orchestrator
         // drives terminals through completeWith*.
@@ -156,12 +156,16 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     @Override
     public void completeWithError(String errorText) {
-        finish("\n\n⚠️ " + safeError(errorText));
+        finish("\n\n⚠️ " + SlackMentorTextFilter.normalize(safeError(errorText)));
     }
 
     @Override
     public void completeWithConflict() {
-        finish("_I'm still working on your previous message — give me a moment and try again._");
+        if (!done.compareAndSet(false, true)) {
+            return;
+        }
+        stopFlusher();
+        slack.setStatus(workspaceId, channel, threadTs, "Still working on the previous message...");
     }
 
     @Override
@@ -346,6 +350,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         String remainder;
         lock.lock();
         try {
+            pending.append(textFilter.finish());
             if (suffix != null) {
                 pending.append(suffix);
             }
@@ -368,9 +373,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         try {
             String ts = streamTs.get();
             if (ts != null && !clientGone.get()) {
-                // Attach the feedback buttons (👍/👎, anchored to this turn's ts) as terminal blocks.
-                List<LayoutBlock> blocks = SlackFeedbackBlocks.feedbackButtons(ts);
-                slack.stopStream(workspaceId, channel, ts, blocks);
+                slack.stopStream(workspaceId, channel, ts, List.of());
             }
         } catch (Exception e) {
             // Terminals never throw (contract). A gone recipient just means the stream is already finalized.
@@ -380,7 +383,8 @@ public class SlackStreamingMentorChannel implements MentorChannel {
 
     /** Terminal content write (open or append) with a few transient retries — the flush loop is already stopped. */
     private void terminalWrite(String text) {
-        for (int attempt = 1; attempt <= 3; attempt++) {
+        int attemptsLeft = 3;
+        while (attemptsLeft-- > 0) {
             try {
                 openOrAppend(text);
                 return;
@@ -389,7 +393,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                     markGone();
                     return;
                 }
-                if (attempt == 3) {
+                if (attemptsLeft == 0) {
                     log.debug("Slack terminal write gave up (channel={}): {}", channel, e.slackError());
                     return;
                 }

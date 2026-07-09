@@ -1,4 +1,7 @@
+import { LockIcon } from "lucide-react";
 import { useState } from "react";
+import type { SlackChannelCandidate } from "@/components/admin/AdminSlackChannelsSettings";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -11,42 +14,53 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-
-// Client-side format hint only — the server re-validates. Mirrors AdminSlackNotificationSettings.
-const SLACK_CHANNEL_ID = /^[CGD][A-Z0-9]{8,}$/;
+import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
 
 export interface AddChannelDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	candidates?: SlackChannelCandidate[];
 	/** Register the channel. Resolves on success (dialog closes), rejects to keep it open. */
 	onSubmit: (input: { slackChannelId: string; channelName?: string }) => Promise<void> | void;
 }
 
-/**
- * Free-text add-a-channel form. No discovery endpoint exists, so admins paste the raw
- * channel id (same pattern as the notifications card). Remounted per open via a `key` in
- * the parent, so its inputs always start blank without a prop→state effect.
- */
-export function AddChannelDialog({ open, onOpenChange, onSubmit }: AddChannelDialogProps) {
-	const [channelId, setChannelId] = useState("");
+export function AddChannelDialog({
+	open,
+	onOpenChange,
+	candidates = [],
+	onSubmit,
+}: AddChannelDialogProps) {
+	const [channelReference, setChannelReference] = useState("");
 	const [channelName, setChannelName] = useState("");
+	const [selectedCandidate, setSelectedCandidate] = useState<SlackChannelCandidate | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	const idInvalid = channelId.length > 0 && !SLACK_CHANNEL_ID.test(channelId);
-	const canSubmit = SLACK_CHANNEL_ID.test(channelId) && !submitting;
+	const parsedReference = parseSlackChannelReference(channelReference);
+	const idInvalid = channelReference.length > 0 && parsedReference == null;
+	const canSubmit = (selectedCandidate != null || parsedReference != null) && !submitting;
 
 	async function submit() {
-		if (!canSubmit) return;
+		if (submitting) return;
+		const input = selectedCandidate
+			? {
+					slackChannelId: selectedCandidate.slackChannelId,
+					channelName: selectedCandidate.channelName,
+				}
+			: parsedReference
+				? {
+						slackChannelId: parsedReference.channelId,
+						channelName:
+							channelName.trim().length > 0 ? channelName.trim() : parsedReference.channelName,
+					}
+				: null;
+		if (!input) return;
+
 		setSubmitting(true);
 		try {
-			await onSubmit({
-				slackChannelId: channelId,
-				channelName: channelName.trim().length > 0 ? channelName.trim() : undefined,
-			});
+			await onSubmit(input);
 			onOpenChange(false);
 		} catch {
-			// Rejection = keep the dialog open. The mutation's onError already surfaced the
-			// toast, so swallow here rather than let it escape as an unhandled rejection.
+			// Rejection = keep the dialog open. The mutation's onError already surfaced the toast.
 		} finally {
 			setSubmitting(false);
 		}
@@ -54,50 +68,101 @@ export function AddChannelDialog({ open, onOpenChange, onSubmit }: AddChannelDia
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent>
+			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
 					<DialogTitle>Add a channel to monitor</DialogTitle>
 					<DialogDescription>
-						Paste the channel's Slack id. It lands as <strong>Not started</strong> — nothing is read
-						until you activate monitoring.
+						Choose a Slack channel. Hephaestus stores the stable channel ID. Nothing is read until
+						you activate monitoring and the channel announcement is posted.
 					</DialogDescription>
 				</DialogHeader>
 
 				<FieldGroup>
+					{candidates.length > 0 && (
+						<Field>
+							<FieldLabel>Available channels</FieldLabel>
+							<div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border p-2">
+								{candidates.map((candidate) => {
+									const disabled = candidate.archived || candidate.consentState === "ACTIVE";
+									const selected = selectedCandidate?.slackChannelId === candidate.slackChannelId;
+									return (
+										<Button
+											key={candidate.slackChannelId}
+											type="button"
+											variant={selected ? "secondary" : "ghost"}
+											className="h-auto w-full justify-start gap-3 px-3 py-2 text-left"
+											disabled={disabled || submitting}
+											aria-pressed={selected}
+											onClick={() => {
+												setSelectedCandidate(candidate);
+												setChannelReference("");
+												setChannelName("");
+											}}
+										>
+											<div className="min-w-0 flex-1">
+												<div className="flex flex-wrap items-center gap-2">
+													<span className="truncate font-medium">#{candidate.channelName}</span>
+													{candidate.privateChannel && (
+														<LockIcon className="size-3.5" aria-label="Private" />
+													)}
+													{candidate.consentState && candidate.consentState !== "REVOKED" && (
+														<Badge variant="secondary">Already listed</Badge>
+													)}
+													{candidate.consentState === "REVOKED" && (
+														<Badge variant="outline">Revoked</Badge>
+													)}
+													{candidate.archived && <Badge variant="outline">Archived</Badge>}
+												</div>
+												<div className="text-muted-foreground font-mono text-xs">
+													{candidate.slackChannelId}
+												</div>
+											</div>
+										</Button>
+									);
+								})}
+							</div>
+							<FieldDescription>
+								Private channels appear here after someone invites Hephaestus to them in Slack.
+							</FieldDescription>
+						</Field>
+					)}
+
 					<Field data-invalid={idInvalid}>
-						<FieldLabel htmlFor="add-slack-channel-id">Channel ID</FieldLabel>
+						<FieldLabel htmlFor="add-slack-channel-id">Paste channel link or ID</FieldLabel>
 						<Input
 							id="add-slack-channel-id"
-							value={channelId}
+							value={channelReference}
 							disabled={submitting}
-							onChange={(e) => setChannelId(e.target.value.trim())}
-							placeholder="C0974LJBPBK"
+							onChange={(e) => {
+								setChannelReference(e.target.value.trim());
+								setSelectedCandidate(null);
+							}}
+							placeholder="https://…slack.com/archives/C0974LJBPBK"
 							autoComplete="off"
 							aria-invalid={idInvalid}
 						/>
 						<FieldDescription>
-							Right-click the channel in Slack → <em>View channel details</em> → copy the ID at the
-							bottom.
+							Use this when the channel is not in the list yet. For private channels, invite
+							Hephaestus in Slack first.
 						</FieldDescription>
 						{idInvalid && (
-							<FieldError>
-								Channel IDs start with C / G / D followed by 8+ alphanumerics.
-							</FieldError>
+							<FieldError>Paste a Slack channel URL, mention, or C…/G… channel ID.</FieldError>
 						)}
 					</Field>
 
-					<Field>
-						<FieldLabel htmlFor="add-slack-channel-name">Channel name (optional)</FieldLabel>
-						<Input
-							id="add-slack-channel-name"
-							value={channelName}
-							disabled={submitting}
-							onChange={(e) => setChannelName(e.target.value)}
-							placeholder="e.g. team-standup"
-							autoComplete="off"
-						/>
-						<FieldDescription>Shown in this table so the id stays human-readable.</FieldDescription>
-					</Field>
+					{parsedReference && !selectedCandidate && (
+						<Field>
+							<FieldLabel htmlFor="add-slack-channel-name">Channel name (optional)</FieldLabel>
+							<Input
+								id="add-slack-channel-name"
+								value={channelName}
+								disabled={submitting}
+								onChange={(e) => setChannelName(e.target.value)}
+								placeholder="e.g. team-standup"
+								autoComplete="off"
+							/>
+						</Field>
+					)}
 				</FieldGroup>
 
 				<DialogFooter>

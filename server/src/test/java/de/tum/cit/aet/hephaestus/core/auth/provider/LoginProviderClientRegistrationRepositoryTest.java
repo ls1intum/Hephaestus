@@ -67,7 +67,7 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
     }
 
     @Test
-    void slackIsAnOidcProviderKeyedOnSubAndIsExcludedFromTheLoginPicker() {
+    void slackIsAnOidcProviderKeyedOnSubAndDiscoverableForAccountLinking() {
         LoginProviderRepository repo = mock(LoginProviderRepository.class);
         when(repo.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(
             List.of(
@@ -83,9 +83,9 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
         LoginProviderClientRegistrationRepository repository = new LoginProviderClientRegistrationRepository(repo, "");
 
-        // Link-only: Slack must NOT appear on the public login picker / iterated set.
+        // Link-only in the SPA, but discoverable so the authenticated settings page can offer account linking.
         List<ClientRegistration> picker = repository.listRegistrations();
-        assertThat(picker).extracting(ClientRegistration::getRegistrationId).containsExactly("github");
+        assertThat(picker).extracting(ClientRegistration::getRegistrationId).containsExactly("github", "slack");
 
         // But it IS reachable by registrationId for the account-linking flow, wired to Slack's OIDC endpoints.
         ClientRegistration slack = repository.findByRegistrationId("slack");

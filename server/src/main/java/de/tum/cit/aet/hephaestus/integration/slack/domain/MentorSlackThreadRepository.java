@@ -9,7 +9,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * the tenancy {@code StatementInspector} requires.
  */
 public interface MentorSlackThreadRepository extends JpaRepository<MentorSlackThread, UUID> {
-    Optional<MentorSlackThread> findByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
+    Optional<MentorSlackThread> findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(
+        Long workspaceId,
+        String slackChannelId,
+        String slackThreadTs
+    );
 
     /** Workspace purge: delete every DM→mentor-thread mapping for one workspace. Derived DELETE carries the predicate. */
     long deleteByWorkspaceId(Long workspaceId);

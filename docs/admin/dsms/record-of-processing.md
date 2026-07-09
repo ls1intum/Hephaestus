@@ -37,7 +37,7 @@ A workspace administrator connects one or more Git repositories from github.com 
 
 The synchronised activity is analysed against a set of practices configured by the workspace administrator to produce findings on each contributor's activity. Some of these judgements require reading and understanding natural-language text, such as the meaning of a code comment or the substance of a review reply. For those, the analysis uses an external LLM provider chosen by the administrator for the workspace. The automated practice review of a pull/merge request forwards the diff and surrounding discussion to the provider and posts the AI-generated finding as a comment on the pull/merge request. The conversational mentor is an in-app chat where contributors can ask follow-up questions; their messages and the surrounding context are forwarded to the same provider.
 
-Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements based on workspace activity (all off by default), and Slack notifications for workspace events.
+Contributors who sign in with their GitHub or LRZ-GitLab account get a personal dashboard summarising their findings and activity, access to the conversational mentor, and their account preferences. Sign-in adds the federated user identifier, username, display name, email, and avatar URL to what Hephaestus holds about that contributor. Workspace administrators can additionally enable a leaderboard, leagues, and achievements based on workspace activity (all off by default), plus Slack integration for App Home privacy controls, mentor DMs, optional digests, and explicitly activated monitored channels.
 
 These workspace-level configuration choices are made by the workspace administrator and TUM/AET as joint controllers under Art. 26 GDPR (the choices are enumerated in "Legal basis" below). Hephaestus is built around the contributor's own development: findings serve the contributor and give the workspace administrator a way to deliver targeted feedback during the project. Findings are advisory and contestable; the platform makes no automated decisions within the meaning of Art. 22 GDPR and feeds no grading, assessment, HR, or access-control pipeline. Contributors can disable AI-assisted feedback at any time through the in-app "AI review comments" toggle (Art. 21 GDPR), and rate individual findings via a helpful / not-helpful control.
 ```
@@ -57,7 +57,7 @@ Tick in DSMS:
 Tick in DSMS: Name(s), Contact details: email, Image data, Indicators of Behaviour, IP address, Social network data, User IDs and Passwords. Do **not** tick "Examination and academic performance" — practice findings are advisory, not graded.
 
 ```text
-Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata) and AI guidance-assistant conversations.
+Repository-activity artefacts authored by the contributor in the connected Git repositories (pull/merge requests, issues, code reviews, review comments, commit metadata), AI guidance-assistant conversations, and Slack integration data when enabled (Slack IDs, Slack identity links, App Home privacy choices, Hephaestus DM mentor messages, and new messages in administrator-activated monitored Slack channels).
 ```
 
 No special categories (Art. 9(1) GDPR) and no Art. 10 GDPR data are processed. Contributors are warned in the privacy statement not to enter third-party personal data into commits, reviews, or practice-review diffs.
@@ -71,7 +71,7 @@ External processors engaged by TUM/AET as controller. AVVs are in place at TUM/A
 
 - An external LLM provider, chosen per workspace by the workspace administrator from any OpenAI-API-compatible HTTPS endpoint (configured by a base URL, an API token, and a model name). The choice is a joint-controller decision under Art. 26 GDPR. The TUM-operated deployment uses the Microsoft Azure OpenAI Service in an EU region under enterprise no-training terms by default. A workspace administrator may configure a different endpoint instead, such as OpenAI OpCo, LLC (with OpenAI Ireland Ltd. as the EEA contracting party), an institution-level enterprise gateway, or a self-hosted model server.
 
-- Salesforce, Inc. / Slack Technologies, LLC (USA) — workspace notifications when Slack has been enabled for the workspace.
+- Salesforce, Inc. / Slack Technologies, LLC (USA) — Slack app delivery, identity linking, App Home privacy controls, optional digests, DM mentor messages, and monitored-channel event delivery when Slack has been enabled for the workspace.
 
 Separate controller (not an Art. 28 processor):
 

@@ -32,12 +32,81 @@ Set the following secrets before starting the stack:
 | `HEPHAESTUS_INTEGRATION_SLACK_ENABLED` | Optional: enables the Slack OAuth admin surface (per-workspace connect) |
 | `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID` | Optional: Slack app client ID used by the OAuth flow |
 | `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET` | Optional: Slack app client secret used by the OAuth flow |
-| `HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI` | Optional: Slack OAuth callback URL (typically `https://<host>/oauth/callback/slack`) |
+| `HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI` | Required when Slack is enabled and the app has multiple Slack redirect URLs. Use the public application-server callback URL, including any proxy path prefix, for example `https://<host>/api/oauth/callback/slack` in the production compose stack. |
+| `HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET` | Required when Slack is enabled: verifies Slack Events API and interactivity POSTs on the webhook server |
 | `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` | Optional: post-callback landing URL on success. Defaults to `/integrations?status=success`. Set the absolute URL when the SPA host differs from the API host. |
 | `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Optional: post-callback landing URL on failure. Defaults to the success base + `?status=error`. |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
 
 Per-workspace bot tokens are issued via OAuth and encrypted at rest in the `connection` table; there is no longer a global bot token.
+
+### Slack app configuration
+
+When Slack is enabled, configure one Slack app. Use the public application-server base URL including any proxy path
+prefix for OAuth URLs. In the production compose stack that base is `https://<host>/api`.
+
+- **OAuth redirect URLs** (include any API path prefix your proxy uses):
+    - `<api-public-base-url>/oauth/callback/slack` for workspace app installation.
+    - `<api-public-base-url>/login/oauth2/code/slack` for member account linking.
+- **Events request URL:** `https://<host>/webhooks/slack`
+- **Interactivity request URL:** `https://<host>/webhooks/slack/interactivity`
+- **App Home:** enabled. Slack opens the Home tab when someone clicks the app; that is expected. Hephaestus uses
+  Home for account linking and privacy controls, while actual mentoring happens in the Messages tab / DM.
+
+If you run the webhook receiver on a separate public host, route only `/webhooks/slack` and
+`/webhooks/slack/interactivity` to the webhook role. The OAuth and account-linking paths
+(`/oauth/callback/slack`, `/auth/login`, `/oauth2/authorization/*`, `/login/oauth2/code/slack`, with the same
+public prefix if you use one) must reach the application-server role.
+
+The bot token scope set should stay minimal:
+
+```text
+assistant:write
+chat:write
+im:history
+channels:history
+groups:history
+channels:read
+channels:join
+groups:read
+mpim:read
+users:read
+```
+
+The user token scope set is only for Sign in with Slack account linking:
+
+```text
+openid
+profile
+email
+```
+
+Also create an enabled Hephaestus login provider with registration id `slack`, type `SLACK`,
+base URL `https://slack.com`, and scopes `openid profile email`. Workspace app installation
+alone gives Hephaestus a bot token; personalized mentor DMs also need the member to link
+their Slack identity to their Hephaestus account.
+
+Subscribe to these bot events for the Agent messaging experience (`agent_view`):
+
+```text
+message.im
+message.channels
+message.groups
+member_joined_channel
+app_home_opened
+app_context_changed
+app_uninstalled
+tokens_revoked
+```
+
+Do not add unused broad scopes such as `chat:write.public`, `commands`, `team:read`,
+`app_mentions:read`, `im:write`, or `users:read.email` unless code is added that actually uses
+them. `channels:join` is intentionally present so Hephaestus can join selected public channels from the admin picker. `mpim:read` is present only because Slack's `member_joined_channel` event can require
+it during app configuration; Hephaestus still ignores MPDM message content and does not request
+`mpim:history`.
+
+Use [`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) as the dashboard
+baseline so scopes, events, and request URLs do not drift from the code.
 
 ### GitHub integration
 

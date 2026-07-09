@@ -39,6 +39,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 
 /** Unit tests for the delivered-feedback ledger writer (ADR 0021 C6 + C3 policy-floor binding). */
 @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
@@ -70,7 +71,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             feedbackObservationRepository,
             feedbackPlacementRepository,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, policyFloor),
-            mock(org.springframework.context.ApplicationEventPublisher.class)
+            mock(ApplicationEventPublisher.class)
         );
     }
 

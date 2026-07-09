@@ -65,6 +65,7 @@ public interface AccountIdentityQuery {
      * @param avatarUrl       the provider avatar URL at link time
      * @param profileUrl      the provider profile/web URL at link time
      * @param externalActorId the already-linked actor-mirror id, or {@code null} if not yet wired
+     * @param teamId          the multi-instance tenant id (Slack workspace id), or {@code null}
      */
     record IdentityLinkView(
         Long identityLinkId,
@@ -74,6 +75,7 @@ public interface AccountIdentityQuery {
         @Nullable String displayName,
         @Nullable String avatarUrl,
         @Nullable String profileUrl,
-        @Nullable Long externalActorId
+        @Nullable Long externalActorId,
+        @Nullable String teamId
     ) {}
 }

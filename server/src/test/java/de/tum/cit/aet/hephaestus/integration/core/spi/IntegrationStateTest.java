@@ -3,8 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("unit")
 class IntegrationStateTest extends BaseUnitTest {
 
     @Test
@@ -29,10 +31,10 @@ class IntegrationStateTest extends BaseUnitTest {
     }
 
     @Test
-    void uninstalledIsTerminal() {
+    void uninstalledIsTerminalForGenericTransitions() {
         for (IntegrationState next : IntegrationState.values()) {
             assertThat(IntegrationState.UNINSTALLED.canTransitionTo(next))
-                .as("UNINSTALLED should not transition to %s", next)
+                .as("UNINSTALLED should not transition generically to %s", next)
                 .isFalse();
         }
     }

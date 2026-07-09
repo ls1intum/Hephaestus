@@ -22,7 +22,7 @@ import tools.jackson.databind.node.ObjectNode;
  * and-SQL change <em>inside Slack</em>, not a silent runtime break in the agent.
  *
  * <p><strong>Participant firewall.</strong> {@code slack_thread.participant_member_ids} is the GIN-indexed
- * {@code bigint[]} of resolved workspace member ids stamped by the ingest write-path; the audience match is
+ * {@code bigint[]} of resolved SCM user ids stamped by the ingest write-path; the audience match is
  * {@code audienceMemberId = ANY(participant_member_ids)}. A mentor chat therefore surfaces only conversations the
  * requesting developer actually took part in — never a channel they merely share a workspace with.
  *
@@ -49,14 +49,14 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     }
 
     /** A thread the audience participates in — the key pair used to fetch its messages. */
-    private record ThreadKey(String channelId, String threadTs, long messageCount) {}
+    private record ThreadKey(String channelId, String channelName, String threadTs, long messageCount) {}
 
     /**
      * Build the thread-grouped conversation payload for one audience within one workspace. Pure read; the caller
      * wraps it under the content-source output key.
      *
      * @param workspaceId     the workspace to scope every query to (explicit predicate)
-     * @param audienceMemberId the mentor-chat requester's workspace member id — the participant-firewall audience
+     * @param audienceMemberId the mentor-chat requester's SCM user id — the participant-firewall audience
      */
     @Override
     public ObjectNode buildPayload(long workspaceId, long audienceMemberId) {
@@ -79,6 +79,9 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         for (ThreadKey key : threads) {
             ObjectNode conv = conversations.addObject();
             conv.put("channel", key.channelId());
+            if (key.channelName() != null) {
+                conv.put("channelName", key.channelName());
+            }
             conv.put("threadTs", key.threadTs());
             conv.put("messageCount", key.messageCount());
             ArrayNode messages = conv.putArray("messages");
@@ -117,7 +120,7 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         root.put("threadTs", threadTs);
 
         ArrayNode messages = root.putArray("messages");
-        appendThreadMessages(workspaceId, new ThreadKey(channelId, threadTs, 0), messages);
+        appendThreadMessages(workspaceId, new ThreadKey(channelId, null, threadTs, 0), messages);
         root.put("messageCount", messages.size());
         return root;
     }
@@ -130,7 +133,7 @@ public class SlackConversationProjector implements ConversationThreadProjection 
         List<ThreadKey> keys = new ArrayList<>();
         jdbc.query(
             """
-            SELECT t.slack_channel_id, t.slack_thread_ts, t.message_count
+            SELECT t.slack_channel_id, c.channel_name, t.slack_thread_ts, t.message_count
             FROM slack_thread t
             JOIN slack_monitored_channel c
               ON c.workspace_id = t.workspace_id AND c.slack_channel_id = t.slack_channel_id
@@ -144,6 +147,7 @@ public class SlackConversationProjector implements ConversationThreadProjection 
                 keys.add(
                     new ThreadKey(
                         rs.getString("slack_channel_id"),
+                        rs.getString("channel_name"),
                         rs.getString("slack_thread_ts"),
                         rs.getLong("message_count")
                     )
@@ -168,10 +172,12 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     private void appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
         jdbc.query(
             """
-            SELECT m.slack_ts, m.author_slack_user_id, m.text, m.edited_at
+            SELECT m.slack_ts, m.author_slack_user_id, m.author_member_id, u.login AS author_login, u.name AS author_name,
+                   m.text, m.edited_at
             FROM slack_message m
             JOIN slack_monitored_channel c
               ON c.workspace_id = m.workspace_id AND c.slack_channel_id = m.slack_channel_id
+            LEFT JOIN "user" u ON u.id = m.author_member_id
             WHERE m.workspace_id = ?
               AND m.slack_channel_id = ?
               AND (m.slack_thread_ts = ? OR m.slack_ts = ?)
@@ -184,6 +190,18 @@ public class SlackConversationProjector implements ConversationThreadProjection 
                 ObjectNode node = messages.addObject();
                 node.put("ts", rs.getString("slack_ts"));
                 node.put("author", rs.getString("author_slack_user_id"));
+                long authorMemberId = rs.getLong("author_member_id");
+                if (!rs.wasNull()) {
+                    node.put("authorMemberId", authorMemberId);
+                }
+                String authorLogin = rs.getString("author_login");
+                if (authorLogin != null) {
+                    node.put("authorLogin", authorLogin);
+                }
+                String authorName = rs.getString("author_name");
+                if (authorName != null) {
+                    node.put("authorName", authorName);
+                }
                 node.put("text", rs.getString("text"));
                 if (rs.getTimestamp("edited_at") != null) {
                     node.put("edited", true);

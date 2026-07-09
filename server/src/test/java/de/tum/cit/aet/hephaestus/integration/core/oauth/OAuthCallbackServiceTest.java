@@ -25,11 +25,13 @@ import java.lang.reflect.Field;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+@Tag("unit")
 class OAuthCallbackServiceTest extends BaseUnitTest {
 
     @Mock
@@ -206,6 +208,103 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         )
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("instance_key");
+    }
+
+    @Test
+    void complete_slackTeamAlreadyActiveInAnotherWorkspace_throwsBeforeSaving() {
+        Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
+        Connection otherWorkspace = newConnection(8L, 99L, IntegrationKind.SLACK, "T1", IntegrationState.ACTIVE);
+        ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
+            "T1",
+            new BearerToken("t", null),
+            "Acme"
+        );
+        when(
+            connectionRepository.findFirstByKindAndInstanceKeyAndState(
+                IntegrationKind.SLACK,
+                "T1",
+                IntegrationState.ACTIVE
+            )
+        ).thenReturn(Optional.of(otherWorkspace));
+
+        assertThatThrownBy(() -> service.completeConnection(pending, completed, "alice"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("already connected")
+            .hasMessageContaining("workspace 99");
+
+        verify(connectionRepository, never()).save(any(Connection.class));
+        verify(connectionService, never()).transition(any(), any());
+    }
+
+    @Test
+    void complete_slackTeamAlreadyActiveInSameWorkspace_refreshesActiveConnection() {
+        Connection stalePending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
+        Connection active = newConnection(8L, 42L, IntegrationKind.SLACK, "T1", IntegrationState.ACTIVE);
+        ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
+            "T1",
+            new BearerToken("new-token", null),
+            "Acme"
+        );
+        when(
+            connectionRepository.findFirstByKindAndInstanceKeyAndState(
+                IntegrationKind.SLACK,
+                "T1",
+                IntegrationState.ACTIVE
+            )
+        ).thenReturn(Optional.of(active));
+        when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv ->
+            inv.getArgument(0)
+        );
+        when(credentialBundleConverter.encrypt(any(), any())).thenReturn(new byte[] { 0x02, 4, 5, 6 });
+
+        Connection result = service.completeConnection(stalePending, completed, "alice");
+
+        assertThat(result).isSameAs(active);
+        assertThat(active.getDisplayName()).isEqualTo("Acme");
+        assertThat(active.getCredentialsAlg()).isEqualTo("aesgcm-v2");
+        verify(connectionRepository).save(active);
+        verify(connectionRepository, never()).save(stalePending);
+        verify(connectionRepository).delete(stalePending);
+        verify(connectionService).transition(eq(active), any(TransitionRequest.class));
+    }
+
+    @Test
+    void complete_slackTeamPreviouslyUninstalledInSameWorkspace_reusesConnectionAndDeletesPending() {
+        Connection stalePending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
+        Connection uninstalled = newConnection(8L, 42L, IntegrationKind.SLACK, "T1", IntegrationState.UNINSTALLED);
+        ConnectFinalization.Completed completed = new ConnectFinalization.Completed(
+            "T1",
+            new BearerToken("new-token", null),
+            "Acme"
+        );
+        when(
+            connectionRepository.findFirstByKindAndInstanceKeyAndState(
+                IntegrationKind.SLACK,
+                "T1",
+                IntegrationState.ACTIVE
+            )
+        ).thenReturn(Optional.empty());
+        when(connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(42L, IntegrationKind.SLACK, "T1")).thenReturn(
+            Optional.of(uninstalled)
+        );
+        when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection c = inv.getArgument(0);
+            c.setState(IntegrationState.ACTIVE);
+            return c;
+        });
+        when(credentialBundleConverter.encrypt(any(), any())).thenReturn(new byte[] { 0x02, 7, 8, 9 });
+
+        Connection result = service.completeConnection(stalePending, completed, "alice");
+
+        assertThat(result).isSameAs(uninstalled);
+        assertThat(uninstalled.getDisplayName()).isEqualTo("Acme");
+        assertThat(uninstalled.getCredentialsAlg()).isEqualTo("aesgcm-v2");
+        verify(connectionRepository).delete(stalePending);
+        verify(connectionRepository).save(uninstalled);
+        verify(connectionRepository, never()).save(stalePending);
+        verify(connectionService).transition(eq(uninstalled), any(TransitionRequest.class));
     }
 
     @Test

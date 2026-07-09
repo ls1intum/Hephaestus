@@ -213,20 +213,25 @@ public class WorkspaceProvisioningService {
         //   (b) it has an ACTIVE non-GitLab Connection (e.g. GitHub) → refuse cross-vendor
         //       attach. Symmetric with GithubLifecycleListener#createOrUpdateFromInstallation.
         //       Falling through to createWorkspace would crash on the slug unique constraint.
-        Optional<Workspace> existing = workspaceRepository.findByAccountLoginIgnoreCase(groupPath);
-        if (existing.isPresent()) {
-            long existingId = existing.get().getId();
-            if (connectionService.findActive(existingId, IntegrationKind.GITLAB).isPresent()) {
+        List<Workspace> existing = workspaceRepository.findAllByAccountLoginIgnoreCase(groupPath);
+        if (!existing.isEmpty()) {
+            Optional<Workspace> existingGitLab = existing
+                .stream()
+                .filter(workspace ->
+                    connectionService.findActive(workspace.getId(), IntegrationKind.GITLAB).isPresent()
+                )
+                .findFirst();
+            if (existingGitLab.isPresent()) {
                 log.debug(
                     "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
-                    existingId,
+                    existingGitLab.get().getId(),
                     groupPath
                 );
                 return;
             }
             log.warn(
-                "Skipped GitLab PAT workspace creation, workspace has ACTIVE non-GITLAB Connection (cross-vendor refuse): workspaceId={}, groupPath={}",
-                existingId,
+                "Skipped GitLab PAT workspace creation, matching workspace has no ACTIVE GitLab Connection: workspaceIds={}, groupPath={}",
+                existing.stream().map(Workspace::getId).toList(),
                 groupPath
             );
             return;

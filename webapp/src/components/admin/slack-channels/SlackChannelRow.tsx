@@ -4,12 +4,13 @@ import {
 	CheckIcon,
 	ClockIcon,
 	HistoryIcon,
+	type LucideIcon,
 	MoreHorizontalIcon,
 	PauseIcon,
 	PlayIcon,
+	RotateCcwIcon,
 	Trash2Icon,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,13 +23,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 /** The consent lifecycle states, sourced from the generated DTO so they never drift. */
 export type SlackConsentState = SlackMonitoredChannel["consentState"];
 
 interface StatusPresentation {
 	label: string;
-	icon: ReactNode;
+	Icon: LucideIcon;
 	variant: "outline" | "secondary" | "destructive";
 	/** Extra classes for the icon so ACTIVE reads green without relying on color alone. */
 	iconClassName?: string;
@@ -44,21 +46,21 @@ function statusPresentation(state: SlackConsentState): StatusPresentation {
 		case "ACTIVE":
 			return {
 				label: "Monitoring",
-				icon: <CheckIcon aria-hidden />,
+				Icon: CheckIcon,
 				variant: "outline",
 				iconClassName: "text-green-600 dark:text-green-400",
 			};
 		case "PAUSED":
 			return {
 				label: "Paused",
-				icon: <PauseIcon aria-hidden />,
+				Icon: PauseIcon,
 				variant: "outline",
 				iconClassName: "text-muted-foreground",
 			};
 		case "REVOKED":
-			return { label: "Revoked", icon: <BanIcon aria-hidden />, variant: "destructive" };
+			return { label: "Revoked", Icon: BanIcon, variant: "destructive" };
 		default:
-			return { label: "Not started", icon: <ClockIcon aria-hidden />, variant: "secondary" };
+			return { label: "Not started", Icon: ClockIcon, variant: "secondary" };
 	}
 }
 
@@ -72,6 +74,8 @@ export interface SlackChannelRowProps {
 	onResume: (channel: SlackMonitoredChannel) => void;
 	/** Open the type-to-confirm remove & erase dialog. */
 	onRemove: (channel: SlackMonitoredChannel) => void;
+	/** Set up a revoked channel for a new consent cycle. */
+	onSetUpAgain: (channel: SlackMonitoredChannel) => void;
 	/** Open the consent-history sheet. */
 	onViewHistory: (channel: SlackMonitoredChannel) => void;
 }
@@ -86,6 +90,7 @@ export function SlackChannelRow({
 	onPause,
 	onResume,
 	onRemove,
+	onSetUpAgain,
 	onViewHistory,
 }: SlackChannelRowProps) {
 	const label = channel.channelName ?? channel.slackChannelId;
@@ -101,7 +106,7 @@ export function SlackChannelRow({
 
 			<TableCell>
 				<Badge variant={status.variant} className="gap-1">
-					<span className={status.iconClassName}>{status.icon}</span>
+					<status.Icon className={cn("size-3", status.iconClassName)} aria-hidden />
 					{status.label}
 				</Badge>
 			</TableCell>
@@ -160,6 +165,12 @@ export function SlackChannelRow({
 							<DropdownMenuItem onClick={() => onResume(channel)}>
 								<PlayIcon className="size-4" />
 								Resume
+							</DropdownMenuItem>
+						)}
+						{isTerminal && (
+							<DropdownMenuItem onClick={() => onSetUpAgain(channel)}>
+								<RotateCcwIcon className="size-4" />
+								Set up again
 							</DropdownMenuItem>
 						)}
 						{channel.consentState !== "PENDING" && (

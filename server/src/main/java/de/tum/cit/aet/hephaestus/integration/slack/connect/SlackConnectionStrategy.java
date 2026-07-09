@@ -34,36 +34,19 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     private static final String AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
 
-    // Locked, least-privilege OAuth bot-scope set for the live Slack subsystem (DM mentor + assistant + App
-    // Home). Each scope maps to a Slack API method or event the SHIPPED code actually exercises; rotating apps
-    // are rejected at finalize until the token-rotation refresher ships.
-    //
-    // NOTE — deliberately EXCLUDED: channels:history / groups:history. Those authorize delivery of public/private
-    // channel `message` events, which only the channel-ingestion subsystem consumes
-    // (SlackIngestService.ingestChannelMessage). That subsystem's capability flag
-    // (hephaestus.integration.slack.conversation-ingest.enabled) is available by default, but these OAuth scopes are
-    // a separate, still-excluded gate: without them Slack delivers no channel `message` events, so no channel
-    // traffic reaches the bot regardless of the flag. Requesting them is a deliberate, consent-designed rollout
-    // step (paired with the per-channel activation UX) — so they stay off until that scope request ships.
+    // Exact Slack bot scopes used by current code and subscribed events. Channel reading still requires
+    // workspace-admin channel activation and the per-member opt-out firewall.
     static final Set<String> DEFAULT_SCOPES = Set.of(
-        // chat.postMessage + chat.startStream/appendStream/stopStream: canned replies and the streamed mentor DM
-        // reply (SlackMessageService).
         "chat:write",
-        // Post to an admin-configured notification channel / leaderboard-digest channel the bot may not have
-        // joined (SlackConnectionAdminController, SlackLeaderboardDigestPublisher).
-        "chat:write.public",
-        // assistant.threads.setStatus + setSuggestedPrompts: the assistant "Thinking…" status and the
-        // suggested-prompt seed on assistant_thread_started (SlackMessageService / SlackStreamingMentorChannel).
         "assistant:write",
-        // Delivery of `message` events with channel_type=im — the DM that drives a mentor turn
-        // (SlackEventDispatcher). Without it the mentor DM entry point receives nothing.
         "im:history",
-        // team/workspace metadata resolution.
-        "team:read",
-        // users.list + Slack user → workspace member identity resolution (SlackMentorIdentityResolver).
-        "users:read",
-        // email-keyed member matching when linking a Slack user to a Hephaestus member.
-        "users:read.email"
+        "channels:history",
+        "groups:history",
+        "channels:read",
+        "channels:join",
+        "groups:read",
+        "mpim:read",
+        "users:read"
     );
 
     private final OAuthStateService oauthStateService;
@@ -95,6 +78,9 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ConnectInitiation initiate(InitiateRequest request) {
+        if (redirectUri == null || redirectUri.isBlank()) {
+            throw new IllegalStateException("Slack redirect URI must be configured");
+        }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.SLACK, request.actorRef());
         StringBuilder url = new StringBuilder(AUTHORIZE_URL)
             .append('?')
@@ -104,9 +90,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             .append(enc(scopes))
             .append("&state=")
             .append(enc(state));
-        if (redirectUri != null && !redirectUri.isBlank()) {
-            url.append("&redirect_uri=").append(enc(redirectUri));
-        }
+        url.append("&redirect_uri=").append(enc(redirectUri));
         return new ConnectInitiation.RedirectToVendor(URI.create(url.toString()), state);
     }
 
@@ -115,6 +99,9 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         String code = callbackParams == null ? null : callbackParams.get("code");
         if (code == null || code.isBlank()) {
             return new ConnectFinalization.Failed("missing code");
+        }
+        if (redirectUri == null || redirectUri.isBlank()) {
+            return new ConnectFinalization.Failed("Slack redirect URI must be configured");
         }
         OAuthV2Access r;
         try {
@@ -150,12 +137,6 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public void revoke(IntegrationRef ref) {
-        // Best-effort: invalidate the bot token on Slack's side so a disconnect doesn't
-        // leave a dangling credential. Failure here MUST NOT block the local UNINSTALLED
-        // transition — the caller has already cleared credentials_encrypted, so the
-        // local state is consistent regardless of Slack's reachability. Network failures
-        // (502/timeout), 401 (already-revoked), 5xx — all swallowed with a single
-        // warn log so the disconnect flow stays idempotent.
         var bundle = credentialProvider.resolve(ref);
         if (bundle.isEmpty() || !(bundle.get() instanceof BearerToken bt)) {
             log.debug("Slack revoke skipped: no bearer token for workspace={}", ref.workspaceId());

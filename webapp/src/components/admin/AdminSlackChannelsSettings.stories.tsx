@@ -100,7 +100,7 @@ export const AllStates: Story = {
 	args: { channels: [pending, active, paused, revoked] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Not started")).toBeInTheDocument();
+		await expect(canvas.getAllByText("Not started").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Monitoring")).toBeInTheDocument();
 		await expect(canvas.getByText("Paused")).toBeInTheDocument();
 		await expect(canvas.getByText("Revoked")).toBeInTheDocument();
@@ -171,7 +171,7 @@ export const RevokeTypeToConfirm: Story = {
 		const dialog = await screen.findByRole("alertdialog");
 		const confirm = within(dialog).getByRole("button", { name: /remove & erase/i });
 		await expect(confirm).toBeDisabled();
-		await userEvent.type(within(dialog).getByLabelText(/to confirm/i), "team-standup");
+		await userEvent.type(within(dialog).getByLabelText(/to confirm/i), active.slackChannelId);
 		await expect(confirm).toBeEnabled();
 	},
 };
@@ -198,7 +198,7 @@ export const MutationError: Story = {
 		// Empty list ⇒ both a header button and an empty-state CTA; open via the header one.
 		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");
-		await userEvent.type(within(dialog).getByLabelText(/channel id/i), "C0974LJBPBK");
+		await userEvent.type(within(dialog).getByLabelText(/paste channel link or id/i), "C0974LJBPBK");
 		await userEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
 		// Rejected mutation ⇒ the dialog stays open for a retry.
 		await expect(await screen.findByRole("dialog")).toBeInTheDocument();

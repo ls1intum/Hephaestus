@@ -92,4 +92,7 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
 
     /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
     long countByWorkspaceId(Long workspaceId);
+
+    /** Scoped count by lifecycle state, used by App Home to show whether channel context is actually active. */
+    long countByWorkspaceIdAndConsentState(Long workspaceId, ConsentState consentState);
 }

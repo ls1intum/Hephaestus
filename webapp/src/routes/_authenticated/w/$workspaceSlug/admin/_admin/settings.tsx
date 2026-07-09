@@ -6,6 +6,7 @@ import {
 	deleteSlackChannelMutation,
 	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
+	listSlackChannelCandidatesOptions,
 	listSlackChannelsOptions,
 	listWorkspacesQueryKey,
 	registerSlackChannelMutation,
@@ -125,11 +126,20 @@ function AdminSettings() {
 	});
 	const { data: slackChannels, isLoading: isLoadingSlackChannels } = useQuery({
 		...slackChannelsQueryOptions,
-		enabled: Boolean(workspaceSlug),
+		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
+	});
+
+	const slackChannelCandidatesQueryOptions = listSlackChannelCandidatesOptions({
+		path: { workspaceSlug: workspaceSlug ?? "" },
+	});
+	const { data: slackChannelCandidates, isLoading: isLoadingSlackChannelCandidates } = useQuery({
+		...slackChannelCandidatesQueryOptions,
+		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
 	});
 
 	const invalidateSlackChannels = () => {
 		queryClient.invalidateQueries({ queryKey: slackChannelsQueryOptions.queryKey });
+		queryClient.invalidateQueries({ queryKey: slackChannelCandidatesQueryOptions.queryKey });
 	};
 
 	// Register (allow-list) a Slack channel — lands PENDING.
@@ -315,11 +325,18 @@ function AdminSettings() {
 			slackNotificationsEnabled={workspaceData?.leaderboardNotificationEnabled ?? false}
 			slackScheduleDay={workspaceData?.leaderboardScheduleDay ?? undefined}
 			slackScheduleTime={workspaceData?.leaderboardScheduleTime ?? undefined}
-			onSlackSaved={() =>
-				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
+			onSlackSaved={() => {
+				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey });
+				invalidateSlackChannels();
+			}}
+			slackChannels={workspaceData?.hasSlackToken ? (slackChannels ?? []) : []}
+			slackChannelCandidates={slackChannelCandidates ?? []}
+			isLoadingSlackChannels={
+				isWorkspaceLoading ||
+				(Boolean(workspaceData?.hasSlackToken) &&
+					(isLoadingSlackChannels || isLoadingSlackChannelCandidates)) ||
+				!workspaceSlug
 			}
-			slackChannels={slackChannels ?? []}
-			isLoadingSlackChannels={isWorkspaceLoading || isLoadingSlackChannels || !workspaceSlug}
 			onRegisterSlackChannel={handleRegisterSlackChannel}
 			onUpdateSlackChannelConsent={handleUpdateSlackChannelConsent}
 			onRemoveSlackChannel={handleRemoveSlackChannel}

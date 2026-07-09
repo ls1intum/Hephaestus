@@ -40,7 +40,7 @@ class SlackOAuthClientTest extends BaseUnitTest {
                 .body(
                     "{\"ok\":true,\"access_token\":\"xoxb-abc\",\"app_id\":\"A1\",\"bot_user_id\":\"U1\"," +
                         "\"team\":{\"id\":\"T1\",\"name\":\"Acme\"}," +
-                        "\"scope\":\"chat:write,team:read\"}"
+                        "\"scope\":\"chat:write,users:read\"}"
                 )
                 .build()
         );

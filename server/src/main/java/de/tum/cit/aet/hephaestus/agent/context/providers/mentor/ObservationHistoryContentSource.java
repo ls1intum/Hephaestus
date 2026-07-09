@@ -197,6 +197,15 @@ public class ObservationHistoryContentSource implements ContentSource {
             node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", o.getConfidence());
             node.put("observedAt", o.getObservedAt().toString());
+            if (o.getArtifactType() != null) {
+                node.put("artifactType", o.getArtifactType().name());
+            }
+            if (o.getArtifactId() != null) {
+                node.put("artifactId", o.getArtifactId());
+            }
+            if (o.getEvidence() != null && !o.getEvidence().isNull()) {
+                node.set("evidence", o.getEvidence());
+            }
             // Scrub the raw model reasoning through the same firewall the SCM composer uses before it reaches
             // the mentor: the detection model echoes its grading vocabulary (rubric bands, presence/assessment
             // tuples, bucket arithmetic) into reasoning, and shipping it un-scrubbed lets the mentor quote

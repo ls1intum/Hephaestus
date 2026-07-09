@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -33,6 +34,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
  * Pins the security-relevant provisioning behavior: verified-email stamping on JIT create, and
  * account-linking that binds to the current account and rejects cross-account collisions.
  */
+@Tag("unit")
 class AccountProvisioningServiceTest extends BaseUnitTest {
 
     private static final Instant NOW = Instant.parse("2026-06-01T00:00:00Z");
@@ -43,6 +45,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private VerifiedEmailResolver verifiedEmailResolver;
     private AccountJitCreator accountJitCreator;
     private AdminBootstrapPolicy adminBootstrapPolicy;
+    private de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository loginProviderRepository;
     private AccountProvisioningService service;
 
     @BeforeEach
@@ -54,9 +57,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         accountJitCreator = mock(AccountJitCreator.class);
         // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
         adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
-        de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository loginProviderRepository = mock(
-            de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository.class
-        );
+        loginProviderRepository = mock(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository.class);
         var githubProvider = new de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider();
         githubProvider.setRegistrationId("github");
         githubProvider.setType(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType.GITHUB);
@@ -80,6 +81,31 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             adminBootstrapPolicy,
             Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    void slackLoginMode_rejectedBecauseSlackIsLinkOnly() {
+        useSlackProvider();
+
+        assertThatThrownBy(() ->
+            service.resolveOrProvision("slack", "U123", principal(), AuthIntentCookie.Intent.login(null, null))
+        ).isInstanceOf(LinkOnlyProviderLoginException.class);
+
+        verify(accountJitCreator, never()).create(any(), any());
+        verify(identityLinkRepository, never()).save(any());
+    }
+
+    @Test
+    void slackLink_withoutTeamId_failsClosed() {
+        useSlackProvider();
+
+        assertThatThrownBy(() ->
+            service.resolveOrProvision("slack", "U123", principal(), AuthIntentCookie.Intent.link(42L, null))
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("team_id");
+
+        verify(identityLinkRepository, never()).save(any());
     }
 
     @Test
@@ -129,6 +155,14 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             Map.of("id", "sub-1", "login", "octocat"),
             "id"
         );
+    }
+
+    private void useSlackProvider() {
+        var slackProvider = new de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider();
+        slackProvider.setRegistrationId("slack");
+        slackProvider.setType(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType.SLACK);
+        slackProvider.setBaseUrl("https://slack.com");
+        when(loginProviderRepository.findByRegistrationId("slack")).thenReturn(Optional.of(slackProvider));
     }
 
     private static IdentityLink linkOn(Account account) {
@@ -260,7 +294,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         assertThatThrownBy(() ->
             service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.link(42L, null))
         )
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(AccountLinkConflictException.class)
             .hasMessageContaining("already linked to a different account");
 
         verify(identityLinkRepository, never()).save(any());

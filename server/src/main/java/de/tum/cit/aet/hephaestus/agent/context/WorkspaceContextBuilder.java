@@ -21,7 +21,8 @@ import tools.jackson.databind.JsonNode;
  * Orchestrates {@link ContentSource}s to materialise the AI-readable workspace context under
  * {@code inputs/context/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
  * ({@code @Order} / {@code Ordered}); a per-repository {@link ReentrantLock} serialises
- * concurrent builds against the same on-disk git working tree.
+ * concurrent builds against the same on-disk git working tree. Requests without a repository
+ * key do not touch git and are not serialised globally.
  *
  * <p>Failure policy is per-provider: {@link ContentSource#required()} failures bubble as
  * {@link JobPreparationException}; non-required failures are logged and skipped. Programmer
@@ -80,22 +81,27 @@ public class WorkspaceContextBuilder {
      * @return insertion-ordered {@link LinkedHashMap} of workspace-relative path → bytes
      */
     public Map<String, byte[]> build(ContextRequest request) {
-        ReentrantLock lock = stripeFor(repoKey(request));
+        Long repoKey = repoKey(request);
+        ReentrantLock lock = repoKey == null ? null : stripeFor(repoKey);
         long startNs = System.nanoTime();
-        lock.lock();
+        if (lock != null) {
+            lock.lock();
+        }
         try {
             return buildLocked(request);
         } finally {
-            lock.unlock();
+            if (lock != null) {
+                lock.unlock();
+            }
             meterRegistry
                 .timer(METRIC_BUILD + ".duration", Tags.of("kind", request.getClass().getSimpleName()))
                 .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
     }
 
-    /** Map a repository id to one of {@link #LOCK_STRIPES} locks; {@code null} keys all collide on stripe 0. */
+    /** Map a repository id to one of {@link #LOCK_STRIPES} locks. */
     private ReentrantLock stripeFor(Long repoKey) {
-        int idx = repoKey == null ? 0 : Math.floorMod(repoKey.hashCode(), LOCK_STRIPES);
+        int idx = Math.floorMod(repoKey.hashCode(), LOCK_STRIPES);
         return repoLockStripes[idx];
     }
 

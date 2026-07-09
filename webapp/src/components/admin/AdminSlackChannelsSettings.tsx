@@ -1,6 +1,9 @@
 import { PlusIcon, RadioIcon } from "lucide-react";
 import { useState } from "react";
-import type { SlackMonitoredChannel } from "@/api/types.gen";
+import type {
+	SlackChannelCandidate as ApiSlackChannelCandidate,
+	SlackMonitoredChannel,
+} from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -21,11 +24,14 @@ import { SlackChannelRow, type SlackConsentState } from "./slack-channels/SlackC
 
 export type { SlackConsentState };
 
+export type SlackChannelCandidate = ApiSlackChannelCandidate;
+
 export interface AdminSlackChannelsSettingsProps {
 	workspaceSlug: string;
 	/** Whether the workspace has an installed Slack app; gates the Add-channel affordance. */
 	hasSlackConnection: boolean;
 	channels: SlackMonitoredChannel[];
+	channelCandidates?: SlackChannelCandidate[];
 	isLoading: boolean;
 	/** Allow-list a new channel (lands PENDING). Resolves on success, rejects to keep the dialog open. */
 	onRegisterChannel: (input: {
@@ -52,6 +58,7 @@ export function AdminSlackChannelsSettings({
 	workspaceSlug,
 	hasSlackConnection,
 	channels,
+	channelCandidates = [],
 	isLoading,
 	onRegisterChannel,
 	onUpdateConsent,
@@ -83,6 +90,11 @@ export function AdminSlackChannelsSettings({
 							monitored channel gets a <strong>visible in-channel announcement</strong>, and any
 							member can <strong>opt out</strong> from the app's Home tab. Removing a channel{" "}
 							<strong>permanently erases</strong> everything collected from it.
+						</p>
+						<p className="text-muted-foreground text-sm">
+							You can also invite Hephaestus from Slack. In the channel, run{" "}
+							<code className="rounded bg-muted px-1 py-0.5">/invite @Hephaestus</code>; it appears
+							here as <strong>Not started</strong> until an admin activates monitoring.
 						</p>
 
 						{!hasSlackConnection && (
@@ -129,6 +141,12 @@ export function AdminSlackChannelsSettings({
 												})
 											}
 											onRemove={setRemoveChannel}
+											onSetUpAgain={(c) =>
+												onRegisterChannel({
+													slackChannelId: c.slackChannelId,
+													channelName: c.channelName,
+												})
+											}
 											onViewHistory={setHistoryChannel}
 										/>
 									))}
@@ -162,6 +180,7 @@ export function AdminSlackChannelsSettings({
 				key={addOpen ? "add-open" : "add-closed"}
 				open={addOpen}
 				onOpenChange={setAddOpen}
+				candidates={channelCandidates}
 				onSubmit={onRegisterChannel}
 			/>
 

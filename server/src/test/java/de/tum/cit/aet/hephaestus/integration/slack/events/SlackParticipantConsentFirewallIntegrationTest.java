@@ -148,4 +148,30 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
             messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "100.1")
         ).isFalse();
     }
+
+    @Test
+    @DisplayName("channel-message opt-out preserves any existing research decision")
+    void channelMessageOptOut_preservesResearchDecision() {
+        participantConsentRepository.upsert(workspaceId, OPTED_OUT_USER, false, true, "SLACK_APP_HOME");
+
+        participantConsentRepository.optOutOfIngestion(
+            workspaceId,
+            OPTED_OUT_USER,
+            SlackParticipantConsentService.SOURCE_SLACK_CHANNEL_NOTICE
+        );
+
+        assertThat(
+            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                workspaceId,
+                OPTED_OUT_USER
+            )
+        ).isTrue();
+        Boolean researchOptedOut = jdbcTemplate.queryForObject(
+            "SELECT research_opted_out FROM slack_participant_consent WHERE workspace_id = ? AND slack_user_id = ?",
+            Boolean.class,
+            workspaceId,
+            OPTED_OUT_USER
+        );
+        assertThat(researchOptedOut).isTrue();
+    }
 }

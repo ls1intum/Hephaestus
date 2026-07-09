@@ -32,6 +32,10 @@ hephaestus:
         nats:
             enabled: true
 
+    sandbox:
+        llm-proxy:
+            enabled: false
+
 logging:
     level:
         de.tum.cit.aet.hephaestus.integration.core.webhook: INFO

@@ -29,6 +29,7 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
     private static final long WORKSPACE = 42L;
     private static final String TEAM = "T1";
     private static final String CHANNEL = "D9";
+    private static final String THREAD = "100.1";
     private static final String USER = "U1";
 
     @Mock
@@ -45,11 +46,11 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
         UUID existing = UUID.randomUUID();
         MentorSlackThread mapping = new MentorSlackThread();
         mapping.setChatThreadId(existing);
-        when(mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelId(WORKSPACE, CHANNEL)).thenReturn(
-            Optional.of(mapping)
-        );
+        when(
+            mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WORKSPACE, CHANNEL, THREAD)
+        ).thenReturn(Optional.of(mapping));
 
-        UUID result = linker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, USER, "alice");
+        UUID result = linker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, THREAD, USER, "alice");
 
         assertThat(result).isEqualTo(existing);
         verifyNoInteractions(mentorSlackThreadService);
@@ -59,12 +60,12 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
     @Test
     void missingMapping_provisionsThreadAndPersistsMapping() {
         UUID created = UUID.randomUUID();
-        when(mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelId(WORKSPACE, CHANNEL)).thenReturn(
-            Optional.empty()
-        );
+        when(
+            mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WORKSPACE, CHANNEL, THREAD)
+        ).thenReturn(Optional.empty());
         when(mentorSlackThreadService.ensureSlackThread(eq(WORKSPACE), isNull(), eq("alice"))).thenReturn(created);
 
-        UUID result = linker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, USER, "alice");
+        UUID result = linker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, THREAD, USER, "alice");
 
         assertThat(result).isEqualTo(created);
         ArgumentCaptor<MentorSlackThread> saved = ArgumentCaptor.forClass(MentorSlackThread.class);
@@ -74,6 +75,7 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
         assertThat(mapping.getChatThreadId()).isEqualTo(created);
         assertThat(mapping.getSlackTeamId()).isEqualTo(TEAM);
         assertThat(mapping.getSlackChannelId()).isEqualTo(CHANNEL);
+        assertThat(mapping.getSlackThreadTs()).isEqualTo(THREAD);
         assertThat(mapping.getSlackUserId()).isEqualTo(USER);
         assertThat(mapping.getId()).isNotNull();
     }

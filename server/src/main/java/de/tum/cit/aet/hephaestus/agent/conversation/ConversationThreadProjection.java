@@ -21,7 +21,7 @@ public interface ConversationThreadProjection {
      * messages only. Wrapped in the untrusted-content quarantine envelope.
      *
      * @param workspaceId     the workspace to scope every query to
-     * @param developerId     the mentor-chat requester's workspace member id — the participant-firewall audience
+     * @param developerId     the mentor-chat requester's SCM user id — the participant-firewall audience
      */
     ObjectNode buildPayload(long workspaceId, long developerId);
 

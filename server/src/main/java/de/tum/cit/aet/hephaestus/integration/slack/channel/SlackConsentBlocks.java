@@ -1,11 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
 import static com.slack.api.model.block.Blocks.actions;
-import static com.slack.api.model.block.Blocks.context;
 import static com.slack.api.model.block.Blocks.section;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
-import static com.slack.api.model.block.element.BlockElements.asContextElements;
 import static com.slack.api.model.block.element.BlockElements.asElements;
 import static com.slack.api.model.block.element.BlockElements.button;
 
@@ -26,10 +24,10 @@ import java.util.List;
  *       never reach.</li>
  * </ul>
  *
- * <p>The copy follows plain-language transparency guidance: it says concretely what is read (new messages, for
- * practice feedback), what is not (earlier history), and gives the member direct control. The {@code "Opt me out"}
- * button carries a Slack {@code confirm} dialog and the stable {@link #ACTION_PARTICIPANT_OPT_OUT} action id the
- * interactivity router binds to the same person opt-out + erase path the App Home "Opt out" button uses.
+ * <p>The copy follows plain-language transparency guidance: it says concretely what is read, what is not read, and
+ * gives the member direct control. The button carries a Slack {@code confirm} dialog and the stable
+ * {@link #ACTION_PARTICIPANT_OPT_OUT} action id the interactivity router binds to the channel-message exclusion +
+ * erase path.
  *
  * <p>Pure and dependency-free (static block assembly, no Spring): a plain-text fallback rides on the surrounding
  * message so the notice still reads on a client that cannot render the actions.
@@ -37,78 +35,142 @@ import java.util.List;
 public final class SlackConsentBlocks {
 
     /**
-     * In-message one-click opt-out. Bound by {@code SlackFeedbackHandler} to the App Home opt-out path (person
-     * ingestion opt-out + erase already-collected data), keyed on the acting Slack user id.
+     * In-message one-click channel-message exclusion. Bound by {@code SlackInteractivityHandler} to person ingestion
+     * opt-out + erase already-collected channel data, keyed on the acting Slack user id.
      */
     public static final String ACTION_PARTICIPANT_OPT_OUT = "participant_opt_out";
 
-    /** Defensive: a pointer button back to the App Home privacy tab. Re-renders the Home view when clicked. */
-    public static final String ACTION_OPEN_PRIVACY_HOME = "open_privacy_home";
+    private static final String ACTIVATION_LINE_1 = "*Hephaestus is now active in this channel.*";
 
-    private static final String NOTICE_LINE_1 =
-        "*Hephaestus is now reading new messages in this channel* to give people feedback on how the team works " +
-        "day to day — code review, testing, and how issues and questions are written. Only messages from now on " +
-        "are read; earlier history is never touched.";
+    private static final String ACTIVATION_LINE_2 =
+        "Starting now, Hephaestus may use new messages and thread replies here as context for private mentoring " +
+        "about software practices: code reviews, tests, issues, questions, and collaboration.";
 
-    private static final String NOTICE_LINE_2 =
-        "You're in control — you can keep *your own* messages out at any time; it also deletes anything already " +
-        "collected about you.";
+    private static final String SHARED_LINE =
+        "It does not read earlier history and will not reply in this channel. You can stop use of your own channel " +
+        "messages at any time. This also deletes your already collected channel-message data.";
+
+    private static final String LATE_JOIN_LINE_1 = "*You joined a channel where Hephaestus is active.*";
+
+    private static final String LATE_JOIN_LINE_2 =
+        "From now on, your new messages and thread replies here may be used as context for private mentoring " +
+        "about software practices. Hephaestus does not read earlier history or reply in this channel. Manage this " +
+        "anytime from App Home.";
 
     /** Plain-text fallback for the notice (no mrkdwn), shown in notifications + by accessibility tools. */
-    public static final String FALLBACK_TEXT =
-        "Hephaestus is now reading new messages in this channel to give people feedback on how the team works day " +
-        "to day — code review, testing, and how issues and questions are written. Only messages from now on are " +
-        "read; earlier history is never touched. You're in control — you can keep your own messages out at any " +
-        "time; it also deletes anything already collected about you.";
+    private static final String FALLBACK_TEXT =
+        "Hephaestus is now active in this channel. Starting now, Hephaestus may use new messages and thread " +
+        "replies here as context for private mentoring about software practices: code reviews, tests, issues, " +
+        "questions, and collaboration. It does not read earlier history and will not reply in this channel. You can " +
+        "stop use of your own channel messages at any time with Do not use my channel messages. This also deletes " +
+        "your already collected channel-message data.";
+
+    private static final String LATE_JOIN_FALLBACK_TEXT =
+        "You joined a Hephaestus-monitored channel. From now on, your new messages and thread replies here may be " +
+        "used as context for private mentoring about software practices. Hephaestus does not read earlier history " +
+        "or reply in this channel. Manage this anytime from App Home.";
 
     /** Ephemeral confirmation shown to a member right after they opt out via the in-message button. */
-    public static final String CONFIRMATION_TEXT =
-        "You're opted out — your messages won't be read and anything collected has been deleted.";
+    private static final String CONFIRMATION_TEXT =
+        "Done. Hephaestus will not use your channel messages. Any channel-message data already collected from you " +
+        "has been deleted.";
 
     private SlackConsentBlocks() {}
 
     /**
-     * The consent notice: the copy, a danger {@code "Opt me out"} button (with a confirm dialog), and a context
-     * pointer to the App Home. Freshly built per call so the returned list is never shared/mutated.
+     * The consent notice: copy plus a destructive button with a confirm dialog. Freshly built per call so the
+     * returned list is never shared/mutated.
      */
     public static List<LayoutBlock> consentNotice() {
-        return List.of(
-            section(s -> s.text(markdownText(NOTICE_LINE_1 + "\n\n" + NOTICE_LINE_2))),
-            actions(a ->
-                a.elements(
-                    asElements(
-                        button(b ->
-                            b
-                                .text(plainText("Opt me out"))
-                                .actionId(ACTION_PARTICIPANT_OPT_OUT)
-                                .style("danger")
-                                .confirm(optOutConfirm())
-                        )
+        return activationNotice();
+    }
+
+    public static List<LayoutBlock> activationNotice() {
+        return List.of(noticeText(ACTIVATION_LINE_1, ACTIVATION_LINE_2, ""), optOutAction());
+    }
+
+    public static List<LayoutBlock> activationNotice(String hephaestusUrl) {
+        return activationNotice();
+    }
+
+    public static List<LayoutBlock> lateJoinNotice() {
+        return lateJoinNotice("");
+    }
+
+    public static List<LayoutBlock> lateJoinNotice(String hephaestusUrl) {
+        return List.of(noticeText(LATE_JOIN_LINE_1, LATE_JOIN_LINE_2, hephaestusUrl), optOutAction());
+    }
+
+    private static LayoutBlock noticeText(String line1, String line2, String hephaestusUrl) {
+        return section(s ->
+            s.text(markdownText(line1 + "\n\n" + line2 + "\n\n" + SHARED_LINE + uiLinkLine(hephaestusUrl)))
+        );
+    }
+
+    private static String uiLinkLine(String hephaestusUrl) {
+        return "";
+    }
+
+    private static LayoutBlock optOutAction() {
+        return actions(a ->
+            a.elements(
+                asElements(
+                    button(b ->
+                        b
+                            .text(plainText("Do not use my channel messages"))
+                            .actionId(ACTION_PARTICIPANT_OPT_OUT)
+                            .style("danger")
+                            .confirm(channelMessageOptOutConfirm())
                     )
                 )
-            ),
-            context(c ->
-                c.elements(asContextElements(markdownText("Manage this anytime in the Hephaestus app → *Home* tab.")))
             )
         );
     }
 
-    /** The ephemeral opt-out confirmation shown to the member who just clicked {@code "Opt me out"}. */
+    public static String fallbackText() {
+        return activationFallbackText();
+    }
+
+    public static String activationFallbackText() {
+        return FALLBACK_TEXT;
+    }
+
+    public static String activationFallbackText(String hephaestusUrl) {
+        return activationFallbackText();
+    }
+
+    public static String lateJoinFallbackText() {
+        return lateJoinFallbackText("");
+    }
+
+    public static String lateJoinFallbackText(String hephaestusUrl) {
+        return LATE_JOIN_FALLBACK_TEXT + fallbackLink(hephaestusUrl);
+    }
+
+    private static String fallbackLink(String hephaestusUrl) {
+        return "";
+    }
+
+    /** The ephemeral opt-out confirmation shown to the member who just excluded their channel messages. */
     public static List<LayoutBlock> optOutConfirmation() {
         return List.of(section(s -> s.text(markdownText(CONFIRMATION_TEXT))));
     }
 
+    public static String confirmationText() {
+        return CONFIRMATION_TEXT;
+    }
+
     /** The confirm dialog on the opt-out button — spells out the consequence before the irreversible erase. */
-    private static ConfirmationDialogObject optOutConfirm() {
+    public static ConfirmationDialogObject channelMessageOptOutConfirm() {
         return ConfirmationDialogObject.builder()
-            .title(plainText("Opt out of message reading"))
+            .title(plainText("Stop using your channel messages?"))
             .text(
                 plainText(
-                    "Your messages in monitored channels won't be read, and anything already collected about you " +
-                        "is deleted. Your own DMs with the mentor are unaffected."
+                    "This stops Hephaestus from using your messages in monitored channels and deletes any channel " +
+                        "message data already collected from you. Mentor DMs are not affected."
                 )
             )
-            .confirm(plainText("Opt me out"))
+            .confirm(plainText("Do not use my messages"))
             .deny(plainText("Cancel"))
             .style("danger")
             .build();

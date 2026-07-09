@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.type.TypeReference;
@@ -29,8 +30,7 @@ public record ChatMessageDTO(
     UUID id,
     @Nullable UUID parentMessageId,
     String role,
-    @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / reasoning / tool / data-finding)."))
-    List<Object> parts,
+    @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-finding).")) List<Object> parts,
     @Nullable @Schema(description = "Per-turn metadata: status, model, costUsd, usage, …") Map<String, Object> metadata,
     Instant createdAt
 ) {
@@ -47,6 +47,7 @@ public record ChatMessageDTO(
             effectiveParts != null && effectiveParts.isArray()
                 ? mapper.convertValue(effectiveParts, new TypeReference<List<Object>>() {})
                 : List.of();
+        parts = parts.stream().filter(ChatMessageDTO::isUserVisiblePart).filter(Objects::nonNull).toList();
         Map<String, Object> metadata =
             message.getMetadata() != null && message.getMetadata().isObject()
                 ? new java.util.LinkedHashMap<>(
@@ -68,5 +69,16 @@ public record ChatMessageDTO(
             metadata,
             message.getCreatedAt()
         );
+    }
+
+    private static boolean isUserVisiblePart(Object part) {
+        if (!(part instanceof Map<?, ?> map)) {
+            return true;
+        }
+        Object type = map.get("type");
+        if (!(type instanceof String value)) {
+            return true;
+        }
+        return !"reasoning".equals(value) && !value.startsWith("tool-");
     }
 }

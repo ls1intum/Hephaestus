@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Bounded-retention sweep for ingested Slack messages (GDPR Art. 5(1)(e), D10).
+ * Bounded-retention sweep for ingested Slack messages.
  *
  * <p>Enumerates every workspace that currently holds at least one {@code slack_message} row, resolves
  * that workspace's retention window (its {@link ConnectionConfig.SlackConfig#retentionDaysOrDefault()},

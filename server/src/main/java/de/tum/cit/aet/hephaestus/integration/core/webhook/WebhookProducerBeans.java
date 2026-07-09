@@ -13,17 +13,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 
 /**
- * The NATS <em>producer</em> cluster shared verbatim by {@link WebhookConfiguration} (webhook role)
- * and {@link SlackNatsPublisherConfiguration} (server role, webhook off, Slack on): JetStream +
- * management handles, the publish-retry policy, the {@link JetStreamPublisher}, the
- * {@link StreamBootstrap}, and the {@link WebhookGracefulShutdown}.
+ * The NATS <em>producer</em> cluster contributed by {@link WebhookConfiguration} on the
+ * webhook runtime role: JetStream + management handles, the publish-retry policy, the
+ * {@link JetStreamPublisher}, the {@link WebhookJetStreamBootstrap}, and the {@link WebhookGracefulShutdown}.
  *
  * <p><strong>Not component-scanned.</strong> This is a plain class with {@code @Bean} factory
- * methods (no {@code @Configuration}/{@code @Component} stereotype), so it is only ever contributed
- * via {@code @Import} from exactly one of the two host configs. Because those hosts are mutually
- * exclusive by condition ({@code webhook} vs {@code !webhook and slack}), only one imports these
- * beans, so there is never a duplicate {@link JetStreamPublisher}. Keeping the producer beans in one
- * place removes the copy that had drifted between the two configs.
+ * methods (no {@code @Configuration}/{@code @Component} stereotype), so it is only contributed
+ * via {@code @Import} from the webhook host config.
  */
 class WebhookProducerBeans {
 
@@ -62,8 +58,8 @@ class WebhookProducerBeans {
     }
 
     @Bean
-    StreamBootstrap webhookStreamBootstrap(JetStreamManagement jsm, WebhookProperties properties) {
-        return new StreamBootstrap(jsm, properties);
+    WebhookJetStreamBootstrap webhookJetStreamBootstrap(JetStreamManagement jsm, WebhookProperties properties) {
+        return new WebhookJetStreamBootstrap(jsm, properties);
     }
 
     @Bean

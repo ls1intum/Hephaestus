@@ -506,6 +506,10 @@ export type UpdateTeamSettingsRequest = {
     hidden: boolean;
 };
 
+export type UpdateSlackUserPreferencesRequest = {
+    channelMessagesAllowed: boolean;
+};
+
 /**
  * Transition a Slack channel to a target consent state
  */
@@ -862,6 +866,21 @@ export type SortObject = {
     unsorted?: boolean;
 };
 
+export type SlackWorkspacePreferences = {
+    activeMonitoredChannelCount?: number;
+    channelMessagesAllowed?: boolean;
+    slackDisplayName?: string;
+    slackTeamId: string;
+    slackTeamName?: string;
+    slackUserId: string;
+    workspaceName: string;
+    workspaceSlug: string;
+};
+
+export type SlackUserPreferences = {
+    workspaces: Array<SlackWorkspacePreferences>;
+};
+
 /**
  * Result of the Slack test-message probe; carries the Slack error code on failure.
  */
@@ -909,7 +928,7 @@ export type SlackMonitoredChannel = {
      */
     optedOutMemberCount: number;
     /**
-     * Slack channel id (the stable C… id; the natural key)
+     * Slack channel id (stable C…/G… id; the natural key)
      */
     slackChannelId: string;
     /**
@@ -950,6 +969,36 @@ export type SlackChannelConsentEvent = {
      * State the channel entered
      */
     toState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+};
+
+/**
+ * A Slack channel the app can offer in the workspace channel picker
+ */
+export type SlackChannelCandidate = {
+    /**
+     * Whether Slack reports the channel as archived
+     */
+    archived?: boolean;
+    /**
+     * Current Slack channel name
+     */
+    channelName: string;
+    /**
+     * Existing Hephaestus monitoring state, if already allow-listed
+     */
+    consentState?: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    /**
+     * Whether the app bot is already a member
+     */
+    member?: boolean;
+    /**
+     * Whether this is a private channel
+     */
+    privateChannel?: boolean;
+    /**
+     * Stable Slack channel id
+     */
+    slackChannelId: string;
 };
 
 export type SessionView = {
@@ -1008,7 +1057,7 @@ export type RegisterSlackChannelRequest = {
      */
     channelName?: string;
     /**
-     * Slack channel id (the stable C… id)
+     * Slack public/private channel id (stable C… or G… id)
      */
     slackChannelId: string;
 };
@@ -3339,25 +3388,21 @@ export type UpdateUserSettingsResponses = {
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
 
-export type IngestData = {
+export type ListSlackUserPreferencesData = {
     body?: never;
-    path: {
-        kind: string;
-    };
+    path?: never;
     query?: never;
-    url: '/webhooks/{kind}';
+    url: '/user/slack/preferences';
 };
 
-export type IngestResponses = {
+export type ListSlackUserPreferencesResponses = {
     /**
      * OK
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: SlackUserPreferences;
 };
 
-export type IngestResponse = IngestResponses[keyof IngestResponses];
+export type ListSlackUserPreferencesResponse = ListSlackUserPreferencesResponses[keyof ListSlackUserPreferencesResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -5264,6 +5309,27 @@ export type RegisterSlackChannelResponses = {
 
 export type RegisterSlackChannelResponse = RegisterSlackChannelResponses[keyof RegisterSlackChannelResponses];
 
+export type ListSlackChannelCandidatesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/candidates';
+};
+
+export type ListSlackChannelCandidatesResponses = {
+    /**
+     * OK
+     */
+    200: Array<SlackChannelCandidate>;
+};
+
+export type ListSlackChannelCandidatesResponse = ListSlackChannelCandidatesResponses[keyof ListSlackChannelCandidatesResponses];
+
 export type DeleteSlackChannelData = {
     body?: never;
     path: {
@@ -5327,6 +5393,27 @@ export type ListSlackChannelConsentEventsResponses = {
 };
 
 export type ListSlackChannelConsentEventsResponse = ListSlackChannelConsentEventsResponses[keyof ListSlackChannelConsentEventsResponses];
+
+export type UpdateSlackUserPreferencesData = {
+    body: UpdateSlackUserPreferencesRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/me/preferences';
+};
+
+export type UpdateSlackUserPreferencesResponses = {
+    /**
+     * OK
+     */
+    200: SlackWorkspacePreferences;
+};
+
+export type UpdateSlackUserPreferencesResponse = UpdateSlackUserPreferencesResponses[keyof UpdateSlackUserPreferencesResponses];
 
 export type RenameSlugData = {
     body: RenameWorkspaceSlugRequest;

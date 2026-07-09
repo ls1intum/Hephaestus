@@ -46,6 +46,12 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     @Query("UPDATE ChatThread t SET t.sessionJsonl = :bytes WHERE t.id = :threadId")
     int updateSessionJsonl(@Param("threadId") UUID threadId, @Param("bytes") byte[] bytes);
 
+    @Modifying
+    @Transactional
+    @WorkspaceAgnostic("Caller has already resolved thread ownership via findByIdAndWorkspaceId")
+    @Query("UPDATE ChatThread t SET t.sessionJsonl = NULL WHERE t.id = :threadId")
+    int clearSessionJsonl(@Param("threadId") UUID threadId);
+
     /**
      * Bulk-delete every thread for a workspace. Cascades to {@code chat_message} +
      * {@code chat_message_vote} via existing FKs. Used by
@@ -58,8 +64,8 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
 
     /**
      * Bulk-delete every thread of one {@link ThreadSurface} for a workspace. Cascades to {@code chat_message} +
-     * {@code chat_message_vote} (and, for {@code SLACK_DM}, the {@code mentor_slack_thread} mapping) via the
-     * existing DB {@code ON DELETE CASCADE} FKs. Used to erase Slack-originated DM content on an app uninstall
+     * {@code chat_message_vote} via the existing DB {@code ON DELETE CASCADE} FKs. Used to erase
+     * Slack-originated DM content on an app uninstall
      * without touching the workspace's web mentor history. Returns the thread count deleted, for observability.
      */
     @Modifying

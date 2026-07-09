@@ -76,8 +76,12 @@ public class AuthBeginController {
             return new RedirectView("/auth/error?code=unknown_provider", false);
         }
         String safeReturnTo = ReturnToValidator.safeOrFallback(returnTo);
+        boolean linkMode = "link".equalsIgnoreCase(mode);
+        if (!linkMode && isSlackRegistration(registration)) {
+            return new RedirectView("/auth/error?code=link_requires_auth", false);
+        }
         AuthIntentCookie.Intent intent;
-        if ("link".equalsIgnoreCase(mode)) {
+        if (linkMode) {
             // Link mode MUST be initiated by an already-authenticated user (secure account linking:
             // never auto-link to an unauthenticated context — that is the pre-account-takeover bug).
             // The login chain is stateless and permitAll, so no SecurityContext exists here; we validate
@@ -100,6 +104,11 @@ public class AuthBeginController {
         // not the SPA. (The /auth/error targets above are SPA routes at the origin root, so they keep none.)
         String urlEncodedRegistration = URLEncoder.encode(registrationId, StandardCharsets.UTF_8);
         return new RedirectView(apiBasePath + OAUTH_INIT_PATH + urlEncodedRegistration, false);
+    }
+
+    private static boolean isSlackRegistration(ClientRegistration registration) {
+        String authorizationUri = registration.getProviderDetails().getAuthorizationUri();
+        return authorizationUri != null && authorizationUri.startsWith("https://slack.com/");
     }
 
     /**

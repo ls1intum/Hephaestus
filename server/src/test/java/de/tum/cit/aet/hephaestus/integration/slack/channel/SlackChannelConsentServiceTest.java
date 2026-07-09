@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.SlackHephaestusUiLinks;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEvent;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -68,7 +70,11 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private SlackHephaestusUiLinks uiLinks;
+
     private SlackChannelConsentService service() {
+        lenient().when(uiLinks.workspaceHomeUrl(WS)).thenReturn("https://heph.example/w/team");
         return new SlackChannelConsentService(
             monitoredChannelRepository,
             consentEventRepository,
@@ -76,7 +82,8 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             ingestService,
             slackMessageService,
             connectionService,
-            userRepository
+            userRepository,
+            uiLinks
         );
     }
 
@@ -98,7 +105,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     private void stubActor(long actorId) {
         User user = new User();
         user.setId(actorId);
-        when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
+        lenient().when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
     }
 
     @Test
@@ -118,9 +125,9 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             eq(WS),
             eq(CHANNEL),
             blocksCaptor.capture(),
-            eq(SlackConsentBlocks.FALLBACK_TEXT)
+            eq(SlackConsentBlocks.activationFallbackText())
         );
-        assertThat(blocksCaptor.getValue()).isNotEmpty();
+        assertThat(blocksCaptor.getValue().toString()).doesNotContain("Open Hephaestus", "workspace dashboard");
         assertThat(c.getConsentAnnouncedAt()).isNotNull();
         assertThat(c.getConsentState()).isEqualTo(ConsentState.ACTIVE);
         verify(monitoredChannelRepository).save(c);
@@ -305,11 +312,9 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void activate_whenAnnouncementFails_stillActivatesStampsAndAudits() {
-        // A Slack-side posting failure (not_in_channel / no token) is best-effort: it must NOT roll the @Transactional
-        // activation back. Remove the try/catch around the announcement and the exception propagates → the channel is
-        // permanently un-activatable whenever Slack posting fails. Also pins stamp-before-post ordering (the stamp is
-        // set on the entity before the failing post, so it survives).
+    void activate_whenAnnouncementFails_doesNotActivateOrAudit() {
+        // Ingestion must not start without a visible channel disclosure. If Slack rejects the announcement
+        // (not_in_channel / no token), the transition fails and can be retried after fixing Slack configuration.
         SlackMonitoredChannel c = channel(ConsentState.PENDING, null);
         stubChannel(c);
         stubActor(5L);
@@ -317,14 +322,13 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             .when(slackMessageService)
             .sendForWorkspace(eq(WS), eq(CHANNEL), anyList(), anyString());
 
-        SlackMonitoredChannelDTO dto = service().transition(WS, CHANNEL, ConsentState.ACTIVE, "go");
+        assertThatThrownBy(() -> service().transition(WS, CHANNEL, ConsentState.ACTIVE, "go")).isInstanceOf(
+            SlackSendException.class
+        );
 
-        // No propagation: the transition completed, ACTIVE + stamped, and the audit row was written.
-        assertThat(dto.consentState()).isEqualTo(ConsentState.ACTIVE);
-        assertThat(c.getConsentState()).isEqualTo(ConsentState.ACTIVE);
-        assertThat(c.getConsentAnnouncedAt()).isNotNull();
-        verify(monitoredChannelRepository).save(c);
-        verify(consentEventRepository).save(org.mockito.ArgumentMatchers.any());
+        assertThat(c.getConsentState()).isEqualTo(ConsentState.PENDING);
+        verify(monitoredChannelRepository, never()).save(c);
+        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -371,6 +375,23 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         verify(monitoredChannelRepository).save(existing);
         // The existing branch returns before the connection lookup — an always-create mutant would consult it.
         verifyNoInteractions(connectionService);
+    }
+
+    @Test
+    void register_revokedChannel_setsUpAgainAsPendingAndClearsAnnouncement() {
+        Instant announcedAt = Instant.parse("2020-01-01T00:00:00Z");
+        SlackMonitoredChannel existing = channel(ConsentState.REVOKED, announcedAt);
+        existing.setChannelName("old-name");
+        stubChannel(existing);
+
+        SlackChannelConsentService.RegistrationOutcome outcome = service().register(WS, CHANNEL, "new-name");
+
+        assertThat(outcome.created()).isFalse();
+        assertThat(existing.getConsentState()).isEqualTo(ConsentState.PENDING);
+        assertThat(existing.getConsentAnnouncedAt()).isNull();
+        assertThat(existing.getChannelName()).isEqualTo("new-name");
+        assertThat(outcome.channel().consentState()).isEqualTo(ConsentState.PENDING);
+        verify(monitoredChannelRepository).save(existing);
     }
 
     @Test

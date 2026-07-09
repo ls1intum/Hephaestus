@@ -231,7 +231,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
     }
 
     private static IdentityLinkView view(long linkId, long providerId, String subject, String username) {
-        return new IdentityLinkView(linkId, providerId, subject, username, "Display", null, null, null);
+        return new IdentityLinkView(linkId, providerId, subject, username, "Display", null, null, null, null);
     }
 
     private static IdentityProvider gitProvider(long id, IdentityProviderType type, String serverUrl) {

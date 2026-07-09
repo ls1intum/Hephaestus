@@ -56,7 +56,7 @@ class CurrentAccountUsersTest extends BaseUnitTest {
     }
 
     private static IdentityLinkView link(long providerId, String login, Long externalActorId) {
-        return new IdentityLinkView(1L, providerId, "subject", login, "Display", null, null, externalActorId);
+        return new IdentityLinkView(1L, providerId, "subject", login, "Display", null, null, externalActorId, null);
     }
 
     private static User user(long id, String login) {

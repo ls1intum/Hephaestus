@@ -6,7 +6,7 @@ import java.util.Set;
  * Single source of truth for mentor context output keys. The Java {@code fetch_context}
  * whitelist + the runner's JS whitelist ({@code pi-mentor-runner.mjs#FETCH_CONTEXT_ALLOWED})
  * must agree; the Java side derives from the provider constants so a new provider auto-extends
- * the set, but the JS side needs a manual mirror — keep the file basenames identical.
+ * the set, but the JS side needs a manual mirror — keep the full workspace-relative keys identical.
  */
 public final class MentorContextKeys {
 
@@ -19,7 +19,8 @@ public final class MentorContextKeys {
         DeliveredFeedbackContentSource.OUTPUT_KEY,
         RecentAuthoredWorkContentSource.OUTPUT_KEY,
         SlackConversationContentSource.OUTPUT_KEY,
-        PreparedConversationFeedbackContentSource.OUTPUT_KEY
+        PreparedConversationFeedbackContentSource.OUTPUT_KEY,
+        CurrentThreadHistoryContentSource.OUTPUT_KEY
     );
 
     private MentorContextKeys() {}

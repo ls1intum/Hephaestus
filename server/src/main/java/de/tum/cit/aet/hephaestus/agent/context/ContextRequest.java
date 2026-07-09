@@ -48,8 +48,18 @@ public sealed interface ContextRequest
      * @param developerId the active user (sometimes called {@code userId}) the content sources describe
      * @param threadId      conversation thread the request originated from (used by providers
      *                      that need per-thread cache keys)
+     * @param currentUserMessageId message persisted for the active turn; history providers exclude it
      */
-    record MentorChatRequest(long workspaceId, long developerId, UUID threadId) implements ContextRequest {
+    record MentorChatRequest(
+        long workspaceId,
+        long developerId,
+        UUID threadId,
+        UUID currentUserMessageId
+    ) implements ContextRequest {
+        public MentorChatRequest(long workspaceId, long developerId, UUID threadId) {
+            this(workspaceId, developerId, threadId, null);
+        }
+
         public MentorChatRequest {
             Objects.requireNonNull(threadId, "threadId must not be null");
             if (workspaceId <= 0) {

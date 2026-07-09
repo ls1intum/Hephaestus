@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService.RegistrationOutcome;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * target state driving a guarded, idempotent {@code switch}). Slack-workspace admin ≠ Hephaestus admin, so
  * activation lives in the webapp admin plane guarded by {@link RequireAtLeastWorkspaceAdmin}, never in a Slack modal.
  *
- * <p>The path variable is the Slack {@code C…} channel id — the stable, non-enumerable natural key
+ * <p>The path variable is the Slack {@code C…}/{@code G…} channel id — the stable, non-enumerable natural key
  * {@code (workspace_id, slack_channel_id)}. Every method scopes on the {@link WorkspaceContext} workspace id, so a
  * channel of another workspace resolves to 404 (isolation). Illegal transitions surface as {@code 409 ProblemDetail}
  * through {@link SlackChannelControllerAdvice}; not-found / validation / auth flow through the shared advice chain.
@@ -36,15 +37,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @WorkspaceScopedController
 @RequestMapping("/slack/channels")
 @RequireAtLeastWorkspaceAdmin
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 @Validated
 @Tag(name = "Slack channel activation", description = "Per-workspace Slack channel consent + activation")
 public class SlackChannelAdminController {
 
     private final SlackChannelConsentService consentService;
+    private final SlackChannelDirectoryService directoryService;
 
-    public SlackChannelAdminController(SlackChannelConsentService consentService) {
+    public SlackChannelAdminController(
+        SlackChannelConsentService consentService,
+        SlackChannelDirectoryService directoryService
+    ) {
         this.consentService = consentService;
+        this.directoryService = directoryService;
     }
 
     @GetMapping
@@ -54,6 +61,15 @@ public class SlackChannelAdminController {
     )
     public ResponseEntity<List<SlackMonitoredChannelDTO>> listSlackChannels(WorkspaceContext workspace) {
         return ResponseEntity.ok(consentService.listChannels(workspace.id()));
+    }
+
+    @GetMapping("/candidates")
+    @Operation(
+        operationId = "listSlackChannelCandidates",
+        summary = "List Slack channels available to add to monitoring"
+    )
+    public ResponseEntity<List<SlackChannelCandidateDTO>> listSlackChannelCandidates(WorkspaceContext workspace) {
+        return ResponseEntity.ok(directoryService.listCandidates(workspace.id()));
     }
 
     @PostMapping

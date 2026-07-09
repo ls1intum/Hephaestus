@@ -11,8 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.node.JsonNodeFactory;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Translates Pi {@code AgentSessionEvent} JSON into AI SDK {@link UIMessageChunk}s. Stateful
@@ -23,7 +21,6 @@ import tools.jackson.databind.node.ObjectNode;
 public class PiEventToUiChunkTranslator {
 
     private static final Logger log = LoggerFactory.getLogger(PiEventToUiChunkTranslator.class);
-    private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     /**
      * Translate a single Pi event into zero or more UI chunks. Idempotency / replay handling is
@@ -90,7 +87,7 @@ public class PiEventToUiChunkTranslator {
         // Runner emits this when the per-turn budget is exceeded; the bare type string
         // ("turn_watchdog_fired") leaked to the UI as the error text. Map to a user-facing
         // message; the runner-side correlate is logged at WARN already. Close any open
-        // text/reasoning block first so the AI SDK reducer doesn't crash on an `error` chunk
+        // text block first so the AI SDK reducer doesn't crash on an `error` chunk
         // following an unmatched `*-start` (vercel/ai #11700).
         List<UIMessageChunk> out = new ArrayList<>(closeOpenStreamingBlocks(state));
         out.add(new UIMessageChunk.Error("Mentor turn timed out before completion."));
@@ -117,13 +114,8 @@ public class PiEventToUiChunkTranslator {
     // message_start / Start + StartStep
 
     private List<UIMessageChunk> handleMessageStart(JsonNode event, TranslatorState state) {
-        // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts MessageStartEvent:
-        //   {type:"message_start", message: AgentMessage}
-        // The role lives on `message.role`. Top-level `role` is the older stub-shape; we keep
-        // it as a fallback for backwards compat with the protocol-only test fixtures.
         String role = optionalString(event.path("message"), "role");
-        if (role == null) role = optionalString(event, "role");
-        if (role != null && !"assistant".equals(role)) {
+        if (!"assistant".equals(role)) {
             return List.of();
         }
         // Capture model + any opening usage snapshot on the assistant message header.
@@ -148,7 +140,7 @@ public class PiEventToUiChunkTranslator {
         return List.of(new UIMessageChunk.StartStep());
     }
 
-    // message_update: text_delta + thinking_delta
+    // message_update: text_delta only. Hidden reasoning and tool internals are never user-facing.
 
     private List<UIMessageChunk> handleMessageUpdate(JsonNode event, TranslatorState state) {
         // Pi shape: {type:"message_update", message: AgentMessage, assistantMessageEvent: {...}}
@@ -183,21 +175,10 @@ public class PiEventToUiChunkTranslator {
                 String delta = optionalString(ame, "delta");
                 yield delta == null ? List.of() : textDelta(blockId, delta, state);
             }
-            case "thinking_delta" -> {
-                String delta = optionalString(ame, "delta");
-                yield delta == null ? List.of() : reasoningDelta(blockId, delta, state);
-            }
-            // Pi may interleave text + reasoning blocks within a single message_update stream.
-            // `*_end` events are the authoritative close signal — without honouring them, a
-            // reasoning block followed by a text block in the same message would never drain
-            // its buffer into the persisted parts array (closeXBlock is the only path that
-            // appends), so the reasoning text is LOST on multi-block messages. Open is lazy
-            // (on first delta); close must respect the explicit end signal.
+            case "thinking_delta", "thinking_end" -> List.of();
             case "text_end" -> closeTextIfMatches(blockId, state);
-            case "thinking_end" -> closeReasoningIfMatches(blockId, state);
             // text_start / thinking_start are pure lifecycle markers; we open lazily on the
-            // first delta, so the dedicated start events are no-ops. Tool calls surface via
-            // the top-level `tool_execution_*` events.
+            // first text delta, so the dedicated start events are no-ops.
             case
                 "text_start",
                 "thinking_start",
@@ -225,20 +206,13 @@ public class PiEventToUiChunkTranslator {
         return List.of(new UIMessageChunk.TextEnd(blockId));
     }
 
-    private List<UIMessageChunk> closeReasoningIfMatches(String blockId, TranslatorState state) {
-        if (blockId == null || !blockId.equals(state.activeReasoningId())) return List.of();
-        state.closeReasoningBlock();
-        return List.of(new UIMessageChunk.ReasoningEnd(blockId));
-    }
-
     private static String blockIdFor(JsonNode ame, String innerType) {
         // Pi's contentIndex is the per-message position of the content block. Map it to a stable
         // block id so concurrent deltas merge into the same TextStart on the AI SDK side. We
         // namespace by inner-type so text-0 and reasoning-0 never collide.
         JsonNode idx = ame.path("contentIndex");
         long index = idx.isIntegralNumber() ? idx.asLong() : 0L;
-        String prefix = innerType.startsWith("thinking") ? "reasoning-" : "text-";
-        return prefix + index;
+        return "text-" + index;
     }
 
     private static void capturePartialUsage(JsonNode messageNode, TranslatorState state) {
@@ -266,85 +240,14 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    private List<UIMessageChunk> reasoningDelta(@Nullable String blockId, String deltaText, TranslatorState state) {
-        List<UIMessageChunk> out = new ArrayList<>(2);
-        if (state.activeReasoningId() == null) {
-            String id = blockId != null ? blockId : "reasoning-" + UUID.randomUUID();
-            state.openReasoningBlock(id);
-            out.add(new UIMessageChunk.ReasoningStart(id));
-        }
-        state.appendReasoning(deltaText);
-        out.add(new UIMessageChunk.ReasoningDelta(state.activeReasoningId(), deltaText));
-        return out;
-    }
-
     // tool_execution_start / end
 
     private List<UIMessageChunk> handleToolStart(JsonNode event, TranslatorState state) {
-        // Pi shape per pi-coding-agent extensions/types.ts ToolExecutionStartEvent:
-        //   {type:"tool_execution_start", toolCallId, toolName, args}
-        String toolCallId = optionalString(event, "toolCallId");
-        String toolName = optionalString(event, "toolName");
-        if (toolCallId == null || toolName == null) {
-            log.debug("tool_execution_start missing toolCallId or toolName — skipping: {}", event);
-            return List.of();
-        }
-        JsonNode input = event.has("args") && !event.get("args").isNull() ? event.get("args") : null;
-        state.recordToolCallStart(toolCallId, toolName, input);
-        // Closing any open text block before the tool call mirrors what AI SDK does on the client
-        // — tools render as discrete blocks; keeping text "open" across them confuses the UI.
-        List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
-        out.add(new UIMessageChunk.ToolInputStart(toolCallId, toolName));
-        out.add(
-            new UIMessageChunk.ToolInputAvailable(toolCallId, toolName, input != null ? input : NODES.objectNode())
-        );
-        return out;
+        return closeOpenStreamingBlocks(state);
     }
 
     private List<UIMessageChunk> handleToolEnd(JsonNode event, TranslatorState state) {
-        // Pi shape per ToolExecutionEndEvent:
-        //   {type:"tool_execution_end", toolCallId, toolName, result, isError: boolean}
-        String toolCallId = optionalString(event, "toolCallId");
-        if (toolCallId == null) {
-            log.debug("tool_execution_end missing toolCallId — skipping: {}", event);
-            return List.of();
-        }
-        boolean isError = event.path("isError").asBoolean(false);
-        if (!isError) {
-            JsonNode result = event.path("result");
-            JsonNode output = !result.isMissingNode() && !result.isNull() ? result : null;
-            state.recordToolCallOutput(toolCallId, output);
-            return List.of(
-                new UIMessageChunk.ToolOutputAvailable(toolCallId, output != null ? output : NODES.nullNode())
-            );
-        }
-        String errorText = extractToolErrorText(event);
-        state.recordToolCallError(toolCallId, errorText);
-        return List.of(new UIMessageChunk.ToolOutputError(toolCallId, errorText));
-    }
-
-    /** Max tool-error length surfaced to the UI. Pi's tool result can ship the whole stderr
-     *  (could be MBs). Truncating keeps the AI SDK error banner usable and bounds wire size. */
-    static final int MAX_TOOL_ERROR_LEN = 1024;
-
-    private static String extractToolErrorText(JsonNode event) {
-        String raw = extractToolErrorRaw(event);
-        if (raw == null) return "tool execution failed";
-        if (raw.length() <= MAX_TOOL_ERROR_LEN) return raw;
-        return raw.substring(0, MAX_TOOL_ERROR_LEN) + "…[truncated " + (raw.length() - MAX_TOOL_ERROR_LEN) + " chars]";
-    }
-
-    @Nullable
-    private static String extractToolErrorRaw(JsonNode event) {
-        // Pi tool-result shape: {result: {content: [{type:"text", text:"..."}]}}.
-        JsonNode content = event.path("result").path("content");
-        if (content.isArray() && !content.isEmpty()) {
-            JsonNode first = content.get(0);
-            if (first.isObject() && first.path("text").isString()) {
-                return first.get("text").asString();
-            }
-        }
-        return null;
+        return List.of();
     }
 
     // turn_end
@@ -362,11 +265,6 @@ public class PiEventToUiChunkTranslator {
             String id = state.activeTextId();
             state.closeTextBlock();
             out.add(new UIMessageChunk.TextEnd(id));
-        }
-        if (state.activeReasoningId() != null) {
-            String id = state.activeReasoningId();
-            state.closeReasoningBlock();
-            out.add(new UIMessageChunk.ReasoningEnd(id));
         }
         return out;
     }

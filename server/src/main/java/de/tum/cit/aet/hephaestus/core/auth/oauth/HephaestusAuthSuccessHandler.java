@@ -21,7 +21,6 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Production success handler for {@code oauth2Login}. Delegates account resolution / JIT /
@@ -82,7 +81,6 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     }
 
     @Override
-    @Transactional
     public void onAuthenticationSuccess(
         HttpServletRequest request,
         HttpServletResponse response,
@@ -105,12 +103,18 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         AuthIntentCookie.Intent intent = authIntentCookie.read(request);
         authIntentCookie.clear(response);
 
-        AccountProvisioningService.ProvisionResult provisioned = provisioningService.resolveOrProvision(
-            registrationId,
-            subject,
-            principal,
-            intent
-        );
+        AccountProvisioningService.ProvisionResult provisioned;
+        try {
+            provisioned = provisioningService.resolveOrProvision(registrationId, subject, principal, intent);
+        } catch (LinkOnlyProviderLoginException e) {
+            log.warn("auth.success: refused link-only provider login: {}", e.getMessage());
+            redirectToApp(request, response, "/auth/error?code=link_requires_auth");
+            return;
+        } catch (AccountLinkConflictException e) {
+            log.warn("auth.success: refused link because the identity is already linked to another account");
+            redirectToApp(request, response, "/auth/error?code=identity_already_linked");
+            return;
+        }
         Account account = provisioned.account();
 
         // Authoritative account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must

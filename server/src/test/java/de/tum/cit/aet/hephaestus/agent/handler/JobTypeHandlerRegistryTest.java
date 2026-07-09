@@ -17,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.json.JsonMapper;
 
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
@@ -87,7 +88,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             parser,
             deliveryService,
-            org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class),
+            org.mockito.Mockito.mock(ApplicationEventPublisher.class),
             org.mockito.Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class)
         );
     }

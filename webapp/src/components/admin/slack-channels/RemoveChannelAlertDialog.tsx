@@ -23,10 +23,8 @@ export interface RemoveChannelAlertDialogProps {
 }
 
 /**
- * Strongest safeguard in the surface: a destructive AlertDialog whose confirm action stays
- * disabled until the admin retypes the channel name (nonstandard type-to-confirm, WCAG 3.3.4).
- * Terminal + irreversible: it erases every message collected and its derived observations.
- * Mounted fresh per open (parent `key`) so the typed gate never carries over.
+ * Destructive confirmation for a terminal erase. The confirm action stays disabled until the admin
+ * types the stable Slack channel ID.
  */
 export function RemoveChannelAlertDialog({
 	channel,
@@ -38,7 +36,8 @@ export function RemoveChannelAlertDialog({
 	const [submitting, setSubmitting] = useState(false);
 
 	const label = channel ? (channel.channelName ?? channel.slackChannelId) : "";
-	const matches = confirmText === label;
+	const channelId = channel?.slackChannelId ?? "";
+	const matches = confirmText.trim() === channelId;
 
 	async function confirm() {
 		if (!channel || !matches) return;
@@ -71,7 +70,8 @@ export function RemoveChannelAlertDialog({
 				<div className="space-y-4">
 					<Field>
 						<FieldLabel htmlFor="remove-slack-confirm">
-							Type <span className="font-mono font-medium">{label}</span> to confirm
+							Type the channel ID <span className="font-mono font-medium">{channelId}</span> to
+							confirm
 						</FieldLabel>
 						<Input
 							id="remove-slack-confirm"

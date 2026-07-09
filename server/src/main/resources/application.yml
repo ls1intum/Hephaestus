@@ -181,6 +181,11 @@ hephaestus:
                 display-name: ${GITLAB_OAUTH_DISPLAY_NAME:GitLab}
                 client-id: ${GITLAB_OAUTH_CLIENT_ID:}
                 client-secret: ${GITLAB_OAUTH_CLIENT_SECRET:}
+            slack:
+                type: SLACK
+                display-name: ${SLACK_OAUTH_DISPLAY_NAME:Slack}
+                client-id: ${SLACK_OAUTH_CLIENT_ID:${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}}
+                client-secret: ${SLACK_OAUTH_CLIENT_SECRET:${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}}
         # Token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
         # Buckets are SHARED across replicas via a Postgres ProxyManager (no Redis) when
         # postgres-backed=true (default) and a DataSource is present; otherwise an in-JVM
@@ -211,7 +216,7 @@ hephaestus:
                 capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_CAPACITY:10}
                 period: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_PERIOD:1h}
 
-    host-url: https://hephaestus.ase.cit.tum.de/
+    host-url: ${APPLICATION_HOST_URL:http://localhost:4200}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # RUNTIME ROLES (single JAR, deploy-config-selected mode)
@@ -276,7 +281,7 @@ hephaestus:
         nats:
             enabled: false
             replay-timeframe-days: 7
-            durable-consumer-name: ""
+            durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:hephaestus}
             server: ""
             consumer:
                 # Request timeout for JetStream API calls. Increase for workspaces with many
@@ -301,7 +306,7 @@ hephaestus:
         storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
 
     webapp:
-        url: ${APPLICATION_HOST_URL:http://localhost:4200}
+        url: ${HEPHAESTUS_WEBAPP_URL:${APPLICATION_HOST_URL:http://localhost:4200}}
 
     leaderboard:
         schedule:
@@ -505,12 +510,10 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # INTEGRATION FEATURE FLAGS + SCM/SLACK CONFIG
     # ═══════════════════════════════════════════════════════════════════════════
-    # Slack and Outline integrations are opt-in. Every bean under
-    # integration/slack/** and integration/outline/** carries
-    # @ConditionalOnProperty(...enabled, matchIfMissing=false), so leaving these
-    # unset keeps the OAuth flows, webhook verifiers, and lifecycle listeners
-    # inert. Flip `enabled` to `true` once client-id + client-secret + redirect-uri
-    # are configured.
+    # Slack and Outline runtime surfaces are opt-in. Leaving these unset keeps
+    # OAuth flows, webhook ingress, schedulers, and outbound clients inert; a few
+    # pure helper/subject classes may still load because they do no external work.
+    # Flip `enabled` to `true` once credentials and redirect URLs are configured.
     integration:
         # Generic gate for the fleet-wide flat-stream NATS consumer (IntegrationNatsConsumer stays
         # vendor-neutral in core). Driven by the messaging integrations; today only Slack publishes a
@@ -565,14 +568,13 @@ hephaestus:
             token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
         slack:
             enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
-            # OAuth client-id/client-secret drive the per-workspace install flow (Slack does NOT
-            # support refresh-token rotation for legacy bot tokens, so no refresher ships). Slack
-            # is outbound-only today; there is no inbound webhook signing secret.
+            # OAuth client-id/client-secret drive the per-workspace install flow. Slack also
+            # verifies inbound Events API and interactivity requests.
             client-id: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}
             client-secret: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}
             redirect-uri: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:}
             api-base: ${HEPHAESTUS_INTEGRATION_SLACK_API_BASE:https://slack.com}
-            # App signing secret — verifies inbound Events API POSTs to /slack/events (v0 HMAC over
+            # App signing secret — verifies inbound Events API POSTs to /webhooks/slack and interactivity POSTs to /webhooks/slack/interactivity (v0 HMAC over
             # "v0:{ts}:{rawBody}", 300s replay window). Inbound (mentor DM + channel ingest) is inert without it.
             signing-secret: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:}
             conversation-ingest:
@@ -583,15 +585,9 @@ hephaestus:
                 # firewall, and is forward-only (never pre-announcement history). Nothing is read until a channel
                 # is deliberately activated. Set to false to hard-disable the whole subsystem fleet-wide.
                 enabled: ${HEPHAESTUS_INTEGRATION_SLACK_CONVERSATION_INGEST_ENABLED:true}
-                # Durable channel-message ingest now rides the core NATS/JetStream framework (subject
-                # slack.<team>.<channel>.message, Nats-Msg-Id = slack-<event_id>). It therefore requires
-                # hephaestus.sync.nats.enabled=true; with NATS off the events endpoint replies 503 on the channel
-                # branch so Slack redelivers (never a silent drop). The mentor DM path stays in-process and needs no NATS.
-            mentor:
-                # Per-user cap on mentor DM turns per (UTC) day — a friendly message is sent over-cap, never an error.
-                turns-per-user-per-day: ${HEPHAESTUS_INTEGRATION_SLACK_MENTOR_TURNS_PER_USER_PER_DAY:50}
-                # Fleet-wide daily mentor-turn budget (coarse LLM-spend safety valve, counted per replica).
-                daily-budget: ${HEPHAESTUS_INTEGRATION_SLACK_MENTOR_DAILY_BUDGET:1000}
+                # Slack Events API ingest rides the core /webhooks/slack + NATS/JetStream framework
+                # (subjects slack.<team>.<scope>.<event>, Nats-Msg-Id = slack-<event_id>).
+                # The mentor response stream itself is direct Slack Web API output, not NATS.
     #     outline:
     #         enabled: false
 

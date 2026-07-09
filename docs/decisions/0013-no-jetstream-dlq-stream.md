@@ -48,7 +48,7 @@ What the revert noticed:
 - No persistent record of poisoned message bytes. The operator's primary signal is
   the counter rate.
 
-No `dlq` stream is provisioned in `StreamBootstrap`. No `IntegrationDlqConsumer` bean
+No `dlq` stream is provisioned in `WebhookJetStreamBootstrap`. No `IntegrationDlqConsumer` bean
 exists. No `integration_consumer_dlq` table exists in Liquibase.
 
 ## Considered options

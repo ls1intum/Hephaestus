@@ -510,19 +510,8 @@ erDiagram
         UUID chat_thread_id FK "NOT NULL"
         VARCHAR(32) slack_team_id "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
-        VARCHAR(32) slack_thread_ts
+        VARCHAR(32) slack_thread_ts UK "NOT NULL"
         VARCHAR(32) slack_user_id "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-    }
-
-    MentorTurnRating {
-        UUID id PK
-        BIGINT workspace_id "NOT NULL"
-        BIGINT rater_user_id "NOT NULL"
-        VARCHAR(32) channel_id "NOT NULL"
-        VARCHAR(32) thread_ts
-        VARCHAR(32) slack_message_ts "NOT NULL"
-        VARCHAR(16) rating "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
@@ -871,11 +860,6 @@ erDiagram
         BIGINT actor_user_id
         TEXT reason
         TIMESTAMPTZ created_at "NOT NULL"
-    }
-
-    SlackMentorDailyBudget {
-        DATE day PK
-        INTEGER used "NOT NULL"
     }
 
     SlackMessage {
