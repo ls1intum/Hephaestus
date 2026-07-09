@@ -6,7 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Parity with {@code GithubSubjectParserTest}/{@code GitlabSubjectParserTest}: pins the
@@ -32,35 +36,22 @@ class SlackSubjectParserTest extends BaseUnitTest {
         assertThat(key).isEqualTo(new EventTypeKey(IntegrationKind.SLACK, "message.changed"));
     }
 
-    @Test
-    void blankOrNullSubjectThrows() {
-        assertThatThrownBy(() -> parser.parse(null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("blank");
-        assertThatThrownBy(() -> parser.parse("   "))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("blank");
+    private static Stream<Arguments> invalidSubjects() {
+        return Stream.of(
+            Arguments.of("null subject", null, "blank"),
+            Arguments.of("blank subject", "   ", "blank"),
+            Arguments.of("wrong prefix", "github.a.b.c", "slack."),
+            Arguments.of("too few components", "slack.T1.C1", ">= 4"),
+            Arguments.of("blank event segment", "slack.T1.C1.", "event segment must not be blank")
+        );
     }
 
-    @Test
-    void wrongPrefixThrows() {
-        assertThatThrownBy(() -> parser.parse("github.a.b.c"))
+    @ParameterizedTest(name = "{0} throws")
+    @MethodSource("invalidSubjects")
+    void invalidSubjectThrows(String description, String subject, String expectedMessageFragment) {
+        assertThatThrownBy(() -> parser.parse(subject))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("slack.");
-    }
-
-    @Test
-    void tooFewComponentsThrows() {
-        assertThatThrownBy(() -> parser.parse("slack.T1.C1"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining(">= 4");
-    }
-
-    @Test
-    void blankEventSegmentThrows() {
-        assertThatThrownBy(() -> parser.parse("slack.T1.C1."))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("event segment must not be blank");
+            .hasMessageContaining(expectedMessageFragment);
     }
 
     @Test

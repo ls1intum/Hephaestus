@@ -15,9 +15,9 @@ public interface MentorSlackThreadRepository extends JpaRepository<MentorSlackTh
         String slackThreadTs
     );
 
-    /** Workspace purge: delete every DM→mentor-thread mapping for one workspace. Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every DM→mentor-thread mapping for one workspace. */
     long deleteByWorkspaceId(Long workspaceId);
 
-    /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
+    /** Scoped row count for a workspace. */
     long countByWorkspaceId(Long workspaceId);
 }

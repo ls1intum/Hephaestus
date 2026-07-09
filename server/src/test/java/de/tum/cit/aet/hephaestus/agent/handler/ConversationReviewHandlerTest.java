@@ -103,8 +103,8 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
 
     /**
-     * The spike: a conversation-review job is REPO-LESS. It carries no SCM source mount and no volume
-     * mounts, so the orchestrator/runner run without a clone. These lock that contract.
+     * A conversation-review job is REPO-LESS: it carries no SCM source mount and no volume mounts, so the
+     * orchestrator/runner run without a clone.
      */
     @Nested
     class RepoLessSpike {
@@ -147,7 +147,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             // "context + task, nothing else" shape the test name asserts.
             assertThat(files).containsKey(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json");
             assertThat(files).containsKey(SandboxLayout.TASK_ENVELOPE_FILENAME);
-            // Repo-less proof: no SCM source keep file is written anywhere in the prepared workspace.
+            // No SCM source keep file is written anywhere in the prepared workspace.
             assertThat(files).doesNotContainKey(SandboxLayout.SCM_SOURCE_KEEP);
             assertThat(files.keySet()).noneMatch(k -> k.startsWith(SandboxLayout.SOURCES_PREFIX));
         }

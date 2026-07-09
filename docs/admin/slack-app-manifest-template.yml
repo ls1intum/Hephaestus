@@ -35,7 +35,6 @@ oauth_config:
       - channels:read
       - channels:join
       - groups:read
-      - mpim:read
       - users:read
     user:
       - openid

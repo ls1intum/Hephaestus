@@ -18,7 +18,7 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Slack thread aggregate (root message + its replies) keyed by {@code slack_thread_ts} (P3). Workspace-scoped
+ * A Slack thread aggregate (root message + its replies) keyed by {@code slack_thread_ts}. Workspace-scoped
  * (scalar {@code workspaceId}); loosely coupled to {@link SlackMessage} by {@code (slackChannelId, slackThreadTs)}
  * rather than a hard FK, so message ingestion and thread bookkeeping stay independently idempotent.
  */

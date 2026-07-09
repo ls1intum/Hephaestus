@@ -43,9 +43,7 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
         if (slackThreadIds.isEmpty()) {
             return 0;
         }
-        // Feedback first: its ON DELETE CASCADE cleans feedback_observation / placement / reaction. Then the
-        // observations, clearing any remaining join/reaction children. Both are pinned to CONVERSATION_THREAD +
-        // artifact_id ∈ threads + workspace, so no PR/ISSUE or cross-tenant row is in range.
+        // Cascade order + scope pinning: see class javadoc. Scoped to the given thread ids.
         int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedback(workspaceId, slackThreadIds);
         int observationsDeleted = observationRepository.deleteConversationThreadObservations(
             workspaceId,
@@ -66,8 +64,8 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
     @Override
     @Transactional
     public int eraseAllConversationForWorkspace(long workspaceId) {
-        // Feedback first (its ON DELETE CASCADE cleans the join/placement/reaction children), then observations.
-        // Both pin CONVERSATION_THREAD + workspace, so no PR/ISSUE or cross-tenant row is in range.
+        // Cascade order + scope pinning: see class javadoc. Workspace-wide (every CONVERSATION_THREAD row), not
+        // thread-scoped.
         int feedbackDeleted = feedbackRepository.deleteAllConversationThreadFeedback(workspaceId);
         int observationsDeleted = observationRepository.deleteAllConversationThreadObservations(workspaceId);
         if (feedbackDeleted > 0 || observationsDeleted > 0) {
@@ -84,8 +82,8 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
     @Override
     @Transactional
     public int eraseConversationFeedbackAboutUser(long workspaceId, long aboutUserId) {
-        // Feedback first (cascade cleans children), then observations. Both pin CONVERSATION_THREAD + workspace +
-        // about_user_id, so another person's rows, PR/ISSUE rows, and other tenants' rows are all left intact.
+        // Cascade order + scope pinning: see class javadoc. Additionally pinned to about_user_id, so only that
+        // person's rows are erased.
         int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedbackAboutUser(workspaceId, aboutUserId);
         int observationsDeleted = observationRepository.deleteConversationThreadObservationsAboutUser(
             workspaceId,

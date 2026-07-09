@@ -41,11 +41,7 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
     private SlackConversationTestSupport support;
 
-    /**
-     * Add the raw-JDBC-only {@code slack_thread} columns to the entity-derived test schema (they are unmapped on the
-     * {@code SlackThread} entity — see {@link SlackConversationTestSupport}). The DDL is shared with
-     * {@code ConversationThreadDetectionIntegrationTest} so the two hand-rolled copies cannot drift.
-     */
+    /** Add the raw-JDBC-only {@code slack_thread} columns to the entity-derived test schema — see {@link SlackConversationTestSupport}. */
     @BeforeEach
     void ensureUnmappedSlackThreadColumns() {
         support = new SlackConversationTestSupport(jdbc);

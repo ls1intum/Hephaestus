@@ -41,14 +41,9 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
  *
- * <p><strong>Consent gate (fail-closed).</strong> A {@code CONVERSATION_THREAD} feedback unit's body is composed
- * from the raw messages of a Slack thread (its {@code artifactId} IS the source {@code slack_thread.id}), so it is
- * surfaced ONLY while that thread's source channel consent is still {@code ACTIVE} — the same
- * {@link ConversationConsentGate} gate the raw {@code SlackConversationProjector} applies. PR- and ISSUE-derived
- * feedback carries no Slack content and passes through unchanged. When a surviving conversation unit is present,
- * the whole payload carries the {@code _meta.trustLevel: "UNTRUSTED_EXTERNAL"} quarantine envelope; a PR/issue-only
- * payload keeps its trusted shape (no envelope). The consent decision is (re)computed on every cache build, so a
- * revoked channel's derived body clears within one cache TTL ({@code MENTOR_CONTEXT_TTL} = 5 min) at the latest.
+ * <p><strong>Consent gate.</strong> CONVERSATION_THREAD-derived feedback bodies are consent-filtered and
+ * quarantine-enveloped before inclusion here, recomputed on every cache build (TTL {@code MENTOR_CONTEXT_TTL} =
+ * 5 min); see {@link ConversationConsentGate} for the shared contract.
  */
 @Component
 @RequiredArgsConstructor
@@ -121,8 +116,7 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             PageRequest.of(0, MAX_DELIVERED)
         );
 
-        // Fail-closed consent gate (see class javadoc): a CONVERSATION_THREAD feedback unit surfaces only while its
-        // source Slack channel is ACTIVE. PR/ISSUE feedback carries no Slack content and is never gated.
+        // Fail-closed consent gate — see ConversationConsentGate.
         Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
             workspaceId,
             conversationThreadIds(delivered)

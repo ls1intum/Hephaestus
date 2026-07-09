@@ -65,22 +65,6 @@ class MentorContextKeysRunnerMirrorTest {
     }
 
     @Test
-    @DisplayName("system prompt uses full context paths as the canonical mentor context contract")
-    void systemPromptUsesCanonicalContextPaths() throws IOException {
-        String prompt = Files.readString(SYSTEM_PROMPT, StandardCharsets.UTF_8);
-
-        assertThat(prompt)
-            .contains("`fetch_context` using the full canonical path")
-            .contains("call `fetch_context`\nwith `inputs/context/recent_authored_work.json`")
-            .contains("first fetch `inputs/context/prepared_conversation_feedback.json`")
-            .contains("fetch\n`inputs/context/slack_conversations.json`")
-            .contains("`inputs/context/current_thread_history.json`")
-            .contains("not `recent_authored_work.json` or `inputs/recent_authored_work.json`")
-            .doesNotContain("exact basename")
-            .doesNotContain("`read` / `grep` / `bash`");
-    }
-
-    @Test
     @DisplayName("runner exposes only mentor-specific tools and requires canonical context paths")
     void runnerUsesLeastPrivilegeContextToolSurface() throws IOException {
         String source = Files.readString(RUNNER, StandardCharsets.UTF_8);

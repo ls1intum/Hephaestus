@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
  *       registry (a {@code Map<IntegrationKind, …Channel>} keyed by {@code channel.kind()}),
  *       never by naming a concrete enum constant ({@code IntegrationKind.GITHUB} /
  *       {@code GITLAB} / {@code SLACK}), and must never reach for the legacy
- *       {@code IdentityProviderType} enum at all. This is Issue #1198 AC#8: the delivery classes
+ *       {@code IdentityProviderType} enum at all. The delivery classes
  *       {@code DiffNotePoster}, {@code PullRequestCommentPoster}, {@code FeedbackDeliveryService}
  *       must not branch on the provider enum.
  * </ul>
@@ -89,7 +89,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * Issue #1198 AC#8 — the load-bearing invariant.
+     * The load-bearing invariant.
      *
      * <p>Agent-side code must dispatch on the provider through the SPI <em>registry</em>
      * ({@code Map<IntegrationKind, …Channel>} populated from Spring beans and looked up by
@@ -124,7 +124,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
             // vacuously — the population is the whole agent module and is never legitimately empty.
             .allowEmptyShould(false)
             .because(
-                "Issue #1198 AC#8: agent/** dispatches on the provider via the SPI registry " +
+                "agent/** dispatches on the provider via the SPI registry " +
                     "(Map<IntegrationKind, …Channel> keyed by channel.kind()). Reading a concrete " +
                     "IntegrationKind constant (GITHUB/GITLAB/SLACK) — or touching the legacy " +
                     "IdentityProviderType enum at all — is the branch-on-provider smell; push the " +

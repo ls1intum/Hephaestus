@@ -547,38 +547,34 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("retention sweep deletes only messages older than the default window, per workspace")
-        void retentionSweepDeletesOnlyExpiredMessages() {
-            // Arrange — workspace A has recent + expired threads; workspace B has only a recent thread.
+        @DisplayName(
+            "retention sweep processes each workspace independently: B's recent message survives A's expired prune"
+        )
+        void retentionSweepIsWorkspaceIsolated() {
+            // Age-based pruning itself (which ts survives, message-grain vs. thread-grain) is proven by
+            // SlackRetentionErasureIntegrationTest; this is the cross-workspace delta it doesn't cover — that the
+            // sweep loop enumerates workspaces independently, so A's expired data cannot affect B's recent data.
             // Neither workspace has a Slack Connection, so both resolve to DEFAULT_RETENTION_DAYS (30d).
             Instant now = Instant.now();
             Workspace a = createBareWorkspace("slack-retain-a");
             Workspace b = createBareWorkspace("slack-retain-b");
-            String aRecent = slackTs(now);
             String aExpired = slackTs(now.minus(Duration.ofDays(40)));
-            String aVeryExpired = slackTs(now.minus(Duration.ofDays(200)));
             String bRecent = slackTs(now);
-            insertThread(a.getId(), "C1", aRecent, aRecent);
             insertThread(a.getId(), "C1", aExpired, aExpired);
-            insertThread(a.getId(), "C1", aVeryExpired, aVeryExpired);
             insertThread(b.getId(), "C1", bRecent, bRecent);
-            insertMessage(a.getId(), aRecent, aRecent, now);
             insertMessage(a.getId(), aExpired, aExpired, now.minus(Duration.ofDays(40)));
-            insertMessage(a.getId(), aVeryExpired, aVeryExpired, now.minus(Duration.ofDays(200)));
             insertMessage(b.getId(), bRecent, bRecent, now);
 
-            // Act
             slackRetentionSweeper.sweepNow();
 
-            // Assert — only the two expired threads in A are gone; A's recent row and all of B survive.
-            assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isEqualTo(1);
+            assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(slackMessageRepository.countByWorkspaceId(b.getId())).isEqualTo(1);
         }
 
         @Test
         @DisplayName("purge empties every Slack table for the workspace while other workspaces stay intact")
         void purgeEmptiesAllSlackTables() {
-            // Arrange — seed all four Slack tables for both A and B.
+            // Seed all four Slack tables for both A and B.
             Instant now = Instant.now();
             Workspace a = createBareWorkspace("slack-purge-a");
             Workspace b = createBareWorkspace("slack-purge-b");
@@ -587,10 +583,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             seedAggregates(a, "CA", "300.1");
             seedAggregates(b, "CB", "400.1");
 
-            // Act
             workspaceLifecycleService.purgeWorkspace(a.getWorkspaceSlug());
 
-            // Assert — A's Slack rows are empty; B's rows are untouched.
+            // A's Slack rows are empty; B's rows are untouched.
             assertThat(slackMessageRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(slackThreadRepository.countByWorkspaceId(a.getId())).isZero();
             assertThat(slackMonitoredChannelRepository.countByWorkspaceId(a.getId())).isZero();
@@ -631,7 +626,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             threadB = slackThreadRepository.save(threadB);
             java.util.UUID convObsB = seedDerivedConversation(b, threadB.getId());
 
-            // Act — drive the Slack purge contributor for A in isolation (the real chain wraps the contributors in
+            // Drive the Slack purge contributor for A in isolation (the real chain wraps the contributors in
             // one transaction, so mirror that with a TransactionTemplate). It is the explicit
             // eraseAllConversationForWorkspace call (not the practices contributor) that must erase the derived rows
             // here, so this fails if that port call is removed from the adapter.

@@ -219,34 +219,6 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void optedOutParticipant_failsClosed_storesNothing() {
-        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
-        when(consentGate.ingestAllowed(WORKSPACE, "C1")).thenReturn(true);
-        when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1")).thenReturn(
-            Optional.of(ANNOUNCED_BEFORE)
-        );
-        when(participantConsentGate.ingestionAllowed(WORKSPACE, "U1")).thenReturn(false); // opted out
-
-        handler.onMessage(natsMessage(PLAIN_MESSAGE));
-
-        verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void forwardOnly_preAnnouncementMessage_isNotStored() {
-        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
-        when(consentGate.ingestAllowed(WORKSPACE, "C1")).thenReturn(true);
-        // Announcement stamped AFTER the message ts (epoch 200 > 100.1) — the backlog before consent never enters.
-        when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1")).thenReturn(
-            Optional.of(Instant.ofEpochSecond(200))
-        );
-
-        handler.onMessage(natsMessage(PLAIN_MESSAGE));
-
-        verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
     void botMessage_isIgnored() {
         handler.onMessage(
             natsMessage(
@@ -403,10 +375,12 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
     }
 
-    /** The tombstone path gates on the SAME channel-consent + forward-only rules as ingest (no participant gate). */
-    private void stubActiveConsentedChannelForTombstone() {
+    /**
+     * The tombstone path applies in every consent state (a delete must erase a copy stored while ACTIVE even if the
+     * channel is now PAUSED); only the forward-only announcement window gates it. No participant gate.
+     */
+    private void stubAnnouncedChannelForTombstone() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
-        when(consentGate.ingestAllowed(WORKSPACE, "C1")).thenReturn(true);
         when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1")).thenReturn(
             Optional.of(ANNOUNCED_BEFORE)
         );
@@ -414,7 +388,7 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
 
     @Test
     void messageDeleted_tombstonesOnDeletedTs_notEventTs() {
-        stubActiveConsentedChannelForTombstone();
+        stubAnnouncedChannelForTombstone();
 
         handler.onMessage(
             natsMessage(
@@ -431,7 +405,7 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
 
     @Test
     void messageDeleted_fallsBackToPreviousMessageTs() {
-        stubActiveConsentedChannelForTombstone();
+        stubAnnouncedChannelForTombstone();
 
         handler.onMessage(
             natsMessage(
@@ -446,9 +420,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void messageDeleted_onNonActiveChannel_tombstonesNothing() {
-        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
-        when(consentGate.ingestAllowed(WORKSPACE, "C1")).thenReturn(false); // PENDING/PAUSED/REVOKED
+    void messageDeleted_onPausedChannel_stillTombstones() {
+        // PAUSED retains rows stored while the channel was ACTIVE; the author's delete must erase our copy anyway,
+        // so the tombstone deliberately ignores the consent state (the gate mock is never consulted).
+        stubAnnouncedChannelForTombstone();
 
         handler.onMessage(
             natsMessage(
@@ -459,16 +434,24 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
             )
         );
 
-        // A delete on a channel we don't ingest must not create a (contentless) tombstone row.
-        verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
+        verify(messageRepository).tombstone(eq(WORKSPACE), eq("T1"), eq("C1"), eq("100.1"), any(Instant.class));
     }
 
     @Test
-    void unresolvedTeam_storesNothing() {
-        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.empty());
+    void messageDeleted_onNeverAnnouncedChannel_tombstonesNothing() {
+        when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(WORKSPACE));
+        when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1")).thenReturn(Optional.empty());
 
-        handler.onMessage(natsMessage(PLAIN_MESSAGE));
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+                """
+            )
+        );
 
-        verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
+        // Nothing was ever stored on a never-announced channel; no contentless tombstone row is created.
+        verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
     }
 }

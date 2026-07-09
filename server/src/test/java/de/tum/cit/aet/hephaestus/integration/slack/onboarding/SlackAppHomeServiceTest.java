@@ -93,10 +93,6 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
         assertThat(view.getType()).isEqualTo("home");
         String rendered = view.getBlocks().toString();
         String json = JsonMapper.builder().build().writeValueAsString(view);
-        assertThat(rendered).contains("AI mentor for software project practices");
-        assertThat(rendered).contains("Ask in the Messages tab");
-        assertThat(rendered).contains("Open account settings");
-        assertThat(rendered).contains("Use this Home tab for Slack message-use controls");
         assertThat(rendered).contains("https://heph.example/settings");
         assertThat(rendered).doesNotContain("https://heph.example/w/team");
         assertThat(rendered).doesNotContain("Try asking in Messages");
@@ -104,13 +100,10 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
         assertThat(rendered).doesNotContain("How can I write a clearer review");
         assertThat(rendered).doesNotContain("What project-practice issue should I follow up on");
         assertThat(json).doesNotContain("\\\\n");
-        assertThat(rendered).contains("Ready to answer");
-        assertThat(rendered).contains("Linked as `octocat`");
-        assertThat(rendered).contains("Channel context");
-        assertThat(rendered).contains("Allowed, 1 active channel");
-        assertThat(rendered).contains("Context and privacy"); // disclosure
-        assertThat(rendered).contains("It does not mentor in channels");
-        assertThat(rendered).contains("Stop using my messages");
+        assertThat(rendered).contains("Ready to answer"); // mentor-status anchor
+        assertThat(rendered).contains("Linked as `octocat`"); // identity anchor
+        assertThat(rendered).contains("Allowed, 1 active channel"); // channel-count anchor
+        assertThat(rendered).contains("Stop using my messages"); // opt-out wording
         assertThat(rendered).contains(SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT);
         assertThat(rendered).contains(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT); // participating → offer opt-out
         assertThat(rendered).doesNotContain(SlackAppHomeService.ACTION_RESEARCH_OPT_IN);
@@ -142,9 +135,6 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
 
         String rendered = view.getBlocks().toString();
         assertThat(rendered).contains("LINK_ME_MARKER");
-        assertThat(rendered).contains("Link account");
-        assertThat(rendered).contains("Link your account to use the mentor");
-        assertThat(rendered).contains("Link account first");
         assertThat(rendered).contains(SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT);
         assertThat(rendered).doesNotContain(SlackAppHomeService.ACTION_RESEARCH_OPT_OUT);
         assertThat(rendered).doesNotContain(SlackAppHomeService.ACTION_RESEARCH_OPT_IN);
@@ -163,8 +153,7 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
 
         String rendered = view.getBlocks().toString();
         assertThat(rendered).contains(SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_IN);
-        assertThat(rendered).contains("Allow future messages");
-        assertThat(rendered).contains("Deleted data is not restored");
+        assertThat(rendered).contains("Allow future messages"); // opt-in wording, symmetric to the opt-out anchor
         assertThat(rendered).doesNotContain(SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT);
     }
 

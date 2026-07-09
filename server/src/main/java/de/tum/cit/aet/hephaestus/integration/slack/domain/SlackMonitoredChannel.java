@@ -18,9 +18,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A Slack channel the workspace has allow-listed for monitoring (P3). The consent lifecycle rides a dedicated
+ * A Slack channel the workspace has allow-listed for monitoring. The consent lifecycle rides a dedicated
  * state column on the allow-list row rather than a separate table. Workspace-scoped (scalar {@code workspaceId});
- * ingestion only flows for a channel whose {@link ConsentState} is {@code ACTIVE} — enforced by the P3 message
+ * ingestion only flows for a channel whose {@link ConsentState} is {@code ACTIVE} — enforced by the message
  * handler, not by this row's mere presence.
  */
 @Entity

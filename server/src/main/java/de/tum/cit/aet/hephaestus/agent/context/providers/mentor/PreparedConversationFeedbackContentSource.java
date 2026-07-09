@@ -24,18 +24,9 @@ import tools.jackson.databind.node.ObjectNode;
  * shortlist. Facts + practice only, never a body (a PREPARED unit carries a NULL body by construction; the
  * mentor composes the wording at delivery). {@code originId="core"}. Best-effort.
  *
- * <p><strong>Consent gate (fail-closed).</strong> A CONVERSATION_THREAD-derived fact's {@code title}/{@code
- * reasoning} is LLM-composed from the raw messages of a Slack thread's participants, so it may only surface while
- * that thread's source channel consent is still {@code ACTIVE} — the same gate {@code SlackConversationProjector}
- * applies on the raw message read. A paused/revoked/erased channel (or a deleted thread) yields nothing here, so a
- * withdrawn-consent channel's derived reasoning never flows into the developer's next mentor turn. Facts derived
- * from a PR or issue carry no Slack content and are surfaced unconditionally. The check is raw JDBC by table name
- * (no Hibernate, explicit {@code workspace_id} pin) mirroring the projector, so no cross-module import is added.
- *
- * <p><strong>Untrusted-content quarantine.</strong> Because a fact's title/reasoning is model output over
- * attacker-controlled third-party text, the whole payload carries the {@code _meta.trustLevel:
- * "UNTRUSTED_EXTERNAL"} envelope (matching the projector) and the mentor {@code system.md} names this file in its
- * untrusted-content list, so a surviving injection is treated as DATA, never as instructions.
+ * <p><strong>Consent gate.</strong> CONVERSATION_THREAD-derived facts are consent-filtered before inclusion, and
+ * this payload always carries the {@code UNTRUSTED_EXTERNAL} quarantine envelope; see {@link ConversationConsentGate}
+ * for the shared contract.
  */
 @Component
 public class PreparedConversationFeedbackContentSource implements ContentSource {
@@ -86,9 +77,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
                 PageRequest.of(0, MAX_PREPARED)
             );
 
-        // Fail-closed consent gate for the Slack-derived facts (see class javadoc): only CONVERSATION_THREAD facts
-        // whose source channel is still ACTIVE survive; a non-ACTIVE (paused/revoked/erased) channel or a deleted
-        // thread contributes no id and its fact is dropped.
+        // Fail-closed consent gate — see ConversationConsentGate.
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
 
         ObjectNode root = objectMapper.createObjectNode();

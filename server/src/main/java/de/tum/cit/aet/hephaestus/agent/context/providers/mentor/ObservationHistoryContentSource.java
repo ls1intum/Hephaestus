@@ -43,16 +43,9 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
  *
- * <p><strong>Consent gate (fail-closed).</strong> A {@code CONVERSATION_THREAD} observation's title + reasoning is
- * LLM-composed from the raw messages of a Slack thread's participants (its {@code artifactId} IS the source
- * {@code slack_thread.id}). Such an observation is surfaced ONLY while its source channel consent is still
- * {@code ACTIVE} — the same {@link ConversationConsentGate} gate the raw {@code SlackConversationProjector} applies.
- * A paused/revoked/erased channel (or a deleted thread) drops the row (fail-closed). PR- and ISSUE-derived
- * observations carry no Slack content and pass through unchanged. When a surviving conversation row is present, the
- * whole payload carries the {@code _meta.trustLevel: "UNTRUSTED_EXTERNAL"} quarantine envelope; a PR/issue-only
- * payload keeps its trusted shape (no envelope). The consent decision is (re)computed on every cache build, so a
- * revoked channel's derived reasoning clears within one cache TTL ({@code MENTOR_CONTEXT_TTL} = 5 min) at the
- * latest; the authoritative always-fresh gate is {@link PreparedConversationFeedbackContentSource} (uncached).
+ * <p><strong>Consent gate.</strong> CONVERSATION_THREAD-derived observations are consent-filtered and
+ * quarantine-enveloped before inclusion here, recomputed on every cache build (TTL {@code MENTOR_CONTEXT_TTL} =
+ * 5 min); see {@link ConversationConsentGate} for the shared contract.
  */
 @Component
 @RequiredArgsConstructor
@@ -142,8 +135,7 @@ public class ObservationHistoryContentSource implements ContentSource {
             PageRequest.of(0, MAX_RECENT_REVIEWS)
         );
 
-        // Fail-closed consent gate (see class javadoc): a CONVERSATION_THREAD observation surfaces only while its
-        // source Slack channel is ACTIVE. PR/ISSUE observations carry no Slack content and are never gated.
+        // Fail-closed consent gate — see ConversationConsentGate.
         Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(workspaceId, conversationThreadIds(recent));
         boolean anyConversationSurvivor = recent.stream().anyMatch(o -> isSurvivingConversation(o, activeThreadIds));
 

@@ -2,33 +2,17 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.FeedbackChannelRouter;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.RoutingContext;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -50,9 +34,7 @@ import tools.jackson.databind.ObjectMapper;
  * derived from a non-Slack artifact (a PR) is surfaced unconditionally: the gate applies only to the
  * Slack-content-bearing CONVERSATION_THREAD facts. Deterministic.
  */
-class PreparedConversationFeedbackConsentGateIntegrationTest extends BaseIntegrationTest {
-
-    private static final ObjectMapper OM = new ObjectMapper();
+class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGateIntegrationTest {
 
     @Autowired
     private PreparedConversationFeedbackContentSource contentSource;
@@ -73,34 +55,14 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends BaseIntegra
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private IdentityProviderRepository identityProviderRepository;
-
-    @Autowired
-    private SlackThreadRepository slackThreadRepository;
-
-    @Autowired
-    private SlackMonitoredChannelRepository slackMonitoredChannelRepository;
-
-    @Autowired
     private ObjectMapper objectMapper;
 
-    private Workspace workspace;
     private Practice practice;
-    private User recipient;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("conv-consent-gate-test"));
+        setUpWorkspaceAndRecipient("conv-consent-gate-test");
         practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
@@ -108,12 +70,6 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends BaseIntegra
         practice.setCriteria("Test description");
         practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
-        IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
-        recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
     }
 
     @Test
@@ -181,30 +137,6 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends BaseIntegra
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
         preparer.prepare(job.getId(), workspace.getId(), admitted);
-    }
-
-    /** Seed a monitored channel at {@code consent} plus one thread on it; return the generated {@code slack_thread.id}. */
-    private long seedThread(String channelId, String threadTs, ConsentState consent) {
-        SlackMonitoredChannel channel = new SlackMonitoredChannel();
-        channel.setWorkspaceId(workspace.getId());
-        channel.setSlackTeamId("T1");
-        channel.setSlackChannelId(channelId);
-        channel.setConsentState(consent);
-        slackMonitoredChannelRepository.save(channel);
-
-        SlackThread thread = new SlackThread();
-        thread.setWorkspaceId(workspace.getId());
-        thread.setSlackChannelId(channelId);
-        thread.setSlackThreadTs(threadTs);
-        return slackThreadRepository.save(thread).getId();
-    }
-
-    private AgentJob newJob() {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(job);
     }
 
     private Observation saveConversationObservation(AgentJob job, String occurrenceKey, long threadId) {

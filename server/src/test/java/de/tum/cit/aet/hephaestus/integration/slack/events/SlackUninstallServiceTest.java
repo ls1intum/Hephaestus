@@ -16,8 +16,12 @@ import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurge
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -49,6 +53,9 @@ class SlackUninstallServiceTest extends BaseUnitTest {
     private ConversationFeedbackErasure conversationFeedbackErasure;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService messageService;
+
+    @Mock
     private Connection connection;
 
     private SlackUninstallService service() {
@@ -57,45 +64,51 @@ class SlackUninstallServiceTest extends BaseUnitTest {
             connectionService,
             purgeAdapter,
             mentorSlackThreadService,
-            conversationFeedbackErasure
+            conversationFeedbackErasure,
+            messageService
         );
     }
 
-    @Test
-    void appUninstalled_flipsConnectionUninstalled_thenPurges() {
+    private static Stream<Arguments> eventTypeMapping() {
+        return Stream.of(
+            Arguments.of("app_uninstalled", "Ev1", "APP_UNINSTALLED", "slack-app_uninstalled-Ev1"),
+            Arguments.of("tokens_revoked", "Ev2", "TOKENS_REVOKED", "slack-tokens_revoked-Ev2")
+        );
+    }
+
+    @ParameterizedTest(name = "{0} maps to eventType {2}")
+    @MethodSource("eventTypeMapping")
+    void eventTypeMapsToConnectionTransition(
+        String slackEventType,
+        String eventId,
+        String expectedEventType,
+        String expectedCorrelationId
+    ) {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         when(connectionService.findActive(WORKSPACE, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
 
-        service().onUninstall(TEAM, "app_uninstalled", "Ev1");
+        service().onUninstall(TEAM, slackEventType, eventId);
 
         ArgumentCaptor<ConnectionService.TransitionRequest> captor = ArgumentCaptor.forClass(
             ConnectionService.TransitionRequest.class
         );
         verify(connectionService).transition(eq(connection), captor.capture());
         assertThat(captor.getValue().next()).isEqualTo(IntegrationState.UNINSTALLED);
-        assertThat(captor.getValue().eventType()).isEqualTo("APP_UNINSTALLED");
-        assertThat(captor.getValue().correlationId()).isEqualTo("slack-app_uninstalled-Ev1");
-        verify(conversationFeedbackErasure).eraseAllConversationForWorkspace(WORKSPACE);
-        verify(purgeAdapter).deleteWorkspaceData(WORKSPACE);
+        assertThat(captor.getValue().eventType()).isEqualTo(expectedEventType);
+        assertThat(captor.getValue().correlationId()).isEqualTo(expectedCorrelationId);
+    }
+
+    @Test
+    void appUninstalled_purgesWorkspaceDataInOrder() {
+        when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
+        when(connectionService.findActive(WORKSPACE, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
+
+        service().onUninstall(TEAM, "app_uninstalled", "Ev1");
+
         InOrder order = Mockito.inOrder(conversationFeedbackErasure, purgeAdapter);
         order.verify(conversationFeedbackErasure).eraseAllConversationForWorkspace(WORKSPACE);
         order.verify(purgeAdapter).deleteWorkspaceData(WORKSPACE);
         verify(mentorSlackThreadService).purgeSlackThreads(WORKSPACE);
-    }
-
-    @Test
-    void tokensRevoked_recordsRevokedEventType() {
-        when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(connectionService.findActive(WORKSPACE, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
-
-        service().onUninstall(TEAM, "tokens_revoked", "Ev2");
-
-        ArgumentCaptor<ConnectionService.TransitionRequest> captor = ArgumentCaptor.forClass(
-            ConnectionService.TransitionRequest.class
-        );
-        verify(connectionService).transition(eq(connection), captor.capture());
-        assertThat(captor.getValue().eventType()).isEqualTo("TOKENS_REVOKED");
-        assertThat(captor.getValue().correlationId()).isEqualTo("slack-tokens_revoked-Ev2");
     }
 
     @Test

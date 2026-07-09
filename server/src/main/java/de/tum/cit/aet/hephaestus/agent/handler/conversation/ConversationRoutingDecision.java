@@ -14,6 +14,6 @@ public enum ConversationRoutingDecision {
     HAS_INLINE_ANCHOR,
     /** The same locus (recurrence_key) was already DELIVERED in-context to this recipient - do not re-raise it. */
     ALREADY_DELIVERED_IN_CONTEXT,
-    /** Reviewer-targeted - explicit deferral behind ADR-0021-C2 reviewer attribution (not a silent drop). */
+    /** Reviewer-targeted - deferred (ADR-0021-C2). */
     REVIEWER_DEFERRED,
 }

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,8 +55,9 @@ public class SlackRetentionPurger {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long purgeWorkspaceBefore(long workspaceId, Instant cutoff) {
         // Aged threads: last_ts strictly older than the cutoff, rendered as a Slack ts string for a lexicographic
-        // (== numeric, for the fixed <10-digit>.<6-digit> format) comparison.
-        String cutoffTs = String.format("%010d.000000", cutoff.getEpochSecond());
+        // (== numeric, for the fixed <10-digit>.<6-digit> format) comparison. Locale.ROOT: localized digits would
+        // silently match nothing and stop the purge.
+        String cutoffTs = String.format(Locale.ROOT, "%010d.000000", cutoff.getEpochSecond());
         List<Long> agedThreadIds = slackThreadRepository.findAgedThreadIds(workspaceId, cutoffTs);
 
         // 1) Erase the derived CONVERSATION_THREAD feedback/observations BEFORE dropping the aggregates they point at.

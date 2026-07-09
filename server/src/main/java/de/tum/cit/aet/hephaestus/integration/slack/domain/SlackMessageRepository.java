@@ -36,13 +36,12 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         @Param("threadIds") java.util.Collection<Long> threadIds
     );
 
-    /** Workspace purge: delete every ingested message for one workspace. Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every ingested message for one workspace. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /**
      * Channel erasure: delete every ingested message of one channel promptly (not waiting for the 180-day
-     * retention sweep) when its consent is withdrawn. Derived DELETE carries the {@code workspace_id} predicate the
-     * tenancy inspector requires; idempotent (returns 0 when the channel had nothing ingested).
+     * retention sweep) when its consent is withdrawn. Idempotent (returns 0 when the channel had nothing ingested).
      */
     long deleteByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
 
@@ -73,7 +72,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         @Param("slackUserId") String slackUserId
     );
 
-    /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
+    /** Scoped row count for a workspace. */
     long countByWorkspaceId(Long workspaceId);
 
     /**

@@ -6,10 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
+import java.util.stream.Stream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 class SlackSignatureVerifierTest extends BaseUnitTest {
@@ -24,15 +28,6 @@ class SlackSignatureVerifierTest extends BaseUnitTest {
         String sig = sign(SECRET, ts, body);
 
         assertThat(newVerifier(SECRET).verify(ts, sig, body, NOW)).isTrue();
-    }
-
-    @Test
-    void expiredTimestampOutsideReplayWindowRejected() {
-        byte[] body = body("token=abc&command=%2Fmentor");
-        String ts = Long.toString(NOW - 301);
-        String sig = sign(SECRET, ts, body);
-
-        assertThat(newVerifier(SECRET).verify(ts, sig, body, NOW)).isFalse();
     }
 
     @Test
@@ -60,30 +55,32 @@ class SlackSignatureVerifierTest extends BaseUnitTest {
             .run(context -> assertThat(context).doesNotHaveBean(SlackSignatureVerifier.class));
     }
 
-    @Test
-    void tamperedBodyRejected() {
+    private static Stream<Arguments> rejectedSignatures() {
         byte[] signedBody = body("{\"text\":\"hello\"}");
-        String ts = Long.toString(NOW);
-        String sig = sign(SECRET, ts, signedBody);
-        byte[] tampered = body("{\"text\":\"HELLO\"}");
+        String validTs = Long.toString(NOW);
+        String validSig = sign(SECRET, validTs, signedBody);
+        byte[] tamperedBody = body("{\"text\":\"HELLO\"}");
 
-        assertThat(newVerifier(SECRET).verify(ts, sig, tampered, NOW)).isFalse();
+        String expiredTs = Long.toString(NOW - 301);
+        byte[] expiredBody = body("token=abc&command=%2Fmentor");
+        String expiredSig = sign(SECRET, expiredTs, expiredBody);
+
+        String nonNumericTs = "not-a-number";
+        byte[] plainBody = body("{}");
+        String nonNumericSig = sign(SECRET, nonNumericTs, plainBody);
+
+        return Stream.of(
+            Arguments.of("expired timestamp outside replay window", expiredTs, expiredSig, expiredBody),
+            Arguments.of("tampered body", validTs, validSig, tamperedBody),
+            Arguments.of("wrong signature", validTs, "v0=deadbeef", plainBody),
+            Arguments.of("non-numeric timestamp", nonNumericTs, nonNumericSig, plainBody)
+        );
     }
 
-    @Test
-    void wrongSignatureRejected() {
-        byte[] body = body("{}");
-        String ts = Long.toString(NOW);
-
-        assertThat(newVerifier(SECRET).verify(ts, "v0=deadbeef", body, NOW)).isFalse();
-    }
-
-    @Test
-    void nonNumericTimestampRejectedNotThrown() {
-        byte[] body = body("{}");
-        String sig = sign(SECRET, "not-a-number", body);
-
-        assertThat(newVerifier(SECRET).verify("not-a-number", sig, body, NOW)).isFalse();
+    @ParameterizedTest(name = "{0} is rejected")
+    @MethodSource("rejectedSignatures")
+    void invalidSignatureRejected(String description, String ts, String sig, byte[] body) {
+        assertThat(newVerifier(SECRET).verify(ts, sig, body, NOW)).isFalse();
     }
 
     @Test

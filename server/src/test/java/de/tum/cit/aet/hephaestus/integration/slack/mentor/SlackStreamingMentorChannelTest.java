@@ -25,8 +25,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -218,17 +222,24 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         verify(slack, never()).stopStream(anyLong(), anyString(), anyString(), any());
     }
 
-    @Test
-    @DisplayName("a transient Slack failure is retried and the turn is NOT aborted")
-    void transientFailureRetriesWithoutAbort() {
+    private static Stream<Arguments> transientStartStreamFailures() {
+        return Stream.of(
+            Arguments.of("bare rate-limit error", new SlackSendException(WS, CH, "ratelimited")),
+            Arguments.of("429 with Retry-After", new SlackSendException(WS, CH, "ratelimited", 20L))
+        );
+    }
+
+    @ParameterizedTest(name = "{0} is retried and the turn is NOT aborted")
+    @MethodSource("transientStartStreamFailures")
+    void retriesWithoutAbort_onTransientStartStreamFailure(String description, SlackSendException failure) {
         SlackMessageService slack = mock(SlackMessageService.class);
         List<String> got = Collections.synchronizedList(new java.util.ArrayList<>());
         AtomicInteger startCalls = new AtomicInteger();
         AtomicBoolean stopped = new AtomicBoolean();
         when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
-            // First open is rate-limited; the loop must re-buffer and retry, not give up.
+            // First open fails transiently; the loop must re-buffer and retry, not give up.
             if (startCalls.incrementAndGet() == 1) {
-                throw new SlackSendException(WS, CH, "ratelimited");
+                throw failure;
             }
             got.add(inv.getArgument(3));
             return "ts";
@@ -256,52 +267,8 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         channel.completeWithDone();
         waitUntil(stopped::get, 5000);
 
-        assertThat(disconnected.get()).as("a rate-limit must not be treated as a disconnect").isFalse();
+        assertThat(disconnected.get()).as("a transient failure must not be treated as a disconnect").isFalse();
         assertThat(startCalls.get()).as("startStream retried after the transient failure").isGreaterThanOrEqualTo(2);
-        assertThat(String.join("", got)).contains("hello world");
-    }
-
-    @Test
-    @DisplayName("a 429 rate-limit is honored via Retry-After and does NOT abort or disconnect the turn")
-    void rateLimitHonoredWithoutAbort() {
-        SlackMessageService slack = mock(SlackMessageService.class);
-        List<String> got = Collections.synchronizedList(new java.util.ArrayList<>());
-        AtomicInteger startCalls = new AtomicInteger();
-        AtomicBoolean stopped = new AtomicBoolean();
-        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
-            // First open is rate-limited (429, Retry-After ~20 ms); the loop must honor it and retry, not give up.
-            if (startCalls.incrementAndGet() == 1) {
-                throw new SlackSendException(WS, CH, "ratelimited", 20L);
-            }
-            got.add(inv.getArgument(3));
-            return "ts";
-        });
-        lenient()
-            .doAnswer(inv -> {
-                got.add(inv.getArgument(3));
-                return null;
-            })
-            .when(slack)
-            .appendStream(anyLong(), anyString(), anyString(), anyString());
-        doAnswer(inv -> {
-            stopped.set(true);
-            return null;
-        })
-            .when(slack)
-            .stopStream(anyLong(), anyString(), anyString(), any());
-
-        var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
-        AtomicBoolean disconnected = new AtomicBoolean();
-        channel.onDisconnect(() -> disconnected.set(true));
-
-        channel.send(delta("hello world "));
-        channel.completeWithDone();
-        waitUntil(stopped::get, 5000);
-
-        assertThat(disconnected.get()).as("a 429 throttle must not be treated as a disconnect").isFalse();
-        assertThat(startCalls.get())
-            .as("startStream retried after honoring the Retry-After backoff")
-            .isGreaterThanOrEqualTo(2);
         assertThat(String.join("", got)).contains("hello world");
     }
 

@@ -506,7 +506,7 @@ erDiagram
 
     MentorSlackThread {
         UUID id PK
-        BIGINT workspace_id UK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         UUID chat_thread_id FK "NOT NULL"
         VARCHAR(32) slack_team_id "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
@@ -853,7 +853,7 @@ erDiagram
 
     SlackChannelConsentEvent {
         BIGINT id PK
-        BIGINT workspace_id "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
         VARCHAR(32) slack_channel_id "NOT NULL"
         VARCHAR(16) from_state
         VARCHAR(16) to_state "NOT NULL"
@@ -864,7 +864,7 @@ erDiagram
 
     SlackMessage {
         BIGINT id PK
-        BIGINT workspace_id UK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_team_id "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
         VARCHAR(32) slack_ts UK "NOT NULL"
@@ -879,7 +879,7 @@ erDiagram
 
     SlackMonitoredChannel {
         BIGINT id PK
-        BIGINT workspace_id UK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_team_id "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
         VARCHAR(256) channel_name
@@ -889,7 +889,7 @@ erDiagram
     }
 
     SlackParticipantConsent {
-        BIGINT workspace_id PK
+        BIGINT workspace_id PK,FK
         VARCHAR(32) slack_user_id PK
         BOOLEAN ingestion_opted_out "NOT NULL"
         BOOLEAN research_opted_out "NOT NULL"
@@ -899,7 +899,7 @@ erDiagram
 
     SlackThread {
         BIGINT id PK
-        BIGINT workspace_id UK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
         VARCHAR(32) slack_thread_ts UK "NOT NULL"
         VARCHAR(32) first_ts
@@ -1075,6 +1075,7 @@ erDiagram
     IdentityProvider ||--|| IssueComment : commented_on
     Repository ||--|| Label : labeled
     IdentityProvider ||--|| Label : labeled
+    Workspace ||--|| MentorSlackThread : has
     Repository ||--|| Milestone : has
     IdentityProvider ||--|| Milestone : references
     IdentityProvider ||--|| Organization : references
@@ -1093,6 +1094,10 @@ erDiagram
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     IdentityProvider ||--|| PullRequestReviewThread : reviewed
     IdentityProvider ||--|| Repository : references
+    Workspace ||--|| SlackMessage : has
+    Workspace ||--|| SlackMonitoredChannel : has
+    Workspace ||--|| SlackParticipantConsent : has
+    Workspace ||--|| SlackThread : has
     IdentityProvider ||--|| Team : references
     IdentityProvider ||--|| User : references
     User ||--|| UserAchievement : has
@@ -1168,6 +1173,7 @@ erDiagram
     Feedback ||--o{ Reaction : has
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
+    Workspace ||--o{ SlackChannelConsentEvent : has
     AgentConfig ||--o{ Workspace : practice_config_id
     AgentConfig ||--o{ Workspace : mentor_config_id
     Workspace ||--o{ WorkspaceSlugHistory : has

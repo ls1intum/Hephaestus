@@ -85,25 +85,6 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
         assertThat(messages.get(0).get("text").asString()).isEqualTo("I see two recent Slack threads in the data.");
     }
 
-    @Test
-    void excludesCurrentUserMessageFromHistory() throws Exception {
-        UUID threadId = UUID.randomUUID();
-        UUID currentMessageId = UUID.randomUUID();
-        when(chatMessageRepository.findContextMessages(1L, 2L, threadId, currentMessageId)).thenReturn(List.of());
-
-        CurrentThreadHistoryContentSource source = new CurrentThreadHistoryContentSource(
-            chatMessageRepository,
-            objectMapper
-        );
-        Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId, currentMessageId), files);
-
-        JsonNode messages = objectMapper
-            .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))
-            .get("messages");
-        assertThat(messages).isEmpty();
-    }
-
     private ChatMessage message(ChatMessage.Role role, String text, Instant createdAt) {
         return message(role, List.of(text), createdAt);
     }

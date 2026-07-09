@@ -1,6 +1,26 @@
 package de.tum.cit.aet.hephaestus.integration.slack;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Shared raw-JDBC seed helpers for the Slack conversation SPI integration tests
@@ -95,5 +115,88 @@ public final class SlackConversationTestSupport {
             threadTs,
             text
         );
+    }
+
+    private static final ObjectMapper OM = new ObjectMapper();
+
+    /** Result of {@link #seedBoundConversation}: the ids of the two rows it inserted, for later erasure assertions. */
+    public record BoundConversation(UUID observationId, UUID feedbackId) {}
+
+    /**
+     * Saves a CONVERSATION-channel {@link Practice} + {@link AgentJob} owned by the given workspace. Shared by the
+     * consent-lifecycle E2E, opt-out erasure, and channel-admin controller integration tests, which each seed exactly
+     * this fixture pair before deriving observation/feedback rows from it.
+     */
+    public static AgentJob newConversationReviewJob(AgentJobRepository agentJobRepository, Workspace workspace) {
+        AgentJob job = new AgentJob();
+        job.setWorkspace(workspace);
+        job.setJobType(AgentJobType.CONVERSATION_REVIEW);
+        job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
+        return agentJobRepository.save(job);
+    }
+
+    /** Saves a minimal {@link Practice} owned by the given workspace, slugged so repeated calls do not collide. */
+    public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
+        Practice practice = new Practice();
+        practice.setWorkspace(workspace);
+        practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
+        practice.setName("Test Practice");
+        practice.setCriteria("Test description");
+        practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        return practiceRepository.save(practice);
+    }
+
+    /**
+     * Inserts a derived CONVERSATION_THREAD {@link de.tum.cit.aet.hephaestus.practices.observation.Observation} +
+     * {@link Feedback} pair about {@code aboutUserId}, anchored to {@code threadId} — the shape the Slack consent
+     * erasure paths (person opt-out, channel revoke) must sweep.
+     */
+    public static BoundConversation seedBoundConversation(
+        ObservationRepository observationRepository,
+        FeedbackRepository feedbackRepository,
+        FeedbackObservationRepository feedbackObservationRepository,
+        long workspaceId,
+        UUID jobId,
+        long practiceId,
+        long threadId,
+        long aboutUserId
+    ) {
+        UUID observationId = UUID.randomUUID();
+        observationRepository.insertIfAbsent(
+            observationId,
+            "occ-" + observationId,
+            jobId,
+            practiceId,
+            null,
+            WorkArtifact.CONVERSATION_THREAD.name(),
+            threadId,
+            aboutUserId,
+            "Observation title",
+            "ABSENT",
+            "BAD",
+            "MAJOR",
+            0.8f,
+            null,
+            null,
+            null,
+            Instant.now()
+        );
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(jobId)
+                .workspaceId(workspaceId)
+                .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                .artifactId(threadId)
+                .recipientUserId(aboutUserId)
+                .aboutUserId(aboutUserId)
+                .channel(FeedbackChannel.CONVERSATION)
+                .position((int) ((threadId * 10 + aboutUserId) % 1000))
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .source(FeedbackSource.AGENT)
+                .createdAt(Instant.now())
+                .build()
+        );
+        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
+        return new BoundConversation(observationId, feedback.getId());
     }
 }

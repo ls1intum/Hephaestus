@@ -41,7 +41,7 @@ public class FeedbackChannelRouter {
 
     /** Route a single observation. See the class javadoc for the admission predicate. */
     public ConversationRoutingDecision route(Observation observation, long workspaceId, RoutingContext context) {
-        // Reviewer-targeted delivery: explicit deferral behind ADR-0021-C2 attribution (not a silent omission).
+        // Reviewer-targeted delivery: deferred (ADR-0021-C2).
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;
         }

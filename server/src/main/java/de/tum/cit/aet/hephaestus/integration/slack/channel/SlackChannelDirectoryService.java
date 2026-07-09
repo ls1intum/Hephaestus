@@ -9,7 +9,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -26,7 +25,8 @@ public class SlackChannelDirectoryService {
         this.monitoredChannelRepository = monitoredChannelRepository;
     }
 
-    @Transactional(readOnly = true)
+    // Deliberately not @Transactional: the single repository read is auto-committed, and a tx here would hold a
+    // pooled connection across the paginated (rate-limited) Slack conversations.list call.
     public java.util.List<SlackChannelCandidateDTO> listCandidates(long workspaceId) {
         Map<String, SlackMonitoredChannel> monitoredById = monitoredChannelRepository
             .findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)

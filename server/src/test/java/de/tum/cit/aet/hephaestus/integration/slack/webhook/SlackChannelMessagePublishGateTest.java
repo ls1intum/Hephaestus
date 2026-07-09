@@ -40,6 +40,34 @@ class SlackChannelMessagePublishGateTest extends BaseUnitTest {
     }
 
     @Test
+    void dropsChannelMessageWhenWorkspaceIsUnknown() throws Exception {
+        JsonNode payload = objectMapper.readTree(
+            "{\"team_id\":\"T-UNKNOWN\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}"
+        );
+        when(workspaceResolver.resolveWorkspaceId("T-UNKNOWN")).thenReturn(Optional.empty());
+
+        var decision = gate(true).evaluate(payload, Map.of());
+
+        assertThat(decision.publish()).isFalse();
+        assertThat(decision.reason()).isEqualTo("slack-channel-not-active");
+        org.mockito.Mockito.verifyNoInteractions(consentGate);
+    }
+
+    @Test
+    void allowsMessageDeletedThroughRegardlessOfConsentState() throws Exception {
+        // The delete must reach the tombstone in every consent state (PAUSED/REVOKED included), so the gate never
+        // even resolves the workspace or consults the consent gate for this subtype.
+        JsonNode payload = objectMapper.readTree(
+            "{\"team_id\":\"T1\",\"event\":{\"type\":\"message\",\"subtype\":\"message_deleted\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}"
+        );
+
+        var decision = gate(true).evaluate(payload, Map.of());
+
+        assertThat(decision.publish()).isTrue();
+        org.mockito.Mockito.verifyNoInteractions(workspaceResolver, consentGate);
+    }
+
+    @Test
     void allowsActiveChannelMessage() throws Exception {
         JsonNode payload = objectMapper.readTree(
             "{\"team_id\":\"T1\",\"event\":{\"type\":\"message\",\"channel_type\":\"group\",\"channel\":\"G1\"}}"

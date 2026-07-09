@@ -41,15 +41,9 @@ import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityRes
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -59,7 +53,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -71,7 +64,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -80,9 +72,9 @@ import tools.jackson.databind.node.ObjectNode;
  * The one end-to-end composition proof for the Slack consent redesign: it walks a channel through its whole
  * lifecycle — register → activate (announce + stamp + audit) → forward-only ingest → settled-thread detection over
  * the real {@code bigint[]} participant array → person opt-out (stop + channel-data erase) → revoke (full erase +
- * audit survival + sibling-channel isolation) — asserting real DB state at every hop. It is the only test that fails
- * on a cross-slice wiring break where each unit stays green but the pipeline is severed (e.g. activation stamps a
- * column ingest does not read, or opt-out erases messages the detector already enqueued).
+ * audit survival + sibling-channel isolation) — asserting real DB state at every hop, catching cross-slice wiring
+ * breaks where each unit stays green but the pipeline is severed (e.g. activation stamps a column ingest does not
+ * read, or opt-out erases messages the detector already enqueued).
  *
  * <p><b>Scope split.</b> The pipeline is driven at the service layer (the outbound {@link SlackMessageService} and
  * {@link AgentJobService} are the only mocks) rather than over HTTP — REST authorization is covered by
@@ -92,13 +84,12 @@ import tools.jackson.databind.node.ObjectNode;
  * against the real Liquibase schema.
  *
  * <p><b>Timing.</b> Forward-only ingest (hop 3) requires {@code ts > consent_announced_at ≈ now}, while detection
- * (hop 4) requires a thread quiescent for &gt;10 min. Those cannot coexist on one live timeline, so — exactly as the
- * plan prescribes — the settled thread is seeded with aged timestamps while forward-only is proven on live ingest.
+ * (hop 4) requires a thread quiescent for &gt;10 min. Those cannot coexist on one live timeline, so the settled
+ * thread is seeded with aged timestamps while forward-only is proven on live ingest.
  */
 @TestPropertySource(properties = "hephaestus.integration.slack.conversation-ingest.enabled=true")
 class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
-    private static final ObjectMapper OM = new ObjectMapper();
     private static final String TEAM = "T1";
     private static final String C1 = "C1";
     private static final String C2 = "C2"; // sibling channel, must stay isolated from C1's erasures
@@ -233,7 +224,8 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
                         )
                     ),
                 "https://hephaestus.test"
-            )
+            ),
+            new org.springframework.transaction.support.TransactionTemplate(transactionManager)
         );
         handler = new SlackInteractivityHandler(
             workspaceResolver,
@@ -287,10 +279,12 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             .orElseThrow()
             .getId();
         // Derived CONVERSATION feedback about each participant, anchored to the settled thread id.
-        UUID u1Obs = seedBoundConversation(settledThreadId, u1MemberId);
-        UUID u1Fb = lastFeedbackId;
-        UUID u2Obs = seedBoundConversation(settledThreadId, u2MemberId);
-        UUID u2Fb = lastFeedbackId;
+        SlackConversationTestSupport.BoundConversation u1Conv = seedBoundConversation(settledThreadId, u1MemberId);
+        UUID u1Obs = u1Conv.observationId();
+        UUID u1Fb = u1Conv.feedbackId();
+        SlackConversationTestSupport.BoundConversation u2Conv = seedBoundConversation(settledThreadId, u2MemberId);
+        UUID u2Obs = u2Conv.observationId();
+        UUID u2Fb = u2Conv.feedbackId();
 
         when(agentJobService.submit(eq(workspaceId), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
             Optional.of(new AgentJob())
@@ -408,64 +402,24 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         return n == null ? 0 : n;
     }
 
-    private UUID lastFeedbackId;
-
-    private UUID seedBoundConversation(long threadId, long aboutUserId) {
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
+    private SlackConversationTestSupport.BoundConversation seedBoundConversation(long threadId, long aboutUserId) {
+        return SlackConversationTestSupport.seedBoundConversation(
+            observationRepository,
+            feedbackRepository,
+            feedbackObservationRepository,
+            workspaceId,
             job.getId(),
             practice.getId(),
-            null,
-            WorkArtifact.CONVERSATION_THREAD.name(),
             threadId,
-            aboutUserId,
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            0.8f,
-            null,
-            null,
-            null,
-            Instant.now()
+            aboutUserId
         );
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(workspaceId)
-                .artifactType(WorkArtifact.CONVERSATION_THREAD)
-                .artifactId(threadId)
-                .recipientUserId(aboutUserId)
-                .aboutUserId(aboutUserId)
-                .channel(FeedbackChannel.CONVERSATION)
-                .position((int) ((threadId * 10 + aboutUserId) % 1000))
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build()
-        );
-        lastFeedbackId = feedback.getId();
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
-        return observationId;
     }
 
     private Practice savePractice(Workspace ws) {
-        Practice p = new Practice();
-        p.setWorkspace(ws);
-        p.setSlug("e2e-practice-" + ws.getId());
-        p.setName("E2E Practice");
-        p.setCriteria("Test description");
-        p.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
-        return practiceRepository.save(p);
+        return SlackConversationTestSupport.newPractice(practiceRepository, ws, "e2e-practice");
     }
 
     private AgentJob newJob(Workspace ws) {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(ws);
-        j.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        j.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(j);
+        return SlackConversationTestSupport.newConversationReviewJob(agentJobRepository, ws);
     }
 }

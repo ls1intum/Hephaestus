@@ -103,6 +103,20 @@ class SlackInteractivityControllerTest extends BaseUnitTest {
     }
 
     @Test
+    void expiredTimestamp_rejected401_noDispatch() {
+        byte[] body = formBody("{\"type\":\"block_actions\",\"actions\":[]}").getBytes(StandardCharsets.UTF_8);
+        String ts = Long.toString(Instant.now().getEpochSecond() - 301);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Slack-Request-Timestamp", ts);
+        headers.add("X-Slack-Signature", sign(ts, body));
+
+        ResponseEntity<String> res = controller.interactivity(body, headers);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(401);
+        verifyNoInteractions(handler);
+    }
+
+    @Test
     void handlerFailure_returns500SoSlackCanRetryPrivacyAction() {
         doThrow(new IllegalStateException("db down")).when(handler).handleBlockActions(any());
         byte[] body = formBody("{\"type\":\"block_actions\",\"actions\":[]}").getBytes(StandardCharsets.UTF_8);

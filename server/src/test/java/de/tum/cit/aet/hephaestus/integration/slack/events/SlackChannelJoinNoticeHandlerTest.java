@@ -88,7 +88,7 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
         when(participantConsentGate.ingestionAllowed(WORKSPACE_ID, JOINER)).thenReturn(true);
         when(messageService.resolveBotUserId(WORKSPACE_ID)).thenReturn(Optional.of(BOT));
 
-        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL));
+        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
         verify(messageService).sendEphemeralForWorkspace(
             eq(WORKSPACE_ID),
@@ -106,7 +106,7 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
         when(participantConsentGate.ingestionAllowed(WORKSPACE_ID, JOINER)).thenReturn(false);
         when(messageService.resolveBotUserId(WORKSPACE_ID)).thenReturn(Optional.of(BOT));
 
-        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL));
+        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
         verify(messageService).resolveBotUserId(WORKSPACE_ID);
         verify(messageService, never()).sendEphemeralForWorkspace(
@@ -123,7 +123,7 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
         when(messageService.resolveBotUserId(WORKSPACE_ID)).thenReturn(Optional.of(BOT));
 
-        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL));
+        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
         verify(messageService).resolveBotUserId(WORKSPACE_ID);
         verify(messageService, never()).sendEphemeralForWorkspace(
@@ -140,7 +140,7 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
         when(messageService.resolveBotUserId(WORKSPACE_ID)).thenReturn(Optional.of(BOT));
 
-        handler.onMemberJoined(TEAM, joinEvent(BOT, CHANNEL));
+        handler.onMemberJoined(TEAM, joinEvent(BOT, CHANNEL), true);
 
         verify(consentService).register(WORKSPACE_ID, CHANNEL, null);
         verify(consentGate, never()).ingestAllowed(WORKSPACE_ID, CHANNEL);
@@ -154,27 +154,10 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void botOwnJoin_isIgnored() {
-        when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
-        when(messageService.resolveBotUserId(WORKSPACE_ID)).thenReturn(Optional.of(BOT));
-
-        // The joiner IS the app's own bot user (adding the app to a channel fires member_joined_channel too).
-        handler.onMemberJoined(TEAM, joinEvent(BOT, CHANNEL));
-
-        verify(messageService, never()).sendEphemeralForWorkspace(
-            org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(),
-            anyList(),
-            org.mockito.ArgumentMatchers.anyString()
-        );
-    }
-
-    @Test
     void unknownWorkspace_noOp() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.empty());
 
-        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL));
+        handler.onMemberJoined(TEAM, joinEvent(JOINER, CHANNEL), true);
 
         verifyNoInteractions(consentGate);
         verify(messageService, never()).resolveBotUserId(org.mockito.ArgumentMatchers.anyLong());
@@ -182,8 +165,8 @@ class SlackChannelJoinNoticeHandlerTest extends BaseUnitTest {
 
     @Test
     void blankJoinerOrChannel_noOp() {
-        handler.onMemberJoined(TEAM, joinEvent("", CHANNEL));
-        handler.onMemberJoined(TEAM, joinEvent(JOINER, ""));
+        handler.onMemberJoined(TEAM, joinEvent("", CHANNEL), true);
+        handler.onMemberJoined(TEAM, joinEvent(JOINER, ""), true);
 
         verifyNoInteractions(workspaceResolver, consentGate, messageService);
     }

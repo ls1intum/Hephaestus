@@ -60,8 +60,7 @@ class KeywordSlackMentorInputGuardTest extends BaseUnitTest {
     @Test
     void paraphrasedDistress_isNotCaught_documentingTheKnownLimit() {
         // By design the fast-path is a substring matcher, not crisis detection: a paraphrase with no listed cue is
-        // NOT diverted (it is mentored normally). This test documents that limit honestly rather than implying the
-        // matcher provides real safety coverage — genuine detection needs a model-backed classifier via the seam.
+        // NOT diverted (it is mentored normally).
         Verdict verdict = guard.decide("I just don't want to be here anymore");
 
         assertThat(verdict.action()).isEqualTo(Action.ALLOW);

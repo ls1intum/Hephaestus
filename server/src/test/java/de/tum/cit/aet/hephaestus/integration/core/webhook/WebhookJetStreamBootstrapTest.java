@@ -32,7 +32,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), 2_000_000L),
+        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), java.util.Map.of(), 2_000_000L),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(26_214_400L)
     );
@@ -51,6 +51,56 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         assertThat(captor.getAllValues())
             .extracting(StreamConfiguration::getName)
             .containsExactlyInAnyOrder("gitlab", "github", "slack");
+    }
+
+    @Test
+    void perStreamMaxAgeOverrideReachesTheStreamConfiguration() throws Exception {
+        WebhookProperties overridden = new WebhookProperties(
+            null,
+            null,
+            new WebhookProperties.TokenRotation(7, 90),
+            new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
+            new WebhookProperties.Stream(
+                Duration.ofMinutes(10),
+                Duration.ofDays(180),
+                java.util.Map.of("slack", Duration.ofHours(72)),
+                2_000_000L
+            ),
+            new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
+            new WebhookProperties.Http(26_214_400L)
+        );
+        JetStreamApiException notFound = apiException(404);
+        JetStreamManagement jsm = mock(JetStreamManagement.class);
+        when(jsm.getStreamInfo(anyString())).thenThrow(notFound);
+
+        new WebhookJetStreamBootstrap(jsm, overridden).bootstrap();
+
+        ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
+        verify(jsm, times(3)).addStream(captor.capture());
+        assertThat(captor.getAllValues())
+            .filteredOn(config -> "slack".equals(config.getName()))
+            .singleElement()
+            .extracting(StreamConfiguration::getMaxAge)
+            .isEqualTo(Duration.ofHours(72));
+        assertThat(captor.getAllValues())
+            .filteredOn(config -> "github".equals(config.getName()))
+            .singleElement()
+            .extracting(StreamConfiguration::getMaxAge)
+            .isEqualTo(Duration.ofDays(180));
+    }
+
+    @Test
+    void rejectsAPerStreamMaxAgeShorterThanTheDedupWindow() {
+        assertThatThrownBy(() ->
+            new WebhookProperties.Stream(
+                Duration.ofMinutes(10),
+                Duration.ofDays(180),
+                java.util.Map.of("slack", Duration.ofMinutes(5)),
+                2_000_000L
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("duplicateWindow");
     }
 
     @Test

@@ -29,12 +29,12 @@ public class SlackMemberJoinedChannelMessageHandler extends AbstractSlackEnvelop
 
     @Override
     protected void handleEnvelope(JsonNode root) {
-        if (isStaleReplay(root)) {
-            return;
-        }
         String teamId = teamId(root);
         JsonNode event = root.path("event");
-        joinNoticeHandler.onMemberJoined(teamId, event);
+        // Staleness only suppresses the time-sensitive ephemeral notice. The bot-self-join registration (a durable
+        // consent-surface write) must still apply on a late redelivery, or a poison-backoff replay would silently
+        // lose the channel's PENDING allow-list row.
+        joinNoticeHandler.onMemberJoined(teamId, event, !isStaleReplay(root));
     }
 
     private boolean isStaleReplay(JsonNode root) {

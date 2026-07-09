@@ -174,8 +174,6 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         finish(null);
     }
 
-    // --- internals ---
-
     private void append(String text) {
         if (text == null || text.isEmpty()) {
             return;

@@ -484,6 +484,10 @@ hephaestus:
             # defense; 10m also covers provider redelivery horizons. See WebhookProperties.Stream.
             duplicate-window: 10m
             max-age: 180d
+            # The Slack stream buffers real channel/DM message text. SQL is the system of record and GDPR
+            # erasure cannot reach inside the broker, so it expires on a transport-buffer horizon, not 180d.
+            max-age-by-stream:
+                slack: 72h
             max-messages: 2000000
         shutdown:
             # Drain budget for in-flight publishes after HTTP closes. Docker stop_grace_period

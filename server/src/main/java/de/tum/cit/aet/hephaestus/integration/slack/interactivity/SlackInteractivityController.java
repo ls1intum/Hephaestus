@@ -21,7 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Slack Interactivity Request URL. Privacy-affecting actions complete before Slack is acknowledged. */
+/**
+ * Slack Interactivity Request URL. Consent state changes and erasure complete before Slack is acknowledged; the
+ * remote follow-ups (confirmation message, App Home refresh) run asynchronously so the 3-second ack budget never
+ * depends on Slack API latency.
+ */
 @Hidden // inbound Slack webhook receiver — not part of the webapp API surface; excluded from the OpenAPI client
 @RestController
 @ConditionalOnWebhookRole

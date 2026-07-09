@@ -19,7 +19,7 @@ public interface SlackParticipantConsentRepository
      * The single read behind {@code SlackParticipantConsentGate}: is this individual currently opted OUT of
      * ingestion in this workspace? Absent row ⇒ {@code false} (allowed) — the person firewall fails <em>open</em> on
      * no decision (a person who never opted out is ingestible), while the capability flag and channel gate fail
-     * closed. Carries the {@code workspace_id} predicate.
+     * closed.
      */
     boolean existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(Long workspaceId, String slackUserId);
 
@@ -117,11 +117,10 @@ public interface SlackParticipantConsentRepository
     /**
      * The count of individuals who have opted OUT of ingestion in this workspace — surfaced to the admin
      * activation control plane so an admin sees how many members have exercised the person firewall. Person opt-out
-     * is workspace-scoped (not per-channel), so this is a single workspace-wide count. Carries the
-     * {@code workspace_id} predicate the tenancy inspector requires.
+     * is workspace-scoped (not per-channel), so this is a single workspace-wide count.
      */
     long countByWorkspaceIdAndIngestionOptedOutTrue(Long workspaceId);
 
-    /** Workspace purge: delete every consent row for one workspace. Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every consent row for one workspace. */
     long deleteByWorkspaceId(Long workspaceId);
 }

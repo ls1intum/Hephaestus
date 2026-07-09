@@ -2,31 +2,15 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,9 +34,7 @@ import tools.jackson.databind.ObjectMapper;
  * touches ONLY CONVERSATION_THREAD units), and a PR/issue-only payload carries NO {@code _meta} envelope.
  * Deterministic.
  */
-class DeliveredFeedbackConsentGateIntegrationTest extends BaseIntegrationTest {
-
-    private static final ObjectMapper OM = new ObjectMapper();
+class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGateIntegrationTest {
 
     @Autowired
     private DeliveredFeedbackContentSource contentSource;
@@ -61,31 +43,11 @@ class DeliveredFeedbackConsentGateIntegrationTest extends BaseIntegrationTest {
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private IdentityProviderRepository identityProviderRepository;
-
-    @Autowired
-    private SlackThreadRepository slackThreadRepository;
-
-    @Autowired
-    private SlackMonitoredChannelRepository slackMonitoredChannelRepository;
-
-    @Autowired
     private CacheManager cacheManager;
 
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Workspace workspace;
-    private User recipient;
     private AgentJob job;
     private int nextPosition;
 
@@ -96,13 +58,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends BaseIntegrationTest {
         if (cache != null) {
             cache.clear();
         }
-        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("delivered-consent-gate-test"));
-        IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
-        recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
+        setUpWorkspaceAndRecipient("delivered-consent-gate-test");
         job = newJob();
         nextPosition = 0;
     }
@@ -171,30 +127,6 @@ class DeliveredFeedbackConsentGateIntegrationTest extends BaseIntegrationTest {
             bodies.add(node.get("body").asString());
         }
         return bodies;
-    }
-
-    /** Seed a monitored channel at {@code consent} plus one thread on it; return the generated {@code slack_thread.id}. */
-    private long seedThread(String channelId, String threadTs, ConsentState consent) {
-        SlackMonitoredChannel channel = new SlackMonitoredChannel();
-        channel.setWorkspaceId(workspace.getId());
-        channel.setSlackTeamId("T1");
-        channel.setSlackChannelId(channelId);
-        channel.setConsentState(consent);
-        slackMonitoredChannelRepository.save(channel);
-
-        SlackThread thread = new SlackThread();
-        thread.setWorkspaceId(workspace.getId());
-        thread.setSlackChannelId(channelId);
-        thread.setSlackThreadTs(threadTs);
-        return slackThreadRepository.save(thread).getId();
-    }
-
-    private AgentJob newJob() {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(workspace);
-        j.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        j.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(j);
     }
 
     private void saveDelivered(WorkArtifact artifactType, long artifactId, FeedbackChannel channel, String body) {

@@ -2,29 +2,13 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,9 +31,7 @@ import tools.jackson.databind.ObjectMapper;
  * observation is ALWAYS present regardless of Slack consent (the gate touches ONLY CONVERSATION_THREAD rows), and a
  * PR/issue-only payload carries NO {@code _meta} envelope (its trusted shape is untouched). Deterministic.
  */
-class ObservationHistoryConsentGateIntegrationTest extends BaseIntegrationTest {
-
-    private static final ObjectMapper OM = new ObjectMapper();
+class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentGateIntegrationTest {
 
     @Autowired
     private ObservationHistoryContentSource contentSource;
@@ -61,32 +43,12 @@ class ObservationHistoryConsentGateIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private IdentityProviderRepository identityProviderRepository;
-
-    @Autowired
-    private SlackThreadRepository slackThreadRepository;
-
-    @Autowired
-    private SlackMonitoredChannelRepository slackMonitoredChannelRepository;
-
-    @Autowired
     private CacheManager cacheManager;
 
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Workspace workspace;
     private Practice practice;
-    private User recipient;
     private AgentJob job;
 
     @BeforeEach
@@ -98,7 +60,7 @@ class ObservationHistoryConsentGateIntegrationTest extends BaseIntegrationTest {
         if (cache != null) {
             cache.clear();
         }
-        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("obs-consent-gate-test"));
+        setUpWorkspaceAndRecipient("obs-consent-gate-test");
         practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
@@ -106,12 +68,6 @@ class ObservationHistoryConsentGateIntegrationTest extends BaseIntegrationTest {
         practice.setCriteria("Test description");
         practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
-        IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
-        recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
         job = newJob();
     }
 
@@ -186,30 +142,6 @@ class ObservationHistoryConsentGateIntegrationTest extends BaseIntegrationTest {
             ids.add(node.get("id").asString());
         }
         return ids;
-    }
-
-    /** Seed a monitored channel at {@code consent} plus one thread on it; return the generated {@code slack_thread.id}. */
-    private long seedThread(String channelId, String threadTs, ConsentState consent) {
-        SlackMonitoredChannel channel = new SlackMonitoredChannel();
-        channel.setWorkspaceId(workspace.getId());
-        channel.setSlackTeamId("T1");
-        channel.setSlackChannelId(channelId);
-        channel.setConsentState(consent);
-        slackMonitoredChannelRepository.save(channel);
-
-        SlackThread thread = new SlackThread();
-        thread.setWorkspaceId(workspace.getId());
-        thread.setSlackChannelId(channelId);
-        thread.setSlackThreadTs(threadTs);
-        return slackThreadRepository.save(thread).getId();
-    }
-
-    private AgentJob newJob() {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(workspace);
-        j.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        j.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(j);
     }
 
     private Observation saveObservation(String occurrenceKey, String artifactType, long artifactId) {

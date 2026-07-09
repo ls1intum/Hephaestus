@@ -69,8 +69,7 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        // participant_member_ids is unmapped on the SlackThread entity (raw bigint[]), so the entity-derived test
-        // schema does not create it — add it here so the thread-upsert on ingest can union the author.
+        // Add the raw-JDBC-only participant_member_ids column — see SlackConversationTestSupport.
         jdbcTemplate.execute(
             "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
         );

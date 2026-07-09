@@ -21,7 +21,6 @@ class SlackConnectionScopesTest extends BaseUnitTest {
             "channels:read",
             "channels:join",
             "groups:read",
-            "mpim:read",
             "users:read"
         );
     }
@@ -33,6 +32,7 @@ class SlackConnectionScopesTest extends BaseUnitTest {
             "team:read",
             "commands",
             "app_mentions:read",
+            "mpim:read",
             "mpim:history",
             "im:write",
             "users:read.email"

@@ -106,11 +106,6 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
-        verify(monitoredChannelRepository, never()).insertIfAbsent(
-            org.mockito.ArgumentMatchers.anyLong(),
-            any(),
-            any()
-        );
         verify(messageRepository, never()).insertIfAbsent(
             org.mockito.ArgumentMatchers.anyLong(),
             any(),
@@ -124,15 +119,13 @@ class SlackIngestServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void pendingChannel_registersButDoesNotIngest() {
+    void nonActiveChannel_failsClosed_storesNothing() {
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(false);
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
-        // Discovery row is still created (so an admin can approve it later)…
-        verify(monitoredChannelRepository).insertIfAbsent(7L, "T1", "C1");
-        // …but the message and thread are NOT persisted until consent is ACTIVE.
+        // The message and thread are NOT persisted until consent is ACTIVE.
         verify(messageRepository, never()).insertIfAbsent(
             org.mockito.ArgumentMatchers.anyLong(),
             any(),
@@ -154,8 +147,8 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
     @Test
     void activeChannel_authorOptedOut_isNotStored_evenOnActiveChannel() {
-        // The person firewall (the #1-defect fix): capability ON + channel ACTIVE, but this individual opted out of
-        // ingestion → nothing is stored. Remove the firewall and this test fails (the message would be inserted).
+        // The person firewall: capability ON + channel ACTIVE, but this individual opted out of ingestion → nothing
+        // is stored.
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
@@ -163,8 +156,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
         service.ingestChannelMessage("T1", "C1", "100.1", "99.0", "U1", "hi");
 
-        // Discovery still happens; the store does not. The identity resolver is never even consulted.
-        verify(monitoredChannelRepository).insertIfAbsent(7L, "T1", "C1");
+        // The store does not happen; the identity resolver is never even consulted.
         verify(messageRepository, never()).insertIfAbsent(
             org.mockito.ArgumentMatchers.anyLong(),
             any(),
@@ -188,7 +180,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     void activeChannel_preAnnouncementMessage_isNotStored_andPersonGateNotEvenConsulted() {
         // Forward-only invariant: on an ACTIVE channel, a message whose ts predates consent_announced_at is never
         // stored — pre-announcement history stays out. The check fires BEFORE the person firewall, so the participant
-        // gate is not even consulted. Remove the forward-only guard and this test fails (the message would be stored).
+        // gate is not even consulted.
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         // Announcement is AFTER the message ts (100.1) → the message predates consent and must not enter.
@@ -214,9 +206,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     @Test
     void activeChannel_messageTsEqualsAnnouncement_isNotStored_forwardOnlyIsStrict() {
         // Forward-only is STRICT (ts > announced), not ts >= announced. A message posted at the exact instant of the
-        // announcement (ts == consent_announced_at) is pre-consent and must NOT be stored. Every other test uses a ts
-        // strictly below or above the stamp, so only this equality cell pins the boundary: flip `>` to `>=` in
-        // isAfterAnnouncement and this test fails (the message would be stored, and the person gate consulted).
+        // announcement (ts == consent_announced_at) is pre-consent and must NOT be stored.
         when(workspaceResolver.resolveWorkspaceId("T1")).thenReturn(Optional.of(7L));
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         // Announcement stamped at epoch-second 100; the message ts "100.0" parses to the same fractional epoch.

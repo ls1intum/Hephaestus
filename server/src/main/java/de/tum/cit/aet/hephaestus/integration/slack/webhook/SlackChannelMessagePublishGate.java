@@ -44,6 +44,12 @@ public class SlackChannelMessagePublishGate implements WebhookPublishGate {
         if (!conversationIngestEnabled) {
             return Decision.drop("slack-channel-ingest-disabled");
         }
+        // A delete must reach the tombstone in EVERY consent state: a message stored while the channel was ACTIVE
+        // still exists during PAUSED, and the author's deletion has to erase our copy too (GDPR parity). The
+        // tombstone is contentless, so letting it through never stores new content.
+        if ("message_deleted".equals(event.path("subtype").asString(""))) {
+            return Decision.allow();
+        }
         String teamId = teamId(payload);
         String channelId = event.path("channel").asString("");
         if (teamId.isBlank() || channelId.isBlank()) {

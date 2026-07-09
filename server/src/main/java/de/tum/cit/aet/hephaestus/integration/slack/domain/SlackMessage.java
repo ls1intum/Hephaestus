@@ -16,7 +16,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.Nullable;
 
 /**
- * An ingested Slack message — the PII-bearing content surface (P3). Stores rendered {@code text} only (data
+ * An ingested Slack message — the PII-bearing content surface. Stores rendered {@code text} only (data
  * minimization: no block payloads, reactions, or files). Workspace-scoped (scalar {@code workspaceId}), idempotent
  * on {@code (workspaceId, slackChannelId, slackTs)}. {@code editedAt}/{@code deletedAt} carry Slack
  * {@code message_changed}/{@code message_deleted} tombstones (GDPR Art. 17); {@code idx_slack_message_ingest}

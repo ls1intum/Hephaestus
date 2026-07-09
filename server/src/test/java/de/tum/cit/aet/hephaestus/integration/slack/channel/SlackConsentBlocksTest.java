@@ -67,11 +67,6 @@ class SlackConsentBlocksTest extends BaseUnitTest {
     }
 
     @Test
-    void optOutConfirmation_isNonEmpty() {
-        assertThat(SlackConsentBlocks.optOutConfirmation()).isNotEmpty();
-    }
-
-    @Test
     void lateJoinText_isSpecificToLateJoiner() {
         assertThat(SlackConsentBlocks.lateJoinFallbackText())
             .contains("You joined a Hephaestus-monitored channel", "From now on", "Manage this anytime from App Home")

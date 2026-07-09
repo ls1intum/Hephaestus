@@ -52,6 +52,35 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
         assertThat(result).isInstanceOf(VerificationResult.Verified.class);
     }
 
+    @Test
+    void invalidSignatureIsRejected() {
+        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}".getBytes(
+            StandardCharsets.UTF_8
+        );
+        Map<String, String> headers = Map.of(
+            "X-Slack-Request-Timestamp",
+            String.valueOf(Instant.now().getEpochSecond()),
+            "X-Slack-Signature",
+            "v0=deadbeef"
+        );
+
+        VerificationResult result = verifier.verify(new WebhookRequest(body, headers));
+
+        assertThat(result).isInstanceOf(VerificationResult.Invalid.class);
+    }
+
+    @Test
+    void expiredTimestampIsRejected() {
+        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}".getBytes(
+            StandardCharsets.UTF_8
+        );
+        long expiredTimestamp = Instant.now().getEpochSecond() - 301;
+
+        VerificationResult result = verifier.verify(new WebhookRequest(body, signedHeaders(body, expiredTimestamp)));
+
+        assertThat(result).isInstanceOf(VerificationResult.StaleTimestamp.class);
+    }
+
     private static Map<String, String> signedHeaders(byte[] body, long timestamp) {
         return Map.of(
             "X-Slack-Request-Timestamp",

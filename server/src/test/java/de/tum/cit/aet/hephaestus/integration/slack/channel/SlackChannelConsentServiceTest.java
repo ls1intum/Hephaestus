@@ -83,7 +83,28 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             slackMessageService,
             connectionService,
             userRepository,
-            uiLinks
+            uiLinks,
+            inlineTransactionTemplate()
+        );
+    }
+
+    /** A TransactionTemplate over a no-op manager: callbacks run inline so unit tests need no real tx. */
+    private static org.springframework.transaction.support.TransactionTemplate inlineTransactionTemplate() {
+        return new org.springframework.transaction.support.TransactionTemplate(
+            new org.springframework.transaction.PlatformTransactionManager() {
+                @Override
+                public org.springframework.transaction.TransactionStatus getTransaction(
+                    org.springframework.transaction.TransactionDefinition definition
+                ) {
+                    return new org.springframework.transaction.support.SimpleTransactionStatus();
+                }
+
+                @Override
+                public void commit(org.springframework.transaction.TransactionStatus status) {}
+
+                @Override
+                public void rollback(org.springframework.transaction.TransactionStatus status) {}
+            }
         );
     }
 
@@ -173,65 +194,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         verifyNoInteractions(ingestService, slackMessageService);
     }
 
-    @Test
-    void revoke_erasesRawAndDerived_andAudits() {
-        SlackMonitoredChannel c = channel(ConsentState.ACTIVE, Instant.parse("2020-01-01T00:00:00Z"));
-        stubChannel(c);
-        stubActor(5L);
-
-        SlackMonitoredChannelDTO dto = service().transition(WS, CHANNEL, ConsentState.REVOKED, "opt-out");
-
-        // Single erasure choke point drives the raw + derived deletion.
-        verify(ingestService).eraseChannel(WS, CHANNEL);
-        assertThat(dto.consentState()).isEqualTo(ConsentState.REVOKED);
-        verifyNoInteractions(slackMessageService);
-
-        ArgumentCaptor<SlackChannelConsentEvent> captor = ArgumentCaptor.forClass(SlackChannelConsentEvent.class);
-        verify(consentEventRepository).save(captor.capture());
-        assertThat(captor.getValue().getFromState()).isEqualTo(ConsentState.ACTIVE);
-        assertThat(captor.getValue().getToState()).isEqualTo(ConsentState.REVOKED);
-    }
-
-    @Test
-    void illegalEdge_pendingToPaused_throws409_withNoSideEffects() {
-        SlackMonitoredChannel c = channel(ConsentState.PENDING, null);
-        stubChannel(c);
-
-        assertThatThrownBy(() -> service().transition(WS, CHANNEL, ConsentState.PAUSED, null)).isInstanceOf(
-            SlackChannelConsentViolationException.class
-        );
-
-        // Guard rejects before any mutation, side effect, or audit write.
-        verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verifyNoInteractions(ingestService, slackMessageService, consentEventRepository);
-    }
-
-    @Test
-    void revokedIsTerminal_toActive_throws409() {
-        SlackMonitoredChannel c = channel(ConsentState.REVOKED, Instant.parse("2020-01-01T00:00:00Z"));
-        stubChannel(c);
-
-        assertThatThrownBy(() -> service().transition(WS, CHANNEL, ConsentState.ACTIVE, null)).isInstanceOf(
-            SlackChannelConsentViolationException.class
-        );
-
-        verifyNoInteractions(ingestService, slackMessageService, consentEventRepository);
-    }
-
-    @Test
-    void sameState_isIdempotentNoOp() {
-        SlackMonitoredChannel c = channel(ConsentState.ACTIVE, Instant.parse("2020-01-01T00:00:00Z"));
-        stubChannel(c);
-
-        SlackMonitoredChannelDTO dto = service().transition(WS, CHANNEL, ConsentState.ACTIVE, null);
-
-        assertThat(dto.consentState()).isEqualTo(ConsentState.ACTIVE);
-        // No transition happened: no side effect, no audit, no save.
-        verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verifyNoInteractions(ingestService, slackMessageService, consentEventRepository);
-    }
-
-    // --- #6: the full 4×4 legality matrix, locked in one method ---
+    // --- the full 4×4 legality matrix, locked in one method ---
 
     private enum Outcome {
         /** {@code from == target}: idempotent no-op, no side effect, no audit. */
@@ -264,10 +227,8 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     }
 
     /**
-     * Locks the whole mentoring-only consent state machine (16 cells) in one place. The load-bearing new cells are
-     * {@code PENDING → REVOKED} and {@code PAUSED → REVOKED}: dropping {@code || REVOKED} from the PENDING/PAUSED
-     * guard arms turns those into 409s instead of the GDPR Art. 17 erase — this asserts they are LEGAL and drive
-     * {@link SlackIngestService#eraseChannel}. Every REVOKED-target legal edge must erase; no other legal edge may.
+     * Locks the whole mentoring-only consent state machine (16 cells) in one place. PENDING→REVOKED and
+     * PAUSED→REVOKED are legal and must erase via {@link SlackIngestService#eraseChannel}.
      */
     @ParameterizedTest(name = "{0} → {1} is {2}")
     @MethodSource("edgeMatrix")
@@ -290,14 +251,18 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
                 assertThatThrownBy(() -> svc.transition(WS, CHANNEL, target, null)).isInstanceOf(
                     SlackChannelConsentViolationException.class
                 );
+                // Guard rejects before any mutation, side effect, or audit write.
+                verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
                 verifyNoInteractions(ingestService, consentEventRepository);
             }
             case LEGAL -> {
                 stubActor(5L);
                 svc.transition(WS, CHANNEL, target, "reason");
-                // Erasure fires iff the target is REVOKED — the cell that kills the dropped-`|| REVOKED` guard mutant.
+                // Erasure fires iff the target is REVOKED.
                 if (target == ConsentState.REVOKED) {
+                    // Single erasure choke point drives the raw + derived deletion; a revoke never re-announces.
                     verify(ingestService).eraseChannel(WS, CHANNEL);
+                    verifyNoInteractions(slackMessageService);
                 } else {
                     verifyNoInteractions(ingestService);
                 }
@@ -342,7 +307,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         verifyNoInteractions(ingestService, slackMessageService, consentEventRepository);
     }
 
-    // --- #8: register() (the whole endpoint had zero tests) ---
+    // --- register() ---
 
     @Test
     void register_new_landsInPending_created() {
@@ -362,8 +327,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     @Test
     void register_existing_backfillsName_returnsNotCreated() {
         // Idempotent on the natural key: a second registration returns the existing row (created=false), backfilling a
-        // previously-unknown channelName. Kills an always-create mutant (which would ignore the existing row, consult
-        // the connection, and INSERT a duplicate that trips uk_slack_monitored_channel → 500).
+        // previously-unknown channelName.
         SlackMonitoredChannel existing = channel(ConsentState.PENDING, null);
         existing.setChannelName(null);
         stubChannel(existing);
@@ -373,7 +337,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         assertThat(outcome.created()).isFalse();
         assertThat(existing.getChannelName()).isEqualTo("general");
         verify(monitoredChannelRepository).save(existing);
-        // The existing branch returns before the connection lookup — an always-create mutant would consult it.
+        // The existing branch returns before the connection lookup.
         verifyNoInteractions(connectionService);
     }
 
@@ -397,7 +361,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     @Test
     void register_noSlackConnection_throwsNotFound() {
         // A purely-admin registration of an unseen channel needs an ACTIVE Slack connection to know the team id; its
-        // absence is a 404 (the dead-untested branch at SlackChannelConsentService#register).
+        // absence is a 404.
         when(monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(WS, CHANNEL)).thenReturn(Optional.empty());
         when(connectionService.findSlackNotificationConfig(WS)).thenReturn(Optional.empty());
 

@@ -95,9 +95,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        // The test schema is entity-derived (ddl-auto: create, Liquibase disabled); participant_member_ids is
-        // deliberately unmapped on the SlackThread entity, so add it here to exercise the array_remove prune —
-        // the same pattern SlackConversationProjectorIntegrationTest / ConversationThreadDetectionIntegrationTest use.
+        // Add the raw-JDBC-only participant_member_ids column — see SlackConversationTestSupport.
         jdbcTemplate.execute(
             "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'"
         );

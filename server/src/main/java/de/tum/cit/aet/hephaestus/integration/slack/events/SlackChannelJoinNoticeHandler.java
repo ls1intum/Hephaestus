@@ -28,9 +28,8 @@ import tools.jackson.databind.JsonNode;
  *       A join into a {@code PENDING}/{@code PAUSED}/{@code REVOKED} or non-allow-listed channel is a no-op: nothing
  *       is being read, so there is nothing to disclose;</li>
  *   <li><strong>not the bot</strong> — adding the app to a channel also fires {@code member_joined_channel} with the
- *       bot as the joiner; comparing against the app's own bot user id ({@code auth.test}) skips that self-join so the
- *       bot never messages itself. The consent gate runs first so the remote {@code auth.test} only happens for a
- *       channel that is actually active.</li>
+ *       bot as the joiner; comparing against the app's own bot user id (cached {@code auth.test}) skips that
+ *       self-join so the bot never messages itself, and registers the channel as {@code PENDING} instead.</li>
  * </ol>
  *
  * <p>Best-effort throughout: it runs from the Slack consumer, and a Slack-side
@@ -69,10 +68,12 @@ public class SlackChannelJoinNoticeHandler {
      * Handle a {@code member_joined_channel} event: post the just-in-time consent notice iff the joiner is a real
      * member of an actively-ingested channel. Never throws.
      *
-     * @param teamId the Slack {@code T…} workspace id from the verified event envelope
-     * @param event  the inner {@code member_joined_channel} event ({@code user} = joiner, {@code channel} = channel)
+     * @param teamId        the Slack {@code T…} workspace id from the verified event envelope
+     * @param event         the inner {@code member_joined_channel} event ({@code user} = joiner, {@code channel} = channel)
+     * @param noticeAllowed whether the time-sensitive ephemeral notice may still be posted (false on a stale
+     *                      redelivery); the bot-self-join registration is durable and applies regardless
      */
-    public void onMemberJoined(String teamId, JsonNode event) {
+    public void onMemberJoined(String teamId, JsonNode event, boolean noticeAllowed) {
         String channelId = event.path("channel").asString("");
         String joinerUserId = event.path("user").asString("");
         if (channelId.isBlank() || joinerUserId.isBlank()) {
@@ -91,6 +92,9 @@ public class SlackChannelJoinNoticeHandler {
             return;
         }
 
+        if (!noticeAllowed) {
+            return;
+        }
         // Only disclose where we are actually reading.
         if (!consentGate.ingestAllowed(workspaceId, channelId)) {
             return;

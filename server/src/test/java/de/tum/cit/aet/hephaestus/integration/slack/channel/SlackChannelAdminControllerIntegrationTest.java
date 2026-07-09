@@ -7,10 +7,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -20,15 +20,9 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -39,7 +33,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,7 +42,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * End-to-end tests for {@link SlackChannelAdminController} — the per-workspace channel activation control plane. The
@@ -67,8 +59,6 @@ import tools.jackson.databind.ObjectMapper;
     }
 )
 class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
-
-    private static final ObjectMapper OM = new ObjectMapper();
 
     @Autowired
     private WebTestClient webTestClient;
@@ -193,31 +183,6 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
 
     @Test
     @WithAdminUser
-    @DisplayName("pause then resume: ACTIVE → PAUSED → ACTIVE; resume does not re-announce")
-    void pauseThenResume() {
-        ensureAdminMembership(workspace);
-        seedChannel(workspace.getId(), "C1", ConsentState.ACTIVE, Instant.parse("2020-01-01T00:00:00Z"));
-
-        patchConsent("C1", ConsentState.PAUSED, null).expectStatus().isOk();
-        assertThat(currentState("C1")).isEqualTo(ConsentState.PAUSED);
-
-        patchConsent("C1", ConsentState.ACTIVE, null).expectStatus().isOk();
-        assertThat(currentState("C1")).isEqualTo(ConsentState.ACTIVE);
-
-        // The channel was already announced at seed time → resume must not post another notice.
-        verify(slackMessageService, never()).sendForWorkspace(any(Long.class), any(), anyList(), any());
-
-        var events = consentEventRepository.findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
-            workspace.getId(),
-            "C1"
-        );
-        assertThat(events)
-            .extracting(e -> e.getToState())
-            .containsExactly(ConsentState.PAUSED, ConsentState.ACTIVE);
-    }
-
-    @Test
-    @WithAdminUser
     @DisplayName("DELETE revokes + erases the channel's raw messages, thread aggregate, and derived feedback")
     void revokeErasesRawAndDerived() {
         ensureAdminMembership(workspace);
@@ -227,8 +192,9 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         messageRepository.insertIfAbsent(workspace.getId(), "T1", "C1", "100.1", null, "U1", null, "hello");
         long threadId = seedThread(workspace.getId(), "C1", "100.1");
         // Derived CONVERSATION_THREAD observation + feedback anchored to the thread id.
-        UUID observationId = seedBoundConversation(threadId);
-        UUID feedbackId = lastFeedbackId;
+        SlackConversationTestSupport.BoundConversation conv = seedBoundConversation(threadId);
+        UUID observationId = conv.observationId();
+        UUID feedbackId = conv.feedbackId();
 
         webTestClient
             .delete()
@@ -367,66 +333,18 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         return threadRepository.save(thread).getId();
     }
 
-    private UUID lastFeedbackId;
-
-    private UUID seedBoundConversation(long threadId) {
-        Practice practice = savePractice();
-        AgentJob job = newJob();
-        UUID observationId = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
+    private SlackConversationTestSupport.BoundConversation seedBoundConversation(long threadId) {
+        Practice practice = SlackConversationTestSupport.newPractice(practiceRepository, workspace, "chan-practice");
+        AgentJob job = SlackConversationTestSupport.newConversationReviewJob(agentJobRepository, workspace);
+        return SlackConversationTestSupport.seedBoundConversation(
+            observationRepository,
+            feedbackRepository,
+            feedbackObservationRepository,
+            workspace.getId(),
             job.getId(),
             practice.getId(),
-            null,
-            WorkArtifact.CONVERSATION_THREAD.name(),
             threadId,
-            owner.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            0.8f,
-            null,
-            null,
-            null,
-            Instant.now()
+            owner.getId()
         );
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.CONVERSATION_THREAD)
-                .artifactId(threadId)
-                .recipientUserId(owner.getId())
-                .aboutUserId(owner.getId())
-                .channel(FeedbackChannel.CONVERSATION)
-                .position(1)
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build()
-        );
-        lastFeedbackId = feedback.getId();
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
-        return observationId;
-    }
-
-    private Practice savePractice() {
-        Practice p = new Practice();
-        p.setWorkspace(workspace);
-        p.setSlug("chan-practice-" + UUID.randomUUID());
-        p.setName("Channel Practice");
-        p.setCriteria("Test description");
-        p.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
-        return practiceRepository.save(p);
-    }
-
-    private AgentJob newJob() {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(workspace);
-        j.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        j.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(j);
     }
 }

@@ -171,12 +171,13 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
 
         verify(joinNoticeHandler).onMemberJoined(
             org.mockito.ArgumentMatchers.eq("T1"),
-            org.mockito.ArgumentMatchers.any(JsonNode.class)
+            org.mockito.ArgumentMatchers.any(JsonNode.class),
+            org.mockito.ArgumentMatchers.eq(true)
         );
     }
 
     @Test
-    void staleMemberJoinedReplayDoesNotPostAnotherNotice() {
+    void staleMemberJoinedReplaySuppressesTheNoticeButStillRegisters() {
         joinHandler.onMessage(
             nats(
                 "slack.T1.C1.member_joined_channel",
@@ -184,9 +185,12 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
             )
         );
 
-        verify(joinNoticeHandler, never()).onMemberJoined(
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any(JsonNode.class)
+        // The durable bot-self-join registration must survive a stale redelivery; only the
+        // time-sensitive ephemeral notice is suppressed (noticeAllowed = false).
+        verify(joinNoticeHandler).onMemberJoined(
+            org.mockito.ArgumentMatchers.eq("T1"),
+            org.mockito.ArgumentMatchers.any(JsonNode.class),
+            org.mockito.ArgumentMatchers.eq(false)
         );
     }
 
@@ -201,12 +205,30 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
         tokensRevokedHandler.onMessage(
             nats(
                 "slack.T1.workspace.tokens_revoked",
-                "{\"team_id\":\"T1\",\"event_id\":\"Ev2\",\"event\":{\"type\":\"tokens_revoked\"}}"
+                "{\"team_id\":\"T1\",\"event_id\":\"Ev2\",\"event\":{\"type\":\"tokens_revoked\",\"tokens\":{\"bot\":[\"U9\"]}}}"
             )
         );
 
         verify(uninstallService).onUninstall("T1", "app_uninstalled", "Ev1");
         verify(uninstallService).onUninstall("T1", "tokens_revoked", "Ev2");
+    }
+
+    @Test
+    void userTokenOnlyRevocationDoesNotTearDownTheWorkspace() {
+        // A member revoking their personal Sign-in-with-Slack authorization fires tokens_revoked with only
+        // oauth entries; the app is still installed and the bot token is valid, so nothing may be purged.
+        tokensRevokedHandler.onMessage(
+            nats(
+                "slack.T1.workspace.tokens_revoked",
+                "{\"team_id\":\"T1\",\"event_id\":\"Ev3\",\"event\":{\"type\":\"tokens_revoked\",\"tokens\":{\"oauth\":[\"U1\"],\"bot\":[]}}}"
+            )
+        );
+
+        verify(uninstallService, never()).onUninstall(
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.anyString()
+        );
     }
 
     private static Message nats(String ignoredSubject, String body) {

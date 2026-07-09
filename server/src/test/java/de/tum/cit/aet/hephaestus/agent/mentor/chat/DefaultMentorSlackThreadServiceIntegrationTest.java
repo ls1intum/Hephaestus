@@ -32,8 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  *
  * <p>Deliberately seeds no {@code chat_message}: the {@code chat_thread → chat_message} {@code ON DELETE CASCADE} that
  * {@code purgeSlackThreads} relies on exists only in the Liquibase production schema, not on this entity-derived
- * ({@code ddl-auto: create}) test schema, so a message here would trip a spurious FK violation. The surface-scoping
- * mutant this test targets is fully exercised at the thread grain.
+ * ({@code ddl-auto: create}) test schema, so a message here would trip a spurious FK violation.
  */
 class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest {
 
@@ -84,7 +83,7 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
         assertThat(purged).isEqualTo(1);
         // A's SLACK_DM thread is gone …
         assertThat(chatThreadRepository.findById(aSlackDm)).isEmpty();
-        // … but A's WEB mentor history survives (the exact-inversion mutant would erase this instead) …
+        // … but A's WEB mentor history survives …
         assertThat(chatThreadRepository.findById(aWeb)).isPresent();
         // … and another workspace's SLACK_DM thread is untouched (workspace scoping).
         assertThat(chatThreadRepository.findById(bSlackDm)).isPresent();

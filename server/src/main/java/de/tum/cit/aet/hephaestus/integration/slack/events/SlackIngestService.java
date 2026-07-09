@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Persists inbound Slack channel messages as workspace-scoped content (the P3 substrate that
+ * Persists inbound Slack channel messages as workspace-scoped content (the substrate that
  * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
  * Idempotent on {@code (workspace, channel, ts)}.
  *
@@ -30,11 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
  * and the per-person opt-out firewall below, and is forward-only, so nothing is read until a channel is deliberately
  * activated. The DM/mentor path and everything else in the Slack integration are unaffected by this flag.
  *
- * <p><strong>Consent gate (fail-closed layer 2).</strong> Even with the capability flag on, seeing a message on a
- * channel auto-creates the allow-list row in {@code PENDING} (discovery: the bot only receives events for channels
- * it was invited to), but a message is only persisted once that channel's {@link ConsentState} is {@code ACTIVE}.
- * A {@code PENDING}/{@code PAUSED}/{@code REVOKED} channel discovers itself but ingests nothing —
- * approval is an explicit, out-of-band consent action, never an implicit side effect of traffic.
+ * <p><strong>Consent gate (fail-closed layer 2).</strong> Even with the capability flag on, a message is only
+ * persisted once its channel's {@link ConsentState} is {@code ACTIVE}. Channels enter the allow-list (as
+ * {@code PENDING}) when the bot is invited ({@code member_joined_channel}) or via the admin directory — approval is
+ * an explicit, out-of-band consent action, never an implicit side effect of traffic.
  *
  * <p>On a genuinely new message the author's Slack id is resolved to the workspace {@code User} (member) id and
  * stamped onto {@code slack_message.author_member_id} (the participant-firewall stamp), and the thread aggregate
@@ -113,11 +112,9 @@ public class SlackIngestService {
         }
         long workspaceId = workspaceOpt.get();
 
-        // Discovery: register the channel on first sight (PENDING). This does NOT authorize ingestion.
-        monitoredChannelRepository.insertIfAbsent(workspaceId, teamId, channelId);
-
-        // Consent gate (single authority): only ACTIVE channels flow content. A brand-new channel is
-        // PENDING → nothing ingested. Fails closed on an absent row.
+        // Consent gate (single authority): only ACTIVE channels flow content. Fails closed on an absent row.
+        // Channels enter the allow-list via bot member_joined_channel registration or the admin directory —
+        // never as a side effect of message traffic.
         if (!consentGate.ingestAllowed(workspaceId, channelId)) {
             return;
         }
@@ -131,7 +128,7 @@ public class SlackIngestService {
             return;
         }
 
-        // Person firewall (the fix for the #1 defect): an individual who opted out of ingestion is never stored,
+        // Person firewall: an individual who opted out of ingestion is never stored,
         // even on an ACTIVE channel with the capability on. This composes the two-layer gate into:
         //   ingest iff conversationIngestEnabled AND channel == ACTIVE AND NOT participantOptedOut(workspace, author).
         // Deny-if-opted-out / allow-if-absent, keyed on the author's Slack id (an unauthored/blank sender has no
@@ -197,13 +194,11 @@ public class SlackIngestService {
             return;
         }
         long workspaceId = workspaceOpt.get();
-        // Tombstone under the SAME channel-consent + forward-only gates as ingest: a delete on a non-ACTIVE channel,
-        // or of a pre-announcement message, tombstones nothing (we never stored it). On an ACTIVE, in-window delete
-        // the durable upsert both tombstones an ingested row AND blocks a later out-of-order base insert from
-        // resurrecting the content. No participant-firewall check: a tombstone is contentless (text NULL).
-        if (!consentGate.ingestAllowed(workspaceId, channelId)) {
-            return;
-        }
+        // Deliberately NOT gated on ACTIVE consent: a message stored while the channel was ACTIVE still exists
+        // during PAUSED, and the author's deletion must erase our copy in every state. The forward-only window
+        // below still applies (a pre-announcement message was never stored), and the durable upsert both
+        // tombstones an ingested row AND blocks a later out-of-order base insert from resurrecting the content.
+        // No participant-firewall check: a tombstone is contentless (text NULL).
         Instant announcedAt = monitoredChannelRepository.findConsentAnnouncedAt(workspaceId, channelId).orElse(null);
         if (announcedAt == null || !isAfterAnnouncement(deletedTs, announcedAt)) {
             return;
@@ -229,7 +224,7 @@ public class SlackIngestService {
         @Nullable String text
     ) {
         // Fail-closed layer 1: honor the channel-ingest kill switch (ingest + tombstone both do). editMessage can now
-        // INSERT via re-ingest, so this guard is load-bearing, not cosmetic.
+        // INSERT via re-ingest.
         if (!conversationIngestEnabled || channelId.isEmpty() || ts.isEmpty()) {
             return;
         }

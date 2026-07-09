@@ -76,7 +76,7 @@ public class WebhookJetStreamBootstrap {
             .discardPolicy(DiscardPolicy.Old)
             .storageType(StorageType.File)
             .duplicateWindow(s.duplicateWindow())
-            .maxAge(s.maxAge())
+            .maxAge(s.maxAgeFor(name))
             .maxMessages(s.maxMessages())
             .build();
         try {
@@ -85,7 +85,7 @@ public class WebhookJetStreamBootstrap {
                 "Created JetStream stream: name={} dedupWindow={} maxAge={} maxMessages={}",
                 name,
                 s.duplicateWindow(),
-                s.maxAge(),
+                s.maxAgeFor(name),
                 s.maxMessages()
             );
         } catch (JetStreamApiException | IOException ex) {
@@ -100,7 +100,7 @@ public class WebhookJetStreamBootstrap {
         WebhookProperties.Stream s = properties.stream();
         var live = info.getConfiguration();
         warnIfDiffers(name, "duplicateWindow", live.getDuplicateWindow(), s.duplicateWindow());
-        warnIfDiffers(name, "maxAge", live.getMaxAge(), s.maxAge());
+        warnIfDiffers(name, "maxAge", live.getMaxAge(), s.maxAgeFor(name));
         warnIfDiffersLong(name, "maxMessages", live.getMaxMsgs(), s.maxMessages());
         if (live.getStorageType() != StorageType.File) {
             log.warn(

@@ -68,7 +68,8 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
             appHomeService,
             participantConsentService,
             personErasureService,
-            messageService
+            messageService,
+            directExecutor()
         );
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
     }
@@ -179,5 +180,38 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
             personErasureService,
             messageService
         );
+    }
+
+    /** Runs Slack follow-ups inline so the tests can verify them synchronously. */
+    private static java.util.concurrent.ExecutorService directExecutor() {
+        return new java.util.concurrent.AbstractExecutorService() {
+            @Override
+            public void execute(Runnable command) {
+                command.run();
+            }
+
+            @Override
+            public void shutdown() {}
+
+            @Override
+            public java.util.List<Runnable> shutdownNow() {
+                return java.util.List.of();
+            }
+
+            @Override
+            public boolean isShutdown() {
+                return true;
+            }
+
+            @Override
+            public boolean isTerminated() {
+                return true;
+            }
+
+            @Override
+            public boolean awaitTermination(long timeout, java.util.concurrent.TimeUnit unit) {
+                return true;
+            }
+        };
     }
 }

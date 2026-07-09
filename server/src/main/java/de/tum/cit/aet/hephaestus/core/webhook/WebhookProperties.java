@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.webhook;
 
 import java.time.Duration;
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -99,6 +100,10 @@ public record WebhookProperties(
         // its ONLY replay defense — plus provider redelivery horizons. See REPLAY_TOLERANCE_FLOOR.
         @DefaultValue("10m") Duration duplicateWindow,
         @DefaultValue("180d") Duration maxAge,
+        // Per-stream retention overrides keyed by stream name (e.g. slack: 72h). Streams whose payloads carry
+        // personal message content should expire quickly once consumed — the SQL substrate is the system of
+        // record, and GDPR erasure cannot reach inside a broker stream.
+        @DefaultValue Map<String, Duration> maxAgeByStream,
         @DefaultValue("2000000") long maxMessages
     ) {
         /**
@@ -126,9 +131,34 @@ public record WebhookProperties(
             if (maxAge.isZero() || maxAge.isNegative()) {
                 throw new IllegalArgumentException("stream.maxAge must be positive, got: " + maxAge);
             }
+            maxAgeByStream = maxAgeByStream == null ? Map.of() : Map.copyOf(maxAgeByStream);
+            for (Map.Entry<String, Duration> e : maxAgeByStream.entrySet()) {
+                Duration v = e.getValue();
+                if (v == null || v.isZero() || v.isNegative()) {
+                    throw new IllegalArgumentException(
+                        "stream.maxAgeByStream." + e.getKey() + " must be positive, got: " + v
+                    );
+                }
+                if (v.compareTo(duplicateWindow) < 0) {
+                    throw new IllegalArgumentException(
+                        "stream.maxAgeByStream." +
+                            e.getKey() +
+                            " (" +
+                            v +
+                            ") must be >= duplicateWindow (" +
+                            duplicateWindow +
+                            ") or the dedup guarantee is meaningless"
+                    );
+                }
+            }
             if (maxMessages < 1) {
                 throw new IllegalArgumentException("stream.maxMessages must be >= 1, got: " + maxMessages);
             }
+        }
+
+        /** Effective retention for one stream: the per-stream override, else the shared {@link #maxAge}. */
+        public Duration maxAgeFor(String streamName) {
+            return maxAgeByStream.getOrDefault(streamName, maxAge);
         }
     }
 

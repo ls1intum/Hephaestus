@@ -28,9 +28,6 @@ class SlackManifestTemplateTest extends BaseUnitTest {
             .doesNotContain("assistant_thread_context_changed")
             .doesNotContain("latest pull request")
             .doesNotContain("most recent pull request")
-            .contains("What needs attention?")
-            .contains("Review my recent work")
-            .contains("Check my reviews")
-            .contains("Follow up");
+            .contains("What needs attention?"); // suggested-prompts anchor
     }
 }

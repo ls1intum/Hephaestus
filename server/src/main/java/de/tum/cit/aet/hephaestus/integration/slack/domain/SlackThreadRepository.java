@@ -26,8 +26,10 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * advances the {@code first_ts}/{@code last_ts} window (Slack {@code ts} strings sort lexicographically —
      * fixed {@code <10-digit>.<6-digit>} format), bumps {@code message_count}, and unions the author's resolved
      * member id into {@code participant_member_ids} (the GIN-indexed {@code bigint[]} the participant firewall
-     * matches with {@code = ANY(...)}). {@code participant_member_ids} is deliberately unmapped on the entity
-     * (raw {@code bigint[]}), so this write is a native {@code @Modifying} statement rather than an entity save.
+     * matches with {@code = ANY(...)}). {@code participant_member_ids} is array-typed and mapped on the entity via
+     * {@code @JdbcTypeCode(SqlTypes.ARRAY)}; this write is still a native {@code @Modifying} statement rather than an
+     * entity save because the conflict-resolving merge logic (window advance, count bump, array union) has no
+     * Spring Data derived form.
      *
      * <p>The caller passes {@code slackThreadTs := thread_ts} for a reply and {@code := ts} for a thread root, so
      * a root and its replies collapse onto one aggregate row. {@code authorMemberId} is nullable (an unlinked
@@ -71,7 +73,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * The ids of every thread aggregate on one channel — collected on channel erasure so the derived
      * {@code CONVERSATION_THREAD} observations/feedback (keyed by these {@code slack_thread} ids as
      * {@code artifact_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
-     * are dropped. Carries the {@code workspace_id} predicate the tenancy inspector requires.
+     * are dropped.
      */
     @Query("SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.slackChannelId = :slackChannelId")
     List<Long> findIdsByWorkspaceIdAndSlackChannelId(
@@ -79,14 +81,13 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         @Param("slackChannelId") String slackChannelId
     );
 
-    /** Workspace purge: delete every thread aggregate for one workspace. Derived DELETE carries the predicate. */
+    /** Workspace purge: delete every thread aggregate for one workspace. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /**
      * Channel erasure: delete every thread aggregate of one channel promptly when its consent is withdrawn (the
      * aggregates hold the {@code participant_member_ids} personal data and are the artifact the derived CONVERSATION
-     * feedback points at). Derived DELETE carries the {@code workspace_id} predicate the tenancy inspector requires;
-     * idempotent (returns 0 when the channel had no threads).
+     * feedback points at). Idempotent (returns 0 when the channel had no threads).
      */
     long deleteByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
 
@@ -100,8 +101,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * <p>{@code cutoffTs} is the retention cutoff rendered as a Slack {@code ts} string
      * ({@code <10-digit-epoch-seconds>.000000}); the comparison is lexicographic, which equals numeric ordering for
      * the fixed {@code <10-digit>.<6-digit>} Slack {@code ts} format (the same invariant {@link #upsertOnMessage}
-     * relies on). {@code last_ts} is always populated on ingest, so a NULL guard is unnecessary. Carries the
-     * {@code workspace_id} predicate the tenancy inspector requires.
+     * relies on). {@code last_ts} is always populated on ingest, so a NULL guard is unnecessary.
      */
     @Query(
         "SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.lastTs IS NOT NULL AND t.lastTs < :cutoffTs"
@@ -110,8 +110,8 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * Retention sweep: drop a set of aged thread aggregates for a workspace after their derived CONVERSATION feedback
-     * has already been erased through the practices port. Carries the {@code workspace_id} predicate the tenancy
-     * inspector requires; idempotent (0 when the id set is empty / already gone). Callers guard an empty collection.
+     * has already been erased through the practices port. Idempotent (0 when the id set is empty / already gone).
+     * Callers guard an empty collection.
      */
     @Modifying
     @Transactional
@@ -127,7 +127,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * otherwise keeps a person's id (and, on id reuse, their thread visibility) after they leave — this prunes it.
      * The {@code :memberId = ANY(participant_member_ids)} guard narrows the write set to rows that actually contain
      * the member (the GIN index on the array serves it), so unaffected threads are not rewritten. Native (the
-     * {@code participant_member_ids} {@code bigint[]} is unmapped on the entity) and workspace-scoped. Idempotent
+     * {@code array_remove} merge has no Spring Data derived form) and workspace-scoped. Idempotent
      * (0 when no thread references the member).
      *
      * @return the number of thread aggregates pruned
@@ -141,6 +141,6 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     )
     int pruneParticipant(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
 
-    /** Scoped row count for a workspace — carries the {@code workspace_id} predicate the inspector requires. */
+    /** Scoped row count for a workspace. */
     long countByWorkspaceId(Long workspaceId);
 }

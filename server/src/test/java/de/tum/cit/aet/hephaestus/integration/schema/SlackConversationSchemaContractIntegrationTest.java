@@ -28,10 +28,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Drives the <b>production</b> Slack conversation SPIs against the <b>real Liquibase schema</b> so the raw-JDBC
- * {@code bigint[]} / {@code VARCHAR(32)} paths run over the migrated column types — the thing the fast, entity-derived
- * SPI ITs cannot prove, because they hand-roll their own {@code participant_member_ids BIGINT[]} / {@code last_reviewed_ts
- * VARCHAR(32)} copies (which cannot drift from themselves). Boots the full {@code db/master.xml} on a dedicated
- * Testcontainer with {@code ddl-auto=validate}, exactly like {@code ObservationAssessmentBackfillIntegrationTest}.
+ * {@code bigint[]} / {@code VARCHAR(32)} paths run over the migrated column types. Boots the full
+ * {@code db/master.xml} on a dedicated Testcontainer with {@code ddl-auto=validate}, exactly like
+ * {@code ObservationAssessmentBackfillIntegrationTest}.
  *
  * <p>What each hop uniquely pins (all against changesets {@code 1782980500800-12/-13}):
  * <ul>

@@ -45,7 +45,6 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         "channels:read",
         "channels:join",
         "groups:read",
-        "mpim:read",
         "users:read"
     );
 

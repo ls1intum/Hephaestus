@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
@@ -16,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
@@ -29,13 +29,8 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -47,7 +42,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +49,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -70,7 +63,6 @@ import tools.jackson.databind.node.ObjectNode;
  */
 class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
-    private static final ObjectMapper OM = new ObjectMapper();
     private static final String TEAM = "T1";
     private static final String CHANNEL = "C1";
     private static final String OPTING_OUT_SLACK_USER = "UME";
@@ -126,7 +118,6 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     private long otherMemberId;
     private Practice practice;
     private AgentJob job;
-    private UUID lastFeedbackId;
 
     @BeforeEach
     void setUp() {
@@ -171,15 +162,19 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Channel-message opt-out records ingestion consent AND erases the person's data, sparing others + PR")
     void optOut_recordsConsent_andErasesPersonScopedData() {
         // Stored content: a message from the opting-out member and one from a co-participant, a thread they both
-        // joined, CONVERSATION feedback about each of them, and an unrelated PR observation about the opting-out user.
+        // joined, CONVERSATION feedback about each of them, an unrelated PR observation about the opting-out user,
+        // and the opting-out person's own mentor DM thread (not channel ingestion — must survive).
         insertMessage("me.1", meMemberId, OPTING_OUT_SLACK_USER);
         insertMessage("other.1", otherMemberId, "UOTHER");
         long threadId = insertThreadWithParticipants("root.1", meMemberId, otherMemberId);
-        UUID meObs = seedBoundConversation(threadId, meMemberId);
-        UUID meFb = lastFeedbackId;
-        UUID otherObs = seedBoundConversation(threadId, otherMemberId);
-        UUID otherFb = lastFeedbackId;
+        SlackConversationTestSupport.BoundConversation meConv = seedBoundConversation(threadId, meMemberId);
+        UUID meObs = meConv.observationId();
+        UUID meFb = meConv.feedbackId();
+        SlackConversationTestSupport.BoundConversation otherConv = seedBoundConversation(threadId, otherMemberId);
+        UUID otherObs = otherConv.observationId();
+        UUID otherFb = otherConv.feedbackId();
         UUID prObs = seedObservation(WorkArtifact.PULL_REQUEST, 7777L, meMemberId);
+        UUID myDmId = seedOwnMentorDm();
 
         handler.handleBlockActions(optOut(OPTING_OUT_SLACK_USER));
 
@@ -210,6 +205,9 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
 
         // 5) The unrelated PR observation (a different artifact type) is untouched — no over-reach.
         assertThat(observationRepository.findById(prObs)).isPresent();
+
+        // 6) The person's own mentor DM thread is not channel ingestion — left intact.
+        assertThat(chatThreadRepository.findById(myDmId)).isPresent();
     }
 
     @Test
@@ -235,15 +233,10 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         ).isTrue();
     }
 
-    @Test
-    @DisplayName("opt-out is channel-ingestion scoped: erases channel data but keeps the person's mentor DM")
-    void optOut_channelIngestionScoped_keepsOwnMentorDm() {
-        // Channel-derived data the person authored (must be erased by the opt-out).
-        insertMessage("me.1", meMemberId, OPTING_OUT_SLACK_USER);
-        long threadId = insertThreadWithParticipants("root.1", meMemberId, otherMemberId);
-        UUID meConvObs = seedBoundConversation(threadId, meMemberId);
+    // --- payload + fixtures ---
 
-        // The person's own mentor DM is not channel ingestion and is not erased by a channel-message opt-out.
+    /** The opting-out person's own mentor DM thread — not channel ingestion, must survive a channel opt-out. */
+    private UUID seedOwnMentorDm() {
         User me = userRepository.findById(meMemberId).orElseThrow();
         Workspace ws = workspaceRepository.findById(workspaceId).orElseThrow();
         ChatThread myDm = new ChatThread();
@@ -252,22 +245,8 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         myDm.setUser(me);
         myDm.setWorkspace(ws);
         myDm.setSurface(ThreadSurface.SLACK_DM);
-        UUID myDmId = chatThreadRepository.save(myDm).getId();
-
-        handler.handleBlockActions(optOut(OPTING_OUT_SLACK_USER));
-
-        // Channel-ingestion data erased …
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, CHANNEL, "me.1")
-        ).isFalse();
-        assertThat(observationRepository.findById(meConvObs)).isEmpty();
-        assertThat(participantIds(threadId)).containsExactly(otherMemberId);
-
-        // … but the person's own mentor DM thread is left intact.
-        assertThat(chatThreadRepository.findById(myDmId)).isPresent();
+        return chatThreadRepository.save(myDm).getId();
     }
-
-    // --- payload + fixtures ---
 
     private ObjectNode optOut(String slackUserId) {
         ObjectNode payload = mapper.createObjectNode();
@@ -344,26 +323,17 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
         return List.of(ids);
     }
 
-    private UUID seedBoundConversation(long threadId, long aboutUserId) {
-        UUID observationId = seedObservation(WorkArtifact.CONVERSATION_THREAD, threadId, aboutUserId);
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(workspaceId)
-                .artifactType(WorkArtifact.CONVERSATION_THREAD)
-                .artifactId(threadId)
-                .recipientUserId(aboutUserId)
-                .aboutUserId(aboutUserId)
-                .channel(FeedbackChannel.CONVERSATION)
-                .position((int) ((threadId * 10 + aboutUserId) % 1000))
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build()
+    private SlackConversationTestSupport.BoundConversation seedBoundConversation(long threadId, long aboutUserId) {
+        return SlackConversationTestSupport.seedBoundConversation(
+            observationRepository,
+            feedbackRepository,
+            feedbackObservationRepository,
+            workspaceId,
+            job.getId(),
+            practice.getId(),
+            threadId,
+            aboutUserId
         );
-        lastFeedbackId = feedback.getId();
-        feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);
-        return observationId;
     }
 
     private UUID seedObservation(WorkArtifact artifactType, long artifactId, long aboutUserId) {
@@ -391,20 +361,10 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private Practice savePractice(Workspace ws) {
-        Practice p = new Practice();
-        p.setWorkspace(ws);
-        p.setSlug("optout-practice-" + ws.getId());
-        p.setName("Opt-out Practice");
-        p.setCriteria("Test description");
-        p.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
-        return practiceRepository.save(p);
+        return SlackConversationTestSupport.newPractice(practiceRepository, ws, "optout-practice");
     }
 
     private AgentJob newJob(Workspace ws) {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(ws);
-        j.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        j.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(j);
+        return SlackConversationTestSupport.newConversationReviewJob(agentJobRepository, ws);
     }
 }

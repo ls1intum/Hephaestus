@@ -26,7 +26,7 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), 2_000_000L),
+        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), java.util.Map.of(), 2_000_000L),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(MAX)
     );

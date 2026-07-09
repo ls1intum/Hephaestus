@@ -31,6 +31,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import okhttp3.Response;
 import org.jspecify.annotations.Nullable;
@@ -65,6 +67,7 @@ public class SlackMessageService {
 
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
+    private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
 
     public SlackMessageService(SlackCredentialProvider credentialProvider) {
         this.slack = Slack.getInstance();
@@ -171,15 +174,29 @@ public class SlackMessageService {
      * resolved (no active connection / Slack failure). Best-effort and never throws — used only to skip the bot's
      * OWN {@code member_joined_channel} event (adding the app to a channel fires that event too), so an unresolved
      * id degrades to "cannot confirm it's the bot" rather than blocking the caller.
+     *
+     * <p>Positive results are cached per workspace: the bot user id is stable for an installation, and this runs on
+     * the serial event-consumer thread for every {@code member_joined_channel}, so an uncached remote call per join
+     * would stall unrelated workspaces' events. Failures are not cached (retried on the next event).
      */
+    /** Evict the cached bot user id, e.g. on uninstall — a later reconnect may install a different app. */
+    public void evictBotUserId(long workspaceId) {
+        botUserIdCache.remove(workspaceId);
+    }
+
     public Optional<String> resolveBotUserId(long workspaceId) {
+        String cached = botUserIdCache.get(workspaceId);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
         Optional<String> token = resolveToken(workspaceId);
         if (token.isEmpty()) {
             return Optional.empty();
         }
         try {
-            AuthTestResponse r = slack.methods(token.get()).authTest(req -> req);
+            AuthTestResponse r = callHonoringRateLimit(() -> slack.methods(token.get()).authTest(req -> req));
             if (r.isOk() && r.getUserId() != null && !r.getUserId().isBlank()) {
+                botUserIdCache.put(workspaceId, r.getUserId());
                 return Optional.of(r.getUserId());
             }
             log.debug("Slack auth.test not ok for workspaceId={}: error={}", workspaceId, r.getError());
@@ -455,7 +472,9 @@ public class SlackMessageService {
         try {
             do {
                 final String pageCursor = cursor;
-                UsersListResponse response = methods.usersList(r -> r.limit(USERS_LIST_PAGE_SIZE).cursor(pageCursor));
+                UsersListResponse response = callHonoringRateLimit(() ->
+                    methods.usersList(r -> r.limit(USERS_LIST_PAGE_SIZE).cursor(pageCursor))
+                );
                 if (!response.isOk()) {
                     log.warn(
                         "Slack users.list returned ok=false: workspaceId={}, error={}",
@@ -497,8 +516,6 @@ public class SlackMessageService {
         boolean member,
         boolean archived
     ) {}
-
-    // --- rate-limit handling ---
 
     /** A synchronous Slack Web API call that may throw the SDK's checked failures. */
     @FunctionalInterface
