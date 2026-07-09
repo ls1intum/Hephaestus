@@ -3,7 +3,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	addRepositoryToMonitorMutation,
-	deleteSlackChannelMutation,
 	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
 	listSlackChannelCandidatesOptions,
@@ -188,20 +187,6 @@ function AdminSettings() {
 		},
 	});
 
-	// Terminal revoke + erase.
-	const deleteSlackChannel = useMutation({
-		...deleteSlackChannelMutation(),
-		onSuccess: () => {
-			toast.success("Channel removed and its data erased");
-			invalidateSlackChannels();
-		},
-		onError: (e) => {
-			toast.error("Failed to remove channel", {
-				description: e instanceof Error ? e.message : undefined,
-			});
-		},
-	});
-
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
 	}
@@ -290,20 +275,13 @@ function AdminSettings() {
 		if (!workspaceSlug) {
 			return;
 		}
-		// The DELETE endpoint carries no body, so a supplied reason is recorded through the
-		// consent PATCH to REVOKED (same terminal erase server-side); the reason-less path
-		// uses the dedicated DELETE. Both are the same user-facing action — removal — so both
-		// must surface the removal toast; `updateSlackChannelConsent`'s own onSuccess/onError
-		// (below) branch on the REVOKED consent state to avoid the generic "Channel updated"
-		// copy leaking onto this destructive path.
-		if (reason && reason.trim().length > 0) {
-			await updateSlackChannelConsent.mutateAsync({
-				path: { workspaceSlug, slackChannelId },
-				body: { consentState: "REVOKED", reason },
-			});
-			return;
-		}
-		await deleteSlackChannel.mutateAsync({ path: { workspaceSlug, slackChannelId } });
+		// Removal is the consent transition to REVOKED (the API has no separate DELETE);
+		// `updateSlackChannelConsent`'s onSuccess/onError branch on the REVOKED consent state
+		// so this destructive path gets the removal toast, not the generic "Channel updated".
+		await updateSlackChannelConsent.mutateAsync({
+			path: { workspaceSlug, slackChannelId },
+			body: { consentState: "REVOKED", reason: reason?.trim() ? reason : undefined },
+		});
 	};
 
 	return (

@@ -775,7 +775,7 @@ paths:
       - Account
   /user/slack/preferences:
     get:
-      operationId: listSlackUserPreferences
+      operationId: getSlackUserPreferences
       responses:
         "200":
           content:
@@ -783,7 +783,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SlackUserPreferences"
           description: OK
-      summary: List current user's Slack preferences
+      summary: Get current user's Slack preferences
       tags:
       - Slack User Preferences
   /workspaces:
@@ -1360,7 +1360,7 @@ paths:
          200 result carrying <code>ok</code>/<code>slackError</code>, never an HTTP error. That lets the admin UI
          test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
          with a transport failure.
-      operationId: sendTestMessage
+      operationId: sendSlackTestMessage
       parameters:
       - description: Workspace slug
         in: path
@@ -1383,7 +1383,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SlackTestMessageResponse"
           description: OK
-      summary: Probe the Slack connection by posting a test message.
+      summary: Post a test message to verify the Slack connection
       tags:
       - Connections
   /workspaces/{workspaceSlug}/connections/{id}:
@@ -3052,27 +3052,6 @@ paths:
       tags:
       - Slack channel activation
   /workspaces/{workspaceSlug}/slack/channels/{slackChannelId}:
-    delete:
-      operationId: deleteSlackChannel
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: slackChannelId
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Revoke a Slack channel and erase its raw + derived data (terminal)
-      tags:
-      - Slack channel activation
     patch:
       operationId: updateSlackChannelConsent
       parameters:
@@ -3155,7 +3134,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SlackWorkspacePreferences"
+                $ref: "#/components/schemas/SlackUserWorkspacePreferences"
           description: OK
       summary: Update current user's Slack workspace preferences
       tags:
@@ -6536,10 +6515,10 @@ components:
         workspaces:
           type: array
           items:
-            $ref: "#/components/schemas/SlackWorkspacePreferences"
+            $ref: "#/components/schemas/SlackUserWorkspacePreferences"
       required:
       - workspaces
-    SlackWorkspacePreferences:
+    SlackUserWorkspacePreferences:
       type: object
       properties:
         activeMonitoredChannelCount:

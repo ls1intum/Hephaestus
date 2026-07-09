@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	initiateMutation,
-	sendTestMessageMutation,
+	sendSlackTestMessageMutation,
 	updateLeaderboardDigestMutation,
 	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -118,7 +118,7 @@ export function AdminSlackNotificationSettings({
 	});
 
 	const test = useMutation({
-		...sendTestMessageMutation(),
+		...sendSlackTestMessageMutation(),
 		onSuccess: (data) => {
 			if (data.ok) {
 				toast.success("Test message posted to Slack", {

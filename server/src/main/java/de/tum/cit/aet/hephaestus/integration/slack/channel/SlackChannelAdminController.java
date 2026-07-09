@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService.RegistrationOutcome;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -14,7 +13,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +26,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * convention ({@code WorkspaceController.updateStatus → WorkspaceLifecycleService.updateStatus}: a PATCH to the
  * target state driving a guarded, idempotent {@code switch}). Slack-workspace admin ≠ Hephaestus admin, so
  * activation lives in the webapp admin plane guarded by {@link RequireAtLeastWorkspaceAdmin}, never in a Slack modal.
+ *
+ * <p>Revocation (+ erasure) is expressed only as {@code PATCH consentState=REVOKED} — there is deliberately no
+ * {@code DELETE}: it would be the identical transition under different semantics, and the row is NOT removed from
+ * the collection (a REVOKED row documents that a channel was revoked, and {@code register()} resurrects it to
+ * {@code PENDING} when an admin sets it up again).
  *
  * <p>The path variable is the Slack {@code C…}/{@code G…} channel id — the stable, non-enumerable natural key
  * {@code (workspace_id, slack_channel_id)}. Every method scopes on the {@link WorkspaceContext} workspace id, so a
@@ -102,16 +105,6 @@ public class SlackChannelAdminController {
         return ResponseEntity.ok(
             consentService.transition(workspace.id(), slackChannelId, request.consentState(), request.reason())
         );
-    }
-
-    @DeleteMapping("/{slackChannelId}")
-    @Operation(
-        operationId = "deleteSlackChannel",
-        summary = "Revoke a Slack channel and erase its raw + derived data (terminal)"
-    )
-    public ResponseEntity<Void> deleteSlackChannel(WorkspaceContext workspace, @PathVariable String slackChannelId) {
-        consentService.transition(workspace.id(), slackChannelId, ConsentState.REVOKED, null);
-        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{slackChannelId}/consent-events")

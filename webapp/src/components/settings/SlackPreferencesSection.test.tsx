@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { SlackWorkspacePreferences } from "@/api/types.gen";
+import type { SlackUserWorkspacePreferences } from "@/api/types.gen";
 import { SlackPreferencesSection } from "./SlackPreferencesSection";
 
-const workspace: SlackWorkspacePreferences = {
+const workspace: SlackUserWorkspacePreferences = {
 	workspaceSlug: "hephaestustest",
 	workspaceName: "Hephaestus Test",
 	slackTeamId: "T1",

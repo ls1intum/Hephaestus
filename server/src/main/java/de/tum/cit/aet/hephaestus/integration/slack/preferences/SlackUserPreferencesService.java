@@ -84,7 +84,7 @@ public class SlackUserPreferencesService {
             return new SlackUserPreferencesDTO(List.of());
         }
 
-        List<SlackWorkspacePreferencesDTO> workspaces = connectionRepository
+        List<SlackUserWorkspacePreferencesDTO> workspaces = connectionRepository
             .findAllByKindAndInstanceKeyInAndState(
                 IntegrationKind.SLACK,
                 slackLinksByTeam.keySet(),
@@ -95,13 +95,13 @@ public class SlackUserPreferencesService {
             .filter(connection -> slackLinksByTeam.containsKey(connection.getInstanceKey()))
             .filter(connection -> workspaceIds.contains(connection.toRef().workspaceId()))
             .flatMap(connection -> toDto(connection, slackLinksByTeam.get(connection.getInstanceKey()), null).stream())
-            .sorted(Comparator.comparing(SlackWorkspacePreferencesDTO::workspaceName))
+            .sorted(Comparator.comparing(SlackUserWorkspacePreferencesDTO::workspaceName))
             .toList();
         return new SlackUserPreferencesDTO(workspaces);
     }
 
     @Transactional
-    public SlackWorkspacePreferencesDTO updateChannelMessagesAllowed(
+    public SlackUserWorkspacePreferencesDTO updateChannelMessagesAllowed(
         long workspaceId,
         long accountId,
         boolean channelMessagesAllowed
@@ -175,7 +175,7 @@ public class SlackUserPreferencesService {
             .collect(Collectors.toSet());
     }
 
-    private Optional<SlackWorkspacePreferencesDTO> toDto(
+    private Optional<SlackUserWorkspacePreferencesDTO> toDto(
         Connection connection,
         AccountIdentityQuery.IdentityLinkView slackLink,
         Boolean channelMessagesAllowed
@@ -186,7 +186,7 @@ public class SlackUserPreferencesService {
             .map(workspace -> toDto(connection, slackLink, channelMessagesAllowed, workspace));
     }
 
-    private SlackWorkspacePreferencesDTO toDto(
+    private SlackUserWorkspacePreferencesDTO toDto(
         Connection connection,
         AccountIdentityQuery.IdentityLinkView slackLink,
         Boolean channelMessagesAllowed,
@@ -201,7 +201,7 @@ public class SlackUserPreferencesService {
                       workspaceId,
                       slackUserId
                   );
-        return new SlackWorkspacePreferencesDTO(
+        return new SlackUserWorkspacePreferencesDTO(
             workspace.slug(),
             workspace.displayName(),
             connection.getInstanceKey(),

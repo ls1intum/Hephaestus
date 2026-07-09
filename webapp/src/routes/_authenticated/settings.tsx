@@ -3,13 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	getCurrentUserQueryKey,
+	getSlackUserPreferencesOptions,
+	getSlackUserPreferencesQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
 	listIdentityProvidersOptions,
 	listLinkedIdentitiesOptions,
 	listLinkedIdentitiesQueryKey,
-	listSlackUserPreferencesOptions,
-	listSlackUserPreferencesQueryKey,
 	unlinkIdentityMutation,
 	updateSlackUserPreferencesMutation,
 	updateUserSettingsMutation,
@@ -128,7 +128,7 @@ function RouteComponent() {
 		},
 	});
 
-	const slackPreferencesQueryKey = listSlackUserPreferencesQueryKey({});
+	const slackPreferencesQueryKey = getSlackUserPreferencesQueryKey({});
 	const updateSlackPreferencesMutation = useMutation({
 		...updateSlackUserPreferencesMutation(),
 		onSuccess: (updatedWorkspace) => {
@@ -186,7 +186,7 @@ function RouteComponent() {
 	const slackAvailable = Boolean(slackProvider?.registrationId || slackIdentity);
 
 	const slackPreferencesQuery = useQuery({
-		...listSlackUserPreferencesOptions({}),
+		...getSlackUserPreferencesOptions({}),
 		enabled: slackAvailable,
 		retry: 1,
 	});

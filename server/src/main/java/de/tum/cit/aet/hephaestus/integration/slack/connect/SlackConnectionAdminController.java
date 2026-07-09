@@ -49,6 +49,10 @@ public class SlackConnectionAdminController {
      * @param body optional channel override; when blank, the persisted notification channel is used.
      */
     @PostMapping("/test-message")
+    @io.swagger.v3.oas.annotations.Operation(
+        operationId = "sendSlackTestMessage",
+        summary = "Post a test message to verify the Slack connection"
+    )
     public SlackTestMessageResponseDTO sendTestMessage(
         WorkspaceContext workspace,
         @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body

@@ -26,6 +26,11 @@ abstract class SlackUserPreferencesController {
         this.service = service;
     }
 
+    /**
+     * The account id from the verified cookie-JWT. Both failure branches surface the same generic 401 (rendered as
+     * RFC-7807 by Spring's problemdetails support) — the subject-shape detail is an internal matter that must not
+     * leak into the response body.
+     */
     protected static long accountId(JwtAuthenticationToken auth) {
         if (auth == null || auth.getToken() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "not authenticated");
@@ -33,7 +38,7 @@ abstract class SlackUserPreferencesController {
         try {
             return Long.parseLong(auth.getToken().getSubject());
         } catch (NumberFormatException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "token subject is not an account id");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "not authenticated");
         }
     }
 }
@@ -51,8 +56,8 @@ class SlackUserPreferencesUserController extends SlackUserPreferencesController 
     }
 
     @GetMapping
-    @Operation(summary = "List current user's Slack preferences", operationId = "listSlackUserPreferences")
-    ResponseEntity<SlackUserPreferencesDTO> list(JwtAuthenticationToken auth) {
+    @Operation(summary = "Get current user's Slack preferences", operationId = "getSlackUserPreferences")
+    ResponseEntity<SlackUserPreferencesDTO> get(JwtAuthenticationToken auth) {
         return ResponseEntity.ok(service.listForAccount(accountId(auth)));
     }
 }
@@ -74,7 +79,7 @@ class SlackWorkspaceUserPreferencesController extends SlackUserPreferencesContro
         summary = "Update current user's Slack workspace preferences",
         operationId = "updateSlackUserPreferences"
     )
-    ResponseEntity<SlackWorkspacePreferencesDTO> update(
+    ResponseEntity<SlackUserWorkspacePreferencesDTO> update(
         WorkspaceContext workspace,
         JwtAuthenticationToken auth,
         @Valid @RequestBody UpdateSlackUserPreferencesRequestDTO request

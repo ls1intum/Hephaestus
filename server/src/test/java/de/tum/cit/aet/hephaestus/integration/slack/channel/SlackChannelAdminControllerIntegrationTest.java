@@ -183,7 +183,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
 
     @Test
     @WithAdminUser
-    @DisplayName("DELETE revokes + erases the channel's raw messages, thread aggregate, and derived feedback")
+    @DisplayName("PATCH to REVOKED erases the channel's raw messages, thread aggregate, and derived feedback")
     void revokeErasesRawAndDerived() {
         ensureAdminMembership(workspace);
         seedChannel(workspace.getId(), "C1", ConsentState.ACTIVE, Instant.parse("2020-01-01T00:00:00Z"));
@@ -196,13 +196,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         UUID observationId = conv.observationId();
         UUID feedbackId = conv.feedbackId();
 
-        webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/slack/channels/{c}", workspace.getWorkspaceSlug(), "C1")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+        patchConsent("C1", ConsentState.REVOKED, null).expectStatus().isOk();
 
         // Channel flipped to REVOKED (row survives as the terminal record) …
         assertThat(currentState("C1")).isEqualTo(ConsentState.REVOKED);
@@ -216,8 +210,8 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
         assertThat(observationRepository.findById(observationId)).isEmpty();
 
         // … but the immutable accountability record of the erasure itself survives: the ACTIVE → REVOKED audit row is
-        // NOT swept with the content (a future broad-purge that added slack_channel_consent_event to the erase set, or
-        // a DELETE that bypassed recordAudit, would make this vanish).
+        // NOT swept with the content (a future broad-purge that added slack_channel_consent_event to the erase set
+        // would make this vanish).
         var events = consentEventRepository.findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(
             workspace.getId(),
             "C1"

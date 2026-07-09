@@ -1,4 +1,4 @@
-import type { SlackWorkspacePreferences } from "@/api/types.gen";
+import type { SlackUserWorkspacePreferences } from "@/api/types.gen";
 import { SlackIcon } from "@/components/icons/brand";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
 export interface SlackPreferencesSectionProps {
-	workspaces: SlackWorkspacePreferences[];
+	workspaces: SlackUserWorkspacePreferences[];
 	isSlackLinked: boolean;
 	canConnectSlack: boolean;
 	onConnectSlack: () => void;
@@ -103,7 +103,7 @@ export function SlackPreferencesSection({
 }
 
 interface WorkspacePreferenceRowProps {
-	workspace: SlackWorkspacePreferences;
+	workspace: SlackUserWorkspacePreferences;
 	isUpdating: boolean;
 	onToggleChannelMessages: (workspaceSlug: string, channelMessagesAllowed: boolean) => void;
 }

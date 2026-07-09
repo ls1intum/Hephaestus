@@ -148,7 +148,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         when(identityResolver.resolveMemberId(1L, "T1", "U1")).thenReturn(Optional.of(123L));
         when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(1L, ConsentState.ACTIVE)).thenReturn(1L);
 
-        SlackWorkspacePreferencesDTO dto = service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, false);
+        SlackUserWorkspacePreferencesDTO dto = service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, false);
 
         verify(participantConsentService).recordChannelMessageOptOut(1L, "U1");
         verify(erasureService).erasePerson(1L, 123L, "U1");
