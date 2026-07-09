@@ -239,8 +239,9 @@ public class IssueReviewHandler implements JobTypeHandler {
                 log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
         } catch (JobDeliveryException e) {
-            // A genuine delivery failure (the agent ran, but the student saw nothing) must NOT be reported
-            // as DELIVERED — re-throw so the job is recorded as failed, matching the PR path.
+            // A genuine delivery failure (the student saw nothing) must NOT be reported as DELIVERED — persist the
+            // composed body as FAILED (auditable), then re-throw so the job is recorded failed, matching the PR path.
+            recordUndelivered(job, delivery);
             throw e;
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
@@ -252,6 +253,9 @@ public class IssueReviewHandler implements JobTypeHandler {
         // try/catch so it can never affect the issue note the developer already received. Issues have no inline
         // placements.
         if (!posted) {
+            // Nothing landed (null comment id or a swallowed non-fatal error): not a DELIVERED unit — persist the
+            // composed body as FAILED for auditability, then stop.
+            recordUndelivered(job, delivery);
             return;
         }
         try {
@@ -259,6 +263,19 @@ public class IssueReviewHandler implements JobTypeHandler {
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+        }
+    }
+
+    /** Best-effort FAILED-unit persist (two call sites). REQUIRES_NEW in the recorder + this catch mean a ledger failure never masks the delivery outcome. */
+    private void recordUndelivered(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+        try {
+            feedbackLedgerRecorder.recordUndelivered(job, delivery);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Undelivered-feedback ledger record failed (delivery unaffected): jobId={}, error={}",
                 job.getId(),
                 e.getMessage()
             );

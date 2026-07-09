@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,15 +41,18 @@ public class ConversationalDeliveryReconciler {
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
+    private final ObservationRepository observationRepository;
 
     public ConversationalDeliveryReconciler(
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
-        FeedbackPlacementRepository feedbackPlacementRepository
+        FeedbackPlacementRepository feedbackPlacementRepository,
+        ObservationRepository observationRepository
     ) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
+        this.observationRepository = observationRepository;
     }
 
     /**
@@ -73,6 +78,20 @@ public class ConversationalDeliveryReconciler {
                 observationId
             );
             if (feedbackIds.isEmpty()) {
+                continue;
+            }
+            // Re-check FeedbackChannelRouter's admission dedup at flip time: if a later re-review has since
+            // delivered this locus in-context, skip the flip (let the stale unit age out) so it is not raised twice.
+            Observation observation = observationRepository.findById(observationId).orElse(null);
+            if (
+                observation != null &&
+                observation.getRecurrenceKey() != null &&
+                feedbackRepository.existsDeliveredInContextForRecurrenceKey(
+                    workspaceId,
+                    recipientUserId,
+                    observation.getRecurrenceKey()
+                )
+            ) {
                 continue;
             }
             UUID feedbackId = feedbackIds.get(0);

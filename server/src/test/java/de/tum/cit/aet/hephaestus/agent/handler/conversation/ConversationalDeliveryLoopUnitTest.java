@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private FeedbackPlacementRepository feedbackPlacementRepository;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository;
+
     private FeedbackChannelRouter router() {
         return new FeedbackChannelRouter(feedbackRepository);
     }
@@ -70,7 +74,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         return new ConversationalDeliveryReconciler(
             feedbackRepository,
             feedbackObservationRepository,
-            feedbackPlacementRepository
+            feedbackPlacementRepository,
+            observationRepository
         );
     }
 
@@ -181,6 +186,47 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
         assertThat(flips).isZero();
         verify(feedbackPlacementRepository, never()).save(any());
+    }
+
+    @Test
+    void reconcilerSkipsFlip_whenLocusWasSinceDeliveredInContext() {
+        // A PREPARED unit seeded by a FAILED direct delivery: if a later re-review has since delivered the SAME
+        // recurrence_key in-context, the flip must be skipped (no double-delivery) — the stale unit ages out.
+        UUID a = UUID.randomUUID();
+        UUID fidA = UUID.randomUUID();
+        when(
+            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
+        ).thenReturn(List.of(fidA));
+        Observation obs = problem(null, "rk-delivered");
+        when(observationRepository.findById(a)).thenReturn(Optional.of(obs));
+        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-delivered")).thenReturn(
+            true
+        );
+
+        int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(a));
+
+        assertThat(flips).isZero();
+        verify(feedbackRepository, never()).markConversationDelivered(any(), any());
+    }
+
+    @Test
+    void reconcilerStillFlips_whenLocusHasKeyButWasNotDeliveredInContext() {
+        // The guard must only suppress when the locus WAS delivered in-context; otherwise the flip proceeds.
+        UUID a = UUID.randomUUID();
+        UUID fidA = UUID.randomUUID();
+        when(
+            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
+        ).thenReturn(List.of(fidA));
+        Observation obs = problem(null, "rk-fresh");
+        when(observationRepository.findById(a)).thenReturn(Optional.of(obs));
+        when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-fresh")).thenReturn(false);
+        when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
+        when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));
+
+        int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(a));
+
+        assertThat(flips).isEqualTo(1);
+        verify(feedbackRepository).markConversationDelivered(eq(fidA), any());
     }
 
     private Observation problem(ObjectNode evidence, String recurrenceKey) {

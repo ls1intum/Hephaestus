@@ -45,7 +45,12 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     private Connection connection;
 
     private OutlineWebhookRegistrar registrar(String externalUrl) {
-        return new OutlineWebhookRegistrar(connectionService, outlineApiClient, new EncryptedStringConverter(), externalUrl);
+        return new OutlineWebhookRegistrar(
+            connectionService,
+            outlineApiClient,
+            new EncryptedStringConverter(),
+            externalUrl
+        );
     }
 
     private void stubActiveConnection(ConnectionConfig config) {

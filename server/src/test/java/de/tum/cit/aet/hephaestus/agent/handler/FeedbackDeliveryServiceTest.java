@@ -359,6 +359,29 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isNull();
+            // The composed body is persisted as FAILED (auditable + dashboard-visible) BEFORE the exception
+            // propagates — a failed direct delivery must not discard it.
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), eq(delivery));
+        }
+
+        @Test
+        void summaryLandedThenInlineFailed_doesNotRecordFalseUndelivered() {
+            // Partial success: the summary posted (developer saw the findings), then the inline-notes step threw
+            // JobDeliveryException. recordUndelivered must NOT run — a FAILED unit + conversation re-signal here
+            // would falsely mark the landed summary undelivered and double-raise its loci.
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_summary_1");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
+                new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("no inline channel wired")
+            );
+
+            var delivery = new DeliveryContent("Summary.", List.of(new DiffNote("src/Foo.java", 3, null, "x")));
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
+                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
+            );
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_summary_1");
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test

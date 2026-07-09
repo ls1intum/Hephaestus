@@ -29,7 +29,11 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
     private ConnectionService connectionService;
 
     private OutlineWebhookSecretSource secretSource() {
-        return new OutlineWebhookSecretSource(connectionService, new EncryptedStringConverter(), JsonMapper.builder().build());
+        return new OutlineWebhookSecretSource(
+            connectionService,
+            new EncryptedStringConverter(),
+            JsonMapper.builder().build()
+        );
     }
 
     private static SecretLookup lookup(String subscriptionId) {

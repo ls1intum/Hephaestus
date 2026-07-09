@@ -62,15 +62,16 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     List<UUID> findObservationIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 
     /**
-     * The DELIVERED feedback body bound to each of the given observations — the developer's advice source for
-     * the read surfaces (reflection dashboard, observation detail). Per ADR 0021 the immutable {@code Observation}
-     * carries evidence + observation + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
-     * and read back from the delivered {@code Feedback}'s {@code body} column here.
+     * The composed advice body bound to each of the given observations — the developer's advice source for the
+     * private read surfaces (reflection dashboard, observation detail). Per ADR 0021 the immutable
+     * {@code Observation} carries evidence + observation + reasoning but NO advice; advice is composed into the
+     * {@code Feedback} and read back from its {@code body} column here.
      *
-     * <p>An observation can be bound to more than one DELIVERED unit (e.g. successive re-deliveries), so this can
-     * return multiple rows per observation id; callers keep the most recent by {@code feedbackCreatedAt}. Only
-     * {@code DELIVERED} units with a non-null body are returned (PREPARED/SUPPRESSED/FAILED carry no body the
-     * developer ever saw).
+     * <p>Returns {@code DELIVERED} bodies AND {@code FAILED} bodies (the direct SCM post did not land, but the
+     * composed advice was persisted): the reflection dashboard is a developer-facing surface in its own right, so
+     * a failed comment must not blank it. PREPARED/SUPPRESSED units carry no summary body and drop out on the
+     * null-body filter. An observation can bind more than one such unit (successive re-deliveries), so callers keep
+     * the most recent by {@code feedbackCreatedAt}.
      */
     @Query(
         """
@@ -79,16 +80,19 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                ff.feedback.createdAt AS feedbackCreatedAt
         FROM FeedbackObservation ff
         WHERE ff.observation.id IN :observationIds
-          AND ff.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+          AND ff.feedback.deliveryState IN (
+                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED,
+                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.FAILED
+              )
           AND ff.feedback.body IS NOT NULL
         """
     )
-    List<DeliveredObservationBody> findDeliveredBodiesByObservationIds(
+    List<ObservationAdviceBody> findAdviceBodiesByObservationIds(
         @Param("observationIds") Collection<UUID> observationIds
     );
 
-    /** Projection: an observation id paired with a DELIVERED feedback body and that feedback's creation time. */
-    interface DeliveredObservationBody {
+    /** Projection: an observation id paired with its composed advice body and that feedback's creation time. */
+    interface ObservationAdviceBody {
         UUID getObservationId();
         String getBody();
         Instant getFeedbackCreatedAt();

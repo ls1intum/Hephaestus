@@ -164,6 +164,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             assertThat(job.getDeliveryCommentId()).isEqualTo("gid://gitlab/Note/9");
             // C12: a confirmed post records the ledger.
             verify(feedbackLedgerRecorder).record(eq(job), any(), any(), any());
+            // A successful delivery must NOT also persist a FAILED/undelivered unit.
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test
@@ -176,6 +178,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             // C12: a swallowed delivery failure means the student saw nothing — the ledger must NOT record a
             // phantom DELIVERED unit (which would also supersede the real prior, corrupting it like A3).
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+            // ...but the composed body must be persisted as a FAILED unit so it stays auditable.
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
@@ -195,6 +199,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             );
             assertThat(job.getDeliveryCommentId()).isNull();
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+            // The undelivered body is persisted (FAILED) BEFORE the exception re-throws, so it is not lost.
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
@@ -208,12 +214,15 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
             assertThat(job.getDeliveryCommentId()).isNull();
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
         }
 
         @Test
         void noDeliveryContent_isNoop() {
             handler.postIssueNote(issueJob("OPEN"), null);
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            // Nothing was composed, so there is nothing to persist as undelivered either.
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
     }
 }
