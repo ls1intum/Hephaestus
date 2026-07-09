@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import java.time.Instant;
@@ -164,19 +165,9 @@ public class SlackIngestService {
         }
     }
 
-    /**
-     * Whether a Slack message {@code ts} arrived strictly after the channel's consent announcement — the
-     * forward-only comparison. A Slack {@code ts} is {@code <epoch-seconds>.<micros>}; parse it as a fractional
-     * epoch and compare against {@code announcedAt} rendered the same way. An unparseable {@code ts} fails closed.
-     */
+    /** Forward-only comparison: only a message strictly after the announcement enters. Unparseable fails closed. */
     private static boolean isAfterAnnouncement(String ts, Instant announcedAt) {
-        try {
-            double messageEpoch = Double.parseDouble(ts);
-            double announcedEpoch = announcedAt.getEpochSecond() + announcedAt.getNano() / 1_000_000_000.0;
-            return messageEpoch > announcedEpoch;
-        } catch (NumberFormatException e) {
-            return false;
-        }
+        return SlackTs.isAfter(ts, announcedAt);
     }
 
     /**

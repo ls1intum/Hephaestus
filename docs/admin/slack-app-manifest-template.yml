@@ -49,6 +49,13 @@ settings:
       - message.channels
       - message.groups
       - member_joined_channel
+      - channel_archive
+      - channel_deleted
+      - channel_left
+      - channel_rename
+      - group_archive
+      - group_left
+      - group_rename
       - app_home_opened
       - app_context_changed
       - app_uninstalled

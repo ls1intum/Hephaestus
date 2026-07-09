@@ -563,4 +563,56 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-slack" id="1782980500800-27">
+        <preConditions onFail="MARK_RAN" onFailMessage="pk_slack_participant_consent is already workspace-first">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM information_schema.key_column_usage
+                 WHERE constraint_name = 'pk_slack_participant_consent'
+                   AND column_name = 'slack_user_id'
+                   AND ordinal_position = 1
+            </sqlCheck>
+        </preConditions>
+        <comment>Reorder the participant-consent primary key workspace-first, matching every other Slack unique key. The leading workspace_id also serves the hot countByWorkspaceIdAndIngestionOptedOutTrue scan, which a slack_user_id-leading index cannot.</comment>
+        <sql>
+            ALTER TABLE slack_participant_consent DROP CONSTRAINT pk_slack_participant_consent;
+            ALTER TABLE slack_participant_consent
+              ADD CONSTRAINT pk_slack_participant_consent PRIMARY KEY (workspace_id, slack_user_id);
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE slack_participant_consent DROP CONSTRAINT pk_slack_participant_consent;
+                ALTER TABLE slack_participant_consent
+                  ADD CONSTRAINT pk_slack_participant_consent PRIMARY KEY (slack_user_id, workspace_id);
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Reconciliation watermarks for the nightly Slack history sync (SlackChannelHistorySyncService), mirroring the
+        SCM sync targets' lastXSyncedAt columns. Slack's Events API retries a failed delivery only three times within
+        ~6 minutes and then drops the event permanently, so a receiver outage longer than that loses monitored-channel
+        messages with no way to notice. The sync re-reads conversations.history for each ACTIVE channel and replays it
+        through the same consent-gated ingest stack.
+
+        last_history_synced_ts is an exact Slack ts string (not a timestamp) so it composes with the lexicographic
+        ts comparisons used everywhere else and never rounds. history_synced_at drives staleness-first ordering, so a
+        rate-limited workspace converges across nights instead of starving its newest channels.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-28">
+        <preConditions onFail="MARK_RAN" onFailMessage="slack_monitored_channel sync watermarks already present">
+            <not><columnExists tableName="slack_monitored_channel" columnName="last_history_synced_ts"/></not>
+        </preConditions>
+        <comment>History-reconciliation watermarks on the monitored-channel allow-list row.</comment>
+        <sql>
+            ALTER TABLE slack_monitored_channel ADD COLUMN last_history_synced_ts VARCHAR(32);
+            ALTER TABLE slack_monitored_channel ADD COLUMN history_synced_at TIMESTAMP WITH TIME ZONE;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE slack_monitored_channel DROP COLUMN IF EXISTS history_synced_at;
+                ALTER TABLE slack_monitored_channel DROP COLUMN IF EXISTS last_history_synced_ts;
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

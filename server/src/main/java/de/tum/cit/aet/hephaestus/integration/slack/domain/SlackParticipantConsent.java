@@ -62,6 +62,10 @@ public class SlackParticipantConsent {
     @Column(name = "source", length = 32)
     private @Nullable String source;
 
+    /**
+     * When the current decision was made. Every write goes through the repository's native {@code ON CONFLICT}
+     * upserts, which restamp this on each re-decision; the creation timestamp only covers a JPA-persisted row.
+     */
     @CreationTimestamp
     @Column(name = "decided_at", nullable = false)
     private Instant decidedAt;

@@ -64,6 +64,59 @@ public interface SlackMonitoredChannelRepository extends JpaRepository<SlackMoni
     )
     int revokeConsent(@Param("workspaceId") Long workspaceId, @Param("slackChannelId") String slackChannelId);
 
+    /** Allow-listed channels for a workspace in one consent state, stalest history sync first (nulls first). */
+    @Query(
+        "SELECT c FROM SlackMonitoredChannel c WHERE c.workspaceId = :workspaceId AND c.consentState = :consentState " +
+            "ORDER BY c.historySyncedAt ASC NULLS FIRST, c.id ASC"
+    )
+    List<SlackMonitoredChannel> findForHistorySync(
+        @Param("workspaceId") Long workspaceId,
+        @Param("consentState") ConsentState consentState
+    );
+
+    /** Every allow-listed channel for a workspace that is not terminally revoked — the metadata-refresh set. */
+    List<SlackMonitoredChannel> findByWorkspaceIdAndConsentStateNot(Long workspaceId, ConsentState consentState);
+
+    /**
+     * Advance a channel's history-reconciliation watermark after a completed sync window. Separate from the entity
+     * setters so the sync never has to hold a managed entity across its (long, rate-limited) fetch loop.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        "UPDATE SlackMonitoredChannel c SET c.lastHistorySyncedTs = :lastTs, c.historySyncedAt = :syncedAt " +
+            "WHERE c.workspaceId = :workspaceId AND c.slackChannelId = :slackChannelId"
+    )
+    int advanceHistoryWatermark(
+        @Param("workspaceId") Long workspaceId,
+        @Param("slackChannelId") String slackChannelId,
+        @Param("lastTs") String lastTs,
+        @Param("syncedAt") Instant syncedAt
+    );
+
+    /** Heal a stale channel name (Slack {@code channel_rename}, or the metadata refresh). */
+    @Modifying
+    @Transactional
+    @Query(
+        "UPDATE SlackMonitoredChannel c SET c.channelName = :channelName " +
+            "WHERE c.workspaceId = :workspaceId AND c.slackChannelId = :slackChannelId"
+    )
+    int updateChannelName(
+        @Param("workspaceId") Long workspaceId,
+        @Param("slackChannelId") String slackChannelId,
+        @Param("channelName") String channelName
+    );
+
+    /**
+     * Every workspace with at least one channel in the given consent state. Deliberately unscoped: the nightly
+     * reconciliation is fleet-wide and must discover its own tenants before it can scope anything.
+     */
+    @Query(
+        value = "SELECT DISTINCT workspace_id FROM slack_monitored_channel WHERE consent_state = :consentState",
+        nativeQuery = true
+    )
+    List<Long> findDistinctWorkspaceIdsByConsentState(@Param("consentState") String consentState);
+
     /** Workspace purge: delete every allow-list row for one workspace. */
     long deleteByWorkspaceId(Long workspaceId);
 

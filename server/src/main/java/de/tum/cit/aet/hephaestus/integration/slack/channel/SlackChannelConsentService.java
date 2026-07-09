@@ -363,4 +363,68 @@ public class SlackChannelConsentService {
 
     /** Whether {@link #register} created a new allow-list row (201) or returned an existing one (200). */
     public record RegistrationOutcome(SlackMonitoredChannelDTO channel, boolean created) {}
+
+    // --- platform-event wrappers (Slack channel-lifecycle handlers) ---
+    //
+    // Unlike transition(), these are guard-first and NEVER throw: a Slack channel-lifecycle event (the bot removed,
+    // a channel archived/deleted/renamed) arrives asynchronously off the NATS consumer with no admin actor and no
+    // opportunity to surface a 404/409 to anyone. Each wrapper re-reads the row inside its own short transaction,
+    // no-ops on an absent row or an edge that does not apply, and otherwise performs the same side effect + audit
+    // write as the corresponding transition() edge would.
+
+    /**
+     * {@code channel_archive} / {@code channel_left} (and the {@code group_*} equivalents): stop ingestion but
+     * keep stored data, exactly like {@code ACTIVE → PAUSED} via {@link #transition}. No-op unless the channel is
+     * currently {@code ACTIVE} — a channel that is {@code PENDING}, already {@code PAUSED}, or {@code REVOKED} has
+     * nothing to pause.
+     */
+    public void pauseForPlatformEvent(long workspaceId, String slackChannelId, String reason) {
+        runInTx(() -> {
+            SlackMonitoredChannel channel = monitoredChannelRepository
+                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                .orElse(null);
+            if (channel == null || channel.getConsentState() != ConsentState.ACTIVE) {
+                return;
+            }
+            channel.setConsentState(ConsentState.PAUSED);
+            monitoredChannelRepository.save(channel);
+            recordAudit(workspaceId, slackChannelId, ConsentState.ACTIVE, ConsentState.PAUSED, reason);
+        });
+    }
+
+    /**
+     * {@code channel_deleted}: the channel and its Slack-side data are gone, so erase our copy too — the same
+     * single choke point ({@link SlackIngestService#eraseChannel}) as {@code * → REVOKED} via {@link #transition}.
+     * No-op if the channel was never allow-listed or is already {@code REVOKED}.
+     */
+    public void revokeForPlatformEvent(long workspaceId, String slackChannelId, String reason) {
+        runInTx(() -> {
+            SlackMonitoredChannel channel = monitoredChannelRepository
+                .findByWorkspaceIdAndSlackChannelId(workspaceId, slackChannelId)
+                .orElse(null);
+            if (channel == null || channel.getConsentState() == ConsentState.REVOKED) {
+                return;
+            }
+            ConsentState from = channel.getConsentState();
+            ingestService.eraseChannel(workspaceId, slackChannelId);
+            recordAudit(workspaceId, slackChannelId, from, ConsentState.REVOKED, reason);
+        });
+    }
+
+    /**
+     * {@code channel_rename} / {@code group_rename}: heal the stale {@code channel_name} so the admin UI and audit
+     * trail stop showing a name Slack no longer uses. Not a consent transition — no audit row. No-op for a blank
+     * name or a channel that is not allow-listed (the bulk update simply touches 0 rows).
+     */
+    public void renameChannel(long workspaceId, String slackChannelId, @Nullable String channelName) {
+        if (channelName == null || channelName.isBlank()) {
+            return;
+        }
+        monitoredChannelRepository.updateChannelName(workspaceId, slackChannelId, channelName);
+    }
+
+    /** Run a DB-only side effect in one short transaction; never returns a value (platform-event wrappers only). */
+    private void runInTx(Runnable work) {
+        transactionTemplate.executeWithoutResult(status -> work.run());
+    }
 }

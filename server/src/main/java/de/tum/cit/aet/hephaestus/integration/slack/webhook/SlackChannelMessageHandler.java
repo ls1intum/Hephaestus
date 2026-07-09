@@ -15,8 +15,13 @@ import tools.jackson.databind.JsonNode;
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandler<JsonNode> {
 
-    /** Message subtypes that still carry user-authored text. */
-    private static final Set<String> CONTENT_BEARING_SUBTYPES = Set.of("thread_broadcast", "me_message");
+    /**
+     * Message subtypes that still carry user-authored text. {@code file_share} is included because an upload's
+     * accompanying comment ("here's the failing trace — is this a race?") is exactly the conversational content the
+     * practice detector needs; the file itself is dropped by construction (only {@code text} is ever persisted),
+     * and a pure upload with no comment is skipped below.
+     */
+    static final Set<String> CONTENT_BEARING_SUBTYPES = Set.of("thread_broadcast", "me_message", "file_share");
 
     private final SlackIngestService ingestService;
 
@@ -63,6 +68,9 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
         }
         if (!subtype.isEmpty() && !CONTENT_BEARING_SUBTYPES.contains(subtype)) {
             return;
+        }
+        if ("file_share".equals(subtype) && event.path("text").asString("").isBlank()) {
+            return; // a pure upload with no comment carries no analyzable text
         }
         ingestService.ingestChannelMessage(
             teamId,

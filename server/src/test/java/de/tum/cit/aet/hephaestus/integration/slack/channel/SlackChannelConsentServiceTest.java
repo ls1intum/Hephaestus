@@ -371,4 +371,94 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
+
+    // --- platform-event wrappers (guard-first, no-op tolerant: they run on the NATS consumer with no actor) ---
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "pauseForPlatformEvent on {0} is a no-op")
+    @org.junit.jupiter.params.provider.EnumSource(
+        value = ConsentState.class,
+        names = { "PENDING", "PAUSED", "REVOKED" }
+    )
+    void pauseForPlatformEvent_nonActive_isANoOp(ConsentState state) {
+        SlackMonitoredChannel c = channel(state, null);
+        stubChannel(c);
+
+        service().pauseForPlatformEvent(WS, CHANNEL, "bot removed from channel");
+
+        verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void pauseForPlatformEvent_active_pausesAndAudits() {
+        SlackMonitoredChannel c = channel(ConsentState.ACTIVE, Instant.parse("2026-07-01T00:00:00Z"));
+        stubChannel(c);
+
+        service().pauseForPlatformEvent(WS, CHANNEL, "channel archived");
+
+        assertThat(c.getConsentState()).isEqualTo(ConsentState.PAUSED);
+        verify(monitoredChannelRepository).save(c);
+        ArgumentCaptor<SlackChannelConsentEvent> captor = ArgumentCaptor.forClass(SlackChannelConsentEvent.class);
+        verify(consentEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getFromState()).isEqualTo(ConsentState.ACTIVE);
+        assertThat(captor.getValue().getToState()).isEqualTo(ConsentState.PAUSED);
+        assertThat(captor.getValue().getReason()).isEqualTo("channel archived");
+    }
+
+    @Test
+    void pauseForPlatformEvent_absentChannel_isANoOp() {
+        when(monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(WS, CHANNEL)).thenReturn(Optional.empty());
+
+        service().pauseForPlatformEvent(WS, CHANNEL, "bot removed from channel");
+
+        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "revokeForPlatformEvent from {0} erases and audits")
+    @org.junit.jupiter.params.provider.EnumSource(value = ConsentState.class, names = { "PENDING", "ACTIVE", "PAUSED" })
+    void revokeForPlatformEvent_erasesAndAudits(ConsentState from) {
+        SlackMonitoredChannel c = channel(from, null);
+        stubChannel(c);
+
+        service().revokeForPlatformEvent(WS, CHANNEL, "channel deleted in Slack");
+
+        verify(ingestService).eraseChannel(WS, CHANNEL);
+        ArgumentCaptor<SlackChannelConsentEvent> captor = ArgumentCaptor.forClass(SlackChannelConsentEvent.class);
+        verify(consentEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getFromState()).isEqualTo(from);
+        assertThat(captor.getValue().getToState()).isEqualTo(ConsentState.REVOKED);
+    }
+
+    @Test
+    void revokeForPlatformEvent_alreadyRevoked_isANoOp() {
+        SlackMonitoredChannel c = channel(ConsentState.REVOKED, null);
+        stubChannel(c);
+
+        service().revokeForPlatformEvent(WS, CHANNEL, "channel deleted in Slack");
+
+        verify(ingestService, never()).eraseChannel(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any()
+        );
+        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void renameChannel_updatesTheStoredName_withoutAnAuditRow() {
+        service().renameChannel(WS, CHANNEL, "renamed");
+
+        verify(monitoredChannelRepository).updateChannelName(WS, CHANNEL, "renamed");
+        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void renameChannel_blankName_isANoOp() {
+        service().renameChannel(WS, CHANNEL, "  ");
+
+        verify(monitoredChannelRepository, never()).updateChannelName(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any()
+        );
+    }
 }

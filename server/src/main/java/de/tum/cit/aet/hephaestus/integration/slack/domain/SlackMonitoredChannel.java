@@ -77,6 +77,18 @@ public class SlackMonitoredChannel {
     @Column(name = "consent_announced_at")
     private @Nullable Instant consentAnnouncedAt;
 
+    /**
+     * Reconciliation watermark: the newest Slack {@code ts} the history sync has replayed for this channel. Null
+     * until the first completed sync window. Kept as the exact Slack ts string so it composes with the lexicographic
+     * comparisons used by the forward-only gate and the retention sweep.
+     */
+    @Column(name = "last_history_synced_ts", length = 32)
+    private @Nullable String lastHistorySyncedTs;
+
+    /** When the last history-sync window completed; drives staleness-first ordering under a request budget. */
+    @Column(name = "history_synced_at")
+    private @Nullable Instant historySyncedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

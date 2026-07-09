@@ -454,4 +454,56 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         // Nothing was ever stored on a never-announced channel; no contentless tombstone row is created.
         verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
     }
+
+    @Test
+    void fileShareWithComment_isStored() {
+        // The upload's accompanying text is conversational content; the file itself is never persisted (only the
+        // text column exists).
+        stubActiveConsentedChannel();
+
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"file_share","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1",
+                  "text":"here is the failing trace - race?","files":[{"id":"F1"}]}}
+                """
+            )
+        );
+
+        verify(messageRepository).insertIfAbsent(
+            eq(WORKSPACE),
+            eq("T1"),
+            eq("C1"),
+            eq("100.1"),
+            eq(null),
+            eq("U1"),
+            eq(7L),
+            eq("here is the failing trace - race?")
+        );
+    }
+
+    @Test
+    void fileShareWithoutComment_storesNothing() {
+        handler.onMessage(
+            natsMessage(
+                """
+                {"type":"event_callback","team_id":"T1","event":{
+                  "type":"message","subtype":"file_share","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1",
+                  "text":"","files":[{"id":"F1"}]}}
+                """
+            )
+        );
+
+        verify(messageRepository, never()).insertIfAbsent(
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any()
+        );
+    }
 }
