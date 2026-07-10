@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
+import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
@@ -124,8 +126,11 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
             // connection, exactly like the mirrored bodies.
             long events = outlineDocumentEventRepository.deleteByWorkspaceId(ref.workspaceId());
             if (erased > 0 || collections > 0 || events > 0) {
+                // Erase audit: who disconnected, and how much mirrored content left the database with it.
+                // "system" when no request principal exists (e.g. the workspace-purge path).
                 log.info(
-                    "Outline revoke: erased {} mirrored document(s), {} collection registration(s) and {} document event(s) for workspace={}",
+                    "outline.audit: revoke erase — actor={} erased {} mirrored document(s), {} collection registration(s) and {} document event(s) for workspace={}",
+                    LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
                     erased,
                     collections,
                     events,

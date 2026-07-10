@@ -5,7 +5,11 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.net.URI;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +41,12 @@ public class OutlineConnectionAdminController {
         operationId = "getOutlineConnectionStatus",
         summary = "Health of the workspace's active Outline connection (webhook, last sync, document count)"
     )
+    @ApiResponse(responseCode = "200", description = "Connection health snapshot returned")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     public ResponseEntity<OutlineConnectionStatusDTO> getOutlineConnectionStatus(WorkspaceContext workspace) {
         return ResponseEntity.ok(adminService.status(workspace.id()));
     }
@@ -44,14 +54,30 @@ public class OutlineConnectionAdminController {
     /**
      * Kicks the authoritative full reconcile for this workspace and returns immediately — the sync
      * runs off the request thread, so a large corpus never stalls (or times out) the admin request.
+     * Always 202 with the status resource in {@code Location}; a duplicate submit while a reconcile
+     * is still running dispatches nothing and answers the same 202 pointing at the same monitor.
      */
     @PostMapping("/sync")
     @Operation(
         operationId = "syncOutlineConnection",
-        summary = "Trigger the full Outline reconcile for this workspace (fire-and-forget, 202)"
+        summary = "Trigger the full Outline reconcile for this workspace (async, 202)",
+        description = "Runs off the request thread. Always answers 202 with the connection status resource in the " +
+            "Location header; a duplicate trigger while a reconcile is still running starts nothing new and " +
+            "returns the same 202 pointing at the same monitor."
+    )
+    @ApiResponse(
+        responseCode = "202",
+        description = "Reconcile accepted (or already running — duplicate submits are absorbed); poll the " +
+            "connection status resource in the Location header"
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "The workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
     )
     public ResponseEntity<Void> syncOutlineConnection(WorkspaceContext workspace) {
         adminService.syncNow(workspace.id());
-        return ResponseEntity.accepted().build();
+        URI statusLocation = URI.create("/workspaces/" + workspace.slug() + "/connections/outline/status");
+        return ResponseEntity.accepted().location(statusLocation).build();
     }
 }

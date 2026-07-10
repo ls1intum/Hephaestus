@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.collection;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -96,9 +97,15 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         connectionId = seedActiveOutlineConnection(workspace);
 
         // The registration kick runs the real sync service against the mocked client off the request
-        // thread; benign empty stubs keep that background pass a harmless no-op.
+        // thread; benign empty stubs keep that background pass a harmless no-op. The candidates path
+        // uses the bounded (maxPages) overload, register/sync the plain one — stub both.
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
+            .thenReturn(
+                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
+            );
+        lenient()
+            .when(outlineApiClient.listCollections(anyString(), anyString(), anyInt()))
             .thenReturn(
                 List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
             );
@@ -130,6 +137,13 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         registerRequest(COLLECTION_ID).expectStatus().isNotFound();
         webTestClient
             .get()
+            .uri("/workspaces/{slug}/outline/collections/{id}", workspace.getWorkspaceSlug(), COLLECTION_ID)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+        webTestClient
+            .get()
             .uri("/workspaces/{slug}/connections/outline/status", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -153,6 +167,9 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         OutlineCollectionDTO created = registerRequest(COLLECTION_ID)
             .expectStatus()
             .isCreated()
+            // 201 points at the freshly minted item resource.
+            .expectHeader()
+            .location("/workspaces/" + workspace.getWorkspaceSlug() + "/outline/collections/" + COLLECTION_ID)
             .expectBody(OutlineCollectionDTO.class)
             .returnResult()
             .getResponseBody();
@@ -179,11 +196,48 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
 
     @Test
     @WithAdminUser
-    @DisplayName("register with an id the live list does not contain → 422, nothing persisted")
+    @DisplayName("item GET returns one mirrored collection; an unregistered id is 404")
+    void getSingleCollection() {
+        ensureAdminMembership(workspace);
+        seedCollection(MirrorState.ENABLED, SyncStatus.COMPLETE);
+        seedDocument("doc-1");
+
+        OutlineCollectionDTO fetched = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/outline/collections/{id}", workspace.getWorkspaceSlug(), COLLECTION_ID)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(OutlineCollectionDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(fetched).isNotNull();
+        assertThat(fetched.collectionId()).isEqualTo(COLLECTION_ID);
+        assertThat(fetched.documentCount()).isEqualTo(1L);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/outline/collections/{id}", workspace.getWorkspaceSlug(), "no-such-collection")
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    @DisplayName("register with an id the live list does not contain → 422 with a stable problem type")
     void registerUnknownCollection_unprocessable() {
         ensureAdminMembership(workspace);
 
-        registerRequest("no-such-collection").expectStatus().isEqualTo(422);
+        registerRequest("no-such-collection")
+            .expectStatus()
+            .isEqualTo(422)
+            .expectBody()
+            .jsonPath("$.type")
+            .isEqualTo("/problems/unknown-outline-collection");
         assertThat(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(workspace.getId())).isEmpty();
     }
 
@@ -266,13 +320,16 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             .exchange()
             .expectStatus()
             .isOk()
+            // The live upstream view must never be cached by the browser or an intermediary.
+            .expectHeader()
+            .cacheControl(org.springframework.http.CacheControl.noStore())
             .expectBodyList(OutlineCollectionCandidateDTO.class)
             .returnResult()
             .getResponseBody();
         assertThat(candidates).hasSize(1);
         assertThat(candidates.get(0).alreadyMirrored()).isTrue();
 
-        when(outlineApiClient.listCollections(anyString(), anyString())).thenThrow(
+        when(outlineApiClient.listCollections(anyString(), anyString(), anyInt())).thenThrow(
             new OutlineApiException("Could not reach the Outline server")
         );
         webTestClient
@@ -284,7 +341,9 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             .isEqualTo(502)
             .expectBody()
             .jsonPath("$.title")
-            .isEqualTo("The Outline server could not be reached");
+            .isEqualTo("The Outline server could not be reached")
+            .jsonPath("$.type")
+            .isEqualTo("/problems/outline-unreachable");
     }
 
     @Test
@@ -316,14 +375,43 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         assertThat(status.documentCount()).isEqualTo(1L);
         // No collection has finished a clean pass yet.
         assertThat(status.lastSyncedAt()).isNull();
+        // No manual reconcile has been triggered, the seeded collection is ENABLED+COMPLETE, no error.
+        assertThat(status.syncRunning()).isFalse();
+        assertThat(status.pendingCollections()).isZero();
+        assertThat(status.erroredCollections()).isZero();
 
+        // A pending collection and a sync error show up in the derived counters.
+        OutlineCollection stored = collectionRepository
+            .findByWorkspaceIdAndConnectionIdAndCollectionId(workspace.getId(), connectionId, COLLECTION_ID)
+            .orElseThrow();
+        stored.setSyncStatus(SyncStatus.PENDING);
+        stored.setLastSyncError("Outline /api/documents.export failed (HTTP 500)");
+        collectionRepository.save(stored);
+
+        OutlineConnectionStatusDTO withPending = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/connections/outline/status", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(OutlineConnectionStatusDTO.class)
+            .returnResult()
+            .getResponseBody();
+        assertThat(withPending).isNotNull();
+        assertThat(withPending.pendingCollections()).isEqualTo(1L);
+        assertThat(withPending.erroredCollections()).isEqualTo(1L);
+
+        // The manual sync always answers 202 and points at the status monitor above.
         webTestClient
             .post()
             .uri("/workspaces/{slug}/connections/outline/sync", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
-            .isAccepted();
+            .isAccepted()
+            .expectHeader()
+            .location("/workspaces/" + workspace.getWorkspaceSlug() + "/connections/outline/status");
     }
 
     // --- helpers ---

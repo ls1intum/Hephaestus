@@ -115,7 +115,34 @@ export function OutlineCollectionRow({
 				</div>
 			</TableCell>
 
-			<TableCell className="tabular-nums">{collection.documentCount}</TableCell>
+			<TableCell className="tabular-nums">
+				<div className="flex items-center gap-1.5">
+					<span>
+						{collection.documentCount}
+						{typeof collection.documentsUpstream === "number" && (
+							<span className="text-muted-foreground"> / {collection.documentsUpstream}</span>
+						)}
+					</span>
+					{!!collection.exportsSkippedForBudget && (
+						<Tooltip>
+							{/* Amber, not destructive — this is expected budget throttling, not an error; the
+							next reconcile catches these up. Default TooltipTrigger renders a real <button> so
+							it's reachable by keyboard and screen-reader users. */}
+							<TooltipTrigger
+								className="text-amber-600 dark:text-amber-400"
+								aria-label={`${collection.exportsSkippedForBudget} exports skipped for budget for ${label}`}
+							>
+								<TriangleAlertIcon className="size-3.5" aria-hidden />
+							</TooltipTrigger>
+							<TooltipContent className="max-w-xs break-words">
+								{collection.exportsSkippedForBudget} export
+								{collection.exportsSkippedForBudget === 1 ? "" : "s"} skipped for the shared budget
+								in the last pass — will catch up on the next reconcile.
+							</TooltipContent>
+						</Tooltip>
+					)}
+				</div>
+			</TableCell>
 
 			<TableCell className="text-muted-foreground text-sm">
 				{collection.lastSyncedAt ? (

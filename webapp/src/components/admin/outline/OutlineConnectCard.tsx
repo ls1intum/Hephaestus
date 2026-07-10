@@ -5,6 +5,7 @@ import {
 	ExternalLinkIcon,
 	FileTextIcon,
 	RefreshCwIcon,
+	TriangleAlertIcon,
 	WebhookIcon,
 	ZapOffIcon,
 } from "lucide-react";
@@ -161,32 +162,48 @@ export function OutlineConnectCard({
 									<Skeleton className="h-5 w-full max-w-md" />
 								) : (
 									status && (
-										<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-											{status.webhookRegistered ? (
+										<>
+											<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+												{status.webhookRegistered ? (
+													<span className="flex items-center gap-1.5">
+														<WebhookIcon
+															className="size-4 text-green-600 dark:text-green-400"
+															aria-hidden
+														/>
+														Live updates via webhook
+													</span>
+												) : (
+													<span className="flex items-center gap-1.5">
+														<ZapOffIcon className="size-4" aria-hidden />
+														Polling only — webhook not registered
+													</span>
+												)}
 												<span className="flex items-center gap-1.5">
-													<WebhookIcon
-														className="size-4 text-green-600 dark:text-green-400"
-														aria-hidden
-													/>
-													Live updates via webhook
+													<FileTextIcon className="size-4" aria-hidden />
+													{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
+													mirrored
 												</span>
-											) : (
-												<span className="flex items-center gap-1.5">
-													<ZapOffIcon className="size-4" aria-hidden />
-													Polling only — webhook not registered
+												<span>
+													{status.lastSyncedAt
+														? `Last synced ${formatDistanceToNow(new Date(status.lastSyncedAt), { addSuffix: true })}`
+														: "Not synced yet"}
 												</span>
+												{status.syncRunning && (
+													<span className="flex items-center gap-1.5">
+														<RefreshCwIcon className="size-4 animate-spin" aria-hidden />
+														Sync in progress…
+													</span>
+												)}
+											</div>
+											{status.erroredCollections > 0 && (
+												<p className="flex items-center gap-1.5 text-sm text-destructive">
+													<TriangleAlertIcon className="size-4" aria-hidden />
+													{status.erroredCollections} collection
+													{status.erroredCollections === 1 ? "" : "s"} hit a sync error — check the
+													collections list below.
+												</p>
 											)}
-											<span className="flex items-center gap-1.5">
-												<FileTextIcon className="size-4" aria-hidden />
-												{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
-												mirrored
-											</span>
-											<span>
-												{status.lastSyncedAt
-													? `Last synced ${formatDistanceToNow(new Date(status.lastSyncedAt), { addSuffix: true })}`
-													: "Not synced yet"}
-											</span>
-										</div>
+										</>
 									)
 								)}
 

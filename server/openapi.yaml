@@ -1371,16 +1371,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutlineConnectionStatus"
-          description: OK
+          description: Connection health snapshot returned
+        "404":
+          description: The workspace has no ACTIVE Outline connection
       summary: "Health of the workspace's active Outline connection (webhook, last\
         \ sync, document count)"
       tags:
       - Connections
   /workspaces/{workspaceSlug}/connections/outline/sync:
     post:
-      description: |-
-        Kicks the authoritative full reconcile for this workspace and returns immediately — the sync
-         runs off the request thread, so a large corpus never stalls (or times out) the admin request.
+      description: Runs off the request thread. Always answers 202 with the connection
+        status resource in the Location header; a duplicate trigger while a reconcile
+        is still running starts nothing new and returns the same 202 pointing at the
+        same monitor.
       operationId: syncOutlineConnection
       parameters:
       - description: Workspace slug
@@ -1391,10 +1394,12 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
-        "200":
-          description: OK
-      summary: "Trigger the full Outline reconcile for this workspace (fire-and-forget,\
-        \ 202)"
+        "202":
+          description: Reconcile accepted (or already running — duplicate submits
+            are absorbed); poll the connection status resource in the Location header
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+      summary: "Trigger the full Outline reconcile for this workspace (async, 202)"
       tags:
       - Connections
   /workspaces/{workspaceSlug}/connections/slack/test-message:
@@ -2097,7 +2102,9 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/OutlineCollection"
-          description: OK
+          description: Mirrored collections returned
+        "404":
+          description: The workspace has no ACTIVE Outline connection
       summary: List the workspace's mirrored Outline collections with their sync state
       tags:
       - Outline collections
@@ -2123,13 +2130,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutlineCollection"
-          description: OK
+          description: Collection was already registered (idempotent repeat)
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: Collection registered; the Location header points at the collection
+            resource
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+        "409":
+          description: A concurrent registration of the same collection won the race
+        "422":
+          description: Outline does not know the requested collection id
       summary: Register an Outline collection for mirroring (lands ENABLED + PENDING;
         idempotent on the id)
       tags:
       - Outline collections
   /workspaces/{workspaceSlug}/outline/collections/candidates:
     get:
+      description: "Proxies Outline's collections.list with the stored token under\
+        \ a bounded interactive page budget. Served with Cache-Control: no-store —\
+        \ the live upstream view must not be cached."
       operationId: listOutlineCollectionCandidates
       parameters:
       - description: Workspace slug
@@ -2147,7 +2170,15 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/OutlineCollectionCandidate"
-          description: OK
+          description: "Candidate collections returned (Cache-Control: no-store)"
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+        "502":
+          description: The Outline server could not be reached or answered with an
+            error
+        "503":
+          description: Outline is rate-limiting requests; the Retry-After header carries
+            the seconds to wait before retrying
       summary: List the Outline collections available to mirror (live proxy; doubles
         as connectivity probe)
       tags:
@@ -2169,13 +2200,47 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Collection removed and its mirrored documents erased
+        "404":
+          description: "The collection is not registered for this workspace, or the\
+            \ workspace has no ACTIVE Outline connection"
       summary: Remove a collection from the mirror and erase its mirrored documents
         (terminal)
       tags:
       - Outline collections
+    get:
+      operationId: getOutlineCollection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: collectionId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: Mirrored collection returned
+        "404":
+          description: "The collection is not registered for this workspace, or the\
+            \ workspace has no ACTIVE Outline connection"
+      summary: One mirrored Outline collection with its sync state and live document
+        count
+      tags:
+      - Outline collections
     patch:
+      description: Resuming (PAUSED → ENABLED) resets the sync status to PENDING and
+        kicks a targeted sync; requesting the current state is an idempotent no-op.
       operationId: updateOutlineCollectionState
       parameters:
       - description: Workspace slug
@@ -2202,7 +2267,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutlineCollection"
-          description: OK
+          description: Collection state after the transition returned
+        "404":
+          description: "The collection is not registered for this workspace, or the\
+            \ workspace has no ACTIVE Outline connection"
       summary: Transition a mirrored collection to a target mirror state (pause /
         resume)
       tags:
@@ -5790,17 +5858,33 @@ components:
           type: integer
           format: int64
           description: Live (non-tombstoned) mirrored document count across all collections
+        erroredCollections:
+          type: integer
+          format: int64
+          description: Collections whose last sync attempt recorded an error (cleared
+            on the next clean pass)
         lastSyncedAt:
           type: string
           format: date-time
           description: "When a mirrored collection last finished a clean sync pass,\
             \ if any"
+        pendingCollections:
+          type: integer
+          format: int64
+          description: Enabled collections still awaiting a clean sync pass
+        syncRunning:
+          type: boolean
+          description: Whether a manually triggered full reconcile is currently running
+            for this workspace
         webhookRegistered:
           type: boolean
           description: Whether the Outline change-notification webhook subscription
             is registered
       required:
       - documentCount
+      - erroredCollections
+      - pendingCollections
+      - syncRunning
       - webhookRegistered
     PageAgentJob:
       type: object

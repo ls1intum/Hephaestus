@@ -90,6 +90,20 @@ const failing: OutlineCollection = {
 	createdAt: ago(60 * 24 * 10),
 };
 
+const budgetThrottled: OutlineCollection = {
+	id: 5,
+	collectionId: "col-research",
+	name: "Research Notes",
+	urlId: "research-8pL4m",
+	state: "ENABLED",
+	syncStatus: "COMPLETE",
+	documentCount: 480,
+	documentsUpstream: 512,
+	exportsSkippedForBudget: 32,
+	lastSyncedAt: ago(30),
+	createdAt: ago(60 * 24 * 60),
+};
+
 /** First run — no collections yet; the empty state offers an Add affordance. */
 export const Empty: Story = {
 	args: { collections: [] },
@@ -135,6 +149,22 @@ export const SyncErrorRow: Story = {
 		await expect(trigger).toBeInTheDocument();
 		await userEvent.hover(trigger);
 		await expect(await screen.findByText(/lost access/i)).toBeInTheDocument();
+	},
+};
+
+/** A collection whose last pass hit the shared export budget — coverage and the skipped count show. */
+export const BudgetThrottled: Story = {
+	args: { collections: [budgetThrottled] },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("480")).toBeInTheDocument();
+		await expect(canvas.getByText(/\/ 512/)).toBeInTheDocument();
+		const trigger = canvas.getByRole("button", {
+			name: /32 exports skipped for budget for research notes/i,
+		});
+		await expect(trigger).toBeInTheDocument();
+		await userEvent.hover(trigger);
+		await expect(await screen.findByText(/skipped for the shared budget/i)).toBeInTheDocument();
 	},
 };
 

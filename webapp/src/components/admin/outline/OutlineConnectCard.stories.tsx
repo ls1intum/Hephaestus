@@ -26,6 +26,9 @@ const healthyStatus = {
 	webhookRegistered: true,
 	documentCount: 128,
 	lastSyncedAt: new Date(Date.now() - 15 * 60 * 1000),
+	syncRunning: false,
+	pendingCollections: 0,
+	erroredCollections: 0,
 };
 
 /** Cold start — the connect button is disabled until a URL + token are entered; no allow-list field. */
@@ -97,7 +100,13 @@ export const ConnectedPollingOnly: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: { webhookRegistered: false, documentCount: 0 },
+		status: {
+			webhookRegistered: false,
+			documentCount: 0,
+			syncRunning: false,
+			pendingCollections: 0,
+			erroredCollections: 0,
+		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -117,6 +126,20 @@ export const Syncing: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /starting sync/i })).toBeDisabled();
+	},
+};
+
+/** A server-side reconcile is running and one collection carries a sync error. */
+export const SyncRunningWithErrors: Story = {
+	args: {
+		connected: true,
+		connectionLabel: "Acme Wiki",
+		status: { ...healthyStatus, syncRunning: true, pendingCollections: 2, erroredCollections: 1 },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/sync in progress/i)).toBeVisible();
+		await expect(canvas.getByText(/1 collection hit a sync error/i)).toBeVisible();
 	},
 };
 

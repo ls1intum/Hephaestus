@@ -1848,9 +1848,21 @@ export type OutlineConnectionStatus = {
      */
     documentCount: number;
     /**
+     * Collections whose last sync attempt recorded an error (cleared on the next clean pass)
+     */
+    erroredCollections: number;
+    /**
      * When a mirrored collection last finished a clean sync pass, if any
      */
     lastSyncedAt?: Date;
+    /**
+     * Enabled collections still awaiting a clean sync pass
+     */
+    pendingCollections: number;
+    /**
+     * Whether a manually triggered full reconcile is currently running for this workspace
+     */
+    syncRunning: boolean;
     /**
      * Whether the Outline change-notification webhook subscription is registered
      */
@@ -1907,6 +1919,14 @@ export type OutlineCollection = {
      * Live (non-tombstoned) mirrored document count
      */
     documentCount: number;
+    /**
+     * Documents upstream reported for this collection at the last enumeration (coverage denominator)
+     */
+    documentsUpstream?: number;
+    /**
+     * Exports the last pass skipped because the shared budget ran out (0 on a clean pass)
+     */
+    exportsSkippedForBudget?: number;
     /**
      * Collection icon as configured in Outline
      */
@@ -4067,9 +4087,16 @@ export type GetOutlineConnectionStatusData = {
     url: '/workspaces/{workspaceSlug}/connections/outline/status';
 };
 
+export type GetOutlineConnectionStatusErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
 export type GetOutlineConnectionStatusResponses = {
     /**
-     * OK
+     * Connection health snapshot returned
      */
     200: OutlineConnectionStatus;
 };
@@ -4088,11 +4115,18 @@ export type SyncOutlineConnectionData = {
     url: '/workspaces/{workspaceSlug}/connections/outline/sync';
 };
 
+export type SyncOutlineConnectionErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
 export type SyncOutlineConnectionResponses = {
     /**
-     * OK
+     * Reconcile accepted (or already running — duplicate submits are absorbed); poll the connection status resource in the Location header
      */
-    200: unknown;
+    202: unknown;
 };
 
 export type SendSlackTestMessageData = {
@@ -4647,9 +4681,16 @@ export type ListOutlineCollectionsData = {
     url: '/workspaces/{workspaceSlug}/outline/collections';
 };
 
+export type ListOutlineCollectionsErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
 export type ListOutlineCollectionsResponses = {
     /**
-     * OK
+     * Mirrored collections returned
      */
     200: Array<OutlineCollection>;
 };
@@ -4668,11 +4709,30 @@ export type RegisterOutlineCollectionData = {
     url: '/workspaces/{workspaceSlug}/outline/collections';
 };
 
+export type RegisterOutlineCollectionErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+    /**
+     * A concurrent registration of the same collection won the race
+     */
+    409: unknown;
+    /**
+     * Outline does not know the requested collection id
+     */
+    422: unknown;
+};
+
 export type RegisterOutlineCollectionResponses = {
     /**
-     * OK
+     * Collection was already registered (idempotent repeat)
      */
     200: OutlineCollection;
+    /**
+     * Collection registered; the Location header points at the collection resource
+     */
+    201: OutlineCollection;
 };
 
 export type RegisterOutlineCollectionResponse = RegisterOutlineCollectionResponses[keyof RegisterOutlineCollectionResponses];
@@ -4689,9 +4749,24 @@ export type ListOutlineCollectionCandidatesData = {
     url: '/workspaces/{workspaceSlug}/outline/collections/candidates';
 };
 
+export type ListOutlineCollectionCandidatesErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+    /**
+     * The Outline server could not be reached or answered with an error
+     */
+    502: unknown;
+    /**
+     * Outline is rate-limiting requests; the Retry-After header carries the seconds to wait before retrying
+     */
+    503: unknown;
+};
+
 export type ListOutlineCollectionCandidatesResponses = {
     /**
-     * OK
+     * Candidate collections returned (Cache-Control: no-store)
      */
     200: Array<OutlineCollectionCandidate>;
 };
@@ -4711,12 +4786,50 @@ export type DeleteOutlineCollectionData = {
     url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
 };
 
+export type DeleteOutlineCollectionErrors = {
+    /**
+     * The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
 export type DeleteOutlineCollectionResponses = {
     /**
-     * OK
+     * Collection removed and its mirrored documents erased
      */
-    200: unknown;
+    204: void;
 };
+
+export type DeleteOutlineCollectionResponse = DeleteOutlineCollectionResponses[keyof DeleteOutlineCollectionResponses];
+
+export type GetOutlineCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        collectionId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
+};
+
+export type GetOutlineCollectionErrors = {
+    /**
+     * The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type GetOutlineCollectionResponses = {
+    /**
+     * Mirrored collection returned
+     */
+    200: OutlineCollection;
+};
+
+export type GetOutlineCollectionResponse = GetOutlineCollectionResponses[keyof GetOutlineCollectionResponses];
 
 export type UpdateOutlineCollectionStateData = {
     body: UpdateOutlineCollectionStateRequest;
@@ -4731,9 +4844,16 @@ export type UpdateOutlineCollectionStateData = {
     url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
 };
 
+export type UpdateOutlineCollectionStateErrors = {
+    /**
+     * The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
 export type UpdateOutlineCollectionStateResponses = {
     /**
-     * OK
+     * Collection state after the transition returned
      */
     200: OutlineCollection;
 };

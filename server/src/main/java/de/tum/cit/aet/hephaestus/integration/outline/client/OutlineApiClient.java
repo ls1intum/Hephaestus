@@ -108,9 +108,23 @@ public class OutlineApiClient {
      * catalog pass refreshes mirrored-collection metadata and visibility from it.
      */
     public List<OutlineCollectionListResponse.Collection> listCollections(String serverUrl, String token) {
+        return listCollections(serverUrl, token, MAX_PAGES);
+    }
+
+    /**
+     * {@link #listCollections(String, String)} under an explicit page budget — the interactive admin
+     * paths pass a small cap so a pathological instance cannot stall a request-thread proxy call.
+     * When the cap stops a still-full page stream, the truncation is logged and the partial result
+     * returned.
+     */
+    public List<OutlineCollectionListResponse.Collection> listCollections(
+        String serverUrl,
+        String token,
+        int maxPages
+    ) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         List<OutlineCollectionListResponse.Collection> all = new ArrayList<>();
-        for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
+        for (int page = 0, offset = 0; page < maxPages; page++, offset += PAGE_LIMIT) {
             OutlineCollectionListResponse body = post(
                 resolvedUrl,
                 token,
@@ -120,13 +134,20 @@ public class OutlineApiClient {
             );
             List<OutlineCollectionListResponse.Collection> pageData = body == null ? null : body.data();
             if (pageData == null || pageData.isEmpty()) {
-                break;
+                return all;
             }
             all.addAll(pageData);
             if (pageData.size() < PAGE_LIMIT) {
-                break;
+                return all;
             }
         }
+        // The loop ran out of budget with the last page still full — more collections likely exist upstream.
+        log.info(
+            "outline.client: collections.list stopped at the {}-page cap ({} collections) for {} — result may be truncated",
+            maxPages,
+            all.size(),
+            resolvedUrl
+        );
         return all;
     }
 

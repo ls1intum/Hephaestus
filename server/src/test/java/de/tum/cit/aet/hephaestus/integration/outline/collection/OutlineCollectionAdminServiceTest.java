@@ -101,6 +101,11 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         when(outlineApiClient.listCollections(SERVER_URL, TOKEN)).thenReturn(List.of(collections));
     }
 
+    /** The candidates path runs under the bounded interactive page budget (5 pages), not the sync cap. */
+    private void stubCandidateCollections(OutlineCollectionListResponse.Collection... collections) {
+        when(outlineApiClient.listCollections(SERVER_URL, TOKEN, 5)).thenReturn(List.of(collections));
+    }
+
     @Test
     void register_verifiesAgainstLiveList_capturesCatalogFields_andKicksTargetedSync() {
         OutlineCollectionAdminService service = service();
@@ -251,7 +256,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WS)).thenReturn(
             List.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE))
         );
-        stubLiveCollections(
+        stubCandidateCollections(
             new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null),
             new OutlineCollectionListResponse.Collection("col-2", "Archive", "col2", null, null)
         );
@@ -264,5 +269,53 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         assertThat(candidates.get(0).alreadyMirrored()).isFalse();
         assertThat(candidates.get(1).collectionId()).isEqualTo(COLLECTION_ID);
         assertThat(candidates.get(1).alreadyMirrored()).isTrue();
+    }
+
+    @Test
+    void candidates_useTheBoundedInteractivePageBudget_notTheSyncCap() {
+        OutlineCollectionAdminService service = service();
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WS)).thenReturn(List.of());
+        stubCandidateCollections(
+            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", null, null, null)
+        );
+
+        List<OutlineCollectionCandidateDTO> candidates = service.listCandidates(WS);
+
+        assertThat(candidates).hasSize(1);
+        // The interactive proxy must request exactly the 5-page budget (500 collections), never the
+        // sync path's unbounded-ish safety cap.
+        verify(outlineApiClient).listCollections(SERVER_URL, TOKEN, 5);
+        verify(outlineApiClient, never()).listCollections(SERVER_URL, TOKEN);
+    }
+
+    @Test
+    void getCollection_returnsTheRegisteredRowWithItsLiveCount() {
+        OutlineCollectionAdminService service = service();
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
+        ).thenReturn(Optional.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE)));
+        when(
+            documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
+                WS,
+                CONNECTION_ID,
+                COLLECTION_ID
+            )
+        ).thenReturn(3L);
+
+        OutlineCollectionDTO dto = service.getCollection(WS, COLLECTION_ID);
+
+        assertThat(dto.collectionId()).isEqualTo(COLLECTION_ID);
+        assertThat(dto.state()).isEqualTo(MirrorState.ENABLED);
+        assertThat(dto.documentCount()).isEqualTo(3L);
+    }
+
+    @Test
+    void getCollection_unknownId_isNotFound() {
+        OutlineCollectionAdminService service = service();
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
+        ).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getCollection(WS, COLLECTION_ID)).isInstanceOf(EntityNotFoundException.class);
     }
 }

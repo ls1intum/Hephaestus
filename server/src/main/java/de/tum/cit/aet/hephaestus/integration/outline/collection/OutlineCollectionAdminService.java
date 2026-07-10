@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.outline.collection;
 
+import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -50,6 +52,13 @@ public class OutlineCollectionAdminService {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineCollectionAdminService.class);
 
+    /**
+     * Page budget for the interactive candidates proxy (5 pages × 100 = 500 collections). The sync
+     * path keeps the client's large safety cap; this endpoint answers an admin picker on the request
+     * thread, so it must stay bounded — the client logs when the cap truncates the live list.
+     */
+    private static final int CANDIDATES_MAX_PAGES = 5;
+
     private final ConnectionService connectionService;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineDocumentRepository documentRepository;
@@ -89,10 +98,17 @@ public class OutlineCollectionAdminService {
             .toList();
     }
 
+    /** One mirrored collection by its Outline id, or {@link EntityNotFoundException} (404) when not registered. */
+    public OutlineCollectionDTO getCollection(Long workspaceId, String collectionId) {
+        OutlineInstall install = requireInstall(workspaceId);
+        return toDto(install, requireRegistered(install, collectionId));
+    }
+
     /**
      * Live proxy to {@code collections.list} with the stored token: every collection the token can
      * see, flagged with whether it is already mirrored. This doubles as the connectivity probe — an
      * unreachable server surfaces as 502, throttling as 503 (via {@link OutlineCollectionControllerAdvice}).
+     * Bounded to {@link #CANDIDATES_MAX_PAGES} pages — an interactive picker, not an exhaustive export.
      */
     public List<OutlineCollectionCandidateDTO> listCandidates(long workspaceId) {
         OutlineInstall install = requireInstall(workspaceId);
@@ -101,7 +117,7 @@ public class OutlineCollectionAdminService {
             .map(OutlineCollection::getCollectionId)
             .collect(Collectors.toSet());
         return outlineApiClient
-            .listCollections(install.serverUrl(), requireToken(workspaceId))
+            .listCollections(install.serverUrl(), requireToken(workspaceId), CANDIDATES_MAX_PAGES)
             .stream()
             .filter(c -> c.id() != null && !c.id().isBlank())
             .map(c ->
@@ -194,12 +210,20 @@ public class OutlineCollectionAdminService {
     public void delete(long workspaceId, String collectionId) {
         OutlineInstall install = requireInstall(workspaceId);
         OutlineCollection row = requireRegistered(install, collectionId);
-        documentRepository.deleteByWorkspaceIdAndConnectionIdAndCollectionId(
+        long erased = documentRepository.deleteByWorkspaceIdAndConnectionIdAndCollectionId(
             workspaceId,
             install.connectionId(),
             collectionId
         );
         collectionRepository.delete(row);
+        // Erase audit: who removed what, and how much mirrored content left the database with it.
+        log.info(
+            "outline.audit: collection erase — actor={} removed collectionId={} from the mirror for workspaceId={} ({} mirrored document(s) erased)",
+            LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
+            LoggingUtils.sanitizeForLog(collectionId),
+            workspaceId,
+            erased
+        );
     }
 
     private List<OutlineCollection> registeredRows(OutlineInstall install) {

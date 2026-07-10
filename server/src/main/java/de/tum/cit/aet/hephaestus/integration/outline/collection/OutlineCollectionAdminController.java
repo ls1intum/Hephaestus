@@ -6,11 +6,15 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -57,19 +61,63 @@ public class OutlineCollectionAdminController {
         operationId = "listOutlineCollections",
         summary = "List the workspace's mirrored Outline collections with their sync state"
     )
+    @ApiResponse(responseCode = "200", description = "Mirrored collections returned")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     public ResponseEntity<List<OutlineCollectionDTO>> listOutlineCollections(WorkspaceContext workspace) {
         return ResponseEntity.ok(adminService.listCollections(workspace.id()));
+    }
+
+    @GetMapping("/{collectionId}")
+    @Operation(
+        operationId = "getOutlineCollection",
+        summary = "One mirrored Outline collection with its sync state and live document count"
+    )
+    @ApiResponse(responseCode = "200", description = "Mirrored collection returned")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    public ResponseEntity<OutlineCollectionDTO> getOutlineCollection(
+        WorkspaceContext workspace,
+        @PathVariable String collectionId
+    ) {
+        return ResponseEntity.ok(adminService.getCollection(workspace.id(), collectionId));
     }
 
     @GetMapping("/candidates")
     @Operation(
         operationId = "listOutlineCollectionCandidates",
-        summary = "List the Outline collections available to mirror (live proxy; doubles as connectivity probe)"
+        summary = "List the Outline collections available to mirror (live proxy; doubles as connectivity probe)",
+        description = "Proxies Outline's collections.list with the stored token under a bounded interactive page " +
+            "budget. Served with Cache-Control: no-store — the live upstream view must not be cached."
+    )
+    @ApiResponse(responseCode = "200", description = "Candidate collections returned (Cache-Control: no-store)")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "502",
+        description = "The Outline server could not be reached or answered with an error",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "503",
+        description = "Outline is rate-limiting requests; the Retry-After header carries the seconds to wait before retrying",
+        content = @Content(schema = @Schema(hidden = true))
     )
     public ResponseEntity<List<OutlineCollectionCandidateDTO>> listOutlineCollectionCandidates(
         WorkspaceContext workspace
     ) {
-        return ResponseEntity.ok(adminService.listCandidates(workspace.id()));
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
+            .body(adminService.listCandidates(workspace.id()));
     }
 
     @PostMapping
@@ -77,18 +125,52 @@ public class OutlineCollectionAdminController {
         operationId = "registerOutlineCollection",
         summary = "Register an Outline collection for mirroring (lands ENABLED + PENDING; idempotent on the id)"
     )
+    @ApiResponse(
+        responseCode = "201",
+        description = "Collection registered; the Location header points at the collection resource"
+    )
+    @ApiResponse(responseCode = "200", description = "Collection was already registered (idempotent repeat)")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "A concurrent registration of the same collection won the race",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "422",
+        description = "Outline does not know the requested collection id",
+        content = @Content(schema = @Schema(hidden = true))
+    )
     public ResponseEntity<OutlineCollectionDTO> registerOutlineCollection(
         WorkspaceContext workspace,
         @Valid @RequestBody RegisterOutlineCollectionRequestDTO request
     ) {
         RegistrationOutcome outcome = adminService.register(workspace.id(), request.collectionId());
-        return ResponseEntity.status(outcome.created() ? HttpStatus.CREATED : HttpStatus.OK).body(outcome.collection());
+        if (!outcome.created()) {
+            return ResponseEntity.ok(outcome.collection());
+        }
+        URI itemLocation = URI.create(
+            "/workspaces/" + workspace.slug() + "/outline/collections/" + outcome.collection().collectionId()
+        );
+        return ResponseEntity.created(itemLocation).body(outcome.collection());
     }
 
     @PatchMapping("/{collectionId}")
     @Operation(
         operationId = "updateOutlineCollectionState",
-        summary = "Transition a mirrored collection to a target mirror state (pause / resume)"
+        summary = "Transition a mirrored collection to a target mirror state (pause / resume)",
+        description = "Resuming (PAUSED → ENABLED) resets the sync status to PENDING and kicks a targeted sync; " +
+            "requesting the current state is an idempotent no-op."
+    )
+    @ApiResponse(responseCode = "200", description = "Collection state after the transition returned")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
     )
     public ResponseEntity<OutlineCollectionDTO> updateOutlineCollectionState(
         WorkspaceContext workspace,
@@ -102,6 +184,12 @@ public class OutlineCollectionAdminController {
     @Operation(
         operationId = "deleteOutlineCollection",
         summary = "Remove a collection from the mirror and erase its mirrored documents (terminal)"
+    )
+    @ApiResponse(responseCode = "204", description = "Collection removed and its mirrored documents erased")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
     )
     public ResponseEntity<Void> deleteOutlineCollection(WorkspaceContext workspace, @PathVariable String collectionId) {
         adminService.delete(workspace.id(), collectionId);

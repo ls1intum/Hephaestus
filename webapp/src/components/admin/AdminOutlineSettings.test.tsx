@@ -54,6 +54,9 @@ const healthyStatus = {
 	webhookRegistered: true,
 	documentCount: 12,
 	lastSyncedAt: "2026-07-01T00:00:00Z",
+	syncRunning: false,
+	pendingCollections: 0,
+	erroredCollections: 0,
 };
 
 /** Baseline handlers for an already-connected workspace with a mutable collection list. */
@@ -85,7 +88,13 @@ describe("AdminOutlineSettings — connect happy path", () => {
 				return HttpResponse.json({ connectionId: activeOutlineConnection.id, mode: "LINKED" });
 			}),
 			http.get("*/workspaces/demo/connections/outline/status", () =>
-				HttpResponse.json({ webhookRegistered: true, documentCount: 0 }),
+				HttpResponse.json({
+					webhookRegistered: true,
+					documentCount: 0,
+					syncRunning: false,
+					pendingCollections: 0,
+					erroredCollections: 0,
+				}),
 			),
 			http.get("*/workspaces/demo/outline/collections", () => HttpResponse.json([])),
 		);
