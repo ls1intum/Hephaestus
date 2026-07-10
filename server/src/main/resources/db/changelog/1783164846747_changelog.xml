@@ -65,4 +65,108 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-outline" id="1783164846747-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_collection already present">
+            <not>
+                <tableExists tableName="outline_collection"/>
+            </not>
+        </preConditions>
+        <comment>
+            One row per Outline collection an admin chose to mirror (the Outline analog of
+            slack_monitored_channel). Carries the human-facing catalog fields for the admin UI,
+            the mirror lifecycle (ENABLED/PAUSED), and the per-collection sync bookkeeping:
+            sync_status PENDING until a clean full pass completes, documents_synced_through as the
+            upstream-clock watermark, documents_synced_at for stalest-first ordering.
+        </comment>
+        <createTable tableName="outline_collection">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="outline_collection_pkey"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="connection_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="collection_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(1024)"/>
+            <column name="url_id" type="VARCHAR(512)"/>
+            <column name="color" type="VARCHAR(32)"/>
+            <column name="icon" type="VARCHAR(64)"/>
+            <column name="state" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sync_status" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="documents_synced_through" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="documents_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="last_sync_error" type="VARCHAR(2048)"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <addUniqueConstraint
+            tableName="outline_collection"
+            columnNames="workspace_id, connection_id, collection_id"
+            constraintName="uk_outline_collection"/>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE outline_collection ADD CONSTRAINT ck_outline_collection_state CHECK (state IN ('ENABLED', 'PAUSED'));
+            ALTER TABLE outline_collection ADD CONSTRAINT ck_outline_collection_sync_status CHECK (sync_status IN ('PENDING', 'COMPLETE'));
+        ]]></sql>
+        <rollback>
+            <dropTable tableName="outline_collection"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document author columns already present">
+            <not>
+                <columnExists tableName="outline_document" columnName="created_by_subject"/>
+            </not>
+        </preConditions>
+        <comment>
+            Document authorship substrate: the Outline user UUID + display name for creator and last
+            editor. Subjects join identity_link lazily at projection time (no member FK — documents
+            are mutable and re-synced, a stamped member id would go stale on late account links).
+            No email column by design (email is never a lookup key).
+        </comment>
+        <addColumn tableName="outline_document">
+            <column name="created_by_subject" type="VARCHAR(64)"/>
+            <column name="created_by_name" type="VARCHAR(255)"/>
+            <column name="updated_by_subject" type="VARCHAR(64)"/>
+            <column name="updated_by_name" type="VARCHAR(255)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="outline_document" columnName="created_by_subject"/>
+            <dropColumn tableName="outline_document" columnName="created_by_name"/>
+            <dropColumn tableName="outline_document" columnName="updated_by_subject"/>
+            <dropColumn tableName="outline_document" columnName="updated_by_name"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="login_provider.type CHECK already admits OUTLINE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_login_provider_type'
+                AND pg_get_constraintdef(oid) LIKE '%OUTLINE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Allow Outline as a link-only OAuth login provider for account linking.</comment>
+        <sql>
+            ALTER TABLE login_provider DROP CONSTRAINT IF EXISTS ck_login_provider_type;
+            ALTER TABLE login_provider
+            ADD CONSTRAINT ck_login_provider_type CHECK (type IN ('GITHUB', 'GITLAB', 'SLACK', 'OUTLINE'));
+        </sql>
+        <rollback>
+            ALTER TABLE login_provider DROP CONSTRAINT IF EXISTS ck_login_provider_type;
+            ALTER TABLE login_provider
+            ADD CONSTRAINT ck_login_provider_type CHECK (type IN ('GITHUB', 'GITLAB', 'SLACK'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

@@ -39,6 +39,12 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
 
     List<Connection> findByWorkspaceIdAndState(long workspaceId, IntegrationState state);
 
+    /**
+     * The Connection by primary key, scoped to its workspace (the predicate the tenancy inspector
+     * requires) and deliberately state-agnostic: deactivation cleanup runs after the row left ACTIVE.
+     */
+    Optional<Connection> findByIdAndWorkspaceId(Long id, long workspaceId);
+
     @Query("SELECT c FROM Connection c WHERE c.workspace.id = :workspaceId")
     List<Connection> findByWorkspaceId(@Param("workspaceId") long workspaceId);
 

@@ -8,19 +8,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.lang.reflect.Field;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -39,6 +43,9 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Mock
     private ConnectionAuditRepository auditRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private CredentialBundleConverter credentialConverter;
     private ConnectionService service;
     private Workspace workspace;
@@ -49,7 +56,7 @@ class ConnectionServiceTest extends BaseUnitTest {
         // Real converter so the credential-purge case operates on a genuine AES-GCM blob,
         // not a mock stand-in.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
-        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter);
+        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter, eventPublisher);
         workspace = new Workspace();
         workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
@@ -115,6 +122,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             "T1",
             new ConnectionConfig.SlackConfig("T1", "Acme", null, null, null, Set.of())
         );
+        setId(connection, 55L);
         connection.setState(IntegrationState.UNINSTALLED);
 
         Connection result = service.transition(
@@ -239,7 +247,7 @@ class ConnectionServiceTest extends BaseUnitTest {
                 workspace,
                 IntegrationKind.OUTLINE,
                 "team-x",
-                new ConnectionConfig.OutlineConfig("https://o.test", Set.of(), subscriptionId, secret, Set.of())
+                new ConnectionConfig.OutlineConfig("https://o.test", subscriptionId, secret, Set.of())
             );
         }
 
@@ -292,6 +300,76 @@ class ConnectionServiceTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * The lifecycle-event seam: {@code transition} signals genuine ACTIVE-boundary crossings to
+     * vendor adapters and stays silent on no-ops and idempotent replays.
+     */
+    @Nested
+    class LifecycleEvents {
+
+        @Test
+        void transitionToActive_publishesActivated() {
+            Connection connection = pendingConnection();
+
+            service.transition(
+                connection,
+                new TransitionRequest(IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-1", "linked")
+            );
+
+            verify(eventPublisher).publishEvent(
+                new ConnectionLifecycleEvent.Activated(55L, 7L, IntegrationKind.GITHUB)
+            );
+        }
+
+        @Test
+        void transitionActiveToSuspended_publishesDeactivated() {
+            Connection connection = connectionInState(IntegrationState.ACTIVE);
+
+            service.transition(
+                connection,
+                new TransitionRequest(IntegrationState.SUSPENDED, "SUSPEND", "ADMIN", "actor-1", "corr-2", "paused")
+            );
+
+            verify(eventPublisher).publishEvent(
+                new ConnectionLifecycleEvent.Deactivated(55L, 7L, IntegrationKind.GITHUB)
+            );
+        }
+
+        @Test
+        void sameStateNoOp_publishesNothing() {
+            Connection connection = connectionInState(IntegrationState.ACTIVE);
+
+            service.transition(
+                connection,
+                new TransitionRequest(IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-3", "again")
+            );
+
+            Mockito.verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        void duplicateCorrelationId_publishesNothing() {
+            Connection connection = pendingConnection();
+            when(auditRepository.save(any(ConnectionAudit.class))).thenThrow(
+                new DataIntegrityViolationException("uq_connection_audit_idempotency")
+            );
+
+            service.transition(
+                connection,
+                new TransitionRequest(
+                    IntegrationState.ACTIVE,
+                    "INSTALL_BIND",
+                    "SYSTEM",
+                    "actor-1",
+                    "corr-dup",
+                    "linked"
+                )
+            );
+
+            Mockito.verifyNoInteractions(eventPublisher);
+        }
+    }
+
     private Connection pendingConnection() {
         return connectionInState(IntegrationState.PENDING);
     }
@@ -303,7 +381,19 @@ class ConnectionServiceTest extends BaseUnitTest {
             "100",
             new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
         );
+        // Lifecycle events carry the connection id; persisted rows always have one.
+        setId(connection, 55L);
         connection.setState(state);
         return connection;
+    }
+
+    private static void setId(Connection connection, long id) {
+        try {
+            Field idField = Connection.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(connection, id);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 }

@@ -1,15 +1,16 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
- * The Outline document lifecycle events Hephaestus subscribes to upstream. Single source of truth for
- * the subscription registrar; every event changes mirrored content and so warrants a whole-workspace
- * reconcile on the consumer side.
+ * The Outline lifecycle events Hephaestus subscribes to upstream. Single source of truth for the
+ * subscription registrar; document events drive a targeted refresh of the named document, collection
+ * events refresh the mirrored-collection catalog (or tombstone on delete).
  */
 public final class OutlineWebhookEvents {
 
-    /** Dotted event names as Outline emits and subscribes them. */
+    /** Dotted document event names as Outline emits and subscribes them. */
     public static final List<String> DOCUMENT_EVENTS = List.of(
         "documents.create",
         "documents.publish",
@@ -20,6 +21,19 @@ public final class OutlineWebhookEvents {
         "documents.delete",
         "documents.move"
     );
+
+    /** Collection lifecycle events: renames/recolors refresh the catalog, deletes tombstone the mirror. */
+    public static final List<String> COLLECTION_EVENTS = List.of(
+        "collections.create",
+        "collections.update",
+        "collections.delete"
+    );
+
+    /** Everything the registrar subscribes upstream. */
+    public static final List<String> SUBSCRIBED_EVENTS = Stream.concat(
+        DOCUMENT_EVENTS.stream(),
+        COLLECTION_EVENTS.stream()
+    ).toList();
 
     private OutlineWebhookEvents() {}
 }

@@ -20,6 +20,12 @@ public record OutlineDocumentListResponse(@Nullable List<Meta> data, @Nullable O
         @Nullable Instant updatedAt,
         @Nullable String urlId,
         @Nullable String parentDocumentId,
-        @Nullable String collectionId
+        @Nullable String collectionId,
+        @Nullable OutlineUser createdBy,
+        @Nullable OutlineUser updatedBy
     ) {}
+
+    /** Document author reference — id and display name only; email is deliberately never captured. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record OutlineUser(@Nullable String id, @Nullable String name) {}
 }

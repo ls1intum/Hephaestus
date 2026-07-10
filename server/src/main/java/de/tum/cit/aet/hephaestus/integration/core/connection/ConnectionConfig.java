@@ -96,17 +96,16 @@ public sealed interface ConnectionConfig
     }
 
     /**
-     * Outline — the server host, the allow-list of collections whose documents are mirrored,
-     * and (when the change-notification subscription is registered) its id plus signing secret.
+     * Outline — the server host and (when the change-notification subscription is registered)
+     * its id plus signing secret. Which collections are mirrored is NOT config: the
+     * {@code outline_collection} registry is the single source of truth, populated post-connect
+     * through the admin surface.
      *
      * <p>{@code serverUrl} is validated against the SSRF guard before any request is made.
-     * {@code collectionAllowList} scopes ingestion: only documents in these collections are
-     * mirrored into {@code outline_document}. The webhook fields stay {@code null} until a
-     * change-notification subscription is registered.
+     * The webhook fields stay {@code null} until a change-notification subscription is registered.
      */
     record OutlineConfig(
         @Nullable String serverUrl,
-        Set<String> collectionAllowList,
         @Nullable String webhookSubscriptionId,
         @Nullable String webhookSecret,
         Set<String> enabledStreams
@@ -117,7 +116,7 @@ public sealed interface ConnectionConfig
          * {@code connectionService.updateConfig(...)} to persist the swap atomically.
          */
         public OutlineConfig withWebhookSubscription(@Nullable String subscriptionId, @Nullable String signingSecret) {
-            return new OutlineConfig(serverUrl, collectionAllowList, subscriptionId, signingSecret, enabledStreams);
+            return new OutlineConfig(serverUrl, subscriptionId, signingSecret, enabledStreams);
         }
     }
 }

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineWebhookEvents;
 import java.security.SecureRandom;
 import java.util.HexFormat;
@@ -18,16 +19,19 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Auto-registers (and tears down) the Outline change-notification subscription for a workspace, mirroring
- * {@code GitLabWebhookService}. On the first reconcile after connect it registers a subscription pointing at
- * {@code <externalUrl>/webhooks/outline} (the unified JetStream lane) with a freshly generated signing secret
- * and stores both the returned subscription id and the secret on the Connection
- * ({@link ConnectionConfig.OutlineConfig#withWebhookSubscription}). The signing secret never leaves the server
- * except as the shared secret Outline HMACs each delivery with.
+ * Registers (and tears down) the Outline change-notification subscription for a workspace, mirroring
+ * {@code GitLabWebhookService}. Runs at connect time (via the connection-lifecycle listener) and as a
+ * self-heal inside every full reconcile: Outline auto-disables a subscription after repeated delivery
+ * failures, so {@link #ensureSubscription} verifies a stored id upstream and re-registers when the
+ * subscription went missing or was disabled. The subscription points at
+ * {@code <externalUrl>/webhooks/outline} (the unified JetStream lane) with a freshly generated signing
+ * secret; both the returned subscription id and the secret are stored on the Connection
+ * ({@link ConnectionConfig.OutlineConfig#withWebhookSubscription}). The signing secret never leaves the
+ * server except as the shared secret Outline HMACs each delivery with.
  *
- * <p>Registration is idempotent (a workspace whose config already carries a subscription id is skipped) and
- * entirely best-effort: without a configured external URL, token, or on any Outline-side failure the periodic
- * six-hour reconcile remains the source of truth, so a missing subscription only costs freshness.
+ * <p>Everything here is best-effort and never throws: without a configured external URL, token, or on
+ * any Outline-side failure the periodic reconcile remains the source of truth, so a missing
+ * subscription only costs freshness.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -57,20 +61,19 @@ public class OutlineWebhookRegistrar {
     }
 
     /**
-     * Registers a change-notification subscription for the workspace when one is not already stored. A no-op
-     * (returning quietly) when the integration has no external URL, the workspace has no ACTIVE Outline
-     * connection or token, or a subscription id is already recorded.
+     * Ensures the workspace has a live change-notification subscription. Without a stored id this
+     * registers one (a quiet no-op when the integration has no external URL, ACTIVE Outline connection,
+     * server URL, or token). With a stored id it verifies the subscription upstream: gone or
+     * {@code enabled=false} (Outline auto-disables after 25 consecutive delivery failures) drops the
+     * stale id + secret and registers fresh; an unverifiable upstream (listing failed) changes nothing.
      */
-    public void registerIfNeeded(long workspaceId) {
+    public void ensureSubscription(long workspaceId) {
         if (externalUrl == null || externalUrl.isBlank()) {
             return;
         }
         Optional<Connection> active = connectionService.findActive(workspaceId, IntegrationKind.OUTLINE);
         if (active.isEmpty() || !(active.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)) {
             return;
-        }
-        if (config.webhookSubscriptionId() != null && !config.webhookSubscriptionId().isBlank()) {
-            return; // already registered
         }
         String serverUrl = config.serverUrl();
         if (serverUrl == null || serverUrl.isBlank()) {
@@ -80,7 +83,46 @@ public class OutlineWebhookRegistrar {
         if (bearer.isEmpty()) {
             return;
         }
+        String token = bearer.get().token();
 
+        String storedId = config.webhookSubscriptionId();
+        if (storedId != null && !storedId.isBlank()) {
+            Boolean healthy = isSubscriptionHealthy(serverUrl, token, storedId);
+            if (healthy == null || healthy) {
+                return; // healthy, or unverifiable — don't churn a subscription we cannot see
+            }
+            log.info(
+                "outline.webhook: stored subscription {} is missing/disabled upstream for workspaceId={} — re-registering",
+                storedId,
+                workspaceId
+            );
+            clearStoredSubscription(workspaceId);
+        }
+        register(workspaceId, serverUrl, token);
+    }
+
+    /**
+     * Whether the stored subscription still exists upstream and is enabled. {@code null} when the
+     * upstream listing itself failed (unknown — the caller must not churn on that).
+     */
+    private Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
+        try {
+            for (OutlineWebhookSubscriptionListResponse.Subscription subscription : outlineApiClient.listWebhookSubscriptions(
+                serverUrl,
+                token
+            )) {
+                if (subscriptionId.equals(subscription.id())) {
+                    return !Boolean.FALSE.equals(subscription.enabled());
+                }
+            }
+            return false;
+        } catch (RuntimeException e) {
+            log.warn("outline.webhook: could not verify subscription {}: {}", subscriptionId, e.toString());
+            return null;
+        }
+    }
+
+    private void register(long workspaceId, String serverUrl, String token) {
         // Unified JetStream lane: deliveries land on WebhookController's /webhooks/{kind} entry, are
         // signature-verified, and are published to the durable `outline` stream (ADR 0023 §3).
         String deliveryUrl = externalUrl.replaceAll("/+$", "") + "/webhooks/outline";
@@ -91,11 +133,11 @@ public class OutlineWebhookRegistrar {
         try {
             String subscriptionId = outlineApiClient.createWebhookSubscription(
                 serverUrl,
-                bearer.get().token(),
+                token,
                 SUBSCRIPTION_NAME,
                 deliveryUrl,
                 signingSecret,
-                OutlineWebhookEvents.DOCUMENT_EVENTS
+                OutlineWebhookEvents.SUBSCRIBED_EVENTS
             );
             if (subscriptionId == null || subscriptionId.isBlank()) {
                 log.warn("outline.webhook: register returned no subscription id for workspaceId={}", workspaceId);
@@ -114,10 +156,27 @@ public class OutlineWebhookRegistrar {
         }
     }
 
+    private void clearStoredSubscription(long workspaceId) {
+        try {
+            connectionService.updateConfig(workspaceId, IntegrationKind.OUTLINE, cfg -> {
+                if (!(cfg instanceof ConnectionConfig.OutlineConfig outlineCfg)) {
+                    return cfg;
+                }
+                return outlineCfg.withWebhookSubscription(null, null);
+            });
+        } catch (RuntimeException e) {
+            log.warn(
+                "outline.webhook: clearing stale subscription fields failed for workspaceId={}: {}",
+                workspaceId,
+                e.toString()
+            );
+        }
+    }
+
     /**
      * Best-effort delete of the workspace's change-notification subscription and clearing of the stored id and
-     * secret. Never throws — a left-over subscription simply auto-disables upstream after repeated delivery
-     * failures once the workspace is gone.
+     * secret, resolved through the ACTIVE connection. Never throws — a left-over subscription simply
+     * auto-disables upstream after repeated delivery failures once the workspace is gone.
      */
     public void deregister(long workspaceId) {
         Optional<Connection> active = connectionService.findActive(workspaceId, IntegrationKind.OUTLINE);
@@ -137,19 +196,45 @@ public class OutlineWebhookRegistrar {
                 log.warn("outline.webhook: deregistration failed for workspaceId={}: {}", workspaceId, e.toString());
             }
         }
-        try {
-            connectionService.updateConfig(workspaceId, IntegrationKind.OUTLINE, cfg -> {
-                if (!(cfg instanceof ConnectionConfig.OutlineConfig outlineCfg)) {
-                    return cfg;
-                }
-                return outlineCfg.withWebhookSubscription(null, null);
-            });
-        } catch (RuntimeException e) {
-            log.warn(
-                "outline.webhook: clearing subscription fields failed for workspaceId={}: {}",
-                workspaceId,
-                e.toString()
+        clearStoredSubscription(workspaceId);
+    }
+
+    /**
+     * Deactivation-time variant: the connection just left ACTIVE, so it is resolved by id regardless of
+     * state. SUSPENDED connections still carry credentials and get a real upstream delete; UNINSTALLED
+     * ones had their credentials purged — then this only logs that the orphaned subscription will
+     * auto-disable upstream. The stored id/secret stay on the row (the ACTIVE-scoped config mutator no
+     * longer reaches it); reactivation's {@link #ensureSubscription} self-heal replaces them.
+     */
+    public void deregister(long workspaceId, long connectionId) {
+        Optional<Connection> connection = connectionService.findInWorkspace(workspaceId, connectionId);
+        if (connection.isEmpty() || !(connection.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)) {
+            return;
+        }
+        String subscriptionId = config.webhookSubscriptionId();
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            return;
+        }
+        String serverUrl = config.serverUrl();
+        Optional<BearerToken> bearer = connectionService.findBearerToken(workspaceId, connectionId);
+        if (serverUrl == null || serverUrl.isBlank() || bearer.isEmpty()) {
+            log.info(
+                "outline.webhook: no usable credentials to delete subscription {} for connectionId={} — " +
+                    "it will auto-disable upstream after repeated delivery failures",
+                subscriptionId,
+                connectionId
             );
+            return;
+        }
+        try {
+            outlineApiClient.deleteWebhookSubscription(serverUrl, bearer.get().token(), subscriptionId);
+            log.info(
+                "outline.webhook: deleted subscription {} for deactivated connectionId={}",
+                subscriptionId,
+                connectionId
+            );
+        } catch (RuntimeException e) {
+            log.warn("outline.webhook: deregistration failed for connectionId={}: {}", connectionId, e.toString());
         }
     }
 

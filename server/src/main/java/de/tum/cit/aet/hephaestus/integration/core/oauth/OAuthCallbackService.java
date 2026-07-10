@@ -200,7 +200,7 @@ public class OAuthCallbackService {
                 new HashSet<>()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, new HashSet<>());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig(null, new HashSet<>(), null, null, new HashSet<>());
+            case OUTLINE -> new ConnectionConfig.OutlineConfig(null, null, null, new HashSet<>());
         };
     }
 

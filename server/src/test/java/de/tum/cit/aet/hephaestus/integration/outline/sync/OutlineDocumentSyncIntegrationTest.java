@@ -21,6 +21,10 @@ import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -41,9 +45,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * (the SSRF-guarded client cannot be pointed at a loopback mock server, so the seam under the network is
  * stubbed while the whole sync/mapping/persistence path runs for real).
  *
- * <p>Three properties are pinned: an initial sync mirrors every allow-listed document; a second sync with
- * one changed {@code updatedAt} re-exports only the changed document (the unchanged one is served from the
- * cache); and a document removed upstream is tombstoned — its body dropped and {@code deleted_at} stamped.
+ * <p>Pinned properties: an initial sync mirrors every registered collection's documents and advances the
+ * per-collection watermark to COMPLETE; a second sync with one changed {@code updatedAt} re-exports only
+ * the changed document; a document removed upstream is tombstoned with its author fields cleared; a
+ * collection that vanishes from {@code collections.list} records an error and keeps its documents.
  */
 @TestPropertySource(properties = "hephaestus.integration.outline.enabled=true")
 class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
@@ -54,6 +59,10 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private static final String DOC_TWO = "doc-2";
     private static final Instant T1 = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant T2 = Instant.parse("2026-02-01T00:00:00Z");
+    private static final OutlineDocumentListResponse.OutlineUser AUTHOR = new OutlineDocumentListResponse.OutlineUser(
+        "user-1",
+        "Ada Lovelace"
+    );
 
     @MockitoBean
     private OutlineApiClient outlineApiClient;
@@ -65,6 +74,9 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private OutlineDocumentRepository documentRepository;
 
     @Autowired
+    private OutlineCollectionRepository collectionRepository;
+
+    @Autowired
     private ConnectionRepository connectionRepository;
 
     @Autowired
@@ -74,6 +86,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private CredentialBundleConverter credentialConverter;
 
     private long workspaceId;
+    private long connectionId;
 
     @BeforeEach
     void setUp() {
@@ -85,16 +98,26 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
             workspace,
             IntegrationKind.OUTLINE,
             "team-1",
-            new ConnectionConfig.OutlineConfig(SERVER_URL, Set.of(COLLECTION_ID), null, null, Set.of())
+            new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())
         );
         connection.setCredentials(new BearerToken("outline-token", null), credentialConverter);
         connection.setState(IntegrationState.ACTIVE);
-        connectionRepository.save(connection);
+        connectionId = connectionRepository.save(connection).getId();
 
-        // The one allow-listed collection is always resolvable.
+        OutlineCollection registered = new OutlineCollection();
+        registered.setWorkspaceId(workspaceId);
+        registered.setConnectionId(connectionId);
+        registered.setCollectionId(COLLECTION_ID);
+        registered.setState(MirrorState.ENABLED);
+        registered.setSyncStatus(SyncStatus.PENDING);
+        collectionRepository.save(registered);
+
+        // The registered collection is visible to the token unless a test says otherwise.
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
-            .thenReturn(List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1")));
+            .thenReturn(
+                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
+            );
         lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha");
         lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta");
     }
@@ -122,7 +145,9 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
                     id.equals(DOC_ONE) ? docOneUpdatedAt : docTwoUpdatedAt,
                     id,
                     null,
-                    COLLECTION_ID
+                    COLLECTION_ID,
+                    AUTHOR,
+                    AUTHOR
                 )
             )
             .toList();
@@ -130,24 +155,31 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void initialSync_mirrorsEveryAllowListedDocument() {
-        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
+    void initialSync_mirrorsEveryRegisteredDocument_andCompletesTheCollection() {
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T2);
 
         scheduler.syncAllNow();
 
-        List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(
-            workspaceId,
-            onlyConnectionId()
-        );
+        List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(workspaceId, connectionId);
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> {
             assertThat(r.getBodyMarkdown()).isNotBlank();
             assertThat(r.getContentHash()).isNotBlank();
             assertThat(r.isDeleted()).isFalse();
             assertThat(r.getCollectionId()).isEqualTo(COLLECTION_ID);
+            assertThat(r.getCreatedBySubject()).isEqualTo("user-1");
+            assertThat(r.getCreatedByName()).isEqualTo("Ada Lovelace");
         });
         verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_ONE));
         verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_TWO));
+
+        OutlineCollection collection = onlyCollection();
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getDocumentsSyncedThrough()).isEqualTo(T2);
+        assertThat(collection.getDocumentsSyncedAt()).isNotNull();
+        assertThat(collection.getLastSyncError()).isNull();
+        assertThat(collection.getName()).isEqualTo("Design");
+        assertThat(collection.getUrlId()).isEqualTo("col1");
     }
 
     @Test
@@ -170,7 +202,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void documentRemovedUpstream_isTombstoned() {
+    void documentRemovedUpstream_isTombstonedWithAuthorsCleared() {
         stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
         scheduler.syncAllNow();
 
@@ -182,21 +214,40 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         assertThat(docTwo.isDeleted()).isTrue();
         assertThat(docTwo.getDeletedAt()).isNotNull();
         assertThat(docTwo.getBodyMarkdown()).isNull();
+        assertThat(docTwo.getCreatedBySubject()).isNull();
+        assertThat(docTwo.getCreatedByName()).isNull();
+        assertThat(docTwo.getUpdatedBySubject()).isNull();
 
         OutlineDocument docOne = documentById(DOC_ONE);
         assertThat(docOne.isDeleted()).isFalse();
         assertThat(docOne.getBodyMarkdown()).isNotBlank();
     }
 
-    private long onlyConnectionId() {
-        List<Connection> connections = connectionRepository.findAll();
-        assertThat(connections).hasSize(1);
-        return connections.get(0).getId();
+    @Test
+    void collectionNoLongerVisible_recordsErrorAndKeepsDocuments() {
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
+        scheduler.syncAllNow();
+
+        // The token loses the collection: collections.list no longer returns it.
+        when(outlineApiClient.listCollections(anyString(), anyString())).thenReturn(List.of());
+        scheduler.syncAllNow();
+
+        OutlineCollection collection = onlyCollection();
+        assertThat(collection.getLastSyncError()).contains("no longer visible");
+        List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(workspaceId, connectionId);
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(r -> assertThat(r.isDeleted()).isFalse());
+    }
+
+    private OutlineCollection onlyCollection() {
+        List<OutlineCollection> collections = collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId);
+        assertThat(collections).hasSize(1);
+        return collections.get(0);
     }
 
     private OutlineDocument documentById(String documentId) {
         return documentRepository
-            .findByWorkspaceIdAndConnectionId(workspaceId, onlyConnectionId())
+            .findByWorkspaceIdAndConnectionId(workspaceId, connectionId)
             .stream()
             .filter(d -> d.getDocumentId().equals(documentId))
             .findFirst()

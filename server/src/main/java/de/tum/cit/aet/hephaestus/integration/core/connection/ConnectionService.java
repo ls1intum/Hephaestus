@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -12,6 +13,7 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +31,18 @@ public class ConnectionService {
     private final ConnectionRepository connectionRepository;
     private final ConnectionAuditRepository auditRepository;
     private final CredentialBundleConverter credentialConverter;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ConnectionService(
         ConnectionRepository connectionRepository,
         ConnectionAuditRepository auditRepository,
-        CredentialBundleConverter credentialConverter
+        CredentialBundleConverter credentialConverter,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -158,6 +163,27 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return findActive(workspaceId, kind)
+            .flatMap(c -> c.credentials(credentialConverter))
+            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
+    }
+
+    /**
+     * The Connection by id within its workspace, regardless of state. Deactivation-time cleanup
+     * (e.g. tearing down a vendor webhook) runs after the row left ACTIVE, so {@link #findActive}
+     * can no longer resolve it.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Connection> findInWorkspace(long workspaceId, long connectionId) {
+        return connectionRepository.findByIdAndWorkspaceId(connectionId, workspaceId);
+    }
+
+    /**
+     * Decrypts the stored {@link BearerToken} of one Connection regardless of state. Empty once
+     * credentials were purged (the UNINSTALLED transition) — SUSPENDED rows still resolve.
+     */
+    @Transactional(readOnly = true)
+    public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
+        return findInWorkspace(workspaceId, connectionId)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -383,7 +409,27 @@ public class ConnectionService {
             connection.setCredentialsAlg(null);
             log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
         }
-        return connectionRepository.save(connection);
+        Connection saved = connectionRepository.save(connection);
+        publishLifecycleEvent(saved, current, req.next());
+        return saved;
+    }
+
+    /**
+     * Signal a genuine ACTIVE-boundary crossing to vendor adapters (AFTER_COMMIT listeners).
+     * Fires inside the transition transaction so a rollback also drops the event; the
+     * same-state and duplicate-correlation early returns above keep replays silent.
+     */
+    private void publishLifecycleEvent(Connection connection, IntegrationState previous, IntegrationState next) {
+        long workspaceId = connection.getWorkspace().getId();
+        if (next == IntegrationState.ACTIVE) {
+            eventPublisher.publishEvent(
+                new ConnectionLifecycleEvent.Activated(connection.getId(), workspaceId, connection.getKind())
+            );
+        } else if (previous == IntegrationState.ACTIVE) {
+            eventPublisher.publishEvent(
+                new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind())
+            );
+        }
     }
 
     private static boolean isSlackOAuthReconnect(

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.domain;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -25,6 +26,20 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
 
     /** The workspace's mirrored documents for one Outline install; the reconcile diffs against this set. */
     List<OutlineDocument> findByWorkspaceIdAndConnectionId(Long workspaceId, Long connectionId);
+
+    /** One collection's mirrored documents — the scope of a collection-delete tombstone sweep. */
+    List<OutlineDocument> findByWorkspaceIdAndConnectionIdAndCollectionId(
+        Long workspaceId,
+        Long connectionId,
+        String collectionId
+    );
+
+    /** One mirrored document by its Outline id — the webhook targeted-refresh lookup. */
+    Optional<OutlineDocument> findByWorkspaceIdAndConnectionIdAndDocumentId(
+        Long workspaceId,
+        Long connectionId,
+        String documentId
+    );
 
     /**
      * The agent-facing projection breadth: a bounded page of the workspace's mirrored documents, live rows first

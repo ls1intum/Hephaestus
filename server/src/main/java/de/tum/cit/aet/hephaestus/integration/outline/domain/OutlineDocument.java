@@ -86,6 +86,25 @@ public class OutlineDocument {
     @Column(name = "outline_updated_at")
     private @Nullable Instant outlineUpdatedAt;
 
+    /**
+     * Outline user id (UUID) of the document's creator — authorship substrate. Subjects join
+     * {@code identity_link} lazily at projection time; no member id is stamped here.
+     */
+    @Column(name = "created_by_subject", length = 64)
+    private @Nullable String createdBySubject;
+
+    /** Creator display name (graceful floor when the subject has no linked account). */
+    @Column(name = "created_by_name", length = 255)
+    private @Nullable String createdByName;
+
+    /** Outline user id (UUID) of the last editor — authorship substrate, same lazy-join contract. */
+    @Column(name = "updated_by_subject", length = 64)
+    private @Nullable String updatedBySubject;
+
+    /** Last editor display name. */
+    @Column(name = "updated_by_name", length = 255)
+    private @Nullable String updatedByName;
+
     /** Set when the document no longer exists upstream; the body is dropped and a placeholder is served. */
     @Column(name = "deleted_at")
     private @Nullable Instant deletedAt;

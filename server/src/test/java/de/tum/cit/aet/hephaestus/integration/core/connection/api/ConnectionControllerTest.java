@@ -428,13 +428,7 @@ class ConnectionControllerTest extends BaseUnitTest {
                 Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, Set.of());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig(
-                "https://app.getoutline.com",
-                Set.of(),
-                null,
-                null,
-                Set.of()
-            );
+            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, null, Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

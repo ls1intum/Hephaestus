@@ -18,12 +18,14 @@ import org.springframework.boot.convert.DurationUnit;
  *       enabled: true
  *       sync:
  *         cron: "0 0 0/6 * * *"
+ *         export-budget: 500
+ *         catch-up-delay: PT5M
  *       cache:
  *         max-size-mb: 200
  *       staleness: 30d
  * }</pre>
  *
- * @param sync      scheduling of the periodic reconcile
+ * @param sync      scheduling and pacing of the reconcile passes
  * @param cache     bound on the per-workspace mirrored-body footprint
  * @param staleness how long a document that has vanished upstream is kept as a tombstone before its row is
  *                  dropped entirely (defence-in-depth ceiling on stale rows; default 30 days)
@@ -35,9 +37,19 @@ public record OutlineProperties(
     @DurationUnit(HOURS) @DefaultValue("720h") Duration staleness
 ) {
     /**
-     * @param cron reconcile schedule (default every six hours)
+     * @param cron         full-reconcile schedule (default every six hours)
+     * @param exportBudget max document exports one workspace pass may spend (default 500). Bounds the
+     *                     cost of a huge corpus's first sync; a collection whose pass ran out of budget
+     *                     stays {@code PENDING} — no watermark, no tombstones — and the catch-up tick
+     *                     resumes it
+     * @param catchUpDelay how often the catch-up tick sweeps collections still awaiting a clean pass
+     *                     (default 5 minutes; a fully caught-up fleet makes zero API calls per tick)
      */
-    public record Sync(@DefaultValue("0 0 */6 * * *") String cron) {}
+    public record Sync(
+        @DefaultValue("0 0 */6 * * *") String cron,
+        @DefaultValue("500") int exportBudget,
+        @DefaultValue("PT5M") Duration catchUpDelay
+    ) {}
 
     /**
      * @param maxSizeMb per-workspace cap on the total size of mirrored Markdown bodies; when exceeded, the

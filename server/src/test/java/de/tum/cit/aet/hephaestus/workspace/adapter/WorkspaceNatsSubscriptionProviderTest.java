@@ -85,7 +85,7 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
     void outlineOnlyWorkspaceEmitsOnlyTheOutlineStream() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
         when(connectionService.findActiveOutlineConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", Set.of(), "sub-1", "secret", Set.of()))
+            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "secret", Set.of()))
         );
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
@@ -98,7 +98,7 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
     void dualConnectionWorkspaceEmitsBothStreams() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.of(IntegrationKind.GITLAB));
         when(connectionService.findActiveOutlineConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", Set.of(), "sub-9", "secret", Set.of()))
+            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", "sub-9", "secret", Set.of()))
         );
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
@@ -113,7 +113,7 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
     void outlineConnectionWithoutRegisteredSubscriptionIsSkipped() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
         when(connectionService.findActiveOutlineConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", Set.of(), null, null, Set.of()))
+            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", null, null, Set.of()))
         );
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();

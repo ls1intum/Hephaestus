@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Input shape: {@code outline.<subscriptionId>.<event>} produced by
  * {@link OutlineSubjectKeyDeriver}. The subscription id is passthrough (handlers resolve the
- * workspace from the body). Every document event drives the same whole-workspace reconcile, so the
+ * workspace from the body). One handler routes every Outline event off the body's event name, so the
  * parser collapses the flat event space onto the single logical key
  * {@code EventTypeKey(OUTLINE, }{@value OutlineWebhookMessageHandler#EVENT_TYPE}{@code )} — analogous
  * to GitHub's parser folding domain tiers — after asserting the subject is well-formed. The specific

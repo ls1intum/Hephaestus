@@ -5,8 +5,10 @@ import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineAuthInfoResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentInfoResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineExportResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionResponse;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -15,6 +17,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,8 +50,8 @@ public class OutlineApiClient {
     private static final Logger log = LoggerFactory.getLogger(OutlineApiClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
-    /** Outline caps list endpoints at 100 rows per page; 25 keeps each response small and bounded. */
-    private static final int PAGE_LIMIT = 25;
+    /** Outline caps list endpoints at 100 rows per page; using the max keeps a full pass cheapest in calls. */
+    private static final int PAGE_LIMIT = 100;
 
     /** Guards against a malformed {@code pagination} block looping forever. */
     private static final int MAX_PAGES = 1000;
@@ -101,8 +104,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Lists the collections the token can see ({@code collections.list}, offset/limit paged). Used to
-     * resolve an allow-list entry to a concrete collection id and slug.
+     * Lists the collections the token can see ({@code collections.list}, offset/limit paged). The sync's
+     * catalog pass refreshes mirrored-collection metadata and visibility from it.
      */
     public List<OutlineCollectionListResponse.Collection> listCollections(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
@@ -149,8 +152,10 @@ public class OutlineApiClient {
     }
 
     /**
-     * Lists per-document metadata for a collection ({@code documents.list}, offset/limit paged). The
-     * {@code updatedAt} field is the incremental cursor the sync diffs against.
+     * Lists per-document metadata for a collection ({@code documents.list}, offset/limit paged,
+     * newest-{@code updatedAt} first). The ordering matters: the sync spends its bounded export budget
+     * front-to-back, so the most recently edited documents mirror first. {@code updatedAt} is also the
+     * incremental cursor the sync diffs against.
      */
     public List<OutlineDocumentListResponse.Meta> listDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
@@ -160,7 +165,18 @@ public class OutlineApiClient {
                 resolvedUrl,
                 token,
                 "/api/documents.list",
-                Map.of("collectionId", collectionId, "offset", offset, "limit", PAGE_LIMIT),
+                Map.of(
+                    "collectionId",
+                    collectionId,
+                    "offset",
+                    offset,
+                    "limit",
+                    PAGE_LIMIT,
+                    "sort",
+                    "updatedAt",
+                    "direction",
+                    "DESC"
+                ),
                 OutlineDocumentListResponse.class
             );
             List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
@@ -173,6 +189,85 @@ public class OutlineApiClient {
             }
         }
         return all;
+    }
+
+    /**
+     * Fetches one document's metadata ({@code documents.info}). Returns {@link Optional#empty()} when the
+     * document no longer exists upstream (HTTP 404) — the webhook refresh path treats that as "tombstone" —
+     * and rethrows every other failure.
+     */
+    public Optional<OutlineDocumentListResponse.Meta> getDocumentInfo(
+        String serverUrl,
+        String token,
+        String documentId
+    ) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        OutlineDocumentInfoResponse body;
+        try {
+            body = post(
+                resolvedUrl,
+                token,
+                "/api/documents.info",
+                Map.of("id", documentId),
+                OutlineDocumentInfoResponse.class
+            );
+        } catch (OutlineApiException e) {
+            if (isNotFound(e)) {
+                return Optional.empty();
+            }
+            throw e;
+        }
+        OutlineDocumentInfoResponse.Data data = body == null ? null : body.data();
+        if (data == null) {
+            return Optional.empty();
+        }
+        return Optional.of(
+            new OutlineDocumentListResponse.Meta(
+                data.id(),
+                data.title(),
+                data.updatedAt(),
+                data.urlId(),
+                data.parentDocumentId(),
+                data.collectionId(),
+                data.createdBy(),
+                data.updatedBy()
+            )
+        );
+    }
+
+    /**
+     * Lists the change-notification subscriptions the token owns ({@code webhookSubscriptions.list},
+     * offset/limit paged). The registrar's self-heal pass diffs its stored subscription id against this.
+     */
+    public List<OutlineWebhookSubscriptionListResponse.Subscription> listWebhookSubscriptions(
+        String serverUrl,
+        String token
+    ) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        List<OutlineWebhookSubscriptionListResponse.Subscription> all = new ArrayList<>();
+        for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
+            OutlineWebhookSubscriptionListResponse body = post(
+                resolvedUrl,
+                token,
+                "/api/webhookSubscriptions.list",
+                Map.of("offset", offset, "limit", PAGE_LIMIT),
+                OutlineWebhookSubscriptionListResponse.class
+            );
+            List<OutlineWebhookSubscriptionListResponse.Subscription> pageData = body == null ? null : body.data();
+            if (pageData == null || pageData.isEmpty()) {
+                break;
+            }
+            all.addAll(pageData);
+            if (pageData.size() < PAGE_LIMIT) {
+                break;
+            }
+        }
+        return all;
+    }
+
+    /** A permanent failure whose wire cause was an HTTP 404 — the addressed resource is gone upstream. */
+    private static boolean isNotFound(OutlineApiException e) {
+        return (e.getCause() instanceof WebClientResponseException wire && wire.getStatusCode().value() == 404);
     }
 
     /**

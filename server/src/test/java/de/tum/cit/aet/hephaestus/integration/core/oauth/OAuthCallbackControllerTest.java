@@ -545,7 +545,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, Set.of());
             case OUTLINE -> new ConnectionConfig.OutlineConfig(
                 "https://app.getoutline.com",
-                java.util.Set.of(),
                 null,
                 null,
                 java.util.Set.of()

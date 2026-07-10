@@ -614,6 +614,14 @@ hephaestus:
             sync:
                 # Reconcile schedule for the per-workspace document mirror (default every six hours).
                 cron: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CRON:0 0 */6 * * *}
+                # Max document exports one workspace reconcile pass may spend; bounds the cost of a huge
+                # corpus's first sync. A collection that ran out of budget stays PENDING (no watermark, no
+                # tombstones) and the catch-up tick resumes it. 500 covers most corpora in one pass.
+                export-budget: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_EXPORT_BUDGET:500}
+                # How often the catch-up tick sweeps collections still awaiting a clean pass. Five minutes
+                # converges a freshly registered large collection quickly; a caught-up fleet has no pending
+                # rows, so a tick then costs zero API calls.
+                catch-up-delay: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CATCH_UP_DELAY:PT5M}
             cache:
                 # Per-workspace cap on the total size of mirrored Markdown bodies; least-recently-materialized
                 # bodies are evicted (the row survives as a directory marker) once the mirror grows past it.
