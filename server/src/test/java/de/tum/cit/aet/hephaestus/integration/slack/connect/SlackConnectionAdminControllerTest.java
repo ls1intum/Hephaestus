@@ -4,15 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -20,7 +15,6 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,35 +25,17 @@ import org.mockito.Mock;
 class SlackConnectionAdminControllerTest extends BaseUnitTest {
 
     @Mock
-    private ConnectionService connectionService;
-
-    @Mock
     private SlackMessageService slackMessageService;
 
     private SlackConnectionAdminController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new SlackConnectionAdminController(connectionService, slackMessageService);
-        // lenient: the channel-override test deliberately never reads the persisted config.
-        lenient()
-            .when(connectionService.findSlackNotificationConfig(anyLong()))
-            .thenReturn(
-                Optional.of(new ConnectionConfig.SlackConfig("T1", "Acme", "C123456789", "core-team", null, Set.of()))
-            );
+        controller = new SlackConnectionAdminController(slackMessageService);
     }
 
     @Test
-    void sendTestMessage_happyPath_usesPersistedChannel() {
-        SlackTestMessageResponseDTO result = controller.sendTestMessage(ctx(1L), null);
-
-        assertThat(result.ok()).isTrue();
-        assertThat(result.channelId()).isEqualTo("C123456789");
-        assertThat(result.slackError()).isNull();
-    }
-
-    @Test
-    void sendTestMessage_overrideChannel_testsTypedChannelWithoutReadingPersisted() {
+    void sendTestMessage_typedChannel_probesThatChannel() {
         SlackTestMessageResponseDTO result = controller.sendTestMessage(
             ctx(1L),
             new SlackTestMessageRequestDTO("C999999999")
@@ -67,23 +43,22 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
 
         assertThat(result.ok()).isTrue();
         assertThat(result.channelId()).isEqualTo("C999999999");
-        // A non-blank override short-circuits the persisted lookup entirely.
-        verify(connectionService, never()).findSlackNotificationConfig(anyLong());
+        assertThat(result.slackError()).isNull();
     }
 
     @Test
-    void sendTestMessage_blankOverride_fallsBackToPersistedChannel() {
-        SlackTestMessageResponseDTO result = controller.sendTestMessage(ctx(1L), new SlackTestMessageRequestDTO("   "));
-
-        assertThat(result.ok()).isTrue();
-        assertThat(result.channelId()).isEqualTo("C123456789");
-    }
-
-    @Test
-    void sendTestMessage_noChannelAnywhere_returnsProbeFailureNotError() {
-        when(connectionService.findSlackNotificationConfig(eq(2L))).thenReturn(Optional.empty());
-
+    void sendTestMessage_missingBody_returnsProbeFailureNotError() {
         SlackTestMessageResponseDTO result = controller.sendTestMessage(ctx(2L), null);
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.channelId()).isNull();
+        assertThat(result.slackError()).isEqualTo("no_channel_configured");
+        verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void sendTestMessage_blankChannel_returnsProbeFailureNotError() {
+        SlackTestMessageResponseDTO result = controller.sendTestMessage(ctx(2L), new SlackTestMessageRequestDTO("   "));
 
         assertThat(result.ok()).isFalse();
         assertThat(result.channelId()).isNull();
@@ -98,7 +73,10 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
             .when(slackMessageService)
             .sendForWorkspace(anyLong(), anyString(), any(), anyString());
 
-        SlackTestMessageResponseDTO result = controller.sendTestMessage(ctx(1L), null);
+        SlackTestMessageResponseDTO result = controller.sendTestMessage(
+            ctx(1L),
+            new SlackTestMessageRequestDTO("C123456789")
+        );
 
         assertThat(result.ok()).isFalse();
         assertThat(result.channelId()).isEqualTo("C123456789");

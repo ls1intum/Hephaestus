@@ -28,7 +28,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Read-model service for practice reports over the just-closed review cycle. */
+/**
+ * Read-model service for practice reports. The reporting window opens at the previous review-cycle
+ * boundary ({@code previousCycleWindow().after()}) and is open-ended to now — queries filter on
+ * {@code since} only, so activity after the cycle's nominal close is included.
+ */
 @Service
 @RequiredArgsConstructor
 public class PracticeReportService {

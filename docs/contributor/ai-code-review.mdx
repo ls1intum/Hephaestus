@@ -5,7 +5,7 @@ title: AI Code Review Pipeline
 description: Architecture and internals of the practice-based automated code review system.
 ---
 
-Hephaestus runs an AI-powered code review pipeline that evaluates merge requests against configurable software engineering practices. When a student opens a non-draft MR (or uses `/hephaestus review`), the system detects relevant practices, runs an LLM agent inside a sandboxed container, parses the structured output, and posts findings as MR comments and inline diff notes.
+Hephaestus runs an AI-powered code review pipeline that evaluates work against configurable software engineering practices. The pipeline reviews three artifact kinds — pull/merge requests, issues, and settled Slack conversation threads — each through its own `JobTypeHandler` (`PullRequestReviewHandler`, `IssueReviewHandler`, `ConversationReviewHandler`). When a student opens a non-draft MR (or uses `/hephaestus review`), the system detects relevant practices, runs an LLM agent inside a sandboxed container, parses the structured output, and posts observations as MR comments and inline diff notes. Issue and conversation reviews follow the same detection → sandbox → parse → deliver pipeline but with no diff and no inline notes (see [Practices](#practices) and [Delivery pipeline](#delivery-pipeline)).
 
 ## Pipeline overview
 
@@ -21,14 +21,14 @@ sequenceDiagram
     GL->>WH: MR webhook event
     WH->>NATS: Publish event
     NATS->>AS: Consume event
-    AS->>AS: Detection gate (8 checks)
+    AS->>AS: Detection gate (10 checks)
     AS->>NATS: Submit agent_job to job stream
     Note over AS,NATS: Job persisted as QUEUED
     NATS->>AS: Pull consumer claims job
     AS->>AS: Prepare context files + bind-mount repo
     AS->>SB: Create Docker container
     SB->>LLM: Evaluate practices (via LLM proxy)
-    LLM-->>SB: Structured JSON findings
+    LLM-->>SB: Structured JSON observations
     SB-->>AS: Extract output files + logs
     AS->>AS: Parse, validate, filter, persist
     AS->>AS: Compose delivery (MR note + diff notes)
@@ -37,40 +37,49 @@ sequenceDiagram
 
 ## Key components
 
-| Component         | Class                           | Responsibility                                                                                                                                                             |
-| ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Detection gate    | `PracticeReviewDetectionGate`   | 8-check gate: draft skip, workspace resolution, agent config, practice matching, `runForAllUsers` bypass, assignee presence, role-checker health, assignee role                |
-| Review handler    | `PullRequestReviewHandler`      | Context assembly (diff, metadata, practices), diff summary computation, post-execution delivery orchestration                                                              |
-| Result parser     | `PracticeDetectionResultParser` | Parses agent JSON, validates and normalizes slugs, deduplicates by practice (highest confidence wins). Never throws -- failures go to `discarded` list                     |
-| Delivery composer | `DeliveryComposer`              | Inline-first rendering: inlinable findings (with file locations) become compact MR summary entries + full diff notes; non-inlinable findings get full detail in MR summary |
-| Diff validator    | `DiffHunkValidator`             | Validates diff note line positions against actual diff hunks. Snaps invalid positions to nearest valid line (`TreeSet.floor`/`ceiling`)                                    |
-| Feedback service  | `FeedbackDeliveryService`       | Posts MR summary comment and diff notes to the git provider. Suppresses delivery for closed, merged, draft, or opted-out PRs                                               |
-| Bot command       | `BotCommandProcessor`           | Listens for `/hephaestus review` comments (via Spring `@TransactionalEventListener`) to retrigger reviews                                                                  |
-| Job executor      | `AgentJobExecutor`              | NATS pull consumer: claims jobs with `SKIP LOCKED`, dispatches to sandbox executor pool, persists results in micro-transactions                                            |
+| Component            | Class                            | Responsibility                                                                                                                                                                                  |
+| -------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Detection gate       | `PracticeReviewDetectionGate`     | Ordered cheap-to-expensive checks: workspace resolution, draft skip, practices-enabled + trigger-mode settings, agent config, practice matching, `runForAllUsers` bypass, assignee presence, role-checker health, assignee role. Shared by `evaluate` (PR) and `evaluateIssue` (issue) |
+| PR review handler    | `PullRequestReviewHandler`        | Context assembly (diff, metadata, practices), diff-scope filtering, delivery orchestration for pull/merge requests                                                                            |
+| Issue review handler | `IssueReviewHandler`              | Issue counterpart -- no diff, no repo mount, no inline notes; posts a single issue comment                                                                                                     |
+| Conversation handler | `ConversationReviewHandler`       | Slack-conversation counterpart -- repo-less; persists observations and publishes an event that drives the mentor DM delivery loop, nothing posts back to Slack                                |
+| Result parser        | `PracticeDetectionResultParser`   | Parses agent JSON, validates and normalizes slugs, coerces `(presence, assessment, severity)` to the system's coherence invariants. Never throws -- failures go to `discarded` list            |
+| Delivery composer    | `DeliveryComposer`                | Inline-first rendering: inlinable observations (with file locations) become compact MR summary entries + full diff notes; non-inlinable observations get full detail in MR summary            |
+| Diff validator       | `DiffHunkValidator`               | Validates diff note line positions against actual diff hunks. Snaps invalid positions to nearest valid line (`TreeSet.floor`/`ceiling`)                                                        |
+| Feedback service     | `FeedbackDeliveryService`         | Posts MR summary comment and diff notes to the git provider. Suppresses delivery for closed, merged, draft, or opted-out PRs                                                                   |
+| Bot command          | `BotCommandProcessor`             | Listens for `/hephaestus review` comments (via Spring `@TransactionalEventListener`) to retrigger reviews                                                                                      |
+| Job executor         | `AgentJobExecutor`                | NATS pull consumer: claims jobs with `SKIP LOCKED`, dispatches to sandbox executor pool, persists results in micro-transactions                                                                |
 
 ## Agent architecture
 
-A single backend powers practice detection: the **Pi practice agent**, wired via `PracticePiAdapter` on top of the shared `PiRuntimeFactory`. It uses a single-pass architecture — one agent evaluates all relevant practices for the diff and persists structured findings via the custom Pi tool `report_finding` (the run-level summary is composed downstream from the persisted findings, not via a separate tool).
+A single backend powers practice detection: the **Pi practice agent**, wired via `PracticePiAdapter` on top of the shared `PiRuntimeFactory`. One Pi session reads the diff/context once, then is driven through the matched practices in focused turns — one turn per practice area (a coherent 2-4 practice group), each turn reading only that area's per-practice criteria. The agent persists one structured observation per `report_observation` tool call as soon as it is ready; a coverage gate re-prompts, at the end of the turn loop, any practice no turn reported, so every matched practice gets an observation. The run-level summary is composed downstream from the persisted observations, not by the agent.
 
-The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a soft-timeout steering message and a hard-timeout abort, followed by a format retry if the persisted output is incomplete. A top-level watchdog hard-exits the process at `AGENT_BUDGET_MS + 30s` so the orchestrator always observes a terminal state.
+The runner (`pi-runner.mjs`, copied into the workspace as `.run-pi.mjs`) drives the Pi SDK in-process: the turn loop and coverage gate run under a soft-timeout steering message and a hard-timeout abort, followed by a format retry if the persisted output is incomplete. A top-level watchdog hard-exits the process at `AGENT_BUDGET_MS + 30s` so the orchestrator always observes a terminal state.
 
 ### Workspace layout
 
-Every agent container gets this file structure (agent-specific files noted):
+Every agent container gets this file structure (files vary by artifact kind — see notes):
 
-The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `SandboxLayout`; see `docs/developer/agent/workspace-abi.mdx` for the full ABI.
+The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `SandboxLayout`; see `docs/contributor/agent/workspace-abi.mdx` for the full ABI.
 
 ```
 /workspace/
   inputs/                              # read-only — the path-guard whitelists exactly this subtree
     manifest.json                      #   telescope: integration-agnostic index (path/connector/sha256)
-    sources/scm/repo/                  #   the SCM connector's source — git checkout (read-only mount)
+    sources/scm/repo/                  #   the SCM connector's source — git checkout (PR reviews only; RO mount)
     context/                           #   workspace context (WorkspaceContextBuilder populates this)
-      metadata.json                    #     PR metadata + commits
-      comments.json                    #     review comments
-      diff.patch                       #     diff with [L<n>] annotations
-      diff_summary.md                  #     per-file diff chunks with index table
-      contributor_history.json         #     prior findings for this author (optional)
+      metadata.json                    #     PR/issue metadata + commits (PR, issue)
+      comments.json                    #     review/issue comments (PR, issue)
+      diff.patch                       #     diff with [L<n>] annotations (PR only)
+      diff_stat.txt                    #     git diff --stat output (PR only)
+      diff_summary.md                  #     per-file diff chunks with index table (PR only)
+      contributor_history.json         #     prior observations for this author, optional (PR only)
+      general_comments.json            #     conversation-tab review discussion, optional (PR only)
+      review_threads.json              #     review-decision + thread state, optional (PR only)
+      linked_work_items.json           #     resolved linked-issue rows, optional (PR only)
+      issue_summary.md                 #     issue body + comment thread rendered for the agent (issue only)
+      project_inventory.json           #     cross-repo workspace inventory (issue, conversation; also PR)
+      conversation_thread.json         #     ordered human turns of one settled Slack thread (conversation only)
     practices/                         #   per-practice catalog (generated from the DB)
       index.json                       #     [{slug, name, area}]
       {slug}.md                        #     per-practice criteria
@@ -78,23 +87,23 @@ The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only
   work/                                # scratch the agent + precompute write; NEVER collected
     precompute/practices/{slug}.ts     #   precompute scripts (from DB, if present)
     precompute-out/                    #   precompute output (summary.md + per-practice JSON)
-    analysis/practices/                #   directory for intermediate findings markers
+    analysis/practices/                #   directory for intermediate observation markers
   out/                                 # the ONLY directory collected back into SQL
   task.json                            # TaskEnvelope around Task.PracticeReview — prompt, jobId, workspaceId
   .pi/                                 # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
     AGENTS.md                          #   Pi orchestrator instructions
     settings.json                      #   Pi SDK configuration (provider, model, compaction)
     extensions/                        #   custom provider extensions (auto-discovered)
-  .run-pi.mjs                          # runner entry point
+  .run-pi.mjs                          # runner entry point (copied from the pi-runner.mjs classpath resource)
 ```
 
 ### Output schema
 
-The agent returns a JSON object with a `findings` array:
+Each `report_observation` tool call persists one observation; the runner assembles the accumulated calls into a JSON object with an `observations` array (`result.json` / `AgentJob.output.rawOutput`):
 
 ```json
 {
-  "findings": [
+  "observations": [
     {
       "practiceSlug": "hardcoded-secrets",
       "title": "API key exposed in source",
@@ -125,36 +134,44 @@ The agent returns a JSON object with a `findings` array:
 
 **Severities**: `CRITICAL`, `MAJOR`, `MINOR`, `INFO` -- defined per practice in the criteria files.
 
+**`subjectLogin`** (optional): for reviewer-audience practices on a multi-reviewer PR, the reviewer login the model proposes the observation is about. The server validates this against the resolved reviewer set before it can drive attribution — the model only proposes, it never decides.
+
 ## Practices
 
 > **Terminology.** A **practice** is one detectable item (its slug, e.g. `scope-one-reviewable-change`). A **practice area** is one of the groupings that contain practices (entity `PracticeArea`, table `practice_area`). The canonical one-word name for the grouping is **area** (the field is literally `Practice.area` / `practice_area_id`; see `practice-feedback-schema.md` §2 and `practice-catalogue.md` — *area*, never *goal* or *category*). Spell it out as "practice area" only where a bare "area" would be ambiguous from context; never substitute "goal" or "category" for the grouping. (Unrelated uses — achievement categories, mentor goal-setting, CSS grid areas — are exempt.)
 
-Practices are stored in the database (`practice` table, `criteria` column). At runtime, the handler generates `.practices/{slug}.md` files from the DB criteria and injects them into the agent workspace. Each practice defines:
+Practices are stored in the database (`practice` table, `criteria` column). At runtime, `PracticeCatalogInjector` generates `inputs/practices/{slug}.md` files from the DB criteria and injects them into the agent workspace. Each practice defines:
 
 - What to look for
 - Severity classification rules
 - False-positive exclusions
 
-The current deployment uses 32 practices across 11 practice areas. Practices are fully configurable per workspace and can be added or modified without code changes.
+The seeded default catalog (`resources/practices/default-catalog.json`) ships 35 practices across 12 practice areas; each new workspace is seeded with a copy on creation. Practices are fully configurable per workspace and can be added or modified without code changes.
 
 ## Delivery pipeline
 
-After the agent returns findings, the server runs a 6-step delivery pipeline in `PullRequestReviewHandler.deliver()`:
+After the agent returns observations, the server runs the delivery pipeline in `PullRequestReviewHandler.deliver()` (the PR path; `IssueReviewHandler` and `ConversationReviewHandler` run the same parse → coerce → persist → compose → post skeleton without the diff-specific steps):
 
-1. **Parse** -- `PracticeDetectionResultParser` validates all fields, normalizes slugs (`toLowerCase` + replace `_` with `-`), deduplicates by practice (highest confidence wins), and collects `suggestedDiffNotes` from `BAD` findings. Malformed entries are captured in a `discarded` list (never throws).
+1. **Parse** -- `PracticeDetectionResultParser` validates all fields, normalizes slugs (`toLowerCase` + replace `_` with `-`), and collects `suggestedDiffNotes` from `BAD` observations. Malformed entries are captured in a `discarded` list (never throws).
 
-2. **Filter by diff scope** -- `filterByDiffScope` removes findings whose evidence locations don't intersect the actual diff. Prevents hallucinated findings about unchanged code.
+2. **Secret pre-pass** -- `SecretDiffScanner` runs a deterministic scan over the raw diff and injects synthetic `hardcoded-secrets` `PRESENT`/`BAD` observations for any hit the model didn't already flag at the same diff position, so a credential leak is caught even if the model abstains.
 
-3. **Persist** -- Validated findings are saved as `Observation` entities in the database.
+3. **Filter by diff scope** -- `filterByDiffScope` removes observations whose evidence locations don't intersect the actual diff (metadata-level and reviewer-audience practices are exempt). Prevents hallucinated observations about unchanged code; an all-`NOT_APPLICABLE` result over a non-empty diff is treated as a stale-diff failure rather than delivered as a false all-clear.
 
-4. **Compose** -- `DeliveryComposer` partitions findings into:
+4. **Coerce coherence** -- `PracticeDetectionResultParser.coerceCoherence` re-derives `(presence, assessment, severity)` per observation: a defect-detector practice's `GOOD` becomes `NOT_APPLICABLE`, severity is nulled unless `assessment == BAD`, and an advisory (non-`BLOCKING_ELIGIBLE_PRACTICES`) `BAD` is capped to `MINOR` so craft feedback never presents as a merge-blocker.
+
+5. **Persist** -- `PracticeDetectionDeliveryService.deliver` resolves the target (`PULL_REQUEST`/`ISSUE`/`CONVERSATION_THREAD`) and subject, and inserts each observation via `ObservationRepository.insertIfAbsent` (idempotent on `occurrence_key`), publishing `PracticeDetectionCompletedEvent`.
+
+6. **Reviewer-audience firewall** -- reviewer-audience observations (`ReviewerAudiencePractices`, e.g. `reviews-substantively-with-understanding`) are persisted in step 5 so the reviewer's own dashboard/mentor sees them, but are filtered out here before anything posts back to the PR author. A `ReviewSubmitted` job is entirely reviewer-audience, so nothing posts.
+
+7. **Compose** -- `DeliveryComposer` partitions the remaining author-audience observations into:
    - **Inlinable** (have file locations, not in internal paths like `inputs/context/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
    - **Non-inlinable** (PR-description / commit-discipline practices such as `describe-what-and-why` and `commits-are-atomic-and-cohesive`, or no file location) -- full detail in MR summary
-   - When all findings are `GOOD` strengths, composes a short approval comment naming the top strengths
+   - When all observations are `GOOD` strengths, composes a short approval comment naming the top strengths
 
-5. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
+8. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
 
-6. **Post** -- `FeedbackDeliveryService` checks suppression conditions (PR closed, merged, draft, or author opted out) and, if not suppressed, posts the MR summary comment (with an HTML marker `<!-- hephaestus:practice-review:{jobId} -->` for identification) and inline diff notes to the git provider's API. On re-runs, `DiffNotePoster` first deletes old diff notes bearing the `<!-- hephaestus-diff-note -->` marker to prevent accumulation.
+9. **Post** -- `FeedbackDeliveryService` checks suppression conditions (PR closed, merged, draft, or author opted out) and, if not suppressed, posts the MR summary comment (with an HTML marker `<!-- hephaestus:practice-review:{jobId} -->` for identification) and inline diff notes to the git provider's API. On re-runs, `DiffNotePoster` first deletes old diff notes bearing the `<!-- hephaestus-diff-note -->` marker to prevent accumulation.
 
 ## Bot command
 
@@ -171,10 +188,10 @@ Key tables for code review:
 
 | Table              | Key Columns                                                                                                               | Purpose                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `agent_config`     | `name`, `agent_type`, `model_name`, `model_version`, `enabled`, `llm_api_key` (encrypted), `llm_provider`, `credential_mode`, `timeout_seconds`, `max_concurrent_jobs`, `allow_internet` | LLM backend configuration per workspace                                                      |
-| `agent_job`        | `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
-| `practice`         | `slug`, `name`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `practice_area_id` (FK → `practice_area`), `artifact_type`, `why_it_matters`, `what_good_looks_like`, `is_active`, `workspace_id` | Practice definitions, each linked to a practice area. Unique constraint on `(workspace_id, slug)` |
-| `observation`      | `occurrence_key`, `title`, `presence`, `assessment`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `recurrence_key`, `agent_job_id`, `practice_id`, `artifact_type`, `artifact_id`, `about_user_id`, `observed_at` | Individual observations per target (PR) per practice                                          |
+| `agent_config`     | `name`, `model_name`, `model_version`, `enabled`, `llm_api_key` (encrypted), `llm_base_url`, `llm_provider`, `credential_mode`, `timeout_seconds`, `max_concurrent_jobs`, `allow_internet` | LLM backend configuration per workspace                                                      |
+| `agent_job`        | `job_type`, `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
+| `practice`         | `slug`, `name`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `practice_area_id` (FK → `practice_area`), `applies_to`, `why_it_matters`, `what_good_looks_like`, `is_active`, `workspace_id` | Practice definitions, each linked to a practice area. Unique constraint on `(workspace_id, slug)` |
+| `observation`      | `occurrence_key`, `title`, `presence`, `assessment`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `recurrence_key`, `agent_job_id`, `practice_id`, `artifact_type`, `artifact_id`, `about_user_id`, `observed_at` | One detector's evaluation of one practice on one artifact (PR, issue, or conversation thread). Immutable; deduped on `occurrence_key` |
 
 ## Configuration
 
@@ -214,16 +231,17 @@ Then trigger with:
 
 ```bash
 curl -X POST "http://localhost:${SERVER_PORT}/api/dev/trigger-review?prId=123&workspaceId=1"
+curl -X POST "http://localhost:${SERVER_PORT}/api/dev/trigger-review?issueId=123&workspaceId=1&triggerEvent=IssueClosed"
 ```
 
 The port must match your `SERVER_PORT` environment variable (default: `8080` in `.env`).
 
 ## Adding a new practice
 
-1. Insert a row in the `practice` table with all required fields: `slug`, `name`, `workspace_id`, and `trigger_events` (JSONB array of event names like `["PULL_REQUEST_OPENED", "PULL_REQUEST_UPDATED"]`)
+1. Insert a row in the `practice` table with all required fields: `slug`, `name`, `workspace_id`, and `trigger_events` (JSONB array of event names drawn from `TriggerEventCatalog`, e.g. `["PullRequestCreated", "PullRequestSynchronized"]` for a PR practice or `["IssueCreated", "IssueClosed"]` for an issue practice -- a practice may only subscribe to events matching its `applies_to`)
 2. Set the `criteria` column with the evaluation criteria text (Markdown)
 3. Link the practice to a **practice area** for grouping via `practice_area_id` (FK → `practice_area`, e.g. the seeded review-ready-work or testing-discipline areas)
-4. No code changes needed -- the handler generates `{slug}.md` from the DB criteria and the agent reads practices dynamically from `index.json`
+4. No code changes needed -- `PracticeCatalogInjector` generates `inputs/practices/{slug}.md` from the DB criteria and the agent reads practices dynamically from `index.json`
 
 ### Wording the human-facing strings
 

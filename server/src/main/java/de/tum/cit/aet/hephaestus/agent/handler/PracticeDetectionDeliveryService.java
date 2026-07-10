@@ -190,11 +190,16 @@ public class PracticeDetectionDeliveryService {
                 if (reviewer != null) {
                     // (a) The model's proposed login resolves to a real reviewer.
                     subjectUserId = reviewer.getId();
-                } else if (reviewersByLogin.size() == 1) {
-                    // (b) Exactly one reviewer: deterministic fast path, no model trust needed.
+                } else if (normalized == null && reviewersByLogin.size() == 1) {
+                    // (b) Model named nobody and exactly one reviewer exists: deterministic fast path.
+                    //     Guarded on normalized == null — when the model DID name a subject and that name
+                    //     resolves to no reviewer, the observation is about someone outside the roster
+                    //     (often the author or a bot); silently re-pinning it on the sole reviewer would
+                    //     misattribute, so that case falls through to the discard below.
                     subjectUserId = reviewersByLogin.values().iterator().next().getId();
                 } else {
-                    // (c) Multiple reviewers and no usable subjectLogin → cannot attribute → discard.
+                    // (c) Named-but-unresolvable subject, or multiple reviewers with no usable
+                    //     subjectLogin → cannot attribute → discard.
                     discardedUnresolvedReviewer++;
                     log.info(
                         "Discarded reviewer-audience finding — subjectLogin unresolved among {} reviewers: slug={}, subjectLogin={}, jobId={}",

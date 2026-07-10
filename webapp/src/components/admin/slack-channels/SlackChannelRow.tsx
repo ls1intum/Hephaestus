@@ -39,7 +39,7 @@ interface StatusPresentation {
 /**
  * Word + icon for every state (never color-only) so the status survives WCAG 1.4.1.
  * There is no semantic "success" token in the kit, so ACTIVE reuses the same hard-coded
- * green as the connection indicator in {@link AdminSlackNotificationSettings}.
+ * green as the connection indicator in {@link AdminSlackConnectionSettings}.
  */
 function statusPresentation(state: SlackConsentState): StatusPresentation {
 	switch (state) {

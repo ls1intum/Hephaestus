@@ -36,7 +36,7 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	);
 	if (looksLarge && !hasBreakdown)
 		directions.push(
-			`Signals suggest large work with NO explicit breakdown — a strong candidate for a decomposition finding; verify the body really bundles multiple trackable parts.`,
+			`Signals suggest large work with NO explicit breakdown — a strong candidate for a decomposition observation; verify the body really bundles multiple trackable parts.`,
 		);
 	if (!looksLarge)
 		directions.push(

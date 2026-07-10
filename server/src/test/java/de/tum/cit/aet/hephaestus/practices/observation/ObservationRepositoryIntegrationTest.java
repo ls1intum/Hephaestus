@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.CohortStandingRow;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.report.PracticeReportService;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -764,124 +763,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         /** Former-GOOD practice valence: PRESENT is a strength (GOOD), ABSENT is a problem (BAD). */
         private static String assessmentFor(String presence) {
             return "PRESENT".equals(presence) ? "GOOD" : "BAD";
-        }
-    }
-
-    @Nested
-    class FindSummaryDashboardDedupTests {
-
-        private AgentJob anotherJob() {
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
-            return agentJobRepository.save(job);
-        }
-
-        private void insertForJob(String key, UUID jobId, long artifactId, String presence, Instant observedAt) {
-            // Former-GOOD practice valence: PRESENT -> GOOD (strength), ABSENT -> BAD (problem). A
-            // NOT_APPLICABLE observation has no sign at all (assessment + severity are null).
-            boolean notApplicable = "NOT_APPLICABLE".equals(presence);
-            String assessment = notApplicable ? null : ("PRESENT".equals(presence) ? "GOOD" : "BAD");
-            String severity = notApplicable ? null : "INFO";
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                key,
-                jobId,
-                practice.getId(),
-                null,
-                "PULL_REQUEST",
-                artifactId,
-                aboutUser.getId(),
-                "finding",
-                presence,
-                assessment,
-                severity,
-                0.9f,
-                null,
-                null,
-                null,
-                observedAt
-            );
-        }
-
-        @Test
-        @DisplayName("dashboard summary counts only the latest run per target (re-review dedup)")
-        void countsOnlyLatestRunPerArtifact() {
-            // The SAME target (PR 42) reviewed twice: an earlier run said ABSENT/BAD, a later run said PRESENT/GOOD.
-            // A naive COUNT would show 2 observations (1 PRESENT, 1 ABSENT); the dashboard must show the
-            // target's CURRENT state only — 1 observation, PRESENT/GOOD.
-            AgentJob laterJob = anotherJob();
-            insertForJob("dedup-old", agentJob.getId(), 42L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
-            insertForJob("dedup-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
-
-            List<DeveloperPracticeSummaryProjection> result = observationRepository.findSummaryByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(1);
-            DeveloperPracticeSummaryProjection row = result.get(0);
-            assertThat(row.getPracticeSlug()).isEqualTo("test-practice");
-            assertThat(row.getTotalObservations()).isEqualTo(1L);
-            assertThat(row.getGoodCount()).isEqualTo(1L);
-            assertThat(row.getBadCount()).isEqualTo(0L);
-            assertThat(row.getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
-        }
-
-        @Test
-        @DisplayName("each distinct target contributes its own latest run")
-        void countsEachTargetIndependently() {
-            // Target 42 reviewed twice (latest = PRESENT/GOOD); target 43 reviewed once (ABSENT/BAD). The dedup is
-            // per-target, so the older run survives for 43 while only the newer run survives for 42.
-            AgentJob laterJob = anotherJob();
-            insertForJob("t42-old", agentJob.getId(), 42L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
-            insertForJob("t42-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
-            insertForJob("t43", agentJob.getId(), 43L, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
-
-            List<DeveloperPracticeSummaryProjection> result = observationRepository.findSummaryByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(1);
-            DeveloperPracticeSummaryProjection row = result.get(0);
-            assertThat(row.getTotalObservations()).isEqualTo(2L);
-            assertThat(row.getGoodCount()).isEqualTo(1L);
-            assertThat(row.getBadCount()).isEqualTo(1L);
-        }
-
-        @Test
-        @DisplayName("NOT_APPLICABLE inflates totalObservations but never good/bad, and is omitted from findRecent")
-        void notApplicableCountedInTotalButExcludedFromRecent() {
-            // A NOT_APPLICABLE observation (no assessment, no severity) for a distinct target so the latest-run
-            // dedup keeps it: it must count toward totalObservations yet contribute to neither good nor bad
-            // (so total != good + bad by design), and the mentor's drill-down list must omit it entirely.
-            insertForJob("na-target", agentJob.getId(), 50L, "NOT_APPLICABLE", Instant.parse("2026-03-20T10:00:00Z"));
-            insertForJob("bad-target", agentJob.getId(), 51L, "ABSENT", Instant.parse("2026-03-20T11:00:00Z"));
-
-            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(summary).hasSize(1);
-            DeveloperPracticeSummaryProjection row = summary.get(0);
-            assertThat(row.getTotalObservations()).isEqualTo(2L); // NA + BAD both counted
-            assertThat(row.getGoodCount()).isEqualTo(0L);
-            assertThat(row.getBadCount()).isEqualTo(1L); // only the BAD row, the NA is excluded
-
-            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                Instant.parse("2026-01-01T00:00:00Z"),
-                PageRequest.of(0, 50)
-            );
-
-            // The NA row is filtered out of the drill-down list; only the actionable BAD finding remains.
-            assertThat(recent).hasSize(1);
-            assertThat(recent.get(0).getOccurrenceKey()).isEqualTo("bad-target");
-            assertThat(recent.get(0).getPresence()).isEqualTo(Presence.ABSENT);
         }
     }
 

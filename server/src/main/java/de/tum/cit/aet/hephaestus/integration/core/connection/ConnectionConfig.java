@@ -79,6 +79,8 @@ public sealed interface ConnectionConfig
     record SlackConfig(
         @Nullable String teamId,
         @Nullable String teamName,
+        // Retained for stored-config JSON compatibility; nothing writes or reads it since the
+        // weekly-digest removal (ADR 0023).
         @Nullable String notificationChannelId,
         @Nullable String teamLabel,
         @Nullable Integer retentionDays,

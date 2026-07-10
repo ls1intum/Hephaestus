@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { expect, within } from "storybook/test";
 import type { PracticeReportCard } from "@/api/types.gen";
 import { PracticeReflectionSection } from "./PracticeReflectionSection";
 
@@ -74,7 +75,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ canvasElement }) => {
+		// A reflection card renders per practice, and the copy affordance appears once there's
+		// something to copy.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("heading", { name: practices[0].name })).toBeVisible();
+		await expect(canvas.getByRole("heading", { name: practices[1].name })).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /copy my practice summary/i })).toBeVisible();
+	},
+};
 
 export const Loading: Story = {
 	args: { isLoading: true, practices: undefined },

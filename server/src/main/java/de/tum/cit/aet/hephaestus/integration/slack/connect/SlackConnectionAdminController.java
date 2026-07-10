@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -29,14 +28,9 @@ public class SlackConnectionAdminController {
 
     private static final Logger log = LoggerFactory.getLogger(SlackConnectionAdminController.class);
 
-    private final ConnectionService connectionService;
     private final SlackMessageService slackMessageService;
 
-    public SlackConnectionAdminController(
-        ConnectionService connectionService,
-        SlackMessageService slackMessageService
-    ) {
-        this.connectionService = connectionService;
+    public SlackConnectionAdminController(SlackMessageService slackMessageService) {
         this.slackMessageService = slackMessageService;
     }
 
@@ -47,7 +41,8 @@ public class SlackConnectionAdminController {
      * test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
      * with a transport failure.
      *
-     * @param body optional channel override; when blank, the persisted notification channel is used.
+     * @param body the channel to probe; when blank the probe reports {@code no_channel_configured}
+     *     (nothing writes a persisted default channel since the digest removal).
      */
     @PostMapping("/test-message")
     @Operation(operationId = "sendSlackTestMessage", summary = "Post a test message to verify the Slack connection")
@@ -57,12 +52,7 @@ public class SlackConnectionAdminController {
     ) {
         long workspaceId = workspace.id();
         String override = body == null ? null : body.channelId();
-        String channelId = (override != null && !override.isBlank())
-            ? override.trim()
-            : connectionService
-                  .findSlackNotificationConfig(workspaceId)
-                  .map(c -> c.notificationChannelId())
-                  .orElse(null);
+        String channelId = (override != null && !override.isBlank()) ? override.trim() : null;
 
         if (channelId == null || channelId.isBlank()) {
             return new SlackTestMessageResponseDTO(false, null, "no_channel_configured");

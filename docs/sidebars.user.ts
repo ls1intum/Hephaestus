@@ -11,7 +11,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Core Experiences',
-      items: ['workspace', 'achievements', 'ai-mentor', 'ai-code-review'],
+      items: ['workspace', 'practices', 'achievements', 'ai-mentor', 'ai-code-review'],
     },
   ],
 };

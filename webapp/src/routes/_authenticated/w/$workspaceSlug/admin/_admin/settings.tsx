@@ -299,11 +299,8 @@ function AdminSettings() {
 		<AdminSettingsPage
 			repositories={formattedRepositories}
 			isLoadingRepositories={isWorkspaceLoading || isLoadingRepositories || !workspaceSlug}
-			repositoriesError={
-				(workspaceError as Error | null) ??
-				(workspaceDataError as Error | null) ??
-				(repositoriesError as Error | null)
-			}
+			// workspaceDataError is unreachable here — the component early-returns on it above.
+			repositoriesError={(workspaceError as Error | null) ?? (repositoriesError as Error | null)}
 			addRepositoryError={addRepository.error as Error | null}
 			isAddingRepository={addRepository.isPending}
 			isRemovingRepository={removeRepository.isPending}

@@ -68,7 +68,6 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 		expect(screen.getByRole("heading", { name: /slack connection/i })).toBeTruthy();
 		expect(screen.queryByText(/slack channel monitoring/i)).toBeNull();
 		expect(screen.queryByText(/old-channel/i)).toBeNull();
-		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});
 
 	it("shows connected Slack management under one integration section", () => {
@@ -76,7 +75,6 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 
 		expect(screen.getByRole("heading", { name: /slack connection/i })).toBeTruthy();
 		expect(screen.getByRole("heading", { name: /slack channel monitoring/i })).toBeTruthy();
-		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});
 
 	it("threads the channel-list query failure into a retry panel, not the empty state", () => {

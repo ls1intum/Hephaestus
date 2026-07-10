@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { PracticeReportCard, PracticeReportItem } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { copyHtmlAndText } from "@/lib/clipboard";
@@ -70,9 +71,14 @@ export function CopyPracticeSummaryButton({ practices }: CopyPracticeSummaryButt
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const disabled = practices.length === 0;
 
-	const handleCopy = () => {
+	const handleCopy = async () => {
 		if (disabled) return;
-		copyHtmlAndText(buildHtml(practices), buildMarkdown(practices));
+		const succeeded = await copyHtmlAndText(buildHtml(practices), buildMarkdown(practices));
+		if (!succeeded) {
+			// Don't claim "Copied" when the browser rejected the write (e.g. permission denied).
+			toast.error("Couldn't copy to the clipboard");
+			return;
+		}
 		setCopied(true);
 		if (timerRef.current !== null) clearTimeout(timerRef.current);
 		timerRef.current = setTimeout(() => {

@@ -24,7 +24,7 @@ const FeatureList: FeatureItem[] = [
       'Achievements for consistent contributions',
       'Activity Monitor for a transparent contribution log',
     ],
-    cta: {label: 'Explore your practices', to: '/user/achievements'},
+    cta: {label: 'Explore your practices', to: '/user/practices'},
   },
   {
     title: 'Process-Aware AI Mentoring',

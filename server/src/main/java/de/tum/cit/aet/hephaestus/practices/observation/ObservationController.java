@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -73,26 +72,6 @@ public class ObservationController {
             .getObservations(workspaceContext.id(), practiceSlug, presence, pageable)
             .map(ObservationListDTO::from);
         return ResponseEntity.ok(observations);
-    }
-
-    @GetMapping("/summary")
-    @Operation(
-        summary = "Per-practice summary for current user",
-        description = "Aggregated observation counts per practice for dashboard cards"
-    )
-    @ApiResponse(
-        responseCode = "200",
-        description = "Practice summaries returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class)))
-    )
-    @SecurityRequirements
-    public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getMyPracticeSummary(WorkspaceContext workspaceContext) {
-        List<DeveloperPracticeSummaryDTO> summaries = observationService
-            .getSummary(workspaceContext.id())
-            .stream()
-            .map(DeveloperPracticeSummaryDTO::from)
-            .toList();
-        return ResponseEntity.ok(summaries);
     }
 
     @GetMapping("/{observationId}")

@@ -2,11 +2,13 @@
  * Slack vendor adapter — webhook + connect + lifecycle + messaging.
  *
  * <p>OPEN (matching {@code scm.github} / {@code scm.gitlab}): the
- * {@code messaging} named interface is consumed cross-module, the {@code connect}
- * admin controller depends on {@code workspace::authorization}, and the
- * {@code integration.core::*} sub-surfaces are needed for credentials + connection
- * + state. {@code allowedDependencies} still pins the OUTBOUND boundary so this
- * adapter cannot silently grow new cross-module imports.
+ * {@code messaging} named interface currently has no cross-module consumer (the
+ * digest publisher that used it was deleted) and is exposed for the module's own
+ * controllers/services and as the sanctioned seam should an outside sender return,
+ * the {@code connect} admin controller depends on {@code workspace::authorization},
+ * and the {@code integration.core::*} sub-surfaces are needed for credentials +
+ * connection + state. {@code allowedDependencies} still pins the OUTBOUND boundary
+ * so this adapter cannot silently grow new cross-module imports.
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Integration · Slack",

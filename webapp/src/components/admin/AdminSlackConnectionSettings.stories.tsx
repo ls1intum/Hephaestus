@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
-import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
+import { AdminSlackConnectionSettings } from "./AdminSlackConnectionSettings";
 
 const meta = {
-	component: AdminSlackNotificationSettings,
+	component: AdminSlackConnectionSettings,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	decorators: [
@@ -19,7 +19,7 @@ const meta = {
 		hasSlackConnection: false,
 		onSaved: fn(),
 	},
-} satisfies Meta<typeof AdminSlackNotificationSettings>;
+} satisfies Meta<typeof AdminSlackConnectionSettings>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -36,37 +36,33 @@ export const NotConnected: Story = {
 };
 
 /**
- * OAuth completed but no channel typed yet — the Send-test button must stay disabled because there
- * is no valid channel to probe.
+ * OAuth completed but no channel typed yet — the Send-test button stays disabled: the probe
+ * needs an explicit channel (nothing persists a default channel since the digest removal).
  */
 export const ConnectedNoChannel: Story = {
 	args: { hasSlackConnection: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeDisabled();
 	},
 };
 
-/** A valid channel id enables the Send-test probe. */
+/** A valid channel id typed into the field keeps the Send-test probe enabled. */
 export const ConnectedWithChannel: Story = {
-	args: {
-		hasSlackConnection: true,
-		channelId: "C0974LJBPBK",
-	},
+	args: { hasSlackConnection: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
+		await userEvent.type(canvas.getByLabelText(/channel id/i), "C0974LJBPBK");
 		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeEnabled();
 	},
 };
 
 /** Invalid channel id — the field shows its format error and the probe stays disabled. */
 export const InvalidChannel: Story = {
-	args: {
-		hasSlackConnection: true,
-		channelId: "not-a-channel",
-	},
+	args: { hasSlackConnection: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
+		await userEvent.type(canvas.getByLabelText(/channel id/i), "not-a-channel");
 		await expect(canvas.getByText(/Channel IDs start with C \/ G \/ D/i)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeDisabled();
 	},
@@ -80,7 +76,6 @@ export const ConnectedWithDisconnect: Story = {
 	args: {
 		hasSlackConnection: true,
 		slackConnectionId: 42,
-		channelId: "C0974LJBPBK",
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);

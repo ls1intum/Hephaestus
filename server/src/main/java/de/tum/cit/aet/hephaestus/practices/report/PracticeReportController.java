@@ -64,10 +64,13 @@ public class PracticeReportController {
     )
     @SecurityRequirements
     public ResponseEntity<List<PracticeReportSummaryDTO>> listPracticeReports(WorkspaceContext workspaceContext) {
-        requireAdmin(workspaceContext);
+        requireAdmin();
         Long viewerUserId = reportService.requireAuditableCurrentUserId();
+        // Audit write-after-read (matching the drill-down): the writer runs in its own transaction, so
+        // writing first would leave a committed disclosure row even when the read itself fails.
+        List<PracticeReportSummaryDTO> reports = reportService.listReports(workspaceContext.id());
         dataAccessAuditWriter.recordRosterView(workspaceContext.id(), viewerUserId);
-        return ResponseEntity.ok(reportService.listReports(workspaceContext.id()));
+        return ResponseEntity.ok(reports);
     }
 
     /**
@@ -131,7 +134,7 @@ public class PracticeReportController {
         WorkspaceContext workspaceContext,
         @PathVariable Long userId
     ) {
-        requireAdmin(workspaceContext);
+        requireAdmin();
         Long viewerUserId = reportService.requireAuditableCurrentUserId();
         List<PracticeReportCardDTO> cards = reportService.getDeveloperReport(workspaceContext.id(), userId);
         dataAccessAuditWriter.recordReportView(workspaceContext.id(), viewerUserId, userId);
@@ -168,7 +171,7 @@ public class PracticeReportController {
     }
 
     /** ADMIN or OWNER (super-admins with membership are elevated to ADMIN by the access service). */
-    private void requireAdmin(WorkspaceContext workspaceContext) {
+    private void requireAdmin() {
         if (!accessService.isAdmin()) {
             throw new AccessForbiddenException("Workspace ADMIN or OWNER is required to view this resource");
         }

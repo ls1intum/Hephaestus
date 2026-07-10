@@ -34,7 +34,7 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 		);
 		if (unchecked > 0 || subOpen > 0) {
 			directions.push(
-				`Closed with ${unchecked} unchecked acceptance item(s) and ${subOpen} open sub-issue(s) — candidate for a "closed before its own DoD was confirmed" finding. Note: an unticked box may simply never have been ticked; frame as a lifecycle habit, not a claim the work is wrong.`,
+				`Closed with ${unchecked} unchecked acceptance item(s) and ${subOpen} open sub-issue(s) — candidate for a "closed before its own DoD was confirmed" observation. Note: an unticked box may simply never have been ticked; frame as a lifecycle habit, not a claim the work is wrong.`,
 			);
 		} else if (subTotal > 0 || checked > 0) {
 			directions.push(

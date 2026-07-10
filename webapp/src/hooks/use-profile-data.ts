@@ -11,7 +11,7 @@ import {
 	DEFAULT_ACTIVITY_MONITOR_LIMIT,
 	MAX_ACTIVITY_MONITOR_LIMIT,
 } from "@/lib/activity-monitor";
-import type { ProviderType } from "@/lib/provider";
+import { type ProviderType, toScmProviderType } from "@/lib/provider";
 import {
 	DEFAULT_REVIEW_CYCLE,
 	formatDateRangeForApi,
@@ -175,7 +175,7 @@ export function useProfileData({
 	};
 
 	return {
-		providerType: (workspaceQuery.data?.providerType ?? "GITHUB") as ProviderType,
+		providerType: toScmProviderType(workspaceQuery.data?.providerType),
 		profileData: profileQuery.data,
 		activityMonitorData: activityMonitorQuery.data,
 		isLoading:

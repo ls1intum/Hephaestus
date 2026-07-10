@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportItemDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
@@ -81,20 +80,6 @@ public class ObservationService {
             presence,
             pageable
         );
-    }
-
-    /**
-     * Per-practice summary for the current user in a workspace.
-     *
-     * @return empty list if user is not a synced developer
-     */
-    @Transactional(readOnly = true)
-    public List<DeveloperPracticeSummaryProjection> getSummary(Long workspaceId) {
-        Optional<User> currentUser = userRepository.getCurrentUser();
-        if (currentUser.isEmpty()) {
-            return List.of();
-        }
-        return observationRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
     }
 
     /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */

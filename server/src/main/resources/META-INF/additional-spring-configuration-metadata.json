@@ -25,10 +25,6 @@
       "description": "Workspace initialization and management settings"
     },
     {
-      "name": "hephaestus.activity",
-      "description": "Activity event tracking settings"
-    },
-    {
       "name": "hephaestus.integration.slack",
       "description": "Slack integration toggle and OAuth client credentials"
     },
@@ -42,11 +38,6 @@
     }
   ],
   "properties": [
-    {
-      "name": "hephaestus.activity.self-review-author-logins",
-      "type": "java.util.List",
-      "description": "List of bot logins whose PRs are excluded from self-review detection"
-    },
     {
       "name": "hephaestus.integration.github.sync.graphql-timeout",
       "type": "java.time.Duration",

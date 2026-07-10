@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Users } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useState } from "react";
 import { getDeveloperPracticeReportOptions } from "@/api/@tanstack/react-query.gen";
 import type { PracticeReportSummary } from "@/api/types.gen";
 import { PracticeReflectionCard } from "@/components/practices/reflection/PracticeReflectionCard";
@@ -27,11 +27,19 @@ export function DeveloperDrillDownDialog({
 	onClose,
 }: DeveloperDrillDownDialogProps) {
 	const open = developer !== null;
-	const userId = developer?.userId;
 
-	const lastDeveloper = useRef<PracticeReportSummary | null>(null);
-	if (developer) lastDeveloper.current = developer;
-	const displayDeveloper = developer ?? lastDeveloper.current;
+	// Remember the last non-null developer in state (updated in an effect — never during render,
+	// which the React Compiler forbids) so the content stays populated through the close animation.
+	// While open, `developer` is used directly, so the first open never renders stale state.
+	const [lastDeveloper, setLastDeveloper] = useState<PracticeReportSummary | null>(null);
+	useEffect(() => {
+		if (developer) setLastDeveloper(developer);
+	}, [developer]);
+	const displayDeveloper = developer ?? lastDeveloper;
+	// Key the query on the DISPLAYED developer, not the raw prop: when the dialog closes the prop
+	// goes null, and keying on it would switch the query (and its cached data) away mid-animation,
+	// flashing the empty state over the still-visible content.
+	const userId = displayDeveloper?.userId;
 
 	const reflectionQuery = useQuery({
 		...getDeveloperPracticeReportOptions({ path: { workspaceSlug, userId: userId ?? 0 } }),

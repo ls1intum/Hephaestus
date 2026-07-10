@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -230,67 +229,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Per-practice aggregation for the developer dashboard: present/good and bad counts, and last finding date.
-     *
-     * <p><b>Re-review dedup (ADR 0021):</b> a target gets re-detected on every push, and every run writes a
-     * fresh {@link Observation} row — so a naive {@code COUNT} over all rows inflates the dashboard by the
-     * re-review multiplier (a target re-reviewed N times shows N× the findings). The dashboard reflects each
-     * target's CURRENT state, so this query keeps only the findings from each target's LATEST detection run
-     * ({@code agent_job_id} with the most recent {@code observed_at} for that
-     * {@code (artifact_type, artifact_id, about_user_id)}). The {@code about_user_id} is part of the grain
-     * (reviewer attribution, ADR 0021 C2): a later AUTHOR job on the same PR must not evict a REVIEWER's
-     * observations from that PR — "latest run" is per SUBJECT, not per artifact. Superseded runs for the same
-     * subject do not count toward the habit signal.
-     *
-     * <p>Native (not JPQL) because the latest-run-per-target selection needs {@code ORDER BY ... LIMIT 1} in a
-     * correlated subquery, which JPQL cannot express. Aliases are quoted so the JDBC column labels match the
-     * {@link DeveloperPracticeSummaryProjection} getters exactly (Postgres folds unquoted identifiers to
-     * lower-case). Enum columns compare against their {@code STRING} storage form. {@code goodCount} is
-     * the strengths ({@code assessment='GOOD'}); {@code badCount} is the problems ({@code assessment='BAD'}).
-     */
-    @Query(
-        value = """
-        SELECT p.slug AS "practiceSlug",
-               p.name AS "practiceName",
-               COUNT(f.id) AS "totalObservations",
-               SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
-               SUM(CASE WHEN f.assessment = 'BAD' THEN 1 ELSE 0 END) AS "badCount",
-               MAX(f.observed_at) AS "lastObservedAt"
-        FROM observation f
-        JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :aboutUserId
-          AND p.workspace_id = :workspaceId
-          AND NOT EXISTS (
-              SELECT 1
-              FROM issue target_artifact
-              JOIN workspace_team_repository_settings wtrs
-                ON wtrs.workspace_id = p.workspace_id
-               AND wtrs.repository_id = target_artifact.repository_id
-               AND wtrs.hidden_from_contributions = true
-              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
-                AND target_artifact.id = f.artifact_id
-          )
-          AND f.agent_job_id = (
-              SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
-                AND f2.artifact_type = f.artifact_type
-                AND f2.artifact_id = f.artifact_id
-                AND f2.about_user_id = f.about_user_id
-              ORDER BY f2.observed_at DESC
-              LIMIT 1
-          )
-        GROUP BY p.slug, p.name
-        ORDER BY p.name ASC
-        """,
-        nativeQuery = true
-    )
-    List<DeveloperPracticeSummaryProjection> findSummaryByDeveloperAndWorkspace(
-        @Param("aboutUserId") Long aboutUserId,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    /**
      * Single finding by ID within a workspace, restricted to a specific about-user.
      *
      * <p>Ownership is enforced in the query (not in Java) to avoid lazy-load
@@ -375,7 +313,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                 AND f2.about_user_id = f.about_user_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY p.slug, f.presence, f.assessment
         ORDER BY p.slug, f.presence
@@ -390,7 +328,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /**
      * Recent findings the mentor can refer to by title in conversation.
      *
-     * <p>Re-review deduped (same grain as {@link #findSummaryByDeveloperAndWorkspace}): keeps only each
+     * <p>Re-review deduped (same grain as {@link #findDeveloperPracticeSummary}): keeps only each
      * target's LATEST detection run, so a re-pushed PR's findings don't repeat across the list and the
      * mentor doesn't see (and re-litigate) the same finding four times. Native because the latest-run
      * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
@@ -426,7 +364,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                 AND f2.about_user_id = f.about_user_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         ORDER BY f.observed_at DESC
         """,
@@ -472,7 +410,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                 AND f2.about_user_id = f.about_user_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.severity
         """,
@@ -513,7 +451,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                 AND f2.about_user_id = f.about_user_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.presence
         """,
@@ -643,7 +581,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               WHERE p2.workspace_id = p.workspace_id
                 AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                 AND f2.about_user_id = f.about_user_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY pa.slug, pa.name, f.presence, f.assessment, f.severity
         """,
@@ -685,7 +623,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
              AND wm.user_id = f.about_user_id
              AND wm.hidden = false
             LEFT JOIN issue target_issue
-              ON f.artifact_type = 'PULL_REQUEST'
+              ON f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
              AND target_issue.id = f.artifact_id
             WHERE p.workspace_id = :workspaceId
               AND pa.slug = :areaSlug
@@ -706,7 +644,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   WHERE p2.workspace_id = p.workspace_id
                     AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                     AND f2.about_user_id = f.about_user_id
-                  ORDER BY f2.observed_at DESC LIMIT 1
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
               )
         ),
         locus_targets AS (
@@ -764,7 +702,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
              AND wm.user_id = f.about_user_id
              AND wm.hidden = false
             LEFT JOIN issue target_issue
-              ON f.artifact_type = 'PULL_REQUEST'
+              ON f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
              AND target_issue.id = f.artifact_id
             WHERE p.workspace_id = :workspaceId
               AND pa.slug = :areaSlug
@@ -786,7 +724,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   WHERE p2.workspace_id = p.workspace_id
                     AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                     AND f2.about_user_id = f.about_user_id
-                  ORDER BY f2.observed_at DESC LIMIT 1
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
               )
         )
         """,

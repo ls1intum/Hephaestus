@@ -19,7 +19,7 @@ import org.springframework.data.repository.Repository;
  * <ul>
  *   <li><b>integration.scm</b> - Shared kernel for git provider data sync (GitHub now, GitLab coming)</li>
  *   <li><b>workspace</b> - Cross-cutting context (multi-tenancy)</li>
- *   <li><b>Feature modules</b> - leaderboard, activity, mentor, profile depend on both</li>
+ *   <li><b>Feature modules</b> - practices, activity, mentor, profile depend on both</li>
  *   <li><b>Provider subpackages</b> - github/ and (future) gitlab/ isolate provider-specific logic</li>
  * </ul>
  *
@@ -130,7 +130,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
          *
          * <p>The vendor-neutral SCM layer (integration.scm.* minus the per-vendor
          * adapters scm.github/scm.gitlab) is the core ETL engine for git data sync.
-         * It should not have direct dependencies on workspace, leaderboard, or other
+         * It should not have direct dependencies on workspace, practices, or other
          * feature modules - only on SPIs in {@code integration.core.spi}.
          *
          * <p>Vendor adapters under scm.github/scm.gitlab are exempt because their job
@@ -358,7 +358,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         /**
          * Feature modules should only depend on integration.scm's public contracts.
          *
-         * <p>Feature modules (leaderboard, activity, profile, practices) must NOT bypass
+         * <p>Feature modules (practices, activity, profile, achievement) must NOT bypass
          * the SPI layer and directly depend on integration.scm internals like:
          * <ul>
          *   <li>integration.scm.sync - internal sync orchestration</li>

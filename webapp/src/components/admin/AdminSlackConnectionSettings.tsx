@@ -22,25 +22,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export interface AdminSlackNotificationSettingsProps {
+export interface AdminSlackConnectionSettingsProps {
 	workspaceSlug: string;
 	hasSlackConnection: boolean;
 	slackConnectionId?: number;
-	channelId?: string;
 	onSaved: () => void;
 }
 
 // Client-side format hint only — the server re-validates.
 const SLACK_CHANNEL_ID = /^[CGD][A-Z0-9]{8,}$/;
 
-export function AdminSlackNotificationSettings({
+export function AdminSlackConnectionSettings({
 	workspaceSlug,
 	hasSlackConnection,
 	slackConnectionId,
-	channelId,
 	onSaved,
-}: AdminSlackNotificationSettingsProps) {
-	const [channelInput, setChannelInput] = useState(channelId ?? "");
+}: AdminSlackConnectionSettingsProps) {
+	const [channelInput, setChannelInput] = useState("");
 	const [disconnectOpen, setDisconnectOpen] = useState(false);
 
 	const channelInvalid = channelInput.length > 0 && !SLACK_CHANNEL_ID.test(channelInput);
@@ -172,8 +170,8 @@ export function AdminSlackNotificationSettings({
 										aria-invalid={channelInvalid}
 									/>
 									<FieldDescription>
-										Leave blank to use the server-configured channel, or paste a channel ID from
-										Slack. The bot must already be a member (or the channel must be public).
+										Paste a channel ID from Slack. The bot must already be a member (or the channel
+										must be public).
 									</FieldDescription>
 									{channelInvalid && (
 										<FieldError>
@@ -188,10 +186,10 @@ export function AdminSlackNotificationSettings({
 										onClick={() =>
 											test.mutate({
 												path: { workspaceSlug },
-												body: { channelId: channelInput || undefined },
+												body: { channelId: channelInput },
 											})
 										}
-										disabled={test.isPending || channelInvalid}
+										disabled={test.isPending || channelInvalid || channelInput.length === 0}
 									>
 										<SendIcon className="mr-2 size-3.5" />
 										{test.isPending ? "Sending…" : "Send test message"}

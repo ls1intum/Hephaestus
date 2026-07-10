@@ -103,7 +103,7 @@ So: a BAD observation is either `PRESENT, BAD` (something harmful is in the chan
 6. **Confidence is a delivery gate, not a severity input.** Set confidence high ONLY when a precompute fact or a verbatim
    quote backs the observation; lower it when the call is interpretive. Do not pad confidence. `confidence` is a float in [0.0, 1.0].
 7. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
-   `context/` file. A observation whose only location is a context file is out of scope; drop it.
+   `context/` file. An observation whose only location is a context file is out of scope; drop it.
 8. **Never fabricate context — confirm a file exists before you rely on it.** Before you base ANY observation on a context file
    (`review_threads.json`, `linked_work_items.json`, `comments.json`, `project_inventory.json`, a `work/precompute-out`
    count), confirm it is listed in `inputs/manifest.json`. **If the file or signal you need is NOT present, the only valid

@@ -1374,8 +1374,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/SlackTestMessageRequest"
-        description: "optional channel override; when blank, the persisted notification\
-          \ channel is used."
+        description: |-
+          the channel to probe; when blank the probe reports <code>no_channel_configured</code>
+               (nothing writes a persisted default channel since the digest removal).
       responses:
         "200":
           content:
@@ -2334,31 +2335,6 @@ paths:
       summary: List observations for a pull request
       tags:
       - Practice Observations
-  /workspaces/{workspaceSlug}/practices/observations/summary:
-    get:
-      description: Aggregated observation counts per practice for dashboard cards
-      operationId: getMyPracticeSummary
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/DeveloperPracticeSummary"
-          description: Practice summaries returned
-      security: []
-      summary: Per-practice summary for current user
-      tags:
-      - Practice Observations
   /workspaces/{workspaceSlug}/practices/observations/{observationId}:
     get:
       operationId: getObservation
@@ -2909,6 +2885,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Workspace"
           description: Workspace updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Invalid schedule: day must be 1 (Monday) to 7 (Sunday) and\
+            \ time must be HH:mm (24-hour)"
       summary: Update the weekly practice review cycle schedule
       tags:
       - workspace
@@ -4839,38 +4822,6 @@ components:
           type: string
         username:
           type: string
-    DeveloperPracticeSummary:
-      type: object
-      description: Per-practice observation summary for a developer
-      properties:
-        badCount:
-          type: integer
-          format: int64
-          description: Number of BAD (problem) observations
-        goodCount:
-          type: integer
-          format: int64
-          description: Number of GOOD (strength) observations
-        lastObservedAt:
-          type: string
-          format: date-time
-          description: Timestamp of most recent observation
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        totalObservations:
-          type: integer
-          format: int64
-          description: Total number of observations
-      required:
-      - badCount
-      - goodCount
-      - practiceName
-      - practiceSlug
-      - totalObservations
     ExportCreated:
       type: object
       description: Acknowledgement returned when a data export is requested.
@@ -6395,9 +6346,9 @@ components:
     SlackTestMessageRequest:
       type: object
       description: |-
-        Optional body for the Slack test-message probe. When <code>channelId</code> is present and non-blank,
-         the probe targets that channel (so an admin can validate a typed-but-unsaved channel); otherwise
-         it falls back to the persisted notification channel.
+        Body for the Slack test-message probe. The probe targets <code>channelId</code>; when it is missing or
+         blank the probe reports <code>no_channel_configured</code> (nothing persists a default channel since
+         the digest removal).
       properties:
         channelId:
           type: string

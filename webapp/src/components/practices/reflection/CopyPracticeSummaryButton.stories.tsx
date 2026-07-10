@@ -56,6 +56,12 @@ export const Empty: Story = { args: { practices: [] } };
 export const Copied: Story = {
 	args: { practices },
 	play: async ({ canvasElement }) => {
+		// The button only confirms once the clipboard write resolves; the test browser may not
+		// grant clipboard-write permission, so stub the API to make the success path deterministic.
+		Object.defineProperty(navigator, "clipboard", {
+			value: { write: async () => {}, writeText: async () => {} },
+			configurable: true,
+		});
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("button"));
 		await expect(canvas.getByRole("button")).toHaveTextContent(/copied/i);

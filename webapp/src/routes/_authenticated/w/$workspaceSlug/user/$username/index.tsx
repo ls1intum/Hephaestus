@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { getCurrentUserMembershipOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import {
 	type ProfileSearchInput,
@@ -13,11 +14,20 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 	// The self-view is the unified workspace home. Redirect the viewer's OWN page there BEFORE render
 	// so no self queries fire and no empty frame flashes — there is one canonical self surface.
 	beforeLoad: async ({ context, params }) => {
-		const currentUser = await resolveCurrentUser(context.queryClient);
-		if (
-			currentUser?.username &&
-			currentUser.username.toLowerCase() === params.username.toLowerCase()
-		) {
+		// The URL param is an SCM login in THIS workspace's provider, so compare against the same
+		// identity the home self-view renders (membership userLogin via useWorkspaceAccess), not the
+		// global auth username — the two differ when the viewer signed up via another provider or was
+		// renamed since signup. The membership query is shared/cached with the rest of the app; fall
+		// back to the auth username when membership can't be resolved (e.g. non-member).
+		const membership = await context.queryClient
+			.ensureQueryData({
+				...getCurrentUserMembershipOptions({ path: { workspaceSlug: params.workspaceSlug } }),
+				retry: false,
+			})
+			.catch(() => null);
+		const selfLogin =
+			membership?.userLogin ?? (await resolveCurrentUser(context.queryClient))?.username;
+		if (selfLogin && selfLogin.toLowerCase() === params.username.toLowerCase()) {
 			throw redirect({ to: "/w/$workspaceSlug", params: { workspaceSlug: params.workspaceSlug } });
 		}
 	},

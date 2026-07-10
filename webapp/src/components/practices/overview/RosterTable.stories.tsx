@@ -42,7 +42,17 @@ const entries: PracticeReportSummary[] = [
 ];
 
 /** A needs-attention row (server-first) above a clean row. */
-export const Default: Story = { args: { entries } };
+export const Default: Story = {
+	args: { entries },
+	play: async ({ canvasElement }) => {
+		// One row per developer, in the given (server) order — the table never re-sorts.
+		const canvas = within(canvasElement);
+		const buttons = canvas.getAllByRole("button");
+		await expect(buttons).toHaveLength(2);
+		await expect(within(buttons[0]).getByText("Zoe Attention")).toBeVisible();
+		await expect(within(buttons[1]).getByText("Aaron Fine")).toBeVisible();
+	},
+};
 
 /** Every developer flagged, each with plain-language attention reasons. */
 export const NeedsAttention: Story = {
@@ -53,6 +63,13 @@ export const NeedsAttention: Story = {
 			attentionReasons: ["Clear PR description: gaps to work on this cycle"],
 			standings: entry.standings.map((cell) => ({ ...cell, standing: "DEVELOPING" as const })),
 		})),
+	},
+	play: async ({ canvasElement }) => {
+		// Attention reasons render as badges on every flagged row.
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getAllByText("Clear PR description: gaps to work on this cycle"),
+		).toHaveLength(2);
 	},
 };
 

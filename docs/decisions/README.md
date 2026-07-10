@@ -30,5 +30,6 @@ New ADRs use the next available number and link from this index.
 | [0020](0020-context-fabric-everything-is-an-integration.md) | Context Fabric: everything is an integration | Proposed |
 | [0021](0021-findings-feedback-synthesis-seam.md) | Findings vs feedback — detection produces evidence and in-context feedback; cross-channel synthesis is separate | Accepted |
 | [0022](0022-observation-presence-assessment-and-schema-cleanup.md) | Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup | Accepted |
+| [0023](0023-replace-competitive-leaderboard-with-practice-surfaces.md) | Replace the competitive leaderboard with practice surfaces | Accepted |
 
 Template: [0000-template.md](0000-template.md).

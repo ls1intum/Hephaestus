@@ -86,6 +86,8 @@ pnpm run generate:api:application-server:client
 src/main/java/de/tum/cit/aet/hephaestus/
 ├── Application.java              # Entry point (@SpringBootApplication)
 ├── config/                       # @Configuration beans
+├── core/                         # Cross-cutting kernel (auth, tenancy, security, runtime roles, events)
+│   └── audit/                    # Append-only disclosure audit (data_access_event)
 ├── workspace/                    # Multi-tenant workspace management
 ├── integration/                  # Unified integration framework
 │   ├── core/                     # Vendor-agnostic substrate (webhook, consumer, oauth, …)
@@ -96,10 +98,18 @@ src/main/java/de/tum/cit/aet/hephaestus/
 │   │   ├── sync/                 # Data synchronization orchestration
 │   │   ├── github/               # GitHub vendor adapter (REST + GraphQL + webhook ingest)
 │   │   └── gitlab/               # GitLab vendor adapter (REST + GraphQL + webhook ingest)
-│   └── slack/                    # Slack adapter
+│   └── slack/                    # Slack adapter (mentor DMs, channel monitoring)
+├── practices/                    # Practice catalog, observations, feedback, reports (roster/cohort)
 ├── activity/                     # Append-only activity event log (feeds achievements)
+├── achievement/                  # Non-competitive achievements (milestones, no ranking)
+├── agent/                        # AI agent jobs (detection runs, conversations, handlers)
 ├── mentor/                       # AI mentor (in-process Pi agent)
+├── account/                      # Account preferences & settings
 ├── profile/                      # User profiles
+├── contributors/                 # Public open-source contributor list
+├── feature/                      # Feature flags
+├── analytics/                    # Product analytics (PostHog)
+├── observability/                # Observability support (logging filters, …)
 └── notification/                 # Email messaging (Slack messaging lives in integration/slack/messaging/)
 ```
 

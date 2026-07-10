@@ -326,9 +326,19 @@ The schema encodes two orthogonal axes that the display layer must keep separate
 
 - **Actor axis** = the observation's `about_user_id` — *who* the practice evaluates. Already encoded.
 - **Audience axis** = *who reads the analytic*. The display model adds this. Every feedback unit is
-  developer-facing — observations, outcomes and aggregates go to the developer, never to a mentor, instructor,
-  or grader. The only non-developer reader is the researcher analysing **anonymised** study data and the
-  workspace admin who edits the catalog (criteria, area labels); neither receives a developer's feedback.
+  developer-facing first: a developer always reads their **own** report (`GET /practices/reports/me`).
+  Beyond that, exactly two bounded non-developer reads exist, both enforced server-side in
+  `practices.report.PracticeReportController`:
+  1. A workspace **ADMIN/OWNER** (the mentor role) may read the named roster (`GET /practices/reports`)
+     and a per-developer drill-down (`GET /practices/reports/{userId}`). Every serving of either writes an
+     append-only `DataAccessEvent` disclosure row (`core.audit`) — the mentor read is *audited*, never silent.
+  2. The **anonymised cohort** rollup (`GET /practices/cohort`, k-anonymised with K = 5 small-cell
+     suppression) is readable by admins/owners always, and by regular members only when the workspace's
+     `cohortVisibility` feature is `EVERYONE` (default: `MENTORS_ONLY`).
+
+  The researcher analysing **anonymised** study data and the workspace admin editing the catalog
+  (criteria, area labels) remain distinct audiences; no audience ever receives an *unaudited,
+  non-anonymised* view of another developer's feedback.
 
 **Field-by-audience matrix — enforce server-side, never in the webapp.** "Developer" and "Reviewer" are
 the *same human*; the column that applies is selected by the **observation's `about_user_id`**, not a static
@@ -336,17 +346,17 @@ user role, so reviewer-craft never leaks to the author. The `whyItMatters` / `wh
 learner-layer columns are **implemented** — admin-authored `Practice` columns served to learners through
 `LearnerPracticeDTO` (`GET /practices/learner`), which carries no `criteria` field by construction.
 
-| Field | Developer / Learner | Reviewer (observation about the reviewer) | Researcher / Admin |
-| --- | --- | --- | --- |
-| `name` | yes | yes | yes |
-| `whyItMatters` | yes — Layer 1 | yes | yes |
-| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes |
-| area / area progress | yes — own | yes — own | yes — anonymised |
-| per-observation `Feedback` (task-framed) | yes — own only | yes — own only | yes — anonymised |
-| **`criteria`** | **NEVER** | **NEVER** | yes — edit (admin) |
-| `precomputeScript`, `triggerEvents` | no | no | yes — edit (admin) |
-| raw `presence` / `assessment` label | no — delivered as task-framed feedback | no | yes — anonymised |
-| reaction `NOT_APPLICABLE` (validity signal) | own — scope signal, **not** uptake | n/a | yes — anonymised |
+| Field | Developer / Learner | Reviewer (observation about the reviewer) | Mentor (workspace ADMIN/OWNER) | Researcher / Admin |
+| --- | --- | --- | --- | --- |
+| `name` | yes | yes | yes | yes |
+| `whyItMatters` | yes — Layer 1 | yes | yes | yes |
+| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes | yes |
+| area / area progress | yes — own | yes — own | yes — subject's, via audited drill-down | yes — anonymised |
+| per-observation `Feedback` (task-framed) | yes — own only | yes — own only | yes — subject's report cards; every serving writes a `DataAccessEvent` | yes — anonymised |
+| **`criteria`** | **NEVER** | **NEVER** | via the catalog-editing surface only — never in a report | yes — edit (admin) |
+| `precomputeScript`, `triggerEvents` | no | no | via admin surfaces only | yes — edit (admin) |
+| raw `presence` / `assessment` label | no — delivered as task-framed feedback | no | no — same task-framed cards the developer sees | yes — anonymised |
+| reaction `NOT_APPLICABLE` (validity signal) | own — scope signal, **not** uptake | n/a | no | yes — anonymised |
 
 **Two hard rules from theory (not UX taste):**
 

@@ -58,7 +58,7 @@ Hephaestus uses only technically necessary browser-side storage: the session coo
 
 ## 5. Recipients
 
-Within Hephaestus your data is visible to AET operators (platform administration and support) and, depending on the workspace, to other workspace members (your username, avatar, the findings attached to pull/merge requests you authored, per-practice summaries of your activity, and recognition signals where the workspace has enabled them). Workspaces marked publicly viewable by their administrator can be read by anyone on the open web; the upstream open-source contributor list at `/contributors` is also public.
+Within Hephaestus your data is visible to AET operators (platform administration and support) and, depending on the workspace, to other workspace members (your username, avatar, the findings attached to pull/merge requests you authored, and recognition signals where the workspace has enabled them). Your named per-practice report is not visible to other workspace members: workspace administrators and owners can view a named needs-attention roster and open a per-developer practice-report view, and each such access is recorded in an append-only disclosure-audit log; other members see at most cohort-level practice aggregates in which groups of fewer than five people are suppressed, and only where the administrator has set the cohort visibility to all members. Workspaces marked publicly viewable by their administrator can be read by anyone on the open web; the upstream open-source contributor list at `/contributors` is also public.
 
 External recipients, all engaged under data-processing agreements (Auftragsverarbeitungsverträge) at the appropriate level:
 

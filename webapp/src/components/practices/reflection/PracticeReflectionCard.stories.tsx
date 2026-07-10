@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, within } from "storybook/test";
 import type { PracticeReportCard } from "@/api/types.gen";
 import { PracticeReflectionCard } from "./PracticeReflectionCard";
 
@@ -52,7 +53,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ canvasElement }) => {
+		// The card surfaces the practice name, area, and why-it-matters, plus both feedback lists
+		// (strengths and to-work-on).
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getByRole("heading", { name: "Write a clear pull request description" }),
+		).toBeVisible();
+		await expect(canvas.getByText("Pull requests")).toBeVisible();
+		await expect(
+			canvas.getByText(/A clear description helps reviewers understand the change quickly/),
+		).toBeVisible();
+		await expect(canvas.getByText("Explained the user-facing impact up front")).toBeVisible();
+		await expect(canvas.getByText("Link the issue this pull request closes")).toBeVisible();
+	},
+};
 
 export const Strength: Story = {
 	args: {
@@ -61,6 +77,11 @@ export const Strength: Story = {
 			standing: "STRENGTH",
 			toWorkOn: [],
 		},
+	},
+	play: async ({ canvasElement }) => {
+		// The standing enum maps to a human chip label.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Strength")).toBeVisible();
 	},
 };
 

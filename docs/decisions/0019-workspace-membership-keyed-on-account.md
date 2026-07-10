@@ -6,6 +6,12 @@
 **Finishes:** [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md) (the `workspace_membership.user_id → account_id` rename it specifies but never implemented)
 **Builds on:** [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md), [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md)
 
+> **Amendment (2026-07-10):** The competitive leaderboard and its `league_points` column were removed
+> by the practice-focused redesign ([ADR 0023](0023-replace-competitive-leaderboard-with-practice-surfaces.md)),
+> so the leaderboard examples below no longer exist in the schema. The decision itself is unchanged:
+> authorization keys on `account_id`, while SCM-attribution facts (today: `hidden`, practice/activity
+> attribution) stay keyed on the SCM actor. The body is preserved as originally recorded.
+
 > **Scope note.** This ADR is intentionally carved out of the practice-detection-config / dev-login
 > work (branch `1011-practice-detection-mentor-config`). That branch ships the **dev/test login** and
 > the **instance super-admin workspace elevation** — both forward-compatible with this change — but
@@ -39,15 +45,16 @@ than the *identity* (`Account`) is the defect.
 
 Re-key `workspace_membership` to **`(workspace_id, account_id)`** (FK → `account.id`). The SCM `User`
 (to be renamed `ExternalActor` per ADR 0017) stays an **attribution projection** — PR authorship, review
-attribution, team membership, practice/activity attribution facts — which are genuinely SCM-actor facts and must NOT move
+attribution, team membership, leaderboard points — which are genuinely SCM-actor facts and must NOT move
 to the account.
 
 Split the two natural keys the membership row currently conflates:
 
 - **Authorization fact** (`role`) → keyed on `account_id`.
-- **SCM-attribution facts** (`hidden`, practice/activity participation) → keyed on the SCM actor. v1 may keep the
-  visibility flag on the membership row behind a **nullable `external_actor_id`**; a later step may extract a
-  `workspace_contributor_stats(workspace_id, user_id, …)` table. The non-negotiable part is the **PK = `account_id`**.
+- **SCM-attribution facts** (`league_points`, `hidden`) → keyed on the SCM actor. v1 may keep them on the
+  membership row behind a **nullable `external_actor_id`** (account-only members have it `NULL` and never
+  appear on the leaderboard); a later step may extract a `workspace_contributor_stats(workspace_id,
+  user_id, …)` table. The non-negotiable part is the **PK = `account_id`**.
 
 `workspace → core.auth` is a permitted Modulith dependency (the forbidden direction is `core.auth →
 integration`), so `WorkspaceMembership → Account` is legal and the change *removes* the SPI laundering.
@@ -62,8 +69,8 @@ prod boot) → flip NOT NULL + swap the PK. Gate it with a **Testcontainers `liq
 de-risking the suite lacks today). The implementing PR owns the SQL and the per-orphan drop-vs-provision
 policy.
 
-Authorization moves to `account_id`; SCM-actor facts (team membership, PR/activity
-attribution, practice-roster visibility) stay keyed on the SCM actor. An account with no SCM identity is a valid member with no
+Authorization moves to `account_id`; SCM-actor facts (leaderboard points, team membership, PR/activity
+attribution) stay keyed on the SCM actor. An account with no SCM identity is a valid member with no
 attribution surface — the SCM-less semantics, by *absence*, not synthesis. `WorkspaceContextFilter`'s
 auto-heal hack is deleted (the founder's account is seeded directly); the super-admin elevation from the
 dev-login PR stays.

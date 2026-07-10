@@ -803,9 +803,9 @@ export type SlackTestMessageResponse = {
 };
 
 /**
- * Optional body for the Slack test-message probe. When <code>channelId</code> is present and non-blank,
- * the probe targets that channel (so an admin can validate a typed-but-unsaved channel); otherwise
- * it falls back to the persisted notification channel.
+ * Body for the Slack test-message probe. The probe targets <code>channelId</code>; when it is missing or
+ * blank the probe reports <code>no_channel_configured</code> (nothing persists a default channel since
+ * the digest removal).
  */
 export type SlackTestMessageRequest = {
     channelId?: string;
@@ -2103,36 +2103,6 @@ export type ExportStatus = {
 export type ExportCreated = {
     id?: number;
     status?: string;
-};
-
-/**
- * Per-practice observation summary for a developer
- */
-export type DeveloperPracticeSummary = {
-    /**
-     * Number of BAD (problem) observations
-     */
-    badCount: number;
-    /**
-     * Number of GOOD (strength) observations
-     */
-    goodCount: number;
-    /**
-     * Timestamp of most recent observation
-     */
-    lastObservedAt?: Date;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Total number of observations
-     */
-    totalObservations: number;
 };
 
 export type CurrentUserView = {
@@ -3852,7 +3822,8 @@ export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
 
 export type SendSlackTestMessageData = {
     /**
-     * optional channel override; when blank, the persisted notification channel is used.
+     * the channel to probe; when blank the probe reports <code>no_channel_configured</code>
+     * (nothing writes a persisted default channel since the digest removal).
      */
     body?: SlackTestMessageRequest;
     path: {
@@ -4676,27 +4647,6 @@ export type GetObservationsForPullRequestResponses = {
 
 export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
 
-export type GetMyPracticeSummaryData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/summary';
-};
-
-export type GetMyPracticeSummaryResponses = {
-    /**
-     * Practice summaries returned
-     */
-    200: Array<DeveloperPracticeSummary>;
-};
-
-export type GetMyPracticeSummaryResponse = GetMyPracticeSummaryResponses[keyof GetMyPracticeSummaryResponses];
-
 export type GetObservationData = {
     body?: never;
     path: {
@@ -5141,6 +5091,15 @@ export type UpdateReviewCycleData = {
     query?: never;
     url: '/workspaces/{workspaceSlug}/review-cycle';
 };
+
+export type UpdateReviewCycleErrors = {
+    /**
+     * Invalid schedule: day must be 1 (Monday) to 7 (Sunday) and time must be HH:mm (24-hour)
+     */
+    400: ProblemDetail;
+};
+
+export type UpdateReviewCycleError = UpdateReviewCycleErrors[keyof UpdateReviewCycleErrors];
 
 export type UpdateReviewCycleResponses = {
     /**

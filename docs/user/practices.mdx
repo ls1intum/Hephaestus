@@ -1,0 +1,37 @@
+---
+id: practices
+sidebar_position: 4
+title: Practices
+description: Reflect on your own engineering practices privately, and learn how mentors use the anonymised Practice Overview.
+---
+
+Hephaestus turns the findings from your pull requests, issues, and reviews into practice reflections instead of scores. There is no leaderboard, no points, and no ranking anywhere – the goal is to help you see your own habits and act on them.
+
+## My Practices
+
+Your workspace home shows **My Practices**: one reflection card per engineering practice observed in your recent work. Each card explains
+
+- **why the practice matters** and what good looks like,
+- **where you currently stand**, based on your own pull requests, issues, and reviews,
+- **specific feedback to act on**, plus the things you already do well.
+
+These cards are private to you. They reorganise the same feedback you receive on your pull requests by practice, so you can reflect at your own pace instead of hunting through review threads. Use the **Copy my practice summary** button to copy your cards as text – handy for a retrospective, a mentoring session, or your own notes.
+
+:::info Not a score
+Nothing on My Practices compares you to anyone else. Cards describe observations against practice criteria for the current review cycle; they are not grades and feed no ranking.
+:::
+
+## Practice Overview (mentors and administrators)
+
+Workspace administrators and owners have a **Practice Overview** page to support mentoring:
+
+- **Cohort health** – for each practice, how many developers stand at each status. This view is anonymised: buckets with fewer than five developers are suppressed, so it never reveals individuals.
+- **Roster** – a named list of developers with activity, sorted so people who may need attention come first (then by login). This is a triage aid, not a ranking – there is no score or ordering by performance.
+- **Drill-down** – a mentor can open an individual developer's practice cards (the same cards that developer sees) to prepare a conversation.
+
+### Access is controlled and audited
+
+- The named roster and the per-developer drill-down are restricted to workspace **administrators and owners**. Every time either is viewed, Hephaestus records an append-only audit entry (who accessed whose report, and when) as a compliance record.
+- The anonymised cohort view is visible to mentors only by default. A workspace administrator can choose to share it with **all members** – even then, it stays aggregated and small groups remain suppressed.
+
+Questions about how this data is handled? See the privacy statement linked in the app footer.

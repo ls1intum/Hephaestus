@@ -31,6 +31,10 @@ function PracticeOverviewContainer() {
 	const rosterQuery = useQuery({
 		...listPracticeReportsOptions({ path: { workspaceSlug: slug } }),
 		enabled: canQueryRoster,
+		// Each roster fetch is an audited disclosure (the server writes a PRACTICE_ROSTER audit
+		// row per request), so don't refetch gratuitously on focus/reconnect.
+		refetchOnWindowFocus: false,
+		refetchOnReconnect: false,
 	});
 
 	if (showNoWorkspace) {

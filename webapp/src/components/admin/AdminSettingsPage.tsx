@@ -12,7 +12,7 @@ import {
 	type SlackChannelCandidate,
 	type SlackConsentState,
 } from "./AdminSlackChannelsSettings";
-import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
+import { AdminSlackConnectionSettings } from "./AdminSlackConnectionSettings";
 
 type RepositoryItem = {
 	nameWithOwner: string;
@@ -131,10 +131,11 @@ export function AdminSettingsPage({
 				)}
 
 				{workspaceSlug != null && (
-					// key derived from the server snapshot: when a post-OAuth/save refetch lands,
-					// the key changes and React remounts the form with fresh server truth instead
-					// of leaning on prop→state sync effects.
-					<AdminSlackNotificationSettings
+					// key derived from the server snapshot: only OAuth connect/disconnect changes
+					// slackConnectionId, so when the post-OAuth refetch lands the key changes and
+					// React remounts the card with fresh server truth instead of leaning on
+					// prop→state sync effects.
+					<AdminSlackConnectionSettings
 						key={`slack:${slackConnectionId ?? "none"}`}
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}

@@ -669,6 +669,38 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void singleReviewerDiscardsWhenModelNamedSomeoneOutsideTheRoster() {
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
+                List.of(testPractice, reviewerPractice())
+            );
+            when(reviewerResolver.reviewersByLogin(anyLong(), any())).thenReturn(
+                Map.of("reviewer-bob", reviewer(500L, "reviewer-bob"))
+            );
+
+            // The model explicitly named a subject that resolves to no reviewer (e.g. the author) —
+            // re-pinning the observation on the sole reviewer would misattribute, so it is discarded.
+            var result = service.deliver(testJob, List.of(reviewerFinding("the-pr-author")));
+
+            assertThat(result.inserted()).isZero();
+        }
+
+        @Test
+        void singleReviewerWithNamedButUnresolvedSubjectIsDiscarded() {
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
+                List.of(testPractice, reviewerPractice())
+            );
+            when(reviewerResolver.reviewersByLogin(anyLong(), any())).thenReturn(
+                Map.of("reviewer-bob", reviewer(500L, "reviewer-bob"))
+            );
+
+            // The model explicitly named a subject that is NOT the sole resolved reviewer (often the
+            // author or a bot). Re-pinning it on reviewer-bob would misattribute — it must be discarded.
+            var result = service.deliver(testJob, List.of(reviewerFinding("someone-else")));
+
+            assertThat(result.inserted()).isZero();
+        }
+
+        @Test
         void multiReviewerAttributesToTheProposedReviewer() {
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
                 List.of(testPractice, reviewerPractice())

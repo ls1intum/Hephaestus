@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.exception.ProblemDetailSchema;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -86,6 +87,11 @@ public class WorkspaceController {
         responseCode = "200",
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "Invalid schedule: day must be 1 (Monday) to 7 (Sunday) and time must be HH:mm (24-hour)",
+        content = @Content(schema = @Schema(implementation = ProblemDetailSchema.class))
     )
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceDTO> updateReviewCycle(

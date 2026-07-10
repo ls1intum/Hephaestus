@@ -107,21 +107,27 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * finding the moment the agent attaches a stray (non-diff) location to it (e.g. a commit-subject
      * finding citing a commit ref). These slugs therefore bypass the diff-scope filter.
      */
-    private static final Set<String> METADATA_LEVEL_PRACTICES = Set.of(
-        "scope-one-reviewable-change",
-        "describe-what-and-why",
-        "ready-and-traceable-handoff",
-        "commit-subjects-explain-each-change",
-        "engaging-with-inline-review-comments",
+    private static final Set<String> METADATA_LEVEL_PRACTICES = metadataLevelPractices();
+
+    private static Set<String> metadataLevelPractices() {
+        Set<String> slugs = new HashSet<>(
+            Set.of(
+                "scope-one-reviewable-change",
+                "describe-what-and-why",
+                "ready-and-traceable-handoff",
+                "commit-subjects-explain-each-change",
+                "engaging-with-inline-review-comments",
+                // Cross-context practices: grounded in a neighbourhood context file, not a diff line.
+                "honours-linked-issue-acceptance-criteria",
+                "branches-from-the-integration-branch"
+            )
+        );
         // Reviewer-side review practices ground in the review-decision/thread-state context file
         // (review_threads.json) or comments.json — never a diff line of the change under review.
-        "reviews-substantively-with-understanding",
-        "leaves-useful-specific-review-comments",
-        "reviews-respectfully-asks-rather-than-demands",
-        // Cross-context practices: grounded in a neighbourhood context file, not a diff line.
-        "honours-linked-issue-acceptance-criteria",
-        "branches-from-the-integration-branch"
-    );
+        // Single-sourced from ReviewerAudiencePractices so the two sets cannot drift.
+        slugs.addAll(ReviewerAudiencePractices.REVIEWER_AUDIENCE_SLUGS);
+        return Set.copyOf(slugs);
+    }
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 

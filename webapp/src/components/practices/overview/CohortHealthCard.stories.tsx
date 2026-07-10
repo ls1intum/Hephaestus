@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, within } from "storybook/test";
 import type { CohortPracticeStatus } from "@/api/types.gen";
 import { CohortHealthCard } from "./CohortHealthCard";
 
@@ -21,10 +22,25 @@ const health = (over: Partial<CohortPracticeStatus>): CohortPracticeStatus => ({
 	...over,
 });
 
-export const Default: Story = { args: { health: health({}) } };
+export const Default: Story = {
+	args: { health: health({}) },
+	play: async ({ canvasElement }) => {
+		// Not suppressed: the aggregate standing labels and counts render.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Strength")).toBeVisible();
+		await expect(canvas.getByText("6")).toBeVisible();
+	},
+};
 
 export const Suppressed: Story = {
 	args: { health: { name: "Reproduce before fixing", slug: "repro-first", suppressed: true } },
+	play: async ({ canvasElement }) => {
+		// k-anonymity suppression: the practice still renders, but NO standing labels or counts do.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Reproduce before fixing")).toBeVisible();
+		await expect(canvas.queryByText("Strength")).toBeNull();
+		await expect(canvas.queryByText("Developing")).toBeNull();
+	},
 };
 
 export const NoActivity: Story = {
