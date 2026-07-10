@@ -444,7 +444,7 @@ public class PracticeDetectionResultParser {
      * Parses the optional {@code severity}. A missing, null, or non-text value defaults to
      * {@link Severity#INFO} — the model commonly omits severity on non-BAD observations, and
      * {@link ValidatedObservation#coerceCoherence(boolean, boolean)} re-derives the final band regardless (nulling it
-     * out unless {@code assessment == BAD}), so discarding such a observation would silently drop valid
+     * out unless {@code assessment == BAD}), so discarding such an observation would silently drop valid
      * coaching. A present but unrecognised value still fails the entry (genuinely malformed output).
      */
     private static Severity parseSeverityOrDefault(JsonNode entry) {
@@ -606,7 +606,7 @@ public class PracticeDetectionResultParser {
         @Nullable String subjectLogin,
         @Nullable String recurrenceKey
     ) {
-        /** Pre-correlation compatibility shape: a observation with no subject login and no correlation key yet. */
+        /** Pre-correlation compatibility shape: an observation with no subject login and no correlation key yet. */
         public ValidatedObservation(
             String practiceSlug,
             String title,

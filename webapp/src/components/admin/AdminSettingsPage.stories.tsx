@@ -84,7 +84,6 @@ export const SlackConfigured: Story = {
 	args: {
 		hasSlackConnection: true,
 		slackConnectionId: 7,
-		slackChannelId: "C0974LJBPBK",
 	},
 };
 

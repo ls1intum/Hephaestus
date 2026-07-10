@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Enforces the {@link ContentSource} contract (ADR: integration content = EXTRACT+LOAD of raw native
  * objects only; no practice-dependent Transform in a connector). A connector that names a practice or
- * pre-renders a observation is, by definition, code in the wrong layer — this test makes that structural.
+ * pre-renders an observation is, by definition, code in the wrong layer — this test makes that structural.
  *
  * <p>Scope: the SCM-side sources under {@code agent.context.providers} (the mentor content sources under
  * {@code providers.mentor} are core-native projections, out of scope). A connector that computes

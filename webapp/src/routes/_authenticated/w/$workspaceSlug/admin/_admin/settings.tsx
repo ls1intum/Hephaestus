@@ -327,7 +327,6 @@ function AdminSettings() {
 			reviewCycleTime={workspaceData?.reviewCycleTime ?? undefined}
 			hasSlackConnection={workspaceData?.hasSlackToken ?? false}
 			slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
-			slackChannelId={undefined}
 			onWorkspaceRefetch={() => {
 				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey });
 				invalidateSlackChannels();

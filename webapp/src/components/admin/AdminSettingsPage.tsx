@@ -42,7 +42,6 @@ export interface AdminSettingsPageProps {
 	// independent of the review cycle).
 	hasSlackConnection: boolean;
 	slackConnectionId?: number;
-	slackChannelId?: string;
 	/** Refetch the workspace snapshot after any settings card saves (Slack, review cycle, …). */
 	onWorkspaceRefetch: () => void;
 	// Slack channel-monitoring section (rendered directly below the Slack card).
@@ -86,7 +85,6 @@ export function AdminSettingsPage({
 	reviewCycleTime,
 	hasSlackConnection,
 	slackConnectionId,
-	slackChannelId,
 	onWorkspaceRefetch,
 	slackChannels,
 	slackChannelCandidates,
@@ -137,11 +135,10 @@ export function AdminSettingsPage({
 					// the key changes and React remounts the form with fresh server truth instead
 					// of leaning on prop→state sync effects.
 					<AdminSlackNotificationSettings
-						key={`slack:${slackConnectionId ?? "none"}:${slackChannelId ?? ""}`}
+						key={`slack:${slackConnectionId ?? "none"}`}
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
 						slackConnectionId={slackConnectionId}
-						channelId={slackChannelId}
 						onSaved={onWorkspaceRefetch}
 					/>
 				)}
