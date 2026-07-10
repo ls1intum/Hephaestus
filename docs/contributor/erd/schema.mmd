@@ -592,6 +592,24 @@ erDiagram
         VARCHAR(32) role "NOT NULL"
     }
 
+    OutlineCollection {
+        BIGINT id PK
+        BIGINT workspace_id UK "NOT NULL"
+        BIGINT connection_id UK "NOT NULL"
+        VARCHAR(64) collection_id UK "NOT NULL"
+        VARCHAR(1024) name
+        VARCHAR(512) url_id
+        VARCHAR(32) color
+        VARCHAR(64) icon
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(16) sync_status "NOT NULL"
+        TIMESTAMPTZ documents_synced_through
+        TIMESTAMPTZ documents_synced_at
+        VARCHAR(2048) last_sync_error
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
     OutlineDocument {
         BIGINT id PK
         BIGINT workspace_id UK "NOT NULL"
@@ -609,6 +627,10 @@ erDiagram
         TIMESTAMPTZ last_materialized_at
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
+        VARCHAR(64) created_by_subject
+        VARCHAR(255) created_by_name
+        VARCHAR(64) updated_by_subject
+        VARCHAR(255) updated_by_name
     }
 
     Practice {
