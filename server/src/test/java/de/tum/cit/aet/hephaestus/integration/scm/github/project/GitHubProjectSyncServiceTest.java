@@ -51,18 +51,22 @@ import java.math.BigInteger;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
@@ -153,8 +157,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             });
         lenient()
             .doAnswer(invocation -> {
-                java.util.function.Consumer<org.springframework.transaction.TransactionStatus> callback =
-                    invocation.getArgument(0);
+                Consumer<TransactionStatus> callback = invocation.getArgument(0);
                 callback.accept(null);
                 return null;
             })
@@ -248,7 +251,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         ClientResponseField field = mock(ClientResponseField.class);
         lenient().when(response.isValid()).thenReturn(true);
         lenient().when(response.field(fieldPath)).thenReturn(field);
-        lenient().when(field.toEntity(org.mockito.ArgumentMatchers.<Class<Object>>any())).thenReturn(entity);
+        lenient().when(field.toEntity(ArgumentMatchers.<Class<Object>>any())).thenReturn(entity);
         // Mock the parent "node" field for deleted-project detection checks
         if (fieldPath.startsWith("node.")) {
             ClientResponseField nodeField = mock(ClientResponseField.class);
@@ -716,7 +719,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             fvPageInfo.setEndCursor(endCursor);
 
             GHProjectV2ItemFieldValueConnection fvConnection = new GHProjectV2ItemFieldValueConnection();
-            fvConnection.setNodes(fieldValues != null ? new java.util.ArrayList<>(fieldValues) : List.of());
+            fvConnection.setNodes(fieldValues != null ? new ArrayList<>(fieldValues) : List.of());
             fvConnection.setPageInfo(fvPageInfo);
             fvConnection.setTotalCount(fieldValues != null ? fieldValues.size() : 0);
 

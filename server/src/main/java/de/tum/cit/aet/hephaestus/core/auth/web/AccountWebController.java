@@ -59,8 +59,8 @@ public class AccountWebController {
         boolean hasGitLabIdentity,
         // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
         // gate on the *target instance* rather than merely "has any GitLab identity".
-        java.util.List<LinkedProviderDTO> linkedProviders,
-        java.util.List<String> roles,
+        List<LinkedProviderDTO> linkedProviders,
+        List<String> roles,
         // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh before it
         // lapses, rather than waiting for a 401 (BFF pattern; see CurrentAccount.accessTokenExpiresAt).
         @Nullable Long accessTokenExpiresAt
@@ -87,7 +87,7 @@ public class AccountWebController {
         var identities = accountService.activeIdentities(account.getId());
         // Primary identity = most recently used active link (login source for the SPA).
         IdentityLink primary = identities.stream().findFirst().orElse(null);
-        java.util.List<LinkedProviderDTO> linkedProviders = identities
+        List<LinkedProviderDTO> linkedProviders = identities
             .stream()
             .map(il ->
                 new LinkedProviderDTO(

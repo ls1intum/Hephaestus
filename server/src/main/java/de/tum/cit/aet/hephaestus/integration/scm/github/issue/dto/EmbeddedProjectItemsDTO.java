@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto;
 
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Item;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2ItemConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemDTO;
 import java.util.Collections;
 import java.util.List;
@@ -150,15 +152,11 @@ public record EmbeddedProjectItemsDTO(
             var owner = project.getOwner();
             if (owner != null) {
                 // GHProjectV2Owner is a union type - check concrete types
-                if (
-                    owner instanceof de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganization org
-                ) {
+                if (owner instanceof GHOrganization org) {
                     ownerLogin = org.getLogin();
                     ownerDatabaseId = org.getDatabaseId() != null ? (long) org.getDatabaseId() : null;
                     ownerType = "ORGANIZATION";
-                } else if (
-                    owner instanceof de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser user
-                ) {
+                } else if (owner instanceof GHUser user) {
                     ownerLogin = user.getLogin();
                     ownerDatabaseId = user.getDatabaseId() != null ? (long) user.getDatabaseId() : null;
                     ownerType = "USER";

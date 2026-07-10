@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -14,9 +15,18 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Multi-Tenancy Architecture Tests - Workspace Isolation Enforcement.
@@ -561,7 +571,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 public void check(JavaMethod method, ConditionEvents events) {
                     boolean isEventListener =
                         method.isAnnotatedWith(TransactionalEventListener.class) ||
-                        method.isAnnotatedWith(org.springframework.context.event.EventListener.class);
+                        method.isAnnotatedWith(EventListener.class);
 
                     if (!isEventListener) {
                         return;
@@ -682,9 +692,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .stream()
                         .anyMatch(
                             m ->
-                                m.isAnnotatedWith(org.springframework.scheduling.annotation.Async.class) &&
+                                m.isAnnotatedWith(Async.class) &&
                                 (m.isAnnotatedWith(TransactionalEventListener.class) ||
-                                    m.isAnnotatedWith(org.springframework.context.event.EventListener.class))
+                                    m.isAnnotatedWith(EventListener.class))
                         );
 
                     if (!hasAsyncEventListeners) {
@@ -767,7 +777,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 @Override
                 public void check(JavaMethod method, ConditionEvents events) {
                     // Only check public methods
-                    if (!method.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC)) {
+                    if (!method.getModifiers().contains(JavaModifier.PUBLIC)) {
                         return;
                     }
 
@@ -841,7 +851,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Service")
                 .and()
                 .areDeclaredInClassesThat()
-                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .areAnnotatedWith(Service.class)
                 .should(beWorkspaceScopedIfReturningList)
                 .because("Services returning lists should be workspace-scoped");
 
@@ -872,11 +882,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 @Override
                 public void check(JavaMethod method, ConditionEvents events) {
                     boolean hasHttpMapping =
-                        method.isAnnotatedWith(org.springframework.web.bind.annotation.GetMapping.class) ||
-                        method.isAnnotatedWith(org.springframework.web.bind.annotation.PostMapping.class) ||
-                        method.isAnnotatedWith(org.springframework.web.bind.annotation.PutMapping.class) ||
-                        method.isAnnotatedWith(org.springframework.web.bind.annotation.DeleteMapping.class) ||
-                        method.isAnnotatedWith(org.springframework.web.bind.annotation.PatchMapping.class);
+                        method.isAnnotatedWith(GetMapping.class) ||
+                        method.isAnnotatedWith(PostMapping.class) ||
+                        method.isAnnotatedWith(PutMapping.class) ||
+                        method.isAnnotatedWith(DeleteMapping.class) ||
+                        method.isAnnotatedWith(PatchMapping.class);
 
                     if (!hasHttpMapping) {
                         return;
@@ -992,7 +1002,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             ArchRule rule = methods()
                 .that()
                 .areDeclaredInClassesThat()
-                .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .areAnnotatedWith(RestController.class)
                 .and()
                 .arePublic()
                 .should(haveWorkspaceContextForDataEndpoints)

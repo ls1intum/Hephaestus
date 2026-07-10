@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -205,7 +206,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         // runs at SEED time inside createPractice; a violation there is swallowed per-row (green boot, the
         // practice never seeds). This static check catches such a leak at the source, mirroring the service
         // pattern \b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\b matched case-sensitively as standalone tokens.
-        var detectorVocab = java.util.regex.Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
+        var detectorVocab = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
         JsonNode catalog = JsonMapper.builder()
             .build()
             .readTree(getClass().getClassLoader().getResourceAsStream("practices/default-catalog.json"));

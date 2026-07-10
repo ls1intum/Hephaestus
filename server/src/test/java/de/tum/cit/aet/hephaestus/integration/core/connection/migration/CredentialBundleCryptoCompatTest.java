@@ -3,8 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.migration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContext;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -80,12 +82,7 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
                 bundleJson = tools.jackson.databind.json.JsonMapper.builder()
                     .findAndAddModules()
                     .build()
-                    .writeValueAsString(
-                        new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken(
-                            "ghp_xyz",
-                            null
-                        )
-                    );
+                    .writeValueAsString(new ApiCredentialProvider.BearerToken("ghp_xyz", null));
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
@@ -107,12 +104,8 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
             // writes blobs the converter cannot read, every PAT-mode workspace breaks at
             // first request post-deploy.
             var decrypted = converter.decrypt(blob, ctx);
-            assertThat(decrypted).isInstanceOf(
-                de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken.class
-            );
-            assertThat(
-                ((de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken) decrypted).token()
-            ).isEqualTo("ghp_xyz");
+            assertThat(decrypted).isInstanceOf(ApiCredentialProvider.BearerToken.class);
+            assertThat(((ApiCredentialProvider.BearerToken) decrypted).token()).isEqualTo("ghp_xyz");
         }
 
         @Test
@@ -137,9 +130,7 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
                 bundleJson = tools.jackson.databind.json.JsonMapper.builder()
                     .findAndAddModules()
                     .build()
-                    .writeValueAsString(
-                        new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken("x", null)
-                    );
+                    .writeValueAsString(new ApiCredentialProvider.BearerToken("x", null));
                 blob = WorkspaceConnectionBackfillChange.encryptV2(
                     bundleJson.getBytes(StandardCharsets.UTF_8),
                     KEY_BYTES,
@@ -150,9 +141,7 @@ class CredentialBundleCryptoCompatTest extends BaseUnitTest {
             }
 
             // Cross-row substitution must fail — this is the CVE the v2 AAD format closed.
-            assertThatThrownBy(() -> converter.decrypt(blob, readCtx)).isInstanceOf(
-                de.tum.cit.aet.hephaestus.core.security.EncryptionException.class
-            );
+            assertThatThrownBy(() -> converter.decrypt(blob, readCtx)).isInstanceOf(EncryptionException.class);
         }
     }
 

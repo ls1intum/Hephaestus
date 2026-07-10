@@ -6,10 +6,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
@@ -128,17 +134,17 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
 
-        var practice = new de.tum.cit.aet.hephaestus.practices.model.Practice();
+        var practice = new Practice();
         practice.setSlug("robust-error-handling");
         // A real student-facing sentence followed by a pure grading-mechanics sentence the detector echoed.
         String reasoning =
             "The retry block swallows the IOException without logging it. The assessment is BAD, capped at MINOR.";
-        var observation = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
+        var observation = Observation.builder()
             .id(UUID.randomUUID())
             .title("Swallowed IOException")
             .practice(practice)
             .presence(Presence.PRESENT)
-            .assessment(de.tum.cit.aet.hephaestus.practices.model.Assessment.BAD)
+            .assessment(Assessment.BAD)
             .severity(Severity.MINOR)
             .confidence(0.9f)
             .observedAt(Instant.now())
@@ -173,17 +179,17 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
 
-        var practiceBad = new de.tum.cit.aet.hephaestus.practices.model.Practice();
+        var practiceBad = new Practice();
         practiceBad.setSlug("robust-error-handling");
         Instant observedBad = Instant.parse("2025-06-10T08:00:00Z");
-        var badObservation = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
+        var badObservation = Observation.builder()
             .id(UUID.randomUUID())
             .title("Swallowed IOException")
             .practice(practiceBad)
-            .artifactType(de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST)
+            .artifactType(WorkArtifact.PULL_REQUEST)
             .artifactId(123L)
             .presence(Presence.PRESENT)
-            .assessment(de.tum.cit.aet.hephaestus.practices.model.Assessment.BAD)
+            .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
             .confidence(0.9f)
             .observedAt(observedBad)
@@ -195,11 +201,11 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
             .reasoning("The retry block swallows the IOException.")
             .build();
 
-        var practiceNa = new de.tum.cit.aet.hephaestus.practices.model.Practice();
+        var practiceNa = new Practice();
         practiceNa.setSlug("writes-tests");
         Instant observedNa = Instant.parse("2025-06-09T08:00:00Z");
         // NOT_APPLICABLE: assessment AND severity are null — must serialise as JSON null, not the enum name.
-        var naObservation = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
+        var naObservation = Observation.builder()
             .id(UUID.randomUUID())
             .title("No test surface")
             .practice(practiceNa)
@@ -217,17 +223,15 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
 
-        var pr = new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+        var pr = new PullRequest();
         pr.setNumber(42);
         pr.setTitle("Add retry");
-        var review = new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview();
+        var review = new PullRequestReview();
         review.setPullRequest(pr);
         var reviewer = new User();
         reviewer.setLogin("mentor-bot");
         review.setAuthor(reviewer);
-        review.setState(
-            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview.State.CHANGES_REQUESTED
-        );
+        review.setState(PullRequestReview.State.CHANGES_REQUESTED);
         review.setBody("Please add a test.");
         review.setHtmlUrl("https://example.test/pr/42#review");
         review.setSubmittedAt(Instant.parse("2025-06-11T12:00:00Z"));

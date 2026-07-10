@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -38,7 +40,7 @@ public final class TranslatorState {
      * Observation ids the mentor linked this turn via {@code link_finding}, in emission order. Read at
      * end-of-turn by the conversational-delivery reconciler to flip the matching PREPARED unit to DELIVERED.
      */
-    private final java.util.List<UUID> linkedFindingIds = new java.util.ArrayList<>();
+    private final List<UUID> linkedFindingIds = new ArrayList<>();
 
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
@@ -151,8 +153,8 @@ public final class TranslatorState {
      * The observation ids the mentor linked this turn via {@code link_finding}, in emission order (duplicates
      * retained - the reconciler de-duplicates). Snapshot copy for cross-thread safety on the finalise path.
      */
-    public synchronized java.util.List<UUID> linkedFindingIds() {
-        return java.util.List.copyOf(linkedFindingIds);
+    public synchronized List<UUID> linkedFindingIds() {
+        return List.copyOf(linkedFindingIds);
     }
 
     /**

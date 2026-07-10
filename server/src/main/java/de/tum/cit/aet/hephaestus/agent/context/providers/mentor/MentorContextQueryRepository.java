@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -156,7 +158,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
     List<ChatThread> findRecentChatThreads(
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
-        org.springframework.data.domain.Pageable pageable
+        Pageable pageable
     );
 
     // Findings context — reviews received in window
@@ -191,7 +193,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
     )
     List<Object[]> findFirstUserMessagePartsByThreadIds(
         @Param("workspaceId") Long workspaceId,
-        @Param("threadIds") List<java.util.UUID> threadIds
+        @Param("threadIds") List<UUID> threadIds
     );
 
     /**
@@ -216,7 +218,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
         @Param("since") Instant since,
-        org.springframework.data.domain.Pageable page
+        Pageable page
     );
 
     /**
@@ -238,7 +240,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
     List<PullRequest> findRecentAuthoredPullRequests(
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
-        org.springframework.data.domain.Pageable page
+        Pageable page
     );
 
     /**
@@ -259,6 +261,6 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
     List<Issue> findRecentAuthoredIssues(
         @Param("workspaceId") Long workspaceId,
         @Param("userId") Long userId,
-        org.springframework.data.domain.Pageable page
+        Pageable page
     );
 }

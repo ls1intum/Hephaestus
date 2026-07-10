@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -151,7 +152,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     )
     int deleteConversationThreadFeedback(
         @Param("workspaceId") Long workspaceId,
-        @Param("artifactIds") java.util.Collection<Long> artifactIds
+        @Param("artifactIds") Collection<Long> artifactIds
     );
 
     /**

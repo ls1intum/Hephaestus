@@ -97,12 +97,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             SECRET,
             new TokenRotation(7, 90),
             new Publish(java.time.Duration.ofSeconds(9), 5, java.time.Duration.ofMillis(200)),
-            new Stream(
-                java.time.Duration.ofMinutes(10),
-                java.time.Duration.ofDays(180),
-                java.util.Map.of(),
-                2_000_000L
-            ),
+            new Stream(java.time.Duration.ofMinutes(10), java.time.Duration.ofDays(180), Map.of(), 2_000_000L),
             new Shutdown(java.time.Duration.ofSeconds(15)),
             new Http(26_214_400L)
         );
@@ -322,12 +317,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 "",
                 new TokenRotation(7, 90),
                 new Publish(java.time.Duration.ofSeconds(9), 5, java.time.Duration.ofMillis(200)),
-                new Stream(
-                    java.time.Duration.ofMinutes(10),
-                    java.time.Duration.ofDays(180),
-                    java.util.Map.of(),
-                    2_000_000L
-                ),
+                new Stream(java.time.Duration.ofMinutes(10), java.time.Duration.ofDays(180), Map.of(), 2_000_000L),
                 new Shutdown(java.time.Duration.ofSeconds(15)),
                 new Http(26_214_400L)
             );
@@ -461,9 +451,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
 
             // Simulate API error
-            org.mockito.Mockito.doThrow(new RuntimeException("API error"))
-                .when(webhookClient)
-                .deregisterGroupWebhook(1L, 42L, 99L);
+            Mockito.doThrow(new RuntimeException("API error")).when(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
 
             webhookService.deregisterWebhook(workspace);
 

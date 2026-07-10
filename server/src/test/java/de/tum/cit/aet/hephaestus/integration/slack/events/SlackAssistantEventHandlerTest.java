@@ -13,6 +13,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,9 +44,9 @@ class SlackAssistantEventHandlerTest extends BaseUnitTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SuggestedPrompt>> prompts = ArgumentCaptor.forClass(List.class);
         verify(messageService).setSuggestedPrompts(
-            org.mockito.ArgumentMatchers.eq(42L),
-            org.mockito.ArgumentMatchers.eq("D1"),
-            org.mockito.ArgumentMatchers.eq("Practice mentor"),
+            ArgumentMatchers.eq(42L),
+            ArgumentMatchers.eq("D1"),
+            ArgumentMatchers.eq("Practice mentor"),
             prompts.capture()
         );
         assertThat(prompts.getValue()).hasSize(4);
@@ -62,10 +63,10 @@ class SlackAssistantEventHandlerTest extends BaseUnitTest {
         handler.onMessagesOpened("T1", JsonMapper.builder().build().readTree("{\"tab\":\"messages\"}"));
 
         verify(messageService, never()).setSuggestedPrompts(
-            org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyList()
+            ArgumentMatchers.anyLong(),
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyList()
         );
     }
 }

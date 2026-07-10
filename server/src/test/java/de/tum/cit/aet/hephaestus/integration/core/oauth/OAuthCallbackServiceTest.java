@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectFinalization;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -23,6 +24,8 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.lang.reflect.Field;
 import java.util.Optional;
+import java.util.Set;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -44,7 +47,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter credentialBundleConverter;
+    private CredentialBundleConverter credentialBundleConverter;
 
     private OAuthCallbackService service;
 
@@ -203,9 +206,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
             new BearerToken("t", null),
             "Renamed"
         );
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            service.completeConnection(existing, completed, "alice")
-        )
+        Assertions.assertThatThrownBy(() -> service.completeConnection(existing, completed, "alice"))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("instance_key");
     }
@@ -353,15 +354,15 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
-            case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
+            case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
                 "https://gitlab.com",
                 null,
                 null,
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                java.util.Set.of()
+                Set.of()
             );
-            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, java.util.Set.of());
+            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

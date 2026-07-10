@@ -15,6 +15,10 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.repository.Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Code Quality Tests - Detect anti-patterns and code smells.
@@ -66,7 +70,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .that()
                 .haveSimpleNameEndingWith("Service")
                 .and()
-                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .areAnnotatedWith(Service.class)
                 .should(haveAtMostConstructorParameters(MAX_SERVICE_DEPENDENCIES, orchestratorExceptions))
                 .because("God classes with many dependencies violate SRP and are hard to test");
 
@@ -81,7 +85,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         void controllersAreThin() {
             ArchRule rule = classes()
                 .that()
-                .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .areAnnotatedWith(RestController.class)
                 .should(haveAtMostConstructorParameters(MAX_CONTROLLER_DEPENDENCIES))
                 .because("Controllers should delegate to services, not orchestrate many dependencies");
 
@@ -100,7 +104,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .that()
                 .haveSimpleNameEndingWith("Service")
                 .and()
-                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .areAnnotatedWith(Service.class)
                 .should(haveAtMostBusinessMethods(MAX_SERVICE_METHODS))
                 .because("Services with many methods violate SRP and should be split into focused services");
 
@@ -186,7 +190,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         .filter(m -> !m.isAnnotatedWith("org.springframework.retry.annotation.Recover"))
                         // Exclude static factory methods (common pattern for parameter objects)
                         .filter(m ->
-                            !(m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.STATIC) &&
+                            !(m.getModifiers().contains(JavaModifier.STATIC) &&
                                 (m.getName().equals("simple") ||
                                     m.getName().equals("of") ||
                                     m.getName().equals("from")))
@@ -197,7 +201,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         .filter(m ->
                             !nativeSqlRepositoryMethods.contains(javaClass.getSimpleName() + "." + m.getName())
                         )
-                        .filter(m -> m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))
+                        .filter(m -> m.getModifiers().contains(JavaModifier.PUBLIC))
                         .forEach(method -> {
                             int paramCount = method.getRawParameterTypes().size();
                             if (paramCount > MAX_METHOD_PARAMETERS) {
@@ -361,7 +365,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     // Skip Spring Data repositories - they have many default methods
-                    if (javaClass.isAssignableTo(org.springframework.data.repository.Repository.class)) {
+                    if (javaClass.isAssignableTo(Repository.class)) {
                         return;
                     }
 
@@ -371,9 +375,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     if (
                         javaClass
                             .getEnclosingClass()
-                            .map(enclosing ->
-                                enclosing.isAssignableTo(org.springframework.data.repository.Repository.class)
-                            )
+                            .map(enclosing -> enclosing.isAssignableTo(Repository.class))
                             .orElse(false)
                     ) {
                         return;
@@ -523,7 +525,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
 
             ArchRule rule = fields()
                 .that()
-                .haveRawType(org.springframework.beans.factory.ObjectProvider.class)
+                .haveRawType(ObjectProvider.class)
                 .should(beInKnownClass)
                 .because("ObjectProvider usage should be limited to documented cycle-breaking cases");
 
@@ -579,7 +581,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .that()
                 .haveSimpleNameEndingWith("Service")
                 .and()
-                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .areAnnotatedWith(Service.class)
                 .should(notDeclareGenericException)
                 .because("LSP: specific exceptions are required for substitutability");
 
@@ -641,7 +643,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .that()
                 .haveSimpleNameEndingWith("Service")
                 .and()
-                .areAnnotatedWith(org.springframework.stereotype.Service.class)
+                .areAnnotatedWith(Service.class)
                 .should(notThrowUnsupportedOperationException)
                 .because("LSP: implementations must honor contracts, not refuse operations");
 

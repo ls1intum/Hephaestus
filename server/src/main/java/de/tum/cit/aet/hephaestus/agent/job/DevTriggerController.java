@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -108,7 +109,7 @@ public class DevTriggerController {
         return agentJobService.submitPrepared(
             workspaceId,
             prepared.jobType(),
-            (de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest) prepared.request()
+            (JobSubmissionRequest) prepared.request()
         );
     }
 

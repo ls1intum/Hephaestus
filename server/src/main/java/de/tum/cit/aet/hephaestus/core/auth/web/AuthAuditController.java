@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
+import java.util.Map;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springdoc.core.annotations.ParameterObject;
@@ -168,7 +169,7 @@ public class AuthAuditController {
         out.append('\n');
     }
 
-    private static AuthEventViewDTO toView(AuthEvent e, java.util.Map<Long, AuthAuditService.AccountRef> identities) {
+    private static AuthEventViewDTO toView(AuthEvent e, Map<Long, AuthAuditService.AccountRef> identities) {
         return new AuthEventViewDTO(
             e.getId().getId(),
             e.getId().getOccurredAt(),

@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -16,8 +17,15 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
@@ -1419,11 +1427,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // poisoned-transaction bug). With the SELECT ... FOR UPDATE serialisation, the second blocks until
             // the first commits, reads the now-current max, and appends a distinct, gap-free number.
             persistPractice("raced-practice", "Raced", true); // revision 1 is created lazily on first criteria edit
-            var ctx = de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext.fromWorkspace(
-                workspace,
-                java.util.Set.of(de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.ADMIN),
-                null
-            );
+            var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(WorkspaceMembership.WorkspaceRole.ADMIN), null);
 
             // Snapshot revision 1 first (mirrors create) so the race is over revisions 2 and 3.
             practiceService.updatePractice(
@@ -1433,10 +1437,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
 
             int threads = 2;
-            var startGate = new java.util.concurrent.CountDownLatch(1);
-            var done = new java.util.concurrent.CountDownLatch(threads);
-            var pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
-            var failures = java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
+            var startGate = new CountDownLatch(1);
+            var done = new CountDownLatch(threads);
+            var pool = Executors.newFixedThreadPool(threads);
+            var failures = Collections.synchronizedList(new ArrayList<Throwable>());
 
             try {
                 for (int i = 0; i < threads; i++) {
@@ -1457,7 +1461,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                     });
                 }
                 startGate.countDown();
-                assertThat(done.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
             } finally {
                 pool.shutdownNow();
             }
@@ -1488,15 +1492,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(workspace);
             persistPractice("focus-flip", "Focus Flip", true); // saved with PR trigger PullRequestCreated
 
-            var request = new UpdatePracticeRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE,
-                null,
-                null
-            );
+            var request = new UpdatePracticeRequestDTO(null, null, null, null, WorkArtifact.ISSUE, null, null);
 
             ProblemDetail problem = webTestClient
                 .patch()
@@ -1520,7 +1516,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                     .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
                     .orElseThrow()
                     .getArtifactType()
-            ).isEqualTo(de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST);
+            ).isEqualTo(WorkArtifact.PULL_REQUEST);
         }
 
         @Test
@@ -1535,7 +1531,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 List.of("ReviewSubmitted"), // a PR-only event, invalid for an ISSUE focus
                 "Detect something",
                 null,
-                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE,
+                WorkArtifact.ISSUE,
                 null,
                 null
             );

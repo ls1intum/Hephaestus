@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
 import io.github.bucket4j.distributed.jdbc.PrimaryKeyMapper;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.postgresql.Bucket4jPostgreSQL;
 import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +109,7 @@ public class AuthRateLimitConfig {
                 "cluster. Acceptable for dev / specs / worker-only pods; production must run " +
                 "Postgres-backed (hephaestus.auth.rate-limit.postgres-backed=true with a DataSource)."
         );
-        var store = new java.util.concurrent.ConcurrentHashMap<String, io.github.bucket4j.Bucket>();
+        var store = new ConcurrentHashMap<String, io.github.bucket4j.Bucket>();
         return (key, config) -> {
             if (store.size() >= IN_MEMORY_MAX_BUCKETS && !store.containsKey(key)) {
                 store.clear();
@@ -123,7 +125,7 @@ public class AuthRateLimitConfig {
         AuthRateLimitProperties properties,
         BucketResolver bucketResolver,
         ObjectMapper objectMapper,
-        de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics metrics
+        AuthMetrics metrics
     ) {
         return new AuthRateLimitFilter(properties, bucketResolver, objectMapper, metrics);
     }

@@ -7,6 +7,9 @@ import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class HmacOAuthStateServiceTest extends BaseUnitTest {
@@ -121,7 +124,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("nonce store wired: first consume wins, second is rejected as already-consumed")
+    @DisplayName("nonce store wired: first consume wins, second is rejected as already-consumed")
     void singleUseEnforcedWithNonceStore() {
         InMemoryNonceStore store = new InMemoryNonceStore();
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
@@ -139,7 +142,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("nonce store: every issue writes a row; consume flips it exactly once")
+    @DisplayName("nonce store: every issue writes a row; consume flips it exactly once")
     void singleUseHonoursPersistence() {
         InMemoryNonceStore store = new InMemoryNonceStore();
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
@@ -149,7 +152,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("nonce store: HMAC failure is detected BEFORE the store is touched")
+    @DisplayName("nonce store: HMAC failure is detected BEFORE the store is touched")
     void hmacFailureNeverConsumesNonce() {
         InMemoryNonceStore store = new InMemoryNonceStore();
         HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
@@ -165,7 +168,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @org.junit.jupiter.api.DisplayName("nonce store: expired-by-TTL state is rejected before the store is touched")
+    @DisplayName("nonce store: expired-by-TTL state is rejected before the store is touched")
     void ttlFailureNeverConsumesNonce() {
         InMemoryNonceStore store = new InMemoryNonceStore();
         // 1ms TTL forces immediate expiry.
@@ -190,7 +193,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
      */
     private static final class InMemoryNonceStore extends OAuthStateNonceStore {
 
-        private final java.util.Map<String, Boolean> consumed = new java.util.concurrent.ConcurrentHashMap<>();
+        private final Map<String, Boolean> consumed = new ConcurrentHashMap<>();
 
         InMemoryNonceStore() {
             super(null);

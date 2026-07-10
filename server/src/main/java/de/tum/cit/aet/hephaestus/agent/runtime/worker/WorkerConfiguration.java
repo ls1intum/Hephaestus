@@ -5,9 +5,13 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.ToDoubleFunction;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,9 +28,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
-@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
-    "'${hephaestus.worker.control.endpoint:}'.length() > 0"
-)
+@ConditionalOnExpression("'${hephaestus.worker.control.endpoint:}'.length() > 0")
 public class WorkerConfiguration {
 
     /**
@@ -51,8 +53,8 @@ public class WorkerConfiguration {
     }
 
     private static void registerCapacityGauges(MeterRegistry registry, WorkerCapacityState state) {
-        record G(String name, String type, java.util.function.ToDoubleFunction<WorkerCapacityState> f, String desc) {}
-        java.util.List.of(
+        record G(String name, String type, ToDoubleFunction<WorkerCapacityState> f, String desc) {}
+        List.of(
             new G("worker.capacity.total", "review", s -> s.reviewMax(), "Configured maximum concurrent review jobs"),
             new G(
                 "worker.capacity.total",
@@ -129,7 +131,7 @@ public class WorkerConfiguration {
      * NATS is enabled) is resolved without creating a hard dependency cycle.
      */
     @Bean
-    org.springframework.beans.factory.SmartInitializingSingleton workerCancelHandlerWiring(
+    SmartInitializingSingleton workerCancelHandlerWiring(
         WorkerControlClient client,
         Optional<AgentJobExecutor> executor
     ) {

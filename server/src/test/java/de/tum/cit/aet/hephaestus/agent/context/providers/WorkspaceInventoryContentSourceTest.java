@@ -14,8 +14,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,7 @@ import tools.jackson.databind.node.ObjectNode;
 class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
 
     private static final long REPO_ID = 123L;
+    private static final long WORKSPACE_ID = 9L;
     private static final String OUTPUT = "inputs/context/project_inventory.json";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -40,17 +45,26 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     @Mock
     private PullRequestRepository pullRequestRepository;
 
+    @Mock
+    private RepositoryRepository repositoryRepository;
+
     private WorkspaceInventoryContentSource provider;
 
     @BeforeEach
     void setUp() {
-        provider = new WorkspaceInventoryContentSource(objectMapper, issueRepository, pullRequestRepository);
+        provider = new WorkspaceInventoryContentSource(
+            objectMapper,
+            issueRepository,
+            pullRequestRepository,
+            repositoryRepository
+        );
         lenient()
             .when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
             .thenReturn(List.of());
         lenient()
             .when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class)))
             .thenReturn(List.of());
+        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
     }
 
     // --- helpers ---
@@ -109,12 +123,32 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         return new ContextRequest.PracticeReviewRequest(job);
     }
 
+    private Repository repository(long id, String nameWithOwner) {
+        Repository r = new Repository();
+        r.setId(id);
+        r.setNameWithOwner(nameWithOwner);
+        return r;
+    }
+
+    private ContextRequest.ConversationReviewRequest conversationRequest() {
+        ObjectNode meta = objectMapper.createObjectNode();
+        meta.put("slack_channel_id", "C0ABC");
+        meta.put("slack_thread_ts", "1700000000.100000");
+        var job = new AgentJob();
+        var workspace = new Workspace();
+        workspace.setId(WORKSPACE_ID);
+        job.setWorkspace(workspace);
+        job.setMetadata(meta);
+        return new ContextRequest.ConversationReviewRequest(job);
+    }
+
     // --- tests ---
 
     @Test
-    void supportsBothReviewFlows() {
+    void supportsAllThreeReviewFlows() {
         assertThat(provider.supports(issueRequest(1))).isTrue();
         assertThat(provider.supports(prRequest(1))).isTrue();
+        assertThat(provider.supports(conversationRequest())).isTrue();
     }
 
     @Test
@@ -176,7 +210,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         // A full MAX_PER_TYPE page (one row focal) → emitted is one short of the cap, but the listing is
         // NOT exhaustive: truncated must be derived from the PRE-exclusion page size, not the emitted count,
         // so absence-of-match cannot be read as uniqueness.
-        List<Issue> fullPage = new java.util.ArrayList<>();
+        List<Issue> fullPage = new ArrayList<>();
         fullPage.add(issue(1, "Focal issue under review", Issue.State.OPEN, "alice"));
         for (int n = 2; n <= WorkspaceInventoryContentSource.MAX_PER_TYPE; n++) {
             fullPage.add(issue(n, "Issue " + n, Issue.State.OPEN, "bob"));
@@ -237,6 +271,99 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         );
         Map<String, byte[]> files = new LinkedHashMap<>();
         assertThatCode(() -> provider.contribute(issueRequest(1), files)).doesNotThrowAnyException();
+        assertThat(files).doesNotContainKey(OUTPUT);
+    }
+
+    // --- conversation flow: aggregated across every repository the workspace monitors ---
+
+    @Test
+    void conversationFlow_aggregatesAcrossEveryMonitoredRepository_withNoFocalExclusion() throws Exception {
+        Repository repoA = repository(1L, "acme/widgets");
+        Repository repoB = repository(2L, "acme/gadgets");
+        when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repoA, repoB));
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(1L), any(Pageable.class))).thenReturn(
+            List.of(issue(5, "Widget bug", Issue.State.OPEN, "alice"))
+        );
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(2L), any(Pageable.class))).thenReturn(
+            List.of(issue(9, "Gadget bug", Issue.State.CLOSED, "bob"))
+        );
+        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(1L), any(Pageable.class))).thenReturn(
+            List.of(pr(11, "Fix widget", Issue.State.OPEN, false))
+        );
+        when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(2L), any(Pageable.class))).thenReturn(
+            List.of()
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(conversationRequest(), files);
+
+        assertThat(files).containsKey(OUTPUT);
+        JsonNode root = objectMapper.readTree(files.get(OUTPUT));
+        // No single "repository" — the listing spans the workspace's monitored repos.
+        assertThat(root.has("repository")).isFalse();
+        JsonNode repos = root.get("repositories");
+        assertThat(repos).hasSize(2);
+        assertThat(repos.get(0).asString()).isEqualTo("acme/widgets");
+        assertThat(repos.get(1).asString()).isEqualTo("acme/gadgets");
+
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("CONVERSATION_THREAD");
+        // A conversation isn't itself an issue/PR, so nothing is excluded.
+        assertThat(root.get("focal").has("number")).isFalse();
+
+        JsonNode issues = root.get("issues");
+        assertThat(issues).hasSize(2);
+        JsonNode prs = root.get("pullRequests");
+        assertThat(prs).hasSize(1);
+
+        assertThat(root.get("counts").get("issuesListed").asInt()).isEqualTo(2);
+        assertThat(root.get("counts").get("pullRequestsListed").asInt()).isEqualTo(1);
+        assertThat(root.get("truncated").asBoolean()).isFalse();
+    }
+
+    @Test
+    void conversationFlow_writesNothingWhenWorkspaceMonitorsNoRepositories() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(conversationRequest(), files);
+        assertThat(files).doesNotContainKey(OUTPUT);
+    }
+
+    @Test
+    void conversationFlow_writesNothingWhenJobHasNoWorkspace() {
+        ObjectNode meta = objectMapper.createObjectNode();
+        meta.put("slack_channel_id", "C0ABC");
+        meta.put("slack_thread_ts", "1700000000.100000");
+        var job = new AgentJob();
+        job.setMetadata(meta);
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(new ContextRequest.ConversationReviewRequest(job), files);
+        assertThat(files).doesNotContainKey(OUTPUT);
+    }
+
+    @Test
+    void conversationFlow_truncatedWhenARepositoryPageIsFull() throws Exception {
+        Repository repoA = repository(1L, "acme/widgets");
+        when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repoA));
+        List<Issue> fullPage = new ArrayList<>();
+        for (int n = 1; n <= WorkspaceInventoryContentSource.MAX_PER_TYPE; n++) {
+            fullPage.add(issue(n, "Issue " + n, Issue.State.OPEN, "bob"));
+        }
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(1L), any(Pageable.class))).thenReturn(fullPage);
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(conversationRequest(), files);
+
+        JsonNode root = objectMapper.readTree(files.get(OUTPUT));
+        assertThat(root.get("truncated").asBoolean()).isTrue();
+        assertThat(root.get("counts").get("issuesListed").asInt()).isEqualTo(
+            WorkspaceInventoryContentSource.MAX_PER_TYPE
+        );
+    }
+
+    @Test
+    void conversationFlow_neverThrowsOnRepositoryFailure() {
+        when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenThrow(new RuntimeException("db down"));
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        assertThatCode(() -> provider.contribute(conversationRequest(), files)).doesNotThrowAnyException();
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 }

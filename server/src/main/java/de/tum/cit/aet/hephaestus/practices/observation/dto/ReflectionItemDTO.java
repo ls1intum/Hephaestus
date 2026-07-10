@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Locale;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -96,7 +97,7 @@ public record ReflectionItemDTO(
         if (path.startsWith(CONTEXT_PREFIX) || path.startsWith(PRACTICES_PREFIX) || path.equals(MANIFEST_PATH)) {
             return true;
         }
-        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        String lower = path.toLowerCase(Locale.ROOT);
         // Known agent-context basenames that can appear without the directory prefix (the agent strips it).
         return (
             lower.equals("manifest.json") ||

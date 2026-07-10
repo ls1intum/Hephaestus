@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.jpa.repository.Query;
 
 /**
  * Data Isolation Architecture Tests - Prevents Cross-Workspace Data Access.
@@ -446,10 +447,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
 
                     // Check @Query annotation for workspace filter
                     boolean hasQueryWithWorkspaceFilter = false;
-                    if (method.isAnnotatedWith(org.springframework.data.jpa.repository.Query.class)) {
-                        org.springframework.data.jpa.repository.Query q = method.getAnnotationOfType(
-                            org.springframework.data.jpa.repository.Query.class
-                        );
+                    if (method.isAnnotatedWith(Query.class)) {
+                        Query q = method.getAnnotationOfType(Query.class);
                         hasQueryWithWorkspaceFilter =
                             q.value().contains("workspaceId") ||
                             q.value().contains("workspace.id") ||

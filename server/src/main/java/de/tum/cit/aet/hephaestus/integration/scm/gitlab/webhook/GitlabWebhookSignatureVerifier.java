@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.crypto.Mac;
@@ -257,7 +258,7 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
         Map<String, String> out = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : raw.entrySet()) {
             if (e.getKey() != null) {
-                out.put(e.getKey().toLowerCase(java.util.Locale.ROOT), e.getValue());
+                out.put(e.getKey().toLowerCase(Locale.ROOT), e.getValue());
             }
         }
         return out;

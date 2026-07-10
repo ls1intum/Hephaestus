@@ -13,14 +13,19 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -54,7 +59,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             threadRepository,
             reviewRepository
         );
-        lenient().when(pullRequestRepository.findByIdWithAllForGate(any())).thenReturn(java.util.Optional.empty());
+        lenient().when(pullRequestRepository.findByIdWithAllForGate(any())).thenReturn(Optional.empty());
         lenient().when(threadRepository.findAllByPullRequestIdWithResolvedBy(any())).thenReturn(List.of());
         lenient().when(reviewRepository.findAllByPullRequestIdWithAuthor(any())).thenReturn(List.of());
     }
@@ -103,12 +108,8 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         return t;
     }
 
-    private de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment comment(
-        String login,
-        String body
-    ) {
-        var c =
-            new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment();
+    private PullRequestReviewComment comment(String login, String body) {
+        var c = new PullRequestReviewComment();
         c.setBody(body);
         if (login != null) {
             c.setAuthor(user(login));
@@ -128,7 +129,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadata), files);
 
         assertThat(files).doesNotContainKey(FILE_KEY);
@@ -136,7 +137,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_noThreadsNoReviews_writesNothing() {
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         assertThat(files).doesNotContainKey(FILE_KEY);
@@ -149,9 +150,9 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer-a", Instant.parse("2025-06-01T10:00:00Z"))
             )
         );
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(mergedPr()));
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         assertThat(files).containsKey(FILE_KEY);
@@ -172,9 +173,9 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z"))
             )
         );
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(mergedPr()));
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -196,7 +197,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         // than MAX_DECISIONS rows, the consumer's truncation keeps the NEWEST — so a final superseding APPROVE
         // must survive, not be dropped behind older CHANGES_REQUESTED (which would fabricate a false
         // "merged past unresolved request-changes" finding).
-        java.util.List<PullRequestReview> newestFirst = new java.util.ArrayList<>();
+        List<PullRequestReview> newestFirst = new ArrayList<>();
         // The latest decision: an APPROVE at the most recent timestamp.
         newestFirst.add(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z")));
         // Followed by MAX_DECISIONS + 5 older CHANGES_REQUESTED rows (descending timestamps).
@@ -210,9 +211,9 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             );
         }
         when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(newestFirst);
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(mergedPr()));
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -228,9 +229,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         // A thread whose comments are Hephaestus's own posted note (marker-bearing) must NOT count as a
         // reviewer thread — the rootComment FK is null in sync, so the comment set is the signal.
         PullRequestReviewThread botThread = thread(PullRequestReviewThread.State.UNRESOLVED, "src/Foo.swift", 10, null);
-        botThread.setComments(
-            java.util.Set.of(comment(null, "Add a unit test for encodeDepth.\n<!-- hephaestus-diff-note -->"))
-        );
+        botThread.setComments(Set.of(comment(null, "Add a unit test for encodeDepth.\n<!-- hephaestus-diff-note -->")));
 
         PullRequestReviewThread humanThread = thread(
             PullRequestReviewThread.State.UNRESOLVED,
@@ -238,13 +237,11 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             5,
             null
         );
-        humanThread.setComments(
-            java.util.Set.of(comment("reviewer-a", "This force-unwrap will crash — can we guard it?"))
-        );
+        humanThread.setComments(Set.of(comment("reviewer-a", "This force-unwrap will crash — can we guard it?")));
 
         when(threadRepository.findAllByPullRequestIdWithResolvedBy(PR_ID)).thenReturn(List.of(botThread, humanThread));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -252,7 +249,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         // CONTENT, not position, so the test does not encode an incidental ordering over the comment Set.
         assertThat(out.get("unresolvedCount").asInt()).isEqualTo(1);
         assertThat(out.get("threads")).hasSize(1);
-        java.util.List<String> paths = new java.util.ArrayList<>();
+        List<String> paths = new ArrayList<>();
         out.get("threads").forEach(node -> paths.add(node.get("path").asString()));
         assertThat(paths).containsExactly("src/Bar.swift").doesNotContain("src/Foo.swift");
     }
@@ -266,7 +263,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -287,9 +284,9 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z"))
             )
         );
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(mergedPr()));
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(mergedPr()));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -305,7 +302,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             List.of(review(PullRequestReview.State.UNKNOWN, "reviewer-x", Instant.parse("2025-05-01T12:00:00Z")))
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -316,14 +313,14 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     void contribute_moreThreadsThanCap_emitsCapButCountsAll() throws Exception {
         // unresolvedCount must reflect the TRUE total even past the emit cap — the one subtle invariant: the
         // count is incremented before the MAX_THREADS truncation, so a noisy PR still reports the real backlog.
-        java.util.List<PullRequestReviewThread> many = new java.util.ArrayList<>();
+        List<PullRequestReviewThread> many = new ArrayList<>();
         int total = ReviewThreadContentSource.MAX_THREADS + 7;
         for (int i = 0; i < total; i++) {
             many.add(thread(PullRequestReviewThread.State.UNRESOLVED, "src/File" + i + ".swift", i, null));
         }
         when(threadRepository.findAllByPullRequestIdWithResolvedBy(PR_ID)).thenReturn(many);
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -338,7 +335,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
             List.of(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z")))
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -355,9 +352,9 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
         PullRequest openPr = new PullRequest();
         openPr.setMerged(false);
         openPr.setState(Issue.State.OPEN);
-        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(openPr));
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(openPr));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -368,7 +365,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     void contribute_neverThrows_onRepositoryFailure() {
         when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenThrow(new RuntimeException("db down"));
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         assertThatCode(() -> provider.contribute(request(metadataWithPr()), files)).doesNotThrowAnyException();
         assertThat(files).doesNotContainKey(FILE_KEY);
     }

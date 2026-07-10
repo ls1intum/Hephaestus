@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.UnexpectedRollbackException;
 
 /**
  * GraphQL-based data synchronization service.
@@ -1239,7 +1240,7 @@ public class GithubDataSyncService {
                 // a poisoned transaction that should be retried with a fresh one.
                 boolean retryable;
                 String errorDetail;
-                if (e instanceof org.springframework.transaction.UnexpectedRollbackException) {
+                if (e instanceof UnexpectedRollbackException) {
                     retryable = true;
                     errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
                 } else {

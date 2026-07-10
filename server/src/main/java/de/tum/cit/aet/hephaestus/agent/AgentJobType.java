@@ -7,12 +7,10 @@ package de.tum.cit.aet.hephaestus.agent;
  * volume, parse output, and deliver results. Add new values as new handler types are built.
  */
 public enum AgentJobType {
+    /** Detection over a pull/merge request's diff, comments, and review state. */
     PULL_REQUEST_REVIEW,
+    /** Detection over an issue's body, comment thread, and lifecycle state. */
     ISSUE_REVIEW,
-    /**
-     * Detection over a settled Slack conversation thread. Repo-less: the case context is the
-     * thread's human turns (materialised as {@code inputs/context/conversation_thread.json}), with no
-     * clone, no diff, and no SCM source mount. Handled by {@code ConversationReviewHandler}.
-     */
+    /** Detection over a settled Slack conversation thread. */
     CONVERSATION_REVIEW,
 }

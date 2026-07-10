@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class AgentConfigServiceTest extends BaseUnitTest {
 
@@ -244,7 +246,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnConfigsForWorkspace() {
-            var configs = java.util.List.of(new AgentConfig(), new AgentConfig());
+            var configs = List.of(new AgentConfig(), new AgentConfig());
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(configs);
 
             var result = agentConfigService.getConfigs(workspaceContext);
@@ -328,7 +330,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenThrow(
-                new org.springframework.dao.DataIntegrityViolationException("uk_agent_config_workspace_name")
+                new DataIntegrityViolationException("uk_agent_config_workspace_name")
             );
 
             var request = CreateAgentConfigRequestDTO.builder()

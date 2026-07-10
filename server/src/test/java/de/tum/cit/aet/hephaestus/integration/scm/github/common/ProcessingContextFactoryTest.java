@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 
 /**
  * Unit tests for {@link ProcessingContextFactory}.
@@ -179,7 +180,7 @@ class ProcessingContextFactoryTest {
             assertThat(result).isPresent();
             assertThat(result.get().scopeId()).isEqualTo(expectedScopeId);
             // Should NOT try org lookup for personal repos
-            verify(scopeIdResolver, never()).findScopeIdByOrgLogin(org.mockito.ArgumentMatchers.any());
+            verify(scopeIdResolver, never()).findScopeIdByOrgLogin(ArgumentMatchers.any());
             // Should use repository-based lookup
             verify(scopeIdResolver).findScopeIdByRepositoryName(repoFullName);
         }

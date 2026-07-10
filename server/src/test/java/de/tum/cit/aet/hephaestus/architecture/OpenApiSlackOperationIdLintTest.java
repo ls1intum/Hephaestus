@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Tag;
@@ -40,7 +41,7 @@ class OpenApiSlackOperationIdLintTest extends BaseUnitTest {
                 continue;
             }
             Matcher m = OPERATION_ID.matcher(line);
-            if (m.find() && !m.group(1).toLowerCase(java.util.Locale.ROOT).contains("slack")) {
+            if (m.find() && !m.group(1).toLowerCase(Locale.ROOT).contains("slack")) {
                 offenders.add(currentPath + " → " + m.group(1));
             }
         }

@@ -20,6 +20,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -101,7 +102,7 @@ class GithubApprovalChannelTest extends BaseUnitTest {
         when(spec.variable(any(), any())).thenReturn(spec);
 
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        when(response.getErrors()).thenReturn(List.of(mock(org.springframework.graphql.ResponseError.class)));
+        when(response.getErrors()).thenReturn(List.of(mock(ResponseError.class)));
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> channel.approve(target, "ok"))

@@ -34,6 +34,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -89,7 +91,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
             "onAuthenticationSuccess",
             jakarta.servlet.http.HttpServletRequest.class,
             jakarta.servlet.http.HttpServletResponse.class,
-            org.springframework.security.core.Authentication.class
+            Authentication.class
         );
 
         Assertions.assertNull(method.getAnnotation(Transactional.class));
@@ -193,7 +195,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     @Test
     void nonOAuth2AuthenticationIsRejectedWithNoProvisioningAndNoCookie() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
-        var nonOauth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+        var nonOauth = new UsernamePasswordAuthenticationToken(
             new User("u", "p", List.of(new SimpleGrantedAuthority("ROLE_USER"))),
             "p",
             List.of(new SimpleGrantedAuthority("ROLE_USER"))

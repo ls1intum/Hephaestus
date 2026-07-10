@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
@@ -47,6 +48,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.GraphQlClient.RequestSpec;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 
@@ -100,7 +102,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             fieldValueSyncService,
             graphQlClientProvider,
             syncProperties,
-            new de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties(
+            new SyncSchedulerProperties(
                 true,
                 7,
                 "0 0 3 * * *",
@@ -108,9 +110,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 null,
                 null,
                 null,
-                new de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.ProjectsProperties(
-                    true
-                )
+                new SyncSchedulerProperties.ProjectsProperties(true)
             ),
             exceptionClassifier,
             transactionTemplate
@@ -603,10 +603,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             // Mock transaction template to execute the action
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-                var callback = invocation.getArgument(
-                    0,
-                    org.springframework.transaction.support.TransactionCallback.class
-                );
+                var callback = invocation.getArgument(0, TransactionCallback.class);
                 return callback.doInTransaction(null);
             });
 
@@ -823,10 +820,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
             // Mock transaction template
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-                var callback = invocation.getArgument(
-                    0,
-                    org.springframework.transaction.support.TransactionCallback.class
-                );
+                var callback = invocation.getArgument(0, TransactionCallback.class);
                 return callback.doInTransaction(null);
             });
 

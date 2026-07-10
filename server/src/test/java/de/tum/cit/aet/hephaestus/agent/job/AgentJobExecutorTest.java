@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -119,8 +121,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             transactionTemplate,
             objectMapper,
             meterRegistry,
-            java.util.Optional.empty(),
-            java.util.Optional.empty()
+            Optional.empty(),
+            Optional.empty()
         );
 
         jobId = UUID.randomUUID();
@@ -162,7 +164,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         lenient()
             .doAnswer(inv -> {
                 @SuppressWarnings("unchecked")
-                java.util.function.Consumer<TransactionStatus> callback = inv.getArgument(0);
+                Consumer<TransactionStatus> callback = inv.getArgument(0);
                 callback.accept(mock(TransactionStatus.class));
                 return null;
             })
@@ -189,7 +191,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void cancelLocalJobUnknownIsNoOp() {
             boolean cancelled = executor.cancelLocalJob(UUID.randomUUID(), "user-cancel");
 
-            org.assertj.core.api.Assertions.assertThat(cancelled).isFalse();
+            Assertions.assertThat(cancelled).isFalse();
             verify(sandboxManager, never()).cancel(any());
         }
 

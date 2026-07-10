@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -226,8 +227,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
     static final class FakeSandbox implements AttachedSandbox {
 
         private final UUID sessionId = UUID.randomUUID();
-        private final java.util.concurrent.LinkedBlockingDeque<JsonNode> sentFrames =
-            new java.util.concurrent.LinkedBlockingDeque<>();
+        private final LinkedBlockingDeque<JsonNode> sentFrames = new LinkedBlockingDeque<>();
         private final CopyOnWriteArrayList<Consumer<JsonNode>> listeners = new CopyOnWriteArrayList<>();
 
         @Override

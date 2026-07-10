@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -148,7 +151,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     List<PreparedConversationFact> findPreparedConversationFactsForRecipient(
         @Param("workspaceId") Long workspaceId,
         @Param("recipientUserId") Long recipientUserId,
-        org.springframework.data.domain.Pageable pageable
+        Pageable pageable
     );
 
     /** Projection: facts + practice for one PREPARED conversational unit (no body - composed at delivery). */
@@ -159,8 +162,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getPracticeName();
         String getTitle();
         String getReasoning();
-        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
-        de.tum.cit.aet.hephaestus.practices.model.WorkArtifact getArtifactType();
+        Severity getSeverity();
+        WorkArtifact getArtifactType();
         Long getArtifactId();
         Instant getPreparedAt();
     }

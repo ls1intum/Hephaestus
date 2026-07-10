@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -93,7 +94,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
             List.of(t1.getId(), t2.getId())
         );
 
-        Map<UUID, String> byThread = new java.util.HashMap<>();
+        Map<UUID, String> byThread = new HashMap<>();
         for (Object[] row : rows) {
             byThread.put((UUID) row[0], row[1] == null ? null : row[1].toString());
         }

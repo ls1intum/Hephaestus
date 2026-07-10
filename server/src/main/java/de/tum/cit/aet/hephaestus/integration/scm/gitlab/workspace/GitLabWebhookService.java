@@ -14,7 +14,9 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -297,7 +299,7 @@ public class GitLabWebhookService {
      * The cast inside the mutator is safe because we only reach this helper for workspaces
      * whose active SCM connection is GitLab (caller-side filtered by {@link #gitLabConfig}).
      */
-    private void updateGitLabConfig(long workspaceId, java.util.function.UnaryOperator<GitLabConfig> mutator) {
+    private void updateGitLabConfig(long workspaceId, UnaryOperator<GitLabConfig> mutator) {
         connectionService.updateConfig(workspaceId, IntegrationKind.GITLAB, cfg -> {
             if (!(cfg instanceof GitLabConfig gitLabCfg)) {
                 throw new IllegalStateException(
@@ -389,7 +391,7 @@ public class GitLabWebhookService {
                 }
                 return new GitLabHealthCandidate(ws, cfg.get().gitlabGroupId(), cfg.get().gitlabWebhookId());
             })
-            .filter(java.util.Objects::nonNull)
+            .filter(Objects::nonNull)
             .toList();
 
         if (gitLabWorkspaces.isEmpty()) return;

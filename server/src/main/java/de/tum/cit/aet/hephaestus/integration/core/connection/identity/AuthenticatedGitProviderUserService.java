@@ -13,6 +13,7 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -101,13 +102,13 @@ public class AuthenticatedGitProviderUserService {
 
         if (firstOfType(links, IdentityProviderType.GITHUB) != null) {
             throw new ResponseStatusException(
-                org.springframework.http.HttpStatus.CONFLICT,
+                HttpStatus.CONFLICT,
                 "You need to link your GitLab account before creating a GitLab workspace. Go to Settings → Linked Accounts to connect your GitLab identity."
             );
         }
 
         throw new ResponseStatusException(
-            org.springframework.http.HttpStatus.CONFLICT,
+            HttpStatus.CONFLICT,
             "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
         );
     }
@@ -174,7 +175,7 @@ public class AuthenticatedGitProviderUserService {
             // env-default registrations via userNameAttributeName("id")). A non-numeric subject
             // means a mis-configured registration mapped a mutable username as the subject.
             throw new ResponseStatusException(
-                org.springframework.http.HttpStatus.CONFLICT,
+                HttpStatus.CONFLICT,
                 "Linked " +
                     type +
                     " identity has a non-numeric subject; the account must be re-linked. Go to Settings → Linked Accounts."

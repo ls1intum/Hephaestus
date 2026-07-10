@@ -37,6 +37,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -328,9 +329,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             assertThat(result).isEqualTo(1);
 
             @SuppressWarnings("unchecked")
-            ArgumentCaptor<java.util.Collection<Long>> staleCaptor = ArgumentCaptor.forClass(
-                java.util.Collection.class
-            );
+            ArgumentCaptor<Collection<Long>> staleCaptor = ArgumentCaptor.forClass(Collection.class);
             verify(organizationMembershipRepository).deleteByOrganizationIdAndUserIdIn(eq(42L), staleCaptor.capture());
             assertThat(staleCaptor.getValue()).containsExactly(9999L);
         }
@@ -490,9 +489,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             // All existing memberships are stale — they get removed
             // (this is correct behavior: the group is now empty)
             @SuppressWarnings("unchecked")
-            ArgumentCaptor<java.util.Collection<Long>> staleCaptor = ArgumentCaptor.forClass(
-                java.util.Collection.class
-            );
+            ArgumentCaptor<Collection<Long>> staleCaptor = ArgumentCaptor.forClass(Collection.class);
             verify(organizationMembershipRepository).deleteByOrganizationIdAndUserIdIn(eq(42L), staleCaptor.capture());
             assertThat(staleCaptor.getValue()).containsExactlyInAnyOrder(1010L, 1020L);
         }

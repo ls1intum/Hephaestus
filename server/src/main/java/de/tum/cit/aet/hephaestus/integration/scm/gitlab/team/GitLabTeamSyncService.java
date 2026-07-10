@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -508,7 +509,7 @@ public class GitLabTeamSyncService {
     int syncTeamMembers(HttpGraphQlClient client, Long scopeId, Long teamId, String groupFullPath, Long providerId) {
         // Phase C.1: Fetch all members via GraphQL OUTSIDE a transaction
         // to avoid holding a DB connection during network I/O and throttle delays.
-        List<GitLabGroupMemberResponse> allMembers = new java.util.ArrayList<>();
+        List<GitLabGroupMemberResponse> allMembers = new ArrayList<>();
         boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
 
         // Phase C.2: Apply membership diff in a short transaction

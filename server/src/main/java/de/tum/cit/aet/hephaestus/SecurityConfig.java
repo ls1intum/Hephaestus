@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -55,7 +58,7 @@ public class SecurityConfig {
 
     public SecurityConfig(
         CorsProperties corsProperties,
-        org.springframework.core.env.Environment environment,
+        Environment environment,
         @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
         @Value("${hephaestus.auth.dev-login-enabled:false}") boolean devLoginEnabled,
         @Value("${hephaestus.auth.cookie-secure:true}") boolean cookieSecure,
@@ -63,7 +66,7 @@ public class SecurityConfig {
     ) {
         // Fail-closed: insecure cookies (Secure off, __Host- prefix dropped) are a local-http-E2E-only
         // affordance and must be impossible in production.
-        if (!cookieSecure && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"))) {
+        if (!cookieSecure && environment.acceptsProfiles(Profiles.of("prod"))) {
             throw new IllegalStateException(
                 "hephaestus.auth.cookie-secure must NOT be false under the 'prod' profile (fail-closed)."
             );
@@ -342,7 +345,7 @@ public class SecurityConfig {
         return repository;
     }
 
-    private static final java.util.Set<String> SAFE_METHODS = java.util.Set.of("GET", "HEAD", "OPTIONS", "TRACE");
+    private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
 
     /**
      * Single canonical matcher for the optional dev-trigger surface, shared by the authorize rules and

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.domain;
 import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -157,5 +158,71 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         @Param("slackTs") String slackTs,
         @Param("text") @Nullable String text,
         @Param("now") Instant now
+    );
+
+    /**
+     * Agent-owned {@code ConversationThreadProjection} SPI: the non-tombstoned turns of one thread (root
+     * {@code slack_ts = threadTs} + replies {@code slack_thread_ts = threadTs}), oldest first, with the author's
+     * linked login/name resolved via an ad-hoc {@code LEFT JOIN} on {@code User} (no FK — {@code authorMemberId} is
+     * a scalar firewall stamp). Consent-gated on the SAME read as the message fetch (not only on a prior thread
+     * scan): {@code c.consentState = ACTIVE} is a join predicate here, so a channel paused/revoked between enqueue
+     * and execution — or on a retry — yields zero rows atomically with the read, never a stale/leaked message.
+     * Workspace-pinned. Plain JPQL (no array operator needed here), unlike
+     * {@link SlackThreadRepository#findParticipatingThreadRows}.
+     *
+     * @param pageable caller passes {@code PageRequest.of(0, limit)} for the per-thread message cap
+     */
+    @Query(
+        """
+        SELECT new de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadMessageRow(
+            m.slackTs, m.authorSlackUserId, m.authorMemberId, u.login, u.name, m.text, m.editedAt
+        )
+        FROM SlackMessage m
+        JOIN SlackMonitoredChannel c ON c.workspaceId = m.workspaceId AND c.slackChannelId = m.slackChannelId
+        LEFT JOIN de.tum.cit.aet.hephaestus.integration.scm.domain.user.User u ON u.id = m.authorMemberId
+        WHERE m.workspaceId = :workspaceId
+          AND m.slackChannelId = :channelId
+          AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs)
+          AND m.deletedAt IS NULL
+          AND c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
+        ORDER BY m.slackTs ASC
+        """
+    )
+    List<SlackThreadMessageRow> findThreadMessages(
+        @Param("workspaceId") long workspaceId,
+        @Param("channelId") String channelId,
+        @Param("threadTs") String threadTs,
+        Pageable pageable
+    );
+
+    /**
+     * Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread
+     * (root {@code slack_ts = threadTs} + replies {@code slack_thread_ts = threadTs}), workspace-pinned.
+     */
+    @Query(
+        "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId " +
+            "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL"
+    )
+    long countLiveTurns(
+        @Param("workspaceId") long workspaceId,
+        @Param("channelId") String channelId,
+        @Param("threadTs") String threadTs
+    );
+
+    /**
+     * Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread whose
+     * {@code slack_ts} is strictly greater than {@code watermark} (lexicographic — the same Slack-{@code ts}
+     * ordering invariant {@link SlackThreadRepository#upsertOnMessage} relies on), workspace-pinned.
+     */
+    @Query(
+        "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId " +
+            "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL " +
+            "AND m.slackTs > :watermark"
+    )
+    long countLiveTurnsSince(
+        @Param("workspaceId") long workspaceId,
+        @Param("channelId") String channelId,
+        @Param("threadTs") String threadTs,
+        @Param("watermark") String watermark
     );
 }

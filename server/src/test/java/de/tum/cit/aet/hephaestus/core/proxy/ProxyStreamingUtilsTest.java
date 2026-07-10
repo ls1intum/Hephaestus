@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -276,7 +277,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             when(resp.headers()).thenReturn(respHeaders);
             when(respHeaders.asHttpHeaders()).thenReturn(headers);
             when(respHeaders.contentType()).thenReturn(Optional.ofNullable(contentType));
-            when(resp.statusCode()).thenReturn(org.springframework.http.HttpStatusCode.valueOf(status));
+            when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
             when(resp.bodyToMono(byte[].class)).thenReturn(body != null ? Mono.just(body) : Mono.empty());
             return resp;
         }
@@ -292,7 +293,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             when(resp.headers()).thenReturn(respHeaders);
             when(respHeaders.asHttpHeaders()).thenReturn(headers);
             when(respHeaders.contentType()).thenReturn(Optional.of(ct));
-            when(resp.statusCode()).thenReturn(org.springframework.http.HttpStatusCode.valueOf(status));
+            when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
             when(resp.bodyToFlux(DataBuffer.class)).thenReturn(sseFlux);
             return resp;
         }
@@ -303,7 +304,7 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             when(resp.headers()).thenReturn(respHeaders);
             when(respHeaders.asHttpHeaders()).thenReturn(headers);
             when(respHeaders.contentType()).thenReturn(Optional.of(MediaType.APPLICATION_JSON));
-            when(resp.statusCode()).thenReturn(org.springframework.http.HttpStatusCode.valueOf(status));
+            when(resp.statusCode()).thenReturn(HttpStatusCode.valueOf(status));
             when(resp.bodyToMono(byte[].class)).thenReturn(Mono.empty());
             return resp;
         }

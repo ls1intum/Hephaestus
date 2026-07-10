@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -205,7 +206,7 @@ class WorkspaceProvisioningServiceTest {
 
         when(workspaceRepository.count()).thenReturn(1L);
         when(workspaceRepository.findByWorkspaceSlug("aet-org")).thenReturn(Optional.empty());
-        when(workspaceRepository.findAll()).thenReturn(java.util.List.of(workspace));
+        when(workspaceRepository.findAll()).thenReturn(List.of(workspace));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
         when(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), admin.getId())).thenReturn(
             Optional.empty()
@@ -253,9 +254,7 @@ class WorkspaceProvisioningServiceTest {
         when(workspaceRepository.findAllByAccountLoginIgnoreCase("hephaestustest")).thenReturn(
             List.of(gitlabWorkspace, githubDuplicate)
         );
-        when(connectionService.findActive(10L, IntegrationKind.GITLAB)).thenReturn(
-            Optional.of(mock(de.tum.cit.aet.hephaestus.integration.core.connection.Connection.class))
-        );
+        when(connectionService.findActive(10L, IntegrationKind.GITLAB)).thenReturn(Optional.of(mock(Connection.class)));
 
         provisioningService.bootstrapDefaultGitLabPatWorkspace();
 

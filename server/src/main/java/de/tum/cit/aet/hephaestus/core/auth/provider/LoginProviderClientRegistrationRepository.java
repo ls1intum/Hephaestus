@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import java.time.Duration;
+import java.util.Iterator;
 import java.util.List;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -69,7 +70,7 @@ public class LoginProviderClientRegistrationRepository
     }
 
     @Override
-    public java.util.Iterator<ClientRegistration> iterator() {
+    public Iterator<ClientRegistration> iterator() {
         return listRegistrations().iterator();
     }
 

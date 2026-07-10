@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TokenRefresher;
-import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -53,7 +52,6 @@ public class IntegrationFrameworkBootstrap {
     public IntegrationFrameworkBootstrap(
         IntegrationManifestRegistry manifests,
         List<WebhookSignatureVerifier> signatureVerifiers,
-        @SuppressWarnings("unused") List<WebhookSecretSource> secretSources,
         List<SubjectKeyDeriver> subjectKeyDerivers,
         List<SubjectParser> subjectParsers,
         List<ApiCredentialProvider> credentialProviders,
@@ -107,6 +105,10 @@ public class IntegrationFrameworkBootstrap {
         );
 
         if (declared.contains(Capability.WEBHOOK_INGEST)) {
+            // No WebhookSecretSource check here: Slack resolves its signing secret via
+            // SlackSignatureVerifier, not this SPI, so requiring it would fail Slack's boot;
+            // GitHub/GitLab still self-validate at construction time in their
+            // WebhookSignatureVerifier (missing-bean DI failure / IllegalStateException).
             if (webhookRoleEnabled) {
                 require(
                     kind,

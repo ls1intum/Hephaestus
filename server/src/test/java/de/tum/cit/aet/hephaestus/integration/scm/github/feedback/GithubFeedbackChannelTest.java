@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
@@ -23,6 +24,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -115,7 +117,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         when(spec.variable(any(), any())).thenReturn(spec);
 
         ClientGraphQlResponse errorResponse = mock(ClientGraphQlResponse.class);
-        when(errorResponse.getErrors()).thenReturn(List.of(mock(org.springframework.graphql.ResponseError.class)));
+        when(errorResponse.getErrors()).thenReturn(List.of(mock(ResponseError.class)));
         when(spec.execute()).thenReturn(Mono.just(errorResponse));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
@@ -144,9 +146,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("new body", "marker"));
 
-        assertThat(outcome.kind()).isEqualTo(
-            de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.UpdateOutcome.Kind.EDITED
-        );
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.EDITED);
         assertThat(outcome.handle().externalId()).isEqualTo("IC_edited");
         verify(spec).variable("id", "IC_prior");
     }
@@ -174,9 +174,7 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
 
-        assertThat(outcome.kind()).isEqualTo(
-            de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.UpdateOutcome.Kind.TRANSIENT
-        );
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
     @Test
@@ -196,16 +194,14 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         when(spec.variable(any(), any())).thenReturn(spec);
 
         ClientGraphQlResponse errorResponse = mock(ClientGraphQlResponse.class);
-        org.springframework.graphql.ResponseError err = mock(org.springframework.graphql.ResponseError.class);
+        ResponseError err = mock(ResponseError.class);
         when(err.getMessage()).thenReturn("Could not resolve to a node with the global id of 'IC_prior'");
         when(errorResponse.getErrors()).thenReturn(List.of(err));
         when(spec.execute()).thenReturn(Mono.just(errorResponse));
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
 
-        assertThat(outcome.kind()).isEqualTo(
-            de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.UpdateOutcome.Kind.GONE
-        );
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
     @Test

@@ -2,13 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
-import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAsyncConfiguration;
 import de.tum.cit.aet.hephaestus.testconfig.TestSecurityConfig;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -27,24 +25,27 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Drives the <b>production</b> Slack conversation SPIs against the <b>real Liquibase schema</b> so the raw-JDBC
- * {@code bigint[]} / {@code VARCHAR(32)} paths run over the migrated column types. Boots the full
- * {@code db/master.xml} on a dedicated Testcontainer with {@code ddl-auto=validate}, exactly like
+ * Drives the <b>production</b> Slack conversation SPIs against the <b>real Liquibase schema</b> so the one
+ * remaining native-SQL path in {@code integration.slack.conversation} runs over the migrated column type. Boots
+ * the full {@code db/master.xml} on a dedicated Testcontainer with {@code ddl-auto=validate}, exactly like
  * {@code ObservationAssessmentBackfillIntegrationTest}.
  *
- * <p>What each hop uniquely pins (all against changesets {@code 1782980500800-12/-13}):
- * <ul>
- *   <li>{@link SlackConversationProjector#buildPayload} — the participant firewall over the real
- *       {@code ? = ANY(participant_member_ids)} GIN membership test (a participant sees the thread; a non-participant
- *       does not). If {@code -12} were {@code TEXT[]} the {@code CAST(... AS bigint[])} seed / decode breaks and the
- *       participant is lost.</li>
- *   <li>{@link SlackConversationCandidateSource#settledCandidates} — the {@code _int8} array decode through
- *       {@code readLongArray} returns the real {@code {100,101}} participant ids (empty if the column type drifted,
- *       which would silently enqueue nothing downstream).</li>
- *   <li>{@link SlackConversationCandidateSource#markReviewed} then re-scan — the {@code last_ts > last_reviewed_ts}
- *       growth watermark compares two real {@code VARCHAR(32)} Slack-ts strings; if {@code -13} drifted to
- *       {@code timestamptz} the stamp/compare breaks.</li>
- * </ul>
+ * <p><b>Why this test shrank.</b> The conversation package used to hand-roll every read as raw
+ * {@code JdbcTemplate} SQL, including its own {@code bigint[]} {@code ResultSet.getArray()} decode — bespoke code
+ * that could silently drift from the real changelog column types, which is what this test originally existed to
+ * pin (three hops: the participant firewall, the candidate scan's array decode, and the watermark compare). That
+ * raw-JDBC tunnel is gone: every read now rides a Spring Data repository. Plain JPQL reads/writes (the settled-
+ * candidate scan, the watermark advance, the message projection) are ordinary Hibernate-mapped fields — protected
+ * by {@code ddl-auto=validate} at boot and by Hibernate's own (well-tested) {@code @JdbcTypeCode(SqlTypes.ARRAY)}
+ * marshalling, not by bespoke code of ours — so they no longer need a dedicated contract test here.
+ *
+ * <p>What's left, and still IS a hand-written native {@code @Query} that can drift silently against changeset
+ * {@code 1782980500800-12}: {@link SlackThreadRepository#findParticipatingThreadRows}' real Postgres
+ * {@code ? = ANY(participant_member_ids)} GIN membership test, exercised end-to-end through
+ * {@link SlackConversationProjector#buildPayload} (a participant sees the thread; a non-participant does not). If
+ * {@code -12} were {@code TEXT[]} the array literal seed / {@code ANY(...)} match breaks and the participant is
+ * lost — exactly the drift class this test catches that a unit test against the fast, entity-derived schema
+ * cannot.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -89,14 +90,11 @@ class SlackConversationSchemaContractIntegrationTest {
     private SlackConversationProjector projector;
 
     @Autowired
-    private SlackConversationCandidateSource candidateSource;
-
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("production SPIs drive the real bigint[]/VARCHAR(32) columns: firewall, decode, and watermark")
-    void productionSpisDriveTheMigratedColumnTypes() {
+    @DisplayName("participant firewall drives the real bigint[] column: ANY(participant_member_ids) over Postgres")
+    void participantFirewallDrivesTheMigratedArrayColumn() {
         SlackConversationTestSupport support = new SlackConversationTestSupport(jdbcTemplate);
         // Real schema already has the migrated column types. Replica mode keeps fixture seeding independent of
         // unrelated workspace rows.
@@ -112,15 +110,7 @@ class SlackConversationSchemaContractIntegrationTest {
         );
         jdbcTemplate.execute("SET session_replication_role = 'origin'");
 
-        long threadId = jdbcTemplate.queryForObject(
-            "SELECT id FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
-            Long.class,
-            WS,
-            CHANNEL,
-            ROOT_TS
-        );
-
-        // Hop 1 — participant firewall over the real GIN `? = ANY(participant_member_ids)`.
+        // The real GIN `? = ANY(participant_member_ids)` native query: a participant sees the thread…
         ObjectNode forParticipant = projector.buildPayload(WS, 100L);
         assertThat(conversations(forParticipant)).as("a participant (100) sees the thread").hasSize(1);
         assertThat(conversations(forParticipant).get(0).get("channelName").asString()).isEqualTo("engineering");
@@ -129,31 +119,12 @@ class SlackConversationSchemaContractIntegrationTest {
             conversations(forParticipant).get(0).get("messages").get(0).get("authorMemberId").asLong()
         ).isEqualTo(100L);
 
+        // …a non-participant sees nothing. If changeset 1782980500800-12 drifted off bigint[], the array-literal
+        // seed above or the ANY(...) match itself would fail (a type mismatch or a broken membership test), so the
+        // PARTICIPANT assertion above is what actually pins the real column type — this one just confirms the
+        // firewall isn't vacuously true (e.g. "everyone sees everything").
         ObjectNode forOutsider = projector.buildPayload(WS, 999L);
         assertThat(conversations(forOutsider)).as("a non-participant (999) sees nothing").isEmpty();
-
-        // Hop 2 — the _int8 array decode returns the real participant ids.
-        ConversationThreadCandidate candidate = settledForWorkspace(WS);
-        assertThat(candidate).as("the settled thread is a candidate").isNotNull();
-        assertThat(candidate.participantMemberIds())
-            .as("participant_member_ids decode through readLongArray on the real _int8 column")
-            .containsExactly(100L, 101L);
-        assertThat(candidate.lastTs()).isEqualTo(LAST_TS);
-
-        // Hop 3 — advance the VARCHAR(32) watermark; the now-quiescent thread drops out of the settled scan.
-        candidateSource.markReviewed(WS, threadId, LAST_TS);
-        assertThat(settledForWorkspace(WS))
-            .as("after markReviewed (last_ts == last_reviewed_ts) the thread is no longer settled")
-            .isNull();
-    }
-
-    private ConversationThreadCandidate settledForWorkspace(long workspaceId) {
-        return candidateSource
-            .settledCandidates(4)
-            .stream()
-            .filter(c -> c.workspaceId() == workspaceId)
-            .findFirst()
-            .orElse(null);
     }
 
     private static ArrayNode conversations(ObjectNode payload) {

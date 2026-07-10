@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -382,10 +383,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             return findOrCreateLabel(dto, repository);
         }
 
-        de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext callResolveContext(
-            String path,
-            String action
-        ) {
+        ProcessingContext callResolveContext(String path, String action) {
             return resolveContext(path, action);
         }
     }

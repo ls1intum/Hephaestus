@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -65,10 +66,7 @@ public class PracticeDetectionResultParser {
      * {@code OUTPUT_PATH} = {@code WORKSPACE_ROOT + "/out"}, so strip the root and the leading slash, then append one.
      */
     private static final String OUTPUT_RELATIVE_PREFIX =
-        de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.OUTPUT_PATH.substring(
-            de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.WORKSPACE_ROOT.length() + 1
-        ) +
-        "/";
+        SandboxLayout.OUTPUT_PATH.substring(SandboxLayout.WORKSPACE_ROOT.length() + 1) + "/";
 
     /** Maximum length for the pre-rendered MR/PR summary note (matches PullRequestCommentPoster.MAX_BODY_LENGTH). */
     static final int MAX_MR_NOTE_LENGTH = 60_000;
@@ -230,12 +228,12 @@ public class PracticeDetectionResultParser {
 
         // Reject internal workspace paths — agent sometimes hallucinates inputs/context/ or work/analysis/ paths
         if (
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.CONTEXT_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRACTICES_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.ANALYSIS_PREFIX) ||
+            filePath.startsWith(SandboxLayout.CONTEXT_PREFIX) ||
+            filePath.startsWith(SandboxLayout.PRACTICES_PREFIX) ||
+            filePath.startsWith(SandboxLayout.ANALYSIS_PREFIX) ||
             filePath.startsWith(OUTPUT_RELATIVE_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_PREFIX) ||
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_OUT_PREFIX)
+            filePath.startsWith(SandboxLayout.PRECOMPUTE_PREFIX) ||
+            filePath.startsWith(SandboxLayout.PRECOMPUTE_OUT_PREFIX)
         ) {
             log.debug(
                 "Skipping suggestedDiffNote with internal path at finding {}, index {}: {}",

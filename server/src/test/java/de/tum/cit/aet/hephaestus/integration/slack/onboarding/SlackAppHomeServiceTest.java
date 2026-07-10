@@ -29,6 +29,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import tools.jackson.databind.json.JsonMapper;
 
 class SlackAppHomeServiceTest extends BaseUnitTest {
@@ -75,12 +76,12 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
             onboardingService,
             uiLinks
         );
-        org.mockito.Mockito.lenient().when(mentorReadinessQuery.isReady(7L)).thenReturn(true);
-        org.mockito.Mockito.lenient()
+        Mockito.lenient().when(mentorReadinessQuery.isReady(7L)).thenReturn(true);
+        Mockito.lenient()
             .when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(7L, ConsentState.ACTIVE))
             .thenReturn(1L);
-        org.mockito.Mockito.lenient().when(uiLinks.workspaceHomeUrl(7L)).thenReturn("https://heph.example/w/team");
-        org.mockito.Mockito.lenient().when(uiLinks.userSettingsUrl()).thenReturn("https://heph.example/settings");
+        Mockito.lenient().when(uiLinks.workspaceHomeUrl(7L)).thenReturn("https://heph.example/w/team");
+        Mockito.lenient().when(uiLinks.userSettingsUrl()).thenReturn("https://heph.example/settings");
     }
 
     @Test

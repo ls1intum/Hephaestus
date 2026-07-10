@@ -12,6 +12,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -66,7 +67,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
      * Spring-wired constructor. The key is bound via {@link SecurityProperties}; the active
      * profile string still comes through {@code @Value} so the prod fail-fast check is identical.
      */
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public EncryptedStringConverter(
         SecurityProperties securityProperties,
         @Value("${spring.profiles.active:}") String activeProfiles

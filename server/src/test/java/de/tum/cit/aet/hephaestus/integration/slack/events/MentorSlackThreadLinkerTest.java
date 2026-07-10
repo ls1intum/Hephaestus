@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
@@ -54,7 +55,7 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
 
         assertThat(result).isEqualTo(existing);
         verifyNoInteractions(mentorSlackThreadService);
-        verify(mentorSlackThreadRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(mentorSlackThreadRepository, never()).save(ArgumentMatchers.any());
     }
 
     @Test

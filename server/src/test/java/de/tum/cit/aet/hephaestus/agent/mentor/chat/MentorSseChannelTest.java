@@ -13,6 +13,8 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -196,7 +198,7 @@ class MentorSseChannelTest extends BaseUnitTest {
         // Drive lastSendNanos far in the past so EVERY tick attempts a write.
         java.lang.reflect.Field lastSendField = MentorSseChannel.class.getDeclaredField("lastSendNanos");
         lastSendField.setAccessible(true);
-        ((java.util.concurrent.atomic.AtomicLong) lastSendField.get(channel)).set(0L);
+        ((AtomicLong) lastSendField.get(channel)).set(0L);
 
         int total = 200;
         var sender = new Thread(() -> {
@@ -226,7 +228,7 @@ class MentorSseChannelTest extends BaseUnitTest {
         private boolean failOnNextSend;
         private Runnable completionCallback;
         private Runnable timeoutCallback;
-        private java.util.function.Consumer<Throwable> errorCallback;
+        private Consumer<Throwable> errorCallback;
 
         @Override
         public void send(SseEventBuilder builder) throws IOException {
@@ -264,7 +266,7 @@ class MentorSseChannelTest extends BaseUnitTest {
         }
 
         @Override
-        public void onError(java.util.function.Consumer<Throwable> callback) {
+        public void onError(Consumer<Throwable> callback) {
             this.errorCallback = callback;
         }
 

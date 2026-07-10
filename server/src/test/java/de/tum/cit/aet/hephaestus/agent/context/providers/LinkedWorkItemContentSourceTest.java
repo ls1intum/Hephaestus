@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryMan
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -330,10 +331,10 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             1,
             0,
             1,
-            java.util.List.of(),
-            java.util.List.of()
+            List.of(),
+            List.of()
         );
-        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head")).thenReturn(java.util.List.of(commit));
+        when(gitRepositoryManager.walkCommits(REPO_ID, "base", "head")).thenReturn(List.of(commit));
         when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 77)).thenReturn(
             Optional.of(issue(77, "Crash on launch", "criteria"))
         );

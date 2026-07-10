@@ -12,11 +12,13 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 
 class SandboxNetworkManagerTest extends BaseUnitTest {
 
@@ -157,7 +159,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
 
         @Test
         void shouldCacheContainerId() {
-            var callCount = new java.util.concurrent.atomic.AtomicInteger(0);
+            var callCount = new AtomicInteger(0);
             SandboxProperties propsNoId = new SandboxProperties(
                 "unix:///var/run/docker.sock",
                 false,
@@ -218,7 +220,7 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
             // Should not throw — silently skips disconnect
             mgr.disconnectAppServer(NETWORK_ID);
 
-            verify(networkOps, org.mockito.Mockito.never()).disconnectFromNetwork(anyString(), anyString());
+            verify(networkOps, Mockito.never()).disconnectFromNetwork(anyString(), anyString());
         }
     }
 

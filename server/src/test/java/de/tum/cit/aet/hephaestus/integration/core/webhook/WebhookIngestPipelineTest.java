@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -266,7 +267,7 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
 
     @Test
     void duplicateVerifierRejected() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+        Assertions.assertThatThrownBy(() ->
             new WebhookIngestPipeline(
                 List.of(
                     stubVerifier(IntegrationKind.GITHUB, new VerificationResult.Verified()),
@@ -283,7 +284,7 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
 
     @Test
     void duplicateDeriverRejected() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+        Assertions.assertThatThrownBy(() ->
             new WebhookIngestPipeline(
                 List.of(),
                 List.of(stubDeriver(IntegrationKind.GITHUB, "s", "d"), stubDeriver(IntegrationKind.GITHUB, "s", "d")),

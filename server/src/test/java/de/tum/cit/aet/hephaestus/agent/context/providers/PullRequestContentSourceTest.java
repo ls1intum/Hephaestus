@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +56,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     private GitDiffOperations gitDiffOperations;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+    private ConnectionService connectionService;
 
     private static final Long WORKSPACE_ID = 99L;
 
@@ -195,7 +197,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void truncatesComments() throws Exception {
-            var comments = new java.util.ArrayList<PullRequestReviewComment>();
+            var comments = new ArrayList<PullRequestReviewComment>();
             for (int i = 0; i < PullRequestContentSource.MAX_COMMENTS + 100; i++) {
                 PullRequestReviewComment c = new PullRequestReviewComment();
                 c.setPath("file.java");

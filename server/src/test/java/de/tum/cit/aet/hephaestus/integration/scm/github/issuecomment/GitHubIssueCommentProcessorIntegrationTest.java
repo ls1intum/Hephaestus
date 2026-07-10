@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -255,9 +256,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + TEST_COMMENT_ID
             );
-            existing.setAuthorAssociation(
-                de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation.OWNER
-            );
+            existing.setAuthorAssociation(AuthorAssociation.OWNER);
             existing.setCreatedAt(Instant.now());
             existing.setIssue(testIssue);
             commentRepository.save(existing);

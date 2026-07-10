@@ -13,6 +13,11 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Core Architecture Tests - Critical architectural invariants.
@@ -131,10 +136,10 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         void controllersDoNotAccessRepositories() {
             ArchRule rule = noClasses()
                 .that()
-                .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .areAnnotatedWith(RestController.class)
                 .should()
                 .dependOnClassesThat()
-                .areAnnotatedWith(org.springframework.stereotype.Repository.class)
+                .areAnnotatedWith(Repository.class)
                 .because("Controllers should delegate to services, not access data layer directly");
             rule.check(classes);
         }
@@ -186,9 +191,9 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         void transactionalNotOnControllers() {
             ArchRule rule = noClasses()
                 .that()
-                .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .areAnnotatedWith(RestController.class)
                 .should()
-                .beAnnotatedWith(org.springframework.transaction.annotation.Transactional.class)
+                .beAnnotatedWith(Transactional.class)
                 .because("Transaction boundaries should be defined in the service layer");
             rule.check(classes);
         }
@@ -203,7 +208,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         void configurationClassesHaveConfigSuffix() {
             ArchRule rule = classes()
                 .that()
-                .areAnnotatedWith(org.springframework.context.annotation.Configuration.class)
+                .areAnnotatedWith(Configuration.class)
                 .should()
                 .haveSimpleNameEndingWith("Config")
                 .orShould()
@@ -222,7 +227,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         void repositoriesExtendSpringData() {
             ArchRule rule = classes()
                 .that()
-                .areAnnotatedWith(org.springframework.stereotype.Repository.class)
+                .areAnnotatedWith(Repository.class)
                 .and()
                 .areInterfaces()
                 .should()
@@ -331,7 +336,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         void controllerNaming() {
             ArchRule rule = classes()
                 .that()
-                .areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .areAnnotatedWith(RestController.class)
                 .should()
                 .haveSimpleNameEndingWith("Controller")
                 .because("Consistent naming improves code discoverability");
@@ -342,7 +347,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         void repositoryNaming() {
             ArchRule rule = classes()
                 .that()
-                .areAnnotatedWith(org.springframework.stereotype.Repository.class)
+                .areAnnotatedWith(Repository.class)
                 .should()
                 .haveSimpleNameEndingWith("Repository")
                 .because("Consistent naming improves code discoverability");
@@ -369,7 +374,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
                 .that()
                 .resideInAPackage("..adapter..")
                 .should()
-                .beAnnotatedWith(org.springframework.stereotype.Service.class)
+                .beAnnotatedWith(Service.class)
                 .because("Adapters are infrastructure glue, not business services - use @Component");
             rule.check(classes);
         }

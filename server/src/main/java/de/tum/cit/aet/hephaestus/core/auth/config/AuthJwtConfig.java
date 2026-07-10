@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import jakarta.annotation.PostConstruct;
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 
 /**
@@ -53,7 +55,7 @@ public class AuthJwtConfig {
         AuthProperties properties,
         CacheManager cacheManager,
         Clock authClock,
-        de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics authMetrics
+        AuthMetrics authMetrics
     ) {
         return new RevocationAwareJwtDecoder(
             keyService,
@@ -94,7 +96,7 @@ public class AuthJwtConfig {
      * the framework {@link BearerTokenResolver} interface, not the non-exposed {@code core} internals.
      */
     @Bean
-    @org.springframework.context.annotation.Primary
+    @Primary
     public BearerTokenResolver hephaestusBearerTokenResolver(CookieBearerTokenResolver cookieBearerTokenResolver) {
         return cookieBearerTokenResolver;
     }

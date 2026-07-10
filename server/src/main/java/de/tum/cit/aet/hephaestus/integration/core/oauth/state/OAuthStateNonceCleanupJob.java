@@ -9,6 +9,7 @@ import java.time.Instant;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +41,7 @@ public class OAuthStateNonceCleanupJob {
     private final Counter prunedCounter;
 
     /** Spring-wired constructor; retention binds via {@link OAuthStateProperties}. */
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public OAuthStateNonceCleanupJob(
         OAuthStateNonceRepository repository,
         OAuthStateProperties properties,

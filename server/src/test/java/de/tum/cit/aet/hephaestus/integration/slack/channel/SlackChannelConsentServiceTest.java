@@ -24,20 +24,29 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * State-machine unit tests for {@link SlackChannelConsentService}. Deterministic (all collaborators mocked): each
@@ -89,21 +98,19 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     }
 
     /** A TransactionTemplate over a no-op manager: callbacks run inline so unit tests need no real tx. */
-    private static org.springframework.transaction.support.TransactionTemplate inlineTransactionTemplate() {
-        return new org.springframework.transaction.support.TransactionTemplate(
-            new org.springframework.transaction.PlatformTransactionManager() {
+    private static TransactionTemplate inlineTransactionTemplate() {
+        return new TransactionTemplate(
+            new PlatformTransactionManager() {
                 @Override
-                public org.springframework.transaction.TransactionStatus getTransaction(
-                    org.springframework.transaction.TransactionDefinition definition
-                ) {
-                    return new org.springframework.transaction.support.SimpleTransactionStatus();
+                public TransactionStatus getTransaction(TransactionDefinition definition) {
+                    return new SimpleTransactionStatus();
                 }
 
                 @Override
-                public void commit(org.springframework.transaction.TransactionStatus status) {}
+                public void commit(TransactionStatus status) {}
 
                 @Override
-                public void rollback(org.springframework.transaction.TransactionStatus status) {}
+                public void rollback(TransactionStatus status) {}
             }
         );
     }
@@ -139,9 +146,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         // Announcement posted as non-empty Block Kit (the one-click opt-out) with the plain-language fallback +
         // forward-only boundary stamped + state advanced.
-        ArgumentCaptor<java.util.List<com.slack.api.model.block.LayoutBlock>> blocksCaptor = ArgumentCaptor.forClass(
-            java.util.List.class
-        );
+        ArgumentCaptor<List<com.slack.api.model.block.LayoutBlock>> blocksCaptor = ArgumentCaptor.forClass(List.class);
         verify(slackMessageService).sendForWorkspace(
             eq(WS),
             eq(CHANNEL),
@@ -177,7 +182,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         verifyNoInteractions(slackMessageService);
         assertThat(c.getConsentAnnouncedAt()).isEqualTo(originalAnnouncedAt);
         assertThat(c.getConsentState()).isEqualTo(ConsentState.ACTIVE);
-        verify(consentEventRepository).save(org.mockito.ArgumentMatchers.any());
+        verify(consentEventRepository).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -244,7 +249,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             case NOOP -> {
                 SlackMonitoredChannelDTO dto = svc.transition(WS, CHANNEL, target, null);
                 assertThat(dto.consentState()).isEqualTo(from);
-                verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
+                verify(monitoredChannelRepository, never()).save(ArgumentMatchers.any());
                 verifyNoInteractions(ingestService, consentEventRepository, slackMessageService);
             }
             case ILLEGAL -> {
@@ -252,7 +257,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
                     SlackChannelConsentViolationException.class
                 );
                 // Guard rejects before any mutation, side effect, or audit write.
-                verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
+                verify(monitoredChannelRepository, never()).save(ArgumentMatchers.any());
                 verifyNoInteractions(ingestService, consentEventRepository);
             }
             case LEGAL -> {
@@ -293,7 +298,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         assertThat(c.getConsentState()).isEqualTo(ConsentState.PENDING);
         verify(monitoredChannelRepository, never()).save(c);
-        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(consentEventRepository, never()).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -315,13 +320,13 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         when(connectionService.findSlackNotificationConfig(WS)).thenReturn(
             Optional.of(new ConnectionConfig.SlackConfig("T1", null, null, null, null, Set.of()))
         );
-        when(monitoredChannelRepository.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+        when(monitoredChannelRepository.save(ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
 
         SlackChannelConsentService.RegistrationOutcome outcome = service().register(WS, CHANNEL, "general");
 
         assertThat(outcome.created()).isTrue();
         assertThat(outcome.channel().consentState()).isEqualTo(ConsentState.PENDING);
-        verify(monitoredChannelRepository).save(org.mockito.ArgumentMatchers.any());
+        verify(monitoredChannelRepository).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -369,24 +374,21 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             EntityNotFoundException.class
         );
 
-        verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(monitoredChannelRepository, never()).save(ArgumentMatchers.any());
     }
 
     // --- platform-event wrappers (guard-first, no-op tolerant: they run on the NATS consumer with no actor) ---
 
-    @org.junit.jupiter.params.ParameterizedTest(name = "pauseForPlatformEvent on {0} is a no-op")
-    @org.junit.jupiter.params.provider.EnumSource(
-        value = ConsentState.class,
-        names = { "PENDING", "PAUSED", "REVOKED" }
-    )
+    @ParameterizedTest(name = "pauseForPlatformEvent on {0} is a no-op")
+    @EnumSource(value = ConsentState.class, names = { "PENDING", "PAUSED", "REVOKED" })
     void pauseForPlatformEvent_nonActive_isANoOp(ConsentState state) {
         SlackMonitoredChannel c = channel(state, null);
         stubChannel(c);
 
         service().pauseForPlatformEvent(WS, CHANNEL, "bot removed from channel");
 
-        verify(monitoredChannelRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(monitoredChannelRepository, never()).save(ArgumentMatchers.any());
+        verify(consentEventRepository, never()).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -411,11 +413,11 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         service().pauseForPlatformEvent(WS, CHANNEL, "bot removed from channel");
 
-        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(consentEventRepository, never()).save(ArgumentMatchers.any());
     }
 
-    @org.junit.jupiter.params.ParameterizedTest(name = "revokeForPlatformEvent from {0} erases and audits")
-    @org.junit.jupiter.params.provider.EnumSource(value = ConsentState.class, names = { "PENDING", "ACTIVE", "PAUSED" })
+    @ParameterizedTest(name = "revokeForPlatformEvent from {0} erases and audits")
+    @EnumSource(value = ConsentState.class, names = { "PENDING", "ACTIVE", "PAUSED" })
     void revokeForPlatformEvent_erasesAndAudits(ConsentState from) {
         SlackMonitoredChannel c = channel(from, null);
         stubChannel(c);
@@ -436,11 +438,8 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         service().revokeForPlatformEvent(WS, CHANNEL, "channel deleted in Slack");
 
-        verify(ingestService, never()).eraseChannel(
-            org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.any()
-        );
-        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(ingestService, never()).eraseChannel(ArgumentMatchers.anyLong(), ArgumentMatchers.any());
+        verify(consentEventRepository, never()).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -448,7 +447,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         service().renameChannel(WS, CHANNEL, "renamed");
 
         verify(monitoredChannelRepository).updateChannelName(WS, CHANNEL, "renamed");
-        verify(consentEventRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(consentEventRepository, never()).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -456,9 +455,9 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         service().renameChannel(WS, CHANNEL, "  ");
 
         verify(monitoredChannelRepository, never()).updateChannelName(
-            org.mockito.ArgumentMatchers.anyLong(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any()
+            ArgumentMatchers.anyLong(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any()
         );
     }
 
@@ -475,8 +474,6 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
 
         assertThat(c.getConsentState()).isEqualTo(ConsentState.ACTIVE);
         assertThat(c.getLastHistorySyncedTs()).isNotNull();
-        assertThat(
-            de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs.toEpochMicros(c.getLastHistorySyncedTs())
-        ).isNotNull();
+        assertThat(SlackTs.toEpochMicros(c.getLastHistorySyncedTs())).isNotNull();
     }
 }

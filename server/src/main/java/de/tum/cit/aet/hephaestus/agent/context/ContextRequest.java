@@ -73,9 +73,13 @@ public sealed interface ContextRequest
 
     /**
      * Build the materialised conversation-detection context: the ordered human turns of one
-     * settled Slack thread, materialised as {@code inputs/context/conversation_thread.json} — NO diff,
-     * NO code, NO SCM source. Carries the {@link AgentJob} the practice runner executes; the thread is
-     * identified by {@code slack_channel_id} / {@code slack_thread_ts} in the job metadata.
+     * settled Slack thread, materialised as {@code inputs/context/conversation_thread.json}, plus the
+     * same workspace-level cross-artifact context {@code IssueReviewRequest} carries (the project
+     * inventory) — aggregated across every repository the workspace monitors, since a conversation
+     * isn't anchored to one repository. NO diff, NO code, NO repository clone: providers that require a
+     * mounted worktree stay {@code PracticeReviewRequest}-only. Carries the {@link AgentJob} the practice
+     * runner executes; the thread is identified by {@code slack_channel_id} / {@code slack_thread_ts} in
+     * the job metadata.
      */
     record ConversationReviewRequest(AgentJob job) implements ContextRequest {
         public ConversationReviewRequest {

@@ -10,6 +10,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 /** Bans unnamed {@code @UniqueConstraint} on JPA entities so Hibernate's implicit naming can't drift from Liquibase. */
@@ -40,7 +41,7 @@ class JpaEntityNamingArchitectureTest extends HephaestusArchitectureTest {
                                 entityClass,
                                 "%s declares an unnamed @UniqueConstraint(columnNames=%s); add name=\"uq_<table>_<cols>\"".formatted(
                                     entityClass.getName(),
-                                    java.util.Arrays.toString(uc.columnNames())
+                                    Arrays.toString(uc.columnNames())
                                 )
                             )
                         );

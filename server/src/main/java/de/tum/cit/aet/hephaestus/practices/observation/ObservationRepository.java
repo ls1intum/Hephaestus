@@ -380,7 +380,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
-        org.springframework.data.domain.Pageable pageable
+        Pageable pageable
     );
 
     /**
@@ -513,13 +513,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     /** Projection: severity → count. */
     interface SeverityCount {
-        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Severity getSeverity();
         Long getCount();
     }
 
     /** Projection: presence → count. */
     interface PresenceCount {
-        de.tum.cit.aet.hephaestus.practices.model.Presence getPresence();
+        Presence getPresence();
         Long getCount();
     }
 
@@ -565,9 +565,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     interface AreaStandingRow {
         String getAreaSlug();
         String getAreaName();
-        de.tum.cit.aet.hephaestus.practices.model.Presence getPresence();
-        de.tum.cit.aet.hephaestus.practices.model.Assessment getAssessment();
-        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Presence getPresence();
+        Assessment getAssessment();
+        Severity getSeverity();
         Long getCount();
         Long getRecentCount();
 

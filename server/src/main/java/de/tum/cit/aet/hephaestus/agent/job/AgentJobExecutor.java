@@ -122,8 +122,8 @@ public class AgentJobExecutor {
      * workers' jobs. Populated on claim, removed in the {@code executeJob} finally block.
      */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
-    private final java.util.Optional<WorkerCapacityState> capacityState;
-    private final java.util.Optional<WorkerProperties> workerProperties;
+    private final Optional<WorkerCapacityState> capacityState;
+    private final Optional<WorkerProperties> workerProperties;
     /** This worker's identity (null only when the worker role is off); stamped on claimed jobs to fence terminal writes. */
     private final String workerId;
 
@@ -139,8 +139,8 @@ public class AgentJobExecutor {
         TransactionTemplate transactionTemplate,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry,
-        java.util.Optional<WorkerCapacityState> capacityState,
-        java.util.Optional<WorkerProperties> workerProperties
+        Optional<WorkerCapacityState> capacityState,
+        Optional<WorkerProperties> workerProperties
     ) {
         this.natsConnection = natsConnection;
         this.natsProperties = natsProperties;

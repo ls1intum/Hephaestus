@@ -16,7 +16,11 @@ import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityRes
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -183,8 +187,8 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
     }
 
     /** Runs Slack follow-ups inline so the tests can verify them synchronously. */
-    private static java.util.concurrent.ExecutorService directExecutor() {
-        return new java.util.concurrent.AbstractExecutorService() {
+    private static ExecutorService directExecutor() {
+        return new AbstractExecutorService() {
             @Override
             public void execute(Runnable command) {
                 command.run();
@@ -194,8 +198,8 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
             public void shutdown() {}
 
             @Override
-            public java.util.List<Runnable> shutdownNow() {
-                return java.util.List.of();
+            public List<Runnable> shutdownNow() {
+                return List.of();
             }
 
             @Override
@@ -209,7 +213,7 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
             }
 
             @Override
-            public boolean awaitTermination(long timeout, java.util.concurrent.TimeUnit unit) {
+            public boolean awaitTermination(long timeout, TimeUnit unit) {
                 return true;
             }
         };

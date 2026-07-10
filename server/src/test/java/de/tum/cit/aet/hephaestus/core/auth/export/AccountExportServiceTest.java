@@ -28,6 +28,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -229,9 +231,9 @@ class AccountExportServiceTest extends BaseUnitTest {
 
         AccountExportService service = new AccountExportService(repo, worker, logger, clock);
 
-        assertThatExceptionOfType(org.springframework.web.server.ResponseStatusException.class)
+        assertThatExceptionOfType(ResponseStatusException.class)
             .isThrownBy(() -> service.requestExport(ACCOUNT_ID))
-            .satisfies(ex -> assertThat(ex.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+            .satisfies(ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
         verify(repo, never()).save(any());
         verify(worker, never()).generate(any(), any());
     }

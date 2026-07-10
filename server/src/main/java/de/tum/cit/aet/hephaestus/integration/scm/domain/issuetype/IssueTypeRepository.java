@@ -50,7 +50,7 @@ public interface IssueTypeRepository extends JpaRepository<IssueType, String> {
         AND it.isEnabled = true
         """
     )
-    java.util.Optional<IssueType> findByOrganizationIdAndNameIgnoreCase(
+    Optional<IssueType> findByOrganizationIdAndNameIgnoreCase(
         @Param("organizationId") Long organizationId,
         @Param("name") String name
     );

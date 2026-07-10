@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,7 +76,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadata), files);
 
         assertThat(files).doesNotContainKey(FILE_KEY);
@@ -82,7 +84,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_noComments_writesNothing() {
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         assertThat(files).doesNotContainKey(FILE_KEY);
@@ -101,7 +103,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         assertThat(files).containsKey(FILE_KEY);
@@ -130,7 +132,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -147,7 +149,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         // Only the bot's own comment was present — emit nothing so reviewer-craft keeps empty-context abstention.
@@ -160,7 +162,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             new RuntimeException("db down")
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         assertThatCode(() -> provider.contribute(request(metadataWithPr()), files)).doesNotThrowAnyException();
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
@@ -171,7 +173,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         // RECENT MAX_COMMENTS — keeping the oldest head would drop the late approval/resolution and manufacture a
         // false "rubber-stamp" verdict. Build MAX_COMMENTS + 5 comments; only the newest MAX_COMMENTS survive.
         int total = GeneralReviewCommentContentSource.MAX_COMMENTS + 5;
-        java.util.List<IssueComment> comments = new java.util.ArrayList<>();
+        List<IssueComment> comments = new ArrayList<>();
         Instant base = Instant.parse("2025-06-01T00:00:00Z");
         for (int i = 0; i < total; i++) {
             // body encodes the sequence index so we can assert WHICH comments survived.
@@ -179,7 +181,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         }
         when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(comments);
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -201,7 +203,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             List.of(comment("reviewer-a", "looks good", Instant.parse("2025-06-01T10:00:00Z")))
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -214,7 +216,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             List.of(comment(null, "anonymous note", Instant.parse("2025-06-01T10:00:00Z")))
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode first = objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
@@ -229,7 +231,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             List.of(comment("reviewer-a", "no timestamp", null))
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode first = objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
@@ -246,7 +248,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
@@ -271,7 +273,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             )
         );
 
-        Map<String, byte[]> files = new java.util.HashMap<>();
+        Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));

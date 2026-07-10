@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -23,6 +24,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -53,7 +55,7 @@ class SlackUninstallServiceTest extends BaseUnitTest {
     private ConversationFeedbackErasure conversationFeedbackErasure;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService messageService;
+    private SlackMessageService messageService;
 
     @Mock
     private Connection connection;
@@ -117,10 +119,7 @@ class SlackUninstallServiceTest extends BaseUnitTest {
 
         service().onUninstall(TEAM, "app_uninstalled", "Ev1");
 
-        verify(connectionService, never()).transition(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any()
-        );
+        verify(connectionService, never()).transition(ArgumentMatchers.any(), ArgumentMatchers.any());
         verifyNoInteractions(purgeAdapter, mentorSlackThreadService, conversationFeedbackErasure);
     }
 }

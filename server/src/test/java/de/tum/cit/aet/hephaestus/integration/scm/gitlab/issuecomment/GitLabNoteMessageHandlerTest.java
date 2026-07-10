@@ -12,8 +12,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
@@ -22,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabN
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.EmbeddedIssue;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.EmbeddedMergeRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.NoteAttributes;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiffNoteWebhookProcessor;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
@@ -50,16 +53,16 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     private GitLabDiffNoteWebhookProcessor diffNoteProcessor;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestProcessor mergeRequestProcessor;
+    private GitLabMergeRequestProcessor mergeRequestProcessor;
 
     @Mock
     private GitLabWebhookContextResolver contextResolver;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository pullRequestRepository;
+    private PullRequestRepository pullRequestRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository userRepository;
+    private UserRepository userRepository;
 
     @Mock
     private NatsMessageDeserializer deserializer;

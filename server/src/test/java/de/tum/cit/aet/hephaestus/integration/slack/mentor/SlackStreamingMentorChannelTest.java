@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -233,7 +234,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     @MethodSource("transientStartStreamFailures")
     void retriesWithoutAbort_onTransientStartStreamFailure(String description, SlackSendException failure) {
         SlackMessageService slack = mock(SlackMessageService.class);
-        List<String> got = Collections.synchronizedList(new java.util.ArrayList<>());
+        List<String> got = Collections.synchronizedList(new ArrayList<>());
         AtomicInteger startCalls = new AtomicInteger();
         AtomicBoolean stopped = new AtomicBoolean();
         when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {

@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
@@ -111,7 +112,7 @@ public class SlackLeaderboardDigestPublisher {
             .orElseGet(() -> plainName(reviewer));
     }
 
-    private static java.util.Optional<User> exactMatch(UserInfoDTO reviewer, List<User> allSlackUsers) {
+    private static Optional<User> exactMatch(UserInfoDTO reviewer, List<User> allSlackUsers) {
         return allSlackUsers
             .stream()
             .filter(user -> reviewer.name() != null && reviewer.name().equalsIgnoreCase(user.getName()))

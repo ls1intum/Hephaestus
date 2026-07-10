@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.live;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
@@ -17,11 +18,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -544,15 +547,15 @@ class MentorSandboxStressTest {
             printRow("marginal RSS / extra session", "KB", marginalKbPerExtraSession);
         }
 
-        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
+        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : LongStream.of(peakRssKb).sum() / 1024L);
         long avgFloorMb =
             rssOneSessionFloor.length == 0
                 ? 0L
-                : (java.util.stream.LongStream.of(rssOneSessionFloor).sum() / rssOneSessionFloor.length / 1024L);
+                : (LongStream.of(rssOneSessionFloor).sum() / rssOneSessionFloor.length / 1024L);
         long avgMarginalKb =
             marginalKbPerExtraSession.length == 0
                 ? 0L
-                : java.util.stream.LongStream.of(marginalKbPerExtraSession).sum() / marginalKbPerExtraSession.length;
+                : LongStream.of(marginalKbPerExtraSession).sum() / marginalKbPerExtraSession.length;
         System.out.printf(
             "%n  ▸ aggregate peak RSS across all %d runners (× %d sessions): %d MB%n",
             peakRssKb.length,
@@ -656,7 +659,7 @@ class MentorSandboxStressTest {
         printRow("peak RSS per runner", "KB", peakRssKb);
         printRow("peak threads per runner", "", peakThreads);
 
-        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : java.util.stream.LongStream.of(peakRssKb).sum() / 1024L);
+        long totalPeakRssMb = (peakRssKb.length == 0 ? 0L : LongStream.of(peakRssKb).sum() / 1024L);
         System.out.printf("%n  ▸ aggregate peak RSS across all %d runners: %d MB%n", peakRssKb.length, totalPeakRssMb);
 
         long failed = sessions
@@ -688,7 +691,7 @@ class MentorSandboxStressTest {
         long p50 = sortedSamples[Math.min(sortedSamples.length - 1, sortedSamples.length / 2)];
         long min = sortedSamples[0];
         long max = sortedSamples[sortedSamples.length - 1];
-        long mean = java.util.stream.LongStream.of(sortedSamples).sum() / sortedSamples.length;
+        long mean = LongStream.of(sortedSamples).sum() / sortedSamples.length;
         if (sortedSamples.length < PERCENTILE_MIN_N) {
             System.out.printf(
                 "  %-30s n=%3d  min=%6d  p50=%6d  max=%6d  mean=%6d  %s%n",
@@ -768,7 +771,7 @@ class MentorSandboxStressTest {
             null,
             true,
             300,
-            new de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile(),
+            new MentorRunnerProfile(),
             Map.of(),
             ""
         );
@@ -886,10 +889,8 @@ class MentorSandboxStressTest {
     private static final class RunnerDriver {
 
         private final StdioAttachedSandbox sandbox;
-        private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> responses =
-            new java.util.concurrent.ConcurrentLinkedQueue<>();
-        private final java.util.concurrent.ConcurrentLinkedQueue<JsonNode> ready =
-            new java.util.concurrent.ConcurrentLinkedQueue<>();
+        private final ConcurrentLinkedQueue<JsonNode> responses = new ConcurrentLinkedQueue<>();
+        private final ConcurrentLinkedQueue<JsonNode> ready = new ConcurrentLinkedQueue<>();
         private final AtomicLong idGen = new AtomicLong();
 
         RunnerDriver(StdioAttachedSandbox sandbox) {

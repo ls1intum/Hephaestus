@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentSe
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackMonitoredChannelDTO;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
@@ -51,6 +52,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +66,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -140,7 +144,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private ConversationThreadTriggerScheduler scheduler;
 
     @Autowired
-    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -216,16 +220,11 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             new SlackHephaestusUiLinks(
                 workspaceId ->
                     Optional.of(
-                        new de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery.WorkspaceSummary(
-                            workspaceId,
-                            "hephaestus",
-                            "Hephaestus",
-                            null
-                        )
+                        new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus", null)
                     ),
                 "https://hephaestus.test"
             ),
-            new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+            new TransactionTemplate(transactionManager)
         );
         handler = new SlackInteractivityHandler(
             workspaceResolver,
@@ -332,7 +331,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         // Hop 6 — revoke C1: all C1 raw + derived rows gone; both audit rows survive; C2 untouched. The manually
         // constructed service is not a @Transactional proxy, so wrap this call in one transaction — exactly the single
         // tx the production `@Transactional transition → eraseChannel` runs in (the erasure port removes entities).
-        new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(s ->
+        new TransactionTemplate(transactionManager).executeWithoutResult(s ->
             consentService.transition(workspaceId, C1, ConsentState.REVOKED, "wind down")
         );
         assertThat(currentChannel(C1).getConsentState()).isEqualTo(ConsentState.REVOKED);
@@ -371,7 +370,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         return payload;
     }
 
-    private de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel currentChannel(String channelId) {
+    private SlackMonitoredChannel currentChannel(String channelId) {
         return monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(workspaceId, channelId).orElseThrow();
     }
 

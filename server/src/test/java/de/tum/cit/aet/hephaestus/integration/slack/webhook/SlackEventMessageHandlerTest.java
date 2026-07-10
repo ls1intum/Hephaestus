@@ -16,7 +16,9 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -101,12 +103,12 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
         );
 
         verify(mentorService, never()).handleDm(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any()
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any()
         );
     }
 
@@ -120,12 +122,12 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
         );
 
         verify(mentorService, never()).handleDm(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any()
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any()
         );
     }
 
@@ -150,14 +152,8 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
             )
         );
 
-        verify(assistantEventHandler).onMessagesOpened(
-            org.mockito.ArgumentMatchers.eq("T1"),
-            org.mockito.ArgumentMatchers.any(JsonNode.class)
-        );
-        verify(appHomeService, never()).onHomeOpened(
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString()
-        );
+        verify(assistantEventHandler).onMessagesOpened(ArgumentMatchers.eq("T1"), ArgumentMatchers.any(JsonNode.class));
+        verify(appHomeService, never()).onHomeOpened(ArgumentMatchers.anyString(), ArgumentMatchers.anyString());
     }
 
     @Test
@@ -170,9 +166,9 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
         );
 
         verify(joinNoticeHandler).onMemberJoined(
-            org.mockito.ArgumentMatchers.eq("T1"),
-            org.mockito.ArgumentMatchers.any(JsonNode.class),
-            org.mockito.ArgumentMatchers.eq(true)
+            ArgumentMatchers.eq("T1"),
+            ArgumentMatchers.any(JsonNode.class),
+            ArgumentMatchers.eq(true)
         );
     }
 
@@ -188,9 +184,9 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
         // The durable bot-self-join registration must survive a stale redelivery; only the
         // time-sensitive ephemeral notice is suppressed (noticeAllowed = false).
         verify(joinNoticeHandler).onMemberJoined(
-            org.mockito.ArgumentMatchers.eq("T1"),
-            org.mockito.ArgumentMatchers.any(JsonNode.class),
-            org.mockito.ArgumentMatchers.eq(false)
+            ArgumentMatchers.eq("T1"),
+            ArgumentMatchers.any(JsonNode.class),
+            ArgumentMatchers.eq(false)
         );
     }
 
@@ -225,14 +221,14 @@ class SlackEventMessageHandlerTest extends BaseUnitTest {
         );
 
         verify(uninstallService, never()).onUninstall(
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString()
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyString()
         );
     }
 
     private static Message nats(String ignoredSubject, String body) {
-        Message message = org.mockito.Mockito.mock(Message.class);
+        Message message = Mockito.mock(Message.class);
         when(message.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
         return message;
     }

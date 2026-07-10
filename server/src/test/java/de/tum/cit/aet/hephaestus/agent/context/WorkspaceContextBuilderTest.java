@@ -10,7 +10,10 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -288,8 +291,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("a second build against the same repo blocks while the first is in-flight")
         void serialisesOnRepoId() throws Exception {
-            java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
-            java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
+            CountDownLatch firstInside = new CountDownLatch(1);
+            CountDownLatch firstMayFinish = new CountDownLatch(1);
             ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
             ContentSource unboundedSecond = new LatchedProvider(null, null);
             // Two distinct concrete provider classes → injection-order semantics, not dedup.
@@ -310,7 +313,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Thread t1 = new Thread(() -> builder.build(new ContextRequest.PracticeReviewRequest(jobA)), "t1");
             Thread t2 = new Thread(() -> builder.build(new ContextRequest.PracticeReviewRequest(jobB)), "t2");
             t1.start();
-            assertThat(firstInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            assertThat(firstInside.await(2, TimeUnit.SECONDS))
                 .as("t1 should enter the critical section quickly")
                 .isTrue();
             t2.start();
@@ -318,11 +321,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             // latch is null, so if t2 ran ahead it would already be past the latch — but it
             // can't, because gatedFirst still holds the stripe lock. We assert t2 reaches a
             // wait/block state without a fixed sleep.
-            awaitState(
-                t2,
-                java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
-                2_000
-            );
+            awaitState(t2, Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED), 2_000);
             firstMayFinish.countDown();
             t1.join(2_000);
             t2.join(2_000);
@@ -333,8 +332,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("null repoKey requests do not serialise globally")
         void nullRepoKeyRequestsCanRunConcurrently() throws Exception {
-            java.util.concurrent.CountDownLatch bothInside = new java.util.concurrent.CountDownLatch(2);
-            java.util.concurrent.CountDownLatch mayFinish = new java.util.concurrent.CountDownLatch(1);
+            CountDownLatch bothInside = new CountDownLatch(2);
+            CountDownLatch mayFinish = new CountDownLatch(1);
             AtomicInteger inFlight = new AtomicInteger();
             AtomicInteger maxInFlight = new AtomicInteger();
             ContentSource concurrentProbe = new ConcurrentProbeProvider(bothInside, mayFinish, inFlight, maxInFlight);
@@ -352,7 +351,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             t1.start();
             t2.start();
             try {
-                assertThat(bothInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                assertThat(bothInside.await(2, TimeUnit.SECONDS))
                     .as("both null-repo builds should enter the provider concurrently")
                     .isTrue();
             } finally {
@@ -367,7 +366,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     /** Wait until {@code thread} enters one of {@code wanted} or the timeout elapses. */
-    private static void awaitState(Thread thread, java.util.Set<Thread.State> wanted, long timeoutMillis)
+    private static void awaitState(Thread thread, Set<Thread.State> wanted, long timeoutMillis)
         throws InterruptedException {
         long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
         while (System.nanoTime() < deadline) {
@@ -393,10 +392,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             return "test";
         }
 
-        private final java.util.concurrent.CountDownLatch entered;
-        private final java.util.concurrent.CountDownLatch mayFinish;
+        private final CountDownLatch entered;
+        private final CountDownLatch mayFinish;
 
-        LatchedProvider(java.util.concurrent.CountDownLatch entered, java.util.concurrent.CountDownLatch mayFinish) {
+        LatchedProvider(CountDownLatch entered, CountDownLatch mayFinish) {
             this.entered = entered;
             this.mayFinish = mayFinish;
         }
@@ -425,14 +424,14 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     /** Provider that records whether two builds were allowed into the provider body at the same time. */
     private static final class ConcurrentProbeProvider implements ContentSource {
 
-        private final java.util.concurrent.CountDownLatch bothInside;
-        private final java.util.concurrent.CountDownLatch mayFinish;
+        private final CountDownLatch bothInside;
+        private final CountDownLatch mayFinish;
         private final AtomicInteger inFlight;
         private final AtomicInteger maxInFlight;
 
         ConcurrentProbeProvider(
-            java.util.concurrent.CountDownLatch bothInside,
-            java.util.concurrent.CountDownLatch mayFinish,
+            CountDownLatch bothInside,
+            CountDownLatch mayFinish,
             AtomicInteger inFlight,
             AtomicInteger maxInFlight
         ) {

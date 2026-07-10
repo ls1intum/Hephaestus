@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Abstract base class for live GitHub API integration tests using GraphQL and REST.
@@ -154,7 +155,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
             githubInstallationId(),
             saved.getAccountLogin(),
             /* serverUrl */ null,
-            java.util.Set.of()
+            Set.of()
         );
         Connection connection = new Connection(
             saved,
@@ -163,7 +164,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
             cfg
         );
         connection.setDisplayName(saved.getAccountLogin());
-        org.springframework.test.util.ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
         connectionRepository.save(connection);
 
         return saved;

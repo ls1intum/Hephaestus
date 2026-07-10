@@ -7,7 +7,10 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -20,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
+import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -40,6 +44,8 @@ import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +53,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Integration tests for workspace purge (deletion) covering data cleanup completeness,
@@ -97,7 +105,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private SlackRetentionSweeper slackRetentionSweeper;
 
     @Autowired
-    private de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter slackWorkspacePurgeAdapter;
+    private SlackWorkspacePurgeAdapter slackWorkspacePurgeAdapter;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -118,7 +126,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+    private PlatformTransactionManager transactionManager;
 
     private static final tools.jackson.databind.ObjectMapper OM = new tools.jackson.databind.ObjectMapper();
 
@@ -136,7 +144,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 slug + "-group",
                 AccountType.ORG,
                 owner.getId(),
-                de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
                 null
             )
@@ -210,7 +218,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                    IntegrationKind.GITLAB,
                     "glpat-cleanup-token",
                     null
                 )
@@ -276,7 +284,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "idempotent-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                    IntegrationKind.GITLAB,
                     "glpat-idempotent-token",
                     null
                 )
@@ -321,7 +329,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     class SensitiveFieldClearing {
 
         @Autowired
-        private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository connectionRepository;
+        private ConnectionRepository connectionRepository;
 
         /**
          * Per-workspace credentials now live on the {@code Connection} aggregate (PAT,
@@ -343,8 +351,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(connections).isNotEmpty();
             assertThat(connections).anyMatch(
                 c ->
-                    c.getKind() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB &&
-                    c.getState() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE &&
+                    c.getKind() == IntegrationKind.GITLAB &&
+                    c.getState() == IntegrationState.ACTIVE &&
                     c.getCredentialsEncrypted() != null
             );
 
@@ -352,9 +360,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             // Post-purge: every Connection is UNINSTALLED and its credential blob is null.
             var postPurge = connectionRepository.findByWorkspaceId(workspaceId);
-            assertThat(postPurge).allMatch(
-                c -> c.getState() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.UNINSTALLED
-            );
+            assertThat(postPurge).allMatch(c -> c.getState() == IntegrationState.UNINSTALLED);
             assertThat(postPurge).allMatch(c -> c.getCredentialsEncrypted() == null);
             assertThat(postPurge).allMatch(c -> c.getCredentialsAlg() == null);
         }
@@ -373,7 +379,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "chat-cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                    IntegrationKind.GITLAB,
                     "glpat-chat-cleanup-token",
                     null
                 )
@@ -434,7 +440,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "non-owner-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                    IntegrationKind.GITLAB,
                     "glpat-non-owner-token",
                     null
                 )
@@ -472,7 +478,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     slug + "-group",
                     AccountType.ORG,
                     owner.getId(),
-                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                    IntegrationKind.GITLAB,
                     "glpat-slack-test-token",
                     null
                 )
@@ -617,21 +623,20 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             threadA.setSlackChannelId("CA");
             threadA.setSlackThreadTs("500.1");
             threadA = slackThreadRepository.save(threadA);
-            java.util.UUID convObsA = seedDerivedConversation(a, threadA.getId());
+            UUID convObsA = seedDerivedConversation(a, threadA.getId());
 
             SlackThread threadB = new SlackThread();
             threadB.setWorkspaceId(b.getId());
             threadB.setSlackChannelId("CB");
             threadB.setSlackThreadTs("600.1");
             threadB = slackThreadRepository.save(threadB);
-            java.util.UUID convObsB = seedDerivedConversation(b, threadB.getId());
+            UUID convObsB = seedDerivedConversation(b, threadB.getId());
 
             // Drive the Slack purge contributor for A in isolation (the real chain wraps the contributors in
             // one transaction, so mirror that with a TransactionTemplate). It is the explicit
             // eraseAllConversationForWorkspace call (not the practices contributor) that must erase the derived rows
             // here, so this fails if that port call is removed from the adapter.
-            org.springframework.transaction.support.TransactionTemplate tx =
-                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+            TransactionTemplate tx = new TransactionTemplate(transactionManager);
             tx.executeWithoutResult(status -> slackWorkspacePurgeAdapter.deleteWorkspaceData(a.getId()));
 
             // A's derived CONVERSATION rows are erased; B's remain intact (tenant scoping).
@@ -643,23 +648,23 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         /** Seed a CONVERSATION_THREAD observation + feedback + join anchored to {@code threadId} for {@code workspace}. */
-        private java.util.UUID seedDerivedConversation(Workspace workspace, long threadId) {
+        private UUID seedDerivedConversation(Workspace workspace, long threadId) {
             User owner = persistUser("conv-" + workspace.getId() + "-subject");
             Practice practice = new Practice();
             practice.setWorkspace(workspace);
             practice.setSlug("conv-practice-" + workspace.getId());
             practice.setName("Conversation Practice");
             practice.setCriteria("Test description");
-            practice.setTriggerEvents(OM.valueToTree(java.util.List.of("PullRequestCreated")));
+            practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
             practice = practiceRepository.save(practice);
 
             AgentJob job = new AgentJob();
             job.setWorkspace(workspace);
             job.setJobType(AgentJobType.CONVERSATION_REVIEW);
-            job.setConfigSnapshot(OM.valueToTree(java.util.Map.of("model", "test")));
+            job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
             job = agentJobRepository.save(job);
 
-            java.util.UUID observationId = java.util.UUID.randomUUID();
+            UUID observationId = UUID.randomUUID();
             observationRepository.insertIfAbsent(
                 observationId,
                 "occ-" + observationId,

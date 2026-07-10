@@ -18,9 +18,11 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -58,7 +60,7 @@ class IssueContentSourceTest extends BaseUnitTest {
 
     private AgentJob jobWith(ObjectNode metadata) {
         var job = new AgentJob();
-        job.setId(java.util.UUID.fromString("00000000-0000-0000-0000-0000000000aa"));
+        job.setId(UUID.fromString("00000000-0000-0000-0000-0000000000aa"));
         job.setMetadata(metadata);
         return job;
     }
@@ -114,8 +116,8 @@ class IssueContentSourceTest extends BaseUnitTest {
         issue.setMilestone(milestone);
 
         // Set iteration order is incidental; the provider sorts label/assignee output.
-        issue.setLabels(new java.util.LinkedHashSet<>(List.of(label("zeta"), label("alpha"))));
-        issue.setAssignees(new java.util.LinkedHashSet<>(List.of(user("bob"), user("alice"))));
+        issue.setLabels(new LinkedHashSet<>(List.of(label("zeta"), label("alpha"))));
+        issue.setAssignees(new LinkedHashSet<>(List.of(user("bob"), user("alice"))));
 
         return issue;
     }
@@ -220,7 +222,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             // Inserted out of order; provider must sort ascending by createdAt.
             IssueComment newer = comment("alice", "second", Instant.parse("2025-06-02T10:00:00Z"));
             IssueComment older = comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"));
-            issue.setComments(new java.util.LinkedHashSet<>(List.of(newer, older)));
+            issue.setComments(new LinkedHashSet<>(List.of(newer, older)));
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
@@ -238,7 +240,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         void emitsNullAuthorWhenCommentHasNoAuthor() throws Exception {
             Issue issue = richIssue();
             issue.setComments(
-                new java.util.LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
+                new LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
             );
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
@@ -253,7 +255,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         @Test
         void truncatesToMaxCommentsKeepingMostRecent() throws Exception {
             Issue issue = richIssue();
-            var thread = new java.util.LinkedHashSet<IssueComment>();
+            var thread = new LinkedHashSet<IssueComment>();
             int overflow = IssueContentSource.MAX_COMMENTS + 50;
             Instant base = Instant.parse("2025-01-01T00:00:00Z");
             for (int i = 0; i < overflow; i++) {
@@ -283,7 +285,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         void writesIssueSummaryMarkdown() {
             Issue issue = richIssue();
             issue.setComments(
-                new java.util.LinkedHashSet<>(List.of(comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"))))
+                new LinkedHashSet<>(List.of(comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"))))
             );
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
@@ -304,7 +306,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             // A null-author comment must render as the literal "**unknown** wrote:", never "**null** wrote:".
             Issue issue = richIssue();
             issue.setComments(
-                new java.util.LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
+                new LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
             );
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
@@ -321,7 +323,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             // The summary uses the post-truncation list, so its "## Discussion (N comments)" header must
             // report the capped MAX_COMMENTS, not the pre-truncation total.
             Issue issue = richIssue();
-            var thread = new java.util.LinkedHashSet<IssueComment>();
+            var thread = new LinkedHashSet<IssueComment>();
             int overflow = IssueContentSource.MAX_COMMENTS + 50;
             Instant base = Instant.parse("2025-01-01T00:00:00Z");
             for (int i = 0; i < overflow; i++) {

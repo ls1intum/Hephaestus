@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.Counter;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 
 class WorkspaceStatementInspectorTest extends BaseUnitTest {
 
@@ -302,6 +303,6 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
 
     // helper: Mockito.any() shorthand
     private static <T> T any() {
-        return org.mockito.ArgumentMatchers.any();
+        return ArgumentMatchers.any();
     }
 }

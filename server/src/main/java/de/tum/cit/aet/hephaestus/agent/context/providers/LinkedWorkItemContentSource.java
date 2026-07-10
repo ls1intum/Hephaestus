@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -375,7 +376,7 @@ public class LinkedWorkItemContentSource implements ContentSource {
     private static final class Refs {
 
         // number -> closingKeyword, first-seen order preserved; closing wins on merge.
-        private final java.util.LinkedHashMap<Integer, Boolean> numbers = new java.util.LinkedHashMap<>();
+        private final LinkedHashMap<Integer, Boolean> numbers = new LinkedHashMap<>();
         private final LinkedHashSet<String> resolvedFrom = new LinkedHashSet<>();
 
         void add(int number, boolean closing) {

@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
@@ -87,15 +88,15 @@ class CacheConfigTest extends BaseUnitTest {
 
     @Test
     void cacheSpecValidation() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L)
-        ).isInstanceOf(IllegalArgumentException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            new CacheConfig.CacheSpec("ok", Duration.ZERO, 1L)
-        ).isInstanceOf(IllegalArgumentException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            new CacheConfig.CacheSpec("ok", Duration.ofMinutes(1), 0L)
-        ).isInstanceOf(IllegalArgumentException.class);
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ZERO, 1L)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ofMinutes(1), 0L)).isInstanceOf(
+            IllegalArgumentException.class
+        );
     }
 
     private static CacheConfig.CacheSpec findSpec(String name) {

@@ -135,8 +135,11 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
         @Test
         void prepareInputFilesWritesNoScmSourceAndOnlyContextPlusTask() {
             AgentJob job = conversationJob();
-            // The only context provider that fires materialises conversation_thread.json — stub the builder.
-            // The practice-catalog injection (inputs/practices/*) is a mocked no-op here; it writes no SCM source.
+            // WorkspaceContextBuilder is mocked here (its own provider wiring — conversation_thread.json plus the
+            // best-effort, workspace-wide project_inventory.json — is covered by WorkspaceContextBuilderTest /
+            // ConversationThreadContentSourceTest / WorkspaceInventoryContentSourceTest); stub a representative
+            // context file. The practice-catalog injection (inputs/practices/*) is a mocked no-op here; neither
+            // path writes an SCM source.
             when(workspaceContextBuilder.build(any())).thenReturn(
                 Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes())
             );

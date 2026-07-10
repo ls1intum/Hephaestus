@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -35,7 +36,7 @@ class EncryptionContextTest extends BaseUnitTest {
         );
         Set<String> distinct = new HashSet<>();
         for (byte[] a : aads) {
-            distinct.add(java.util.Arrays.toString(a));
+            distinct.add(Arrays.toString(a));
         }
         assertThat(distinct).as("every distinguishing field must change the AAD").hasSize(aads.size());
     }

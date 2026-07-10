@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -915,9 +916,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         @Test
         void actionTypeShouldReturnPushed() {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
-            assertThat(event.actionType()).isEqualTo(
-                de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction.Push.PUSHED
-            );
+            assertThat(event.actionType()).isEqualTo(GitHubEventAction.Push.PUSHED);
         }
     }
 

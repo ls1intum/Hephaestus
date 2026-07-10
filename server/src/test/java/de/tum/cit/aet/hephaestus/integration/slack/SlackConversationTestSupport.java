@@ -29,14 +29,15 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Two things are single-sourced here:
  *
  * <ul>
- *   <li>{@link #ensureUnmappedSlackThreadColumns()} — the {@code participant_member_ids bigint[]} + GIN and
- *       {@code last_reviewed_ts VARCHAR(32)} DDL. These columns are deliberately UNMAPPED on the {@code SlackThread}
- *       entity (raw-JDBC-only — changelog changesets -12/-13), so the entity-derived integration profile
- *       ({@code ddl-auto: create}, Liquibase off) does not build them. Both SPI ITs used to carry a verbatim copy of
- *       this DDL; centralising it means the two copies cannot drift from each other. That the hand-rolled
- *       {@code bigint[]}/{@code VARCHAR(32)} shape actually matches the production Liquibase migration is proven
- *       independently by {@code SlackConversationSchemaContractIntegrationTest} against the real schema — that
- *       contract test is what makes keeping this fast, hand-rolled DDL safe.</li>
+ *   <li>{@link #ensureUnmappedSlackThreadColumns()} — idempotent {@code IF NOT EXISTS} DDL for the
+ *       {@code participant_member_ids bigint[]} + GIN index and {@code last_reviewed_ts VARCHAR(32)} column.
+ *       {@code SlackThread} now maps both fields (changelog changesets -12/-13; see
+ *       {@code SlackThread#participantMemberIds}/{@code #lastReviewedTs}), so the entity-derived integration
+ *       profile's {@code ddl-auto: create} already builds them from the entity metadata — this method is a no-op
+ *       there today. It stays as the single place that also lays down the GIN index (which entity mapping alone
+ *       does not express) and as a defensive idempotent guard, so the two SPI ITs cannot drift from each other on
+ *       this DDL. That the shape actually matches the production Liquibase migration is proven independently by
+ *       {@code SlackConversationSchemaContractIntegrationTest} against the real schema.</li>
  *   <li>{@link #seedChannel}/{@link #seedThread}/{@link #seedMessage} — the raw {@code INSERT}s the projector and
  *       detection scans read over. Superset signatures so both callers share one SQL string per table.</li>
  * </ul>

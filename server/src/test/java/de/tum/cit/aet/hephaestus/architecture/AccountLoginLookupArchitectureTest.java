@@ -2,7 +2,10 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,19 +33,15 @@ class AccountLoginLookupArchitectureTest extends HephaestusArchitectureTest {
             .that()
             .doNotHaveFullyQualifiedName("de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository")
             .and(
-                new com.tngtech.archunit.base.DescribedPredicate<>("are not allowlisted callers") {
+                new DescribedPredicate<>("are not allowlisted callers") {
                     @Override
-                    public boolean test(com.tngtech.archunit.core.domain.JavaClass input) {
+                    public boolean test(JavaClass input) {
                         return !ALLOWED_CALLERS.contains(input.getFullName());
                     }
                 }
             )
             .should()
-            .callMethod(
-                de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository.class,
-                "findByAccountLoginIgnoreCase",
-                String.class
-            )
+            .callMethod(WorkspaceRepository.class, "findByAccountLoginIgnoreCase", String.class)
             .because(
                 "bare account-login lookups false-collapse workspaces that share the same login across " +
                     "different SCM vendors (e.g. GitHub org and GitLab group with identical name). " +

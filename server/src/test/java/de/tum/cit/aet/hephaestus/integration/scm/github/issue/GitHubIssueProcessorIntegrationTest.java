@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -1210,8 +1211,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             existing = issueRepository.save(existing);
 
             // Create a label and associate it with the issue
-            de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label label =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label();
+            Label label = new Label();
             label.setNativeId(100001L);
             label.setProvider(githubProvider);
             label.setName("bug");

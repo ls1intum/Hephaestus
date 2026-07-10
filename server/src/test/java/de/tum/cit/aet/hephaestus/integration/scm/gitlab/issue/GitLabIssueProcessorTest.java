@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -32,6 +33,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
@@ -496,7 +499,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
 
             ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(captor.capture());
+            verify(eventPublisher, Mockito.atLeastOnce()).publishEvent(captor.capture());
             assertThat(captor.getAllValues()).anyMatch(e -> e instanceof ScmDomainEvent.IssueLabeled);
         }
 
@@ -988,8 +991,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldResolveIssueTypeIdWhenTypeNameMatches() {
-            de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization organization =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization();
+            Organization organization = new Organization();
             organization.setId(42L);
             testRepo.setOrganization(organization);
 
@@ -1057,7 +1059,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             // The lookup depends on humaniseTypeName: TEST_CASE must become "Test Case" (not "TEST_CASE"
             // or "test case") before the case-insensitive query — the single-word "TASK" case can't catch
             // a regression in the multi-word/lowercasing path.
-            var organization = new de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization();
+            var organization = new Organization();
             organization.setId(42L);
             testRepo.setOrganization(organization);
 
@@ -1101,7 +1103,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             // Subgroup orgs have no own issue_type seed rows: the org-scoped lookup misses and the
             // provider-scoped fallback (the documented LazyInitializationException workaround) resolves
             // the shared provider-global row.
-            var organization = new de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization();
+            var organization = new Organization();
             organization.setId(99L);
             testRepo.setOrganization(organization);
 
@@ -1302,8 +1304,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         );
     }
 
-    private de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject createProject() {
-        return new de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject(
+    private GitLabWebhookProject createProject() {
+        return new GitLabWebhookProject(
             246765L,
             "demo-repository",
             "https://gitlab.lrz.de/hephaestustest/demo-repository",

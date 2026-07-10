@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProject
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -353,7 +354,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
 
             // Simulate GitLab returning [proj1, null, null] — 2 null nodes due to access restrictions
-            List<GitLabProjectResponse> nodesWithNulls = new java.util.ArrayList<>();
+            List<GitLabProjectResponse> nodesWithNulls = new ArrayList<>();
             nodesWithNulls.add(proj1);
             nodesWithNulls.add(null);
             nodesWithNulls.add(null);

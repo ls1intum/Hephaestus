@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -288,7 +289,7 @@ public class SlackChannelConsentService {
     }
 
     /** Run {@code work} in one short DB-only transaction (remote Slack calls happen before it, never inside). */
-    private <T> T inTx(java.util.function.Supplier<T> work) {
+    private <T> T inTx(Supplier<T> work) {
         T result = transactionTemplate.execute(status -> work.get());
         if (result == null) {
             throw new IllegalStateException("Transactional Slack consent operation returned no result");

@@ -5,9 +5,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
@@ -107,8 +109,8 @@ public class WorkspaceContextBuilder {
 
     private Map<String, byte[]> buildLocked(ContextRequest request) {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        Map<String, String> keyOwner = new java.util.HashMap<>();
-        Map<String, String> keyConnector = new java.util.HashMap<>();
+        Map<String, String> keyOwner = new HashMap<>();
+        Map<String, String> keyConnector = new HashMap<>();
         int contributed = 0;
         for (ContentSource provider : providers) {
             if (!provider.supports(request)) {
@@ -120,11 +122,11 @@ public class WorkspaceContextBuilder {
             // calling files.put(key, newBytes) on a key already owned by another provider
             // would otherwise replace the value in-place, and the keyOwner check below
             // (gated on `if (beforeKeys.contains(key)) continue`) would miss it.
-            java.util.Set<String> beforeKeys = java.util.Set.copyOf(files.keySet());
+            Set<String> beforeKeys = Set.copyOf(files.keySet());
             // Reference-snapshot is enough: ContentSource#contribute is required to publish
             // a NEW byte[] for any modification (the existing arrays are interpreted as the
             // owner's immutable output), so reference equality identifies an in-place replace.
-            java.util.Map<String, byte[]> beforeValues = java.util.Map.copyOf(files);
+            Map<String, byte[]> beforeValues = Map.copyOf(files);
             try {
                 provider.contribute(request, files);
             } catch (JobPreparationException e) {

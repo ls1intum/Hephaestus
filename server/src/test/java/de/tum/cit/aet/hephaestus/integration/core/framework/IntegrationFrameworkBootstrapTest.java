@@ -150,7 +150,6 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
         return new IntegrationFrameworkBootstrap(
             registry,
             signatureVerifiers,
-            List.of(), // secretSources
             subjectKeyDerivers,
             subjectParsers,
             credentialProviders,

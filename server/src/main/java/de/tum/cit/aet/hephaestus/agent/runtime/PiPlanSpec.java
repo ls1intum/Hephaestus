@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -68,9 +69,7 @@ public record PiPlanSpec(
                 ? extraInputs
                       .entrySet()
                       .stream()
-                      .collect(
-                          java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().clone())
-                      )
+                      .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().clone()))
                 : Map.of();
         for (String path : extraInputs.keySet()) {
             boolean ok =

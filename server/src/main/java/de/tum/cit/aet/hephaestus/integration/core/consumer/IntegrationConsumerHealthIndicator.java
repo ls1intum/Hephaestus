@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import java.time.Instant;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.health.contributor.Health;
@@ -31,9 +32,7 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
         IntegrationConsumerStats stats,
         IntegrationMessageHandlerRegistry handlerRegistry,
         IntegrationMessageDispatcher dispatcher,
-        @org.springframework.beans.factory.annotation.Value(
-            "${hephaestus.integration.flat-stream.enabled:false}"
-        ) boolean flatStreamConsumerEnabled
+        @Value("${hephaestus.integration.flat-stream.enabled:false}") boolean flatStreamConsumerEnabled
     ) {
         this.stats = stats;
         this.handlerRegistry = handlerRegistry;

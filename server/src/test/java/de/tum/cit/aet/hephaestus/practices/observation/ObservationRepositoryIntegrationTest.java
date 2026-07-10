@@ -34,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.ObjectMapper;
 
 class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
@@ -762,7 +763,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
-                org.springframework.data.domain.PageRequest.of(0, 50)
+                PageRequest.of(0, 50)
             );
 
             // The NA row is filtered out of the drill-down list; only the actionable BAD finding remains.

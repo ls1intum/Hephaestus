@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -49,10 +50,7 @@ public class SlackConnectionAdminController {
      * @param body optional channel override; when blank, the persisted notification channel is used.
      */
     @PostMapping("/test-message")
-    @io.swagger.v3.oas.annotations.Operation(
-        operationId = "sendSlackTestMessage",
-        summary = "Post a test message to verify the Slack connection"
-    )
+    @Operation(operationId = "sendSlackTestMessage", summary = "Post a test message to verify the Slack connection")
     public SlackTestMessageResponseDTO sendTestMessage(
         WorkspaceContext workspace,
         @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body

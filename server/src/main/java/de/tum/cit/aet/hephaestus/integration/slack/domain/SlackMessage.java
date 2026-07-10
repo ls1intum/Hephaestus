@@ -20,7 +20,10 @@ import org.jspecify.annotations.Nullable;
  * minimization: no block payloads, reactions, or files). Workspace-scoped (scalar {@code workspaceId}), idempotent
  * on {@code (workspaceId, slackChannelId, slackTs)}. {@code editedAt}/{@code deletedAt} carry Slack
  * {@code message_changed}/{@code message_deleted} tombstones (GDPR Art. 17); {@code idx_slack_message_ingest}
- * drives the bounded-retention sweep.
+ * drives the bounded-retention sweep; {@code idx_slack_message_thread} serves the thread-read query
+ * ({@code SlackConversationProjector.appendThreadMessages}: {@code workspace_id + slack_channel_id +
+ * (slack_thread_ts = ? OR slack_ts = ?)} — the {@code slack_ts} branch is already covered by
+ * {@code uk_slack_message}, this index covers the {@code slack_thread_ts} branch).
  */
 @Entity
 @Table(
@@ -29,7 +32,10 @@ import org.jspecify.annotations.Nullable;
         name = "uk_slack_message",
         columnNames = { "workspace_id", "slack_channel_id", "slack_ts" }
     ),
-    indexes = @Index(name = "idx_slack_message_ingest", columnList = "workspace_id, ingested_at")
+    indexes = {
+        @Index(name = "idx_slack_message_ingest", columnList = "workspace_id, ingested_at"),
+        @Index(name = "idx_slack_message_thread", columnList = "workspace_id, slack_channel_id, slack_thread_ts"),
+    }
 )
 @Getter
 @Setter
@@ -62,7 +68,9 @@ public class SlackMessage {
      * The resolved workspace {@code User} id of the author (the same id space as
      * {@code MentorChatRequest#developerId}), or {@code null} when the Slack sender is not a linked, workspace-member
      * developer. This is the firewall stamp the conversation projector unions into {@code slack_thread}'s
-     * {@code participant_member_ids}. Written via the native ingest insert.
+     * {@code participant_member_ids}. Written via the native ingest insert. FK'd to {@code "user"(id)} ON DELETE SET
+     * NULL ({@code fk_slack_message_author_member}) — no JPA association (scalar reference only, matching
+     * {@code mentor_slack_thread.chat_thread_id}'s DB-only-FK convention for cross-module references).
      */
     @Column(name = "author_member_id")
     private @Nullable Long authorMemberId;

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -359,7 +360,7 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
             } catch (IOException ignored) {}
         });
         try {
-            boolean exited = p.waitFor(PREP_EXEC_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+            boolean exited = p.waitFor(PREP_EXEC_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             if (!exited) {
                 p.destroyForcibly();
                 drainer.join(500);

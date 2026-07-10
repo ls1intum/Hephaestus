@@ -4,7 +4,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -122,11 +126,11 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
             "serverUrl"
         );
 
-        ArchCondition<com.tngtech.archunit.core.domain.JavaField> notCarryLegacyName = new ArchCondition<>(
+        ArchCondition<JavaField> notCarryLegacyName = new ArchCondition<>(
             "not carry the name of a legacy Connection-owned column"
         ) {
             @Override
-            public void check(com.tngtech.archunit.core.domain.JavaField field, ConditionEvents events) {
+            public void check(JavaField field, ConditionEvents events) {
                 if (forbiddenFieldNames.contains(field.getName())) {
                     events.add(
                         SimpleConditionEvent.violated(
@@ -145,12 +149,9 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
         // Compose entity-AND-workspace-package via DescribedPredicate#and — chaining two
         // `.areDeclaredInClassesThat()` fluents on the ArchRule builder ORs them and would
         // sweep DTOs/context records that legitimately keep these field names on the wire.
-        com.tngtech.archunit.base.DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> entityInWorkspace =
-            com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage("..workspace..").and(
-                com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.annotatedWith(
-                    jakarta.persistence.Entity.class
-                )
-            );
+        DescribedPredicate<JavaClass> entityInWorkspace = JavaClass.Predicates.resideInAPackage("..workspace..").and(
+            CanBeAnnotated.Predicates.annotatedWith(jakarta.persistence.Entity.class)
+        );
         ArchRule rule = fields()
             .that()
             .areDeclaredInClassesThat(entityInWorkspace)

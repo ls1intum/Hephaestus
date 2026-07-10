@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -14,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -44,7 +46,7 @@ public class MentorTurnPersistence {
     private final ChatMessageRepository chatMessageRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ModelPricingService pricingService;
-    private final de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+    private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
 
     /**
      * Find the thread for {@code (workspaceId, threadId)} owned by {@code user}, creating a
@@ -292,7 +294,7 @@ public class MentorTurnPersistence {
      */
     private void reconcileConversationalDelivery(ChatMessage assistant, TranslatorState state) {
         try {
-            java.util.List<UUID> linkedFindingIds = state.linkedFindingIds();
+            List<UUID> linkedFindingIds = state.linkedFindingIds();
             if (linkedFindingIds.isEmpty()) {
                 return;
             }

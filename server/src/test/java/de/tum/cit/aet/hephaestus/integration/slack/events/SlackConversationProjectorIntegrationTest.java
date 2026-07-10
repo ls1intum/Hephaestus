@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -165,7 +166,7 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         ).isZero();
 
         // The row stays a contentless tombstone: text NULL, deleted_at set.
-        java.util.Map<String, Object> row = jdbc.queryForMap(
+        Map<String, Object> row = jdbc.queryForMap(
             "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND slack_ts = ?",
             ws,
             "C1",

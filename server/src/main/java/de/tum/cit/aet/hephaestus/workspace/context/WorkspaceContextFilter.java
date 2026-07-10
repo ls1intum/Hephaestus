@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -84,9 +85,7 @@ public class WorkspaceContextFilter implements Filter {
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ConnectionService connectionService,
         ObjectMapper objectMapper,
-        @org.springframework.beans.factory.annotation.Value(
-            "${hephaestus.workspace.auto-seed-membership:false}"
-        ) boolean autoSeedMembership
+        @Value("${hephaestus.workspace.auto-seed-membership:false}") boolean autoSeedMembership
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;

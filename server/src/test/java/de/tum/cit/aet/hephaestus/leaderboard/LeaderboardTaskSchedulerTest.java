@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
@@ -78,7 +79,7 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
         );
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
 
-        scheduler.onWorkspaceCreated(new de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent(7L, null));
+        scheduler.onWorkspaceCreated(new WorkspaceCreatedEvent(7L, null));
 
         ArgumentCaptor<Runnable> tick = ArgumentCaptor.forClass(Runnable.class);
         verify(taskScheduler).schedule(tick.capture(), any(Trigger.class));

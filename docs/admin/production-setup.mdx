@@ -58,20 +58,18 @@ If you run the webhook receiver on a separate public host, route only `/webhooks
 (`/oauth/callback/slack`, `/auth/login`, `/oauth2/authorization/*`, `/login/oauth2/code/slack`, with the same
 public prefix if you use one) must reach the application-server role.
 
-The bot token scope set should stay minimal:
+The bot token scope set (`SlackConnectionStrategy.DEFAULT_SCOPES`) stays minimal — every scope maps to a
+feature the shipped code actually exercises:
 
-```text
-assistant:write
-chat:write
-im:history
-channels:history
-groups:history
-channels:read
-channels:join
-groups:read
-mpim:read
-users:read
-```
+| Scope | Feature |
+| --- | --- |
+| `chat:write` | Mentor DM replies and admin/leaderboard-channel announcements |
+| `assistant:write` | The DM "Thinking…" streaming status and suggested prompts on the Agent messaging surface |
+| `im:history` | Receiving the DM `message` events that drive a mentor turn |
+| `channels:history` / `groups:history` | Reading messages in workspace-admin-consented monitored channels (public / private) |
+| `channels:read` / `groups:read` | Channel directory listing for the admin channel picker and periodic channel-metadata refresh |
+| `channels:join` | Letting an admin add a public channel to monitoring directly from the picker |
+| `users:read` | Resolving a Slack user to a workspace member for mentor identity and digest delivery |
 
 The user token scope set is only for Sign in with Slack account linking:
 
@@ -86,24 +84,21 @@ base URL `https://slack.com`, and scopes `openid profile email`. Workspace app i
 alone gives Hephaestus a bot token; personalized mentor DMs also need the member to link
 their Slack identity to their Hephaestus account.
 
-Subscribe to these bot events for the Agent messaging experience (`agent_view`):
-
-```text
-message.im
-message.channels
-message.groups
-member_joined_channel
-app_home_opened
-app_context_changed
-app_uninstalled
-tokens_revoked
-```
-
 Do not add unused broad scopes such as `chat:write.public`, `commands`, `team:read`,
-`app_mentions:read`, `im:write`, or `users:read.email` unless code is added that actually uses
-them. `channels:join` is intentionally present so Hephaestus can join selected public channels from the admin picker. `mpim:read` is present only because Slack's `member_joined_channel` event can require
-it during app configuration; Hephaestus still ignores MPDM message content and does not request
-`mpim:history`.
+`app_mentions:read`, `im:write`, `mpim:read`, or `users:read.email` unless code is added that
+actually uses them. `channels:join` is intentionally present so Hephaestus can join selected
+public channels from the admin picker.
+
+Subscribe to the bot events listed under `settings.event_subscriptions` in
+[`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) — the manifest is the single
+source of truth for event subscriptions, so do not duplicate the list here. It covers the DM/channel
+`message` events that drive mentor turns and channel ingestion, the channel-lifecycle events
+(`channel_archive`, `channel_deleted`, `channel_left`, `channel_rename`, `group_archive`, `group_left`,
+`group_rename`) that keep the monitored-channel allow-list in sync, and the app-lifecycle events
+(`app_home_opened`, `app_context_changed`, `app_uninstalled`, `tokens_revoked`).
+
+The nightly Slack history-reconciliation sweep replays `conversations.history` for already-consented
+channels through this same bot token, so it needs no scopes beyond the set above.
 
 Use [`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) as the dashboard
 baseline so scopes, events, and request URLs do not drift from the code.

@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -143,4 +145,102 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /** Scoped row count for a workspace. */
     long countByWorkspaceId(Long workspaceId);
+
+    /**
+     * Agent-owned {@code ConversationCandidateSource} SPI: threads on an {@code ACTIVE} channel that have grown
+     * past their review watermark and have at least {@code minMessageCount} messages, oldest {@code last_ts}
+     * first. The {@code participant_member_ids bigint[]} is selected as a plain mapped field (no raw JDBC array
+     * decode needed — {@link SlackThread#getParticipantMemberIds()} rides Hibernate's own
+     * {@code @JdbcTypeCode(SqlTypes.ARRAY)} marshalling). Rows come back as {@code Object[]} rather than a JPQL
+     * constructor expression into the agent's {@link ConversationThreadCandidate} record: that record's
+     * {@code workspaceId}/{@code threadId} components are primitive {@code long}, and Hibernate's "SELECT new"
+     * constructor resolution is not guaranteed to widen a selected (boxed) {@code Long} attribute into a primitive
+     * constructor parameter — {@link SlackConversationCandidateSource#toCandidate} does the explicit unboxing
+     * instead (same {@code Object[]} idiom as
+     * {@code MentorContextQueryRepository#findFirstUserMessagePartsByThreadIds}). Columns: {@code workspace_id},
+     * {@code id}, {@code slack_channel_id}, {@code slack_thread_ts}, {@code last_ts}, {@code last_reviewed_ts},
+     * {@code participant_member_ids}.
+     *
+     * <p>Deliberately unscoped — cross-workspace by design; each returned candidate carries its own
+     * {@code workspaceId}. The join predicate ({@code c.workspaceId = t.workspaceId}) still mentions
+     * {@code workspace_id} in the emitted SQL, so the runtime tenancy inspector passes without a bypass; the
+     * compile-time repository-scoping check is satisfied via the explicit allowlist in
+     * {@code SlackIntegrationArchitectureTest} (mirroring {@link SlackMessageRepository#findDistinctWorkspaceIds}).
+     * The caller ({@code SlackConversationCandidateSource.settledCandidates}, and above it the agent's
+     * {@code ConversationThreadTriggerScheduler}) is itself {@code @WorkspaceAgnostic} for exactly this reason.
+     */
+    @Query(
+        """
+        SELECT t.workspaceId, t.id, t.slackChannelId, t.slackThreadTs, t.lastTs, t.lastReviewedTs, t.participantMemberIds
+        FROM SlackThread t
+        JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId
+        WHERE c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
+          AND t.lastTs IS NOT NULL
+          AND (t.lastReviewedTs IS NULL OR t.lastTs > t.lastReviewedTs)
+          AND t.messageCount >= :minMessageCount
+        ORDER BY t.lastTs ASC
+        """
+    )
+    List<Object[]> findSettledCandidateRows(@Param("minMessageCount") int minMessageCount);
+
+    /**
+     * Agent-owned {@code ConversationSourceLiveness} SPI: the subset of {@code threadIds} whose source channel
+     * consent is still {@code ACTIVE} in this workspace — the fail-closed allow-set a
+     * {@code CONVERSATION_THREAD}-derived row must belong to before it may reach the mentor. Callers guard an
+     * empty {@code threadIds} (a native {@code IN ()} — or here, JPQL {@code IN :threadIds} — would otherwise be
+     * evaluated against nothing productively).
+     */
+    @Query(
+        "SELECT t.id FROM SlackThread t " +
+            "JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId " +
+            "WHERE t.workspaceId = :workspaceId AND t.id IN :threadIds " +
+            "AND c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE"
+    )
+    List<Long> findActiveThreadIds(
+        @Param("workspaceId") long workspaceId,
+        @Param("threadIds") Collection<Long> threadIds
+    );
+
+    /**
+     * Agent-owned {@code ConversationThreadProjection} SPI (participant-firewalled thread listing): threads in the
+     * workspace whose channel consent is {@code ACTIVE} and whose participant set contains {@code audienceMemberId},
+     * newest-active first, capped at {@code limit}. Native — Postgres {@code = ANY(participant_member_ids)} GIN
+     * array-membership has no portable JPQL form (the array is a genuine Postgres type, not a to-many relationship
+     * JPA can traverse). Columns: {@code slack_channel_id}, {@code channel_name} (nullable), {@code slack_thread_ts},
+     * {@code message_count} — unpacked by the caller into its own row type.
+     */
+    @Query(
+        value = """
+        SELECT t.slack_channel_id, c.channel_name, t.slack_thread_ts, t.message_count
+        FROM slack_thread t
+        JOIN slack_monitored_channel c ON c.workspace_id = t.workspace_id AND c.slack_channel_id = t.slack_channel_id
+        WHERE t.workspace_id = :workspaceId
+          AND c.consent_state = 'ACTIVE'
+          AND :audienceMemberId = ANY(t.participant_member_ids)
+        ORDER BY t.last_ts DESC NULLS LAST
+        LIMIT :limit
+        """,
+        nativeQuery = true
+    )
+    List<Object[]> findParticipatingThreadRows(
+        @Param("workspaceId") long workspaceId,
+        @Param("audienceMemberId") long audienceMemberId,
+        @Param("limit") int limit
+    );
+
+    /**
+     * Agent-owned {@code ConversationCandidateSource} SPI: advance the thread's {@code last_reviewed_ts} watermark
+     * to {@code lastTs}, workspace-pinned. Scoped {@code @Modifying} JPQL update (the entity is not loaded into
+     * the persistence context first — the caller has only the thread id from a prior scan).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        "UPDATE SlackThread t SET t.lastReviewedTs = :lastTs WHERE t.workspaceId = :workspaceId AND t.id = :threadId"
+    )
+    int advanceReviewWatermark(
+        @Param("workspaceId") long workspaceId,
+        @Param("threadId") long threadId,
+        @Param("lastTs") String lastTs
+    );
 }

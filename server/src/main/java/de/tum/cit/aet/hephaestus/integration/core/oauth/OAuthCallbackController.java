@@ -15,6 +15,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -290,7 +291,7 @@ public class OAuthCallbackController {
         if (request == null) return false;
         String accept = request.getHeader(HttpHeaders.ACCEPT);
         if (accept == null) return false;
-        String lower = accept.toLowerCase(java.util.Locale.ROOT);
+        String lower = accept.toLowerCase(Locale.ROOT);
         return lower.contains("application/json") && !lower.contains("text/html");
     }
 

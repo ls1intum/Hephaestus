@@ -615,4 +615,64 @@
         </rollback>
     </changeSet>
 
+    <!--
+        JPA column pressure-test follow-ups (reviewer: "pressure test each column, adversarially challenge
+        and consider alternatives"). Three real gaps survived the challenge; everything else on the six Slack
+        entities was kept as-is (see the per-entity verdict table in the PR description):
+          - slack_message(workspace_id, slack_channel_id, slack_thread_ts): SlackConversationProjector's
+            appendThreadMessages reads "WHERE workspace_id = ? AND slack_channel_id = ? AND (slack_thread_ts = ?
+            OR slack_ts = ?)". The slack_ts branch is already served by uk_slack_message; the slack_thread_ts
+            branch had no supporting index.
+          - slack_channel_consent_event.from_state / to_state share SlackMonitoredChannel.ConsentState with
+            slack_monitored_channel.consent_state, which is CHECK-constrained
+            (chk_slack_monitored_channel_consent); the audit-trail sibling columns never got the matching CHECK.
+          - slack_message.author_member_id and slack_channel_consent_event.actor_user_id are the only two
+            resolved "user" ids in the Slack surface without a real FK — every other author/actor/creator
+            column referencing "user" in this schema (author_id, creator_id, workspace_membership.user_id, …)
+            carries one. ON DELETE SET NULL (not RESTRICT/CASCADE): no code path hard-deletes a "user" row
+            today, but both columns are already nullable-and-meaningful-when-absent ("no resolved member"),
+            so SET NULL matches the existing contract if that ever changes.
+    -->
+    <changeSet author="hephaestus-slack" id="1782980500800-29">
+        <preConditions onFail="MARK_RAN" onFailMessage="Slack column pressure-test follow-ups already applied">
+            <not><indexExists indexName="idx_slack_message_thread"/></not>
+        </preConditions>
+        <comment>slack_message thread-read index + slack_channel_consent_event state CHECKs + missing author/actor FKs to "user".</comment>
+        <sql>
+            CREATE INDEX idx_slack_message_thread ON slack_message (workspace_id, slack_channel_id, slack_thread_ts);
+
+            ALTER TABLE slack_channel_consent_event
+                ADD CONSTRAINT chk_slack_channel_consent_event_from_state
+                CHECK (from_state IS NULL OR from_state IN ('PENDING', 'ACTIVE', 'PAUSED', 'REVOKED'));
+            ALTER TABLE slack_channel_consent_event
+                ADD CONSTRAINT chk_slack_channel_consent_event_to_state
+                CHECK (to_state IN ('PENDING', 'ACTIVE', 'PAUSED', 'REVOKED'));
+        </sql>
+        <addForeignKeyConstraint
+            baseTableName="slack_message"
+            baseColumnNames="author_member_id"
+            constraintName="fk_slack_message_author_member"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"
+            validate="true"/>
+        <addForeignKeyConstraint
+            baseTableName="slack_channel_consent_event"
+            baseColumnNames="actor_user_id"
+            constraintName="fk_slack_channel_consent_event_actor"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"
+            validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="slack_channel_consent_event" constraintName="fk_slack_channel_consent_event_actor"/>
+            <dropForeignKeyConstraint baseTableName="slack_message" constraintName="fk_slack_message_author_member"/>
+            <sql>
+                ALTER TABLE slack_channel_consent_event DROP CONSTRAINT IF EXISTS chk_slack_channel_consent_event_to_state;
+                ALTER TABLE slack_channel_consent_event DROP CONSTRAINT IF EXISTS chk_slack_channel_consent_event_from_state;
+                DROP INDEX IF EXISTS idx_slack_message_thread;
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

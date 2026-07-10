@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,7 @@ public class WorkspaceRepositoryMonitorService {
     private final IdentityProviderRepository gitProviderRepository;
 
     // Services — natsConsumerService absent under webhook profile.
-    private final org.springframework.beans.factory.ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitRepositoryManager gitRepositoryManager;
 
@@ -86,7 +87,7 @@ public class WorkspaceRepositoryMonitorService {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         IdentityProviderRepository gitProviderRepository,
-        org.springframework.beans.factory.ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitRepositoryManager gitRepositoryManager,
         ConnectionService connectionService,

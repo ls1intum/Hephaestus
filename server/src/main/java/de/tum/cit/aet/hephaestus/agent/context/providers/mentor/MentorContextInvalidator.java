@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -132,19 +135,14 @@ public class MentorContextInvalidator {
      */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPracticeDetectionCompleted(
-        de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent event
-    ) {
+    public void onPracticeDetectionCompleted(PracticeDetectionCompletedEvent event) {
         if (event == null || event.workspaceId() == null || event.developerId() == null) {
             return;
         }
         evictPerUser(event.workspaceId(), event.developerId(), DETECTION_DEPENDENT_CACHES);
     }
 
-    private void evictForReview(
-        de.tum.cit.aet.hephaestus.integration.core.events.EventContext context,
-        de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload.ReviewData review
-    ) {
+    private void evictForReview(EventContext context, ScmEventPayload.ReviewData review) {
         Long workspaceId = resolveWorkspaceId(context);
         if (workspaceId == null || review == null) return;
         evictPerUser(workspaceId, review.authorId());
@@ -161,7 +159,7 @@ public class MentorContextInvalidator {
      * Best-effort resolution of {@code workspaceId} from event context. Returns {@code null}
      * when the event lacks the necessary linkage — the caller is then a no-op.
      */
-    private Long resolveWorkspaceId(de.tum.cit.aet.hephaestus.integration.core.events.EventContext context) {
+    private Long resolveWorkspaceId(EventContext context) {
         if (context == null || context.repository() == null) return null;
         // The ScmDomainEvent context carries a RepositoryRef — we resolve to workspace via the
         // RepositoryToMonitor join (same approach the context queries use).

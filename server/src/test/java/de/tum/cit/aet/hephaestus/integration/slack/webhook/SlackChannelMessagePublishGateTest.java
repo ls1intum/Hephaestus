@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,7 +51,7 @@ class SlackChannelMessagePublishGateTest extends BaseUnitTest {
 
         assertThat(decision.publish()).isFalse();
         assertThat(decision.reason()).isEqualTo("slack-channel-not-active");
-        org.mockito.Mockito.verifyNoInteractions(consentGate);
+        Mockito.verifyNoInteractions(consentGate);
     }
 
     @Test
@@ -64,7 +65,7 @@ class SlackChannelMessagePublishGateTest extends BaseUnitTest {
         var decision = gate(true).evaluate(payload, Map.of());
 
         assertThat(decision.publish()).isTrue();
-        org.mockito.Mockito.verifyNoInteractions(workspaceResolver, consentGate);
+        Mockito.verifyNoInteractions(workspaceResolver, consentGate);
     }
 
     @Test

@@ -33,6 +33,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
@@ -346,7 +347,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             );
             when(projectFieldRepository.existsById("field-1")).thenReturn(true);
 
-            List<GitHubProjectFieldValueDTO> fieldValues = new java.util.ArrayList<>();
+            List<GitHubProjectFieldValueDTO> fieldValues = new ArrayList<>();
             fieldValues.add(null);
             fieldValues.add(validDto);
             fieldValues.add(new GitHubProjectFieldValueDTO(null, "TEXT", "val", null, null, null, null));

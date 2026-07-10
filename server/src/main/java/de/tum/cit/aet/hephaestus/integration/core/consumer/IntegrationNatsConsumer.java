@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -148,9 +149,7 @@ public class IntegrationNatsConsumer {
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
         IntegrationConsumerStats stats,
-        @org.springframework.beans.factory.annotation.Value(
-            "${hephaestus.integration.flat-stream.enabled:false}"
-        ) boolean flatStreamConsumerEnabled
+        @Value("${hephaestus.integration.flat-stream.enabled:false}") boolean flatStreamConsumerEnabled
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;

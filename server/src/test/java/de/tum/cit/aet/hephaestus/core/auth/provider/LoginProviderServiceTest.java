@@ -13,8 +13,10 @@ import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -126,7 +128,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
         ).seedFromEnvOnStartup();
 
         ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
-        verify(repository, org.mockito.Mockito.times(2)).save(captor.capture());
+        verify(repository, Mockito.times(2)).save(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(LoginProvider::getRegistrationId)
             .containsExactlyInAnyOrder("github", "gitlab-lrz");
@@ -213,7 +215,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void updateRejectsGitlabOpenidScope() {
         LoginProvider existing = gitlabProvider("gitlab", "sealed");
-        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(existing));
+        when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() ->
             adminService().update(
@@ -237,7 +239,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
         only.setRegistrationId("github");
         only.setType(LoginProvider.ProviderType.GITHUB);
         only.setEnabled(true);
-        when(repository.findByRegistrationId("github")).thenReturn(java.util.Optional.of(only));
+        when(repository.findByRegistrationId("github")).thenReturn(Optional.of(only));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
 
         assertThatThrownBy(() ->
@@ -249,7 +251,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void deleteRefusesWhenItIsTheLastEnabledProvider() {
         LoginProvider only = gitlabProvider("gitlab", "sealed");
-        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(only));
+        when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(only));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
 
         assertThatThrownBy(() -> adminService().delete("gitlab")).isInstanceOf(ResponseStatusException.class);
@@ -269,7 +271,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void updateLeavesSealedSecretUnchangedWhenPatchSecretIsNullOrBlank() {
         LoginProvider existing = gitlabProvider("gitlab", "sealed-secret");
-        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(existing));
+        when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService().update("gitlab", new LoginProviderService.Patch("Renamed", null, null, null, null, null));
@@ -282,7 +284,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void updateReplacesSecretWhenPatchSecretIsPresent() {
         LoginProvider existing = gitlabProvider("gitlab", "old-secret");
-        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(existing));
+        when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "new-secret", null, null));

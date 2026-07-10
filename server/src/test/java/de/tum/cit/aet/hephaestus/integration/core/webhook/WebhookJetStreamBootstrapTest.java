@@ -18,6 +18,7 @@ import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,7 +33,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), java.util.Map.of(), 2_000_000L),
+        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), Map.of(), 2_000_000L),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(26_214_400L)
     );
@@ -63,7 +64,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
             new WebhookProperties.Stream(
                 Duration.ofMinutes(10),
                 Duration.ofDays(180),
-                java.util.Map.of("slack", Duration.ofHours(72)),
+                Map.of("slack", Duration.ofHours(72)),
                 2_000_000L
             ),
             new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
@@ -95,7 +96,7 @@ class WebhookJetStreamBootstrapTest extends BaseUnitTest {
             new WebhookProperties.Stream(
                 Duration.ofMinutes(10),
                 Duration.ofDays(180),
-                java.util.Map.of("slack", Duration.ofMinutes(5)),
+                Map.of("slack", Duration.ofMinutes(5)),
                 2_000_000L
             )
         )

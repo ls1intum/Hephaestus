@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -45,7 +48,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private VerifiedEmailResolver verifiedEmailResolver;
     private AccountJitCreator accountJitCreator;
     private AdminBootstrapPolicy adminBootstrapPolicy;
-    private de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository loginProviderRepository;
+    private LoginProviderRepository loginProviderRepository;
     private AccountProvisioningService service;
 
     @BeforeEach
@@ -57,10 +60,10 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         accountJitCreator = mock(AccountJitCreator.class);
         // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
         adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
-        loginProviderRepository = mock(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository.class);
-        var githubProvider = new de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider();
+        loginProviderRepository = mock(LoginProviderRepository.class);
+        var githubProvider = new LoginProvider();
         githubProvider.setRegistrationId("github");
-        githubProvider.setType(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType.GITHUB);
+        githubProvider.setType(LoginProvider.ProviderType.GITHUB);
         githubProvider.setBaseUrl("https://github.com");
         lenient().when(loginProviderRepository.findByRegistrationId(any())).thenReturn(Optional.of(githubProvider));
         lenient().when(gitProviderRegistry.resolveProviderId(any(), any())).thenReturn(PROVIDER_ID);
@@ -158,9 +161,9 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     }
 
     private void useSlackProvider() {
-        var slackProvider = new de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider();
+        var slackProvider = new LoginProvider();
         slackProvider.setRegistrationId("slack");
-        slackProvider.setType(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType.SLACK);
+        slackProvider.setType(LoginProvider.ProviderType.SLACK);
         slackProvider.setBaseUrl("https://slack.com");
         when(loginProviderRepository.findByRegistrationId("slack")).thenReturn(Optional.of(slackProvider));
     }
@@ -224,9 +227,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
         );
         when(accountJitCreator.create(any(), any())).thenThrow(
-            new org.springframework.dao.DataIntegrityViolationException(
-                "duplicate key value violates uq_identity_link_provider_subject_team"
-            )
+            new DataIntegrityViolationException("duplicate key value violates uq_identity_link_provider_subject_team")
         );
 
         var result = service.resolveOrProvision(
@@ -250,9 +251,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
             new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
         );
-        when(accountJitCreator.create(any(), any())).thenThrow(
-            new org.springframework.dao.DataIntegrityViolationException("duplicate key")
-        );
+        when(accountJitCreator.create(any(), any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
         assertThatThrownBy(() ->
             service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.login(null, null))

@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -172,7 +173,7 @@ public class WorkspaceContentSource implements ContentSource {
         List<ChatThread> threads = queryRepository.findRecentChatThreads(
             workspaceId,
             developerId,
-            org.springframework.data.domain.PageRequest.of(0, MAX_RECENT_SESSIONS)
+            PageRequest.of(0, MAX_RECENT_SESSIONS)
         );
         ArrayNode arr = root.putArray("recentSessions");
         if (threads.isEmpty()) {

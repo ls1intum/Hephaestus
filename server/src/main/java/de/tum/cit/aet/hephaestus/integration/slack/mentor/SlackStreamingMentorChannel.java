@@ -382,7 +382,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     /** Terminal content write (open or append) with a few transient retries — the flush loop is already stopped. */
     private void terminalWrite(String text) {
         int attemptsLeft = 3;
-        while (attemptsLeft-- > 0) {
+        while (attemptsLeft > 0) {
             try {
                 openOrAppend(text);
                 return;
@@ -391,6 +391,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                     markGone();
                     return;
                 }
+                attemptsLeft--;
                 if (attemptsLeft == 0) {
                     log.debug("Slack terminal write gave up (channel={}): {}", channel, e.slackError());
                     return;

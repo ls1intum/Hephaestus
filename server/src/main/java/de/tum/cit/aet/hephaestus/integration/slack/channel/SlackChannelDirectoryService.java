@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,7 +28,7 @@ public class SlackChannelDirectoryService {
 
     // Deliberately not @Transactional: the single repository read is auto-committed, and a tx here would hold a
     // pooled connection across the paginated (rate-limited) Slack conversations.list call.
-    public java.util.List<SlackChannelCandidateDTO> listCandidates(long workspaceId) {
+    public List<SlackChannelCandidateDTO> listCandidates(long workspaceId) {
         Map<String, SlackMonitoredChannel> monitoredById = monitoredChannelRepository
             .findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
             .stream()

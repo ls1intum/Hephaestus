@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -108,7 +109,7 @@ public class IssueContentSource implements ContentSource {
             .getAssignees()
             .stream()
             .map(u -> u.getLogin())
-            .filter(java.util.Objects::nonNull)
+            .filter(Objects::nonNull)
             .sorted()
             .forEach(assignees::add);
         writeJson(files, "metadata.json", meta);

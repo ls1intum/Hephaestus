@@ -18,6 +18,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -337,7 +338,7 @@ public class GitHubExceptionClassifier {
 
         // UnexpectedRollbackException is transient — typically caused by a nested
         // transaction that was rolled back (e.g., deadlock in a sub-transaction)
-        if (cause instanceof org.springframework.transaction.UnexpectedRollbackException) {
+        if (cause instanceof UnexpectedRollbackException) {
             return ClassificationResult.of(
                 Category.RETRYABLE,
                 "Transaction rollback detected - will retry: " + cause.getMessage()

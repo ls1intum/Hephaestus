@@ -44,16 +44,25 @@ public class SlackChannelConsentEvent {
     @Column(name = "slack_channel_id", nullable = false, length = 32)
     private String slackChannelId;
 
-    /** The state the channel left. Null only for a hypothetical transition of a not-yet-persisted channel. */
+    /**
+     * The state the channel left. Null only for a hypothetical transition of a not-yet-persisted channel.
+     * Value-constrained by {@code chk_slack_channel_consent_event_from_state}, the audit-trail sibling of
+     * {@code slack_monitored_channel}'s {@code chk_slack_monitored_channel_consent} (same {@link ConsentState}).
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "from_state", length = 16)
     private @Nullable ConsentState fromState;
 
+    /** Value-constrained by {@code chk_slack_channel_consent_event_to_state} (see {@link #fromState}). */
     @Enumerated(EnumType.STRING)
     @Column(name = "to_state", nullable = false, length = 16)
     private ConsentState toState;
 
-    /** The workspace {@code User} (admin) who made the change; null if driven by a system path rather than an admin. */
+    /**
+     * The workspace {@code User} (admin) who made the change; null if driven by a system path rather than an admin.
+     * FK'd to {@code "user"(id)} ON DELETE SET NULL ({@code fk_slack_channel_consent_event_actor}) — no JPA
+     * association, matching {@code SlackMessage#getAuthorMemberId()}'s DB-only-FK convention.
+     */
     @Column(name = "actor_user_id")
     private @Nullable Long actorUserId;
 

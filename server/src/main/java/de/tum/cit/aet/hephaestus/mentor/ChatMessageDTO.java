@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.mentor;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,10 +51,10 @@ public record ChatMessageDTO(
         parts = parts.stream().filter(ChatMessageDTO::isUserVisiblePart).filter(Objects::nonNull).toList();
         Map<String, Object> metadata =
             message.getMetadata() != null && message.getMetadata().isObject()
-                ? new java.util.LinkedHashMap<>(
+                ? new LinkedHashMap<>(
                       mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {})
                   )
-                : new java.util.LinkedHashMap<>();
+                : new LinkedHashMap<>();
         // Status was promoted to a real column in migration mentor-1071-add-status-column,
         // but the webapp's generated client still reads it from `metadata.status`. Merge the
         // column back into the metadata bag at the API boundary so the wire shape stays

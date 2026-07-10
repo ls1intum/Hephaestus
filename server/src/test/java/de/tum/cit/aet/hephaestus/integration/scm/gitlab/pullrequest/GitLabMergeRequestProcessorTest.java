@@ -35,6 +35,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
@@ -51,6 +52,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
@@ -1737,7 +1739,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
             // Verify new approval was created (save called for new review)
             // and stale review was dismissed (save called for stale review)
-            verify(reviewRepository, org.mockito.Mockito.atLeast(2)).save(any(PullRequestReview.class));
+            verify(reviewRepository, Mockito.atLeast(2)).save(any(PullRequestReview.class));
 
             // Verify stale approval was dismissed (not CHANGES_REQUESTED — unapproval is distinct)
             assertThat(staleReview.getState()).isEqualTo(PullRequestReview.State.DISMISSED);
@@ -2172,13 +2174,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         );
     }
 
-    private de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject createProject() {
-        return new de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject(
-            278964L,
-            "gitlab",
-            "https://gitlab.com/gitlab-org/gitlab",
-            "gitlab-org/gitlab"
-        );
+    private GitLabWebhookProject createProject() {
+        return new GitLabWebhookProject(278964L, "gitlab", "https://gitlab.com/gitlab-org/gitlab", "gitlab-org/gitlab");
     }
 
     private GitLabMergeRequestProcessor.SyncMergeRequestData createSyncData() {

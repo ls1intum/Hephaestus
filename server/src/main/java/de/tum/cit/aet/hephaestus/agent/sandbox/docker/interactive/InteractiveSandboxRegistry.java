@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -81,8 +82,7 @@ public class InteractiveSandboxRegistry {
         SessionKey key = new SessionKey(id.userId(), id.workspaceId());
 
         // Per-user atomic reservation: increment only when a slot is available.
-        java.util.concurrent.atomic.AtomicReference<RegistrationOutcome> userResult =
-            new java.util.concurrent.atomic.AtomicReference<>();
+        AtomicReference<RegistrationOutcome> userResult = new AtomicReference<>();
         sessionsPerUser.compute(id.userId(), (u, prev) -> {
             AtomicInteger c = prev != null ? prev : new AtomicInteger();
             if (c.get() >= properties.maxSessionsPerUser()) {

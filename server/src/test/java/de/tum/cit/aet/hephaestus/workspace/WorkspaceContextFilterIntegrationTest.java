@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -104,10 +105,7 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
             .isForbidden();
 
         assertThat(
-            workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(
-                workspace.getId(),
-                java.util.Set.of(visitor.getId())
-            )
+            workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), Set.of(visitor.getId()))
         )
             .as("auto-seed disabled must not create a membership")
             .isEmpty();

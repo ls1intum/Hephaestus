@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.slack.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadMessageRow;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Component;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -19,19 +22,21 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><strong>Ownership.</strong> This class lives in {@code integration.slack} because it reads Slack's own
  * private tables ({@code slack_thread}/{@code slack_message}/{@code slack_monitored_channel}); the agent consumes
  * the projected payload through the SPI, never the schema. A column rename in these tables is therefore a compile-
- * and-SQL change <em>inside Slack</em>, not a silent runtime break in the agent.
+ * and-JPQL change <em>inside Slack</em>, not a silent runtime break in the agent.
  *
  * <p><strong>Participant firewall.</strong> {@code slack_thread.participant_member_ids} is the GIN-indexed
  * {@code bigint[]} of resolved SCM user ids stamped by the ingest write-path; the audience match is
- * {@code audienceMemberId = ANY(participant_member_ids)}. A mentor chat therefore surfaces only conversations the
- * requesting developer actually took part in — never a channel they merely share a workspace with.
+ * {@code audienceMemberId = ANY(participant_member_ids)}, evaluated by
+ * {@link SlackThreadRepository#findParticipatingThreadRows} (native — Postgres array membership has no portable
+ * JPQL form). A mentor chat therefore surfaces only conversations the requesting developer actually took part in
+ * — never a channel they merely share a workspace with.
  *
- * <p><strong>Tenancy.</strong> Every statement here is raw {@link JdbcTemplate} (the tenancy
- * {@code StatementInspector} only hooks Hibernate, and these {@code bigint[]}/{@code = ANY} reads are unmapped),
- * so <em>every</em> query carries an explicit {@code workspace_id = ?} predicate, on both the thread scan and the
- * per-thread message fetch. There is no path that reads a Slack row without pinning the workspace.
+ * <p><strong>Persistence &amp; tenancy.</strong> Every read here rides the {@code integration.slack.domain} JPA
+ * repositories — no raw {@code JdbcTemplate}. Every query carries an explicit {@code workspace_id} predicate, on
+ * both the thread scan and the per-thread message fetch, so there is no path that reads a Slack row without
+ * pinning the workspace.
  */
-@Component
+@Service
 public class SlackConversationProjector implements ConversationThreadProjection {
 
     /** Cap on distinct threads surfaced per turn — the envelope budget. */
@@ -40,11 +45,17 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     /** Cap on messages materialised per thread. */
     static final int MAX_MESSAGES_PER_THREAD = 100;
 
-    private final JdbcTemplate jdbc;
+    private final SlackThreadRepository threadRepository;
+    private final SlackMessageRepository messageRepository;
     private final ObjectMapper objectMapper;
 
-    public SlackConversationProjector(JdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
+    public SlackConversationProjector(
+        SlackThreadRepository threadRepository,
+        SlackMessageRepository messageRepository,
+        ObjectMapper objectMapper
+    ) {
+        this.threadRepository = threadRepository;
+        this.messageRepository = messageRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -127,91 +138,52 @@ public class SlackConversationProjector implements ConversationThreadProjection 
 
     /**
      * Threads in the workspace whose channel consent is ACTIVE and whose participant set contains the audience.
-     * Newest-active first. GIN-backed membership test ({@code = ANY}).
+     * Newest-active first. GIN-backed membership test ({@code = ANY}), via the native
+     * {@link SlackThreadRepository#findParticipatingThreadRows}.
      */
     private List<ThreadKey> findParticipatingThreads(long workspaceId, long audienceMemberId) {
-        List<ThreadKey> keys = new ArrayList<>();
-        jdbc.query(
-            """
-            SELECT t.slack_channel_id, c.channel_name, t.slack_thread_ts, t.message_count
-            FROM slack_thread t
-            JOIN slack_monitored_channel c
-              ON c.workspace_id = t.workspace_id AND c.slack_channel_id = t.slack_channel_id
-            WHERE t.workspace_id = ?
-              AND c.consent_state = 'ACTIVE'
-              AND ? = ANY(t.participant_member_ids)
-            ORDER BY t.last_ts DESC NULLS LAST
-            LIMIT ?
-            """,
-            rs -> {
-                keys.add(
-                    new ThreadKey(
-                        rs.getString("slack_channel_id"),
-                        rs.getString("channel_name"),
-                        rs.getString("slack_thread_ts"),
-                        rs.getLong("message_count")
-                    )
-                );
-            },
-            workspaceId,
-            audienceMemberId,
-            MAX_THREADS
-        );
+        List<Object[]> rows = threadRepository.findParticipatingThreadRows(workspaceId, audienceMemberId, MAX_THREADS);
+        List<ThreadKey> keys = new ArrayList<>(rows.size());
+        for (Object[] row : rows) {
+            keys.add(new ThreadKey((String) row[0], (String) row[1], (String) row[2], ((Number) row[3]).longValue()));
+        }
         return keys;
     }
 
     /**
      * Non-tombstoned messages of one thread (root {@code slack_ts = thread_ts} + replies
      * {@code slack_thread_ts = thread_ts}), oldest first. Workspace-pinned, and gated on the channel's consent
-     * being {@code ACTIVE} — the same {@code slack_monitored_channel} join as {@link #findParticipatingThreads}.
-     * The consent predicate lives on the message read itself (not only on the thread scan) so the detection
-     * path — which keys straight into {@link #buildThreadPayload} without a prior consent-filtered thread scan —
-     * cannot leak revoked/paused-channel messages when a channel is paused or revoked between enqueue and
-     * execution (or on a retry): a non-ACTIVE channel yields zero messages, atomically with the read.
+     * being {@code ACTIVE} — the same {@code slack_monitored_channel} join as {@link #findParticipatingThreads},
+     * via {@link SlackMessageRepository#findThreadMessages}. The consent predicate lives on the message read
+     * itself (not only on the thread scan) so the detection path — which keys straight into
+     * {@link #buildThreadPayload} without a prior consent-filtered thread scan — cannot leak revoked/paused-channel
+     * messages when a channel is paused or revoked between enqueue and execution (or on a retry): a non-ACTIVE
+     * channel yields zero messages, atomically with the read.
      */
     private void appendThreadMessages(long workspaceId, ThreadKey key, ArrayNode messages) {
-        jdbc.query(
-            """
-            SELECT m.slack_ts, m.author_slack_user_id, m.author_member_id, u.login AS author_login, u.name AS author_name,
-                   m.text, m.edited_at
-            FROM slack_message m
-            JOIN slack_monitored_channel c
-              ON c.workspace_id = m.workspace_id AND c.slack_channel_id = m.slack_channel_id
-            LEFT JOIN "user" u ON u.id = m.author_member_id
-            WHERE m.workspace_id = ?
-              AND m.slack_channel_id = ?
-              AND (m.slack_thread_ts = ? OR m.slack_ts = ?)
-              AND m.deleted_at IS NULL
-              AND c.consent_state = 'ACTIVE'
-            ORDER BY m.slack_ts ASC
-            LIMIT ?
-            """,
-            rs -> {
-                ObjectNode node = messages.addObject();
-                node.put("ts", rs.getString("slack_ts"));
-                node.put("author", rs.getString("author_slack_user_id"));
-                long authorMemberId = rs.getLong("author_member_id");
-                if (!rs.wasNull()) {
-                    node.put("authorMemberId", authorMemberId);
-                }
-                String authorLogin = rs.getString("author_login");
-                if (authorLogin != null) {
-                    node.put("authorLogin", authorLogin);
-                }
-                String authorName = rs.getString("author_name");
-                if (authorName != null) {
-                    node.put("authorName", authorName);
-                }
-                node.put("text", rs.getString("text"));
-                if (rs.getTimestamp("edited_at") != null) {
-                    node.put("edited", true);
-                }
-            },
+        List<SlackThreadMessageRow> rows = messageRepository.findThreadMessages(
             workspaceId,
             key.channelId(),
             key.threadTs(),
-            key.threadTs(),
-            MAX_MESSAGES_PER_THREAD
+            PageRequest.of(0, MAX_MESSAGES_PER_THREAD)
         );
+        for (SlackThreadMessageRow row : rows) {
+            ObjectNode node = messages.addObject();
+            node.put("ts", row.slackTs());
+            node.put("author", row.authorSlackUserId());
+            if (row.authorMemberId() != null) {
+                node.put("authorMemberId", row.authorMemberId());
+            }
+            if (row.authorLogin() != null) {
+                node.put("authorLogin", row.authorLogin());
+            }
+            if (row.authorName() != null) {
+                node.put("authorName", row.authorName());
+            }
+            node.put("text", row.text());
+            if (row.editedAt() != null) {
+                node.put("edited", true);
+            }
+        }
     }
 }
