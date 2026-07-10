@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -34,10 +34,10 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
-    private GitProvider gitlabProvider;
-    private GitProvider otherProvider;
+    private IdentityProvider gitlabProvider;
+    private IdentityProvider otherProvider;
     private Organization rootOrg;
     private Organization subgroupOrg;
 
@@ -46,22 +46,26 @@ class IssueTypeRepositoryIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
 
         gitlabProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.example.com")
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.com")
             .orElseGet(() ->
-                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.example.com"))
+                gitProviderRepository.save(
+                    new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.example.com")
+                )
             );
 
         otherProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://other.gitlab.com")
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://other.gitlab.com")
             .orElseGet(() ->
-                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://other.gitlab.com"))
+                gitProviderRepository.save(
+                    new IdentityProvider(IdentityProviderType.GITLAB, "https://other.gitlab.com")
+                )
             );
 
         rootOrg = persistOrg(gitlabProvider, 1000L, "root-group");
         subgroupOrg = persistOrg(gitlabProvider, 1001L, "root-group/subgroup");
     }
 
-    private Organization persistOrg(GitProvider provider, long nativeId, String login) {
+    private Organization persistOrg(IdentityProvider provider, long nativeId, String login) {
         Organization org = new Organization();
         org.setNativeId(nativeId);
         org.setLogin(login);

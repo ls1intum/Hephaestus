@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResp
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,7 @@ public class GitLabSubIssueSyncService {
         if (issues.isEmpty()) return SyncResult.completed(0);
 
         // Build IID -> Issue lookup map
-        Map<Integer, Issue> issueByIid = new java.util.HashMap<>();
+        Map<Integer, Issue> issueByIid = new HashMap<>();
         for (Issue issue : issues) {
             if (issue.getNumber() > 0) {
                 issueByIid.put(issue.getNumber(), issue);

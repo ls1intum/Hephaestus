@@ -7,7 +7,6 @@ import { cn, sanitizeText } from "@/lib/utils";
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
-import { MessageReasoning } from "./MessageReasoning";
 import { PreviewAttachment } from "./PreviewAttachment";
 import type { PartRenderer, PartRendererMap, ToolPart } from "./renderers/types";
 
@@ -102,28 +101,6 @@ export function PreviewMessage({
 						{message.parts?.map((part, index) => {
 							const { type } = part;
 							const key = `message-${message.id}-part-${index}`;
-
-							if (type === "reasoning" && part.text?.trim().length > 0) {
-								// Consider reasoning "done" as soon as any following text part has started streaming
-								const hasAnswerTextStarted =
-									message.parts?.some(
-										(p, i2) =>
-											i2 > index &&
-											p.type === "text" &&
-											typeof p.text === "string" &&
-											p.text.trim().length > 0,
-									) ?? false;
-								const isReasoningLoading = Boolean(isLoading && !hasAnswerTextStarted);
-
-								return (
-									<MessageReasoning
-										key={key}
-										isLoading={isReasoningLoading}
-										reasoning={part.text}
-										variant={variant}
-									/>
-								);
-							}
 
 							if (type === "text") {
 								if (mode === "view") {

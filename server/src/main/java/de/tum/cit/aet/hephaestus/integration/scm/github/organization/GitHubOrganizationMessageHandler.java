@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.organization;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
@@ -34,14 +34,14 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
 
     private final GitHubOrganizationProcessor organizationProcessor;
     private final GitHubUserProcessor userProcessor;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final OrganizationMembershipRepository membershipRepository;
     private final OrganizationMembershipListener membershipListener;
 
     GitHubOrganizationMessageHandler(
         GitHubOrganizationProcessor organizationProcessor,
         GitHubUserProcessor userProcessor,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         OrganizationMembershipRepository membershipRepository,
         OrganizationMembershipListener membershipListener,
         NatsMessageDeserializer deserializer,
@@ -79,8 +79,8 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
 
         // Resolve GitHub provider ID for user upsert
         Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
             .getId();
 
         switch (event.actionType()) {

@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.dto.UpdateRepositorySettingsRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.settings.dto.UpdateTeamSettingsRequestDTO;
@@ -167,11 +168,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         void updateTeamHidden_asNonAdmin_shouldReturn403() {
             persistUser("mentor");
             User memberUser = persistUser("member-" + System.nanoTime());
-            ensureWorkspaceMembership(
-                workspace,
-                memberUser,
-                de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.MEMBER
-            );
+            ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
             var request = new UpdateTeamSettingsRequestDTO(true);
 
             webTestClient
@@ -297,11 +294,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         void updateRepositoryHidden_asNonAdmin_shouldReturn403() {
             persistUser("mentor");
             User memberUser = persistUser("member-repo-" + System.nanoTime());
-            ensureWorkspaceMembership(
-                workspace,
-                memberUser,
-                de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.MEMBER
-            );
+            ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
             var request = new UpdateRepositorySettingsRequestDTO(true);
 
             webTestClient
@@ -405,11 +398,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         void addLabelFilter_asNonAdmin_shouldReturn403() {
             persistUser("mentor");
             User memberUser = persistUser("member-label-" + System.nanoTime());
-            ensureWorkspaceMembership(
-                workspace,
-                memberUser,
-                de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.MEMBER
-            );
+            ensureWorkspaceMembership(workspace, memberUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             webTestClient
                 .post()

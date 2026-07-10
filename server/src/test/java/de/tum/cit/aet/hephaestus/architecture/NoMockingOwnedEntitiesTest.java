@@ -42,7 +42,7 @@ class NoMockingOwnedEntitiesTest {
         "AgentJob",
         "Commit",
         "Organization",
-        "GitProvider",
+        "IdentityProvider",
         "User",
         "IdentityLink"
     );

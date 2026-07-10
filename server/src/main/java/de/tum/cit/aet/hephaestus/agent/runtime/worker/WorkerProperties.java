@@ -4,6 +4,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -31,7 +32,7 @@ public record WorkerProperties(
      * old id and mask its predecessor's orphaned jobs (#1138). K8s pod names are already unique, but
      * this makes fast orphan recovery hold in every topology.
      */
-    private static final String INSTANCE_SUFFIX = java.util.UUID.randomUUID().toString().substring(0, 8);
+    private static final String INSTANCE_SUFFIX = UUID.randomUUID().toString().substring(0, 8);
 
     /**
      * @return the configured worker id (operator owns its restart semantics), or

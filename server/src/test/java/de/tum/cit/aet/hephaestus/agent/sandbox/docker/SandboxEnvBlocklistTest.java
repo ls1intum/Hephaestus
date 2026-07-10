@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -36,15 +38,15 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isTrue();
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     @DisplayName("static blocklist sets are unmodifiable")
     void blocklistIsImmutable() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            SandboxEnvBlocklist.BLOCKED_NAMES.add("INJECT")
-        ).isInstanceOf(UnsupportedOperationException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            SandboxEnvBlocklist.ALLOWED_PREFIX_EXCEPTIONS.add("BYPASS")
-        ).isInstanceOf(UnsupportedOperationException.class);
+        Assertions.assertThatThrownBy(() -> SandboxEnvBlocklist.BLOCKED_NAMES.add("INJECT")).isInstanceOf(
+            UnsupportedOperationException.class
+        );
+        Assertions.assertThatThrownBy(() -> SandboxEnvBlocklist.ALLOWED_PREFIX_EXCEPTIONS.add("BYPASS")).isInstanceOf(
+            UnsupportedOperationException.class
+        );
     }
 
     @ParameterizedTest(name = "blocks prefix: {0}")
@@ -75,7 +77,7 @@ class SandboxEnvBlocklistTest extends BaseUnitTest {
         assertThat(SandboxEnvBlocklist.isBlocked(name)).isTrue();
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     @DisplayName("null returns false — caller validates")
     void nullIsNotBlocked() {
         assertThat(SandboxEnvBlocklist.isBlocked(null)).isFalse();

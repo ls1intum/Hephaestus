@@ -18,8 +18,10 @@ import java.net.http.WebSocket;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,7 +65,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void handshakeAndCapacityRoundTrip() throws Exception {
-        String workerId = "worker-it-" + java.util.UUID.randomUUID();
+        String workerId = "worker-it-" + UUID.randomUUID();
         WorkerJwtIssuer.IssuedWorkerJwt jwt = jwtIssuer.issue(workerId);
         FrameCodec codec = new FrameCodec(objectMapper);
 
@@ -73,12 +75,12 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
             .newWebSocketBuilder()
             .header("Authorization", "Bearer " + jwt.token())
             .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), listener)
-            .get(10, java.util.concurrent.TimeUnit.SECONDS);
+            .get(10, TimeUnit.SECONDS);
 
         try {
             // Send WorkerHello.
             String helloJson = codec.encode(FrameEnvelope.of(new WorkerHello(workerId, List.of(1), "0.0-it")));
-            ws.sendText(helloJson, true).get(5, java.util.concurrent.TimeUnit.SECONDS);
+            ws.sendText(helloJson, true).get(5, TimeUnit.SECONDS);
 
             // Hub responds with WorkerWelcome and registers the session.
             await()
@@ -93,7 +95,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
             // Publish a CapacityReport; verify the hub records it against the session.
             CapacityReport report = new CapacityReport(4, 2, 0, 0, 4, 2);
             String reportJson = codec.encode(FrameEnvelope.of(report));
-            ws.sendText(reportJson, true).get(5, java.util.concurrent.TimeUnit.SECONDS);
+            ws.sendText(reportJson, true).get(5, TimeUnit.SECONDS);
 
             await()
                 .atMost(Duration.ofSeconds(5))
@@ -104,7 +106,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                     assertThat(session.get().lastCapacity()).isEqualTo(report);
                 });
         } finally {
-            ws.sendClose(WebSocket.NORMAL_CLOSURE, "test done").get(5, java.util.concurrent.TimeUnit.SECONDS);
+            ws.sendClose(WebSocket.NORMAL_CLOSURE, "test done").get(5, TimeUnit.SECONDS);
         }
 
         // After close, the session is gone from the registry.
@@ -117,7 +119,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     @Test
     void revokedJwtIsRejected() throws Exception {
         assertThat(denylist).as("WorkerTokenDenylistService must be wired").isNotNull();
-        String workerId = "worker-rev-" + java.util.UUID.randomUUID();
+        String workerId = "worker-rev-" + UUID.randomUUID();
         WorkerJwtIssuer.IssuedWorkerJwt jwt = jwtIssuer.issue(workerId);
         denylist.revoke(jwt.jti(), jwt.expiresAt());
 
@@ -128,7 +130,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                 .newWebSocketBuilder()
                 .header("Authorization", "Bearer " + jwt.token())
                 .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), new CapturingListener())
-                .get(10, java.util.concurrent.TimeUnit.SECONDS);
+                .get(10, TimeUnit.SECONDS);
         } catch (Throwable t) {
             failure.set(t);
         }

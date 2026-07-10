@@ -126,13 +126,13 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
      * All general (conversation-tab) comments on an issue or merge request, author eagerly fetched,
      * oldest-first.
      *
-     * <p>Used by {@code GeneralReviewCommentContentProvider} to materialise the non-positioned MR
+     * <p>Used by {@code GeneralReviewCommentContentSource} to materialise the non-positioned MR
      * review discussion that {@code GitLabDiscussionSyncService} routes to {@link IssueComment} (any
      * note without a diff position). The inline-only {@code comments.json} cannot see these, so the
      * reviewer-craft practices were blind to review that happened in the conversation tab.
      *
      * <p>This fetch is intentionally unbounded: the consumer first filters out blank and bot-authored
-     * notes, then tail-slices to {@code GeneralReviewCommentContentProvider.MAX_COMMENTS}. Pushing a DB-side
+     * notes, then tail-slices to {@code GeneralReviewCommentContentSource.MAX_COMMENTS}. Pushing a DB-side
      * {@code LIMIT} here would slice the raw set (bot/blank rows included) and could drop the latest real
      * approval, so the cap stays consumer-side. Conversation-tab comment counts are small in practice.
      *

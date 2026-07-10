@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
  * edit-distance matching: a near-miss must never {@code @}-mention an unrelated person in a public
  * channel. A reviewer with no Slack account is rendered as a plain name, never dropped.
  */
+@Tag("unit")
 class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
 
     private static User slackUser(String id, String handle, String email) {
@@ -49,17 +51,16 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
     }
 
     @Test
-    void mentionsByExactEmailWhenHandleDiffers() {
+    void doesNotMentionByEmail() {
         User alice = slackUser("U1", "asmith", "alice@x.io");
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "ALICE@x.io"), List.of(alice))
-        ).isEqualTo("<@U1>");
+        ).isEqualTo("Alice Smith");
     }
 
     @Test
     void rendersPlainNameWhenNoSlackMatch() {
         User bob = slackUser("U2", "bjones", "bob@x.io");
-        // No handle/email match — plain display name, never a fuzzy @-mention of Bob.
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Zachariah Wong", "zw@x.io"), List.of(bob))
         ).isEqualTo("Zachariah Wong");
@@ -68,7 +69,6 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
     @Test
     void doesNotMentionNearMiss() {
         User alice = slackUser("U1", "asmith", "alice@x.io");
-        // "Alice Smyth" is one edit away but is NOT an exact match → plain name, not <@U1>.
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smyth", "smyth@x.io"), List.of(alice))
         ).isEqualTo("Alice Smyth");

@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookPublishGate;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.WebhookRequest;
@@ -11,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.webhook.JetStreamPublisher;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.PublishRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -31,13 +34,14 @@ import tools.jackson.databind.ObjectMapper;
  * Inbound webhook pipeline: verify → derive → publish.
  *
  * <p>Verification can short-circuit with {@code RespondImmediately} (Slack
- * {@code url_verification}, Asana {@code X-Hook-Secret} echo); on {@code Verified} the
+ * {@code url_verification}); on {@code Verified} the
  * pipeline derives the NATS subject + dedup-id via the per-kind {@link SubjectKeyDeriver}
  * and publishes through {@link JetStreamPublisher}.
  *
- * <p>Error responses are opaque ({@code "invalid"} / {@code "missing-signature"} /
- * {@code "stale-timestamp"}). The {@code Invalid.reason} from the verifier is logged
- * server-side only — echoing it would leak signature-format detail to attacker probes.
+ * <p>Error responses carry only a coarse category ({@code "invalid"} / {@code "missing-signature"} /
+ * {@code "stale-timestamp"}). The verifier's {@code Invalid.reason} — which distinguishes a missing secret from a
+ * signature mismatch from a malformed header — is logged server-side only; echoing it would hand attacker probes a
+ * side channel into the signing scheme.
  */
 @Component
 public class WebhookIngestPipeline {
@@ -45,9 +49,11 @@ public class WebhookIngestPipeline {
     private static final Logger log = LoggerFactory.getLogger(WebhookIngestPipeline.class);
 
     static final String NATS_MSG_ID = "Nats-Msg-Id";
+    private static final Duration SLACK_PUBLISH_TIMEOUT = Duration.ofSeconds(2);
 
     private final Map<IntegrationKind, WebhookSignatureVerifier> verifiersByKind;
     private final Map<IntegrationKind, SubjectKeyDeriver> deriversByKind;
+    private final Map<IntegrationKind, WebhookPublishGate> publishGatesByKind;
 
     @Nullable
     private final JetStreamPublisher jetStreamPublisher;
@@ -59,6 +65,17 @@ public class WebhookIngestPipeline {
         List<SubjectKeyDeriver> derivers,
         @Nullable JetStreamPublisher jetStreamPublisher,
         ObjectMapper objectMapper
+    ) {
+        this(verifiers, derivers, jetStreamPublisher, objectMapper, List.of());
+    }
+
+    @Autowired
+    public WebhookIngestPipeline(
+        List<WebhookSignatureVerifier> verifiers,
+        List<SubjectKeyDeriver> derivers,
+        @Nullable JetStreamPublisher jetStreamPublisher,
+        ObjectMapper objectMapper,
+        List<WebhookPublishGate> publishGates
     ) {
         this.verifiersByKind = verifiers
             .stream()
@@ -74,6 +91,13 @@ public class WebhookIngestPipeline {
                     throw new IllegalStateException("Duplicate SubjectKeyDeriver for kind=" + a.kind());
                 })
             );
+        this.publishGatesByKind = publishGates
+            .stream()
+            .collect(
+                Collectors.toUnmodifiableMap(WebhookPublishGate::kind, Function.identity(), (a, b) -> {
+                    throw new IllegalStateException("Duplicate WebhookPublishGate for kind=" + a.kind());
+                })
+            );
         this.jetStreamPublisher = jetStreamPublisher;
         this.objectMapper = objectMapper;
     }
@@ -84,11 +108,7 @@ public class WebhookIngestPipeline {
         return handle(kind, body, headers);
     }
 
-    /**
-     * Pre-read overload — useful when the body has already been consumed (tests,
-     * future re-entrant call sites). The {@code /webhooks/{kind}} controller path
-     * uses the {@link HttpServletRequest} overload above.
-     */
+    /** Pre-read overload for tests and call sites that already consumed the servlet body. */
     public ResponseEntity<?> handle(IntegrationKind kind, byte[] body, Map<String, String> headers) {
         WebhookSignatureVerifier verifier = verifiersByKind.get(kind);
         if (verifier == null) {
@@ -116,9 +136,9 @@ public class WebhookIngestPipeline {
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "stale-timestamp"));
             }
             case VerificationResult.Invalid i -> {
-                // Server-side log carries the discriminator; HTTP response stays opaque so
-                // attacker probes cannot distinguish missing-secret from signature-mismatch
-                // from malformed-header (side channel into the signing scheme).
+                // The response collapses every Invalid.reason into one category so attacker probes cannot
+                // distinguish missing-secret from signature-mismatch from malformed-header; the discriminator
+                // survives in the server-side log.
                 log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
             }
@@ -153,6 +173,15 @@ public class WebhookIngestPipeline {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid-json"));
         }
 
+        WebhookPublishGate gate = publishGatesByKind.get(kind);
+        if (gate != null) {
+            WebhookPublishGate.Decision decision = gate.evaluate(payload, headers);
+            if (!decision.publish()) {
+                log.info("Dropped {} webhook before durable publish: {}", kind, sanitizeForLog(decision.reason()));
+                return ResponseEntity.accepted().body(Map.of("status", "dropped"));
+            }
+        }
+
         String subject = deriver.deriveSubject(payload, headers);
         String dedupId = deriver.deriveDedupKey(body, headers);
 
@@ -168,7 +197,12 @@ public class WebhookIngestPipeline {
         outboundHeaders.put(NATS_MSG_ID, dedupId);
 
         try {
-            jetStreamPublisher.publish(new PublishRequest(subject, dedupId, outboundHeaders, body));
+            PublishRequest request = new PublishRequest(subject, dedupId, outboundHeaders, body);
+            if (kind == IntegrationKind.SLACK) {
+                jetStreamPublisher.publishFast(request, SLACK_PUBLISH_TIMEOUT);
+            } else {
+                jetStreamPublisher.publish(request);
+            }
         } catch (JetStreamPublisher.PublishFailedException e) {
             log.error(
                 "WebhookIngestPipeline: publish failed for kind={} subject={}: {}",

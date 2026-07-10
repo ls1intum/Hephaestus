@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.socket.WebSocketSession;
 import tools.jackson.databind.ObjectMapper;
@@ -74,8 +75,8 @@ class WorkerSessionRegistryTest extends BaseUnitTest {
 
     private WebSocketSession newTransport() {
         WebSocketSession transport = mock(WebSocketSession.class);
-        org.mockito.Mockito.lenient().when(transport.isOpen()).thenReturn(true);
-        org.mockito.Mockito.lenient().when(transport.getAttributes()).thenReturn(new HashMap<>());
+        Mockito.lenient().when(transport.isOpen()).thenReturn(true);
+        Mockito.lenient().when(transport.getAttributes()).thenReturn(new HashMap<>());
         return transport;
     }
 

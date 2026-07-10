@@ -20,6 +20,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,7 +171,7 @@ public class ObservationService {
                 .stream()
                 .filter(f -> f.getAssessment() == Assessment.BAD)
                 .toList();
-            // Corroboration is per recurrence LOCUS, not per practice group (matching the standing-aspect
+            // Corroboration is per recurrence LOCUS, not per practice group (matching the standing content source
             // design, where distinct-target counts are keyed per row): an uncorroborated gap on target A must
             // not be rescued from quarantine just because an UNRELATED BAD exists on target B for the same
             // practice. Count distinct targets within each recurrenceKey; the whole-group count is the fallback
@@ -180,9 +181,7 @@ public class ObservationService {
             Map<String, Set<Long>> targetsByLocus = new HashMap<>();
             for (Observation f : bad) {
                 if (f.getRecurrenceKey() != null) {
-                    targetsByLocus
-                        .computeIfAbsent(f.getRecurrenceKey(), k -> new java.util.HashSet<>())
-                        .add(f.getArtifactId());
+                    targetsByLocus.computeIfAbsent(f.getRecurrenceKey(), k -> new HashSet<>()).add(f.getArtifactId());
                 }
             }
             // P4 firewall on the read model (audit gap #1c): a quarantined BAD (low-confidence AND seen on a

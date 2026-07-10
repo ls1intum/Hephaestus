@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import org.springframework.web.client.RestClientException;
  * secrets are never logged.
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackOAuthClient {
 

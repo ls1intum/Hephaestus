@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
@@ -14,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -44,6 +46,7 @@ public class MentorTurnPersistence {
     private final ChatMessageRepository chatMessageRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ModelPricingService pricingService;
+    private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
 
     /**
      * Find the thread for {@code (workspaceId, threadId)} owned by {@code user}, creating a
@@ -92,8 +95,8 @@ public class MentorTurnPersistence {
      *
      * <p>{@code userMessageId} is the client-supplied UUID (from the AI SDK UIMessage envelope).
      * Pass {@code null} to fall back to {@code UUID.randomUUID()}. Persisting the client id is
-     * required for the webapp's optimistic UI: vote, regenerate, and reconciliation on refresh
-     * all key by the message id the client already minted.
+     * required for the webapp's optimistic UI and Slack event idempotency: duplicate inbound
+     * deliveries reuse the same user id and collapse to the existing in-flight/finished turn.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public TurnPersistenceCookie persistInFlight(
@@ -103,6 +106,12 @@ public class MentorTurnPersistence {
         @Nullable UUID userMessageId
     ) {
         try {
+            if (userMessageId != null && chatMessageRepository.existsById(userMessageId)) {
+                throw new TurnAlreadyInFlightException(
+                    thread.getId(),
+                    new DataIntegrityViolationException("duplicate client user message id")
+                );
+            }
             ChatMessage userMessage = new ChatMessage();
             userMessage.setId(userMessageId != null ? userMessageId : UUID.randomUUID());
             userMessage.setThread(thread);
@@ -129,9 +138,11 @@ public class MentorTurnPersistence {
         } catch (DataIntegrityViolationException ex) {
             // Spring translates ANY DB integrity violation (FK, NOT NULL, CHECK) to this
             // class — only narrow to TurnAlreadyInFlightException when Hibernate confirms
-            // the underlying constraint is our partial-unique in-flight index. A future
-            // CHECK regression on `parts` / `metadata` would otherwise masquerade as a 409.
-            if (isInFlightUniqueViolation(ex)) {
+            // the underlying constraint is our partial-unique in-flight index or the
+            // duplicate client-supplied user-message id used for transport idempotency.
+            // A future CHECK regression on `parts` / `metadata` would otherwise
+            // masquerade as a 409.
+            if (isInFlightUniqueViolation(ex) || (userMessageId != null && isDuplicateMessageIdViolation(ex))) {
                 throw new TurnAlreadyInFlightException(thread.getId(), ex);
             }
             throw ex;
@@ -143,11 +154,19 @@ public class MentorTurnPersistence {
      * the expected race from other integrity violations.
      */
     private static boolean isInFlightUniqueViolation(DataIntegrityViolationException ex) {
+        return hasConstraintName(ex, "ux_chat_message_in_flight_v2");
+    }
+
+    private static boolean isDuplicateMessageIdViolation(DataIntegrityViolationException ex) {
+        return hasConstraintName(ex, "chat_message_pkey");
+    }
+
+    private static boolean hasConstraintName(DataIntegrityViolationException ex, String expectedName) {
         Throwable cur = ex;
         while (cur != null) {
             if (cur instanceof ConstraintViolationException cve) {
                 String name = cve.getConstraintName();
-                return name != null && name.equalsIgnoreCase("ux_chat_message_in_flight_v2");
+                return name != null && name.equalsIgnoreCase(expectedName);
             }
             cur = cur.getCause();
         }
@@ -257,9 +276,44 @@ public class MentorTurnPersistence {
         // a benign reaper race into a logged turn failure.
         chatMessageRepository.saveAndFlush(assistant);
 
+        // close the conversational-delivery loop for any PREPARED unit the mentor raised this turn. MUST run
+        // AFTER the assistant saveAndFlush above - the CONVERSATION_TURN placement's chat_message_id FK
+        // (ON DELETE SET NULL) references this just-flushed row. Runs in THIS (finalise) transaction. Best-effort.
+        reconcileConversationalDelivery(assistant, state);
+
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
             chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
+        }
+    }
+
+    /**
+     * Reconcile the mentor's linked findings for this turn against the PREPARED conversational queue.
+     * Derives the recipient + workspace from the assistant message's thread. Best-effort - a failure is logged
+     * and swallowed so it can never fail the turn persistence the finalise transaction just did.
+     */
+    private void reconcileConversationalDelivery(ChatMessage assistant, TranslatorState state) {
+        try {
+            List<UUID> linkedFindingIds = state.linkedFindingIds();
+            if (linkedFindingIds.isEmpty()) {
+                return;
+            }
+            ChatThread thread = assistant.getThread();
+            if (thread == null || thread.getWorkspace() == null || thread.getUser() == null) {
+                return;
+            }
+            conversationalDeliveryReconciler.reconcile(
+                thread.getWorkspace().getId(),
+                thread.getUser().getId(),
+                assistant.getId(),
+                linkedFindingIds
+            );
+        } catch (RuntimeException e) {
+            log.warn(
+                "Conversational delivery reconciliation failed (turn persistence unaffected): assistantMessageId={}, error={}",
+                assistant.getId(),
+                e.toString()
+            );
         }
     }
 

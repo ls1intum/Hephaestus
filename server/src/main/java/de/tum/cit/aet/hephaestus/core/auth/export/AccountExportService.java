@@ -7,9 +7,15 @@ import de.tum.cit.aet.hephaestus.core.auth.export.dto.ExportStatusDTO;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * GDPR Art. 20 self-service data export. Owns the {@link AccountExport} lifecycle and the
@@ -50,16 +56,13 @@ public class AccountExportService {
     }
 
     /** Statuses that count as "in flight" for the one-export-per-account cap. */
-    private static final java.util.List<AccountExport.Status> IN_FLIGHT = java.util.List.of(
+    private static final List<AccountExport.Status> IN_FLIGHT = List.of(
         AccountExport.Status.PENDING,
         AccountExport.Status.PROCESSING
     );
 
-    private static org.springframework.web.server.ResponseStatusException inFlightConflict() {
-        return new org.springframework.web.server.ResponseStatusException(
-            org.springframework.http.HttpStatus.CONFLICT,
-            "An export is already in progress for this account."
-        );
+    private static ResponseStatusException inFlightConflict() {
+        return new ResponseStatusException(HttpStatus.CONFLICT, "An export is already in progress for this account.");
     }
 
     /**
@@ -79,7 +82,7 @@ public class AccountExportService {
         AccountExport export;
         try {
             export = accountExportRepository.saveAndFlush(new AccountExport(accountId));
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException e) {
             // Lost the race: a concurrent POST inserted the in-flight row first and won the unique index.
             throw inFlightConflict();
         }
@@ -148,9 +151,9 @@ public class AccountExportService {
      * Package-private + overridable so tests can assert the handoff without an executor.
      */
     void registerAfterCommit(Runnable action) {
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                new org.springframework.transaction.support.TransactionSynchronization() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
                         action.run();

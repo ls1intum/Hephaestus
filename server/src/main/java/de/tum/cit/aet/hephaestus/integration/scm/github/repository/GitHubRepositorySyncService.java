@@ -6,7 +6,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.RepositoryNotFoundOnGitProviderException;
@@ -81,11 +81,11 @@ public class GitHubRepositorySyncService {
      *
      * @param scopeId the scope ID for authentication
      * @param nameWithOwner the full repository name (owner/repo)
-     * @param provider the GitProvider entity representing the GitHub provider instance
+     * @param provider the IdentityProvider entity representing the GitHub provider instance
      * @return the synced Repository entity, or empty if not found
      */
     @Transactional
-    public Optional<Repository> syncRepository(Long scopeId, String nameWithOwner, GitProvider provider) {
+    public Optional<Repository> syncRepository(Long scopeId, String nameWithOwner, IdentityProvider provider) {
         return syncRepositoryWithRetry(scopeId, nameWithOwner, provider, 0);
     }
 
@@ -95,7 +95,7 @@ public class GitHubRepositorySyncService {
     private Optional<Repository> syncRepositoryWithRetry(
         Long scopeId,
         String nameWithOwner,
-        GitProvider provider,
+        IdentityProvider provider,
         int retryAttempt
     ) {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
@@ -284,7 +284,7 @@ public class GitHubRepositorySyncService {
      * Uses PostgreSQL upsert for thread-safe concurrent access.
      */
     @Nullable
-    private Organization ensureOrganization(GHRepositoryOwner owner, GitProvider provider) {
+    private Organization ensureOrganization(GHRepositoryOwner owner, IdentityProvider provider) {
         if (owner == null) {
             return null;
         }

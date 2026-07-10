@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 
 class AgentImagePullBootstrapperTest extends BaseUnitTest {
 
@@ -70,7 +71,7 @@ class AgentImagePullBootstrapperTest extends BaseUnitTest {
         bootstrapperWith(ImagePullPolicy.IF_NOT_PRESENT, new SimpleMeterRegistry()).pullOnStartup();
 
         verify(imageOps).imageIsPresent(IMAGE);
-        verify(imageOps, alreadyPresent ? never() : org.mockito.Mockito.times(expectedPulls)).pullImage(IMAGE);
+        verify(imageOps, alreadyPresent ? never() : Mockito.times(expectedPulls)).pullImage(IMAGE);
     }
 
     @Test

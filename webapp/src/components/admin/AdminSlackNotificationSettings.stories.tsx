@@ -3,16 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
-/**
- * Admin card for the weekly Slack leaderboard digest. The component owns its form
- * state and is remounted (via a server-snapshot `key` in the parent) whenever the
- * server truth changes, so each story here represents one immutable initial snapshot.
- */
 const meta = {
 	component: AdminSlackNotificationSettings,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
-	// useMutation needs a client; stories never hit the network (no play triggers a save).
 	decorators: [
 		(Story) => (
 			<QueryClientProvider client={new QueryClient()}>
@@ -44,14 +38,12 @@ export const NotConnected: Story = {
 	},
 };
 
-/**
- * OAuth completed but no channel picked yet — the Send-test button must stay disabled
- * because there is no valid channel to probe.
- */
+/** OAuth completed, but no digest channel is selected yet. */
 export const ConnectedNoChannel: Story = {
 	args: { hasSlackConnection: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeEnabled();
 		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeDisabled();
 	},
 };
@@ -66,16 +58,12 @@ export const ConnectedConfigured: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Valid channel + valid time ⇒ both actions are live.
 		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeEnabled();
 		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeEnabled();
 	},
 };
 
-/**
- * Toggling the digest Switch off flips the control's checked state — verifies the
- * Switch is locally controlled (no prop→state effect resets it mid-edit).
- */
+/** Toggling the digest Switch off updates local form state. */
 export const ToggleDigestOff: Story = {
 	args: {
 		hasSlackConnection: true,
@@ -89,6 +77,52 @@ export const ToggleDigestOff: Story = {
 		await expect(digest).toBeChecked();
 		await userEvent.click(digest);
 		await expect(digest).not.toBeChecked();
+	},
+};
+
+/**
+ * Slack-discovered channels can be searched and selected without manual ID entry — a
+ * searchable combobox (roving keyboard focus, no scrollable `aria-pressed` button list), with
+ * disabled options carrying a visible reason instead of vanishing from the list.
+ */
+export const WithChannelPicker: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelCandidates: [
+			{
+				slackChannelId: "C01GENERAL01",
+				channelName: "general",
+				privateChannel: false,
+				member: true,
+				archived: false,
+			},
+			{
+				slackChannelId: "C02PRIVATE02",
+				channelName: "private-team",
+				privateChannel: true,
+				member: false,
+				archived: false,
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const general = canvas.getByRole("option", { name: /#general/i });
+		const privateTeam = canvas.getByRole("option", { name: /#private-team/i });
+		await expect(privateTeam).toHaveAttribute("aria-disabled", "true");
+		await expect(canvas.getByText(/needs invite/i)).toBeInTheDocument();
+
+		// Search narrows the option list to the match. Scope by name — the schedule Day <Select>
+		// on the same page is also exposed as role="combobox".
+		await userEvent.type(
+			canvas.getByRole("combobox", { name: /search digest slack channels/i }),
+			"gen",
+		);
+		await expect(canvas.getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expect(canvas.queryByRole("option", { name: /#private-team/i })).not.toBeInTheDocument();
+
+		await userEvent.click(general);
+		await expect(canvas.getByLabelText(/digest channel/i)).toHaveValue("C01GENERAL01");
 	},
 };
 
@@ -116,7 +150,7 @@ export const InvalidChannel: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Channel IDs start with C \/ G \/ D/i)).toBeVisible();
+		await expect(canvas.getByText(/Paste a Slack channel URL/i)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeDisabled();
 	},
 };

@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -319,7 +320,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     private void runCloseAsync(Duration graceTimeout) {
         try {
             closeExecutor.execute(() -> runClose(graceTimeout));
-        } catch (java.util.concurrent.RejectedExecutionException ree) {
+        } catch (RejectedExecutionException ree) {
             // Executor shut down (e.g. by a @Scheduled tick during Spring destruction).
             log.warn("closeExecutor rejected runClose for sessionId={} — running inline", sessionId);
             runClose(graceTimeout);

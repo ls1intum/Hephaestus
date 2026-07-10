@@ -37,7 +37,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class WorkspaceSettingsService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSettingsService.class);
-    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CGD][A-Z0-9]{8,}$");
+    private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CG][A-Z0-9]{8,}$");
 
     private final WorkspaceRepository workspaceRepository;
     private final ConnectionService connectionService;
@@ -111,6 +111,7 @@ public class WorkspaceSettingsService {
                     slack.teamName(),
                     channelId != null ? channelId : slack.notificationChannelId(),
                     team != null ? team : slack.teamLabel(),
+                    slack.retentionDays(),
                     slack.enabledStreams()
                 );
             });
@@ -218,9 +219,8 @@ public class WorkspaceSettingsService {
 
     private void validateTimeFormat(String time) {
         try {
-            // Intentional: parsing validates the format; result not needed
-            @SuppressWarnings("unused")
-            LocalTime parsed = LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
+            // Intentional: parsing validates the format; the parsed value itself is discarded.
+            LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("Invalid time format. Expected HH:mm", e);
         }

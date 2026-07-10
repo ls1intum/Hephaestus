@@ -6,9 +6,11 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -24,12 +26,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @DisplayName("GitLab workspace creation integration")
-@org.springframework.test.context.TestPropertySource(
-    properties = "hephaestus.features.flags.gitlab-workspace-creation=true"
-)
+@TestPropertySource(properties = "hephaestus.features.flags.gitlab-workspace-creation=true")
 class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -59,10 +60,10 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
      */
     private Consumer<HttpHeaders> gitLabCaller(String login) {
         Account account = accountRepository.save(new Account(login));
-        GitProvider gitlab = ensureGitLabProvider();
+        IdentityProvider gitlab = ensureGitLabProvider();
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(gitlab.getId());
+        link.setProviderId(gitlab.getId());
         link.setSubject(String.valueOf(70_000 + account.getId())); // numeric GitLab native id
         link.setUsernameAtSignup(login);
         identityLinkRepository.save(link);
@@ -80,21 +81,16 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
      */
     private GitLabCaller gitLabCallerWithMirror(String login) {
         Account account = accountRepository.save(new Account(login));
-        GitProvider gitlab = ensureGitLabProvider();
+        IdentityProvider gitlab = ensureGitLabProvider();
         long nativeId = 70_000 + account.getId();
         // The SCM mirror's login MUST equal the token's preferred_username, because the current user is
         // resolved by login (SecurityUtils.getCurrentUserLogin → UserRepository.findByLogin). The
         // mock-jwt-sub-<id> token sets preferred_username = "account-<id>".
         String scmLogin = "account-" + account.getId();
-        User scmUser = de.tum.cit.aet.hephaestus.testconfig.TestUserFactory.ensureUser(
-            userRepository,
-            scmLogin,
-            nativeId,
-            gitlab
-        );
+        User scmUser = TestUserFactory.ensureUser(userRepository, scmLogin, nativeId, gitlab);
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(gitlab.getId());
+        link.setProviderId(gitlab.getId());
         link.setSubject(String.valueOf(nativeId));
         link.setUsernameAtSignup(scmLogin);
         link.setExternalActorId(scmUser.getId());
@@ -113,7 +109,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group/my-project",
             AccountType.ORG,
             owner.getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             "glpat-test-token-12345",
             "https://gitlab.example.com"
         );
@@ -137,7 +133,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         // and surfaced via `kind` (the renamed field). The legacy gitProviderMode field
         // is gone.
         assertThat(workspace.kind()).isEqualTo("GITLAB");
-        assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITLAB);
+        assertThat(workspace.providerType()).isEqualTo(IdentityProviderType.GITLAB);
         assertThat(workspace.serverUrl()).isEqualTo("https://gitlab.example.com");
         assertThat(workspace.status()).isEqualTo("ACTIVE");
         assertThat(workspace.hasPersonalAccessToken()).isTrue();
@@ -160,7 +156,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             "glpat-test-token-67890",
             null
         );
@@ -179,7 +175,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
-        assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITLAB);
+        assertThat(workspace.providerType()).isEqualTo(IdentityProviderType.GITLAB);
         assertThat(workspace.serverUrl()).isNull();
     }
 
@@ -194,7 +190,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             null, // missing token
             null
         );
@@ -232,7 +228,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             "glpat-test-token",
             "http://insecure.example.com" // not HTTPS
         );
@@ -270,7 +266,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "owner-group",
             AccountType.ORG,
             owner.getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             "glpat-owner-token",
             null
         );
@@ -308,7 +304,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "secret-group",
             AccountType.ORG,
             owner.getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             secretToken,
             null
         );
@@ -344,7 +340,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "gitlab-group",
             AccountType.ORG,
             caller.scmUser().getId(),
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+            IntegrationKind.GITLAB,
             "glpat-list-token",
             null
         );
@@ -373,7 +369,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(workspaces).isNotNull();
         // providerType is derived from the active Connection: the GitLab workspace created via the REST
         // API path provisions a GitLab Connection inline and surfaces as GITLAB.
-        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).contains(GitProviderType.GITLAB);
+        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).contains(IdentityProviderType.GITLAB);
     }
 
     @Test
@@ -387,7 +383,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 "lifecycle-group",
                 AccountType.ORG,
                 owner.getId(),
-                de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
+                IntegrationKind.GITLAB,
                 "glpat-lifecycle-token",
                 null
             )

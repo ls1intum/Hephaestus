@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
@@ -38,13 +38,13 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
 
     private final RepositoryRepository repositoryRepository;
     private final OrganizationRepository organizationRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
 
     GitLabProjectEventMessageHandler(
         RepositoryRepository repositoryRepository,
         OrganizationRepository organizationRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
@@ -72,12 +72,12 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
             event.projectId()
         );
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElse(null);
 
         if (provider == null) {
-            log.warn("GitProvider not found for GITLAB, skipping project event");
+            log.warn("IdentityProvider not found for GITLAB, skipping project event");
             return;
         }
 
@@ -92,7 +92,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         }
     }
 
-    private void handleProjectCreate(GitLabProjectEventDTO event, GitProvider provider) {
+    private void handleProjectCreate(GitLabProjectEventDTO event, IdentityProvider provider) {
         Long providerId = provider.getId();
         long nativeId = event.projectId();
 
@@ -136,7 +136,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         );
     }
 
-    private void handleProjectDestroy(GitLabProjectEventDTO event, GitProvider provider) {
+    private void handleProjectDestroy(GitLabProjectEventDTO event, IdentityProvider provider) {
         Long providerId = provider.getId();
         long nativeId = event.projectId();
 
@@ -160,7 +160,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
             );
     }
 
-    private void handleProjectRenameOrTransfer(GitLabProjectEventDTO event, GitProvider provider) {
+    private void handleProjectRenameOrTransfer(GitLabProjectEventDTO event, IdentityProvider provider) {
         Long providerId = provider.getId();
         long nativeId = event.projectId();
 

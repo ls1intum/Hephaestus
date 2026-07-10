@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuetype;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -72,7 +72,7 @@ public class GitLabIssueTypeSyncService {
         String safeGroupPath = sanitizeForLog(groupPath);
 
         Organization org = organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(groupPath, GitProviderType.GITLAB)
+            .findByLoginIgnoreCaseAndProvider_Type(groupPath, IdentityProviderType.GITLAB)
             .orElse(null);
         if (org == null) {
             log.debug("Organization not found, skipping issue type sync: groupPath={}", safeGroupPath);

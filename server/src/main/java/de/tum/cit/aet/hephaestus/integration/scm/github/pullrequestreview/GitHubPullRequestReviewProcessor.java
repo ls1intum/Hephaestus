@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -394,21 +395,21 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     /**
      * Converts a GitHub API state string to Issue.State enum.
      */
-    private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State convertState(String state) {
+    private Issue.State convertState(String state) {
         if (state == null) {
             log.warn(
                 "PR state is null when creating stub from review webhook, defaulting to OPEN. " +
                     "This may indicate missing data in webhook payload."
             );
-            return de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
+            return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {
-            case "OPEN" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
-            case "CLOSED" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.CLOSED;
-            case "MERGED" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.MERGED;
+            case "OPEN" -> Issue.State.OPEN;
+            case "CLOSED" -> Issue.State.CLOSED;
+            case "MERGED" -> Issue.State.MERGED;
             default -> {
                 log.warn("Unknown PR state '{}' when creating stub from review webhook, defaulting to OPEN", state);
-                yield de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
+                yield Issue.State.OPEN;
             }
         };
     }

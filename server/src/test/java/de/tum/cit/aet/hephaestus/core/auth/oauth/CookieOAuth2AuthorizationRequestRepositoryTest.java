@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
 import java.security.SecureRandom;
+import java.util.Set;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -36,7 +38,7 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
             .authorizationUri("https://idp.example.test/authorize")
             .clientId("client-123")
             .redirectUri("https://app.example.test/login/oauth2/code/github")
-            .scopes(java.util.Set.of("read:user"))
+            .scopes(Set.of("read:user"))
             .state("state-xyz")
             .attributes(attrs -> {
                 attrs.put(OAuth2ParameterNames.REGISTRATION_ID, "github");
@@ -156,7 +158,7 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
 
     @Test
     void rejectsNonThirtyTwoByteKey() {
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
+        Assertions.assertThrows(IllegalArgumentException.class, () ->
             new CookieOAuth2AuthorizationRequestRepository(new byte[16])
         );
     }

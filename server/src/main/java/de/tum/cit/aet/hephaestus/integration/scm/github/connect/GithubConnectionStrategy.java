@@ -39,7 +39,9 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     private final OAuthStateService oauthStateService;
 
     public GithubConnectionStrategy(
-        @Value("${hephaestus.integration.github.app.install-url:}") String installUrl,
+        @Value(
+            "${hephaestus.integration.github.app.installation-url:${hephaestus.integration.github.app.install-url:}}"
+        ) String installUrl,
         @Value("${hephaestus.integration.github.app.id:}") String appId,
         OAuthStateService oauthStateService
     ) {
@@ -57,7 +59,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     public ConnectInitiation initiate(InitiateRequest request) {
         if (installUrl.isEmpty()) {
             throw new IllegalStateException(
-                "hephaestus.integration.github.app.install-url is not configured — cannot initiate GitHub App install"
+                "hephaestus.integration.github.app.installation-url is not configured — cannot initiate GitHub App install"
             );
         }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB, request.actorRef());

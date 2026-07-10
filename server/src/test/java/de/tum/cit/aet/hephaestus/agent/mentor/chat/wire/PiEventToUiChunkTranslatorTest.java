@@ -75,6 +75,17 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
+    void messageStart_withoutMessageRole_dropped() throws Exception {
+        ObjectNode event = mapper.createObjectNode();
+        event.put("type", "message_start");
+        event.putObject("message").put("model", "test-model");
+        event.put("role", "assistant");
+
+        assertThat(translator.translate(event, state)).isEmpty();
+        assertThat(state.isStarted()).isFalse();
+    }
+
+    @Test
     void messageStart_afterOrchestratorMarkedStarted_emitsStartStepOnly() throws Exception {
         // Orchestrator pre-emits Start at turn open, then markStarted() to suppress duplicate.
         state.markStarted();
@@ -141,17 +152,13 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("thinking_delta opens reasoning block with reasoning-<contentIndex> id")
-    void delta_type_translatesTo_thinkingDelta_chunk() throws Exception {
+    @DisplayName("thinking_delta is hidden from user-visible stream")
+    void delta_type_dropsThinkingDelta() throws Exception {
         JsonNode event = fixture("message_update_thinking_delta.json");
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("ReasoningStart", "ReasoningDelta");
-        assertThat(((UIMessageChunk.ReasoningStart) out.get(0)).id()).isEqualTo("reasoning-0");
-        assertThat(((UIMessageChunk.ReasoningDelta) out.get(1)).delta()).isEqualTo("Let me think");
+        assertThat(out).isEmpty();
     }
 
     // message_end (captures final usage but emits no UI chunks)
@@ -178,14 +185,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("ToolInputStart", "ToolInputAvailable");
-        UIMessageChunk.ToolInputStart startChunk = (UIMessageChunk.ToolInputStart) out.get(0);
-        assertThat(startChunk.toolCallId()).isEqualTo("call-real-1");
-        assertThat(startChunk.toolName()).isEqualTo("fetch_context");
-        UIMessageChunk.ToolInputAvailable avail = (UIMessageChunk.ToolInputAvailable) out.get(1);
-        assertThat(avail.input().get("path").asString()).isEqualTo("workspace.json");
+        assertThat(out).isEmpty();
     }
 
     @Test
@@ -195,9 +195,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out).hasSize(1);
-        UIMessageChunk.ToolOutputAvailable avail = (UIMessageChunk.ToolOutputAvailable) out.get(0);
-        assertThat(avail.output().path("content").get(0).get("text").asString()).isEqualTo("{\"workspace\":{}}");
+        assertThat(out).isEmpty();
     }
 
     @Test
@@ -214,9 +212,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out).hasSize(1);
-        UIMessageChunk.ToolOutputError err = (UIMessageChunk.ToolOutputError) out.get(0);
-        assertThat(err.errorText()).contains("unauthorised_path");
+        assertThat(out).isEmpty();
     }
 
     @Test
@@ -226,8 +222,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         event.put("toolCallId", "x");
         event.putObject("result").putArray("content").addObject().put("type", "text").put("text", "ok");
         List<UIMessageChunk> out = translator.translate(event, state);
-        assertThat(out).hasSize(1);
-        assertThat(out.get(0)).isInstanceOf(UIMessageChunk.ToolOutputAvailable.class);
+        assertThat(out).isEmpty();
     }
 
     // agent_end (no usage on event itself — harvest from messages[])
@@ -324,7 +319,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         assertThat(out)
             .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextEnd", "ReasoningEnd", "FinishStep");
+            .containsExactly("TextEnd", "FinishStep");
     }
 
     @Test
@@ -333,7 +328,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(fixture("tool_execution_start.json"), state);
         assertThat(out)
             .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextEnd", "ToolInputStart", "ToolInputAvailable");
+            .containsExactly("TextEnd");
     }
 
     // link_finding (runner-emitted, camelCase canonical)
@@ -479,8 +474,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    void textEndThinkingEnd_closeBlocksFlushesBuffers() throws Exception {
-        // Open reasoning block first, append, then end it (multi-block scenario).
+    void thinkingEndDoesNotPersistHiddenReasoning() throws Exception {
         ObjectNode reasoningDelta = mapper.createObjectNode();
         reasoningDelta.put("type", "message_update");
         ObjectNode ame1 = reasoningDelta.putObject("assistantMessageEvent");
@@ -494,15 +488,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         ObjectNode ame2 = reasoningEnd.putObject("assistantMessageEvent");
         ame2.put("type", "thinking_end");
         ame2.put("contentIndex", 0);
-        List<UIMessageChunk> out = translator.translate(reasoningEnd, state);
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("ReasoningEnd");
 
-        // The reasoning text must be drained into the persisted parts array on thinking_end, not
-        // only on turn_end — otherwise a multi-block message with reasoning followed by text
-        // would lose the reasoning content.
-        assertThat(state.partsSnapshot().toString()).contains("Let me think");
+        assertThat(translator.translate(reasoningEnd, state)).isEmpty();
+        assertThat(state.partsSnapshot()).isEmpty();
     }
 
     @Test
@@ -532,20 +520,15 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(snapshot.get(1).get("text").asString()).isEqualTo("hello");
     }
 
-    // tool-call part mutation (single part per toolCallId across states)
-
     @Test
-    @DisplayName("Tool execution start+end produces ONE persisted part that mutates state in place")
-    void toolPart_mutatesSingleEntryAcrossLifecycle() throws Exception {
-        // 1) start
+    void toolEventsAreNotPersistedAsMessageParts() throws Exception {
         ObjectNode start = mapper.createObjectNode();
         start.put("type", "tool_execution_start");
         start.put("toolCallId", "tc-1");
         start.put("toolName", "fetch_context");
-        start.putObject("args").put("path", "workspace.json");
+        start.putObject("args").put("path", "inputs/context/workspace.json");
         translator.translate(start, state);
 
-        // 2) success end
         ObjectNode end = mapper.createObjectNode();
         end.put("type", "tool_execution_end");
         end.put("toolCallId", "tc-1");
@@ -554,47 +537,6 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         end.putObject("result").putArray("content").addObject().put("type", "text").put("text", "ok");
         translator.translate(end, state);
 
-        JsonNode snapshot = state.partsSnapshot();
-        // Exactly one tool part — AI SDK's reducer keys parts by toolCallId, so triplicating
-        // start/output/error parts would break getToolInvocation() (which find()s the first
-        // toolCallId hit and would surface the input-available state forever).
-        assertThat(snapshot).hasSize(1);
-        JsonNode part = snapshot.get(0);
-        assertThat(part.get("type").asString()).isEqualTo("tool-fetch_context");
-        assertThat(part.get("toolCallId").asString()).isEqualTo("tc-1");
-        assertThat(part.get("state").asString()).isEqualTo("output-available");
-        assertThat(part.has("input")).isTrue();
-        assertThat(part.has("output")).isTrue();
-    }
-
-    @Test
-    void toolPart_errorMutationCleansOutput() throws Exception {
-        ObjectNode start = mapper.createObjectNode();
-        start.put("type", "tool_execution_start");
-        start.put("toolCallId", "tc-2");
-        start.put("toolName", "fetch_context");
-        start.putObject("args");
-        translator.translate(start, state);
-
-        // Pi's canonical tool-result shape: {result: {content: [{type:"text", text:"..."}]}}.
-        // The translator extracts the first content[].text as the user-facing errorText.
-        ObjectNode end = mapper.createObjectNode();
-        end.put("type", "tool_execution_end");
-        end.put("toolCallId", "tc-2");
-        end.put("isError", true);
-        end
-            .putObject("result")
-            .putArray("content")
-            .addObject()
-            .put("type", "text")
-            .put("text", "fetch_context timed out");
-        translator.translate(end, state);
-
-        JsonNode snapshot = state.partsSnapshot();
-        assertThat(snapshot).hasSize(1);
-        JsonNode part = snapshot.get(0);
-        assertThat(part.get("state").asString()).isEqualTo("output-error");
-        assertThat(part.has("output")).isFalse();
-        assertThat(part.get("errorText").asString()).isEqualTo("fetch_context timed out");
+        assertThat(state.partsSnapshot()).isEmpty();
     }
 }

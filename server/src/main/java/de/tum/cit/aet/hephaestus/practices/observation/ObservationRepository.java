@@ -105,6 +105,80 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     )
     void deleteAllByPracticeWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} observations for a workspace whose {@code artifact_id} (the
+     * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
+     * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
+     * withdrawn. Workspace is scoped through the {@code Practice.workspace} relationship (this repo is
+     * {@code @WorkspaceAgnostic}); the {@code artifactType} + {@code artifactId} predicates keep PR/ISSUE observations
+     * and other tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
+     * {@code reaction} children. Callers guard an empty {@code artifactIds}.
+     *
+     * @return the number of observations deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Observation o
+        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND o.artifactId IN :artifactIds
+          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+        """
+    )
+    int deleteConversationThreadObservations(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactIds") Collection<Long> artifactIds
+    );
+
+    /**
+     * Hard-delete <em>every</em> {@code CONVERSATION_THREAD} observation for a workspace — the whole-tenant erasure
+     * the Slack module invokes through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
+     * app-uninstall / workspace-purge. Workspace is scoped through the {@code Practice.workspace} relationship (this
+     * repo is {@code @WorkspaceAgnostic}); the {@code artifactType} predicate keeps PR/ISSUE observations and other
+     * tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
+     * {@code reaction} children. Idempotent.
+     *
+     * @return the number of observations deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Observation o
+        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+        """
+    )
+    int deleteAllConversationThreadObservations(@Param("workspaceId") Long workspaceId);
+
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} observations a single person is the <em>subject</em> of
+     * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
+     * account hard-delete, invoked through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
+     * Workspace is scoped through {@code Practice.workspace}; the {@code artifactType} + {@code aboutUserId}
+     * predicates keep another person's rows, PR/ISSUE observations, and other tenants' rows intact. DB
+     * {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} / {@code reaction} children. Idempotent.
+     *
+     * @return the number of observations deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Observation o
+        WHERE o.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND o.aboutUserId = :aboutUserId
+          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+        """
+    )
+    int deleteConversationThreadObservationsAboutUser(
+        @Param("workspaceId") Long workspaceId,
+        @Param("aboutUserId") Long aboutUserId
+    );
+
     // Read queries for the developer dashboard (Issue #896)
 
     /**
@@ -306,7 +380,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
-        org.springframework.data.domain.Pageable pageable
+        Pageable pageable
     );
 
     /**
@@ -439,18 +513,18 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     /** Projection: severity → count. */
     interface SeverityCount {
-        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Severity getSeverity();
         Long getCount();
     }
 
     /** Projection: presence → count. */
     interface PresenceCount {
-        de.tum.cit.aet.hephaestus.practices.model.Presence getPresence();
+        Presence getPresence();
         Long getCount();
     }
 
     /**
-     * Per-area standing rows for the mentor prepared-context aspect: one row per
+     * Per-area standing rows for the mentor prepared context: one row per
      * (area, presence, assessment, severity) for a developer in the look-back window, with the
      * recent-window sub-count and the most-recent detection. The sign decision (problem vs strength)
      * is the per-observation {@code assessment} (ADR 0022): {@code BAD} is a problem, {@code GOOD} a strength.
@@ -491,9 +565,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     interface AreaStandingRow {
         String getAreaSlug();
         String getAreaName();
-        de.tum.cit.aet.hephaestus.practices.model.Presence getPresence();
-        de.tum.cit.aet.hephaestus.practices.model.Assessment getAssessment();
-        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Presence getPresence();
+        Assessment getAssessment();
+        Severity getSeverity();
         Long getCount();
         Long getRecentCount();
 
@@ -501,7 +575,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
          * Distinct review targets (artifact_id) contributing to this row — the corroboration signal the
          * standing floor keys on (P4). One BAD on one PR is {@code 1}; the same gap on two distinct PRs is
          * {@code 2}. A single-target gap must not set MAJOR area-priority on its own (see
-         * {@code PracticeStandingAspectProvider}).
+         * {@code PracticeStandingContentSource}).
          */
         Long getDistinctTargets();
 

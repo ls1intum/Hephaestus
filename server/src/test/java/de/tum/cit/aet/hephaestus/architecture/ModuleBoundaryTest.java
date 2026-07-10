@@ -4,11 +4,13 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*;
 import static de.tum.cit.aet.hephaestus.architecture.conditions.HephaestusConditions.*;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.repository.Repository;
 
 /**
  * Module Boundary Tests - Architecture Enforcement.
@@ -315,7 +317,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .and()
                 .resideOutsideOfPackage("..graphql..")
                 .and()
-                .areAssignableTo(org.springframework.data.repository.Repository.class)
+                .areAssignableTo(Repository.class)
                 .should()
                 .beInterfaces()
                 .because("Spring Data repositories should be interfaces");
@@ -446,7 +448,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
                 .should()
                 .dependOnClassesThat(
-                    com.tngtech.archunit.base.DescribedPredicate.describe(
+                    DescribedPredicate.describe(
                         "reside in ..integration.scm.github.. but not ..integration.scm.github.project.. " +
                             "and not ..integration.scm.github.events..",
                         cls -> {

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.webhook.GithubSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabSubjectParser;
+import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackSubjectParser;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.util.List;
@@ -23,7 +24,8 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
     private static final List<SubjectParser> ALL_PARSERS = List.of(
         new GithubSubjectParser(),
-        new GitlabSubjectParser()
+        new GitlabSubjectParser(),
+        new SlackSubjectParser()
     );
 
     @Test
@@ -37,14 +39,16 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     }
 
     @Test
-    void nonNatsKindSubjectReturnsEmpty() {
+    void slackSubjectWithoutHandlerReturnsEmpty() {
         IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
             new IntegrationMessageHandlerRegistry(List.of()),
             ALL_PARSERS
         );
 
-        // Slack is messaging-only and not in the NATS subject allow-list, so its subject
-        // never resolves to a kind — the dispatcher short-circuits to empty.
+        // Slack monitored-channel messages now ride the NATS framework: the subject resolves to
+        // SLACK and the SlackSubjectParser parses it, but with no handler registered the dispatcher
+        // still short-circuits to empty (the consumer ACKs and skips) — same contract as the SCM
+        // "known kind, no handler" cases above.
         assertThat(dispatcher.dispatch("slack.T0123.C456.message")).isEmpty();
     }
 

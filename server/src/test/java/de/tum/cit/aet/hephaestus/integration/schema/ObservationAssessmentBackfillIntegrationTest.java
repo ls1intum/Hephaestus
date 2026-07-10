@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestSecurityConfig;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -166,12 +167,12 @@ class ObservationAssessmentBackfillIntegrationTest {
         );
 
         // Six observations: every (polarity, presence) pair, all with assessment NULL pre-backfill.
-        java.util.UUID desPresent = seedObservation(desirablePracticeId, "PRESENT");
-        java.util.UUID desAbsent = seedObservation(desirablePracticeId, "ABSENT");
-        java.util.UUID desNa = seedObservation(desirablePracticeId, "NOT_APPLICABLE");
-        java.util.UUID undPresent = seedObservation(undesirablePracticeId, "PRESENT");
-        java.util.UUID undAbsent = seedObservation(undesirablePracticeId, "ABSENT");
-        java.util.UUID undNa = seedObservation(undesirablePracticeId, "NOT_APPLICABLE");
+        UUID desPresent = seedObservation(desirablePracticeId, "PRESENT");
+        UUID desAbsent = seedObservation(desirablePracticeId, "ABSENT");
+        UUID desNa = seedObservation(desirablePracticeId, "NOT_APPLICABLE");
+        UUID undPresent = seedObservation(undesirablePracticeId, "PRESENT");
+        UUID undAbsent = seedObservation(undesirablePracticeId, "ABSENT");
+        UUID undNa = seedObservation(undesirablePracticeId, "NOT_APPLICABLE");
 
         jdbcTemplate.execute("SET session_replication_role = 'origin'");
 
@@ -209,8 +210,8 @@ class ObservationAssessmentBackfillIntegrationTest {
     }
 
     /** Seeds one observation row for a practice + presence, assessment left NULL. Returns its id. */
-    private java.util.UUID seedObservation(long practiceId, String presence) {
-        java.util.UUID id = java.util.UUID.randomUUID();
+    private UUID seedObservation(long practiceId, String presence) {
+        UUID id = UUID.randomUUID();
         Map<String, Object> overrides = new LinkedHashMap<>();
         overrides.put("id", id);
         overrides.put("practice_id", practiceId);
@@ -269,7 +270,7 @@ class ObservationAssessmentBackfillIntegrationTest {
     /** Type-appropriate dummy for a NOT-NULL column the test does not otherwise care about. */
     private Object dummyFor(String dataType, String columnName) {
         return switch (dataType) {
-            case "uuid" -> java.util.UUID.randomUUID();
+            case "uuid" -> UUID.randomUUID();
             case "bigint", "integer", "smallint" -> 1L;
             case "real", "double precision", "numeric" -> 0.0;
             case "boolean" -> Boolean.FALSE;
@@ -279,11 +280,11 @@ class ObservationAssessmentBackfillIntegrationTest {
             );
             // character varying / text: keep it unique so any UNIQUE NOT-NULL column (e.g.
             // observation.occurrence_key) doesn't collide across the seeded rows.
-            default -> "seed-" + columnName + "-" + java.util.UUID.randomUUID();
+            default -> "seed-" + columnName + "-" + UUID.randomUUID();
         };
     }
 
-    private String assessmentOf(java.util.UUID observationId) {
+    private String assessmentOf(UUID observationId) {
         return jdbcTemplate.queryForObject(
             "SELECT assessment FROM observation WHERE id = ?",
             String.class,

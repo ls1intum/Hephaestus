@@ -25,6 +25,9 @@ export const TRIGGER_EVENTS_BY_FOCUS: Record<
 		{ value: "IssueLabeled", label: "Issue is labeled" },
 		{ value: "IssueClosed", label: "Issue is closed" },
 	],
+	// Conversation practices are scheduler-driven (see the server's SlackConversationThread trigger
+	// scheduler), not fired by user-selectable lifecycle events — so there are no trigger toggles.
+	CONVERSATION_THREAD: [],
 };
 
 /** The set of event values valid for a given focus (used to prune incompatible selections). */

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,7 +26,7 @@ public record WorkspaceDTO(
     @Schema(description = "GitHub App installation ID, if linked") Long installationId,
     @Schema(description = "Integration kind backing this workspace (GITHUB or GITLAB)") String kind,
     @Schema(description = "High-level git provider type for the workspace's SCM connection (null if none bound)")
-    GitProviderType providerType,
+    IdentityProviderType providerType,
     @Schema(description = "Custom server URL for self-hosted instances (null for cloud defaults)") String serverUrl,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the workspace was last updated") Instant updatedAt,
@@ -116,7 +116,7 @@ public record WorkspaceDTO(
             workspace.getAccountLogin(),
             installationId,
             providerKind.map(Enum::name).orElse(null),
-            providerKind.map(GitProviderType::from).orElse(null),
+            providerKind.map(IdentityProviderType::from).orElse(null),
             serverUrl,
             workspace.getCreatedAt(),
             workspace.getUpdatedAt(),

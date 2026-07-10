@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -74,27 +75,34 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         seeder(true).seed();
 
-        // The shipped catalog is eleven areas with thirty-two practices total, each bound to its area.
+        // The shipped catalog is twelve areas with thirty-five practices total, each bound to its area.
         verify(areaService).createArea(any(), eq("review-ready-work"), any());
         verify(areaService).createArea(any(), eq("acting-on-review-feedback"), any());
         verify(areaService).createArea(any(), eq("actionable-issue-authoring"), any());
         verify(areaService).createArea(any(), eq("constructive-code-review"), any());
         verify(areaService).createArea(any(), eq("testing-discipline"), any());
-        verify(areaService, times(11)).createArea(any(), any(), any());
+        verify(areaService).createArea(any(), eq("communication"), any());
+        verify(areaService, times(12)).createArea(any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
-        verify(practiceService, times(32)).createPractice(any(), practiceCaptor.capture());
-        verify(areaService, times(32)).bindPractice(any(), any(), any());
+        verify(practiceService, times(35)).createPractice(any(), practiceCaptor.capture());
+        verify(areaService, times(35)).bindPractice(any(), any(), any());
 
-        // 6 of the 32 practices are issue-focused and must seed with WorkArtifact.ISSUE.
+        // Focus breakdown: 6 issue-focused, 3 conversation-focused (the communication area), the rest PR-focused.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::artifactType).toList();
-        assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
+        assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST, WorkArtifact.CONVERSATION_THREAD);
         assertThat(
             foci
                 .stream()
                 .filter(f -> f == WorkArtifact.ISSUE)
                 .count()
         ).isEqualTo(6);
+        assertThat(
+            foci
+                .stream()
+                .filter(f -> f == WorkArtifact.CONVERSATION_THREAD)
+                .count()
+        ).isEqualTo(3);
 
         // Every seeded practice's criteria is the per-focus evidence-contract preamble composed onto the
         // practice-specific criteria with a "\n\n---\n\n" fence: a non-empty preamble before the fence,
@@ -103,9 +111,12 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             int fence = request.criteria().indexOf("\n\n---\n\n");
             assertThat(fence).as("preamble fenced ahead of the practice criteria").isGreaterThan(40);
             String preamble = request.criteria().substring(0, fence);
-            assertThat(preamble).containsIgnoringCase(
-                request.artifactType() == WorkArtifact.ISSUE ? "issue" : "pull request"
-            );
+            String expectedFocusWord = switch (request.artifactType()) {
+                case ISSUE -> "issue";
+                case CONVERSATION_THREAD -> "conversation";
+                case PULL_REQUEST -> "pull request";
+            };
+            assertThat(preamble).containsIgnoringCase(expectedFocusWord);
         }
     }
 
@@ -138,8 +149,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         // No area is re-created (all present), but every absent practice is still seeded and bound.
         verify(areaService, never()).createArea(any(), any(), any());
-        verify(practiceService, times(32)).createPractice(any(), any());
-        verify(areaService, times(32)).bindPractice(any(), any(), any());
+        verify(practiceService, times(35)).createPractice(any(), any());
+        verify(areaService, times(35)).bindPractice(any(), any(), any());
     }
 
     @Test
@@ -156,14 +167,14 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         // Never re-create an existing practice, but bind each unbound one to its catalog area.
         verify(practiceService, never()).createPractice(any(), any());
-        verify(areaService, times(32)).bindPractice(any(), any(), any());
+        verify(areaService, times(35)).bindPractice(any(), any(), any());
     }
 
     @Test
     void perRowFailure_skipsTheBadRowButSeedsTheRest() {
         // Per-ROW resilience: one practice that fails (e.g. a malformed artifactType making createPractice
-        // throw) must skip ONLY that row, not abort the remaining catalog. With 32 practices, a single
-        // throwing createPractice still leaves 31 created and bound.
+        // throw) must skip ONLY that row, not abort the remaining catalog. With 35 practices, a single
+        // throwing createPractice still leaves 34 created and bound.
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
@@ -174,9 +185,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
 
-        // All 32 are attempted; the 31 that did not throw are bound (the failed row never reaches bindPractice).
-        verify(practiceService, times(32)).createPractice(any(), any());
-        verify(areaService, times(31)).bindPractice(any(), any(), any());
+        // All 35 are attempted; the 34 that did not throw are bound (the failed row never reaches bindPractice).
+        verify(practiceService, times(35)).createPractice(any(), any());
+        verify(areaService, times(34)).bindPractice(any(), any(), any());
     }
 
     @Test
@@ -186,6 +197,29 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(areaService.createArea(any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shippedCatalogLearnerCopy_carriesNoDetectorVocab() {
+        // Silent-swallow guard: whyItMatters / whatGoodLooksLike are learner-facing, so PracticeService's
+        // authoring guard rejects the detector's ALL-CAPS presence/assessment tokens in them. That guard
+        // runs at SEED time inside createPractice; a violation there is swallowed per-row (green boot, the
+        // practice never seeds). This static check catches such a leak at the source, mirroring the service
+        // pattern \b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\b matched case-sensitively as standalone tokens.
+        var detectorVocab = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
+        JsonNode catalog = JsonMapper.builder()
+            .build()
+            .readTree(getClass().getClassLoader().getResourceAsStream("practices/default-catalog.json"));
+        for (JsonNode area : catalog.path("areas")) {
+            for (JsonNode practice : area.path("practices")) {
+                String slug = practice.path("slug").asString();
+                for (String field : List.of("whyItMatters", "whatGoodLooksLike")) {
+                    assertThat(detectorVocab.matcher(practice.path(field).asString()).find())
+                        .as("learner-facing %s for '%s' must not contain detector vocabulary", field, slug)
+                        .isFalse();
+                }
+            }
+        }
     }
 
     @Test

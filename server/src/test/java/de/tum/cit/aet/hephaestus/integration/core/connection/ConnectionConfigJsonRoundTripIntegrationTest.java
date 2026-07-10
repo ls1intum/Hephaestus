@@ -130,6 +130,7 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
             "Acme Slack",
             "C456",
             "Engineering",
+            /* retentionDays */ null,
             Set.of("leaderboard")
         );
         Long id = persistAndClear(IntegrationKind.SLACK, "T123", original);

@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -603,7 +604,7 @@ class UserProfileServiceTest {
         void clampsLimitAndReportsTotals() {
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(30L);
-            List<PullRequest> sevenPrs = java.util.stream.IntStream.rangeClosed(1, 7)
+            List<PullRequest> sevenPrs = IntStream.rangeClosed(1, 7)
                 .mapToObj(i -> createOpenPullRequest(2000L + i, user, repo))
                 .toList();
 

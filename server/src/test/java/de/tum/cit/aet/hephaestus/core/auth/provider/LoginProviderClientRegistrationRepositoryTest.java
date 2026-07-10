@@ -67,6 +67,40 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
     }
 
     @Test
+    void slackIsAnOidcProviderKeyedOnSubAndDiscoverableForAccountLinking() {
+        LoginProviderRepository repo = mock(LoginProviderRepository.class);
+        when(repo.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(
+            List.of(
+                provider("github", LoginProvider.ProviderType.GITHUB, "https://github.com", "read:user user:email"),
+                provider("slack", LoginProvider.ProviderType.SLACK, "https://slack.com", "openid profile email")
+            )
+        );
+        when(repo.findByRegistrationId("slack")).thenReturn(
+            Optional.of(
+                provider("slack", LoginProvider.ProviderType.SLACK, "https://slack.com", "openid profile email")
+            )
+        );
+
+        LoginProviderClientRegistrationRepository repository = new LoginProviderClientRegistrationRepository(repo, "");
+
+        // Link-only in the SPA, but discoverable so the authenticated settings page can offer account linking.
+        List<ClientRegistration> picker = repository.listRegistrations();
+        assertThat(picker).extracting(ClientRegistration::getRegistrationId).containsExactly("github", "slack");
+
+        // But it IS reachable by registrationId for the account-linking flow, wired to Slack's OIDC endpoints.
+        ClientRegistration slack = repository.findByRegistrationId("slack");
+        assertThat(slack.getProviderDetails().getAuthorizationUri()).isEqualTo(
+            "https://slack.com/openid/connect/authorize"
+        );
+        assertThat(slack.getProviderDetails().getTokenUri()).isEqualTo("https://slack.com/api/openid.connect.token");
+        assertThat(slack.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo(
+            "https://slack.com/api/openid.connect.userInfo"
+        );
+        assertThat(slack.getProviderDetails().getJwkSetUri()).isEqualTo("https://slack.com/openid/connect/keys");
+        assertThat(slack.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("sub");
+    }
+
+    @Test
     void gitlabEndpointsHangOffTheInstanceBaseUrl() {
         LoginProviderRepository repo = mock(LoginProviderRepository.class);
         when(repo.findByRegistrationId("gitlab-lrz")).thenReturn(

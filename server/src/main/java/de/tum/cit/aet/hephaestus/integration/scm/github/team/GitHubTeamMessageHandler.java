@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -34,7 +34,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
 
     private final GitHubTeamProcessor teamProcessor;
     private final ScopeIdResolver scopeIdResolver;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final TeamRepository teamRepository;
     private final RepositoryRepository repositoryRepository;
     private final TeamRepositoryPermissionRepository permissionRepository;
@@ -42,7 +42,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
     GitHubTeamMessageHandler(
         GitHubTeamProcessor teamProcessor,
         ScopeIdResolver scopeIdResolver,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         TeamRepository teamRepository,
         RepositoryRepository repositoryRepository,
         TeamRepositoryPermissionRepository permissionRepository,
@@ -89,8 +89,8 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
         // Create context for team events (no repository context available, but scope is resolved)
-        GitProvider gitHubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+        IdentityProvider gitHubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
         ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
@@ -114,7 +114,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
      * (with its native id). We look up both by native ID + provider to find internal entities,
      * then create a permission record with the team's default permission level.
      */
-    private void handleAddedToRepository(GitHubTeamEventDTO event, GitProvider provider) {
+    private void handleAddedToRepository(GitHubTeamEventDTO event, IdentityProvider provider) {
         var repoRef = event.repository();
         var teamDto = event.team();
 
@@ -181,7 +181,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
     /**
      * Handles the {@code removed_from_repository} action by deleting the TeamRepositoryPermission.
      */
-    private void handleRemovedFromRepository(GitHubTeamEventDTO event, GitProvider provider) {
+    private void handleRemovedFromRepository(GitHubTeamEventDTO event, IdentityProvider provider) {
         var repoRef = event.repository();
         var teamDto = event.team();
 

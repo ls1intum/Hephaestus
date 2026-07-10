@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.team;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
@@ -35,12 +35,12 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
     private static final Logger log = LoggerFactory.getLogger(GitLabSubgroupMessageHandler.class);
 
     private final GitLabTeamProcessor teamProcessor;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
 
     GitLabSubgroupMessageHandler(
         GitLabTeamProcessor teamProcessor,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
@@ -68,12 +68,12 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
             event.parentGroupId()
         );
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElse(null);
 
         if (provider == null) {
-            log.warn("GitProvider not found for GITLAB, skipping subgroup event");
+            log.warn("IdentityProvider not found for GITLAB, skipping subgroup event");
             return;
         }
 
@@ -86,7 +86,7 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
         }
     }
 
-    private void handleSubgroupCreate(GitLabSubgroupEventDTO event, GitProvider provider) {
+    private void handleSubgroupCreate(GitLabSubgroupEventDTO event, IdentityProvider provider) {
         // Determine root full path from parent hierarchy.
         // The workspace's accountLogin is the root group. We derive it from the
         // parent_full_path by taking the top-level segment, but since we don't know
@@ -119,7 +119,7 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
         );
     }
 
-    private void handleSubgroupDestroy(GitLabSubgroupEventDTO event, GitProvider provider) {
+    private void handleSubgroupDestroy(GitLabSubgroupEventDTO event, IdentityProvider provider) {
         teamProcessor.delete(event.groupId(), provider.getId());
         log.info(
             "Deleted team from subgroup event: fullPath={}, groupId={}",

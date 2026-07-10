@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -44,12 +44,12 @@ public class GitHubLabelProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubLabelProcessor.class);
 
     private final LabelRepository labelRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubLabelProcessor(
         LabelRepository labelRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         ApplicationEventPublisher eventPublisher
     ) {
         this.labelRepository = labelRepository;

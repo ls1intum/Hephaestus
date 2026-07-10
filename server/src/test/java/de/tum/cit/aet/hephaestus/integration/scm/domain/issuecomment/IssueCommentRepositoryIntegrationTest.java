@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -26,7 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * Integration tests for {@code findByIssueIdWithAuthorOrderByCreatedAt}, the query that materialises the
  * general (conversation-tab) MR discussion for the reviewer-craft firewall.
  *
- * <p>The unit test ({@code GeneralReviewCommentContentProviderTest}) mocks the repository, so it can only
+ * <p>The unit test ({@code GeneralReviewCommentContentSourceTest}) mocks the repository, so it can only
  * cover the in-memory filtering. This test runs the JPQL against a real Postgres schema to prove the three
  * load-bearing contracts the provider depends on: (a) {@code LEFT JOIN FETCH ic.author} actually initialises
  * the {@code FetchType.LAZY} author so {@code getLogin()} is readable AFTER the persistence context closes
@@ -52,9 +52,9 @@ class IssueCommentRepositoryIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
-    private GitProvider provider;
+    private IdentityProvider provider;
     private Repository repository;
     private long nativeIdSeq = 1_000L;
 
@@ -63,8 +63,10 @@ class IssueCommentRepositoryIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
 
         provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
 
         Organization org = new Organization();
         org.setNativeId(nextNativeId());

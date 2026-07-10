@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -15,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * for the BYO threat model where compromise is handled by rotating registration tokens rather
  * than relying on near-real-time revocation.
  */
-@de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic("Worker JWTs are fleet-wide, not workspace-scoped")
+@WorkspaceAgnostic("Worker JWTs are fleet-wide, not workspace-scoped")
 public class WorkerTokenDenylistService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerTokenDenylistService.class);

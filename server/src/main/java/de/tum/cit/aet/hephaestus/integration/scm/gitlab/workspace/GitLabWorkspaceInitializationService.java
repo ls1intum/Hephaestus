@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
@@ -350,7 +350,7 @@ public class GitLabWorkspaceInitializationService {
             return;
         }
         organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), GitProviderType.GITLAB)
+            .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), IdentityProviderType.GITLAB)
             .ifPresent(org -> {
                 // Check if another workspace already references this organization
                 // (workspace.organization_id has a unique constraint)
@@ -453,7 +453,7 @@ public class GitLabWorkspaceInitializationService {
         var memberSyncService = gitLabServices.getGroupMemberSyncService();
         if (memberSyncService != null) {
             organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), GitProviderType.GITLAB)
+                .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), IdentityProviderType.GITLAB)
                 .ifPresent(org -> {
                     try {
                         int membersSynced = memberSyncService.syncGroupMemberships(

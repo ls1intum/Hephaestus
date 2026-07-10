@@ -1,7 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Threads are scoped through their pull request via the
@@ -9,9 +13,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
  */
 @WorkspaceAgnostic("Threads scoped through pull_request_id -> repository.workspace_id")
 public interface PullRequestReviewThreadRepository extends JpaRepository<PullRequestReviewThread, Long> {
-    java.util.Optional<PullRequestReviewThread> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+    Optional<PullRequestReviewThread> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
-    java.util.Optional<PullRequestReviewThread> findByNodeIdAndProviderId(String nodeId, Long providerId);
+    Optional<PullRequestReviewThread> findByNodeIdAndProviderId(String nodeId, Long providerId);
 
     /**
      * All review threads of a pull request, with {@code resolvedBy} and the thread's {@code comments}
@@ -20,7 +24,7 @@ public interface PullRequestReviewThreadRepository extends JpaRepository<PullReq
      * (The {@code rootComment} FK is not populated by the sync, so the comment set is the reliable source
      * for the marker check.) Read-only context materialisation; the caller establishes workspace scope.
      */
-    @org.springframework.data.jpa.repository.Query(
+    @Query(
         """
         SELECT DISTINCT t
         FROM PullRequestReviewThread t
@@ -30,7 +34,5 @@ public interface PullRequestReviewThreadRepository extends JpaRepository<PullReq
         WHERE t.pullRequest.id = :pullRequestId
         """
     )
-    java.util.List<PullRequestReviewThread> findAllByPullRequestIdWithResolvedBy(
-        @org.springframework.data.repository.query.Param("pullRequestId") Long pullRequestId
-    );
+    List<PullRequestReviewThread> findAllByPullRequestIdWithResolvedBy(@Param("pullRequestId") Long pullRequestId);
 }

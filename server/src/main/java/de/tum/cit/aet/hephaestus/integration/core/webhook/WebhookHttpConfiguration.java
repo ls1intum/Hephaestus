@@ -1,0 +1,28 @@
+package de.tum.cit.aet.hephaestus.integration.core.webhook;
+
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+
+/** HTTP guards for the public webhook ingress. Independent of NATS publisher availability. */
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnWebhookRole
+public class WebhookHttpConfiguration {
+
+    @Bean
+    FilterRegistrationBean<WebhookPayloadSizeFilter> webhookPayloadSizeFilter(
+        WebhookProperties properties,
+        MeterRegistry meterRegistry
+    ) {
+        FilterRegistrationBean<WebhookPayloadSizeFilter> registration = new FilterRegistrationBean<>(
+            new WebhookPayloadSizeFilter(properties, meterRegistry)
+        );
+        registration.addUrlPatterns("/webhooks/*");
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return registration;
+    }
+}

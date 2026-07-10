@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.events;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import java.time.Instant;
@@ -22,7 +22,7 @@ public record EventContext(
     @NonNull DataSource source,
     @Nullable String webhookAction,
     @NonNull String correlationId,
-    @Nullable GitProviderType providerType
+    @Nullable IdentityProviderType providerType
 ) {
     private static final Logger log = LoggerFactory.getLogger(EventContext.class);
 
@@ -37,7 +37,7 @@ public record EventContext(
         // surrounding transaction has already committed. Best-effort eager-resolve;
         // fall back to a null provider type rather than propagating the proxy
         // (which would explode again the next time a downstream listener touched it).
-        GitProviderType resolvedType = null;
+        IdentityProviderType resolvedType = null;
         if (ctx.provider() != null) {
             try {
                 resolvedType = ctx.provider().getType();
@@ -80,7 +80,7 @@ public record EventContext(
     /**
      * Creates an EventContext for sync operations with a known provider type.
      */
-    public static EventContext forSync(Long scopeId, RepositoryRef repository, GitProviderType providerType) {
+    public static EventContext forSync(Long scopeId, RepositoryRef repository, IdentityProviderType providerType) {
         return new EventContext(
             UUID.randomUUID(),
             Instant.now(),
@@ -102,10 +102,10 @@ public record EventContext(
     }
 
     public boolean isGitHub() {
-        return providerType == GitProviderType.GITHUB;
+        return providerType == IdentityProviderType.GITHUB;
     }
 
     public boolean isGitLab() {
-        return providerType == GitProviderType.GITLAB;
+        return providerType == IdentityProviderType.GITLAB;
     }
 }

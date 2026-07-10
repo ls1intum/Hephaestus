@@ -14,6 +14,7 @@ import {
 	DEFAULT_ACTIVITY_MONITOR_LIMIT,
 	MAX_ACTIVITY_MONITOR_LIMIT,
 } from "@/lib/activity-monitor";
+import { toScmProviderType } from "@/lib/provider";
 import {
 	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
@@ -165,7 +166,7 @@ function UserProfile() {
 
 	return (
 		<ProfilePage
-			providerType={workspaceQuery.data?.providerType ?? "GITHUB"}
+			providerType={toScmProviderType(workspaceQuery.data?.providerType)}
 			profileData={profileQuery.data}
 			activityMonitorData={activityMonitorQuery.data}
 			activityMonitorFilters={{

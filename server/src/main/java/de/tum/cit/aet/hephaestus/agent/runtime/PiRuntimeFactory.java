@@ -69,11 +69,14 @@ public class PiRuntimeFactory {
         // pins defaultProvider/defaultModel so the runner's registration is what Pi resolves to.
         boolean useCustomProvider = useHephaestusProvider(spec);
         inputFiles.put(
-            WorkspaceAbi.PI_AGENT_PREFIX + "settings.json",
+            SandboxLayout.PI_AGENT_PREFIX + "settings.json",
             buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
         );
-        inputFiles.put(WorkspaceAbi.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
-        inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerProfile().runnerScript()));
+        inputFiles.put(SandboxLayout.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
+        inputFiles.put(
+            SandboxLayout.RUNNER_SCRIPT_FILENAME,
+            loadClasspathResource(spec.runnerProfile().runnerScript())
+        );
         inputFiles.putAll(spec.extraInputs());
 
         long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
@@ -82,7 +85,7 @@ public class PiRuntimeFactory {
         env.put("HOME", "/home/agent");
         env.put("XDG_CONFIG_HOME", "/home/agent/.config");
         env.put("TMPDIR", "/home/agent/.local/tmp");
-        env.put("PI_CODING_AGENT_DIR", WorkspaceAbi.PI_AGENT_DIR);
+        env.put("PI_CODING_AGENT_DIR", SandboxLayout.PI_AGENT_DIR);
 
         // Azure's `azure-openai-responses` provider hard-defaults the model id to "gpt-5.2"; route
         // both that and the configured model to the same Azure deployment.
@@ -93,7 +96,7 @@ public class PiRuntimeFactory {
             env.put("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", deployment + "=" + deployment + ",gpt-5.2=" + deployment);
         }
 
-        String workspaceRoot = WorkspaceAbi.WORKSPACE_ROOT;
+        String workspaceRoot = SandboxLayout.WORKSPACE_ROOT;
         PiRunnerProfile profile = spec.runnerProfile();
         String nodeFlagsFragment = renderNodeFlags(profile.nodeFlags());
         String nodeEnvFragment = renderNodeEnv(profile.additionalEnv());
@@ -101,7 +104,7 @@ public class PiRuntimeFactory {
         String command =
             authSetup +
             "mkdir -p " +
-            WorkspaceAbi.OUTPUT_PATH +
+            SandboxLayout.OUTPUT_PATH +
             " /home/agent/.config /home/agent/.local/tmp && " +
             // Pi SDK ESM imports resolve from /<workspace>/node_modules. The agent-pi Dockerfile
             // exposes the SDK at /opt/pi-sdk/node_modules (a stable symlink to pnpm's
@@ -116,7 +119,7 @@ public class PiRuntimeFactory {
             nodeFlagsFragment +
             workspaceRoot +
             "/" +
-            WorkspaceAbi.RUNNER_SCRIPT_FILENAME;
+            SandboxLayout.RUNNER_SCRIPT_FILENAME;
 
         NetworkPolicy networkPolicy = buildNetworkPolicy(
             spec.credentialMode(),

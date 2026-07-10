@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.organization;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubOrganizationEventDTO;
@@ -31,12 +31,12 @@ public class GitHubOrganizationProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationProcessor.class);
 
     private final OrganizationRepository organizationRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final ProjectIntegrityService projectIntegrityService;
 
     public GitHubOrganizationProcessor(
         OrganizationRepository organizationRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         ProjectIntegrityService projectIntegrityService
     ) {
         this.organizationRepository = organizationRepository;
@@ -49,7 +49,7 @@ public class GitHubOrganizationProcessor {
      * Uses upsert pattern to handle both create and update scenarios.
      *
      * @param dto the GitHub organization DTO
-     * @param providerId the FK ID of the GitProvider entity
+     * @param providerId the FK ID of the IdentityProvider entity
      * @return the persisted Organization entity, or null if dto is invalid
      */
     @Transactional
@@ -106,7 +106,7 @@ public class GitHubOrganizationProcessor {
      *
      * @param nativeId the provider's native numeric ID of the organization
      * @param newLogin the new login name
-     * @param providerId the FK ID of the GitProvider entity
+     * @param providerId the FK ID of the IdentityProvider entity
      * @return the updated Organization entity, or null if not found
      */
     @Transactional
@@ -141,7 +141,7 @@ public class GitHubOrganizationProcessor {
      * at the application level through ProjectIntegrityService.
      *
      * @param nativeId   the provider's native numeric ID of the organization
-     * @param providerId the FK ID of the GitProvider entity
+     * @param providerId the FK ID of the IdentityProvider entity
      */
     @Transactional
     public void delete(Long nativeId, Long providerId) {

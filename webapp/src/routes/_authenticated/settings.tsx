@@ -3,24 +3,29 @@ import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	getCurrentUserQueryKey,
+	getSlackUserPreferencesOptions,
+	getSlackUserPreferencesQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
 	listIdentityProvidersOptions,
 	listLinkedIdentitiesOptions,
 	listLinkedIdentitiesQueryKey,
 	unlinkIdentityMutation,
+	updateSlackUserPreferencesMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Options } from "@/api/sdk.gen";
 import type {
+	SlackUserPreferences,
 	UpdateUserSettingsData,
 	UpdateUserSettingsResponse,
 	UserSettings,
 } from "@/api/types.gen";
 import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAccountsSection";
 import { SettingsPage } from "@/components/settings/SettingsPage";
+import type { SlackPreferencesSectionProps } from "@/components/settings/SlackPreferencesSection";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { isPosthogEnabled } from "@/integrations/posthog/config";
+import { analyticsConfigured } from "@/integrations/consent";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -123,10 +128,42 @@ function RouteComponent() {
 		},
 	});
 
+	const slackPreferencesQueryKey = getSlackUserPreferencesQueryKey({});
+	const updateSlackPreferencesMutation = useMutation({
+		...updateSlackUserPreferencesMutation(),
+		onSuccess: (updatedWorkspace) => {
+			queryClient.setQueryData<SlackUserPreferences>(slackPreferencesQueryKey, (current) => {
+				const workspaces = current?.workspaces ?? [];
+				const hasWorkspace = workspaces.some(
+					(workspace) => workspace.workspaceSlug === updatedWorkspace.workspaceSlug,
+				);
+				return {
+					workspaces: hasWorkspace
+						? workspaces.map((workspace) =>
+								workspace.workspaceSlug === updatedWorkspace.workspaceSlug
+									? updatedWorkspace
+									: workspace,
+							)
+						: [...workspaces, updatedWorkspace],
+				};
+			});
+			queryClient.invalidateQueries({ queryKey: slackPreferencesQueryKey });
+			toast.success(
+				updatedWorkspace.channelMessagesAllowed
+					? "Slack channel-message use is on."
+					: "Slack channel-message use is off.",
+			);
+		},
+		onError: (error: DefaultError) => {
+			console.error("Failed to update Slack preferences:", error);
+			toast.error(problemDetailOf(error, "Couldn't update Slack preferences. Please try again."));
+		},
+	});
+
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
-		onLink: linkAccount,
+		onLink: (registrationId) => linkAccount(registrationId, "/settings"),
 		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
 		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a
 		// second DELETE against the already-removed row.
@@ -140,6 +177,46 @@ function RouteComponent() {
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 	};
 
+	const slackProvider = identityProvidersQuery.data?.find(
+		(provider) => provider.providerType?.toUpperCase() === "SLACK",
+	);
+	const slackIdentity = linkedIdentitiesQuery.data?.find(
+		(identity) => identity.providerType?.toUpperCase() === "SLACK",
+	);
+	const slackAvailable = Boolean(slackProvider?.registrationId || slackIdentity);
+
+	const slackPreferencesQuery = useQuery({
+		...getSlackUserPreferencesOptions({}),
+		enabled: slackAvailable,
+		retry: 1,
+	});
+
+	const slackPreferencesProps: SlackPreferencesSectionProps = {
+		workspaces: slackPreferencesQuery.data?.workspaces ?? [],
+		isSlackLinked: Boolean(slackIdentity),
+		canConnectSlack: Boolean(slackProvider?.registrationId),
+		onConnectSlack: () => {
+			if (slackProvider?.registrationId) {
+				linkAccount(slackProvider.registrationId, "/settings");
+			}
+		},
+		onToggleChannelMessages: (workspaceSlug, channelMessagesAllowed) => {
+			updateSlackPreferencesMutation.mutate({
+				path: { workspaceSlug },
+				body: { channelMessagesAllowed },
+			});
+		},
+		updatingWorkspaceSlug: updateSlackPreferencesMutation.isPending
+			? (updateSlackPreferencesMutation.variables?.path.workspaceSlug ?? null)
+			: null,
+		isLoading:
+			linkedIdentitiesQuery.isLoading ||
+			identityProvidersQuery.isLoading ||
+			(slackAvailable && slackPreferencesQuery.isLoading),
+		isError: slackAvailable && slackPreferencesQuery.isError,
+		onRetry: () => slackPreferencesQuery.refetch(),
+	};
+
 	return (
 		<SettingsPage
 			isLoading={isLoading}
@@ -151,13 +228,15 @@ function RouteComponent() {
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			showAiReviewSection={showAiReviewSection}
-			showResearchSection={isPosthogEnabled}
+			showResearchSection={analyticsConfigured}
 			researchProps={{
 				participateInResearch: settings?.participateInResearch ?? true,
 				onToggleResearch: handleResearchToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			linkedAccountsProps={linkedAccountsProps}
+			showSlackPreferencesSection={slackAvailable}
+			slackPreferencesProps={slackPreferencesProps}
 			onAccountDeleted={handleAccountDeleted}
 		/>
 	);

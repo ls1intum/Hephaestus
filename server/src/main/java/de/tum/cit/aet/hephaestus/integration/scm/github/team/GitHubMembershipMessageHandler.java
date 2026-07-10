@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
@@ -33,13 +33,13 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
     private static final String GITHUB_SERVER_URL = "https://github.com";
 
     private final GitHubUserProcessor userProcessor;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final TeamRepository teamRepository;
     private final TeamMembershipRepository teamMembershipRepository;
 
     GitHubMembershipMessageHandler(
         GitHubUserProcessor userProcessor,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         TeamRepository teamRepository,
         TeamMembershipRepository teamMembershipRepository,
         NatsMessageDeserializer deserializer,
@@ -79,8 +79,8 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
 
         // Resolve GitHub provider ID for user upsert
         Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
             .getId();
 
         // Ensure user exists via processor

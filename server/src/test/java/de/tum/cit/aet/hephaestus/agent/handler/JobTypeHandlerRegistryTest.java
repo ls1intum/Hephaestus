@@ -17,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.json.JsonMapper;
 
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
@@ -77,9 +78,26 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         );
     }
 
+    private JobTypeHandler conversationReviewHandler() {
+        var parser = new PracticeDetectionResultParser(objectMapper);
+        var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
+        return new ConversationReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            envelopeWriter,
+            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            parser,
+            deliveryService,
+            org.mockito.Mockito.mock(ApplicationEventPublisher.class),
+            org.mockito.Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class)
+        );
+    }
+
     /** A registry with the full handler set (every {@link AgentJobType} mapped). */
     private JobTypeHandlerRegistry fullRegistry() {
-        return new JobTypeHandlerRegistry(List.of(prReviewHandler(), issueReviewHandler()));
+        return new JobTypeHandlerRegistry(
+            List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler())
+        );
     }
 
     @Nested
@@ -89,10 +107,14 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         void shouldIndexHandlersByJobType() {
             var pr = prReviewHandler();
             var issue = issueReviewHandler();
-            var registry = new JobTypeHandlerRegistry(List.of(pr, issue));
+            var conversation = conversationReviewHandler();
+            var registry = new JobTypeHandlerRegistry(List.of(pr, issue, conversation));
 
             assertThat(registry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).isSameAs(pr);
             assertThat(registry.getHandler(AgentJobType.ISSUE_REVIEW)).isSameAs(issue);
+            // Handler-registered contract: the conversation job type resolves to its handler, so a boot
+            // with this bean set never trips the registry's "no handler registered" fail-fast.
+            assertThat(registry.getHandler(AgentJobType.CONVERSATION_REVIEW)).isSameAs(conversation);
         }
 
         @Test

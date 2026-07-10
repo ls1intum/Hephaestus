@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilter;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
 import java.util.Objects;
@@ -104,8 +105,12 @@ public class WorkspaceTeamLabelService {
         );
 
         // Use workspace-scoped label filter settings
-        Optional<de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilter> filterOpt =
-            workspaceTeamSettingsService.addLabelFilterByName(workspace, teamId, repositoryId, label);
+        Optional<WorkspaceTeamLabelFilter> filterOpt = workspaceTeamSettingsService.addLabelFilterByName(
+            workspace,
+            teamId,
+            repositoryId,
+            label
+        );
 
         if (filterOpt.isEmpty()) {
             log.warn(

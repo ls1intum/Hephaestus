@@ -5,9 +5,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
@@ -18,12 +20,13 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Orchestrates {@link ContentProvider}s to materialise the AI-readable workspace context under
+ * Orchestrates {@link ContentSource}s to materialise the AI-readable workspace context under
  * {@code inputs/context/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
  * ({@code @Order} / {@code Ordered}); a per-repository {@link ReentrantLock} serialises
- * concurrent builds against the same on-disk git working tree.
+ * concurrent builds against the same on-disk git working tree. Requests without a repository
+ * key do not touch git and are not serialised globally.
  *
- * <p>Failure policy is per-provider: {@link ContentProvider#required()} failures bubble as
+ * <p>Failure policy is per-provider: {@link ContentSource#required()} failures bubble as
  * {@link JobPreparationException}; non-required failures are logged and skipped. Programmer
  * errors ({@link NullPointerException}, {@link IllegalArgumentException}, {@link IllegalStateException})
  * propagate as-is so production stack traces stay diagnostic.
@@ -41,7 +44,7 @@ public class WorkspaceContextBuilder {
     /** Number of stripes for per-repo single-flight locks. Bounded → no map-leak. */
     private static final int LOCK_STRIPES = 64;
 
-    private final List<ContentProvider> providers;
+    private final List<ContentSource> providers;
     private final MeterRegistry meterRegistry;
 
     /** Builds the integration-agnostic context manifest after the providers run; null in unit tests. */
@@ -50,11 +53,11 @@ public class WorkspaceContextBuilder {
     private final ReentrantLock[] repoLockStripes;
 
     public WorkspaceContextBuilder(
-        List<ContentProvider> providers,
+        List<ContentSource> providers,
         MeterRegistry meterRegistry,
         @Nullable ContextManifestBuilder manifestBuilder
     ) {
-        List<ContentProvider> sorted = new ArrayList<>(providers);
+        List<ContentSource> sorted = new ArrayList<>(providers);
         AnnotationAwareOrderComparator.sort(sorted);
         this.providers = List.copyOf(sorted);
         this.meterRegistry = meterRegistry;
@@ -80,31 +83,36 @@ public class WorkspaceContextBuilder {
      * @return insertion-ordered {@link LinkedHashMap} of workspace-relative path → bytes
      */
     public Map<String, byte[]> build(ContextRequest request) {
-        ReentrantLock lock = stripeFor(repoKey(request));
+        Long repoKey = repoKey(request);
+        ReentrantLock lock = repoKey == null ? null : stripeFor(repoKey);
         long startNs = System.nanoTime();
-        lock.lock();
+        if (lock != null) {
+            lock.lock();
+        }
         try {
             return buildLocked(request);
         } finally {
-            lock.unlock();
+            if (lock != null) {
+                lock.unlock();
+            }
             meterRegistry
                 .timer(METRIC_BUILD + ".duration", Tags.of("kind", request.getClass().getSimpleName()))
                 .record(System.nanoTime() - startNs, TimeUnit.NANOSECONDS);
         }
     }
 
-    /** Map a repository id to one of {@link #LOCK_STRIPES} locks; {@code null} keys all collide on stripe 0. */
+    /** Map a repository id to one of {@link #LOCK_STRIPES} locks. */
     private ReentrantLock stripeFor(Long repoKey) {
-        int idx = repoKey == null ? 0 : Math.floorMod(repoKey.hashCode(), LOCK_STRIPES);
+        int idx = Math.floorMod(repoKey.hashCode(), LOCK_STRIPES);
         return repoLockStripes[idx];
     }
 
     private Map<String, byte[]> buildLocked(ContextRequest request) {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        Map<String, String> keyOwner = new java.util.HashMap<>();
-        Map<String, String> keyConnector = new java.util.HashMap<>();
+        Map<String, String> keyOwner = new HashMap<>();
+        Map<String, String> keyConnector = new HashMap<>();
         int contributed = 0;
-        for (ContentProvider provider : providers) {
+        for (ContentSource provider : providers) {
             if (!provider.supports(request)) {
                 continue;
             }
@@ -114,11 +122,11 @@ public class WorkspaceContextBuilder {
             // calling files.put(key, newBytes) on a key already owned by another provider
             // would otherwise replace the value in-place, and the keyOwner check below
             // (gated on `if (beforeKeys.contains(key)) continue`) would miss it.
-            java.util.Set<String> beforeKeys = java.util.Set.copyOf(files.keySet());
-            // Reference-snapshot is enough: ContentProvider#contribute is required to publish
+            Set<String> beforeKeys = Set.copyOf(files.keySet());
+            // Reference-snapshot is enough: ContentSource#contribute is required to publish
             // a NEW byte[] for any modification (the existing arrays are interpreted as the
             // owner's immutable output), so reference equality identifies an in-place replace.
-            java.util.Map<String, byte[]> beforeValues = java.util.Map.copyOf(files);
+            Map<String, byte[]> beforeValues = Map.copyOf(files);
             try {
                 provider.contribute(request, files);
             } catch (JobPreparationException e) {
@@ -151,9 +159,9 @@ public class WorkspaceContextBuilder {
                     }
                     continue;
                 }
-                if (!key.startsWith(ContentProvider.OUTPUT_PREFIX)) {
+                if (!key.startsWith(ContentSource.OUTPUT_PREFIX)) {
                     throw new IllegalStateException(
-                        providerName + " wrote file outside " + ContentProvider.OUTPUT_PREFIX + ": " + key
+                        providerName + " wrote file outside " + ContentSource.OUTPUT_PREFIX + ": " + key
                     );
                 }
                 // Invariant: a brand-new key (absent from beforeKeys) cannot already be owned —
@@ -162,7 +170,7 @@ public class WorkspaceContextBuilder {
                 // cross-provider duplicate detector.
                 assert keyOwner.get(key) == null : "brand-new key already owned: " + key;
                 keyOwner.put(key, providerName);
-                keyConnector.put(key, provider.connectorId());
+                keyConnector.put(key, provider.originId());
             }
             contributed++;
         }
@@ -180,13 +188,16 @@ public class WorkspaceContextBuilder {
         return files;
     }
 
-    /** The job behind a PR/Issue review request, or {@code null} for the mentor-chat flow. */
+    /** The job behind a PR/Issue/conversation review request, or {@code null} for the mentor-chat flow. */
     private static @Nullable AgentJob reviewJob(ContextRequest request) {
         if (request instanceof ContextRequest.PracticeReviewRequest pr) {
             return pr.job();
         }
         if (request instanceof ContextRequest.IssueReviewRequest ir) {
             return ir.job();
+        }
+        if (request instanceof ContextRequest.ConversationReviewRequest cr) {
+            return cr.job();
         }
         return null;
     }

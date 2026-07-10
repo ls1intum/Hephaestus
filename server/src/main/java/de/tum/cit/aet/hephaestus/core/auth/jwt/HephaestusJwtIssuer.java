@@ -10,6 +10,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -129,17 +131,17 @@ public class HephaestusJwtIssuer {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
             .issuer(properties.issuer().toString())
             .subject(String.valueOf(principal.accountId()))
-            .audience(java.util.List.of(properties.audience()))
+            .audience(List.of(properties.audience()))
             .id(jti.toString())
             .issuedAt(now)
             .expiresAt(expiresAt)
             .claim("preferred_username", principal.login())
-            .claim("roles", java.util.List.copyOf(principal.roles()));
+            .claim("roles", List.copyOf(principal.roles()));
         if (principal.givenName() != null) {
             claims.claim("given_name", principal.givenName());
         }
         if (impersonatorId != null) {
-            claims.claim("act", java.util.Map.of("sub", String.valueOf(impersonatorId)));
+            claims.claim("act", Map.of("sub", String.valueOf(impersonatorId)));
         }
         if (impersonationExpiresAt != null) {
             // Absolute impersonation ceiling (epoch seconds), constant across refreshes. refresh reads

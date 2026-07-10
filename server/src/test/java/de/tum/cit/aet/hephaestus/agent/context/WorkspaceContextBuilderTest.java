@@ -10,7 +10,11 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,27 +33,22 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         return new ContextRequest.PracticeReviewRequest(anyJob());
     }
 
-    private static WorkspaceContextBuilder builderOf(ContentProvider... providers) {
+    private static WorkspaceContextBuilder builderOf(ContentSource... providers) {
         return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry(), null);
     }
 
     private static SimpleMeterRegistry sharedRegistry;
 
-    private static WorkspaceContextBuilder builderWithSharedRegistry(ContentProvider... providers) {
+    private static WorkspaceContextBuilder builderWithSharedRegistry(ContentSource... providers) {
         sharedRegistry = new SimpleMeterRegistry();
         return new WorkspaceContextBuilder(List.of(providers), sharedRegistry, null);
     }
 
     /** Helper to construct a stub provider inline. */
-    private static ContentProvider stubProvider(
-        boolean required,
-        String pathSuffix,
-        byte[] payload,
-        boolean throwError
-    ) {
-        return new ContentProvider() {
+    private static ContentSource stubProvider(boolean required, String pathSuffix, byte[] payload, boolean throwError) {
+        return new ContentSource() {
             @Override
-            public String connectorId() {
+            public String originId() {
                 return "test";
             }
 
@@ -126,9 +125,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("skips providers that do not support the request")
         void skipsUnsupported() {
             var supports = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
-            var skips = new ContentProvider() {
+            var skips = new ContentSource() {
                 @Override
-                public String connectorId() {
+                public String originId() {
                     return "test";
                 }
 
@@ -169,9 +168,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("re-raises JobPreparationException without re-wrapping")
         void jpePassThrough() {
-            var bad = new ContentProvider() {
+            var bad = new ContentSource() {
                 @Override
-                public String connectorId() {
+                public String originId() {
                     return "test";
                 }
 
@@ -198,17 +197,17 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("two providers writing the same path is a wiring bug")
         void detectsConflictingKey() {
             // Distinct concrete classes so dedup distinguishes ownership.
-            ContentProvider first = new ProviderA();
-            ContentProvider second = new ProviderB();
+            ContentSource first = new ProviderA();
+            ContentSource second = new ProviderB();
             assertThatThrownBy(() -> builderOf(first, second).build(reviewRequest()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate workspace key");
         }
 
-        private final class ProviderA implements ContentProvider {
+        private final class ProviderA implements ContentSource {
 
             @Override
-            public String connectorId() {
+            public String originId() {
                 return "test";
             }
 
@@ -223,10 +222,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             }
         }
 
-        private final class ProviderB implements ContentProvider {
+        private final class ProviderB implements ContentSource {
 
             @Override
-            public String connectorId() {
+            public String originId() {
                 return "test";
             }
 
@@ -248,9 +247,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("rejects providers that write outside inputs/context/")
         void rejectsBadPrefix() {
-            var wrong = new ContentProvider() {
+            var wrong = new ContentSource() {
                 @Override
-                public String connectorId() {
+                public String originId() {
                     return "test";
                 }
 
@@ -292,10 +291,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("a second build against the same repo blocks while the first is in-flight")
         void serialisesOnRepoId() throws Exception {
-            java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
-            java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
-            ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
-            ContentProvider unboundedSecond = new LatchedProvider(null, null);
+            CountDownLatch firstInside = new CountDownLatch(1);
+            CountDownLatch firstMayFinish = new CountDownLatch(1);
+            ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
+            ContentSource unboundedSecond = new LatchedProvider(null, null);
             // Two distinct concrete provider classes → injection-order semantics, not dedup.
             var builder = new WorkspaceContextBuilder(
                 List.of(gatedFirst, unboundedSecond),
@@ -314,7 +313,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Thread t1 = new Thread(() -> builder.build(new ContextRequest.PracticeReviewRequest(jobA)), "t1");
             Thread t2 = new Thread(() -> builder.build(new ContextRequest.PracticeReviewRequest(jobB)), "t2");
             t1.start();
-            assertThat(firstInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            assertThat(firstInside.await(2, TimeUnit.SECONDS))
                 .as("t1 should enter the critical section quickly")
                 .isTrue();
             t2.start();
@@ -322,11 +321,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             // latch is null, so if t2 ran ahead it would already be past the latch — but it
             // can't, because gatedFirst still holds the stripe lock. We assert t2 reaches a
             // wait/block state without a fixed sleep.
-            awaitState(
-                t2,
-                java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
-                2_000
-            );
+            awaitState(t2, Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED), 2_000);
             firstMayFinish.countDown();
             t1.join(2_000);
             t2.join(2_000);
@@ -335,20 +330,17 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null repoKey requests (e.g. issue reviews) all collide on stripe 0 and serialise")
-        void serialisesOnNullRepoKey() throws Exception {
-            java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
-            java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
-            ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
-            ContentProvider unboundedSecond = new LatchedProvider(null, null);
-            var builder = new WorkspaceContextBuilder(
-                List.of(gatedFirst, unboundedSecond),
-                new SimpleMeterRegistry(),
-                null
-            );
+        @DisplayName("null repoKey requests do not serialise globally")
+        void nullRepoKeyRequestsCanRunConcurrently() throws Exception {
+            CountDownLatch bothInside = new CountDownLatch(2);
+            CountDownLatch mayFinish = new CountDownLatch(1);
+            AtomicInteger inFlight = new AtomicInteger();
+            AtomicInteger maxInFlight = new AtomicInteger();
+            ContentSource concurrentProbe = new ConcurrentProbeProvider(bothInside, mayFinish, inFlight, maxInFlight);
+            var builder = new WorkspaceContextBuilder(List.of(concurrentProbe), new SimpleMeterRegistry(), null);
 
-            // IssueReviewRequest jobs WITHOUT repository_id metadata → repoKey() is null → stripe 0.
-            // A regression returning distinct stripes for null keys would let these de-serialise.
+            // IssueReviewRequest jobs without repository_id metadata have no git worktree to protect.
+            // Serialising all such requests behind stripe 0 would throttle Slack/web mentor context builds.
             AgentJob jobA = new AgentJob();
             jobA.setId(UUID.randomUUID());
             AgentJob jobB = new AgentJob();
@@ -357,27 +349,24 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Thread t1 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobA)), "t1-null");
             Thread t2 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobB)), "t2-null");
             t1.start();
-            assertThat(firstInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
-                .as("t1 should enter the critical section quickly")
-                .isTrue();
             t2.start();
-            // t2 must park on the same stripe-0 lock while t1 holds it — its `entered` latch is null,
-            // so reaching a wait/block state proves it could not run ahead.
-            awaitState(
-                t2,
-                java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
-                2_000
-            );
-            firstMayFinish.countDown();
+            try {
+                assertThat(bothInside.await(2, TimeUnit.SECONDS))
+                    .as("both null-repo builds should enter the provider concurrently")
+                    .isTrue();
+            } finally {
+                mayFinish.countDown();
+            }
             t1.join(2_000);
             t2.join(2_000);
             assertThat(t1.isAlive()).isFalse();
             assertThat(t2.isAlive()).isFalse();
+            assertThat(maxInFlight.get()).isEqualTo(2);
         }
     }
 
     /** Wait until {@code thread} enters one of {@code wanted} or the timeout elapses. */
-    private static void awaitState(Thread thread, java.util.Set<Thread.State> wanted, long timeoutMillis)
+    private static void awaitState(Thread thread, Set<Thread.State> wanted, long timeoutMillis)
         throws InterruptedException {
         long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
         while (System.nanoTime() < deadline) {
@@ -396,17 +385,17 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
      * Provider that releases on {@code entered} and waits on {@code mayFinish}. Both latches
      * may be {@code null} for the unbounded variant.
      */
-    private static final class LatchedProvider implements ContentProvider {
+    private static final class LatchedProvider implements ContentSource {
 
         @Override
-        public String connectorId() {
+        public String originId() {
             return "test";
         }
 
-        private final java.util.concurrent.CountDownLatch entered;
-        private final java.util.concurrent.CountDownLatch mayFinish;
+        private final CountDownLatch entered;
+        private final CountDownLatch mayFinish;
 
-        LatchedProvider(java.util.concurrent.CountDownLatch entered, java.util.concurrent.CountDownLatch mayFinish) {
+        LatchedProvider(CountDownLatch entered, CountDownLatch mayFinish) {
             this.entered = entered;
             this.mayFinish = mayFinish;
         }
@@ -432,11 +421,57 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
     }
 
-    /** Ordered provider: writes a single file; reports a fixed precedence. */
-    private static final class OrderedStubProvider implements ContentProvider, Ordered {
+    /** Provider that records whether two builds were allowed into the provider body at the same time. */
+    private static final class ConcurrentProbeProvider implements ContentSource {
+
+        private final CountDownLatch bothInside;
+        private final CountDownLatch mayFinish;
+        private final AtomicInteger inFlight;
+        private final AtomicInteger maxInFlight;
+
+        ConcurrentProbeProvider(
+            CountDownLatch bothInside,
+            CountDownLatch mayFinish,
+            AtomicInteger inFlight,
+            AtomicInteger maxInFlight
+        ) {
+            this.bothInside = bothInside;
+            this.mayFinish = mayFinish;
+            this.inFlight = inFlight;
+            this.maxInFlight = maxInFlight;
+        }
 
         @Override
-        public String connectorId() {
+        public String originId() {
+            return "test";
+        }
+
+        @Override
+        public boolean supports(ContextRequest request) {
+            return true;
+        }
+
+        @Override
+        public void contribute(ContextRequest request, Map<String, byte[]> files) {
+            int active = inFlight.incrementAndGet();
+            maxInFlight.accumulateAndGet(active, Math::max);
+            bothInside.countDown();
+            try {
+                mayFinish.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                inFlight.decrementAndGet();
+            }
+            files.put(OUTPUT_PREFIX + "marker-" + System.nanoTime() + ".txt", new byte[0]);
+        }
+    }
+
+    /** Ordered provider: writes a single file; reports a fixed precedence. */
+    private static final class OrderedStubProvider implements ContentSource, Ordered {
+
+        @Override
+        public String originId() {
             return "test";
         }
 

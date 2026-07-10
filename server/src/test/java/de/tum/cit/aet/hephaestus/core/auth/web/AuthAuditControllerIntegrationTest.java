@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
 import java.time.Instant;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -214,7 +215,7 @@ class AuthAuditControllerIntegrationTest {
             .jsonPath("$.totalElements")
             .isEqualTo(1)
             .jsonPath("$.content[0].occurredAt")
-            .value(v -> org.assertj.core.api.Assertions.assertThat((String) v).startsWith("2026-06-05"));
+            .value(v -> Assertions.assertThat((String) v).startsWith("2026-06-05"));
     }
 
     @Test
@@ -258,18 +259,16 @@ class AuthAuditControllerIntegrationTest {
             .expectStatus()
             .isOk()
             .expectHeader()
-            .value("Content-Type", ct -> org.assertj.core.api.Assertions.assertThat(ct).contains("text/csv"))
+            .value("Content-Type", ct -> Assertions.assertThat(ct).contains("text/csv"))
             .expectHeader()
-            .value("Content-Disposition", cd ->
-                org.assertj.core.api.Assertions.assertThat(cd).contains("audit-log.csv")
-            )
+            .value("Content-Disposition", cd -> Assertions.assertThat(cd).contains("audit-log.csv"))
             .expectBody(String.class)
             .returnResult()
             .getResponseBody();
 
-        org.assertj.core.api.Assertions.assertThat(csv).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(csv).startsWith("occurred_at_utc,event_type,result");
-        org.assertj.core.api.Assertions.assertThat(csv).contains("LOGIN").contains("Keeper Admin");
+        Assertions.assertThat(csv).isNotNull();
+        Assertions.assertThat(csv).startsWith("occurred_at_utc,event_type,result");
+        Assertions.assertThat(csv).contains("LOGIN").contains("Keeper Admin");
     }
 
     @Test
@@ -294,11 +293,11 @@ class AuthAuditControllerIntegrationTest {
             .returnResult()
             .getResponseBody();
 
-        org.assertj.core.api.Assertions.assertThat(csv).isNotNull();
+        Assertions.assertThat(csv).isNotNull();
         // Formula trigger neutralized: the cell is quoted and the leading '=' is prefixed with an apostrophe.
-        org.assertj.core.api.Assertions.assertThat(csv).contains("\"'=cmd");
+        Assertions.assertThat(csv).contains("\"'=cmd");
         // RFC-4180: the embedded double-quote is doubled.
-        org.assertj.core.api.Assertions.assertThat(csv).contains("\"\"x\"\"");
+        Assertions.assertThat(csv).contains("\"\"x\"\"");
     }
 
     @Test

@@ -10,6 +10,7 @@ import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 
 import com.slack.api.model.User;
 import com.slack.api.model.block.LayoutBlock;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
@@ -53,6 +55,7 @@ import org.springframework.stereotype.Component;
  * does not abort the (synchronous) listener; each workspace is published under its own event.
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackLeaderboardDigestPublisher {
 
@@ -99,11 +102,6 @@ public class SlackLeaderboardDigestPublisher {
         }
     }
 
-    /**
-     * Slack mention for a leaderboard entry: {@code <@id>} when the entry exactly matches a Slack
-     * member by handle or email (case-insensitive), otherwise the reviewer's plain display name.
-     * Returns {@code null} only for a team-aggregate row (no individual user).
-     */
     static String mentionFor(LeaderboardEntryDTO entry, List<User> allSlackUsers) {
         UserInfoDTO reviewer = entry.user();
         if (reviewer == null) {
@@ -114,21 +112,13 @@ public class SlackLeaderboardDigestPublisher {
             .orElseGet(() -> plainName(reviewer));
     }
 
-    /** Deterministic, case-insensitive match on Slack handle or profile email. No fuzzy fallback. */
-    private static java.util.Optional<User> exactMatch(UserInfoDTO reviewer, List<User> allSlackUsers) {
+    private static Optional<User> exactMatch(UserInfoDTO reviewer, List<User> allSlackUsers) {
         return allSlackUsers
             .stream()
-            .filter(
-                user ->
-                    (reviewer.name() != null && reviewer.name().equalsIgnoreCase(user.getName())) ||
-                    (reviewer.email() != null &&
-                        user.getProfile() != null &&
-                        reviewer.email().equalsIgnoreCase(user.getProfile().getEmail()))
-            )
+            .filter(user -> reviewer.name() != null && reviewer.name().equalsIgnoreCase(user.getName()))
             .findFirst();
     }
 
-    /** Best human-readable name for an unmatched reviewer: display name, else login. */
     private static String plainName(UserInfoDTO reviewer) {
         if (reviewer.name() != null && !reviewer.name().isBlank()) {
             return reviewer.name();

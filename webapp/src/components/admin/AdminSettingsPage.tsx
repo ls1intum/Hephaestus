@@ -1,3 +1,4 @@
+import type { SlackMonitoredChannel } from "@/api/types.gen";
 import {
 	AdminFeaturesSettings,
 	type FeatureKey,
@@ -5,6 +6,11 @@ import {
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
+import {
+	AdminSlackChannelsSettings,
+	type SlackChannelCandidate,
+	type SlackConsentState,
+} from "./AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 type RepositoryItem = {
@@ -27,8 +33,8 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	// Slack notification card props (rendered for any workspace with a slug — the weekly
-	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
+	// Slack integration card props. The card owns connection state and the weekly digest
+	// controls; channel monitoring is shown only while Slack is connected.
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
 	slackConnectionId?: number;
@@ -38,6 +44,25 @@ export interface AdminSettingsPageProps {
 	slackScheduleDay?: number;
 	slackScheduleTime?: string;
 	onSlackSaved: () => void;
+	// Slack channel-monitoring section (rendered directly below the notifications card).
+	slackChannels: SlackMonitoredChannel[];
+	slackChannelCandidates: SlackChannelCandidate[];
+	isLoadingSlackChannels: boolean;
+	isSlackChannelsError?: boolean;
+	onRetrySlackChannels?: () => void;
+	onRegisterSlackChannel: (input: {
+		slackChannelId: string;
+		channelName?: string;
+	}) => Promise<void> | void;
+	onUpdateSlackChannelConsent: (input: {
+		slackChannelId: string;
+		consentState: SlackConsentState;
+		reason?: string;
+	}) => Promise<void> | void;
+	onRemoveSlackChannel: (input: {
+		slackChannelId: string;
+		reason?: string;
+	}) => Promise<void> | void;
 }
 
 export function AdminSettingsPage({
@@ -64,6 +89,14 @@ export function AdminSettingsPage({
 	slackScheduleDay,
 	slackScheduleTime,
 	onSlackSaved,
+	slackChannels,
+	slackChannelCandidates,
+	isLoadingSlackChannels,
+	isSlackChannelsError = false,
+	onRetrySlackChannels,
+	onRegisterSlackChannel,
+	onUpdateSlackChannelConsent,
+	onRemoveSlackChannel,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -106,7 +139,23 @@ export function AdminSettingsPage({
 						enabled={slackNotificationsEnabled}
 						scheduleDay={slackScheduleDay}
 						scheduleTime={slackScheduleTime}
+						channelCandidates={slackChannelCandidates}
 						onSaved={onSlackSaved}
+					/>
+				)}
+
+				{workspaceSlug != null && hasSlackConnection && (
+					<AdminSlackChannelsSettings
+						workspaceSlug={workspaceSlug}
+						hasSlackConnection={hasSlackConnection}
+						channels={slackChannels}
+						channelCandidates={slackChannelCandidates}
+						isLoading={isLoadingSlackChannels}
+						isError={isSlackChannelsError}
+						onRetry={onRetrySlackChannels}
+						onRegisterChannel={onRegisterSlackChannel}
+						onUpdateConsent={onUpdateSlackChannelConsent}
+						onRemoveChannel={onRemoveSlackChannel}
 					/>
 				)}
 			</div>

@@ -1,5 +1,6 @@
 {
 	"scripts": {
-		"setup": "bash \"$JEAN_ROOT_PATH/scripts/jean-setup.sh\""
+		"setup": "bash \"$JEAN_ROOT_PATH/scripts/jean-setup.sh\"",
+		"run": "bash ./scripts/jean-public-test.sh start"
 	}
 }

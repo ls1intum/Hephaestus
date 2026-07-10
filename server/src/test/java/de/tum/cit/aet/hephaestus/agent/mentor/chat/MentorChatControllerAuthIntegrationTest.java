@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -53,14 +54,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
             "id",
             UUID.randomUUID(),
             "message",
-            Map.of(
-                "id",
-                UUID.randomUUID(),
-                "role",
-                "user",
-                "parts",
-                java.util.List.of(Map.of("type", "text", "text", "hi"))
-            )
+            Map.of("id", UUID.randomUUID(), "role", "user", "parts", List.of(Map.of("type", "text", "text", "hi")))
         );
     }
 

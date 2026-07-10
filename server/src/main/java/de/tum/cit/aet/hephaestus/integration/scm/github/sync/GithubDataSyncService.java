@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.UnexpectedRollbackException;
 
 /**
  * GraphQL-based data synchronization service.
@@ -91,7 +92,7 @@ public class GithubDataSyncService {
 
     private final SyncSchedulerProperties syncSchedulerProperties;
 
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final SyncTargetProvider syncTargetProvider;
     private final OrganizationMembershipListener organizationMembershipListener;
     private final RepositoryRepository repositoryRepository;
@@ -122,7 +123,7 @@ public class GithubDataSyncService {
 
     public GithubDataSyncService(
         SyncSchedulerProperties syncSchedulerProperties,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         SyncTargetProvider syncTargetProvider,
         OrganizationMembershipListener organizationMembershipListener,
         RepositoryRepository repositoryRepository,
@@ -204,10 +205,10 @@ public class GithubDataSyncService {
         }
 
         // Resolve the GitHub provider entity
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
             .orElseThrow(() ->
-                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL)
+                new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL)
             );
 
         Repository repository = repositoryRepository
@@ -880,7 +881,7 @@ public class GithubDataSyncService {
 
         // Find the organization to get its ID
         Organization organization = organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, GitProviderType.GITHUB)
+            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
             .orElse(null);
         if (organization == null) {
             log.debug("Skipped project items sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
@@ -1239,7 +1240,7 @@ public class GithubDataSyncService {
                 // a poisoned transaction that should be retried with a fresh one.
                 boolean retryable;
                 String errorDetail;
-                if (e instanceof org.springframework.transaction.UnexpectedRollbackException) {
+                if (e instanceof UnexpectedRollbackException) {
                     retryable = true;
                     errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
                 } else {

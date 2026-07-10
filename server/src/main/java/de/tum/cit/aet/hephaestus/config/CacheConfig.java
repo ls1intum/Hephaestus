@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>{@link CacheSpec} entries are the single source of truth. Callers MAY use either the
  * declarative {@code @Cacheable(value="...")} aspect OR resolve a {@code Cache} imperatively
- * through {@code CacheManager.getCache(name)} — the mentor aspect providers chose the latter
+ * through {@code CacheManager.getCache(name)} — the mentor content sources chose the latter
  * to avoid the proxy-self-invocation footgun. Either way, the name must appear in
  * {@link #SPECS}: a typo silently falls back to a no-op {@code NoOpCache}.
  *
@@ -29,20 +29,20 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@code cache.size} — current entry count</li>
  * </ul>
  *
- * <h2>Mentor aspect caches</h2>
+ * <h2>Mentor context caches</h2>
  *
- * <p>The {@code mentor_*_aspect} caches feed the {@code agent.context.providers.mentor.*}
+ * <p>The {@code mentor_*_context} caches feed the {@code agent.context.providers.mentor.*}
  * content providers. 5-minute TTL is short enough that staleness across a single chat turn
  * (which itself runs in seconds) is invisible to users, but long enough that two consecutive
  * turns from the same user hit warm.
  *
  * <p>The invalidator ({@code MentorContextInvalidator}) evicts surgically on PR / Issue /
- * review and detection-completed events. Event-invalidated caches: {@code mentor_user_aspect},
- * {@code mentor_workspace_aspect}, {@code mentor_findings_aspect},
- * {@code mentor_practice_standing_aspect}, {@code mentor_authored_work_aspect} (see
+ * review and detection-completed events. Event-invalidated caches: {@code mentor_user_context},
+ * {@code mentor_workspace_context}, {@code mentor_findings_context},
+ * {@code mentor_practice_standing_context}, {@code mentor_authored_work_context} (see
  * {@code MentorContextInvalidator.PER_USER_CACHES} for the authoritative list). TTL-only caches
- * (no event-driven invalidator): {@code mentor_delivered_feedback_aspect} (immutable once posted,
- * so it cannot drift) and {@code mentor_practice_aspect}.
+ * (no event-driven invalidator): {@code mentor_delivered_feedback_context} (immutable once posted,
+ * so it cannot drift) and {@code mentor_practice_context}.
  */
 @Configuration
 public class CacheConfig {
@@ -50,8 +50,8 @@ public class CacheConfig {
     /** TTL for long-lived caches (contributors, PR templates, achievement progress). */
     private static final Duration LONG_TTL = Duration.ofSeconds(3600);
 
-    /** TTL for mentor aspect caches. Short enough to be invisible per-turn, long enough to be warm across consecutive turns. */
-    private static final Duration MENTOR_ASPECT_TTL = Duration.ofMinutes(5);
+    /** TTL for mentor context caches. Short enough to be invisible per-turn, long enough to be warm across consecutive turns. */
+    private static final Duration MENTOR_CONTEXT_TTL = Duration.ofMinutes(5);
 
     /**
      * TTL for the JWT revocation NEGATIVE cache. Only REVOKED verdicts are cached (see
@@ -68,7 +68,7 @@ public class CacheConfig {
     /** Max entries for the long-lived caches. */
     private static final long LONG_MAX = 1000L;
 
-    /** Max entries for mentor aspect caches — bounded per active user, not per workspace. */
+    /** Max entries for mentor context caches — bounded per active user, not per workspace. */
     private static final long MENTOR_MAX = 512L;
 
     /** Max entries for the JWT revocation cache — bounded per active session. */
@@ -84,13 +84,13 @@ public class CacheConfig {
         // avoid a config→core.auth internal-type dependency; the decoder owns the canonical const).
         new CacheSpec("auth_jwt_revoked", AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
         new CacheSpec("contributors", LONG_TTL, LONG_MAX),
-        new CacheSpec("mentor_authored_work_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_delivered_feedback_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_findings_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_practice_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_practice_standing_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_user_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_workspace_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_authored_work_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_delivered_feedback_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_findings_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_practice_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_practice_standing_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_user_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_workspace_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
         new CacheSpec("pullRequestTemplates", LONG_TTL, LONG_MAX)
     );
 

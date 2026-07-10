@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { toScmProviderType } from "@/lib/provider";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
@@ -129,7 +130,9 @@ export function useActiveWorkspaceSlug() {
 	return {
 		workspaceSlug: activeSlug,
 		workspaces,
-		providerType: activeWorkspace?.providerType ?? "GITHUB",
+		// A workspace is SCM-backed; SLACK (an identity provider) never reaches SCM-only UI, but the
+		// generated type includes it, so narrow to the SCM ProviderType with a GITHUB fallback.
+		providerType: toScmProviderType(activeWorkspace?.providerType),
 		selectWorkspace: setSelectedSlug,
 		isLoading: query.isLoading || workspaceSelectionLoading,
 		error: query.error as Error | null,

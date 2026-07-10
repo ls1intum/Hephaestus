@@ -23,6 +23,8 @@ tags:
   name: Account
 - description: Instance-admin login provider management
   name: Admin
+- description: Per-workspace Slack channel consent + activation
+  name: Slack channel activation
 - description: Manage practice areas
   name: Practice Areas
 - description: Workspace-scoped agent configuration management
@@ -41,21 +43,10 @@ tags:
   name: Practice Observations
 - description: Instance-admin account management
   name: Admin
+- description: Current user's Slack privacy preferences
+  name: Slack User Preferences
 - description: Team management within workspace
   name: Teams
-- description: |-
-    Unified webhook ingest controller.
-
-     <p><code>POST /webhooks/{kind</code>} is the sole webhook entry point. Per-kind
-     routing resolves the {@link IntegrationKindRouting kind} from the path and
-     delegates to {@link WebhookIngestPipeline WebhookIngestPipeline}, which dispatches signature
-     verification, subject derivation and JetStream publication through the per-kind
-     {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
-     {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
-     GitHub, GitLab and Slack all share this endpoint.
-
-     <p>Active only on the webhook runtime role.
-  name: webhook-controller
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
@@ -169,6 +160,7 @@ paths:
           - ACCOUNT_DELETED
           - EXPORT_REQUESTED
           - APP_ROLE_CHANGED
+          - RESEARCH_CONSENT_REVOKED
       - in: query
         name: result
         required: false
@@ -233,6 +225,7 @@ paths:
           - ACCOUNT_DELETED
           - EXPORT_REQUESTED
           - APP_ROLE_CHANGED
+          - RESEARCH_CONSENT_REVOKED
       - in: query
         name: result
         required: false
@@ -780,24 +773,19 @@ paths:
       summary: Update user settings
       tags:
       - Account
-  /webhooks/{kind}:
-    post:
-      operationId: ingest
-      parameters:
-      - in: path
-        name: kind
-        required: true
-        schema:
-          type: string
+  /user/slack/preferences:
+    get:
+      operationId: getSlackUserPreferences
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/SlackUserPreferences"
           description: OK
+      summary: Get current user's Slack preferences
       tags:
-      - webhook
+      - Slack User Preferences
   /workspaces:
     get:
       operationId: listWorkspaces
@@ -1372,7 +1360,7 @@ paths:
          200 result carrying <code>ok</code>/<code>slackError</code>, never an HTTP error. That lets the admin UI
          test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
          with a transport failure.
-      operationId: sendTestMessage
+      operationId: sendSlackTestMessage
       parameters:
       - description: Workspace slug
         in: path
@@ -1395,7 +1383,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SlackTestMessageResponse"
           description: OK
-      summary: Probe the Slack connection by posting a test message.
+      summary: Post a test message to verify the Slack connection
       tags:
       - Connections
   /workspaces/{workspaceSlug}/connections/{id}:
@@ -2989,6 +2977,168 @@ paths:
       summary: Update leaderboard schedule configuration
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/slack/channels:
+    get:
+      operationId: listSlackChannels
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlackMonitoredChannel"
+          description: OK
+      summary: List the workspace's allow-listed Slack channels with their consent
+        state
+      tags:
+      - Slack channel activation
+    post:
+      operationId: registerSlackChannel
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterSlackChannelRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackMonitoredChannel"
+          description: OK
+      summary: Allow-list a Slack channel (lands in PENDING; idempotent on the natural
+        key)
+      tags:
+      - Slack channel activation
+  /workspaces/{workspaceSlug}/slack/channels/candidates:
+    get:
+      operationId: listSlackChannelCandidates
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlackChannelCandidate"
+          description: OK
+      summary: List Slack channels available to add to monitoring
+      tags:
+      - Slack channel activation
+  /workspaces/{workspaceSlug}/slack/channels/{slackChannelId}:
+    patch:
+      operationId: updateSlackChannelConsent
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slackChannelId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSlackChannelConsentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackMonitoredChannel"
+          description: OK
+      summary: Transition a Slack channel to a target consent state (activate / pause
+        / resume / revoke)
+      tags:
+      - Slack channel activation
+  /workspaces/{workspaceSlug}/slack/channels/{slackChannelId}/consent-events:
+    get:
+      operationId: listSlackChannelConsentEvents
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slackChannelId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlackChannelConsentEvent"
+          description: OK
+      summary: The immutable consent-transition audit trail of one Slack channel
+      tags:
+      - Slack channel activation
+  /workspaces/{workspaceSlug}/slack/me/preferences:
+    patch:
+      operationId: updateSlackUserPreferences
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSlackUserPreferencesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackUserWorkspacePreferences"
+          description: OK
+      summary: Update current user's Slack workspace preferences
+      tags:
+      - Slack User Preferences
   /workspaces/{workspaceSlug}/slug:
     patch:
       operationId: renameSlug
@@ -3812,6 +3962,7 @@ components:
           enum:
           - GITHUB
           - GITLAB
+          - SLACK
         status:
           type: string
         workspaceSlug:
@@ -3944,6 +4095,7 @@ components:
           enum:
           - PULL_REQUEST_REVIEW
           - ISSUE_REVIEW
+          - CONVERSATION_REVIEW
         llmCacheReadTokens:
           type: integer
           format: int32
@@ -4157,7 +4309,7 @@ components:
         parts:
           type: array
           items:
-            description: AI SDK UIMessage part (text / reasoning / tool / data-finding).
+            description: AI SDK UIMessage part (text / data-finding).
         role:
           type: string
     ChatMessageVote:
@@ -4482,6 +4634,7 @@ components:
           enum:
           - GITHUB
           - GITLAB
+          - SLACK
       required:
       - clientId
       - clientSecret
@@ -4542,6 +4695,7 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+          - CONVERSATION_THREAD
           example: PULL_REQUEST
         criteria:
           type: string
@@ -5219,6 +5373,7 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+          - CONVERSATION_THREAD
         assessment:
           type: string
           description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
@@ -5297,6 +5452,7 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+          - CONVERSATION_THREAD
         assessment:
           type: string
           description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
@@ -5479,6 +5635,7 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+          - CONVERSATION_THREAD
         createdAt:
           type: string
           format: date-time
@@ -6010,6 +6167,7 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+          - CONVERSATION_THREAD
         guidance:
           type: string
           description: What to do — the delivered feedback for this observation (null
@@ -6083,6 +6241,24 @@ components:
       - standing
       - strengths
       - toWorkOn
+    RegisterSlackChannelRequest:
+      type: object
+      description: Allow-list a Slack channel (lands in PENDING)
+      properties:
+        channelName:
+          type: string
+          description: Optional human-readable channel name to store alongside the
+            id
+          maxLength: 256
+          minLength: 0
+        slackChannelId:
+          type: string
+          description: Slack public/private channel id (stable C… or G… id)
+          maxLength: 32
+          minLength: 0
+          pattern: "^[CG][A-Z0-9]{8,}$"
+      required:
+      - slackChannelId
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -6193,6 +6369,126 @@ components:
           format: uuid
         userAgent:
           type: string
+    SlackChannelCandidate:
+      type: object
+      description: A Slack channel the app can offer in the workspace channel picker
+      properties:
+        archived:
+          type: boolean
+          description: Whether Slack reports the channel as archived
+        channelName:
+          type: string
+          description: Current Slack channel name
+        consentState:
+          type: string
+          description: "Existing Hephaestus monitoring state, if already allow-listed"
+          enum:
+          - PENDING
+          - ACTIVE
+          - PAUSED
+          - REVOKED
+        member:
+          type: boolean
+          description: Whether the app bot is already a member
+        privateChannel:
+          type: boolean
+          description: Whether this is a private channel
+        slackChannelId:
+          type: string
+          description: Stable Slack channel id
+      required:
+      - channelName
+      - slackChannelId
+    SlackChannelConsentEvent:
+      type: object
+      description: An immutable Slack channel consent-transition audit entry
+      properties:
+        actorUserId:
+          type: integer
+          format: int64
+          description: Workspace user id of the admin who made the change
+        createdAt:
+          type: string
+          format: date-time
+          description: When the transition was recorded
+        fromState:
+          type: string
+          description: State the channel left (absent for the very first record)
+          enum:
+          - PENDING
+          - ACTIVE
+          - PAUSED
+          - REVOKED
+        id:
+          type: integer
+          format: int64
+          description: Audit entry id
+        reason:
+          type: string
+          description: Optional free-text reason the admin supplied
+        slackChannelId:
+          type: string
+          description: Slack channel id the transition applied to
+        toState:
+          type: string
+          description: State the channel entered
+          enum:
+          - PENDING
+          - ACTIVE
+          - PAUSED
+          - REVOKED
+      required:
+      - createdAt
+      - id
+      - slackChannelId
+      - toState
+    SlackMonitoredChannel:
+      type: object
+      description: An allow-listed Slack channel with its consent state and person
+        opt-out count
+      properties:
+        channelName:
+          type: string
+          description: "Human-readable channel name, if known"
+        consentAnnouncedAt:
+          type: string
+          format: date-time
+          description: When the in-channel consent announcement was posted (stamped
+            on first activation)
+        consentState:
+          type: string
+          description: Current per-channel consent lifecycle state
+          enum:
+          - PENDING
+          - ACTIVE
+          - PAUSED
+          - REVOKED
+        createdAt:
+          type: string
+          format: date-time
+          description: When the channel was first discovered / allow-listed
+        id:
+          type: integer
+          format: int64
+          description: Internal allow-list row id
+        optedOutMemberCount:
+          type: integer
+          format: int64
+          description: Number of workspace members who have opted out of ingestion
+            (workspace-wide)
+        slackChannelId:
+          type: string
+          description: Slack channel id (stable C…/G… id; the natural key)
+        slackTeamId:
+          type: string
+          description: Slack team (workspace) id the channel belongs to
+      required:
+      - consentState
+      - createdAt
+      - id
+      - optedOutMemberCount
+      - slackChannelId
+      - slackTeamId
     SlackTestMessageRequest:
       type: object
       description: |-
@@ -6213,6 +6509,40 @@ components:
           type: boolean
         slackError:
           type: string
+    SlackUserPreferences:
+      type: object
+      properties:
+        workspaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/SlackUserWorkspacePreferences"
+      required:
+      - workspaces
+    SlackUserWorkspacePreferences:
+      type: object
+      properties:
+        activeMonitoredChannelCount:
+          type: integer
+          format: int64
+        channelMessagesAllowed:
+          type: boolean
+        slackDisplayName:
+          type: string
+        slackTeamId:
+          type: string
+        slackTeamName:
+          type: string
+        slackUserId:
+          type: string
+        workspaceName:
+          type: string
+        workspaceSlug:
+          type: string
+      required:
+      - slackTeamId
+      - slackUserId
+      - workspaceName
+      - workspaceSlug
     SortObject:
       type: object
       properties:
@@ -6422,7 +6752,7 @@ components:
           type: string
           description: Slack channel ID for notifications
           example: C01234567AB
-          pattern: "^[CGD][A-Z0-9]{8,}$"
+          pattern: "^[CG][A-Z0-9]{8,}$"
         day:
           type: integer
           format: int32
@@ -6515,6 +6845,7 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+          - CONVERSATION_THREAD
           example: ISSUE
         criteria:
           type: string
@@ -6600,6 +6931,32 @@ components:
             from leaderboard calculations
       required:
       - hiddenFromContributions
+    UpdateSlackChannelConsentRequest:
+      type: object
+      description: Transition a Slack channel to a target consent state
+      properties:
+        consentState:
+          type: string
+          description: Target consent state
+          enum:
+          - PENDING
+          - ACTIVE
+          - PAUSED
+          - REVOKED
+        reason:
+          type: string
+          description: Optional free-text reason recorded in the immutable audit trail
+          maxLength: 2000
+          minLength: 0
+      required:
+      - consentState
+    UpdateSlackUserPreferencesRequest:
+      type: object
+      properties:
+        channelMessagesAllowed:
+          type: boolean
+      required:
+      - channelMessagesAllowed
     UpdateTeamSettingsRequest:
       type: object
       description: Request to update team visibility settings in a workspace
@@ -6646,7 +7003,7 @@ components:
           type: string
           description: Slack channel ID for notifications
           example: C01234567AB
-          pattern: "^[CGD][A-Z0-9]{8,}$"
+          pattern: "^[CG][A-Z0-9]{8,}$"
         enabled:
           type: boolean
           description: Whether leaderboard notifications are enabled
@@ -6872,6 +7229,7 @@ components:
           enum:
           - GITHUB
           - GITLAB
+          - SLACK
         serverUrl:
           type: string
           description: Custom server URL for self-hosted instances (null for cloud
@@ -6956,6 +7314,7 @@ components:
           enum:
           - GITHUB
           - GITLAB
+          - SLACK
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\

@@ -58,7 +58,7 @@ The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a
 
 Every agent container gets this file structure (agent-specific files noted):
 
-The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `WorkspaceAbi`; see `docs/developer/agent/workspace-abi.mdx` for the full ABI.
+The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `SandboxLayout`; see `docs/developer/agent/workspace-abi.mdx` for the full ABI.
 
 ```
 /workspace/

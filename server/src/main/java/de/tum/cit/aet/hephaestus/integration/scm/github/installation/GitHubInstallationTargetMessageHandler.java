@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
@@ -31,12 +31,12 @@ public class GitHubInstallationTargetMessageHandler
 
     private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
     GitHubInstallationTargetMessageHandler(
         ProvisioningListener provisioningListener,
         OrganizationService organizationService,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -102,8 +102,8 @@ public class GitHubInstallationTargetMessageHandler
         }
 
         Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
             .getId();
         organizationService.upsertIdentity(account.id(), login, providerId);
     }

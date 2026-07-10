@@ -17,7 +17,7 @@ services:
       HEPHAESTUS_RUNTIME_SERVER_ENABLED: "false"
       HEPHAESTUS_RUNTIME_WORKER_ENABLED: "false"
       SPRING_LIQUIBASE_ENABLED: "false"
-      # NATS — reuses the existing `natsConnection` bean to publish to gitlab.> / github.>
+      # NATS — reuses the existing `natsConnection` bean to publish inbound events.
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
       # Shared webhook secret used for incoming HMAC / token verification.
@@ -34,6 +34,10 @@ services:
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      # Slack Events API + interactivity are received by this pod under /webhooks/slack*.
+      # Interactivity may send Slack follow-ups; OAuth/admin and mentor replies stay on application-server.
+      HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:-}
       # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
       # supplies it (an unset var fails the boot at placeholder resolution).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
@@ -91,10 +95,8 @@ services:
   nats-server:
     image: nats:alpine
     restart: unless-stopped
-    # Lock down the 4222 port from the internet for production
-    # We expose it to the host so we can interact with it from the host machine via the nats cli
     ports:
-      - "4222:4222"
+      - "127.0.0.1:4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
       - nats-data:/data

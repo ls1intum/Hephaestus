@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -135,7 +136,7 @@ class AchievementRegistryTest extends BaseUnitTest {
         @DisplayName("no non-standalone parent cycles exist in the hierarchy")
         void shouldNotFormCyclesWhenFollowingParentChain() {
             for (AchievementDefinition def : registry.values()) {
-                Set<String> visited = new java.util.HashSet<>();
+                Set<String> visited = new HashSet<>();
                 visited.add(def.id());
                 String current = def.parent();
                 while (current != null && !current.isEmpty() && !current.equals(def.id())) {

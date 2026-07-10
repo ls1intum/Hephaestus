@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
@@ -24,13 +25,13 @@ class CacheConfigTest extends BaseUnitTest {
         "achievementProgress",
         "auth_jwt_revoked",
         "contributors",
-        "mentor_authored_work_aspect",
-        "mentor_delivered_feedback_aspect",
-        "mentor_findings_aspect",
-        "mentor_practice_aspect",
-        "mentor_practice_standing_aspect",
-        "mentor_user_aspect",
-        "mentor_workspace_aspect",
+        "mentor_authored_work_context",
+        "mentor_delivered_feedback_context",
+        "mentor_findings_context",
+        "mentor_practice_context",
+        "mentor_practice_standing_context",
+        "mentor_user_context",
+        "mentor_workspace_context",
         "pullRequestTemplates"
     );
 
@@ -50,8 +51,8 @@ class CacheConfigTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("mentor aspect caches share a 5-minute TTL and 512-entry cap")
-    void mentorAspectsHaveCorrectTtlAndSize() {
+    @DisplayName("mentor context caches share a 5-minute TTL and 512-entry cap")
+    void mentorContextsHaveCorrectTtlAndSize() {
         // Derive the list from the spec table itself so EVERY mentor_* cache is pinned — adding a
         // new one with a divergent TTL/size can no longer slip past a hand-maintained list.
         List<String> mentorCaches = CacheConfig.SPECS.stream()
@@ -59,15 +60,15 @@ class CacheConfigTest extends BaseUnitTest {
             .filter(name -> name.startsWith("mentor_"))
             .toList();
         assertThat(mentorCaches)
-            .as("expected all seven mentor aspect caches")
+            .as("expected all seven mentor context caches")
             .containsExactlyInAnyOrder(
-                "mentor_authored_work_aspect",
-                "mentor_delivered_feedback_aspect",
-                "mentor_findings_aspect",
-                "mentor_practice_aspect",
-                "mentor_practice_standing_aspect",
-                "mentor_user_aspect",
-                "mentor_workspace_aspect"
+                "mentor_authored_work_context",
+                "mentor_delivered_feedback_context",
+                "mentor_findings_context",
+                "mentor_practice_context",
+                "mentor_practice_standing_context",
+                "mentor_user_context",
+                "mentor_workspace_context"
             );
         for (String name : mentorCaches) {
             CacheConfig.CacheSpec spec = findSpec(name);
@@ -87,15 +88,15 @@ class CacheConfigTest extends BaseUnitTest {
 
     @Test
     void cacheSpecValidation() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L)
-        ).isInstanceOf(IllegalArgumentException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            new CacheConfig.CacheSpec("ok", Duration.ZERO, 1L)
-        ).isInstanceOf(IllegalArgumentException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-            new CacheConfig.CacheSpec("ok", Duration.ofMinutes(1), 0L)
-        ).isInstanceOf(IllegalArgumentException.class);
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ZERO, 1L)).isInstanceOf(
+            IllegalArgumentException.class
+        );
+        Assertions.assertThatThrownBy(() -> new CacheConfig.CacheSpec("ok", Duration.ofMinutes(1), 0L)).isInstanceOf(
+            IllegalArgumentException.class
+        );
     }
 
     private static CacheConfig.CacheSpec findSpec(String name) {

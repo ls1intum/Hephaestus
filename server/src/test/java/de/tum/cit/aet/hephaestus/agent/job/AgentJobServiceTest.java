@@ -24,6 +24,10 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -62,7 +66,7 @@ class AgentJobServiceTest extends BaseUnitTest {
     private ReviewableArtifactLoader artifactLoader;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+    private ConnectionService connectionService;
 
     @Mock
     private JobTypeHandlerRegistry handlerRegistry;
@@ -97,7 +101,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, false),
             sandboxManager,
-            java.util.Optional.empty()
+            Optional.empty()
         );
 
         workspace = new Workspace();
@@ -791,8 +795,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void buildReviewRequestReturnsNullWhenBranchInfoMissing() {
-            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            PullRequest pr = new PullRequest();
             pr.setId(5L);
             // headRefOid/headRefName/baseRefName all null → nothing to clone or diff.
             assertThat(service.buildReviewRequest(pr, "PullRequestMerged")).isNull();
@@ -800,14 +803,12 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void buildReviewRequestBuildsDetachedRequestWhenBranchInfoPresent() {
-            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            PullRequest pr = new PullRequest();
             pr.setId(5L);
             pr.setHeadRefOid("abc123");
             pr.setHeadRefName("feature/test");
             pr.setBaseRefName("main");
-            de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository repo =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository();
+            Repository repo = new Repository();
             repo.setId(100L);
             repo.setNameWithOwner("owner/repo");
             pr.setRepository(repo);
@@ -821,8 +822,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void buildIssueRequestReturnsNullWhenRepositoryMissing() {
-            de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue issue =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
+            Issue issue = new Issue();
             issue.setId(7L);
             assertThat(service.buildIssueRequest(issue, "IssueClosed")).isNull();
         }

@@ -3,13 +3,19 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -84,7 +90,7 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThatThrownBy(() ->
             workspaceService.updateNotifications(workspace.getWorkspaceSlug(), null, null, "C12345678")
         )
-            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+            .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("No active Slack Connection");
 
         // But toggling enabled-only without a Slack Connection is fine — independent meaning.
@@ -94,23 +100,18 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private void persistSlackConnection(Workspace workspace) {
-        de.tum.cit.aet.hephaestus.integration.core.connection.Connection conn =
-            new de.tum.cit.aet.hephaestus.integration.core.connection.Connection(
-                workspace,
-                IntegrationKind.SLACK,
-                "test-team-id",
-                new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, java.util.Set.of())
-            );
-        org.springframework.test.util.ReflectionTestUtils.setField(
-            conn,
-            "state",
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE
+        Connection conn = new Connection(
+            workspace,
+            IntegrationKind.SLACK,
+            "test-team-id",
+            new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, null, Set.of())
         );
+        ReflectionTestUtils.setField(conn, "state", IntegrationState.ACTIVE);
         connectionRepository.save(conn);
     }
 
     @Autowired
-    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository connectionRepository;
+    private ConnectionRepository connectionRepository;
 
     @Test
     void workspaceLifecycleTransitions() {

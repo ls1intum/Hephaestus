@@ -1,7 +1,7 @@
 import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
-import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
+import { GithubIcon, GitlabIcon, SlackIcon } from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -20,11 +20,13 @@ import { Spinner } from "@/components/ui/spinner";
 const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,
+	SLACK: SlackIcon,
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
 	GITHUB: "GitHub",
 	GITLAB: "GitLab",
+	SLACK: "Slack",
 };
 
 /**

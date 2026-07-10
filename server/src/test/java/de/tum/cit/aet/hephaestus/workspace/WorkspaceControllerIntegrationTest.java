@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -177,7 +177,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         WorkspaceDTO workspace = Objects.requireNonNull(created, "Workspace creation response was null");
         assertThat(workspace.workspaceSlug()).isEqualTo("controller-space");
         assertThat(workspace.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE.name());
-        assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITHUB);
+        assertThat(workspace.providerType()).isEqualTo(IdentityProviderType.GITHUB);
         assertThat(workspace.serverUrl()).isNull();
 
         Workspace persistedWorkspace = workspaceRepository.findById(workspace.id()).orElseThrow();
@@ -208,7 +208,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .getResponseBody();
         assertThat(workspaces).isNotNull();
         assertThat(workspaces).extracting(WorkspaceListItemDTO::workspaceSlug).contains(workspace.workspaceSlug());
-        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(GitProviderType.GITHUB);
+        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(IdentityProviderType.GITHUB);
 
         var membership = workspaceMembershipRepository
             .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())
@@ -448,6 +448,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             /* teamName */ "Initial Team",
             /* notificationChannelId */ null,
             /* teamLabel */ null,
+            /* retentionDays */ null,
             Set.of()
         );
         Connection connection = new Connection(workspace, IntegrationKind.SLACK, "T00000000", cfg);

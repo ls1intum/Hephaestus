@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -45,13 +45,13 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     private RepositoryRepository repositoryRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private CommitRepository commitRepository;
 
     private Workspace workspace;
-    private GitProvider gitProvider;
+    private IdentityProvider gitProvider;
     private User author;
     private Repository targetRepository;
     private Repository otherRepository;
@@ -68,8 +68,10 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(workspace);
 
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
+            );
 
         author = new User();
         author.setNativeId(900L);

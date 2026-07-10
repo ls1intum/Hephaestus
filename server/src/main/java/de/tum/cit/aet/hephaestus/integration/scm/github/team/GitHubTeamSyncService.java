@@ -9,8 +9,8 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepositoryPermission;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -137,13 +138,13 @@ public class GitHubTeamSyncService {
         // Resolve the organization's provider for ProcessingContext (within @Transactional).
         // Provider-type-scoped so a same-login GitLab org cannot collide (ADR-0012).
         Organization organization = organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, GitProviderType.GITHUB)
+            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
             .orElse(null);
         if (organization == null) {
             log.warn("Skipped team sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
             return 0;
         }
-        GitProvider provider = organization.getProvider();
+        IdentityProvider provider = organization.getProvider();
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         // Create processing context for sync operations (no repository for org-level teams)
@@ -505,10 +506,7 @@ public class GitHubTeamSyncService {
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            de.tum.cit.aet.hephaestus.integration.scm.domain.user.User user = userProcessor.ensureExists(
-                userDTO,
-                team.getProvider().getId()
-            );
+            User user = userProcessor.ensureExists(userDTO, team.getProvider().getId());
 
             if (user != null) {
                 syncedMemberIds.add(user.getId());

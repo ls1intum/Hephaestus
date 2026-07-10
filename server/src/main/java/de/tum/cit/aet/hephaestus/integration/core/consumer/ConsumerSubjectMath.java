@@ -8,55 +8,25 @@ import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Pure-function subject-arithmetic helpers for NATS consumers.
- *
- * <p>This class exists so the consumer wiring can build wildcard subject filters and parse
- * kind-from-prefix without touching either the NATS client or Spring. Every method is
- * static, side-effect-free, and deterministic — they are unit-testable in milliseconds and
- * can be composed in benchmarks.
- *
- * <h2>Filter shapes (consumer side)</h2>
- * <ul>
- *   <li><b>Repository filter</b> — {@code <stream>.<owner>.<repo>.>} matches every event for
- *       a single repository. Wildcards keep the filter set small (one entry per repo, not
- *       one entry per repo*eventType).</li>
- *   <li><b>Organization filter</b> — {@code <stream>.<owner>.?.>} matches every org-level
- *       event (the {@code ?} is the literal placeholder publishers emit when there is no
- *       repository context).</li>
- *   <li><b>Installation filter</b> — {@code github.?.?.>} matches every GitHub installation
- *       event. GitLab uses PAT-based auth so installation events are GitHub-only here.</li>
- * </ul>
- *
- * <h2>Why wildcards?</h2>
- * Without wildcards a scope with 200 repos and 12 event types creates 2,400 filter
- * subjects. NATS validates each subject against the stream when the consumer is
- * created or updated, so the cost is O(n*m) round-trips on large filter lists. Using
- * wildcards collapses this to O(n) repos.
- *
- * <h2>Subject-prefix → kind</h2>
- * {@link #kindFromSubjectPrefix(String)} is the single source of truth for NATS-subject
- * routing; {@link IntegrationMessageDispatcher} delegates to it rather than keeping its
- * own copy. The map is pure (no Spring), can be called from anywhere on the hot path, and
- * never calls {@link IntegrationKind#valueOf(String)} on subject-derived input
- * (reflection-on-user-input is the bug class we are precluding). It lists only the kinds
- * that publish to JetStream (GitHub, GitLab); Slack is messaging-only and has no NATS
- * stream. The HTTP-path router {@code IntegrationKindRouting} is intentionally separate —
- * it additionally routes {@code slack} for the OAuth-callback endpoint, a membership the
- * NATS map must not share.
+ * Pure subject helpers for NATS consumers. Repository integrations use scoped wildcard filters such as
+ * {@code github.owner.repo.>}; Slack Events API callbacks use the flat {@code slack.>} consumer. Slack
+ * interactivity/button postbacks stay on the separate signed HTTP endpoint.
  *
  * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP-path router
  */
 public final class ConsumerSubjectMath {
 
     /**
-     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack is
-     * messaging-only (no stream) and is deliberately absent.
+     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack Events API callbacks publish as
+     * {@code slack.<team>.<scope>.<event>}; Slack interactivity/button postbacks carry no subject.
      */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
         "github",
         IntegrationKind.GITHUB,
         "gitlab",
-        IntegrationKind.GITLAB
+        IntegrationKind.GITLAB,
+        "slack",
+        IntegrationKind.SLACK
     );
 
     private ConsumerSubjectMath() {
@@ -170,9 +140,8 @@ public final class ConsumerSubjectMath {
      * (GitHub → {@code "github"}, GitLab → {@code "gitlab"}); kinds without a stream return
      * {@link Optional#empty()} so callers can short-circuit without exceptions on the path.
      *
-     * <p>Messaging kinds (Slack) do not have JetStream subscriptions in
-     * this slice — their events flow through other channels. The empty return is the signal
-     * to skip, not an error.
+     * <p>Slack maps to the {@code "slack"} stream (monitored-channel {@code message} ingest).
+     * A null kind returns {@link Optional#empty()} so callers can short-circuit on the path.
      */
     public static Optional<String> streamNameFor(@Nullable IntegrationKind kind) {
         if (kind == null) {
@@ -181,7 +150,7 @@ public final class ConsumerSubjectMath {
         return switch (kind) {
             case GITHUB -> Optional.of("github");
             case GITLAB -> Optional.of("gitlab");
-            case SLACK -> Optional.empty();
+            case SLACK -> Optional.of("slack");
         };
     }
 
@@ -225,5 +194,34 @@ public final class ConsumerSubjectMath {
             throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
         }
         return baseConsumerName + "-installation";
+    }
+
+    /**
+     * Builds the durable consumer name for a fleet-wide flat-stream consumer:
+     * {@code <base>-<stream>}. A flat-stream kind is not repository-scoped, so a single
+     * fleet-wide consumer subscribes to {@link #flatStreamSubjectFilter(IntegrationKind)} and
+     * resolves the tenant inside the handler (mirroring the installation-wide consumer's shape;
+     * today only the messaging kinds, e.g. Slack).
+     */
+    public static String flatStreamConsumerName(String baseConsumerName, IntegrationKind kind) {
+        if (baseConsumerName == null || baseConsumerName.isBlank()) {
+            throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
+        }
+        return baseConsumerName + "-" + resolveStream(kind);
+    }
+
+    /**
+     * Wildcard subject filter matching every event on a flat-stream kind's stream
+     * ({@code <stream>.>}). One fleet-wide filter — a flat-stream kind has no per-scope
+     * repository fan-out.
+     */
+    public static String flatStreamSubjectFilter(IntegrationKind kind) {
+        return resolveStream(kind) + ".>";
+    }
+
+    private static String resolveStream(IntegrationKind kind) {
+        return streamNameFor(kind).orElseThrow(() ->
+            new IllegalArgumentException("No NATS stream resolved for kind=" + kind)
+        );
     }
 }

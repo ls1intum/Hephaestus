@@ -62,7 +62,9 @@ export function LoginProvidersTable({
 		return (
 			<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
 				<KeyRound className="size-8" aria-hidden />
-				<p className="text-sm">No login providers yet. Add one so users can sign in.</p>
+				<p className="text-sm">
+					No login providers yet. Add one so users can sign in or link accounts.
+				</p>
 			</div>
 		);
 	}

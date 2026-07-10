@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
@@ -46,7 +46,7 @@ public class WorkspaceProvisioningService {
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
     private final UserRepository userRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
@@ -66,7 +66,7 @@ public class WorkspaceProvisioningService {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
         UserRepository userRepository,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
         AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
@@ -213,20 +213,25 @@ public class WorkspaceProvisioningService {
         //   (b) it has an ACTIVE non-GitLab Connection (e.g. GitHub) → refuse cross-vendor
         //       attach. Symmetric with GithubLifecycleListener#createOrUpdateFromInstallation.
         //       Falling through to createWorkspace would crash on the slug unique constraint.
-        Optional<Workspace> existing = workspaceRepository.findByAccountLoginIgnoreCase(groupPath);
-        if (existing.isPresent()) {
-            long existingId = existing.get().getId();
-            if (connectionService.findActive(existingId, IntegrationKind.GITLAB).isPresent()) {
+        List<Workspace> existing = workspaceRepository.findAllByAccountLoginIgnoreCase(groupPath);
+        if (!existing.isEmpty()) {
+            Optional<Workspace> existingGitLab = existing
+                .stream()
+                .filter(workspace ->
+                    connectionService.findActive(workspace.getId(), IntegrationKind.GITLAB).isPresent()
+                )
+                .findFirst();
+            if (existingGitLab.isPresent()) {
                 log.debug(
                     "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
-                    existingId,
+                    existingGitLab.get().getId(),
                     groupPath
                 );
                 return;
             }
             log.warn(
-                "Skipped GitLab PAT workspace creation, workspace has ACTIVE non-GITLAB Connection (cross-vendor refuse): workspaceId={}, groupPath={}",
-                existingId,
+                "Skipped GitLab PAT workspace creation, matching workspace has no ACTIVE GitLab Connection: workspaceIds={}, groupPath={}",
+                existing.stream().map(Workspace::getId).toList(),
                 groupPath
             );
             return;
@@ -371,8 +376,8 @@ public class WorkspaceProvisioningService {
      */
     private Long syncGitLabUserForPAT(String patToken, String serverUrl, String groupPath) {
         // Resolve the GitLab provider first so all lookups are provider-scoped
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, serverUrl)
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
             .orElse(null);
 
         // If provider exists, check for existing user scoped to this provider
@@ -470,11 +475,11 @@ public class WorkspaceProvisioningService {
         String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
         String safeWebUrl = webUrl != null ? webUrl : "";
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, serverUrl)
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
             .orElseGet(() -> {
-                log.info("Creating GitProvider for self-hosted GitLab: serverUrl={}", serverUrl);
-                return gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, serverUrl));
+                log.info("Creating IdentityProvider for self-hosted GitLab: serverUrl={}", serverUrl);
+                return gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, serverUrl));
             });
         Long providerId = provider.getId();
 
@@ -551,9 +556,9 @@ public class WorkspaceProvisioningService {
     }
 
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"));
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
         Long providerId = provider.getId();
 
         // Check for existing user scoped to GitHub provider

@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -48,7 +49,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
             .hasMessageContaining("Invalid env var name");
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     void rejectsNulInValue() {
         assertThatThrownBy(() -> spec(Map.of("FOO", "a\0b")))
             .isInstanceOf(IllegalArgumentException.class)
@@ -63,7 +64,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
             .hasMessageContaining("NUL/LF/CR");
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     void environmentIsCopied() {
         Map<String, String> env = new HashMap<>();
         env.put("OK_KEY", "good");
@@ -74,7 +75,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
         assertThat(s.environment()).containsEntry("OK_KEY", "good").doesNotContainKey("LD_PRELOAD");
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     void commandIsCopied() {
         List<String> cmd = new ArrayList<>(List.of("node", "/run.mjs"));
         InteractiveSandboxSpec s = new InteractiveSandboxSpec(

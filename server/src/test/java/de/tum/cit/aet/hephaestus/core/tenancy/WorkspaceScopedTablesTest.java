@@ -30,7 +30,7 @@ class WorkspaceScopedTablesTest extends BaseUnitTest {
         assertThat(WorkspaceScopedTables.GLOBAL_TABLES).contains(
             "workspace",
             "user",
-            "git_provider",
+            "identity_provider",
             "databasechangelog"
         );
     }

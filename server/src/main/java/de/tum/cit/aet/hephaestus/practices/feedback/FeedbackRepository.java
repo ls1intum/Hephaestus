@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,7 +52,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /**
      * The feedback a developer actually RECEIVED in a workspace — only units that reached a surface
-     * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback aspect so the coach
+     * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback content source so the coach
      * references the exact words the student saw ({@link Feedback#getBody()}) instead of
      * reconstructing from raw pre-delivery findings (which may have been suppressed, superseded, or never
      * postable). Bounded by the caller's {@code Pageable}.
@@ -127,4 +128,168 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Transactional
     @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} feedback for a workspace whose {@code artifact_id} (the
+     * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
+     * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
+     * withdrawn. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} / {@code feedback_placement} /
+     * {@code feedback_reaction}. Bulk JPQL delete (the {@code @Immutable} entity forbids an ORM remove). The
+     * {@code workspace_id} + {@code artifact_type} + {@code artifact_id} predicates keep it scoped so no PR/ISSUE unit
+     * and no other-tenant row is affected. Callers guard an empty {@code artifactIds}.
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.artifactId IN :artifactIds
+        """
+    )
+    int deleteConversationThreadFeedback(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactIds") Collection<Long> artifactIds
+    );
+
+    /**
+     * Hard-delete <em>every</em> {@code CONVERSATION_THREAD} feedback unit for a workspace — the whole-tenant erasure
+     * the Slack module invokes through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
+     * app-uninstall / workspace-purge. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} /
+     * {@code feedback_placement} / {@code feedback_reaction}. The {@code workspace_id} + {@code artifact_type}
+     * predicates keep it scoped so no PR/ISSUE unit and no other-tenant row is affected. Idempotent (0 when the
+     * workspace has no conversation feedback).
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+        """
+    )
+    int deleteAllConversationThreadFeedback(@Param("workspaceId") Long workspaceId);
+
+    /**
+     * Hard-delete the {@code CONVERSATION_THREAD} feedback a single person is the <em>subject</em> of
+     * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
+     * account hard-delete, invoked through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
+     * DB {@code ON DELETE CASCADE} clears the join/placement/reaction children. The {@code workspace_id} +
+     * {@code artifact_type} + {@code about_user_id} predicates keep another person's rows, PR/ISSUE rows, and other
+     * tenants' rows intact. Idempotent.
+     *
+     * @return the number of feedback units deleted
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        """
+        DELETE FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.artifactType = de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.CONVERSATION_THREAD
+          AND f.aboutUserId = :aboutUserId
+        """
+    )
+    int deleteConversationThreadFeedbackAboutUser(
+        @Param("workspaceId") Long workspaceId,
+        @Param("aboutUserId") Long aboutUserId
+    );
+
+    // --- conversational feedback delivery loop ---
+
+    /**
+     * Flip a PREPARED conversational unit to DELIVERED (compare-and-set). Native (not JPQL) because the
+     * {@code @Immutable} entity forbids ORM state mutation, mirroring {@link #updateState}. The
+     * {@code delivery_state='PREPARED'} predicate is the CAS guard: exactly one of N racing mentor turns wins the
+     * flip; the others see a rowcount of 0. A unit already DELIVERED, SUPPRESSED (aged out), or non-existent yields
+     * 0 - the caller treats that as a no-op and does NOT write a placement.
+     *
+     * @return {@code 1} on a clean flip, {@code 0} if the unit was no longer PREPARED (lost race / expired).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = :at " +
+            "WHERE id = :id AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markConversationDelivered(@Param("id") UUID id, @Param("at") Instant at);
+
+    /**
+     * Newest PREPARED conversational units for a developer (as RECIPIENT) in a workspace - the mentor's queue.
+     * Body is intentionally NULL on these rows (composed at delivery). Ordered newest-first, bounded by the caller's
+     * {@code Pageable}.
+     */
+    @Query(
+        """
+        SELECT f FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        ORDER BY f.createdAt DESC
+        """
+    )
+    List<Feedback> findRecentPreparedConversationForRecipient(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        Pageable pageable
+    );
+
+    /**
+     * Does a DELIVERED IN_CONTEXT feedback unit already exist for this recipient in this workspace bound to an
+     * observation carrying {@code recurrenceKey}? The router uses this to avoid re-raising a locus already received
+     * inline. A null key is never passed (the caller skips the check when the key is null).
+     */
+    @Query(
+        """
+        SELECT (COUNT(f) > 0) FROM Feedback f, FeedbackObservation fo
+        WHERE fo.feedback = f
+          AND fo.observation.recurrenceKey = :recurrenceKey
+          AND f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CONTEXT
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+        """
+    )
+    boolean existsDeliveredInContextForRecurrenceKey(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("recurrenceKey") String recurrenceKey
+    );
+
+    /** Distinct workspaces that currently hold at least one PREPARED conversational unit (TTL sweep enumeration). */
+    @Query(
+        """
+        SELECT DISTINCT f.workspaceId FROM Feedback f
+        WHERE f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        """
+    )
+    List<Long> findWorkspaceIdsWithPreparedConversation();
+
+    /**
+     * Age out every PREPARED conversational unit for a workspace created strictly before {@code cutoff}: SUPPRESSED /
+     * CONVERSATION_EXPIRED. Native - the {@code @Immutable} entity forbids an ORM update. Carries the
+     * {@code workspace_id} predicate the tenancy inspector requires for a raw native statement.
+     *
+     * @return the number of units expired
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = 'CONVERSATION_EXPIRED' " +
+            "WHERE workspace_id = :workspaceId AND channel = 'CONVERSATION' " +
+            "AND delivery_state = 'PREPARED' AND created_at < :cutoff",
+        nativeQuery = true
+    )
+    int expirePreparedConversationBefore(@Param("workspaceId") Long workspaceId, @Param("cutoff") Instant cutoff);
 }

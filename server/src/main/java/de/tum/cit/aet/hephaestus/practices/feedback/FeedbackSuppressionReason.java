@@ -18,4 +18,6 @@ public enum FeedbackSuppressionReason {
     REACTED_DISPUTED,
     /** The subject marked this locus NOT_APPLICABLE on an earlier run; not re-surfaced unless the underlying evidence changes. */
     REACTED_NOT_APPLICABLE,
+    /** A PREPARED conversational-feedback unit that was never raised in a mentor turn and aged out of the window. */
+    CONVERSATION_EXPIRED,
 }

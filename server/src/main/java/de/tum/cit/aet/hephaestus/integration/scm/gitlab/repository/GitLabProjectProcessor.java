@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -61,7 +61,7 @@ public class GitLabProjectProcessor {
     public Repository processGraphQlResponse(
         GitLabProjectResponse project,
         @Nullable Organization organization,
-        GitProvider provider
+        IdentityProvider provider
     ) {
         if (project == null || project.id() == null || project.fullPath() == null || project.webUrl() == null) {
             log.warn("Skipped project processing: reason=nullOrMissingFields");
@@ -139,7 +139,7 @@ public class GitLabProjectProcessor {
      */
     @Transactional
     @Nullable
-    public Repository processPushEvent(GitLabPushEventDTO.ProjectInfo projectInfo, GitProvider provider) {
+    public Repository processPushEvent(GitLabPushEventDTO.ProjectInfo projectInfo, IdentityProvider provider) {
         if (
             projectInfo == null ||
             projectInfo.id() == null ||

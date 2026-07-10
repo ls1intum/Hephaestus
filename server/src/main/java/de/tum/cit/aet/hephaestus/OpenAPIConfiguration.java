@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -220,7 +221,7 @@ public class OpenAPIConfiguration {
         return false;
     }
 
-    private void ensureWorkspaceSlugParam(io.swagger.v3.oas.models.Operation operation) {
+    private void ensureWorkspaceSlugParam(Operation operation) {
         var params = operation.getParameters();
         if (params == null) {
             params = new ArrayList<>();

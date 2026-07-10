@@ -6,8 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
@@ -40,16 +40,16 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabPullRequestReviewThreadProcessor processor;
-    private GitProvider provider;
+    private IdentityProvider provider;
     private PullRequest pr;
 
     @BeforeEach
     void setUp() {
         processor = new GitLabPullRequestReviewThreadProcessor(threadRepository, eventPublisher);
 
-        provider = new GitProvider();
+        provider = new IdentityProvider();
         provider.setId(PROVIDER_ID);
-        provider.setType(GitProviderType.GITLAB);
+        provider.setType(IdentityProviderType.GITLAB);
 
         pr = new PullRequest();
         pr.setId(PR_ID);

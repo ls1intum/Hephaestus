@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -64,7 +64,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     private Workspace workspace;
     private Practice practice;
@@ -91,9 +91,11 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
         recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
     }
 

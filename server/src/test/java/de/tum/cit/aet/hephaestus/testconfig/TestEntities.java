@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -105,9 +105,9 @@ public final class TestEntities {
         return ws;
     }
 
-    /** A {@link GitProvider} with id and {@code type} set. */
-    public static GitProvider gitProvider(Long id, GitProviderType type) {
-        GitProvider provider = new GitProvider();
+    /** A {@link IdentityProvider} with id and {@code type} set. */
+    public static IdentityProvider gitProvider(Long id, IdentityProviderType type) {
+        IdentityProvider provider = new IdentityProvider();
         provider.setId(id);
         provider.setType(type);
         return provider;

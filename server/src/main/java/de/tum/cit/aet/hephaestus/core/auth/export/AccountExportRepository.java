@@ -2,9 +2,11 @@ package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -25,14 +27,14 @@ public interface AccountExportRepository extends JpaRepository<AccountExport, Lo
      * one-in-flight-per-account cap that stops a session from queueing unbounded async full-bundle
      * assemblies, each persisting a BYTEA blob (DoS / storage-amplification guard).
      */
-    boolean existsByAccountIdAndStatusIn(Long accountId, java.util.Collection<AccountExport.Status> statuses);
+    boolean existsByAccountIdAndStatusIn(Long accountId, Collection<AccountExport.Status> statuses);
 
     /**
      * Bulk-expire READY exports past their retention window: flip to EXPIRED and free the payload in
      * one UPDATE, without loading the (large) BYTEA blobs into the persistence context (the prior
      * findById-per-id undid the id-only projection). Returns the number of rows affected.
      */
-    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         """
         UPDATE AccountExport e

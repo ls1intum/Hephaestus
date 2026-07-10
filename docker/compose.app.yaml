@@ -137,7 +137,7 @@ services:
       GH_AUTH_TOKEN: ${GH_AUTH_TOKEN}
       # Default on: the integration event flow needs NATS in prod (the code-level fallback is off for local dev).
       NATS_ENABLED: ${NATS_ENABLED:-true}
-      NATS_DURABLE_CONSUMER_NAME: ${NATS_DURABLE_CONSUMER_NAME:-}
+      NATS_DURABLE_CONSUMER_NAME: ${NATS_DURABLE_CONSUMER_NAME:-hephaestus}
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-7}
       MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-true}
       MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 * * * *}
@@ -162,7 +162,7 @@ services:
       # chars. Required in prod (fail-fast); the Liquibase backfill re-encrypts on boot, so this
       # MUST be set on application-server (where Liquibase runs). Keep it stable.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
-      # Slack integration (per-workspace OAuth install; outbound-only — no inbound signing secret)
+      # Slack OAuth/admin and mentor replies run here. Inbound Events API + interactivity are verified on webhook-server.
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:-}
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:-}
@@ -252,7 +252,7 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.sticky.cookie.sameSite=lax"
       - "traefik.http.services.https-application-server.loadbalancer.sticky.cookie.path=/api/workspaces"
       - "traefik.http.services.https-application-server.loadbalancer.sticky.cookie.maxAge=300"
-      - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/liveness"
+      - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/readiness"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
     # The distroless image has no shell for a wget probe; the probe is the static thc binary the

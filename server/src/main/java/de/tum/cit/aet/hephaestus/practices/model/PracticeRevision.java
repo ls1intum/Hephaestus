@@ -14,6 +14,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -88,12 +89,12 @@ public class PracticeRevision {
     public PracticeRevision(Practice practice, int revisionNumber, String criteria) {
         // Fail fast at the call site: criteria/practice are NOT NULL and revision_number is 1-based, so a misuse
         // should surface a meaningful message here rather than as a deferred flush-time DataIntegrityViolation.
-        this.practice = java.util.Objects.requireNonNull(practice, "practice");
+        this.practice = Objects.requireNonNull(practice, "practice");
         if (revisionNumber < 1) {
             throw new IllegalArgumentException("revisionNumber must be >= 1, got " + revisionNumber);
         }
         this.revisionNumber = revisionNumber;
-        this.criteria = java.util.Objects.requireNonNull(criteria, "criteria");
+        this.criteria = Objects.requireNonNull(criteria, "criteria");
     }
 
     @PrePersist

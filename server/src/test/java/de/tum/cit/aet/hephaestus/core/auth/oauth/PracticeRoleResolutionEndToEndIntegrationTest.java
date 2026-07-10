@@ -9,9 +9,9 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
@@ -73,7 +73,7 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
     private LoginProviderRepository loginProviderRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -116,12 +116,12 @@ class PracticeRoleResolutionEndToEndIntegrationTest {
         IdentityLink link = identityLinkRepository.findActiveByAccountId(account.getId()).get(0);
         // (a) the stored subject IS the numeric id — exactly what the gate stringifies from User.nativeId.
         assertThat(link.getSubject()).isEqualTo(String.valueOf(NATIVE_ID));
-        long loginResolvedProviderId = link.getGitProviderId();
+        long loginResolvedProviderId = link.getProviderId();
 
         // (b) the SCM side independently resolves the SAME git_provider row at the canonical origin.
         String origin = originOf(LOGIN_BASE_URL);
-        GitProvider scmProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, origin)
+        IdentityProvider scmProvider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
             .orElseThrow(() ->
                 new AssertionError(
                     "login created no git_provider at canonical origin " +

@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -424,7 +425,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
 
     private static Map<String, Object> note(String id, String body, boolean system) {
         // HashMap-backed (not Map.of) so null discussion ids in tests don't throw.
-        Map<String, Object> n = new java.util.HashMap<>();
+        Map<String, Object> n = new HashMap<>();
         n.put("id", id);
         n.put("body", body);
         n.put("system", system);
@@ -432,7 +433,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     }
 
     private static Map<String, Object> discussion(String id, List<Map<String, Object>> notes) {
-        Map<String, Object> disc = new java.util.HashMap<>();
+        Map<String, Object> disc = new HashMap<>();
         disc.put("id", id);
         disc.put("notes", Map.of("nodes", new ArrayList<>(notes)));
         return disc;

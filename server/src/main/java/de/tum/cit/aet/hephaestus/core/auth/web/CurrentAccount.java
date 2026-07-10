@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -49,15 +51,15 @@ public final class CurrentAccount {
     }
 
     /** Roles from the JWT's flat {@code roles} claim; empty if absent. */
-    public static java.util.List<String> roles() {
+    public static List<String> roles() {
         Jwt jwt = jwtOrNull();
         if (jwt == null) {
-            return java.util.List.of();
+            return List.of();
         }
-        if (jwt.getClaims().get("roles") instanceof java.util.List<?> roles) {
+        if (jwt.getClaims().get("roles") instanceof List<?> roles) {
             return roles.stream().filter(String.class::isInstance).map(String.class::cast).toList();
         }
-        return java.util.List.of();
+        return List.of();
     }
 
     /** Impersonator account id if this is an impersonation session, else null. */
@@ -68,7 +70,7 @@ public final class CurrentAccount {
             return null;
         }
         Object act = jwt.getClaim("act");
-        if (act instanceof java.util.Map<?, ?> map && map.get("sub") instanceof String sub) {
+        if (act instanceof Map<?, ?> map && map.get("sub") instanceof String sub) {
             try {
                 return Long.parseLong(sub);
             } catch (NumberFormatException ignored) {

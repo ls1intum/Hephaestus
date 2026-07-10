@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -67,7 +68,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             c.closed(),
             c.sendBytes(),
             terminalFires::incrementAndGet,
-            java.util.Map.of()
+            Map.of()
         );
         writer.start();
 
@@ -123,7 +124,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             c.closed(),
             c.sendBytes(),
             terminalFires::incrementAndGet,
-            java.util.Map.of()
+            Map.of()
         );
         writer.start();
 
@@ -188,7 +189,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             c.closed(),
             c.sendBytes(),
             terminalFires::incrementAndGet,
-            java.util.Map.of()
+            Map.of()
         );
         writer.start();
         writer.close();
@@ -232,7 +233,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             c.closed(),
             c.sendBytes(),
             terminalFires::incrementAndGet,
-            java.util.Map.of()
+            Map.of()
         );
         writer.start();
         Thread t = new Thread(() -> {
@@ -268,7 +269,7 @@ class JsonlStdinWriterTest extends BaseUnitTest {
             c.closed(),
             c.sendBytes(),
             () -> {},
-            java.util.Map.of()
+            Map.of()
         );
         writer.start();
         // Real LF in the value must be escaped, not emitted raw; only the trailing \n is real.

@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -49,14 +49,14 @@ public class GitHubProjectStatusUpdateMessageHandler
     private final ProjectRepository projectRepository;
     private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
     private final ScopeIdResolver scopeIdResolver;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     GitHubProjectStatusUpdateMessageHandler(
         ProjectRepository projectRepository,
         GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
         ScopeIdResolver scopeIdResolver,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         SyncSchedulerProperties syncSchedulerProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
@@ -134,8 +134,8 @@ public class GitHubProjectStatusUpdateMessageHandler
             return;
         }
 
-        GitProvider gitHubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+        IdentityProvider gitHubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
         ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 

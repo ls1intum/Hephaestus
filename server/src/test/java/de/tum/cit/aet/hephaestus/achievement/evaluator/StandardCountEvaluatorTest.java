@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.achievement.evaluator;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.achievement.UserAchievement;
+import de.tum.cit.aet.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.cit.aet.hephaestus.achievement.progress.LinearAchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
@@ -128,7 +129,7 @@ class StandardCountEvaluatorTest extends BaseUnitTest {
             UserAchievement ua = UserAchievement.builder()
                 .user(testUser)
                 .achievementId("test.achievement")
-                .progressData(new de.tum.cit.aet.hephaestus.achievement.progress.BinaryAchievementProgress())
+                .progressData(new BinaryAchievementProgress())
                 .build();
 
             boolean result = evaluator.updateProgress(ua, createEvent(ActivityEventType.COMMIT_CREATED));

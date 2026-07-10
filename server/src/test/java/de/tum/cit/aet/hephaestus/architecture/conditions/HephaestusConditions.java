@@ -10,6 +10,7 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Reusable ArchUnit conditions for Hephaestus architecture tests.
@@ -240,7 +241,7 @@ public final class HephaestusConditions {
                 long fieldInjections = javaClass
                     .getFields()
                     .stream()
-                    .filter(f -> f.isAnnotatedWith(org.springframework.beans.factory.annotation.Autowired.class))
+                    .filter(f -> f.isAnnotatedWith(Autowired.class))
                     .count();
 
                 // Count constructor parameters

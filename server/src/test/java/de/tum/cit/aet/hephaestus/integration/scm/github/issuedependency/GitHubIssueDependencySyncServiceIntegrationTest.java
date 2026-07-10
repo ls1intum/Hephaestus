@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.issuedependency;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -38,12 +38,12 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     private RepositoryRepository repositoryRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private EntityManager entityManager;
 
-    private GitProvider gitProvider;
+    private IdentityProvider gitProvider;
     private Repository testRepository;
     private Issue blockedIssue;
     private Issue blockingIssue;
@@ -52,8 +52,10 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     void setUp() {
         // Create git provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
 
         // Create test repository
         testRepository = new Repository();

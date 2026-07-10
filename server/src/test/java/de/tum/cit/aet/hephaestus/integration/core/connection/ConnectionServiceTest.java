@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -29,6 +30,7 @@ import org.springframework.dao.DataIntegrityViolationException;
  * covers the pure {@code canTransitionTo} predicate; this test covers the service that
  * enforces it.
  */
+@Tag("unit")
 class ConnectionServiceTest extends BaseUnitTest {
 
     @Mock
@@ -100,10 +102,35 @@ class ConnectionServiceTest extends BaseUnitTest {
             .hasMessageContaining("UNINSTALLED")
             .hasMessageContaining("ACTIVE");
 
-        // Rejection must be inert: no audit row, no persisted mutation, state unchanged.
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         verify(auditRepository, never()).save(any());
         verify(connectionRepository, never()).save(any());
+    }
+
+    @Test
+    void transition_slackOAuthReconnectFromUninstalled_writesAuditRowAndReactivates() {
+        Connection connection = new Connection(
+            workspace,
+            IntegrationKind.SLACK,
+            "T1",
+            new ConnectionConfig.SlackConfig("T1", "Acme", null, null, null, Set.of())
+        );
+        connection.setState(IntegrationState.UNINSTALLED);
+
+        Connection result = service.transition(
+            connection,
+            new TransitionRequest(IntegrationState.ACTIVE, "OAUTH_COMPLETE", "USER", "actor-1", "corr-x", "reconnected")
+        );
+
+        assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
+        assertThat(result.getStateReason()).isEqualTo("reconnected");
+
+        ArgumentCaptor<ConnectionAudit> audit = ArgumentCaptor.forClass(ConnectionAudit.class);
+        verify(auditRepository).save(audit.capture());
+        assertThat(audit.getValue().getFromState()).isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(audit.getValue().getToState()).isEqualTo(IntegrationState.ACTIVE);
+        assertThat(audit.getValue().getEventType()).isEqualTo("OAUTH_COMPLETE");
+        verify(connectionRepository).save(connection);
     }
 
     @Test

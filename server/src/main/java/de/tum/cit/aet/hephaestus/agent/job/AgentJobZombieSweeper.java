@@ -154,7 +154,7 @@ public class AgentJobZombieSweeper {
                     AgentJobStatus.TIMED_OUT,
                     Instant.now(),
                     "Reaped: exceeded timeout (executor may have crashed)",
-                    java.util.Set.of(AgentJobStatus.RUNNING)
+                    Set.of(AgentJobStatus.RUNNING)
                 );
 
                 if (updated > 0) {

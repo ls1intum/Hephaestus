@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectInitiation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -319,7 +321,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+        Assertions.assertThatThrownBy(() ->
             controller.updateStatus(
                 ctx(workspaceId),
                 7L,
@@ -327,10 +329,7 @@ class ConnectionControllerTest extends BaseUnitTest {
                 null
             )
         ).isInstanceOf(IllegalArgumentException.class);
-        verify(connectionService, org.mockito.Mockito.never()).transition(
-            any(Connection.class),
-            any(TransitionRequest.class)
-        );
+        verify(connectionService, Mockito.never()).transition(any(Connection.class), any(TransitionRequest.class));
     }
 
     @Test
@@ -428,7 +427,7 @@ class ConnectionControllerTest extends BaseUnitTest {
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                 Set.of()
             );
-            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, Set.of());
+            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);
@@ -483,10 +482,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public ConnectFinalization finalizeConnect(
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef ref,
-            Map<String, String> callbackParams
-        ) {
+        public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
             return new ConnectFinalization.Completed(
                 "unused-instance-key",
                 new InstallationCredential(0L, "unused"),
@@ -495,7 +491,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         }
 
         @Override
-        public void revoke(de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef ref) {
+        public void revoke(IntegrationRef ref) {
             revokeCalls++;
             if (revokeThrows) {
                 throw new RuntimeException("vendor unreachable");

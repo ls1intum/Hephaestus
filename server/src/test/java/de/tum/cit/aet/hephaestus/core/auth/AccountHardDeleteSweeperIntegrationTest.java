@@ -16,12 +16,15 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * Regression coverage for the GDPR Art. 17 hard-delete sweeper ({@link AccountHardDeleteSweeper}).
@@ -52,7 +55,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     private AccountHardDeleteSweeper sweeper;
 
     /** Spy so a single account's purge can be made to throw, exercising per-account isolation. */
-    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    @MockitoSpyBean
     private AccountPurger accountPurger;
 
     @Autowired
@@ -232,7 +235,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         markDeleting(badId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(2)));
 
         // Make exactly the "bad" account's purge throw; the real bean handles the rest.
-        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(accountPurger).purge(badId);
+        Mockito.doThrow(new RuntimeException("boom")).when(accountPurger).purge(badId);
 
         int purged = sweeper.sweepNow();
 
@@ -283,7 +286,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
         IdentityLink link = new IdentityLink();
         link.setAccount(accountRepository.findById(accountId).orElseThrow());
-        link.setGitProviderId(1L); // scalar FK column (no JPA association → no ddl-auto FK constraint)
+        link.setProviderId(1L); // scalar FK column (no JPA association → no ddl-auto FK constraint)
         link.setSubject("subject-" + accountId);
         link.setUsernameAtSignup("user" + accountId);
         identityLinkRepository.save(link);
@@ -311,8 +314,8 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
      * account_export. Read straight from the database (not the persistence context) so the
      * sweeper's JDBC deletes are reflected.
      */
-    private java.util.List<Integer> childRowCounts(Long accountId) {
-        return java.util.List.of(
+    private List<Integer> childRowCounts(Long accountId) {
+        return List.of(
             count("account_feature", accountId),
             count("identity_link", accountId),
             count("issued_jwt", accountId),

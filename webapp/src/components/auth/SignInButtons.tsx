@@ -12,6 +12,7 @@ type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
 
 /** Synthetic provider type the server emits for the optional passwordless dev sign-in. */
 const DEV_PROVIDER_TYPE = "DEV";
+const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK"]);
 
 interface SignInButtonsProps {
 	onSignIn: (idpHint: string) => void;
@@ -174,9 +175,10 @@ export function SignInButtons({
 
 	// The dev sign-in needs a username field, so it renders as a small form (full mode only), never as
 	// an OAuth-style button — and it is excluded from the compact header entirely.
-	const oauthProviders = providers.filter(
-		(provider) => provider.providerType?.toUpperCase() !== DEV_PROVIDER_TYPE,
-	);
+	const oauthProviders = providers.filter((provider) => {
+		const type = provider.providerType?.toUpperCase();
+		return type !== DEV_PROVIDER_TYPE && !LINK_ONLY_PROVIDER_TYPES.has(type ?? "");
+	});
 	const hasDevSignIn = providers.some(
 		(provider) => provider.providerType?.toUpperCase() === DEV_PROVIDER_TYPE,
 	);

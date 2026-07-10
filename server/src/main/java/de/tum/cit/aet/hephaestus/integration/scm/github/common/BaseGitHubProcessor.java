@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -101,12 +102,7 @@ public abstract class BaseGitHubProcessor {
         // Use atomic insert to prevent race conditions.
         // If another thread inserted first, this returns 0 and we fetch the winner.
         long nativeId =
-            dto.id() != null
-                ? dto.id()
-                : de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils.generateDeterministicId(
-                      repository.getId(),
-                      dto.name()
-                  );
+            dto.id() != null ? dto.id() : LabelIdUtils.generateDeterministicId(repository.getId(), dto.name());
         Long providerId = repository.getProvider().getId();
         int inserted = labelRepository.insertIfAbsent(
             nativeId,

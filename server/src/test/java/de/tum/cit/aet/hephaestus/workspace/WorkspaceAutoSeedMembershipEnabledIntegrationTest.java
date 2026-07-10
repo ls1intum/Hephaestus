@@ -9,7 +9,9 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceEchoControllers;
 import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Verifies the dev/e2e auto-seed path: when {@code hephaestus.workspace.auto-seed-membership=true},
@@ -50,6 +52,6 @@ class WorkspaceAutoSeedMembershipEnabledIntegrationTest extends AbstractWorkspac
             .hasSize(1);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.test.web.reactive.server.WebTestClient webTestClient;
+    @Autowired
+    private WebTestClient webTestClient;
 }

@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ExponentialBackoff;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -692,11 +693,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     // Set resolvedBy user if available (already converted to DTO)
                     GitHubUserDTO resolvedByDto = threadDto.resolvedBy();
                     if (resolvedByDto != null) {
-                        de.tum.cit.aet.hephaestus.integration.scm.domain.user.User resolvedBy =
-                            userProcessor.ensureExists(
-                                resolvedByDto,
-                                pullRequest.getRepository().getProvider().getId()
-                            );
+                        User resolvedBy = userProcessor.ensureExists(
+                            resolvedByDto,
+                            pullRequest.getRepository().getProvider().getId()
+                        );
                         thread.setResolvedBy(resolvedBy);
                     }
                 } else {
@@ -864,11 +864,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     GHUser graphQlResolvedBy = graphQlThread.getResolvedBy();
                     if (graphQlResolvedBy != null) {
                         GitHubUserDTO resolvedByDto = GitHubUserDTO.fromUser(graphQlResolvedBy);
-                        de.tum.cit.aet.hephaestus.integration.scm.domain.user.User resolvedBy =
-                            userProcessor.ensureExists(
-                                resolvedByDto,
-                                pullRequest.getRepository().getProvider().getId()
-                            );
+                        User resolvedBy = userProcessor.ensureExists(
+                            resolvedByDto,
+                            pullRequest.getRepository().getProvider().getId()
+                        );
                         thread.setResolvedBy(resolvedBy);
                     }
                 } else {

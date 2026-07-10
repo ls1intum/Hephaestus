@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSync
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueTypeColor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueTypeConnection;
 import java.time.Instant;
@@ -299,10 +300,7 @@ public class GitHubIssueTypeSyncService {
         }
     }
 
-    private void syncIssueType(
-        de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueType graphQlType,
-        Organization organization
-    ) {
+    private void syncIssueType(GHIssueType graphQlType, Organization organization) {
         String id = graphQlType.getId();
 
         IssueType issueType = issueTypeRepository

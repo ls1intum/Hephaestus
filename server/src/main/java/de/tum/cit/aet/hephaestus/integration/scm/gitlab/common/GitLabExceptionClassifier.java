@@ -19,6 +19,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -227,7 +228,7 @@ public class GitLabExceptionClassifier {
             );
         }
 
-        if (cause instanceof org.springframework.transaction.UnexpectedRollbackException) {
+        if (cause instanceof UnexpectedRollbackException) {
             return ClassificationResult.of(
                 Category.RETRYABLE,
                 "Transaction rollback detected - will retry: " + cause.getMessage()

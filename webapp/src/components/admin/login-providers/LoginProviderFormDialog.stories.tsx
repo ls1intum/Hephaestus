@@ -16,6 +16,19 @@ const editing: LoginProviderView = {
 	updatedAt: new Date("2026-05-02T00:00:00Z"),
 };
 
+const editingSlack: LoginProviderView = {
+	registrationId: "slack",
+	type: "SLACK",
+	displayName: "Slack",
+	baseUrl: "https://slack.com",
+	scopes: "openid profile email",
+	enabled: true,
+	seededFromEnv: true,
+	redirectUri: "https://hephaestus.example.com/api/login/oauth2/code/slack",
+	createdAt: new Date("2026-05-02T00:00:00Z"),
+	updatedAt: new Date("2026-05-02T00:00:00Z"),
+};
+
 const meta = {
 	component: LoginProviderFormDialog,
 	parameters: { layout: "centered" },
@@ -40,6 +53,17 @@ export const Create: Story = {
 		await expect(screen.getByLabelText("Registration ID")).toBeEnabled();
 		// GitLab is the default type, so the GitLab-only instance base URL field is present.
 		await expect(screen.getByLabelText("Instance base URL")).toBeInTheDocument();
+	},
+};
+
+export const EditSlack: Story = {
+	args: { editing: editingSlack },
+	play: async () => {
+		await expect(await screen.findByText("Edit login provider")).toBeInTheDocument();
+		await expect(screen.queryByLabelText("Instance base URL")).not.toBeInTheDocument();
+		await expect(
+			screen.getByText(/Use the same Slack app client ID and secret/),
+		).toBeInTheDocument();
 	},
 };
 

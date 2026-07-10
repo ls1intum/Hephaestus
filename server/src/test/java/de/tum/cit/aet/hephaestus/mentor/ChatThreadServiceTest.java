@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
 import java.util.UUID;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -94,6 +95,6 @@ class ChatThreadServiceTest extends BaseUnitTest {
     }
 
     private static void assertThatThrownByEnityNotFound(Runnable runnable) {
-        org.assertj.core.api.Assertions.assertThatThrownBy(runnable::run).isInstanceOf(EntityNotFoundException.class);
+        Assertions.assertThatThrownBy(runnable::run).isInstanceOf(EntityNotFoundException.class);
     }
 }

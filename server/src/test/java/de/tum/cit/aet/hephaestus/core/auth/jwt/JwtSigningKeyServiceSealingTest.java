@@ -13,6 +13,7 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.env.MockEnvironment;
@@ -107,11 +108,11 @@ class JwtSigningKeyServiceSealingTest extends BaseUnitTest {
         JwtSigningKeyService service = new JwtSigningKeyService(repo, env("prod"), sealer);
 
         // Startup assertion (called from AuthJwtConfig OUTSIDE the swallow) aborts boot.
-        org.assertj.core.api.Assertions.assertThatThrownBy(service::assertProdKeysSealed)
+        Assertions.assertThatThrownBy(service::assertProdKeysSealed)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("unsealed");
         // Signing path also refuses to materialize the unsealed key.
-        org.assertj.core.api.Assertions.assertThatThrownBy(service::currentSigningKey)
+        Assertions.assertThatThrownBy(service::currentSigningKey)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("unsealed");
     }

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
@@ -356,7 +356,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             verify(eventPublisher).publishEvent(captor.capture());
             ScmDomainEvent.CommitAuthorsReconciled event = captor.getValue();
             Assertions.assertThat(event.repositoryId()).isEqualTo(1L);
-            Assertions.assertThat(event.context().providerType()).isEqualTo(GitProviderType.GITHUB);
+            Assertions.assertThat(event.context().providerType()).isEqualTo(IdentityProviderType.GITHUB);
             Assertions.assertThat(event.context().scopeId()).isEqualTo(7L);
             Assertions.assertThat(event.context().repository()).isNotNull();
             Assertions.assertThat(event.context().repository().id()).isEqualTo(1L);

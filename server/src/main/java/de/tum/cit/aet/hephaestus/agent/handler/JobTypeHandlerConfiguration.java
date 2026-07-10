@@ -14,16 +14,18 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Registers all {@link JobTypeHandler} beans and the {@link JobTypeHandlerRegistry}.
  *
  * <p>This class is in the dependency chain of {@link WorkspaceContextBuilder} (via any
- * {@code ContentProvider} it produces and consumes). Beans produced here that are needed
- * by a {@code ContentProvider} must be declared as top-level {@code @Component}s instead,
+ * {@code ContentSource} it produces and consumes). Beans produced here that are needed
+ * by a {@code ContentSource} must be declared as top-level {@code @Component}s instead,
  * otherwise a circular dependency forms.
  */
 @Configuration
@@ -143,6 +145,26 @@ public class JobTypeHandlerConfiguration {
             deliveryService,
             commentPoster,
             feedbackLedgerRecorder
+        );
+    }
+
+    @Bean
+    JobTypeHandler conversationReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService,
+        ApplicationEventPublisher eventPublisher,
+        TransactionTemplate transactionTemplate
+    ) {
+        return new ConversationReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            practiceCatalogInjector,
+            resultParser,
+            deliveryService,
+            eventPublisher,
+            transactionTemplate
         );
     }
 

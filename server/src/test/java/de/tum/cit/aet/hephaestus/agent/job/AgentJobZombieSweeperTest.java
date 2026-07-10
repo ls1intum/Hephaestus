@@ -21,7 +21,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 class AgentJobZombieSweeperTest extends BaseUnitTest {
@@ -36,7 +41,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
     private WorkerRegistryRepository workerRegistryRepository;
 
     @Mock
-    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+    private TransactionTemplate transactionTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private SimpleMeterRegistry meterRegistry;
@@ -63,8 +68,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             .when(transactionTemplate.execute(any()))
             .thenAnswer(inv -> {
                 @SuppressWarnings("unchecked")
-                org.springframework.transaction.support.TransactionCallback<Object> cb = inv.getArgument(0);
-                return cb.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
+                TransactionCallback<Object> cb = inv.getArgument(0);
+                return cb.doInTransaction(mock(TransactionStatus.class));
             });
         sweeper = new AgentJobZombieSweeper(
             jobRepository,
@@ -126,7 +131,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         @DisplayName("re-publishes to the job's workspace only after the requeue CAS wins")
         void requeuesOrphanedJob() {
             UUID jobId = UUID.randomUUID();
-            when(jobRepository.findOrphanedRunningJobs(any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(
+            when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 0))
             );
             when(jobRepository.requeueOrphan(jobId)).thenReturn(1);
@@ -141,7 +146,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         @DisplayName("does not re-publish if the CAS requeue lost the race to another sweeper")
         void skipsPublishWhenRequeueRaced() {
             UUID jobId = UUID.randomUUID();
-            when(jobRepository.findOrphanedRunningJobs(any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(
+            when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 0))
             );
             when(jobRepository.requeueOrphan(jobId)).thenReturn(0); // another replica won
@@ -155,7 +160,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         @DisplayName("fails (not requeues) an orphan that hit the retry cap")
         void failsOrphanPastRetryCap() {
             UUID jobId = UUID.randomUUID();
-            when(jobRepository.findOrphanedRunningJobs(any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(
+            when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(
                 List.of(orphan(jobId, 7L, 5))
             ); // retryCount == maxDeliver
 
@@ -168,9 +173,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         @Test
         @DisplayName("no orphans → no writes")
         void noOrphansNoWork() {
-            when(jobRepository.findOrphanedRunningJobs(any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(
-                List.of()
-            );
+            when(jobRepository.findOrphanedRunningJobs(any(), ArgumentMatchers.anyLong())).thenReturn(List.of());
 
             sweeper.recoverOrphanedJobs();
 
@@ -213,7 +216,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                 List.of(orphan(jobId1, 1L, 0), orphan(jobId2, 2L, 0))
             );
             // First publish fails, second should still be attempted
-            org.mockito.Mockito.doThrow(new RuntimeException("NATS down")).when(submitter).publish(jobId1, 1L);
+            Mockito.doThrow(new RuntimeException("NATS down")).when(submitter).publish(jobId1, 1L);
 
             sweeper.republishStaleQueuedJobs();
 

@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -137,9 +138,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             ResponseSpec responseSpec = mock(ResponseSpec.class);
 
             when(mockWebClient.post()).thenReturn(bodyUriSpec);
-            org.mockito.Mockito.doReturn(bodySpec).when(bodyUriSpec).uri(anyString(), eq(GROUP_ID));
-            org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
-            org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
+            Mockito.doReturn(bodySpec).when(bodyUriSpec).uri(anyString(), eq(GROUP_ID));
+            Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
+            Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
             when(bodySpec.retrieve()).thenReturn(responseSpec);
             when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
                 Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab"))

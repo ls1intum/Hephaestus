@@ -300,7 +300,7 @@ public class ConnectionService {
             log.debug("Connection {} already in state {}, no-op", connection.getId(), req.next());
             return connection;
         }
-        if (!current.canTransitionTo(req.next())) {
+        if (!current.canTransitionTo(req.next()) && !isSlackOAuthReconnect(connection, current, req)) {
             throw new IllegalStateException(
                 "Illegal transition for connection " + connection.getId() + ": " + current + " → " + req.next()
             );
@@ -334,6 +334,19 @@ public class ConnectionService {
             log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
         }
         return connectionRepository.save(connection);
+    }
+
+    private static boolean isSlackOAuthReconnect(
+        Connection connection,
+        IntegrationState current,
+        TransitionRequest request
+    ) {
+        return (
+            connection.getKind() == IntegrationKind.SLACK &&
+            current == IntegrationState.UNINSTALLED &&
+            request.next() == IntegrationState.ACTIVE &&
+            "OAUTH_COMPLETE".equals(request.eventType())
+        );
     }
 
     /** Parameter object for {@link #transition} — collapses 6 params to one record. */

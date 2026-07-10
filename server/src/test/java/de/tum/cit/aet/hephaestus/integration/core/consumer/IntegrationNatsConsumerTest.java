@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.nats.client.api.DeliverPolicy;
+import java.time.Duration;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,25 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 @Tag("unit")
 class IntegrationNatsConsumerTest {
+
+    @Test
+    void newConsumerStartsAtNewMessagesInsteadOfReplayingStreamHistory() {
+        NatsConsumerProperties properties = new NatsConsumerProperties(
+            Duration.ofMinutes(5),
+            500,
+            Duration.ofSeconds(2),
+            new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
+        );
+
+        var config = IntegrationNatsConsumer.newConsumerConfiguration(
+            new String[] { "slack.>" },
+            properties,
+            "heph-slack"
+        );
+
+        assertThat(config.getDeliverPolicy()).isEqualTo(DeliverPolicy.New);
+        assertThat(config.getDurable()).isEqualTo("heph-slack");
+    }
 
     @Nested
     class ReconnectBackoffMs {

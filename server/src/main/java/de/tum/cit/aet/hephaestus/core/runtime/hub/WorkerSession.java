@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -126,7 +127,7 @@ public final class WorkerSession {
         }
     }
 
-    public void close(org.springframework.web.socket.CloseStatus status) {
+    public void close(CloseStatus status) {
         try {
             transport.close(status);
         } catch (IOException e) {

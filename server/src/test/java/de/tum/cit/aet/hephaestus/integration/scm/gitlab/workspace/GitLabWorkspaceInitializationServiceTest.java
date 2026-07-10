@@ -15,7 +15,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
@@ -235,7 +235,10 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
         when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(syncResult);
         when(
-            organizationRepository.findByLoginIgnoreCaseAndProvider_Type("my-group/subgroup", GitProviderType.GITLAB)
+            organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                "my-group/subgroup",
+                IdentityProviderType.GITLAB
+            )
         ).thenReturn(Optional.empty());
         when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
     }
@@ -363,7 +366,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
                     "my-group/subgroup",
-                    GitProviderType.GITLAB
+                    IdentityProviderType.GITLAB
                 )
             ).thenReturn(Optional.of(organization));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -618,7 +621,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
                     "my-group/subgroup",
-                    GitProviderType.GITLAB
+                    IdentityProviderType.GITLAB
                 )
             ).thenReturn(Optional.of(organization));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -639,7 +642,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
                     "my-group/subgroup",
-                    GitProviderType.GITLAB
+                    IdentityProviderType.GITLAB
                 )
             ).thenReturn(Optional.empty());
 
@@ -654,7 +657,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(
                 organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
                     "my-group/subgroup",
-                    GitProviderType.GITLAB
+                    IdentityProviderType.GITLAB
                 )
             ).thenReturn(Optional.of(organization));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.empty());

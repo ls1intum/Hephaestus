@@ -94,8 +94,8 @@ hephaestus:
     # SCM + SLACK INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no global bot token. Slack is outbound-only (leaderboard
-    # digest + test message); no inbound webhook secret is required.
+    # `connection` table — there is no global bot token. Events API and interactivity are
+    # verified with HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET on the webhook-server.
     # ═══════════════════════════════════════════════════════════════════════════
     integration:
         github:
@@ -120,7 +120,7 @@ hephaestus:
         nats:
             enabled: ${NATS_ENABLED:false}
             server: ${NATS_SERVER:}
-            durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:}
+            durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:hephaestus}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # AUTH (Production) — Hephaestus-native, see ADR 0017

@@ -8,8 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
@@ -99,7 +100,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         project.setNumber(1);
         project.setUrl("https://github.com/orgs/test/projects/1");
 
-        GitProvider provider = new GitProvider(GitProviderType.GITHUB, "https://github.com");
+        IdentityProvider provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
         provider.setId(PROVIDER_ID);
         context = new ProcessingContext(
             SCOPE_ID,
@@ -1030,7 +1031,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Verify both the base event (Updated) and the Archived event are published
             // process() publishes Updated (since !isNew), then processArchived publishes Archived
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
+            verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
             List<Object> events = eventCaptor.getAllValues();
             assertThat(events).hasSize(2);
@@ -1065,7 +1066,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             assertThat(result).isNotNull();
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
+            verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
             GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) eventCaptor
                 .getAllValues()
@@ -1128,7 +1129,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             // Verify both base event (Updated) and Restored event are published
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
+            verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
             List<Object> events = eventCaptor.getAllValues();
             assertThat(events).hasSize(2);
@@ -1162,7 +1163,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             assertThat(result).isNotNull();
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
+            verify(eventPublisher, Mockito.times(2)).publishEvent(eventCaptor.capture());
 
             GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) eventCaptor
                 .getAllValues()

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestSecurityConfig;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -53,7 +54,7 @@ class ImpersonationGuardIntegrationTest extends BaseIntegrationTest {
             .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
             .exchange()
             .expectStatus()
-            .value(status -> org.assertj.core.api.Assertions.assertThat(status).isNotEqualTo(403));
+            .value(status -> Assertions.assertThat(status).isNotEqualTo(403));
     }
 
     @Test
@@ -66,6 +67,6 @@ class ImpersonationGuardIntegrationTest extends BaseIntegrationTest {
             .headers(headers -> headers.setBearerAuth(TestSecurityConfig.IMPERSONATION_TOKEN))
             .exchange()
             .expectStatus()
-            .value(status -> org.assertj.core.api.Assertions.assertThat(status).isNotEqualTo(403));
+            .value(status -> Assertions.assertThat(status).isNotEqualTo(403));
     }
 }

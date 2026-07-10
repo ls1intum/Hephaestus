@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import java.time.Instant;
 import java.util.UUID;
@@ -45,7 +45,7 @@ import org.jspecify.annotations.Nullable;
 public record ProcessingContext(
     Long scopeId,
     Repository repository,
-    GitProvider provider,
+    IdentityProvider provider,
     Instant startedAt,
     String correlationId,
     @Nullable String webhookAction,
@@ -77,7 +77,7 @@ public record ProcessingContext(
      * Creates a context for sync operations that are not repository-scoped
      * (e.g., organization-level project sync, team sync).
      */
-    public static ProcessingContext forSync(Long scopeId, GitProvider provider) {
+    public static ProcessingContext forSync(Long scopeId, IdentityProvider provider) {
         return new ProcessingContext(
             scopeId,
             null,
@@ -108,7 +108,7 @@ public record ProcessingContext(
      * Creates a context for webhook events that are not repository-scoped
      * (e.g., organization-level project events).
      */
-    public static ProcessingContext forWebhook(Long scopeId, GitProvider provider, String action) {
+    public static ProcessingContext forWebhook(Long scopeId, IdentityProvider provider, String action) {
         return new ProcessingContext(
             scopeId,
             null,

@@ -7,9 +7,9 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlight
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -21,12 +21,20 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.annotation.DirtiesContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -57,7 +65,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -97,9 +105,11 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountType(AccountType.ORG);
         workspace = workspaceRepository.save(workspace);
 
-        GitProvider gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.com")));
+        IdentityProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
+            );
 
         user = new User();
         user.setNativeId(7_001L);
@@ -213,13 +223,13 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // exactly one writer wins at the row level.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
 
-        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
-        java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(2);
-        java.util.concurrent.CountDownLatch fire = new java.util.concurrent.CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch fire = new CountDownLatch(1);
         try {
-            java.util.concurrent.Callable<Object> attempt = () -> {
+            Callable<Object> attempt = () -> {
                 ready.countDown();
-                fire.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                fire.await(5, TimeUnit.SECONDS);
                 try {
                     return persistence.persistInFlight(thread, "race", UUID.randomUUID(), null);
                 } catch (RuntimeException ex) {
@@ -229,14 +239,14 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             var fa = pool.submit(attempt);
             var fb = pool.submit(attempt);
             // Wait until both threads are at the barrier, then release simultaneously.
-            assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
             fire.countDown();
-            Object resultA = fa.get(10, java.util.concurrent.TimeUnit.SECONDS);
-            Object resultB = fb.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            Object resultA = fa.get(10, TimeUnit.SECONDS);
+            Object resultB = fb.get(10, TimeUnit.SECONDS);
 
             int winners = 0;
             int conflicts = 0;
-            for (Object r : java.util.List.of(resultA, resultB)) {
+            for (Object r : List.of(resultA, resultB)) {
                 if (r instanceof MentorTurnPersistence.TurnPersistenceCookie) {
                     winners++;
                 } else if (r instanceof TurnAlreadyInFlightException) {
@@ -469,7 +479,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         stale.setStatus(ChatMessage.Status.completed);
         assertThatThrownBy(() -> {
             chatMessageRepository.saveAndFlush(stale);
-        }).isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
+        }).isInstanceOf(OptimisticLockingFailureException.class);
 
         // After the failed save attempt, the row in the DB still reflects the reaper's observation.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
@@ -507,7 +517,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // recreates the constraint in @BeforeEach so this assertion exercises the real
         // predicate, not just a JPA enum validation.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "constraint test");
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> {
+        Assertions.assertThatThrownBy(() -> {
             try (
                 var conn = dataSource.getConnection();
                 var stmt = conn.prepareStatement(
@@ -530,7 +540,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             // @Enumerated(EnumType.STRING) field. Either fires first — both encode the same
             // enum invariant — so the assertion accepts either.
             .satisfies(t ->
-                org.assertj.core.api.Assertions.assertThat(t.getMessage()).containsAnyOf(
+                Assertions.assertThat(t.getMessage()).containsAnyOf(
                     "chk_chat_message_status",
                     "chat_message_status_check"
                 )

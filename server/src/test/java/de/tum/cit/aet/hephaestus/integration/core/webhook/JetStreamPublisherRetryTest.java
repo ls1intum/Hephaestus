@@ -29,7 +29,7 @@ class JetStreamPublisherRetryTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), 2_000_000L),
+        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), Map.of(), 2_000_000L),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(26_214_400L)
     );

@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Abstract base class for live GitHub API integration tests using GraphQL and REST.
@@ -50,7 +51,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     protected RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
-    protected GitProviderRepository gitProviderRepository;
+    protected IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     protected ConnectionRepository connectionRepository;
@@ -67,7 +68,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
 
     protected GitHubTestFixtureService fixtureService;
     protected Workspace workspace;
-    protected GitProvider githubProvider;
+    protected IdentityProvider githubProvider;
 
     @BeforeAll
     void setUpFixtureService() {
@@ -85,8 +86,10 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         repositoriesToDelete.clear();
         teamsToDelete.clear();
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
         workspace = createWorkspace();
     }
 
@@ -152,7 +155,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
             githubInstallationId(),
             saved.getAccountLogin(),
             /* serverUrl */ null,
-            java.util.Set.of()
+            Set.of()
         );
         Connection connection = new Connection(
             saved,
@@ -161,7 +164,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
             cfg
         );
         connection.setDisplayName(saved.getAccountLogin());
-        org.springframework.test.util.ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
         connectionRepository.save(connection);
 
         return saved;

@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -75,7 +75,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     private static String md(String slug) {
-        return WorkspaceAbi.PRACTICES_PREFIX + slug + ".md";
+        return SandboxLayout.PRACTICES_PREFIX + slug + ".md";
     }
 
     @Test
@@ -182,18 +182,18 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
 
         // index.json lists both practices (area falls back to the slug when ungrouped).
-        String index = new String(files.get(WorkspaceAbi.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
+        String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
         assertThat(index).contains("authoring").contains("retrospective");
         // Per-slug criteria + the all-criteria bundle are present.
         assertThat(files).containsKey(md("authoring")).containsKey(md("retrospective"));
         String bundle = new String(
-            files.get(WorkspaceAbi.PRACTICES_PREFIX + "all-criteria.md"),
+            files.get(SandboxLayout.PRACTICES_PREFIX + "all-criteria.md"),
             StandardCharsets.UTF_8
         );
         assertThat(bundle).contains("# authoring").contains("# retrospective");
         // Only the populated precompute script is written; the blank one is skipped.
-        assertThat(files).containsKey(WorkspaceAbi.PRECOMPUTE_PREFIX + "practices/authoring.ts");
-        assertThat(files).doesNotContainKey(WorkspaceAbi.PRECOMPUTE_PREFIX + "practices/retrospective.ts");
+        assertThat(files).containsKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/authoring.ts");
+        assertThat(files).doesNotContainKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/retrospective.ts");
     }
 
     @Test

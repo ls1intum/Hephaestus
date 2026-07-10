@@ -12,8 +12,8 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
@@ -195,7 +195,7 @@ public class GitHubProjectSyncService {
         // Resolve organization outside transaction to avoid holding locks
         Organization organization = transactionTemplate.execute(status -> {
             Organization org = organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, GitProviderType.GITHUB)
+                .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
                 .orElse(null);
             if (org != null) {
                 // Eagerly initialize the lazy-loaded provider for use outside the transaction
@@ -210,7 +210,7 @@ public class GitHubProjectSyncService {
         }
 
         Long organizationId = organization.getId();
-        GitProvider provider = organization.getProvider();
+        IdentityProvider provider = organization.getProvider();
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
@@ -599,10 +599,10 @@ public class GitHubProjectSyncService {
         Long projectId = project.getId();
 
         // Eagerly resolve the provider for ProcessingContext (lazy-loaded, needs transaction)
-        GitProvider provider = transactionTemplate.execute(status -> {
+        IdentityProvider provider = transactionTemplate.execute(status -> {
             Project p = projectRepository.findById(projectId).orElse(null);
             if (p != null) {
-                GitProvider prov = p.getProvider();
+                IdentityProvider prov = p.getProvider();
                 prov.getId(); // force proxy initialization
                 return prov;
             }
@@ -1380,7 +1380,7 @@ public class GitHubProjectSyncService {
         HttpGraphQlClient client,
         Project project,
         Long scopeId,
-        GitProvider provider
+        IdentityProvider provider
     ) {
         String projectNodeId = project.getNodeId();
         if (projectNodeId == null) {
@@ -1595,7 +1595,7 @@ public class GitHubProjectSyncService {
         Long organizationId,
         Set<Long> syncedProjectIds,
         Long scopeId,
-        GitProvider provider
+        IdentityProvider provider
     ) {
         transactionTemplate.executeWithoutResult(status -> {
             List<Project> existingProjects = projectRepository.findAllByOwnerTypeAndOwnerId(
