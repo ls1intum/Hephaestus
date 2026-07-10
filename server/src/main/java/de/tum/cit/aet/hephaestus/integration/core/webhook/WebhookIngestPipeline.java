@@ -38,9 +38,10 @@ import tools.jackson.databind.ObjectMapper;
  * pipeline derives the NATS subject + dedup-id via the per-kind {@link SubjectKeyDeriver}
  * and publishes through {@link JetStreamPublisher}.
  *
- * <p>Error responses are opaque ({@code "invalid"} / {@code "missing-signature"} /
- * {@code "stale-timestamp"}). The {@code Invalid.reason} from the verifier is logged
- * server-side only — echoing it would leak signature-format detail to attacker probes.
+ * <p>Error responses carry only a coarse category ({@code "invalid"} / {@code "missing-signature"} /
+ * {@code "stale-timestamp"}). The verifier's {@code Invalid.reason} — which distinguishes a missing secret from a
+ * signature mismatch from a malformed header — is logged server-side only; echoing it would hand attacker probes a
+ * side channel into the signing scheme.
  */
 @Component
 public class WebhookIngestPipeline {
@@ -135,9 +136,9 @@ public class WebhookIngestPipeline {
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "stale-timestamp"));
             }
             case VerificationResult.Invalid i -> {
-                // Server-side log carries the discriminator; HTTP response stays opaque so
-                // attacker probes cannot distinguish missing-secret from signature-mismatch
-                // from malformed-header (side channel into the signing scheme).
+                // The response collapses every Invalid.reason into one category so attacker probes cannot
+                // distinguish missing-secret from signature-mismatch from malformed-header; the discriminator
+                // survives in the server-side log.
                 log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
                 yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
             }

@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.slack.sync;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import java.util.List;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -33,17 +35,20 @@ public class SlackDataSyncScheduler {
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final SlackChannelMetadataRefresher metadataRefresher;
     private final SlackChannelHistorySyncService historySyncService;
+    private final ConnectionService connectionService;
     private final SlackSyncProperties properties;
 
     public SlackDataSyncScheduler(
         SlackMonitoredChannelRepository monitoredChannelRepository,
         SlackChannelMetadataRefresher metadataRefresher,
         SlackChannelHistorySyncService historySyncService,
+        ConnectionService connectionService,
         SlackSyncProperties properties
     ) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.metadataRefresher = metadataRefresher;
         this.historySyncService = historySyncService;
+        this.connectionService = connectionService;
         this.properties = properties;
     }
 
@@ -67,8 +72,22 @@ public class SlackDataSyncScheduler {
         log.info("slack.sync: nightly reconciliation done: workspaces={}, failed={}", workspaceIds.size(), failed);
     }
 
-    /** Run one workspace's reconciliation immediately (tests and operational replays). */
+    /**
+     * Run one workspace's reconciliation immediately (tests and operational replays).
+     *
+     * <p>Returns an empty summary without touching Slack when the workspace has no ACTIVE Slack connection: every
+     * call would fail on token resolution anyway, and attempting them would spend the rate-limit budget (and its
+     * pacing sleep) plus log one warning per channel for a workspace that simply is not connected. Monitored
+     * channels normally disappear with the connection on uninstall; this covers the window in between.
+     */
     public SlackChannelHistorySyncService.WorkspaceSyncSummary syncWorkspaceNow(long workspaceId) {
+        if (connectionService.findActive(workspaceId, IntegrationKind.SLACK).isEmpty()) {
+            log.debug(
+                "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping reconciliation",
+                workspaceId
+            );
+            return SlackChannelHistorySyncService.WorkspaceSyncSummary.notConnected();
+        }
         if (properties.metadataEnabled()) {
             metadataRefresher.refreshWorkspace(workspaceId);
         }

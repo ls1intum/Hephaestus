@@ -304,5 +304,10 @@ public class SlackChannelHistorySyncService {
         long ingested,
         int requestsUsed,
         boolean budgetExhausted
-    ) {}
+    ) {
+        /** The workspace has no ACTIVE Slack connection, so nothing was attempted and no budget was spent. */
+        public static WorkspaceSyncSummary notConnected() {
+            return new WorkspaceSyncSummary(0, 0, 0, 0L, 0, false);
+        }
+    }
 }
