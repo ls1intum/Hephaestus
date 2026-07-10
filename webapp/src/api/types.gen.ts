@@ -876,7 +876,7 @@ export type SortObject = {
     unsorted?: boolean;
 };
 
-export type SlackWorkspacePreferences = {
+export type SlackUserWorkspacePreferences = {
     activeMonitoredChannelCount?: number;
     channelMessagesAllowed?: boolean;
     slackDisplayName?: string;
@@ -888,7 +888,7 @@ export type SlackWorkspacePreferences = {
 };
 
 export type SlackUserPreferences = {
-    workspaces: Array<SlackWorkspacePreferences>;
+    workspaces: Array<SlackUserWorkspacePreferences>;
 };
 
 /**
@@ -3510,21 +3510,21 @@ export type UpdateUserSettingsResponses = {
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
 
-export type ListSlackUserPreferencesData = {
+export type GetSlackUserPreferencesData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/user/slack/preferences';
 };
 
-export type ListSlackUserPreferencesResponses = {
+export type GetSlackUserPreferencesResponses = {
     /**
      * OK
      */
     200: SlackUserPreferences;
 };
 
-export type ListSlackUserPreferencesResponse = ListSlackUserPreferencesResponses[keyof ListSlackUserPreferencesResponses];
+export type GetSlackUserPreferencesResponse = GetSlackUserPreferencesResponses[keyof GetSlackUserPreferencesResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -4095,7 +4095,7 @@ export type SyncOutlineConnectionResponses = {
     200: unknown;
 };
 
-export type SendTestMessageData = {
+export type SendSlackTestMessageData = {
     /**
      * optional channel override; when blank, the persisted notification channel is used.
      */
@@ -4110,14 +4110,14 @@ export type SendTestMessageData = {
     url: '/workspaces/{workspaceSlug}/connections/slack/test-message';
 };
 
-export type SendTestMessageResponses = {
+export type SendSlackTestMessageResponses = {
     /**
      * OK
      */
     200: SlackTestMessageResponse;
 };
 
-export type SendTestMessageResponse = SendTestMessageResponses[keyof SendTestMessageResponses];
+export type SendSlackTestMessageResponse = SendSlackTestMessageResponses[keyof SendSlackTestMessageResponses];
 
 export type ReadData = {
     body?: never;
@@ -5597,26 +5597,6 @@ export type ListSlackChannelCandidatesResponses = {
 
 export type ListSlackChannelCandidatesResponse = ListSlackChannelCandidatesResponses[keyof ListSlackChannelCandidatesResponses];
 
-export type DeleteSlackChannelData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slackChannelId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
-};
-
-export type DeleteSlackChannelResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
 export type UpdateSlackChannelConsentData = {
     body: UpdateSlackChannelConsentRequest;
     path: {
@@ -5677,7 +5657,7 @@ export type UpdateSlackUserPreferencesResponses = {
     /**
      * OK
      */
-    200: SlackWorkspacePreferences;
+    200: SlackUserWorkspacePreferences;
 };
 
 export type UpdateSlackUserPreferencesResponse = UpdateSlackUserPreferencesResponses[keyof UpdateSlackUserPreferencesResponses];
