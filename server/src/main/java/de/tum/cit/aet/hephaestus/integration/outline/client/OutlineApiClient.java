@@ -245,6 +245,7 @@ public class OutlineApiClient {
         return Optional.of(
             new OutlineDocumentListResponse.Meta(
                 data.id(),
+                data.url(),
                 data.title(),
                 data.createdAt(),
                 data.updatedAt(),

@@ -337,4 +337,42 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     void documentsByReference_emptyInputReturnsEmpty() {
         assertThat(projector.documentsByReference(WORKSPACE_ID, List.of())).isEmpty();
     }
+
+    @Test
+    @DisplayName(
+        "documentsByReference resolves a full-URL reference even when a legacy webhook-synced row " +
+            "stored only the short Outline urlId as its slug (regression: PR/issue linked right after " +
+            "creation used to never resolve until the next full reconcile)"
+    )
+    void documentsByReference_legacyShortSlugRow_stillResolvesAgainstFullUrlReference() {
+        OutlineDocument legacyRow = liveDocument();
+        // Pre-fix webhook targeted-refresh rows stored the bare urlId, not the full "<title>-<urlId>" slug
+        // the full-reconcile path derives from the document tree.
+        legacyRow.setSlug("psUl8qCles");
+        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture())).thenReturn(
+            List.of(legacyRow)
+        );
+
+        List<ProjectedDocument> result = projector.documentsByReference(
+            WORKSPACE_ID,
+            List.of("https://wiki.example.com/doc/setup-guide-psUl8qCles")
+        );
+
+        assertThat(result).hasSize(1);
+        // The trailing "-<urlId>" segment is derived and included as a candidate token.
+        assertThat(refsCaptor.getValue()).contains("setup-guide-psUl8qCles", "psUl8qCles");
+    }
+
+    @Test
+    @DisplayName("documentsByReference does not derive a urlId candidate from a short trailing segment")
+    void documentsByReference_shortTrailingSegment_noUrlIdCandidateDerived() {
+        when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture())).thenReturn(
+            List.of()
+        );
+
+        projector.documentsByReference(WORKSPACE_ID, List.of("https://wiki.example.com/doc/design-doc"));
+
+        // "design-doc" splits to "design" / "doc" — "doc" is far too short to be mistaken for a urlId.
+        assertThat(refsCaptor.getValue()).doesNotContain("doc");
+    }
 }

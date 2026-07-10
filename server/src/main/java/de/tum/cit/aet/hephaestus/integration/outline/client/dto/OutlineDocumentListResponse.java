@@ -9,6 +9,9 @@ import org.jspecify.annotations.Nullable;
  * Response of Outline's {@code documents.list}: per-document metadata for a collection. {@code updatedAt} is
  * the incremental cursor the sync diffs against so an unchanged document is never re-exported;
  * {@code createdAt} and {@code collaboratorIds} feed the mirror's up-to-dateness and middle-editor columns.
+ * {@code url} (e.g. {@code /doc/<title-slug>-<urlId>}) is the same field the document tree exposes — the sync
+ * derives the mirrored slug from it so the webhook targeted-refresh path and the full-reconcile path store
+ * the identical, full slug for a document.
  *
  * <p>A tolerant reader — unknown fields are ignored. Raw wire record; stays inside the client package.
  */
@@ -17,6 +20,7 @@ public record OutlineDocumentListResponse(@Nullable List<Meta> data, @Nullable O
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Meta(
         @Nullable String id,
+        @Nullable String url,
         @Nullable String title,
         @Nullable Instant createdAt,
         @Nullable Instant updatedAt,

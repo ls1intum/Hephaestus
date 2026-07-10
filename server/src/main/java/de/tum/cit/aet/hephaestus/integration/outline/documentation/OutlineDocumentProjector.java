@@ -105,8 +105,21 @@ public class OutlineDocumentProjector implements DocumentProjection {
             String trimmed = ref.trim();
             tokens.add(trimmed);
             int lastSlash = trimmed.lastIndexOf('/');
+            String lastSegment =
+                lastSlash >= 0 && lastSlash < trimmed.length() - 1 ? trimmed.substring(lastSlash + 1) : trimmed;
             if (lastSlash >= 0 && lastSlash < trimmed.length() - 1) {
-                tokens.add(trimmed.substring(lastSlash + 1));
+                tokens.add(lastSegment);
+            }
+            // Defense-in-depth: a row synced before the webhook path stored the full slug may still carry
+            // only the short Outline urlId (e.g. "psUl8qCles") as its slug. A full-URL-shaped reference's
+            // trailing "-<urlId>" segment (e.g. "setup-guide-psUl8qCles") lets such a legacy row still
+            // resolve without waiting for the next full reconcile.
+            int lastDash = lastSegment.lastIndexOf('-');
+            if (lastDash >= 0 && lastDash < lastSegment.length() - 1) {
+                String urlIdCandidate = lastSegment.substring(lastDash + 1);
+                if (urlIdCandidate.length() > 8) {
+                    tokens.add(urlIdCandidate);
+                }
             }
         }
         if (tokens.isEmpty()) {

@@ -142,6 +142,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
             .map(id ->
                 new OutlineDocumentListResponse.Meta(
                     id,
+                    "/doc/" + id,
                     id,
                     T0,
                     id.equals(DOC_ONE) ? docOneUpdatedAt : docTwoUpdatedAt,

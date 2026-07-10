@@ -449,6 +449,58 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         assertThat(files.keySet()).containsExactly("inputs/context/outline/product/spec.md");
     }
 
+    // --- (e) unresolved documentation link visibility ---
+
+    @Test
+    void reviewPathWritesUnresolvedNoteWhenNoExtractedReferenceResolves() {
+        String body = "Design in https://wiki.example.com/doc/vanished-doc-a1b2c3.";
+        extractsReferences(body, "https://wiki.example.com/doc/vanished-doc-a1b2c3");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(List.of());
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String notePath = "inputs/context/outline/unresolved-references.md";
+        assertThat(files.keySet()).containsExactly(notePath);
+        String note = new String(files.get(notePath), StandardCharsets.UTF_8);
+        // No quarantine banner — this is pipeline-authored text, not a mirrored vendor document.
+        assertThat(note).doesNotContain("UNTRUSTED_EXTERNAL");
+        assertThat(note).contains("Pipeline note");
+        assertThat(note).contains("could not be materialised");
+        assertThat(note).contains("https://wiki.example.com/doc/vanished-doc-a1b2c3");
+    }
+
+    @Test
+    void reviewPathWritesNoUnresolvedNoteWhenEveryExtractedReferenceResolves() {
+        String body =
+            "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3 and https://wiki.example.com/doc/old-doc-z9";
+        extractsReferences(
+            body,
+            "https://wiki.example.com/doc/onboarding-guide-a1b2c3",
+            "https://wiki.example.com/doc/old-doc-z9"
+        );
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(
+                doc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome to the team."),
+                tombstone("Engineering", "old-doc", "Old Doc")
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        assertThat(files.keySet()).doesNotContain("inputs/context/outline/unresolved-references.md");
+    }
+
+    @Test
+    void reviewPathWritesNoUnresolvedNoteWhenNoReferencesWereExtracted() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest("A PR body with no wiki links at all."), files);
+
+        assertThat(files).isEmpty();
+        verify(projection, never()).documentsByReference(anyLong(), any());
+    }
+
     // --- (d) no-op when there is nothing to materialise ---
 
     @Test

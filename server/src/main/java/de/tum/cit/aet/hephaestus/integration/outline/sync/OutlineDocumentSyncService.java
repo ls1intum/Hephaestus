@@ -493,7 +493,7 @@ public class OutlineDocumentSyncService {
             node != null && node.parentId() != null ? node.parentId() : (meta == null ? null : meta.parentDocumentId())
         );
         doc.setTitle(node != null && node.title() != null ? node.title() : (meta == null ? null : meta.title()));
-        doc.setSlug(node != null && node.slug() != null ? node.slug() : (meta == null ? null : meta.urlId()));
+        doc.setSlug(resolveSlug(node, meta));
         if (unchanged) {
             // Metadata may have shifted (renamed/moved) but the body is current — do not re-export.
             documentRepository.save(doc);
@@ -676,6 +676,28 @@ public class OutlineDocumentSyncService {
             out.add(new FlatNode(node.id(), node.title(), slugFromUrl(node.url()), parentId));
             flatten(node.children(), node.id(), out);
         }
+    }
+
+    /**
+     * The document's mirrored slug. The tree node's slug (already derived via {@link #slugFromUrl}) takes
+     * precedence when the full-reconcile path supplied one; otherwise the webhook targeted-refresh /
+     * catch-up paths (node {@code null}) derive the identical full-URL-trailing-segment slug from the
+     * metadata's {@code url}, falling back to the short {@code urlId} only when Outline omits {@code url}.
+     * Keeping both paths' slug shape identical is what lets a reference extracted from a full Outline URL
+     * (e.g. {@code setup-guide-psUl8qCles}) resolve a document regardless of which path last wrote the row.
+     */
+    private static @Nullable String resolveSlug(
+        @Nullable FlatNode node,
+        OutlineDocumentListResponse.@Nullable Meta meta
+    ) {
+        if (node != null && node.slug() != null) {
+            return node.slug();
+        }
+        if (meta == null) {
+            return null;
+        }
+        String fromUrl = slugFromUrl(meta.url());
+        return fromUrl != null ? fromUrl : meta.urlId();
     }
 
     /** The document slug is the last path segment of its Outline {@code url} (e.g. {@code /doc/<slug>}). */

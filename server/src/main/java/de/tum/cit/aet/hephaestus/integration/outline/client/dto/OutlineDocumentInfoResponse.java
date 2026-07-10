@@ -17,6 +17,7 @@ public record OutlineDocumentInfoResponse(@Nullable Data data) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Data(
         @Nullable String id,
+        @Nullable String url,
         @Nullable String title,
         @Nullable Instant createdAt,
         @Nullable Instant updatedAt,

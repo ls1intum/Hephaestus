@@ -138,7 +138,35 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     }
 
     private static OutlineDocumentListResponse.Meta meta(String id, Instant updatedAt) {
-        return new OutlineDocumentListResponse.Meta(id, id, T1, updatedAt, id, null, COLLECTION_ID, null, null, null);
+        return new OutlineDocumentListResponse.Meta(
+            id,
+            null,
+            id,
+            T1,
+            updatedAt,
+            id,
+            null,
+            COLLECTION_ID,
+            null,
+            null,
+            null
+        );
+    }
+
+    private static OutlineDocumentListResponse.Meta metaWithUrl(String id, Instant updatedAt, String url) {
+        return new OutlineDocumentListResponse.Meta(
+            id,
+            url,
+            id,
+            T1,
+            updatedAt,
+            id,
+            null,
+            COLLECTION_ID,
+            null,
+            null,
+            null
+        );
     }
 
     private OutlineDocument mirrored(String documentId) {
@@ -233,7 +261,19 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         ).thenReturn(Optional.empty());
         when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-x")).thenReturn(
             Optional.of(
-                new OutlineDocumentListResponse.Meta("doc-x", "X", T1, T1, "doc-x", null, "other-col", null, null, null)
+                new OutlineDocumentListResponse.Meta(
+                    "doc-x",
+                    null,
+                    "X",
+                    T1,
+                    T1,
+                    "doc-x",
+                    null,
+                    "other-col",
+                    null,
+                    null,
+                    null
+                )
             )
         );
         when(
@@ -264,6 +304,49 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
                 d -> "doc-1".equals(d.getDocumentId()) && "# fresh".equals(d.getBodyMarkdown())
             )
         );
+    }
+
+    @Test
+    void refreshDocument_storesTheFullUrlSlug_matchingTheFullReconcilePath() {
+        // Regression: the webhook targeted-refresh path used to store only the bare urlId as the slug
+        // while the full-reconcile path stores the full "<title-slug>-<urlId>" trailing URL segment — a
+        // document linked from a PR/issue right after creation never resolved until the next full sync.
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.empty());
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(
+            Optional.of(metaWithUrl("doc-1", T2, "/doc/setup-guide-psUl8qCles"))
+        );
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
+
+        verify(documentRepository).save(
+            org.mockito.ArgumentMatchers.argThat(d -> "setup-guide-psUl8qCles".equals(d.getSlug()))
+        );
+    }
+
+    @Test
+    void refreshDocument_fallsBackToUrlId_whenMetaHasNoUrl() {
+        // Outline's documents.info always carries `url` in practice, but the DTO field is nullable — a
+        // tolerant reader must still produce a usable (if short) slug rather than null.
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.empty());
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(
+            Optional.of(meta("doc-1", T2)) // url is null; urlId is "doc-1"
+        );
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
+
+        verify(documentRepository).save(org.mockito.ArgumentMatchers.argThat(d -> "doc-1".equals(d.getSlug())));
     }
 
     @Test
@@ -309,6 +392,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             List.of(
                 new OutlineDocumentListResponse.Meta(
                     "doc-1",
+                    null,
                     "Doc 1",
                     T1,
                     T2, // upstream changed → re-export
