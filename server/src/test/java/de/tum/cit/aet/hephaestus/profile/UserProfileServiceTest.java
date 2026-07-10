@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceContributionActivityService;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -41,8 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * Unit tests for UserProfileService.
  *
  * <p>Tests verify the CQRS pattern: ActivityEvent is the source of truth for
- * what activity exists (same as leaderboard), with entity details hydrated
- * from integration.scm tables.
+ * what activity exists, with entity details hydrated from integration.scm tables.
  */
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
@@ -76,9 +74,6 @@ class UserProfileServiceTest {
     private ProfileReviewActivityAssembler reviewActivityAssembler;
 
     @Mock
-    private WorkspaceMembershipService workspaceMembershipService;
-
-    @Mock
     private WorkspaceContributionActivityService workspaceContributionActivityService;
 
     @Mock
@@ -88,7 +83,6 @@ class UserProfileServiceTest {
     private ActivityEventRepository activityEventRepository;
 
     private static final ProfileActivityStatsDTO STATS_STUB = new ProfileActivityStatsDTO(
-        0,
         0,
         0,
         0,
@@ -115,7 +109,6 @@ class UserProfileServiceTest {
             pullRequestReviewCommentRepository,
             issueCommentRepository,
             reviewActivityAssembler,
-            workspaceMembershipService,
             workspaceContributionActivityService,
             profileActivityQueryService,
             activityEventRepository
@@ -139,7 +132,7 @@ class UserProfileServiceTest {
             when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // ActivityEvent is the source of truth
-            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW, 15.0);
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW);
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
@@ -153,7 +146,7 @@ class UserProfileServiceTest {
             when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L))).thenReturn(List.of(review));
 
             // Mock assembler
-            when(reviewActivityAssembler.assemble(eq(review), eq(15))).thenReturn(createProfileReviewDTO(400L, 15));
+            when(reviewActivityAssembler.assemble(eq(review))).thenReturn(createProfileReviewDTO(400L, 15));
 
             Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
                 USER_LOGIN,
@@ -177,8 +170,8 @@ class UserProfileServiceTest {
             // Verify entity hydrated from integration.scm
             verify(pullRequestReviewRepository).findAllByIdWithRelations(Set.of(400L));
 
-            // Verify assembler was called with XP from ActivityEvent
-            verify(reviewActivityAssembler).assemble(eq(review), eq(15));
+            // Verify assembler was called with the hydrated review entity
+            verify(reviewActivityAssembler).assemble(eq(review));
         }
 
         @Test
@@ -235,15 +228,9 @@ class UserProfileServiceTest {
             when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // ActivityEvents for 2 reviews + 1 comment
-            ActivityEvent event1 = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW, 10.0);
-            ActivityEvent event2 = createActivityEvent(WORKSPACE_ID, USER_ID, 401L, ActivityTargetType.REVIEW, 20.0);
-            ActivityEvent event3 = createActivityEvent(
-                WORKSPACE_ID,
-                USER_ID,
-                500L,
-                ActivityTargetType.ISSUE_COMMENT,
-                5.0
-            );
+            ActivityEvent event1 = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW);
+            ActivityEvent event2 = createActivityEvent(WORKSPACE_ID, USER_ID, 401L, ActivityTargetType.REVIEW);
+            ActivityEvent event3 = createActivityEvent(WORKSPACE_ID, USER_ID, 500L, ActivityTargetType.ISSUE_COMMENT);
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
@@ -260,9 +247,9 @@ class UserProfileServiceTest {
             when(issueCommentRepository.findAllByIdWithRelations(Set.of(500L))).thenReturn(List.of(comment));
 
             // Mock assembler returns
-            when(reviewActivityAssembler.assemble(eq(review1), eq(10))).thenReturn(createProfileReviewDTO(400L, 10));
-            when(reviewActivityAssembler.assemble(eq(review2), eq(20))).thenReturn(createProfileReviewDTO(401L, 20));
-            when(reviewActivityAssembler.assemble(eq(comment), eq(5))).thenReturn(createProfileReviewDTO(500L, 5));
+            when(reviewActivityAssembler.assemble(eq(review1))).thenReturn(createProfileReviewDTO(400L, 10));
+            when(reviewActivityAssembler.assemble(eq(review2))).thenReturn(createProfileReviewDTO(401L, 20));
+            when(reviewActivityAssembler.assemble(eq(comment))).thenReturn(createProfileReviewDTO(500L, 5));
 
             service.getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, null);
 
@@ -271,10 +258,10 @@ class UserProfileServiceTest {
             verifyNoInteractions(pullRequestReviewCommentRepository);
             verify(issueCommentRepository, times(1)).findAllByIdWithRelations(any());
 
-            // Verify each item assembled with its correct XP from ActivityEvent
-            verify(reviewActivityAssembler).assemble(eq(review1), eq(10));
-            verify(reviewActivityAssembler).assemble(eq(review2), eq(20));
-            verify(reviewActivityAssembler).assemble(eq(comment), eq(5));
+            // Verify each item assembled from its hydrated entity
+            verify(reviewActivityAssembler).assemble(eq(review1));
+            verify(reviewActivityAssembler).assemble(eq(review2));
+            verify(reviewActivityAssembler).assemble(eq(comment));
         }
 
         @Test
@@ -288,7 +275,7 @@ class UserProfileServiceTest {
             when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // ActivityEvent exists but entity was deleted
-            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 999L, ActivityTargetType.REVIEW, 15.0);
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 999L, ActivityTargetType.REVIEW);
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
@@ -331,13 +318,7 @@ class UserProfileServiceTest {
             ).thenReturn(List.of());
             when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
-            ActivityEvent event = createActivityEvent(
-                WORKSPACE_ID,
-                USER_ID,
-                600L,
-                ActivityTargetType.REVIEW_COMMENT,
-                0.0
-            );
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 600L, ActivityTargetType.REVIEW_COMMENT);
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
@@ -350,9 +331,7 @@ class UserProfileServiceTest {
             when(pullRequestReviewCommentRepository.findAllByIdWithRelations(Set.of(600L))).thenReturn(
                 List.of(reviewComment)
             );
-            when(reviewActivityAssembler.assemble(eq(reviewComment), eq(0))).thenReturn(
-                createProfileReviewDTO(600L, 0)
-            );
+            when(reviewActivityAssembler.assemble(eq(reviewComment))).thenReturn(createProfileReviewDTO(600L, 0));
             Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
                 USER_LOGIN,
                 WORKSPACE_ID,
@@ -365,7 +344,7 @@ class UserProfileServiceTest {
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).hasSize(1);
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
-            verify(reviewActivityAssembler).assemble(eq(reviewComment), eq(0));
+            verify(reviewActivityAssembler).assemble(eq(reviewComment));
         }
 
         @Test
@@ -381,13 +360,7 @@ class UserProfileServiceTest {
             ).thenReturn(List.of());
             when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
-            ActivityEvent event = createActivityEvent(
-                WORKSPACE_ID,
-                USER_ID,
-                600L,
-                ActivityTargetType.REVIEW_COMMENT,
-                0.0
-            );
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 600L, ActivityTargetType.REVIEW_COMMENT);
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
@@ -413,7 +386,7 @@ class UserProfileServiceTest {
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(600L));
-            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment));
         }
 
         @Test
@@ -429,13 +402,7 @@ class UserProfileServiceTest {
             ).thenReturn(List.of());
             when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
-            ActivityEvent event = createActivityEvent(
-                WORKSPACE_ID,
-                USER_ID,
-                500L,
-                ActivityTargetType.ISSUE_COMMENT,
-                0.0
-            );
+            ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 500L, ActivityTargetType.ISSUE_COMMENT);
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
                     eq(WORKSPACE_ID),
@@ -459,7 +426,7 @@ class UserProfileServiceTest {
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
             verify(issueCommentRepository).findAllByIdWithRelations(Set.of(500L));
-            verify(reviewActivityAssembler, never()).assemble(eq(comment), anyInt());
+            verify(reviewActivityAssembler, never()).assemble(eq(comment));
         }
 
         @Test
@@ -480,15 +447,13 @@ class UserProfileServiceTest {
                 WORKSPACE_ID,
                 USER_ID,
                 700L,
-                ActivityTargetType.ISSUE_COMMENT,
-                0.0
+                ActivityTargetType.ISSUE_COMMENT
             );
             ActivityEvent reviewCommentEvent = createActivityEvent(
                 WORKSPACE_ID,
                 USER_ID,
                 700L,
-                ActivityTargetType.REVIEW_COMMENT,
-                0.0
+                ActivityTargetType.REVIEW_COMMENT
             );
             when(
                 activityEventRepository.findProfileActivityByActorInTimeframe(
@@ -505,7 +470,7 @@ class UserProfileServiceTest {
             );
 
             ProfileReviewActivityDTO issueCommentDto = createProfileReviewDTO(700L, 0);
-            when(reviewActivityAssembler.assemble(eq(issueComment), eq(0))).thenReturn(issueCommentDto);
+            when(reviewActivityAssembler.assemble(eq(issueComment))).thenReturn(issueCommentDto);
 
             Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
                 USER_LOGIN,
@@ -520,8 +485,8 @@ class UserProfileServiceTest {
             assertThat(result.get().reviewActivity()).hasSize(1);
             verify(issueCommentRepository).findAllByIdWithRelations(Set.of(700L));
             verify(pullRequestReviewCommentRepository).findAllByIdWithRelations(Set.of(700L));
-            verify(reviewActivityAssembler).assemble(eq(issueComment), eq(0));
-            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment), eq(0));
+            verify(reviewActivityAssembler).assemble(eq(issueComment));
+            verify(reviewActivityAssembler, never()).assemble(eq(reviewComment));
         }
     }
 
@@ -666,7 +631,7 @@ class UserProfileServiceTest {
         }
 
         private ProfileActivityStatsDTO sampleStats() {
-            return new ProfileActivityStatsDTO(42, 3, 2, 1, 0, 5, 0, 0, 7, 1, 0, 0, 0);
+            return new ProfileActivityStatsDTO(3, 2, 1, 0, 5, 0, 0, 7, 1, 0, 0, 0);
         }
     }
 
@@ -752,13 +717,11 @@ class UserProfileServiceTest {
         Long workspaceId,
         Long actorId,
         Long targetId,
-        ActivityTargetType targetType,
-        Double xp
+        ActivityTargetType targetType
     ) {
         return ActivityEvent.builder()
             .targetId(targetId)
             .targetType(targetType.getValue())
-            .xp(xp)
             .occurredAt(Instant.now())
             .eventType(
                 targetType == ActivityTargetType.REVIEW
@@ -790,7 +753,6 @@ class UserProfileServiceTest {
             null,
             null,
             "https://github.com/test/review/" + id,
-            score,
             Instant.now()
         );
     }

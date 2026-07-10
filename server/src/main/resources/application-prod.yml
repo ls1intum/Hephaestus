@@ -69,14 +69,12 @@ hephaestus:
     webapp:
         url: ${APPLICATION_HOST_URL}
 
-    leaderboard:
-        schedule:
-            day: ${LEADERBOARD_SCHEDULE_DAY:2}
-            time: ${LEADERBOARD_SCHEDULE_TIME:9}
-        notification:
-            # Per-workspace channel + team filter live on the Slack Connection's SlackConfig
-            # (set via the connection admin API); this flag is the global kill-switch.
-            enabled: ${LEADERBOARD_NOTIFICATION_ENABLED:true}
+    practices:
+        # Day/time at which a workspace's weekly practice review recency window closes.
+        review-cycle:
+            day: ${REVIEW_CYCLE_DAY:2}
+            time: ${REVIEW_CYCLE_TIME:9}
+            zone: ${REVIEW_CYCLE_ZONE:Europe/Berlin}
 
     workspace:
         init-default: false
@@ -94,8 +92,8 @@ hephaestus:
     # SCM + SLACK INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no global bot token. Slack is outbound-only (leaderboard
-    # digest + test message); no inbound webhook secret is required.
+    # `connection` table — there is no global bot token. Slack is outbound-only (test
+    # message); no inbound webhook secret is required.
     # ═══════════════════════════════════════════════════════════════════════════
     integration:
         github:

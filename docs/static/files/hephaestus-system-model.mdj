@@ -1074,7 +1074,7 @@
 											"top": 295,
 											"width": 102.99497985839844,
 											"height": 14,
-											"text": "leaguePoints",
+											"text": "practiceVisibility",
 											"horizontalAlignment": 0
 										}
 									],
@@ -2107,7 +2107,7 @@
 										"$ref": "AAAAAAGQ34bfRh8KOtY="
 									},
 									"edgePosition": 2,
-									"text": "leaderboards"
+									"text": "practice reports"
 								},
 								{
 									"_type": "EdgeLabelView",
@@ -10557,7 +10557,7 @@
 								"_parent": {
 									"$ref": "AAAAAAGQ34bfRh8G3Eo="
 								},
-								"name": "leaderboards",
+								"name": "practice reports",
 								"reference": {
 									"$ref": "AAAAAAGQ3364/P+ttkE="
 								},
@@ -11037,7 +11037,7 @@
 							"_parent": {
 								"$ref": "AAAAAAGQ34B7ZABFjJ0="
 							},
-							"name": "leaguePoints",
+							"name": "practiceVisibility",
 							"type": ""
 						}
 					]
@@ -15450,7 +15450,7 @@
 											"top": 982,
 											"width": 227,
 											"height": 14,
-											"text": "Receive Leaderboard Notification"
+											"text": "Receive Mentor Notification"
 										},
 										{
 											"_type": "LabelView",
@@ -15672,7 +15672,7 @@
 											"top": 858,
 											"width": 163,
 											"height": 14,
-											"text": "Participate in Challenge"
+											"text": "Reflect on Practices"
 										},
 										{
 											"_type": "LabelView",
@@ -17501,7 +17501,7 @@
 					"_parent": {
 						"$ref": "AAAAAAGUellFaFJIMVY="
 					},
-					"name": "Receive Leaderboard Notification"
+					"name": "Receive Mentor Notification"
 				},
 				{
 					"_type": "UMLUseCase",
@@ -17509,7 +17509,7 @@
 					"_parent": {
 						"$ref": "AAAAAAGUellFaFJIMVY="
 					},
-					"name": "Participate in Challenge"
+					"name": "Reflect on Practices"
 				},
 				{
 					"_type": "UMLUseCaseSubject",
@@ -23053,7 +23053,7 @@
 											"top": 815,
 											"width": 167,
 											"height": 14,
-											"text": "Update leaderboard",
+											"text": "Update practice overview",
 											"wordWrap": true
 										},
 										{
@@ -23173,7 +23173,7 @@
 										"$ref": "AAAAAAGU2TGCZSM2CzA="
 									},
 									"edgePosition": 1,
-									"text": "[affects leaderboard]"
+									"text": "[affects practice overview]"
 								},
 								{
 									"_type": "EdgeLabelView",
@@ -23384,7 +23384,7 @@
 											"top": 991,
 											"width": 121.88409423828125,
 											"height": 14,
-											"text": "View leaderboard"
+											"text": "View my practices"
 										},
 										{
 											"_type": "LabelView",
@@ -24192,7 +24192,7 @@
 					"_parent": {
 						"$ref": "AAAAAAGUnpiumV28+Ck="
 					},
-					"name": "[affects leaderboard]",
+					"name": "[affects practice overview]",
 					"source": {
 						"$ref": "AAAAAAGU2S/IGiLfuF8="
 					},
@@ -24297,7 +24297,7 @@
 							"_parent": {
 								"$ref": "AAAAAAGUnpj92F4Vdf8="
 							},
-							"name": "View leaderboard"
+							"name": "View my practices"
 						},
 						{
 							"_type": "UMLActivityFinalNode",
@@ -24342,7 +24342,7 @@
 							"_parent": {
 								"$ref": "AAAAAAGUnplkAl4fBaU="
 							},
-							"name": "Update leaderboard"
+							"name": "Update practice overview"
 						}
 					]
 				},
@@ -25162,7 +25162,7 @@
 											"top": 375,
 											"width": 102.99497985839844,
 											"height": 14,
-											"text": "leaguePoints",
+											"text": "practiceVisibility",
 											"horizontalAlignment": 0
 										}
 									],
@@ -30330,7 +30330,7 @@
 								"_parent": {
 									"$ref": "AAAAAAGUshcOV5EO/A8="
 								},
-								"name": "leaderboards",
+								"name": "practice reports",
 								"reference": {
 									"$ref": "AAAAAAGUshcOV5EKcHY="
 								},
@@ -30810,7 +30810,7 @@
 							"_parent": {
 								"$ref": "AAAAAAGUshcOV5EnUzc="
 							},
-							"name": "leaguePoints",
+							"name": "practiceVisibility",
 							"type": ""
 						}
 					]

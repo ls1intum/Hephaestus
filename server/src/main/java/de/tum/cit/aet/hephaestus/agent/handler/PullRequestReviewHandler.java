@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.file.Path;
@@ -302,7 +303,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             pullRequestNumber +
             " in " +
             repoName +
-            ". Read the context files, then persist every justified finding via the report_finding tool. " +
+            ". Read the context files, then persist every justified observation via the report_observation tool. " +
             "Follow " +
             WorkspaceAbi.ORCHESTRATOR_PATH +
             " for the schema and rules.";
@@ -323,7 +324,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 parsed.discarded()
             );
         }
-        if (parsed.validFindings().isEmpty()) {
+        if (parsed.validObservations().isEmpty()) {
             throw new JobDeliveryException(
                 "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
             );
@@ -342,15 +343,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // credential even when the model abstains, the precompute crashes, or the clone is checked
         // out at the merge base (so a working-tree grep finds nothing). The synthetic PRESENT/BAD
         // findings flow through the normal persist+compose+deliver path and force the green→red flip.
-        List<PracticeDetectionResultParser.ValidatedFinding> secretFindings = scanForSecrets(
+        List<PracticeDetectionResultParser.ValidatedObservation> secretFindings = scanForSecrets(
             unifiedDiff,
-            parsed.validFindings()
+            parsed.validObservations()
         );
 
-        boolean allNotApplicable = parsed
-            .validFindings()
+        // Audience-aware stale-diff guard: evaluate NA-ness over AUTHOR-audience findings only. A reviewer job
+        // whose reviewer legitimately left nothing substantive returns all-NA reviewer-audience findings on a
+        // non-empty diff — that is NOT a stale diff, so it must not throw. With no author-audience findings at
+        // all (e.g. a pure ReviewSubmitted job), skip the guard entirely.
+        List<PracticeDetectionResultParser.ValidatedObservation> authorAudienceValid = parsed
+            .validObservations()
             .stream()
-            .allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
+            .filter(f -> !ReviewerAudiencePractices.isReviewerAudience(f.practiceSlug()))
+            .toList();
+        boolean allNotApplicable =
+            !authorAudienceValid.isEmpty() &&
+            authorAudienceValid.stream().allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
         if (allNotApplicable && secretFindings.isEmpty()) {
             boolean hasDiffContent = !diffFiles.isEmpty();
             if (hasDiffContent) {
@@ -364,13 +373,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
 
-        var scopedFindings = new ArrayList<>(filterByDiffScope(parsed.validFindings(), diffFiles));
-        if (scopedFindings.size() < parsed.validFindings().size()) {
+        var scopedFindings = new ArrayList<>(filterByDiffScope(parsed.validObservations(), diffFiles));
+        if (scopedFindings.size() < parsed.validObservations().size()) {
             log.info(
                 "Diff scope filter removed {} out-of-scope findings: jobId={}, before={}, after={}",
-                parsed.validFindings().size() - scopedFindings.size(),
+                parsed.validObservations().size() - scopedFindings.size(),
                 job.getId(),
-                parsed.validFindings().size(),
+                parsed.validObservations().size(),
                 scopedFindings.size()
             );
         }
@@ -389,7 +398,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 "All findings were filtered by diff scope: jobId=" +
                     job.getId() +
                     ", before=" +
-                    parsed.validFindings().size() +
+                    parsed.validObservations().size() +
                     ", diffFiles=" +
                     diffFiles.size()
             );
@@ -428,7 +437,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // the key downstream (which could drift). Done BEFORE the reaction filter so an escalated copy inherits
         // the key too. A finding absent from the map (unknown slug — never persisted, never delivered) is left
         // unstamped; it cannot reach compose() anyway since the filter only re-emits what was passed in.
-        Map<PracticeDetectionResultParser.ValidatedFinding, String> findingFingerprints = result.findingFingerprints();
+        Map<PracticeDetectionResultParser.ValidatedObservation, String> findingFingerprints =
+            result.findingFingerprints();
         for (int i = 0; i < scopedFindings.size(); i++) {
             String key = findingFingerprints.get(scopedFindings.get(i));
             if (key != null) {
@@ -436,18 +446,47 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
 
+        // Reviewer-craft firewall (ADR 0021 C2): deliver() PERSISTED every finding — reviewer observations MUST
+        // land so a reviewer's own dashboard/mentor sees them — but ONLY author-audience findings may post back
+        // to the AUTHOR's PR. Reviewer-audience findings (leaves-useful / reviews-respectfully / reviews-
+        // substantively) are persisted-only: never an inline note, summary line, or feedback on the author's
+        // artifact. Partition here, BEFORE the reaction filter / compose / feedback, so all three see only the
+        // author-audience subset. A ReviewSubmitted job is 100% reviewer-audience, so this subset is empty and
+        // nothing posts.
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverableFindings = scopedFindings
+            .stream()
+            .filter(f -> !ReviewerAudiencePractices.isReviewerAudience(f.practiceSlug()))
+            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (deliverableFindings.isEmpty() && !scopedFindings.isEmpty()) {
+            // Persisted-only run (the common ReviewSubmitted case): reviewer observations landed, but there is
+            // nothing author-audience to post on the author's PR. A SUCCESS, not a delivery failure.
+            log.info(
+                "All {} finding(s) are reviewer-audience — persisted only, nothing posts to the author's PR: jobId={}",
+                scopedFindings.size(),
+                job.getId()
+            );
+            return;
+        }
+
         // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
         // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an ADDRESSED-but-recurring
         // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
         // deliver() because recurrence_key is persisted there; before compose() so the drop reaches both the
-        // summary and the inline notes.
-        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, scopedFindings);
-        List<PracticeDetectionResultParser.ValidatedFinding> deliverable = reactions.deliverable();
-        if (deliverable.isEmpty() && !scopedFindings.isEmpty()) {
+        // summary and the inline notes. Fed ONLY the author-audience deliverable subset (firewall above).
+        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(
+            job,
+            deliverableFindings
+        );
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactions.deliverable();
+        if (deliverable.isEmpty() && !deliverableFindings.isEmpty()) {
             // Everything this run was already reacted away — a SUCCESS (the student told us to stop nagging),
             // not a delivery failure. The SUPPRESSED ledger rows are written; the prior edit-in-place summary
             // stays as-is. Nothing new to post.
-            log.info("All {} findings suppressed by prior reactions: jobId={}", scopedFindings.size(), job.getId());
+            log.info(
+                "All {} deliverable findings suppressed by prior reactions: jobId={}",
+                deliverableFindings.size(),
+                job.getId()
+            );
             return;
         }
 
@@ -514,9 +553,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * {@code hardcoded-secrets} PRESENT/BAD finding. Hits already covered by an LLM-produced
      * hardcoded-secrets finding (same matched token already quoted) are skipped to avoid double-posting.
      */
-    private List<PracticeDetectionResultParser.ValidatedFinding> scanForSecrets(
+    private List<PracticeDetectionResultParser.ValidatedObservation> scanForSecrets(
         @Nullable String diff,
-        List<PracticeDetectionResultParser.ValidatedFinding> existing
+        List<PracticeDetectionResultParser.ValidatedObservation> existing
     ) {
         List<SecretDiffScanner.SecretHit> hits = secretDiffScanner.scan(diff);
         if (hits.isEmpty()) return List.of();
@@ -554,7 +593,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
 
-        List<PracticeDetectionResultParser.ValidatedFinding> out = new ArrayList<>();
+        List<PracticeDetectionResultParser.ValidatedObservation> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (SecretDiffScanner.SecretHit hit : hits) {
             String key = hit.path() + ":" + hit.newLine() + ":" + hit.ruleId();
@@ -566,7 +605,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return out;
     }
 
-    private PracticeDetectionResultParser.ValidatedFinding toSecretFinding(SecretDiffScanner.SecretHit hit) {
+    private PracticeDetectionResultParser.ValidatedObservation toSecretFinding(SecretDiffScanner.SecretHit hit) {
         ObjectNode evidence = objectMapper.createObjectNode();
         ArrayNode locations = evidence.putArray("locations");
         ObjectNode location = locations.addObject();
@@ -585,7 +624,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String guidance =
             "Remove the literal value, rotate the credential immediately, and load it at runtime from an environment variable or a secrets manager instead of hardcoding it.";
 
-        return new PracticeDetectionResultParser.ValidatedFinding(
+        return new PracticeDetectionResultParser.ValidatedObservation(
             "hardcoded-secrets",
             "Hardcoded secret on a changed line",
             Presence.PRESENT,
@@ -672,12 +711,12 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     /**
      * Filter findings to only include those whose evidence locations reference files in the diff.
      */
-    static List<PracticeDetectionResultParser.ValidatedFinding> filterByDiffScope(
-        List<PracticeDetectionResultParser.ValidatedFinding> findings,
+    static List<PracticeDetectionResultParser.ValidatedObservation> filterByDiffScope(
+        List<PracticeDetectionResultParser.ValidatedObservation> findings,
         Set<String> diffFiles
     ) {
         if (diffFiles.isEmpty()) return findings;
-        List<PracticeDetectionResultParser.ValidatedFinding> filtered = new ArrayList<>();
+        List<PracticeDetectionResultParser.ValidatedObservation> filtered = new ArrayList<>();
         for (var finding : findings) {
             // Process/metadata-level practices are not diff-anchored — never drop them on a location mismatch.
             if (METADATA_LEVEL_PRACTICES.contains(finding.practiceSlug())) {

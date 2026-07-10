@@ -1,4 +1,4 @@
-// Pi SDK runner — embedded in-process; persists findings via custom tools.
+// Pi SDK runner — embedded in-process; persists observations via custom tools.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
@@ -11,7 +11,7 @@ import {
     defineTool,
 } from "@earendil-works/pi-coding-agent";
 
-import { dedupeKeyForFinding, normalizeFinding } from "./pi-finding-normalize.mjs";
+import { dedupeKeyForObservation, normalizeObservation } from "./pi-observation-normalize.mjs";
 
 const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
@@ -58,8 +58,8 @@ const usageTotals = {
 };
 const runnerDebug = { attempts: [], usageTotals };
 const reviewState = {
-    findings: [],
-    findingKeys: [],
+    observations: [],
+    observationKeys: [],
 };
 const presenceSchema = { type: "string", enum: ["PRESENT", "ABSENT", "NOT_APPLICABLE"] };
 const assessmentSchema = { type: "string", enum: ["GOOD", "BAD"] };
@@ -102,8 +102,8 @@ const diffNoteSchema = {
 };
 // `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
 // conditional cleanly across all validators the SDK may use, so we keep it out of `required`
-// here and enforce the (presence, assessment) coupling in normalizeFinding().
-const findingSchema = {
+// here and enforce the (presence, assessment) coupling in normalizeObservation().
+const observationSchema = {
     type: "object",
     additionalProperties: false,
     required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning", "guidance"],
@@ -114,13 +114,16 @@ const findingSchema = {
         assessment: assessmentSchema,
         severity: severitySchema,
         // Upper bound is 100, not 1, so a model emitting percentage-style confidence (e.g. 85)
-        // is not rejected at the SDK boundary; normalizeFinding rescales (1,100] -> /100 to
+        // is not rejected at the SDK boundary; normalizeObservation rescales (1,100] -> /100 to
         // mirror the Java consumer PracticeDetectionResultParser.parseConfidence.
         confidence: { type: "number", minimum: 0, maximum: 100 },
         evidence: evidenceSchema,
         reasoning: { type: "string", minLength: 1 },
         guidance: { type: "string", minLength: 1 },
         suggestedDiffNotes: { type: "array", items: diffNoteSchema },
+        // Optional: for reviewer-audience practices (multi-reviewer PRs), the exact login of the reviewer
+        // this observation is about, so the server attributes it to that reviewer instead of the PR author.
+        subjectLogin: { type: "string" },
     },
 };
 
@@ -133,7 +136,7 @@ function persistRunnerDebug() {
 function persistReviewState() {
     writeFileSync(
         REVIEW_STATE_PATH,
-        JSON.stringify({ findings: reviewState.findings }, null, 2),
+        JSON.stringify({ observations: reviewState.observations }, null, 2),
     );
 }
 
@@ -148,7 +151,7 @@ function redact(text) {
 }
 
 
-function isValidFinding(f) {
+function isValidObservation(f) {
     if (!f || typeof f !== "object") return false;
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
     if (typeof f.title !== "string" || !f.title.trim()) return false;
@@ -161,13 +164,13 @@ function isValidFinding(f) {
     return true;
 }
 
-function isValidFindingsPayload(p) {
+function isValidObservationsPayload(p) {
     return (
         p &&
         typeof p === "object" &&
-        Array.isArray(p.findings) &&
-        p.findings.length > 0 &&
-        p.findings.some(isValidFinding)
+        Array.isArray(p.observations) &&
+        p.observations.length > 0 &&
+        p.observations.some(isValidObservation)
     );
 }
 
@@ -189,12 +192,12 @@ function checkResultFile() {
     if (!existsSync(RESULT_PATH)) return false;
     try {
         const data = lenientJsonParse(readFileSync(RESULT_PATH, "utf-8"));
-        const valid = isValidFindingsPayload(data);
+        const valid = isValidObservationsPayload(data);
         if (!valid) {
-            const hasFindings = Array.isArray(data?.findings);
-            const count = hasFindings ? data.findings.length : 0;
-            const validCount = hasFindings ? data.findings.filter(isValidFinding).length : 0;
-            console.error(`[pi-runner] result.json validation failed: findings=${count}, valid=${validCount}`);
+            const hasObservations = Array.isArray(data?.observations);
+            const count = hasObservations ? data.observations.length : 0;
+            const validCount = hasObservations ? data.observations.filter(isValidObservation).length : 0;
+            console.error(`[pi-runner] result.json validation failed: observations=${count}, valid=${validCount}`);
         }
         return valid;
     } catch (e) {
@@ -204,30 +207,30 @@ function checkResultFile() {
 }
 
 function maybeWriteResultFile() {
-    if (reviewState.findings.length === 0) return false;
-    writeFileSync(RESULT_PATH, JSON.stringify({ findings: reviewState.findings }, null, 2));
+    if (reviewState.observations.length === 0) return false;
+    writeFileSync(RESULT_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
     return true;
 }
 
 function hasPersistedReviewState() {
-    return reviewState.findings.length > 0;
+    return reviewState.observations.length > 0;
 }
 
 
-function appendFindings(findings) {
+function appendObservations(observations) {
     let inserted = 0;
     let duplicates = 0;
-    const seen = new Set(reviewState.findingKeys);
-    for (const rawFinding of findings) {
-        const finding = normalizeFinding(rawFinding);
-        const key = dedupeKeyForFinding(finding);
+    const seen = new Set(reviewState.observationKeys);
+    for (const rawObservation of observations) {
+        const observation = normalizeObservation(rawObservation);
+        const key = dedupeKeyForObservation(observation);
         if (seen.has(key)) {
             duplicates++;
             continue;
         }
         seen.add(key);
-        reviewState.findingKeys.push(key);
-        reviewState.findings.push(finding);
+        reviewState.observationKeys.push(key);
+        reviewState.observations.push(observation);
         inserted++;
     }
     persistReviewState();
@@ -235,30 +238,30 @@ function appendFindings(findings) {
     return { inserted, duplicates };
 }
 
-const reportFindingTool = defineTool({
-    name: "report_finding",
-    label: "Report Finding",
+const reportObservationTool = defineTool({
+    name: "report_observation",
+    label: "Report Observation",
     description:
-        "Persist exactly one structured finding immediately so it survives retries and timeouts. Call this as soon as one finding is ready. Do not wait to batch findings.",
+        "Persist exactly one structured observation immediately so it survives retries and timeouts. Call as soon as one observation is ready; do not batch.",
     parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["finding"],
+        required: ["observation"],
         properties: {
-            finding: findingSchema,
+            observation: observationSchema,
         },
     },
     execute: async (_toolCallId, params) => {
-        const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.assessment === "BAD" ? 1 : 0;
+        const { inserted, duplicates } = appendObservations([params.observation]);
+        const negativeCount = params.observation.assessment === "BAD" ? 1 : 0;
         return {
             content: [
                 {
                     type: "text",
-                    text: `Stored ${inserted} finding${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative findings in this call: ${negativeCount}.`,
+                    text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negativeCount}.`,
                 },
             ],
-            details: { inserted, duplicates, totalFindings: reviewState.findings.length },
+            details: { inserted, duplicates, totalObservations: reviewState.observations.length },
         };
     },
 });
@@ -341,21 +344,21 @@ function tryParseJsonFromText(text) {
     if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
     try {
         const parsed = JSON.parse(text);
-        if (isValidFindingsPayload(parsed)) return parsed;
+        if (isValidObservationsPayload(parsed)) return parsed;
     } catch {}
     const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g;
     let match = jsonBlockPattern.exec(text);
     while (match !== null) {
         try {
             const parsed = JSON.parse(match[1].trim());
-            if (isValidFindingsPayload(parsed)) return parsed;
+            if (isValidObservationsPayload(parsed)) return parsed;
         } catch {}
         match = jsonBlockPattern.exec(text);
     }
-    // Find {"findings": ... } object (tolerates whitespace).
-    const findingsMatch = text.match(/\{\s*"findings"/);
-    if (!findingsMatch || findingsMatch.index === undefined) return null;
-    const braceStart = findingsMatch.index;
+    // Find {"observations": ... } object (tolerates whitespace).
+    const observationsMatch = text.match(/\{\s*"observations"/);
+    if (!observationsMatch || observationsMatch.index === undefined) return null;
+    const braceStart = observationsMatch.index;
     // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
     // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
     // extractJsonFromText, which caps at a small fixed number of attempts).
@@ -365,7 +368,7 @@ function tryParseJsonFromText(text) {
         try {
             const candidate = text.slice(braceStart, end + 1);
             const parsed = JSON.parse(candidate);
-            if (isValidFindingsPayload(parsed)) return parsed;
+            if (isValidObservationsPayload(parsed)) return parsed;
         } catch {}
     }
     return null;
@@ -384,7 +387,7 @@ function tryRescueFromTextResponse(sessionState) {
         );
         return false;
     }
-    console.error(`[pi-runner] Text rescue: extracted ${payload.findings.length} findings`);
+    console.error(`[pi-runner] Text rescue: extracted ${payload.observations.length} observations`);
     writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
     return checkResultFile();
 }
@@ -435,19 +438,19 @@ function loadPracticeSlugs() {
 // cannot drift between the sites that emit it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
-    `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
-    `Only keep GOOD findings that add real review value. ` +
-    `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+    `For a GOOD (strength) observation or a NOT_APPLICABLE observation, guidance can simply be "No change needed." ` +
+    `Only keep GOOD observations that add real review value. ` +
+    `Do not add derivative low-signal observations when a stronger observation already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
 
 function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
     return (
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
-        `Persist every justified finding with report_finding, one finding per call. ` +
+        `Persist every justified observation with report_observation, one observation per call. ` +
         `There is no target count and no quota. ` +
-        `Only report GOOD findings that add real review value. ` +
-        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
+        `Only report GOOD observations that add real review value. ` +
+        `Do not emit derivative low-signal observations when a stronger root-cause observation already covers the problem.`
     );
 }
 
@@ -513,7 +516,7 @@ async function main() {
 
     // `tools` is an allowlist of tool *names* (Pi 0.74+ filters customTools through the same
     // allowlist), so both built-in and custom tool names must appear here. Edit/write are omitted
-    // — findings are persisted only via report_finding.
+    // — observations are persisted only via report_observation.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
     const authStorage = AuthStorage.create();
@@ -553,8 +556,8 @@ async function main() {
     const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
-        tools: ["read", "bash", "grep", "report_finding"],
-        customTools: [reportFindingTool],
+        tools: ["read", "bash", "grep", "report_observation"],
+        customTools: [reportObservationTool],
         sessionManager,
         settingsManager,
         authStorage,
@@ -579,13 +582,13 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft nudge: steer the agent to persist findings before the hard timeout aborts.
+    // Soft nudge: steer the agent to persist observations before the hard timeout aborts.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
         const steerMessage =
             `Stop analyzing and persist output now. ` +
-            `Use report_finding immediately for any finding you already have, one finding per call. ` +
+            `Use report_observation immediately for any observation you already have, one observation per call. ` +
             PERSIST_DISCIPLINE;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
@@ -620,9 +623,9 @@ async function main() {
     // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
     // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
     // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
-    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
+    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_observation
     // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
-    // practice gets a finding. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
+    // practice gets an observation. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
     const groups = loadPracticeGroups();
@@ -649,8 +652,8 @@ async function main() {
             const readHint = `Read inputs/practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
             const batchPrompt =
                 bi === 0
-                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`
-                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`;
+                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`
+                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`;
             try {
                 await session.prompt(batchPrompt);
             } catch (err) {
@@ -660,16 +663,16 @@ async function main() {
             console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
 
-        // Coverage gate: every active practice must get a finding. Re-prompt the ones no turn reported.
+        // Coverage gate: every active practice must get an observation. Re-prompt the ones no turn reported.
         if (!hardAborted && allSlugs.length > 0) {
-            const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
+            const covered = new Set(reviewState.observations.map((f) => f.practiceSlug).filter(Boolean));
             const missing = allSlugs.filter((s) => !covered.has(s));
             if (missing.length > 0) {
                 console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
                 const gatePrompt =
-                    `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
+                    `Coverage check. You have NOT yet reported an observation for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
-                    `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
+                    `(do NOT re-read the diff). Persist an observation for EVERY one with report_observation, one call per observation ` +
                     `— set presence (PRESENT/ABSENT/NOT_APPLICABLE) and, unless NOT_APPLICABLE, assessment (GOOD/BAD).`;
                 try {
                     await session.prompt(gatePrompt);
@@ -677,7 +680,7 @@ async function main() {
                     console.error(`[pi-runner] coverage-gate prompt error: ${err.message}`);
                 }
                 const stillMissing = allSlugs.filter(
-                    (s) => !new Set(reviewState.findings.map((f) => f.practiceSlug)).has(s),
+                    (s) => !new Set(reviewState.observations.map((f) => f.practiceSlug)).has(s),
                 );
                 console.error(
                     `[pi-runner] Coverage gate done: ${allSlugs.length - stillMissing.length}/${allSlugs.length} practices covered`,
@@ -773,19 +776,19 @@ async function main() {
         retryPrompt =
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Do NOT read more files. ` +
-            `Persist every remaining justified finding with report_finding immediately, one finding per call. ` +
+            `Persist every remaining justified observation with report_observation immediately, one observation per call. ` +
             PERSIST_DISCIPLINE + ` ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
-            `Do NOT read any more files. Persist the remaining findings with report_finding NOW, one finding per call. ` +
+            `Do NOT read any more files. Persist the remaining observations with report_observation NOW, one observation per call. ` +
             PERSIST_DISCIPLINE + ` ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
-            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call. ` +
+            `Use your analysis from above. Do NOT read more files. Persist observations with report_observation immediately, one observation per call. ` +
             PERSIST_DISCIPLINE + ` ` +
             scaffold;
     }

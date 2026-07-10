@@ -284,14 +284,14 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
                 "INSERT INTO workspace (" +
                     "  slug, display_name, status, created_at, updated_at, " +
                     "  account_type, is_publicly_viewable, " +
-                    "  practices_enabled, mentor_enabled, achievements_enabled, leaderboard_enabled, " +
-                    "  progression_enabled, leagues_enabled, " +
+                    "  practices_enabled, mentor_enabled, achievements_enabled, " +
+                    "  progression_enabled, " +
                     "  practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled, " +
                     "  git_provider_mode, account_login, installation_id, personal_access_token, " +
                     "  gitlab_group_id, server_url" +
                     ") VALUES (?, ?, ?, NOW(), NOW(), " +
                     "  'ORG', false, " +
-                    "  false, false, false, false, false, false, true, true, " +
+                    "  false, false, false, false, true, true, " +
                     "  ?, ?, ?, ?, ?, ?) RETURNING id"
             )
         ) {

@@ -18,7 +18,7 @@ public record TeamSummaryDTO(
     @Schema(description = "Privacy level of the team (SECRET or VISIBLE)") Privacy privacy,
     @Schema(description = "Organization the team belongs to") String organization,
     @Schema(description = "URL to the team's page on the git provider") String htmlUrl,
-    @NonNull @Schema(description = "Whether the team is hidden from leaderboard display") Boolean hidden
+    @NonNull @Schema(description = "Whether the team is hidden from the practice overview display") Boolean hidden
 ) {
     /**
      * Creates a TeamSummaryDTO from a Team entity using scope-specific settings.

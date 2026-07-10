@@ -12,6 +12,15 @@ public interface PiRunnerProfile {
     /** Runner script filename under {@code resources/agent/}. */
     String runnerScript();
 
+    /**
+     * Sibling helper scripts the runner imports relatively at workspace-root (e.g.
+     * {@code ./pi-observation-normalize.mjs}). Each is staged next to {@link #runnerScript()} under its own
+     * filename so the runner's relative ESM imports resolve inside the sandbox.
+     */
+    default List<String> sidecarScripts() {
+        return List.of();
+    }
+
     /** V8 flags for the {@code node} invocation. */
     List<String> nodeFlags();
 

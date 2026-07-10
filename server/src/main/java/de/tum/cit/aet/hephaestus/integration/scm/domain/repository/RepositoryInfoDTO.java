@@ -30,13 +30,13 @@ public record RepositoryInfoDTO(
     @NonNull @Schema(description = "URL to the repository on the git provider") String htmlUrl,
     @Schema(description = "Labels defined in the repository") List<LabelInfoDTO> labels,
     /**
-     * Whether contributions from this repository are hidden from leaderboard calculations.
+     * Whether contributions from this repository are hidden from the practice overview.
      * <p>
      * <b>Note:</b> This field is scope-specific business logic and should be moved
      * to a workspace-specific DTO during ETL extraction.
      */
     @NonNull
-    @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
+    @Schema(description = "Whether contributions from this repository are hidden from the practice overview")
     Boolean hiddenFromContributions
 ) {
     @Nullable

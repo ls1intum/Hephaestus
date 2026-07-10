@@ -1,16 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -47,6 +49,7 @@ public class PracticeDetectionDeliveryService {
     private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
+    private final ReviewerResolver reviewerResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
@@ -56,6 +59,7 @@ public class PracticeDetectionDeliveryService {
         ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
+        ReviewerResolver reviewerResolver,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper
     ) {
@@ -64,23 +68,28 @@ public class PracticeDetectionDeliveryService {
         this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
+        this.reviewerResolver = reviewerResolver;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
     }
 
-    /** Resolved delivery target: who the finding is about + the typed (work artifact, id) reference. */
-    private record Target(WorkArtifact type, Long id, Long aboutUserId) {}
+    /**
+     * Resolved delivery target: the typed (work artifact, id) reference plus the ARTIFACT AUTHOR (id + the
+     * {@link User} row). The author drives the completion event and is the subject for author-audience
+     * findings; reviewer-audience findings resolve their own per-row subject from the reviewer set.
+     */
+    private record Target(WorkArtifact type, Long id, User author) {}
 
     /**
      * Persist validated findings and publish completion event.
      *
      * @param job the completed agent job (must have metadata with pull_request_id)
-     * @param validFindings parsed and validated findings from the result parser
+     * @param validObservations parsed and validated findings from the result parser
      * @return delivery result with insert/discard counts
      * @throws JobDeliveryException if the target PR or author cannot be resolved
      */
     @Transactional
-    public DeliveryResult deliver(AgentJob job, List<ValidatedFinding> validFindings) {
+    public DeliveryResult deliver(AgentJob job, List<ValidatedObservation> validObservations) {
         Long workspaceId = job.getWorkspace().getId(); // Hibernate proxy returns the FK without initialization
         JsonNode metadata = job.getMetadata();
         if (metadata == null) {
@@ -101,18 +110,32 @@ public class PracticeDetectionDeliveryService {
             // Empty-catalog discards fold into the discardedUnknownSlug count: with no active practices
             // every finding's slug is unknown to this workspace, so the per-finding loop would attribute
             // them identically — this early-return is just the bulk form of the same reason.
-            return new DeliveryResult(0, validFindings.size(), 0, false);
+            return new DeliveryResult(0, validObservations.size(), 0, false);
         }
 
-        // Resolve the typed target + the developer the finding is about, routing on the artifact.
+        // Resolve the typed target + the artifact author, routing on the artifact.
         Target target = resolveTarget(job, metadata);
-        Long aboutUserId = target.aboutUserId();
+        Long authorId = target.author().getId();
         WorkArtifact artifactType = target.type();
         Long artifactId = target.id();
+
+        // Reviewer-audience practices (constructive-code-review) file their finding against the REVIEWER whose
+        // comments were assessed, not the PR author. Resolve the real reviewer set ONCE per job — the server
+        // owns reviewer identity, never the model — and only when it can matter (a reviewer-audience finding is
+        // present AND the artifact is a PR). Null when not needed; empty when the PR drew no resolvable reviewer
+        // (author/bots only), in which case every reviewer-audience finding is DISCARDED, never misattributed.
+        Map<String, User> reviewersByLogin = null;
+        boolean anyReviewerAudience = validObservations
+            .stream()
+            .anyMatch(f -> ReviewerAudiencePractices.isReviewerAudience(f.practiceSlug()));
+        if (anyReviewerAudience && artifactType == WorkArtifact.PULL_REQUEST) {
+            reviewersByLogin = reviewerResolver.reviewersByLogin(artifactId, target.author());
+        }
 
         int inserted = 0;
         int discardedUnknownSlug = 0;
         int discardedDuplicate = 0;
+        int discardedUnresolvedReviewer = 0;
         boolean hasNegative = false;
         Instant observedAt = Instant.now();
 
@@ -121,14 +144,14 @@ public class PracticeDetectionDeliveryService {
         // SAME key onto the deliverable findings instead of recomputing it downstream, which could drift from
         // what was persisted. Only known-slug findings are entered here; unknown-slug ones are skipped below
         // (no key computed, never delivered), so the map aligns exactly with what the handler composes.
-        Map<ValidatedFinding, String> findingFingerprints = new IdentityHashMap<>();
+        Map<ValidatedObservation, String> findingFingerprints = new IdentityHashMap<>();
 
         // Current criteria-revision per practice, memoized — every finding pins to the criteria as it was
         // (SCD-2 reproducibility). Null if a practice has no revision yet (pre-versioning legacy practices).
         Map<Long, Long> revisionByPractice = new HashMap<>();
 
-        for (int i = 0; i < validFindings.size(); i++) {
-            ValidatedFinding finding = validFindings.get(i);
+        for (int i = 0; i < validObservations.size(); i++) {
+            ValidatedObservation finding = validObservations.get(i);
 
             Practice practice = practicesBySlug.get(finding.practiceSlug());
             if (practice == null) {
@@ -139,6 +162,45 @@ public class PracticeDetectionDeliveryService {
                     job.getId()
                 );
                 continue;
+            }
+
+            // Per-finding subject (ADR 0021 C2): author-audience findings (the bulk of the catalogue) are filed
+            // against the artifact author; reviewer-audience findings against the resolved reviewer. Correctness
+            // rule #1 — NEVER fall back to the author for a reviewer-audience finding whose reviewer cannot be
+            // resolved: that would misattribute a reviewer's craft to the author. DISCARD it instead.
+            Long subjectUserId;
+            if (!ReviewerAudiencePractices.isReviewerAudience(finding.practiceSlug())) {
+                subjectUserId = authorId;
+            } else if (reviewersByLogin == null || reviewersByLogin.isEmpty()) {
+                discardedUnresolvedReviewer++;
+                log.info(
+                    "Discarded reviewer-audience finding — no resolvable reviewer on this PR: slug={}, subjectLogin={}, jobId={}",
+                    finding.practiceSlug(),
+                    finding.subjectLogin(),
+                    job.getId()
+                );
+                continue;
+            } else {
+                String normalized = ReviewerResolver.normalizeLogin(finding.subjectLogin());
+                User reviewer = normalized == null ? null : reviewersByLogin.get(normalized);
+                if (reviewer != null) {
+                    // (a) The model's proposed login resolves to a real reviewer.
+                    subjectUserId = reviewer.getId();
+                } else if (reviewersByLogin.size() == 1) {
+                    // (b) Exactly one reviewer: deterministic fast path, no model trust needed.
+                    subjectUserId = reviewersByLogin.values().iterator().next().getId();
+                } else {
+                    // (c) Multiple reviewers and no usable subjectLogin → cannot attribute → discard.
+                    discardedUnresolvedReviewer++;
+                    log.info(
+                        "Discarded reviewer-audience finding — subjectLogin unresolved among {} reviewers: slug={}, subjectLogin={}, jobId={}",
+                        reviewersByLogin.size(),
+                        finding.practiceSlug(),
+                        finding.subjectLogin(),
+                        job.getId()
+                    );
+                    continue;
+                }
             }
 
             // The index disambiguates multiple findings for the same practice on one artifact.
@@ -154,18 +216,15 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
-            // aboutUserId is whose conduct the finding is filed against — always explicit (never null): the
-            // developer for author-side practices (the whole catalogue today), the reviewer for
-            // reviewer-audience practices once they ship (ADR 0021 C2).
-
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
-            // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
+            // becomes answerable. Derived from what the finding is ABOUT (the subject), never from the job or
+            // line number, so a reviewer's finding keeps its own identity across runs.
             String findingFingerprint = ObservationFingerprint.compute(
                 finding.practiceSlug(),
                 artifactType.name(),
                 artifactId,
-                aboutUserId,
+                subjectUserId,
                 firstLocationPath(finding.evidence())
             );
             findingFingerprints.put(finding, findingFingerprint);
@@ -191,7 +250,7 @@ public class PracticeDetectionDeliveryService {
                 practiceRevisionId,
                 artifactType.name(),
                 artifactId,
-                aboutUserId,
+                subjectUserId,
                 finding.title(),
                 finding.presence().name(),
                 finding.assessment() == null ? null : finding.assessment().name(),
@@ -215,12 +274,13 @@ public class PracticeDetectionDeliveryService {
             }
         }
 
-        int totalDiscarded = discardedUnknownSlug + discardedDuplicate;
+        int totalDiscarded = discardedUnknownSlug + discardedDuplicate + discardedUnresolvedReviewer;
         log.info(
-            "Practice detection delivery: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+            "Practice detection delivery: inserted={}, unknownSlug={}, duplicate={}, unresolvedReviewer={}, jobId={}",
             inserted,
             discardedUnknownSlug,
             discardedDuplicate,
+            discardedUnresolvedReviewer,
             job.getId()
         );
 
@@ -230,7 +290,11 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 artifactType,
                 artifactId,
-                aboutUserId, // the event's developerId field == aboutUserId (author-side subject today)
+                // DIVERGENCE (do NOT "simplify" to the per-finding subject): the event's developerId is the
+                // ARTIFACT AUTHOR, not the per-row about_user_id. It drives author-side delivery and the mentor
+                // cache invalidation for the author. Per-finding rows may be filed against reviewers, but the
+                // completion event stays author-scoped.
+                authorId,
                 inserted,
                 totalDiscarded,
                 hasNegative
@@ -263,7 +327,7 @@ public class PracticeDetectionDeliveryService {
             if (issue.getAuthor() == null) {
                 throw new JobDeliveryException("Issue has no author: issueId=" + issueId + ", jobId=" + job.getId());
             }
-            return new Target(WorkArtifact.ISSUE, issueId, issue.getAuthor().getId());
+            return new Target(WorkArtifact.ISSUE, issueId, issue.getAuthor());
         }
         JsonNode pullRequestIdNode = metadata.get("pull_request_id");
         if (pullRequestIdNode == null || pullRequestIdNode.isNull() || !pullRequestIdNode.isNumber()) {
@@ -282,7 +346,7 @@ public class PracticeDetectionDeliveryService {
                 "Pull request has no author: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
             );
         }
-        return new Target(WorkArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
+        return new Target(WorkArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor());
     }
 
     /**
@@ -317,7 +381,7 @@ public class PracticeDetectionDeliveryService {
         int discardedUnknownSlug,
         int discardedDuplicate,
         boolean hasNegative,
-        Map<ValidatedFinding, String> findingFingerprints
+        Map<ValidatedObservation, String> findingFingerprints
     ) {
         /** Compatibility shape for call sites/tests that do not consume per-finding correlation keys. */
         public DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {

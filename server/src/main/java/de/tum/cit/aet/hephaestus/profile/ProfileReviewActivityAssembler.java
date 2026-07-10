@@ -10,13 +10,12 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Composes git provider entities with pre-computed activity-ledger XP into profile DTOs.
- * Lives in profile (not integration.scm) because XP is unknown to the ETL layer.
+ * Composes git provider entities into profile review-activity DTOs.
  */
 @Component
 public class ProfileReviewActivityAssembler {
 
-    public ProfileReviewActivityDTO assemble(@NonNull PullRequestReview review, int xp) {
+    public ProfileReviewActivityDTO assemble(@NonNull PullRequestReview review) {
         return new ProfileReviewActivityDTO(
             review.getId(),
             review.isDismissed(),
@@ -25,13 +24,12 @@ public class ProfileReviewActivityAssembler {
             UserInfoDTO.fromUser(review.getAuthor()),
             PullRequestBaseInfoDTO.fromPullRequest(review.getPullRequest()),
             review.getHtmlUrl(),
-            xp,
             review.getSubmittedAt()
         );
     }
 
     /** Issue comments on PRs are represented as review activity with COMMENTED state. */
-    public ProfileReviewActivityDTO assemble(@NonNull IssueComment comment, int xp) {
+    public ProfileReviewActivityDTO assemble(@NonNull IssueComment comment) {
         return new ProfileReviewActivityDTO(
             comment.getId(),
             false,
@@ -40,12 +38,11 @@ public class ProfileReviewActivityAssembler {
             UserInfoDTO.fromUser(comment.getAuthor()),
             PullRequestBaseInfoDTO.fromIssue(comment.getIssue()),
             comment.getHtmlUrl(),
-            xp,
             comment.getCreatedAt()
         );
     }
 
-    public ProfileReviewActivityDTO assemble(@NonNull PullRequestReviewComment comment, int xp) {
+    public ProfileReviewActivityDTO assemble(@NonNull PullRequestReviewComment comment) {
         return new ProfileReviewActivityDTO(
             comment.getId(),
             false,
@@ -54,7 +51,6 @@ public class ProfileReviewActivityAssembler {
             UserInfoDTO.fromUser(comment.getAuthor()),
             PullRequestBaseInfoDTO.fromPullRequest(comment.getPullRequest()),
             comment.getHtmlUrl(),
-            xp,
             comment.getCreatedAt()
         );
     }

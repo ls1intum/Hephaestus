@@ -4,7 +4,7 @@ import { ReviewActivityCard } from "./ReviewActivityCard";
 
 /**
  * Card component that displays a user's review activity for a pull request / merge request.
- * Shows the review state, submission time, and score earned from the review.
+ * Shows the review state, submission time, and the reviewed pull request.
  */
 const meta = {
 	component: ReviewActivityCard,
@@ -13,7 +13,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"Displays information about a code review performed by the user, including the status and score earned.",
+					"Displays information about a code review performed by the user, including its status.",
 			},
 		},
 	},
@@ -43,10 +43,6 @@ const meta = {
 			description: "Name of the repository",
 			control: "text",
 		},
-		score: {
-			description: "Points earned for the review",
-			control: "number",
-		},
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof ReviewActivityCard>;
@@ -55,7 +51,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Shows a review where the user approved the pull request and earned points.
+ * Shows a review where the user approved the pull request.
  */
 export const Approved: Story = {
 	args: {
@@ -71,7 +67,6 @@ export const Approved: Story = {
 			},
 		},
 		repositoryName: "Hephaestus",
-		score: 5,
 	},
 };
 
@@ -92,7 +87,6 @@ export const ChangesRequested: Story = {
 			},
 		},
 		repositoryName: "Artemis",
-		score: 3,
 	},
 };
 
@@ -113,7 +107,6 @@ export const Commented: Story = {
 			},
 		},
 		repositoryName: "Athena",
-		score: 1,
 	},
 };
 
@@ -134,12 +127,11 @@ export const Loading: Story = {
 			},
 		},
 		repositoryName: "Hephaestus",
-		score: 0,
 	},
 };
 
 /**
- * Shows a dismissed review which no longer counts towards the user's score.
+ * Shows a dismissed review.
  */
 export const Dismissed: Story = {
 	args: {
@@ -155,7 +147,6 @@ export const Dismissed: Story = {
 			},
 		},
 		repositoryName: "Hephaestus",
-		score: 0,
 	},
 };
 
@@ -176,7 +167,6 @@ export const Unknown: Story = {
 			},
 		},
 		repositoryName: "ExampleRepo",
-		score: 0,
 	},
 };
 
@@ -197,7 +187,6 @@ export const WithCodeInTitle: Story = {
 			},
 		},
 		repositoryName: "Hephaestus",
-		score: 5,
 	},
 };
 

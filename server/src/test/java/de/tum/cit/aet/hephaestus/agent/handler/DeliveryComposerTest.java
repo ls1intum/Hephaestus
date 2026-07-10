@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -62,8 +62,8 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     // Finding builders
 
-    private ValidatedFinding positiveFinding(String slug) {
-        return new ValidatedFinding(
+    private ValidatedObservation positiveFinding(String slug) {
+        return new ValidatedObservation(
             slug,
             humanizeTitle(slug) + " (positive)",
             Presence.PRESENT,
@@ -77,7 +77,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
     }
 
-    private ValidatedFinding negativeFinding(
+    private ValidatedObservation negativeFinding(
         String slug,
         String title,
         Severity severity,
@@ -86,7 +86,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         String reasoning,
         String guidance
     ) {
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             slug,
             title,
             Presence.ABSENT,
@@ -106,8 +106,8 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     // Realistic findings used across tests
 
-    private List<ValidatedFinding> mixedFindings() {
-        List<ValidatedFinding> findings = new ArrayList<>();
+    private List<ValidatedObservation> mixedFindings() {
+        List<ValidatedObservation> findings = new ArrayList<>();
 
         // 3 positives
         findings.add(positiveFinding("error-state-handling"));
@@ -190,7 +190,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withMixedFindings_producesExpectedMrNote() {
-        List<ValidatedFinding> findings = mixedFindings();
+        List<ValidatedObservation> findings = mixedFindings();
 
         DeliveryContent result = DeliveryComposer.compose(findings);
 
@@ -235,7 +235,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withAllPositive_producesObservationNoteWithoutPraise() {
-        List<ValidatedFinding> findings = List.of(
+        List<ValidatedObservation> findings = List.of(
             positiveFinding("error-state-handling"),
             positiveFinding("view-decomposition"),
             positiveFinding("meaningful-naming")
@@ -252,7 +252,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withAllPositiveAndReasoning_listsEvidenceAnchoredObservations() {
-        ValidatedFinding withReasoning = new ValidatedFinding(
+        ValidatedObservation withReasoning = new ValidatedObservation(
             "error-state-handling",
             "Error state handling (positive)",
             Presence.PRESENT,
@@ -281,7 +281,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withManyNegatives_allInCompactList() {
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
 
         // 7 negatives: all inlinable (have file locations)
         findings.add(
@@ -390,7 +390,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_diffNotes_allNegativesGetInlineComments() {
-        List<ValidatedFinding> findings = mixedFindings();
+        List<ValidatedObservation> findings = mixedFindings();
 
         DeliveryContent result = DeliveryComposer.compose(findings);
 
@@ -453,7 +453,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_nonInlinableFindings_renderedInFullInMrNote() {
-        List<ValidatedFinding> findings = List.of(
+        List<ValidatedObservation> findings = List.of(
             negativeFinding(
                 "mr-description-quality",
                 "MR description is empty",
@@ -498,7 +498,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_minorFindings_guidanceInDiffNote() {
-        List<ValidatedFinding> findings = List.of(
+        List<ValidatedObservation> findings = List.of(
             negativeFinding(
                 "code-hygiene",
                 "Dead code in view",
@@ -530,7 +530,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_withOnlyMinorNegatives_usesImprovementLanguage() {
-        List<ValidatedFinding> findings = List.of(
+        List<ValidatedObservation> findings = List.of(
             negativeFinding(
                 "code-hygiene",
                 "Dead code",
@@ -563,7 +563,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_suggestionsOnlyWithPositives_prependsTaskLevelAcknowledgement() {
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         findings.add(positiveFinding("scope-one-reviewable-change"));
         findings.add(positiveFinding("ready-and-traceable-handoff"));
         findings.add(
@@ -590,7 +590,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_blockingIssue_suppressesOpenerButStillAcknowledgesOneStrength() {
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         findings.add(positiveFinding("scope-one-reviewable-change"));
         findings.add(
             negativeFinding(
@@ -619,7 +619,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_uncuratedPositive_acknowledgesGenericallyNeverDropsSilently() {
         // C2: a real OBSERVED strength whose practice has no curated gerund phrase must still be acknowledged
         // (generically, grammatically) — not silently dropped, and not dumped as a raw ungrammatical slug.
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         findings.add(positiveFinding("some-uncurated-practice-xyz"));
         findings.add(
             negativeFinding(
@@ -875,7 +875,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_forIssue_negativeFindingsExpandedInFull_neverDemotedToVanishingDiffNote() {
         // An issue finding with an ordinary location would be "inlinable" on a PR — but issues carry no
         // diff, so it must be expanded in full in the note, not demoted to a diff note that never posts.
-        ValidatedFinding f = negativeFinding(
+        ValidatedObservation f = negativeFinding(
             "issue-has-checkable-outcome",
             "Missing checkable outcome",
             Severity.MINOR,
@@ -901,7 +901,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_noIssuesNote_skipsFindingWhoseReasoningScrubsToBlank() {
         // First positive: reasoning is ENTIRELY grading-meta → sanitises to blank → must not emit a bare
         // "- **...:**" bullet with nothing after it. Second positive carries a real observation.
-        ValidatedFinding scrubbed = new ValidatedFinding(
+        ValidatedObservation scrubbed = new ValidatedObservation(
             "issue-has-checkable-outcome",
             "Checkable outcome",
             Presence.PRESENT,
@@ -913,7 +913,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             List.of()
         );
-        ValidatedFinding real = new ValidatedFinding(
+        ValidatedObservation real = new ValidatedObservation(
             "issue-scoped-to-single-concern",
             "Single concern",
             Presence.PRESENT,
@@ -937,7 +937,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_noIssuesNote_allReasoningScrubbed_fallsBackToNothingToChange() {
-        ValidatedFinding scrubbed = new ValidatedFinding(
+        ValidatedObservation scrubbed = new ValidatedObservation(
             "issue-has-checkable-outcome",
             "Checkable outcome",
             Presence.PRESENT,
@@ -961,7 +961,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_acknowledgementCount_reflectsImprovementsNotStrengths() {
         // One strength in front of TWO suggestions must read "a couple of things to tighten:", never
         // "one thing to tighten:" (the lead-in counts the improvements that follow).
-        List<ValidatedFinding> findings = List.of(
+        List<ValidatedObservation> findings = List.of(
             positiveFinding("issue-scoped-to-single-concern"),
             negativeFinding(
                 "issue-has-checkable-outcome",
@@ -994,7 +994,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_allFindingsNotApplicable_returnsNullNoSpuriousAllClear() {
         // Every practice abstained: the artifact could not be assessed, so we must deliver NOTHING —
         // never a "nothing to change here" all-clear on work that was never actually evaluated.
-        ValidatedFinding na1 = new ValidatedFinding(
+        ValidatedObservation na1 = new ValidatedObservation(
             "issue-scoped-to-single-concern",
             "n/a",
             Presence.NOT_APPLICABLE,
@@ -1006,7 +1006,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             List.of()
         );
-        ValidatedFinding na2 = new ValidatedFinding(
+        ValidatedObservation na2 = new ValidatedObservation(
             "issue-has-checkable-outcome",
             "n/a",
             Presence.NOT_APPLICABLE,
@@ -1029,7 +1029,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // metadata span is frequently a truncated heading / single token / title==body echo / raw JSON
         // envelope ("[Feat", "false", "Analysis Object Model (AOM)", "body": "…") that reads as broken output
         // and leaks raw fields to the student. The lesson stands on the reasoning + guidance instead.
-        ValidatedFinding f = negativeFinding(
+        ValidatedObservation f = negativeFinding(
             "mr-description-quality",
             "PR description lacks clear motivation",
             Severity.MAJOR,
@@ -1260,7 +1260,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // the run's highest-confidence GOOD finding of ANY practice — not only the named process acts. Here
         // the sole strength is a code-craft GOOD (handles-errors...), which previously was censored under a
         // blocking note; it must now be acknowledged, task-level, once.
-        var strength = new ValidatedFinding(
+        var strength = new ValidatedObservation(
             "handles-errors-instead-of-swallowing-them",
             "Errors are surfaced (positive)",
             Presence.PRESENT,
@@ -1296,8 +1296,13 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     // ----- Improvement-tail prioritisation + cap (the proportionality fix) -----
 
-    private ValidatedFinding negativeWithConfidence(String slug, String title, Severity severity, float confidence) {
-        return new ValidatedFinding(
+    private ValidatedObservation negativeWithConfidence(
+        String slug,
+        String title,
+        Severity severity,
+        float confidence
+    ) {
+        return new ValidatedObservation(
             slug,
             title,
             Presence.ABSENT,
@@ -1314,7 +1319,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void compose_capsMinorTail_keepsThreeAndDisclosesOverflowHonestly() {
         // 6 MINOR improvements, zero blocking — the long-tail pile-on the bar rejects. Cap to 3 + "+3 more".
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         for (int i = 1; i <= 6; i++) {
             findings.add(negativeWithConfidence("nudge-" + i, "Minor nudge " + i, Severity.MINOR, 0.90f));
         }
@@ -1332,7 +1337,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void compose_neverCapsBlocking_evenWithManyBlockers() {
         // 5 blocking (CRITICAL/MAJOR) + 4 MINOR. Blocking must ALL survive; only the MINOR tail is capped.
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         findings.add(negativeWithConfidence("sec-1", "Secret 1", Severity.CRITICAL, 0.95f));
         findings.add(negativeWithConfidence("sec-2", "Secret 2", Severity.CRITICAL, 0.95f));
         findings.add(negativeWithConfidence("crash-1", "Crash 1", Severity.MAJOR, 0.9f));
@@ -1358,7 +1363,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void compose_underTheCap_noOverflowTail() {
         // Exactly 3 improvements: at the cap, nothing collapses, no overflow tail.
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
             findings.add(negativeWithConfidence("nudge-" + i, "Minor nudge " + i, Severity.MINOR, 0.9f));
         }
@@ -1374,7 +1379,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void compose_tieBreaksByConfidence_keepsMostCertainNudges() {
         // 4 MINORs, distinct confidences. Cap keeps the 3 highest-confidence; the lowest is collapsed.
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         findings.add(negativeWithConfidence("low", "Low confidence nudge", Severity.MINOR, 0.50f));
         findings.add(negativeWithConfidence("high-a", "High A nudge", Severity.MINOR, 0.95f));
         findings.add(negativeWithConfidence("high-b", "High B nudge", Severity.MINOR, 0.92f));
@@ -1395,7 +1400,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void compose_keepsMinorOverInfo_infoIsTheFirstToCollapse() {
         // 3 MINOR + 2 INFO, cap 3. Severity beats confidence: the two INFO collapse first regardless of conf.
-        List<ValidatedFinding> findings = new ArrayList<>();
+        List<ValidatedObservation> findings = new ArrayList<>();
         findings.add(negativeWithConfidence("minor-1", "Minor one", Severity.MINOR, 0.60f));
         findings.add(negativeWithConfidence("minor-2", "Minor two", Severity.MINOR, 0.60f));
         findings.add(negativeWithConfidence("minor-3", "Minor three", Severity.MINOR, 0.60f));
@@ -1424,7 +1429,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of(new LocationSpec("Views/StockView.swift", 42)),
             List.of("let u = URL(s)!")
         );
-        ValidatedFinding asProblemFinding = new ValidatedFinding(
+        ValidatedObservation asProblemFinding = new ValidatedObservation(
             "uses-force-unwrap",
             "Force-unwrap present in changed code",
             Presence.PRESENT,
@@ -1436,7 +1441,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Use guard-let instead.",
             List.of()
         );
-        ValidatedFinding asStrengthFinding = new ValidatedFinding(
+        ValidatedObservation asStrengthFinding = new ValidatedObservation(
             "uses-force-unwrap",
             "Force-unwrap present in changed code",
             Presence.PRESENT,
@@ -1475,7 +1480,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "But diff_stat.txt lists 28 files and diff_summary.md shows 28 changed files — a material disagreement, so the diff is trusted.",
             "After scanning metadata.body, no sub_issues_total rollup is present (sub_issues_total is null)."
         );
-        ValidatedFinding leaky = negativeFinding(
+        ValidatedObservation leaky = negativeFinding(
             "scope-one-reviewable-change",
             "28 files spread degrades review effectiveness",
             Severity.MAJOR,
@@ -1525,7 +1530,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // Regression: the agent dropped its own plumbing into the evidence snippet, which the
         // "You wrote:" quote rendered verbatim past the reasoning sanitizer. A real student quote never
         // contains pipeline tokens, so the whole quote is suppressed when it does.
-        ValidatedFinding f = negativeFinding(
+        ValidatedObservation f = negativeFinding(
             "mr-description-quality",
             "PR body lacks a quotable WHY",
             Severity.MAJOR,
@@ -1553,7 +1558,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_synthesizedDiffNote_carriesFindingObservationFingerprint() {
         // A stamped finding (no agent suggestedDiffNotes) must propagate its correlation key onto the
         // synthesized diff note so the inline channel can match the placement back to the persisted finding.
-        ValidatedFinding stamped = negativeFinding(
+        ValidatedObservation stamped = negativeFinding(
             "code-hygiene",
             "Dead code in view",
             Severity.MINOR,
@@ -1578,7 +1583,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // in deliveredKeys) and must collapse to a "see inline comments" pointer — its full header line is
         // gone from the summary because the detail now lives on the diff. The OTHER did NOT land, so its full
         // header line MUST survive in the summary as the delivery-failure fallback.
-        ValidatedFinding delivered = negativeFinding(
+        ValidatedObservation delivered = negativeFinding(
             "code-hygiene",
             "Dead code in view",
             Severity.MINOR,
@@ -1587,7 +1592,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Commented-out code adds noise.",
             "Remove it."
         ).withRecurrenceKey("corr-delivered");
-        ValidatedFinding failed = negativeFinding(
+        ValidatedObservation failed = negativeFinding(
             "meaningful-naming",
             "Non-descriptive name 'Data'",
             Severity.MINOR,
@@ -1597,7 +1602,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Use PortfolioSnapshot."
         ).withRecurrenceKey("corr-failed");
 
-        List<ValidatedFinding> findings = List.of(delivered, failed);
+        List<ValidatedObservation> findings = List.of(delivered, failed);
 
         // Baseline (no signals yet): both findings keep their full summary lines, no pointer.
         String firstPass = DeliveryComposer.recomposeMrNote(findings, WorkArtifact.PULL_REQUEST, Map.of(), Set.of());
@@ -1625,7 +1630,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void recomposeMrNote_allInlineDelivered_collapsesWholeListToPointer() {
         // Both inlinable findings landed → the inline section is just the header + a plural pointer, with NO
         // per-finding lines left in the summary. A no-op that ignored deliveredKeys would still list both.
-        ValidatedFinding a = negativeFinding(
+        ValidatedObservation a = negativeFinding(
             "code-hygiene",
             "Dead code A",
             Severity.MINOR,
@@ -1634,7 +1639,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Noise.",
             "Remove."
         ).withRecurrenceKey("k-a");
-        ValidatedFinding b = negativeFinding(
+        ValidatedObservation b = negativeFinding(
             "code-hygiene",
             "Dead code B",
             Severity.MINOR,
@@ -1660,7 +1665,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void recomposeMrNote_keylessFindingNeverDemoted_evenWithMatchingEmptyKey() {
         // A finding with no correlation key can never be demoted (it cannot be matched back to a posted note),
         // so its full line always survives — and Set.of().contains(null) must not blow up.
-        ValidatedFinding keyless = negativeFinding(
+        ValidatedObservation keyless = negativeFinding(
             "code-hygiene",
             "Keyless dead code",
             Severity.MINOR,
@@ -1686,7 +1691,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // When the agent supplied its own suggestedDiffNote (which carries no key of its own), the finding's
         // stamped key must still be carried over to the emitted note.
         DiffNote suggested = new DiffNote("Views/DashboardView.swift", 20, null, "Consider extracting this.");
-        ValidatedFinding stamped = new ValidatedFinding(
+        ValidatedObservation stamped = new ValidatedObservation(
             "code-hygiene",
             "Long method",
             Presence.ABSENT,
@@ -1719,7 +1724,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Add a test for the parser. The practice requires coverage for a OBSERVED observation."
         );
-        ValidatedFinding stamped = new ValidatedFinding(
+        ValidatedObservation stamped = new ValidatedObservation(
             "code-hygiene",
             "Missing test",
             Presence.ABSENT,
@@ -1776,7 +1781,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Remove this unused import."
         );
-        ValidatedFinding stamped = new ValidatedFinding(
+        ValidatedObservation stamped = new ValidatedObservation(
             "code-hygiene",
             "Unused import",
             Presence.ABSENT,
@@ -1979,8 +1984,8 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     // --- W7: feed-up on the all-GOOD path — an above-bar student hears the standard affirmed, not silence ---
 
-    private ValidatedFinding positiveWithReasoning(String slug, String reasoning) {
-        return new ValidatedFinding(
+    private ValidatedObservation positiveWithReasoning(String slug, String reasoning) {
+        return new ValidatedObservation(
             slug,
             humanizeTitle(slug) + " (positive)",
             Presence.PRESENT,
@@ -2056,7 +2061,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void groundingGuard_hallucinatedPath_anchorDropped_findingStillDelivers() {
         // A BAD finding anchored to a file that is NOT in the diff at all — a hallucinated locus.
-        ValidatedFinding hallucinated = negativeFinding(
+        ValidatedObservation hallucinated = negativeFinding(
             "code-hygiene",
             "Dead code",
             Severity.MINOR,
@@ -2083,7 +2088,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void groundingGuard_realPathAndSnippet_anchorKept() {
         // A BAD finding whose file IS in the diff and whose snippet IS substring-present in the hunk.
-        ValidatedFinding grounded = negativeFinding(
+        ValidatedObservation grounded = negativeFinding(
             "code-hygiene",
             "Missing doc on new field",
             Severity.MINOR,
@@ -2108,7 +2113,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void groundingGuard_realPathButSnippetNotInHunk_anchorDropped() {
         // File is in the diff, but the quoted snippet never appears in its hunk — a fabricated evidence line.
-        ValidatedFinding fabricatedSnippet = negativeFinding(
+        ValidatedObservation fabricatedSnippet = negativeFinding(
             "code-hygiene",
             "Phantom evidence",
             Severity.MINOR,
@@ -2133,7 +2138,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     @Test
     void groundingGuard_issueArtifact_forcesNoFileLocus() {
         // An ISSUE finding carries a file location the agent should never have set — it must not become an anchor.
-        ValidatedFinding issueFinding = negativeFinding(
+        ValidatedObservation issueFinding = negativeFinding(
             "issue-states-an-actionable-problem",
             "Vague problem statement",
             Severity.MINOR,
@@ -2161,7 +2166,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // Without a diff the guard is INACTIVE: a PR finding's anchor passes through unchanged, preserving the
         // existing delivery layout for callers that cannot produce the diff (the downstream line validator
         // remains the only check).
-        ValidatedFinding finding = negativeFinding(
+        ValidatedObservation finding = negativeFinding(
             "code-hygiene",
             "Some inline issue",
             Severity.MINOR,

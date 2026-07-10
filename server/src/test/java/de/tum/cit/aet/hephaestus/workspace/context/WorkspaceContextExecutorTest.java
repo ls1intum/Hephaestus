@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -31,6 +32,7 @@ class WorkspaceContextExecutorTest {
             100L,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -66,6 +68,7 @@ class WorkspaceContextExecutorTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContextHolder.setContext(workspaceContext);
@@ -98,6 +101,7 @@ class WorkspaceContextExecutorTest {
             777L,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContextHolder.setContext(context);
@@ -131,6 +135,7 @@ class WorkspaceContextExecutorTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContextHolder.setContext(context);
@@ -199,6 +204,7 @@ class WorkspaceContextExecutorTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContext context2 = new WorkspaceContext(
@@ -209,6 +215,7 @@ class WorkspaceContextExecutorTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
 
@@ -250,6 +257,7 @@ class WorkspaceContextExecutorTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContext wrappedContext = new WorkspaceContext(
@@ -260,6 +268,7 @@ class WorkspaceContextExecutorTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of()
         );
 

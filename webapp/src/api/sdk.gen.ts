@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAiSettingsData, GetAiSettingsResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListAreasData, ListAreasResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateMentorConfigData, UpdateMentorConfigErrors, UpdateMentorConfigResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeConfigData, UpdatePracticeConfigErrors, UpdatePracticeConfigResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAiSettingsData, GetAiSettingsResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetCohortPracticeStatusData, GetCohortPracticeStatusErrors, GetCohortPracticeStatusResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetDeveloperPracticeReportData, GetDeveloperPracticeReportErrors, GetDeveloperPracticeReportResponses, GetEngagementData, GetEngagementResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetMemberData, GetMemberResponses, GetMyPracticeReportData, GetMyPracticeReportErrors, GetMyPracticeReportResponses, GetMyPracticeSummaryData, GetMyPracticeSummaryResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListAreasData, ListAreasResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListPracticeReportsData, ListPracticeReportsErrors, ListPracticeReportsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateMentorConfigData, UpdateMentorConfigErrors, UpdateMentorConfigResponses, UpdatePracticeConfigData, UpdatePracticeConfigErrors, UpdatePracticeConfigResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateReviewCycleData, UpdateReviewCycleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -614,42 +614,6 @@ export const updateFeatures = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Generate leaderboard
- *
- * Creates a ranked contributor list for the specified time range
- */
-export const getLeaderboard = <ThrowOnError extends boolean = false>(options: Options<GetLeaderboardData, ThrowOnError>) => (options.client ?? client).get<GetLeaderboardResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/leaderboard', ...options });
-
-/**
- * Update the whole weekly leaderboard digest config (schedule + notifications) atomically
- */
-export const updateLeaderboardDigest = <ThrowOnError extends boolean = false>(options: Options<UpdateLeaderboardDigestData, ThrowOnError>) => (options.client ?? client).patch<UpdateLeaderboardDigestResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/leaderboard-digest',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Calculate user league stats
- *
- * Computes projected league point changes for a specific user using the global leaderboard
- */
-export const computeUserLeagueStats = <ThrowOnError extends boolean = false>(options: Options<ComputeUserLeagueStatsData, ThrowOnError>) => (options.client ?? client).get<ComputeUserLeagueStatsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats', ...options });
-
-/**
- * Reset and recalculate workspace leagues
- */
-export const resetAndRecalculateLeagues = <ThrowOnError extends boolean = false>(options: Options<ResetAndRecalculateLeaguesData, ThrowOnError>) => (options.client ?? client).put<ResetAndRecalculateLeaguesResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/league/reset',
-    ...options
-});
-
-/**
  * List all members of the workspace with pagination.
  *
  * List all members of the workspace with pagination.
@@ -708,7 +672,7 @@ export const getMember = <ThrowOnError extends boolean = false>(options: Options
  * Toggle the hidden flag for a workspace member.
  *
  * Toggle the hidden flag for a workspace member.
- * Hidden members are excluded from the leaderboard.
+ * Hidden members are excluded from the practice overview.
  */
 export const updateMemberVisibility = <ThrowOnError extends boolean = false>(options: Options<UpdateMemberVisibilityData, ThrowOnError>) => (options.client ?? client).patch<UpdateMemberVisibilityResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -758,19 +722,6 @@ export const removeVote = <ThrowOnError extends boolean = false>(options: Option
 export const vote = <ThrowOnError extends boolean = false>(options: Options<VoteData, ThrowOnError>) => (options.client ?? client).post<VoteResponses, VoteErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/mentor/threads/{threadId}/messages/{messageId}/vote',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Update leaderboard notification preferences
- */
-export const updateNotifications = <ThrowOnError extends boolean = false>(options: Options<UpdateNotificationsData, ThrowOnError>) => (options.client ?? client).patch<UpdateNotificationsResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/notifications',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -863,6 +814,13 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
+ * Cohort practice status
+ *
+ * Per reviewing practice, how many developers stand at each status (k-anonymised, K=5 with small-bucket suppression). Admins/owners always; members only when the workspace cohort visibility is EVERYONE.
+ */
+export const getCohortPracticeStatus = <ThrowOnError extends boolean = false>(options: Options<GetCohortPracticeStatusData, ThrowOnError>) => (options.client ?? client).get<GetCohortPracticeStatusResponses, GetCohortPracticeStatusErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/cohort', ...options });
+
+/**
  * Get engagement statistics
  *
  * Returns the current user's reaction action counts across all feedback they received in this workspace.
@@ -921,18 +879,11 @@ export const listObservations = <ThrowOnError extends boolean = false>(options: 
 export const getObservationsForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetObservationsForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetObservationsForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}', ...options });
 
 /**
- * Reflective dashboard feedback for the current developer
- *
- * Per-practice cards a developer can READ — why the practice matters, what good looks like, where they stand, the specific feedback to act on, and what they already do well. The third feedback channel alongside in-context SCM notes and the conversational mentor; the same findings reorganised by practice for self-paced reflection, not a scoreboard of counts.
- */
-export const getReflection = <ThrowOnError extends boolean = false>(options: Options<GetReflectionData, ThrowOnError>) => (options.client ?? client).get<GetReflectionResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/reflection', ...options });
-
-/**
  * Per-practice summary for current user
  *
  * Aggregated observation counts per practice for dashboard cards
  */
-export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/summary', ...options });
+export const getMyPracticeSummary = <ThrowOnError extends boolean = false>(options: Options<GetMyPracticeSummaryData, ThrowOnError>) => (options.client ?? client).get<GetMyPracticeSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/observations/summary', ...options });
 
 /**
  * Get observation detail
@@ -953,6 +904,27 @@ export const reorderPractices = <ThrowOnError extends boolean = false>(options: 
         ...options.headers
     }
 });
+
+/**
+ * List developer practice reports (admin/owner only)
+ *
+ * One summary per developer with activity in the window: per-practice status + a needs-attention triage flag. Sorted needs-attention-first then login. Not a scoreboard — no score/rank.
+ */
+export const listPracticeReports = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReportsData, ThrowOnError>) => (options.client ?? client).get<ListPracticeReportsResponses, ListPracticeReportsErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/reports', ...options });
+
+/**
+ * The current developer's own practice report
+ *
+ * Per-practice cards a developer can READ — why the practice matters, what good looks like, where they stand, the specific feedback to act on, and what they already do well. The third feedback channel alongside in-context SCM notes and the conversational mentor; the same findings reorganised by practice for self-paced reflection.
+ */
+export const getMyPracticeReport = <ThrowOnError extends boolean = false>(options: Options<GetMyPracticeReportData, ThrowOnError>) => (options.client ?? client).get<GetMyPracticeReportResponses, GetMyPracticeReportErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/reports/me', ...options });
+
+/**
+ * Per-developer practice report drill-down (admin/owner only)
+ *
+ * The developer's own practice report cards, for a mentor. Records an append-only transparency audit row (actor → subject) for compliance.
+ */
+export const getDeveloperPracticeReport = <ThrowOnError extends boolean = false>(options: Options<GetDeveloperPracticeReportData, ThrowOnError>) => (options.client ?? client).get<GetDeveloperPracticeReportResponses, GetDeveloperPracticeReportErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/reports/{userId}', ...options });
 
 /**
  * Delete a practice definition
@@ -1012,7 +984,7 @@ export const bindArea = <ThrowOnError extends boolean = false>(options: Options<
 /**
  * Get user profile
  *
- * Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points
+ * Returns user profile with workspace-scoped activity data including open PRs and review activity
  */
 export const getUserProfile = <ThrowOnError extends boolean = false>(options: Options<GetUserProfileData, ThrowOnError>) => (options.client ?? client).get<GetUserProfileResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/profile/{login}', ...options });
 
@@ -1060,11 +1032,11 @@ export const addRepositoryToMonitor = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
- * Update leaderboard schedule configuration
+ * Update the weekly practice review cycle schedule
  */
-export const updateSchedule = <ThrowOnError extends boolean = false>(options: Options<UpdateScheduleData, ThrowOnError>) => (options.client ?? client).patch<UpdateScheduleResponses, unknown, ThrowOnError>({
+export const updateReviewCycle = <ThrowOnError extends boolean = false>(options: Options<UpdateReviewCycleData, ThrowOnError>) => (options.client ?? client).patch<UpdateReviewCycleResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/schedule',
+    url: '/workspaces/{workspaceSlug}/review-cycle',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -1108,7 +1080,7 @@ export const getAllTeams = <ThrowOnError extends boolean = false>(options: Optio
 /**
  * Update team visibility
  *
- * Show or hide a team in leaderboard calculations
+ * Show or hide a team in the practice overview
  */
 export const updateTeamVisibility = <ThrowOnError extends boolean = false>(options: Options<UpdateTeamVisibilityData, ThrowOnError>) => (options.client ?? client).post<UpdateTeamVisibilityResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

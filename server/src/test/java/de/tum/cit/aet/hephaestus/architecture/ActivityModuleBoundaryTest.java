@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -13,8 +12,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The activity module has a focused internal structure:
  * <ul>
- *   <li><b>activity root</b> - Core activity event handling and leaderboard cache</li>
- *   <li><b>activity.scoring</b> - XP/scoring calculations</li>
+ *   <li><b>activity root</b> - Core activity event handling and aggregation</li>
  * </ul>
  *
  * <p>Note: Code health analysis is in the separate <b>practices</b> module:
@@ -35,30 +33,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
 
     @Nested
     class ActivityModuleIsolationTests {
-
-        /**
-         * Activity module should not depend on leaderboard internals.
-         *
-         * <p>Activity and leaderboard are peer modules. Activity generates events
-         * that leaderboard may consume, but should not have direct dependencies
-         * on leaderboard's service layer.
-         */
-        @Test
-        void activityDoesNotDependOnLeaderboardServices() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..leaderboard..service..")
-                .orShould()
-                .dependOnClassesThat()
-                .resideInAPackage("..leaderboard..repository..")
-                .because(
-                    "Activity should not depend on leaderboard - use domain events for cross-module communication"
-                );
-            rule.check(classes);
-        }
 
         /**
          * Activity module should not depend on mentor module.
@@ -155,46 +129,6 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ACTIVITY SCORING ISOLATION
-
-    @Nested
-    @DisplayName("Activity Scoring Isolation")
-    class ScoringSubmoduleTests {
-
-        /**
-         * Scoring package should be pure calculation logic.
-         *
-         * <p>The scoring package calculates XP - it should not have
-         * direct dependencies on external services or controllers.
-         */
-        @Test
-        void scoringDoesNotDependOnControllers() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity.scoring..")
-                .should()
-                .dependOnClassesThat()
-                .haveSimpleNameEndingWith("Controller")
-                .because("Scoring logic should be independent of presentation layer");
-            rule.check(classes);
-        }
-
-        /**
-         * Scoring should not depend on external feature modules.
-         */
-        @Test
-        void scoringHasMinimalExternalDependencies() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity.scoring..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..mentor..", "..notification..", "..profile..")
-                .because("Scoring should be a pure calculation module");
-            rule.check(classes);
-        }
-    }
-
     // PRACTICES MODULE CONTROLLER ISOLATION
 
     @Nested
@@ -202,8 +136,9 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
 
         /**
          * Only PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD + binding),
-         * ObservationController (contributor findings API), and ReactionController
-         * (contributor reactions) are allowed as REST entry points in the practices module.
+         * ObservationController (contributor findings API), ReactionController (contributor reactions), and
+         * PracticeReportController (mentor/maintainer non-competitive overview) are allowed as REST entry
+         * points in the practices module.
          */
         @Test
         void practicesHasDedicatedController() {
@@ -220,9 +155,11 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleName("ObservationController")
                 .orShould()
                 .haveSimpleName("ReactionController")
+                .orShould()
+                .haveSimpleName("PracticeReportController")
                 .because(
-                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, and " +
-                        "ReactionController are allowed REST entry points"
+                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, " +
+                        "ReactionController, and PracticeReportController are allowed REST entry points"
                 );
             rule.check(classes);
         }

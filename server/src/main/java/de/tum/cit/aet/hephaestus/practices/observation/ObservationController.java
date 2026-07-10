@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,11 +31,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Read-only REST API for practice observations.
+ * Read-only REST API for practice observations — the raw observation ledger.
  *
  * <p>All endpoints require workspace membership (enforced by {@link WorkspaceScopedController}).
  * List, summary, and detail endpoints are scoped to the authenticated developer's own
  * observations. The pull-request endpoint returns observations for all developers on that PR.
+ *
+ * <p>The synthesised per-developer report cards and the anonymised cohort rollup live on the sibling
+ * {@code /practices/reports} + {@code /practices/cohort} resources (see
+ * {@link de.tum.cit.aet.hephaestus.practices.report.PracticeReportController}).
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/observations")
@@ -83,31 +86,13 @@ public class ObservationController {
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class)))
     )
     @SecurityRequirements
-    public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
+    public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getMyPracticeSummary(WorkspaceContext workspaceContext) {
         List<DeveloperPracticeSummaryDTO> summaries = observationService
             .getSummary(workspaceContext.id())
             .stream()
             .map(DeveloperPracticeSummaryDTO::from)
             .toList();
         return ResponseEntity.ok(summaries);
-    }
-
-    @GetMapping("/reflection")
-    @Operation(
-        summary = "Reflective dashboard feedback for the current developer",
-        description = "Per-practice cards a developer can READ — why the practice matters, what good looks like, " +
-            "where they stand, the specific feedback to act on, and what they already do well. The third feedback " +
-            "channel alongside in-context SCM notes and the conversational mentor; the same findings reorganised by " +
-            "practice for self-paced reflection, not a scoreboard of counts."
-    )
-    @ApiResponse(
-        responseCode = "200",
-        description = "Per-practice reflection cards returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReflectionPracticeDTO.class)))
-    )
-    @SecurityRequirements
-    public ResponseEntity<List<ReflectionPracticeDTO>> getReflection(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(observationService.getReflection(workspaceContext.id()));
     }
 
     @GetMapping("/{observationId}")

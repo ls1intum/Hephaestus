@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -42,75 +41,16 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void updateNotificationsPersistsStateAndValidatesChannel() {
-        User owner = persistUser("notification-owner");
-        Workspace workspace = createWorkspace(
-            "notification-space",
-            "Notification Space",
-            "notification",
-            AccountType.ORG,
-            owner
-        );
+    void updateReviewCyclePersistsDayAndTime() {
+        User owner = persistUser("review-cycle-owner");
+        Workspace workspace = createWorkspace("review-cycle", "Review Cycle", "review-cycle", AccountType.ORG, owner);
 
-        // team + channelId live on the Slack Connection's config now,
-        // so updateNotifications requires an ACTIVE Slack Connection to exist.
-        // Seed one ourselves — the OAuth callback path normally provisions it; here we
-        // shortcut for the test.
-        persistSlackConnection(workspace);
-
-        workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, "core-team", "C12345678");
+        workspaceService.updateReviewCycle(workspace.getWorkspaceSlug(), 3, "08:30");
 
         Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
-
-        // team + channel are read back from the Slack Connection config.
-        var slack = connectionService.findSlackNotificationConfig(workspace.getId()).orElseThrow();
-        assertThat(slack.teamLabel()).isEqualTo("core-team");
-        assertThat(slack.notificationChannelId()).isEqualTo("C12345678");
-
-        assertThatThrownBy(() ->
-            workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, "invalid")
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Slack channel ID");
+        assertThat(updated.getReviewCycleDay()).isEqualTo(3);
+        assertThat(updated.getReviewCycleTime()).isEqualTo("08:30");
     }
-
-    @Test
-    void updateNotificationsWithoutSlackConnectionRejectsChannelChange() {
-        User owner = persistUser("no-slack-owner");
-        Workspace workspace = createWorkspace("no-slack", "No Slack", "no-slack", AccountType.ORG, owner);
-
-        // No Slack Connection seeded — supplying channelId must 409, not silently no-op.
-        assertThatThrownBy(() ->
-            workspaceService.updateNotifications(workspace.getWorkspaceSlug(), null, null, "C12345678")
-        )
-            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
-            .hasMessageContaining("No active Slack Connection");
-
-        // But toggling enabled-only without a Slack Connection is fine — independent meaning.
-        workspaceService.updateNotifications(workspace.getWorkspaceSlug(), true, null, null);
-        Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
-    }
-
-    private void persistSlackConnection(Workspace workspace) {
-        de.tum.cit.aet.hephaestus.integration.core.connection.Connection conn =
-            new de.tum.cit.aet.hephaestus.integration.core.connection.Connection(
-                workspace,
-                IntegrationKind.SLACK,
-                "test-team-id",
-                new ConnectionConfig.SlackConfig("test-team-id", "Test Team", null, null, java.util.Set.of())
-            );
-        org.springframework.test.util.ReflectionTestUtils.setField(
-            conn,
-            "state",
-            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE
-        );
-        connectionRepository.save(conn);
-    }
-
-    @Autowired
-    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository connectionRepository;
 
     @Test
     void workspaceLifecycleTransitions() {

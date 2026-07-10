@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 /**
  * Controller for managing teams within a workspace.
  * Teams are synchronized from the GitHub organization and can be configured
- * to filter leaderboard and activity data.
+ * to filter practice overview and activity data.
  */
 @WorkspaceScopedController
 @RequestMapping("/team")
@@ -57,8 +57,8 @@ public class TeamController {
     }
 
     /**
-     * Update team visibility in the leaderboard.
-     * Hidden teams are excluded from leaderboard calculations.
+     * Update team visibility in the practice overview.
+     * Hidden teams are excluded from the practice overview.
      *
      * @param workspaceContext the resolved workspace context
      * @param id the team ID
@@ -68,7 +68,7 @@ public class TeamController {
      */
     @PostMapping("/{id}/visibility")
     @RequireAtLeastWorkspaceAdmin
-    @Operation(summary = "Update team visibility", description = "Show or hide a team in leaderboard calculations")
+    @Operation(summary = "Update team visibility", description = "Show or hide a team in the practice overview")
     public ResponseEntity<Void> updateTeamVisibility(
         WorkspaceContext workspaceContext,
         @PathVariable Long id,

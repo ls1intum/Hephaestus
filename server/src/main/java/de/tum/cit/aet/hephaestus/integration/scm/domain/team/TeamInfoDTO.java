@@ -20,7 +20,7 @@ public record TeamInfoDTO(
     @Schema(description = "Privacy level of the team (SECRET or VISIBLE)") Privacy privacy,
     @Schema(description = "Organization the team belongs to") String organization,
     @Schema(description = "URL to the team's page on the git provider") String htmlUrl,
-    @NonNull @Schema(description = "Whether the team is hidden from leaderboard display") Boolean hidden,
+    @NonNull @Schema(description = "Whether the team is hidden from the practice overview display") Boolean hidden,
     @NonNull @Schema(description = "Repositories the team has access to") List<RepositoryInfoDTO> repositories,
     @NonNull @Schema(description = "Labels configured as filters for this team") List<LabelInfoDTO> labels,
     @NonNull @Schema(description = "Members of the team (excluding bots)") List<UserInfoDTO> members,
@@ -37,7 +37,7 @@ public record TeamInfoDTO(
      * @param isHidden whether the team is hidden in this scope
      * @param scopeLabels labels configured as filters for this team in this scope
      * @param hiddenRepoIds repository IDs hidden from contributions in this scope
-     * @param hiddenMemberIds user IDs hidden from leaderboard/team views in this workspace
+     * @param hiddenMemberIds user IDs hidden from the practice overview and team views in this workspace
      * @return the DTO with scope-specific settings applied
      */
     public static TeamInfoDTO fromTeamWithScopeSettings(

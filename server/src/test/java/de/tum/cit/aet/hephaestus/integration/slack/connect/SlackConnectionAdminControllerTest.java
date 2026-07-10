@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Optional;
@@ -113,6 +114,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
     }

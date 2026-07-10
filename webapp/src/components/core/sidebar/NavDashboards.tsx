@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Sparkles, Trophy, User, Users } from "lucide-react";
+import { Radar, Sparkles, User, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -9,16 +9,20 @@ import {
 } from "@/components/ui/sidebar";
 
 export function NavDashboards({
-	username,
 	workspaceSlug,
 	achievementsEnabled = true,
-	leaderboardEnabled = true,
+	practicesEnabled = true,
+	isAdmin = false,
+	cohortVisibility = "MENTORS_ONLY",
 }: {
-	username: string;
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
-	leaderboardEnabled?: boolean;
+	practicesEnabled?: boolean;
+	isAdmin?: boolean;
+	cohortVisibility?: "MENTORS_ONLY" | "EVERYONE";
 }) {
+	const canSeePracticeOverview = isAdmin || cohortVisibility === "EVERYONE";
+
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Dashboards</SidebarGroupLabel>
@@ -26,17 +30,23 @@ export function NavDashboards({
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Profile"
-						render={
-							<Link
-								to="/w/$workspaceSlug/user/$username"
-								params={{ username: username ?? "", workspaceSlug }}
-							/>
-						}
+						render={<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} />}
 					>
 						<User />
 						<span>Profile</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
+				{practicesEnabled && canSeePracticeOverview && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Practice Overview"
+							render={<Link to="/w/$workspaceSlug/practice-overview" params={{ workspaceSlug }} />}
+						>
+							<Radar />
+							<span>Practice Overview</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 				{achievementsEnabled && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
@@ -45,17 +55,6 @@ export function NavDashboards({
 						>
 							<Sparkles />
 							<span>Achievements</span>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				)}
-				{leaderboardEnabled && (
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							tooltip="Leaderboard"
-							render={<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} />}
-						>
-							<Trophy />
-							<span>Leaderboard</span>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}

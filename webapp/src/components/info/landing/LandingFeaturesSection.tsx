@@ -1,4 +1,4 @@
-import { CheckCheck, Trophy } from "lucide-react";
+import { CheckCheck, Sprout } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,24 +23,26 @@ export function LandingFeaturesSection() {
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<Trophy className="h-5 w-5 text-yellow-500" />
+								<Sprout className="h-5 w-5 text-provider-done-foreground" />
 							</div>
-							<CardTitle>Code Review Gamification</CardTitle>
-							<CardDescription>Transform code reviews into learning opportunities</CardDescription>
+							<CardTitle>Practice Feedback</CardTitle>
+							<CardDescription>
+								Turn code reviews into personal, non-competitive growth
+							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly leaderboards with GitHub integration</span>
+									<span>Practice-by-practice feedback on your own work</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Team competitions across multiple repositories</span>
+									<span>A mentoring overview across the whole cohort</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured league system for ongoing engagement</span>
+									<span>Growth signals, never scores or rankings</span>
 								</li>
 							</ul>
 						</CardContent>

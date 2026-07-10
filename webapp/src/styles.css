@@ -60,12 +60,7 @@ code {
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.871 0.006 286.286);
 
-  /* League colors */
-  --league-bronze: oklch(0.69 0.1181 63.51);
-  --league-silver: oklch(0.81 0 0);
-  --league-gold: oklch(0.83 0.1694 90.75);
-  --league-diamond: oklch(0.52 0.206 265.51);
-  --league-master: oklch(0.73 0.1946 351.86);
+  /* Mentor colors */
 
   --mentor: oklch(0.623 0.214 259.815);
   --mentor-foreground: oklch(0.97 0.014 254.604);
@@ -125,12 +120,7 @@ code {
   --sidebar-border: oklch(0.274 0.006 286.033);
   --sidebar-ring: oklch(0.442 0.017 285.786);
 
-  /* League colors */
-  --league-bronze: oklch(0.69 0.1181 63.52);
-  --league-silver: oklch(0.81 0 0);
-  --league-gold: oklch(0.83 0.1694 90.75);
-  --league-diamond: oklch(0.52 0.206 265.51);
-  --league-master: oklch(0.73 0.1946 351.86);
+  /* Mentor colors */
 
   --mentor: oklch(0.546 0.245 262.881);
   --mentor-foreground: oklch(0.379 0.146 265.522);
@@ -243,12 +233,7 @@ code {
 	/* GitLab brand-only token (used by GitLabSignInButton). Source: design.gitlab.com */
 	--color-gitlab-orange: #fc6d26;
 
-	/* League colors */
-	--color-league-bronze: var(--league-bronze);
-	--color-league-silver: var(--league-silver);
-	--color-league-gold: var(--league-gold);
-	--color-league-diamond: var(--league-diamond);
-	--color-league-master: var(--league-master);
+	/* Mentor colors */
 
 	--color-mentor: var(--mentor);
 	--color-mentor-foreground: var(--mentor-foreground);
@@ -423,21 +408,6 @@ code {
   to {
     height: 0;
   }
-}
-
-/* Leaderboard fade out effect */
-.leaderboard-fade-out {
-  position: relative;
-  mask-image: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 1) 60%,
-    rgba(0, 0, 0, 0)
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 1) 60%,
-    rgba(0, 0, 0, 0)
-  );
 }
 
 /* ProseMirror editor styles */

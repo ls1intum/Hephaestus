@@ -43,12 +43,12 @@ public enum ActivityEventType {
     REVIEW_COMMENTED("review.commented"),
     /** Review with unknown state (API returned unknown/pending state) */
     REVIEW_UNKNOWN("review.unknown"),
-    /** Review dismissed - XP adjustment event (negative XP to reverse original review) */
+    /** Review dismissed - reverses a previously submitted review */
     REVIEW_DISMISSED("review.dismissed"),
     /** Review edited - state or content changed (e.g., COMMENTED → APPROVED) */
     REVIEW_EDITED("review.edited"),
 
-    // Comments (Collaboration quality - for leaderboard scoring)
+    // Comments (Collaboration quality - for activity scoring)
     /** Comment created on issue or pull request (general discussion) */
     COMMENT_CREATED("comment.created"),
     /** Comment updated - audit trail */

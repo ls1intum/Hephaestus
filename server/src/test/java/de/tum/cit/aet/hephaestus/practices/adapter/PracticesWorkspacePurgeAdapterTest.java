@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
+import de.tum.cit.aet.hephaestus.core.audit.DataAccessAuditWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -28,6 +29,9 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @Mock
     private PracticeAreaRepository practiceAreaRepository;
 
+    @Mock
+    private DataAccessAuditWriter dataAccessAuditWriter;
+
     private PracticesWorkspacePurgeAdapter adapter;
 
     @BeforeEach
@@ -36,7 +40,8 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
             feedbackRepository,
             observationRepository,
             practiceRepository,
-            practiceAreaRepository
+            practiceAreaRepository,
+            dataAccessAuditWriter
         );
     }
 
@@ -59,6 +64,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         inOrder.verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(practiceAreaRepository).deleteAllByWorkspaceId(workspaceId);
+        verify(dataAccessAuditWriter).purgeWorkspace(workspaceId);
     }
 
     @Test

@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
 	initiateMutation,
 	sendTestMessageMutation,
-	updateLeaderboardDigestMutation,
 	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
 import {
@@ -20,23 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 export interface AdminSlackNotificationSettingsProps {
 	workspaceSlug: string;
@@ -44,86 +28,42 @@ export interface AdminSlackNotificationSettingsProps {
 	/** Active Slack connection id; enables the Disconnect affordance when present. */
 	slackConnectionId?: number;
 	channelId?: string;
-	teamLabel?: string;
-	enabled: boolean;
-	/** Day of week the weekly cycle ends (1=Monday … 7=Sunday). */
-	scheduleDay?: number;
-	/** Time of day the weekly cycle ends, "HH:mm" (24h). */
-	scheduleTime?: string;
 	onSaved: () => void;
 }
 
-// Client-side format hints only — the server re-validates both on save.
+// Client-side format hint only — the server re-validates.
 const SLACK_CHANNEL_ID = /^[CGD][A-Z0-9]{8,}$/;
-const TIME_24H = /^([01]\d|2[0-3]):[0-5]\d$/;
-const DEFAULT_DAY = 1;
-const DEFAULT_TIME = "09:00";
-
-const DAYS = [
-	{ value: "1", label: "Monday" },
-	{ value: "2", label: "Tuesday" },
-	{ value: "3", label: "Wednesday" },
-	{ value: "4", label: "Thursday" },
-	{ value: "5", label: "Friday" },
-	{ value: "6", label: "Saturday" },
-	{ value: "7", label: "Sunday" },
-];
 
 export function AdminSlackNotificationSettings({
 	workspaceSlug,
 	hasSlackConnection,
 	slackConnectionId,
 	channelId,
-	teamLabel,
-	enabled,
-	scheduleDay,
-	scheduleTime,
 	onSaved,
 }: AdminSlackNotificationSettingsProps) {
-	// State initializes ONCE from props. There is intentionally no prop→state effect:
-	// the parent gives this component a `key` derived from the server snapshot, so a
-	// post-OAuth refetch produces a fresh key and React remounts us with server truth
-	// (https://react.dev/learn/you-might-not-need-an-effect — "resetting all state when
-	// a prop changes"). This avoids the dirty-flag effect maze that silently dropped
-	// server updates once the admin touched any field.
 	const [channelInput, setChannelInput] = useState(channelId ?? "");
-	const [teamInput, setTeamInput] = useState(teamLabel ?? "");
-	const [enabledInput, setEnabledInput] = useState(enabled);
-	const [dayInput, setDayInput] = useState(String(scheduleDay ?? DEFAULT_DAY));
-	const [timeInput, setTimeInput] = useState(scheduleTime ?? DEFAULT_TIME);
 	const [disconnectOpen, setDisconnectOpen] = useState(false);
 
-	// Pop any OAuth-callback result the /integrations route stashed and surface it.
-	// Legitimate effect: it reads-and-clears a one-shot sessionStorage flag on mount.
+	const channelInvalid = channelInput.length > 0 && !SLACK_CHANNEL_ID.test(channelInput);
+
 	useEffect(() => {
 		const result = window.sessionStorage.getItem("slack-connect-result");
 		if (!result) return;
-		const reason = window.sessionStorage.getItem("slack-connect-reason") ?? undefined;
+
+		const reason = window.sessionStorage.getItem("slack-connect-reason");
 		window.sessionStorage.removeItem("slack-connect-result");
 		window.sessionStorage.removeItem("slack-connect-reason");
-		if (result === "success") toast.success("Slack workspace connected");
-		else toast.error("Slack connection failed", { description: reason });
-	}, []);
 
-	const channelInvalid = channelInput.length > 0 && !SLACK_CHANNEL_ID.test(channelInput);
-	const channelValid = SLACK_CHANNEL_ID.test(channelInput);
-	const timeInvalid = !TIME_24H.test(timeInput);
-
-	// One atomic endpoint persists schedule (day/time) + notification (channel/team/enabled)
-	// in a single transaction, so a mid-save failure can't leave the schedule changed but the
-	// channel not (the prior two-call pattern could).
-	const save = useMutation({
-		...updateLeaderboardDigestMutation(),
-		onSuccess: () => {
-			toast.success("Slack notification settings saved");
+		if (result === "success") {
+			toast.success("Slack connected");
 			onSaved();
-		},
-		onError: (e) => {
-			toast.error("Failed to save Slack notification settings", {
-				description: e instanceof Error ? e.message : undefined,
-			});
-		},
-	});
+			return;
+		}
+
+		toast.error("Slack connection failed", {
+			description: reason ?? undefined,
+		});
+	}, [onSaved]);
 
 	const test = useMutation({
 		...sendTestMessageMutation(),
@@ -134,7 +74,6 @@ export function AdminSlackNotificationSettings({
 				});
 				return;
 			}
-			// The probe always returns 200; a falsy `ok` carries the Slack API reason.
 			const reason =
 				data.slackError === "no_channel_configured"
 					? "No channel is configured — enter a channel ID first."
@@ -155,8 +94,6 @@ export function AdminSlackNotificationSettings({
 				window.location.assign(initiation.vendorUrl);
 				return; // page is unloading
 			}
-			// Slack is always a REDIRECT flow. Any other shape is a contract change we want
-			// to fail loudly on, not paper over with a wrong success toast.
 			throw new Error(`Unexpected non-redirect Slack initiation: ${initiation.type}`);
 		},
 		onError: (e) => {
@@ -183,13 +120,12 @@ export function AdminSlackNotificationSettings({
 	return (
 		<div className="space-y-6">
 			<div>
-				<h2 className="text-lg font-semibold mb-4">Slack notifications</h2>
+				<h2 className="text-lg font-semibold mb-4">Slack connection</h2>
 				<Card>
 					<CardContent className="space-y-4">
 						<p className="text-sm text-muted-foreground">
-							Post the weekly leaderboard digest to a Slack channel. The bot is installed once per
-							workspace via OAuth; you can change the channel and schedule later without
-							re-installing.
+							Connect a Slack workspace so Hephaestus can post to it. The bot is installed once per
+							workspace via OAuth.
 						</p>
 
 						{!hasSlackConnection ? (
@@ -220,134 +156,43 @@ export function AdminSlackNotificationSettings({
 						) : (
 							<>
 								<div className="flex items-center gap-2 text-sm">
-									{/* no semantic success token in the kit */}
-									<CheckIcon className="size-4 text-green-600 dark:text-green-400" />
+									<CheckIcon className="size-4 text-provider-done-foreground" />
 									<span>Slack workspace connected</span>
 								</div>
 
-								<FieldGroup>
-									<Field orientation="horizontal">
-										<FieldContent>
-											<FieldLabel htmlFor="slack-enabled" className="font-medium">
-												Send weekly digest
-											</FieldLabel>
-											<FieldDescription>
-												Posts on the schedule below; the leaderboard cycle ends at the same moment.
-											</FieldDescription>
-										</FieldContent>
-										<Switch
-											id="slack-enabled"
-											checked={enabledInput}
-											disabled={save.isPending}
-											onCheckedChange={setEnabledInput}
-										/>
-									</Field>
-
-									<div className="grid grid-cols-2 gap-4">
-										<Field>
-											<FieldLabel htmlFor="slack-day">Day</FieldLabel>
-											<Select
-												items={DAYS}
-												value={dayInput}
-												disabled={save.isPending}
-												onValueChange={(value) => {
-													if (value) setDayInput(value);
-												}}
-											>
-												<SelectTrigger id="slack-day">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													{DAYS.map((d) => (
-														<SelectItem key={d.value} value={d.value}>
-															{d.label}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</Field>
-
-										<Field data-invalid={timeInvalid}>
-											<FieldLabel htmlFor="slack-time">Time (24h)</FieldLabel>
-											<Input
-												id="slack-time"
-												type="time"
-												value={timeInput}
-												disabled={save.isPending}
-												onChange={(e) => setTimeInput(e.target.value)}
-												aria-invalid={timeInvalid}
-											/>
-											<FieldDescription>
-												When the weekly cycle ends and the digest posts (workspace timezone).
-											</FieldDescription>
-											{timeInvalid && <FieldError>Time must be in HH:mm format.</FieldError>}
-										</Field>
-									</div>
-
-									<Field data-invalid={channelInvalid}>
-										<FieldLabel htmlFor="slack-channel">Channel ID</FieldLabel>
-										<Input
-											id="slack-channel"
-											value={channelInput}
-											disabled={save.isPending}
-											onChange={(e) => setChannelInput(e.target.value.trim())}
-											placeholder="C0974LJBPBK"
-											autoComplete="off"
-											aria-invalid={channelInvalid}
-										/>
-										<FieldDescription>
-											Right-click the channel in Slack → <em>View channel details</em> → copy the ID
-											at the bottom. The bot must already be a member (or the channel must be public
-											— the bot installed with <code>chat:write.public</code>).
-										</FieldDescription>
-										{channelInvalid && (
-											<FieldError>
-												Channel IDs start with C / G / D followed by 8+ alphanumerics.
-											</FieldError>
-										)}
-									</Field>
-
-									<Field>
-										<FieldLabel htmlFor="slack-team">Team filter (optional)</FieldLabel>
-										<Input
-											id="slack-team"
-											value={teamInput}
-											disabled={save.isPending}
-											onChange={(e) => setTeamInput(e.target.value)}
-											placeholder="e.g. engineering"
-											autoComplete="off"
-										/>
-										<FieldDescription>
-											Restrict the leaderboard to a single team. Leave blank to include every
-											contributor in the workspace.
-										</FieldDescription>
-									</Field>
-								</FieldGroup>
+								<Field data-invalid={channelInvalid}>
+									<FieldLabel htmlFor="slack-channel">
+										Channel ID for this test message (optional)
+									</FieldLabel>
+									<Input
+										id="slack-channel"
+										value={channelInput}
+										onChange={(e) => setChannelInput(e.target.value.trim())}
+										placeholder="C0974LJBPBK"
+										autoComplete="off"
+										aria-invalid={channelInvalid}
+									/>
+									<FieldDescription>
+										Leave blank to use the server-configured channel, or paste a channel ID from
+										Slack. The bot must already be a member (or the channel must be public).
+									</FieldDescription>
+									{channelInvalid && (
+										<FieldError>
+											Channel IDs start with C / G / D followed by 8+ alphanumerics.
+										</FieldError>
+									)}
+								</Field>
 
 								<div className="flex gap-2 pt-2">
 									<Button
-										onClick={() =>
-											save.mutate({
-												path: { workspaceSlug },
-												body: {
-													day: Number(dayInput),
-													time: timeInput,
-													enabled: enabledInput,
-													channelId: channelInput.length > 0 ? channelInput : undefined,
-													team: teamInput.length > 0 ? teamInput : undefined,
-												},
-											})
-										}
-										disabled={save.isPending || channelInvalid || timeInvalid}
-									>
-										{save.isPending ? "Saving…" : "Save"}
-									</Button>
-									<Button
 										variant="outline"
 										onClick={() =>
-											test.mutate({ path: { workspaceSlug }, body: { channelId: channelInput } })
+											test.mutate({
+												path: { workspaceSlug },
+												body: { channelId: channelInput || undefined },
+											})
 										}
-										disabled={test.isPending || !channelValid}
+										disabled={test.isPending || channelInvalid}
 									>
 										<SendIcon className="mr-2 size-3.5" />
 										{test.isPending ? "Sending…" : "Send test message"}
@@ -377,8 +222,8 @@ export function AdminSlackNotificationSettings({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Disconnect Slack?</AlertDialogTitle>
 						<AlertDialogDescription>
-							The weekly digest will stop posting and the bot will be uninstalled from this
-							workspace. You can reconnect later, but you will need to re-authorize via OAuth.
+							The bot will be uninstalled from this workspace. You can reconnect later, but you will
+							need to re-authorize via OAuth.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

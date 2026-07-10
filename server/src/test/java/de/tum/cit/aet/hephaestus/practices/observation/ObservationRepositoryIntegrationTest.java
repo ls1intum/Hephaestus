@@ -17,13 +17,19 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.CohortStandingRow;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
+import de.tum.cit.aet.hephaestus.practices.report.PracticeReportService;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
@@ -59,7 +65,16 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private WorkspaceMembershipRepository workspaceMembershipRepository;
+
+    @Autowired
     private GitProviderRepository gitProviderRepository;
+
+    @Autowired
+    private ObservationService observationService;
+
+    @Autowired
+    private ReviewCycleWindowResolver reviewCycleWindowResolver;
 
     private Workspace workspace;
     private Practice practice;
@@ -91,6 +106,11 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
         aboutUser = TestUserFactory.createUser(100L, "test-about-user", provider);
         aboutUser = userRepository.save(aboutUser);
+        WorkspaceMembership membership = new WorkspaceMembership();
+        membership.setWorkspace(workspace);
+        membership.setUser(aboutUser);
+        membership.setRole(WorkspaceMembership.WorkspaceRole.MEMBER);
+        workspaceMembershipRepository.save(membership);
     }
 
     @Nested
@@ -464,6 +484,17 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         private void insertFindingForJob(String key, UUID jobId, long artifactId, String presence, Instant at) {
+            insertFindingForUser(key, jobId, artifactId, aboutUser.getId(), presence, at);
+        }
+
+        private void insertFindingForUser(
+            String key,
+            UUID jobId,
+            long artifactId,
+            Long aboutUserId,
+            String presence,
+            Instant at
+        ) {
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 key,
@@ -472,7 +503,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 "PULL_REQUEST",
                 artifactId,
-                aboutUser.getId(),
+                aboutUserId,
                 "Test observation",
                 presence,
                 "PRESENT".equals(presence) ? "GOOD" : "BAD",
@@ -483,6 +514,67 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 at
             );
+        }
+
+        @Test
+        @DisplayName("R1: a reviewer's observation survives a LATER author job on the same PR (per-subject grain)")
+        void reviewerObservationSurvivesLaterAuthorJobOnSamePr() {
+            // Reviewer attribution (ADR 0021 C2): a REVIEWER and the AUTHOR both have observations on PR 7, and
+            // the AUTHOR's job runs LATER. Latest-run dedup is per (artifact_type, artifact_id, about_user_id) —
+            // so the author's later job must NOT evict the reviewer's observations from that PR. Pre-fix (grain
+            // was per artifact only) the author's later run would be selected as THE latest run for the PR and
+            // the reviewer's row would be excluded → the reviewer would silently vanish from every aggregate.
+            GitProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+                .orElseGet(() ->
+                    gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+                );
+            User reviewer = userRepository.save(TestUserFactory.createUser(200L, "reviewer-user", provider));
+
+            AgentJob reviewerJob = new AgentJob();
+            reviewerJob.setWorkspace(workspace);
+            reviewerJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            reviewerJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            reviewerJob = agentJobRepository.save(reviewerJob);
+
+            AgentJob authorJob = new AgentJob();
+            authorJob.setWorkspace(workspace);
+            authorJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            authorJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            authorJob = agentJobRepository.save(authorJob);
+
+            insertFindingForUser(
+                "r1-reviewer",
+                reviewerJob.getId(),
+                7L,
+                reviewer.getId(),
+                "ABSENT",
+                Instant.parse("2026-04-01T10:00:00Z")
+            );
+            insertFindingForUser(
+                "r1-author",
+                authorJob.getId(),
+                7L,
+                aboutUser.getId(),
+                "PRESENT",
+                Instant.parse("2026-04-05T10:00:00Z") // LATER than the reviewer's run
+            );
+
+            // The reviewer's own summary still shows their PR-7 finding — not evicted by the author's later job.
+            List<DeveloperPracticeSummary> reviewerSummary = observationRepository.findDeveloperPracticeSummary(
+                reviewer.getId(),
+                workspace.getId()
+            );
+            assertThat(reviewerSummary).hasSize(1);
+            assertThat(reviewerSummary.get(0).getPresence()).isEqualTo(Presence.ABSENT);
+
+            // …and the author's summary independently reflects their own latest run for the same PR.
+            List<DeveloperPracticeSummary> authorSummary = observationRepository.findDeveloperPracticeSummary(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+            assertThat(authorSummary).hasSize(1);
+            assertThat(authorSummary.get(0).getPresence()).isEqualTo(Presence.PRESENT);
         }
 
         @Test
@@ -806,7 +898,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     class AreaStandingCorroborationTests {
 
         /**
-         * The native COUNT(DISTINCT artifact_id) / MAX(confidence) the standing floor (P4) keys on must be
+         * The native COUNT(DISTINCT artifact_id) / MAX(confidence) the standing floor keys on must be
          * computed correctly against real Postgres — a unit test mocks the row, so the SQL itself is only
          * exercised here. Two distinct PRs flagged BAD on the same area → distinctTargets=2; the max
          * confidence across the group is surfaced for the quarantine floor.
@@ -850,7 +942,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
          * {@code :since} look-back. With {@code recentSince} strictly later than {@code since} and one of two
          * findings falling before it, recentCount must be 1 while count is 2 — a regression that reused
          * {@code :since} for the SUM (or dropped the :recentSince bind) would make recentCount == count and be
-         * caught here. The mentor standing floor (P4) keys on this distinction.
+         * caught here. The mentor standing floor keys on this distinction.
          */
         @Test
         @DisplayName("area-standing recentCount counts only the recent window, not the full look-back")
@@ -915,6 +1007,230 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 at
             );
+        }
+    }
+
+    /**
+     * The reviewer-craft firewall at the JPQL layer (ADR 0021 C2): the author's IN_CONTEXT ledger is sourced
+     * from {@code findByAgentJobIdExcludingSlugs(jobId, REVIEWER_AUDIENCE_SLUGS)}, so a reviewer-audience
+     * observation persisted on the same job/PR must never appear in that source set — while the unfiltered
+     * {@code findByAgentJobId} still returns it (proving the exclusion is the query's doing, not that the row
+     * was never written). A regression to {@code Set.of()} would fuse a reviewer's craft into the author's
+     * delivered-feedback record.
+     */
+    @Nested
+    class ReviewerAudienceExclusionTests {
+
+        @Test
+        @DisplayName("findByAgentJobIdExcludingSlugs drops the reviewer-audience row; the unfiltered read keeps both")
+        void excludesReviewerAudienceObservationsFromAuthorLedgerSource() {
+            // A reviewer-audience practice (its slug IS in REVIEWER_AUDIENCE_SLUGS). The setUp `practice`
+            // ("test-practice") is author-audience (NOT in the set).
+            Practice reviewerPractice = new Practice();
+            reviewerPractice.setWorkspace(workspace);
+            reviewerPractice.setSlug("leaves-useful-specific-review-comments");
+            reviewerPractice.setName("Useful review comments");
+            reviewerPractice.setCriteria("Reviewer craft");
+            reviewerPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("ReviewSubmitted")));
+            reviewerPractice = practiceRepository.save(reviewerPractice);
+
+            // Same agent job, same PR (artifact 7): one author-audience observation, one reviewer-audience.
+            UUID authorObservationId = UUID.randomUUID();
+            observationRepository.insertIfAbsent(
+                authorObservationId,
+                "excl-author-key",
+                agentJob.getId(),
+                practice.getId(),
+                null,
+                "PULL_REQUEST",
+                7L,
+                aboutUser.getId(),
+                "Author-audience finding",
+                "PRESENT",
+                "GOOD",
+                "INFO",
+                0.9f,
+                null,
+                null,
+                null,
+                Instant.now()
+            );
+            UUID reviewerObservationId = UUID.randomUUID();
+            observationRepository.insertIfAbsent(
+                reviewerObservationId,
+                "excl-reviewer-key",
+                agentJob.getId(),
+                reviewerPractice.getId(),
+                null,
+                "PULL_REQUEST",
+                7L,
+                aboutUser.getId(),
+                "Vague review comment",
+                "ABSENT",
+                "BAD",
+                "MINOR",
+                0.9f,
+                null,
+                null,
+                null,
+                Instant.now()
+            );
+
+            // Unfiltered read: BOTH rows — so the exclusion below is the query filtering, not a missing insert.
+            assertThat(observationRepository.findByAgentJobId(agentJob.getId()))
+                .extracting(Observation::getId)
+                .containsExactlyInAnyOrder(authorObservationId, reviewerObservationId);
+
+            // Firewalled read: ONLY the author-audience row survives the reviewer-audience-slug exclusion.
+            assertThat(
+                observationRepository.findByAgentJobIdExcludingSlugs(
+                    agentJob.getId(),
+                    ReviewerAudiencePractices.REVIEWER_AUDIENCE_SLUGS
+                )
+            )
+                .extracting(Observation::getId)
+                .containsExactly(authorObservationId);
+        }
+    }
+
+    /**
+     * Quarantine parity: the cohort SQL {@code findCohortStandingByAreaAndWorkspace} and the
+     * developer's own reflection ({@link ObservationService#getPracticeReport}) must reach the SAME verdict on the
+     * SAME single-target BAD. Both apply the identical floor — a single-target BAD with confidence &lt; 0.5 is
+     * quarantined (excluded), a confident one is not.
+     *
+     * <p><b>How parity is pinned.</b> Both surfaces are driven from ONE inserted observation per test (same
+     * about-user, same reviewing practice, same artifact, same confidence). The recency bound is the SAME
+     * value on both paths: {@code getPracticeReport} computes {@code since} internally from
+     * {@link ReviewCycleWindowResolver#previousCycleWindow}, and the cohort assertion passes exactly that same
+     * {@code previousCycleWindow(workspace).after()} (truncated to the minute, so both reads see it identically
+     * within a test run). So any divergence between the two is a floor-application difference, not an input or
+     * window difference.
+     */
+    @Nested
+    class QuarantineParityTests {
+
+        private Practice reviewingPractice;
+        private Instant since;
+
+        /** Seed a reviewing area + one active reviewing practice, and capture the shared recency bound. */
+        private void seedReviewingArea() {
+            PracticeArea area = new PracticeArea();
+            area.setWorkspace(workspace);
+            area.setSlug(PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG);
+            area.setName("Constructive code review");
+            area = practiceAreaRepository.save(area);
+
+            reviewingPractice = new Practice();
+            reviewingPractice.setWorkspace(workspace);
+            reviewingPractice.setArea(area);
+            reviewingPractice.setSlug("leaves-useful-specific-review-comments");
+            reviewingPractice.setName("Useful review comments");
+            reviewingPractice.setCriteria("Reviewer craft");
+            reviewingPractice.setActive(true);
+            reviewingPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("ReviewSubmitted")));
+            reviewingPractice = practiceRepository.save(reviewingPractice);
+
+            // The exact bound getPracticeReport() will recompute internally — pins window parity across the surfaces.
+            since = reviewCycleWindowResolver.previousCycleWindow(workspace).after();
+        }
+
+        private void insertBad(String key, long artifactId, float confidence) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                agentJob.getId(),
+                reviewingPractice.getId(),
+                null,
+                "PULL_REQUEST",
+                artifactId,
+                aboutUser.getId(),
+                "Vague review comment",
+                "ABSENT",
+                "BAD",
+                "MINOR",
+                confidence,
+                null,
+                null, // recurrence_key null → corroboration falls back to the whole-group distinct-target count
+                null,
+                Instant.now()
+            );
+        }
+
+        /** The cohort query's EFFECTIVE bad count for our (developer, reviewing practice) pair (0 if no row). */
+        private long cohortBadCount() {
+            return observationRepository
+                .findCohortStandingByAreaAndWorkspace(
+                    workspace.getId(),
+                    PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG,
+                    since
+                )
+                .stream()
+                .filter(
+                    r ->
+                        reviewingPractice.getSlug().equals(r.getPracticeSlug()) &&
+                        aboutUser.getId().equals(r.getAboutUserId())
+                )
+                .mapToLong(CohortStandingRow::getBadCount)
+                .sum();
+        }
+
+        /** Whether the developer's own reflection surfaces a {@code toWorkOn} item for the reviewing practice. */
+        private boolean reflectionFlagsPractice() {
+            return observationService
+                .getPracticeReport(workspace.getId(), aboutUser.getId())
+                .stream()
+                .anyMatch(card -> reviewingPractice.getSlug().equals(card.slug()) && !card.toWorkOn().isEmpty());
+        }
+
+        @Test
+        @DisplayName("a single-target low-confidence BAD is quarantined identically on cohort and reflection")
+        void quarantinedBadIsNeitherACohortProblemNorAReflectionToWorkOnItem() {
+            seedReviewingArea();
+            insertBad("parity-quarantined", 7L, 0.4f); // single target + confidence < 0.5 → quarantined on BOTH
+
+            // (i) cohort: the BAD is excluded from badCount, so the developer is NOT DEVELOPING on this practice.
+            long badCount = cohortBadCount();
+            assertThat(badCount).isZero();
+            assertThat(PracticeStatusDeriver.derive(badCount > 0, false)).isNotEqualTo(PracticeStatus.DEVELOPING);
+
+            // (ii) reflection: the same quarantined BAD produces no toWorkOn item on the developer's own surface.
+            assertThat(reflectionFlagsPractice()).isFalse();
+        }
+
+        @Test
+        @DisplayName("a high-confidence BAD is flagged identically on cohort and reflection")
+        void confidentBadIsFlaggedOnBothSurfaces() {
+            seedReviewingArea();
+            insertBad("parity-confident", 7L, 0.8f); // single target but confidence ≥ 0.5 → NOT quarantined
+
+            // (i) cohort: the confident BAD counts → the developer is DEVELOPING on this practice.
+            long badCount = cohortBadCount();
+            assertThat(badCount).isEqualTo(1L);
+            assertThat(PracticeStatusDeriver.derive(badCount > 0, false)).isEqualTo(PracticeStatus.DEVELOPING);
+
+            // (ii) reflection: the same confident BAD DOES surface as a toWorkOn item — floor applied consistently.
+            assertThat(reflectionFlagsPractice()).isTrue();
+        }
+
+        @Test
+        @DisplayName("hidden workspace members are excluded from the practice overview cohort query")
+        void hiddenMembersAreExcludedFromCohortStanding() {
+            seedReviewingArea();
+            insertBad("hidden-member", 7L, 0.8f);
+            WorkspaceMembership membership = workspaceMembershipRepository
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), aboutUser.getId())
+                .orElseThrow();
+            membership.setHidden(true);
+            workspaceMembershipRepository.saveAndFlush(membership);
+
+            assertThat(
+                observationRepository.findCohortStandingByAreaAndWorkspace(
+                    workspace.getId(),
+                    PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG,
+                    since
+                )
+            ).isEmpty();
         }
     }
 }

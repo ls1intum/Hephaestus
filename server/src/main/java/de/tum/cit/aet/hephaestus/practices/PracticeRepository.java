@@ -48,6 +48,26 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findByWorkspaceIdAndAreaId(Long workspaceId, Long areaId);
 
     /**
+     * Active practices under an area (by area slug), in catalogue order — the reviewing-practice set the
+     * mentor overview (cohort cards + roster columns) iterates. Ordered by the practice display order so the
+     * overview presents practices in their configured order, never by any activity count.
+     */
+    @Query(
+        """
+        SELECT p FROM Practice p
+        JOIN p.area a
+        WHERE p.workspace.id = :workspaceId
+        AND a.slug = :areaSlug
+        AND p.active = true
+        ORDER BY p.displayOrder ASC, p.slug ASC
+        """
+    )
+    List<Practice> findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(
+        @Param("workspaceId") Long workspaceId,
+        @Param("areaSlug") String areaSlug
+    );
+
+    /**
      * Acquire a row-level write lock on a practice ({@code SELECT ... FOR UPDATE}). Used to serialise
      * {@link PracticeRevision} appends per practice: holding this lock for the duration of the
      * read-max-then-insert makes the next revision number race-free, so concurrent criteria edits append

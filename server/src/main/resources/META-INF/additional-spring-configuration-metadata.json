@@ -26,7 +26,7 @@
     },
     {
       "name": "hephaestus.activity",
-      "description": "Activity event tracking and XP scoring settings"
+      "description": "Activity event tracking settings"
     },
     {
       "name": "hephaestus.integration.slack",
@@ -43,14 +43,9 @@
   ],
   "properties": [
     {
-      "name": "hephaestus.leaderboard.schedule.cron",
-      "type": "java.lang.String",
-      "description": "Cron expression for leaderboard calculation"
-    },
-    {
       "name": "hephaestus.activity.self-review-author-logins",
       "type": "java.util.List",
-      "description": "List of bot logins whose PRs are excluded from self-review scoring"
+      "description": "List of bot logins whose PRs are excluded from self-review detection"
     },
     {
       "name": "hephaestus.integration.github.sync.graphql-timeout",

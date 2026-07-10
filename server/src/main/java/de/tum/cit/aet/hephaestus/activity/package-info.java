@@ -1,10 +1,9 @@
 /**
- * Append-only activity event log used for gamification and leaderboard aggregation.
+ * Append-only activity event log used for gamification and contribution aggregation.
  *
  * <p>The module owns {@code activity_event} and emits {@code ActivitySavedEvent} on insert.
- * XP is pre-computed at write time so reads are O(1) and leaderboard queries reduce to
- * SUM/GROUP BY against the event table — see {@link de.tum.cit.aet.hephaestus.leaderboard}
- * for the read side.
+ * Aggregate queries reduce to COUNT/GROUP BY against the event table (see {@code profile}
+ * for a read side).
  *
  * <p>Distinct bounded context from {@link de.tum.cit.aet.hephaestus.practices} (code-health
  * analysis), even though both consume {@code ScmDomainEvent}s.

@@ -632,7 +632,7 @@ public class GitLabCommitMergeRequestLinker {
      * row and backfills {@code commit_contributor.user_id} for every contributor
      * row carrying that email, as well as the denormalized {@code git_commit.author_id}
      * and {@code git_commit.committer_id} columns scoped to this repository so that
-     * commit-centric queries (leaderboards, activity feeds) see the attributed user.
+     * commit-centric queries (the practice overview and activity feeds) see the attributed user.
      */
     private int reconcileCommitContributorUsers(
         Map<String, Set<String>> loginToEmails,

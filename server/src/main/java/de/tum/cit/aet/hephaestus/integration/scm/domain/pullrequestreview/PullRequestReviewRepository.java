@@ -18,8 +18,6 @@ import org.springframework.stereotype.Repository;
  * {@code pull_request_id -> pull_request.repository_id -> repository.workspace_id}.
  * Provider-domain lookups (by native ID + provider ID, by pull-request ID) run during
  * sync flows; workspace context is established by the caller.
- *
- * @see de.tum.cit.aet.hephaestus.leaderboard.LeaderboardReviewQueryRepository
  */
 @Repository
 @WorkspaceAgnostic("Reviews scoped through pull_request_id -> repository.workspace_id")

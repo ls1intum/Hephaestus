@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -11,11 +12,12 @@ public record UpdateWorkspaceFeaturesRequestDTO(
     @Schema(description = "Enable the practice review feature") Boolean practicesEnabled,
     @Schema(description = "Enable the Pi mentor chat feature") Boolean mentorEnabled,
     @Schema(description = "Enable the achievements system") Boolean achievementsEnabled,
-    @Schema(description = "Enable the leaderboard ranking page") Boolean leaderboardEnabled,
-    @Schema(description = "Enable the league/progression system") Boolean progressionEnabled,
-    @Schema(description = "Enable league tiers and rankings") Boolean leaguesEnabled,
     @Schema(description = "Enable automatic practice reviews triggered by PR events")
     Boolean practiceReviewAutoTriggerEnabled,
     @Schema(description = "Enable manual practice reviews triggered via bot command")
-    Boolean practiceReviewManualTriggerEnabled
+    Boolean practiceReviewManualTriggerEnabled,
+    @Schema(
+        description = "Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)"
+    )
+    CohortVisibility cohortVisibility
 ) {}

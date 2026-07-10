@@ -40,7 +40,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
  *
  * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
- * {@code report_finding} tool, and the result schema the runner emits — all without Docker.
+ * {@code report_observation} tool, and the result schema the runner emits — all without Docker.
  * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
  * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the {@code tum-openai}
@@ -201,7 +201,7 @@ class PracticeRunnerLiveLlmTest {
         assertThat(rawOutput).as("result.json (or review-state.json fallback) yielded a parsed payload").isNotNull();
 
         JsonNode parsed = MAPPER.readTree(rawOutput);
-        JsonNode findings = parsed.path("findings");
+        JsonNode findings = parsed.path("observations");
         assertThat(findings.isArray()).as("findings must be a JSON array").isTrue();
         assertThat(findings.size()).as("at least one finding emitted").isGreaterThanOrEqualTo(1);
 
@@ -338,7 +338,7 @@ class PracticeRunnerLiveLlmTest {
                 "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, " +
                     "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
                     "Apply the hardcoded-secrets practice to inputs/context/diff.patch. Persist each " +
-                    "justified finding via report_finding (one tool call per finding). Follow " +
+                    "justified observation via report_observation (one tool call per observation). Follow " +
                     WorkspaceAbi.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
                 1,

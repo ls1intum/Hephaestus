@@ -63,8 +63,6 @@ export function generateSkillTreeData(
 	user: {
 		name: string;
 		avatarUrl: string;
-		level: number;
-		leaguePoints: number;
 	},
 	achievements: UIAchievement[] = [],
 	edgeDisplayMode: EdgeDisplayMode = "equalizer-static",
@@ -84,8 +82,6 @@ export function generateSkillTreeData(
 			y: 0,
 		},
 		data: {
-			level: user?.level ?? 0,
-			leaguePoints: user?.leaguePoints ?? 0,
 			avatarUrl: user?.avatarUrl ?? "",
 			name: user?.name ?? "",
 			className: undefined,

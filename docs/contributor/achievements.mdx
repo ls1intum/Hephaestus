@@ -2,22 +2,22 @@
 id: achievements
 sidebar_position: 5
 title: Achievement and Activity System
-description: Architecture and design principles behind the Hephaestus XP and Achievement gamification engines.
+description: Architecture and design principles behind the Hephaestus activity event log and achievement engine.
 ---
 
-The Hephaestus gamification engine is split into two distinct Bounded Contexts: the **Activity Module** (XP tracking) and the **Achievement Module** (milestone unlocking). This separation ensures that raw event logging and complex achievement evaluation are decoupled.
+The Hephaestus practice-recognition engine is split into two distinct Bounded Contexts: the **Activity Module** (append-only activity event log) and the **Achievement Module** (milestone unlocking). This separation ensures that raw event logging and complex achievement evaluation are decoupled.
 
 ## Architecture and Design Principles
 
-The system follows a CQRS-style architecture where write operations (events) are processed asynchronously to compute XP and evaluate achievement progress, while read operations aggregate these computed values efficiently.
+The system follows a CQRS-style architecture where write operations (events) are recorded immutably, while achievement evaluation reacts to those events asynchronously.
 
 ### 1. Activity Module (Write Path)
 
-The Activity Module is an append-only event log. It is not Event Sourcing; rather, it is an **Event Log** that computes derived values (like XP) at write time.
+The Activity Module is an append-only event log. It is not Event Sourcing; rather, it is an immutable **Event Log** of developer activity.
 
 - **Idempotency:** Each event is processed with a unique `event_key` to prevent duplication.
 - **Immutability:** Once written, `ActivityEvent` entities are immutable. No further updates are permitted.
-- **Pre-computed XP:** When an event is recorded (e.g., `ActivitySavedEvent`), the `ExperiencePointCalculator` evaluates the activity and assigns an XP value immediately. This allows for constant-time complexity when querying data.
+- **No scoring:** The log records what happened (e.g., `ActivitySavedEvent`) without computing any experience points or ranking. Downstream consumers such as the Achievement Module and the profile Activity Monitor read the raw events directly.
 
 ### 2. Achievement Module (Event-Driven)
 
@@ -28,10 +28,6 @@ The Achievement Module listens for `ActivitySavedEvent` messages published by th
   - `StandardCountEvaluator`: Increments progress by one for each relevant event.
   - Specialized Evaluators (e.g., `SpeedsterEvaluator`, `NightOwlEvaluator`): Implement complex logic for hidden or special achievements.
 - **Backfill:** For new users or retrospective changes, the `AchievementRecalculationService` can wipe a user's progress and chronologically replay all historical activity events strictly to assign the correct, distinct unlock dates.
-
-### 3. Leaderboard Module (Read Path)
-
-The Leaderboard acts as the read model in the CQRS architecture. Since XP is pre-computed exactly once upon activity creation, determining leaderboards does not require iterating over or replaying events. Instead, the module directly utilizes native database aggregation functions (like `SUM` and `GROUP BY`). This strategy keeps leaderboard queries incredibly fast and ensures page load times remain efficient regardless of how many events are generated over time.
 
 ## Achievements Configuration
 

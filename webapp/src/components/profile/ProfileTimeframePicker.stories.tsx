@@ -1,11 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { fn } from "storybook/test";
-import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
+import {
+	DEFAULT_REVIEW_CYCLE,
+	formatDateRangeForApi,
+	getDateRangeForPreset,
+} from "@/lib/timeframe";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 
 // Calculate default dates using the shared timeframe utilities
-const defaultRange = getDateRangeForPreset("this-week", DEFAULT_SCHEDULE);
+const defaultRange = getDateRangeForPreset("this-week", DEFAULT_REVIEW_CYCLE);
 const { after: defaultAfter, before: defaultBefore } = formatDateRangeForApi(defaultRange);
 
 /**
@@ -16,7 +20,7 @@ const { after: defaultAfter, before: defaultBefore } = formatDateRangeForApi(def
  * Key features:
  * - Icons for each preset type for quick visual recognition
  * - Detailed labels showing actual date ranges (e.g., "This week, since Tue Dec 3")
- * - Supports leaderboard schedule awareness for correct week boundaries
+ * - Supports review-cycle schedule awareness for correct week boundaries
  * - Minimal footprint while providing comprehensive date selection
  */
 const meta = {
@@ -42,7 +46,7 @@ const meta = {
 			control: "boolean",
 		},
 		schedule: {
-			description: "Leaderboard schedule configuration. Affects week start calculation.",
+			description: "Review-cycle schedule configuration. Affects week start calculation.",
 			control: "object",
 		},
 	},
@@ -51,7 +55,7 @@ const meta = {
 		beforeDate: defaultBefore,
 		onTimeframeChange: fn(),
 		enableAllActivity: true,
-		schedule: DEFAULT_SCHEDULE,
+		schedule: DEFAULT_REVIEW_CYCLE,
 	},
 } satisfies Meta<typeof ProfileTimeframePicker>;
 
@@ -81,7 +85,7 @@ export const AllTime: Story = {
  */
 export const LastWeek: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("last-week", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset("last-week", DEFAULT_REVIEW_CYCLE);
 		const { after, before } = formatDateRangeForApi(range);
 		return { afterDate: after, beforeDate: before };
 	})(),
@@ -92,7 +96,7 @@ export const LastWeek: Story = {
  */
 export const ThisMonth: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("this-month", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset("this-month", DEFAULT_REVIEW_CYCLE);
 		const { after, before } = formatDateRangeForApi(range);
 		return { afterDate: after, beforeDate: before };
 	})(),
@@ -103,7 +107,7 @@ export const ThisMonth: Story = {
  */
 export const LastMonth: Story = {
 	args: (() => {
-		const range = getDateRangeForPreset("last-month", DEFAULT_SCHEDULE);
+		const range = getDateRangeForPreset("last-month", DEFAULT_REVIEW_CYCLE);
 		const { after, before } = formatDateRangeForApi(range);
 		return { afterDate: after, beforeDate: before };
 	})(),
@@ -165,7 +169,7 @@ export const TuesdaySchedule: Story = {
 };
 
 /**
- * With Wednesday schedule - demonstrates mid-week leaderboard reset.
+ * With Wednesday schedule - demonstrates a mid-week review-cycle reset.
  */
 export const WednesdaySchedule: Story = {
 	args: {
@@ -231,7 +235,7 @@ export const AllPresets: Story = {
 							afterDate={after}
 							beforeDate={before}
 							enableAllActivity={true}
-							schedule={DEFAULT_SCHEDULE}
+							schedule={DEFAULT_REVIEW_CYCLE}
 						/>
 					</div>
 				))}

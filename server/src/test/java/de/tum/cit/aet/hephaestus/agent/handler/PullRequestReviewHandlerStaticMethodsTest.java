@@ -22,7 +22,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
     @Nested
     class FilterByDiffScope {
 
-        private PracticeDetectionResultParser.ValidatedFinding makeFinding(String slug, List<String> filePaths) {
+        private PracticeDetectionResultParser.ValidatedObservation makeFinding(String slug, List<String> filePaths) {
             ObjectNode evidence = objectMapper.createObjectNode();
             ArrayNode locations = objectMapper.createArrayNode();
             for (String path : filePaths) {
@@ -32,7 +32,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 locations.add(loc);
             }
             evidence.set("locations", locations);
-            return new PracticeDetectionResultParser.ValidatedFinding(
+            return new PracticeDetectionResultParser.ValidatedObservation(
                 slug,
                 "Test Title",
                 Presence.ABSENT,
@@ -46,8 +46,8 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             );
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding makeFindingNoEvidence(String slug) {
-            return new PracticeDetectionResultParser.ValidatedFinding(
+        private PracticeDetectionResultParser.ValidatedObservation makeFindingNoEvidence(String slug) {
+            return new PracticeDetectionResultParser.ValidatedObservation(
                 slug,
                 "Test Title",
                 Presence.PRESENT,

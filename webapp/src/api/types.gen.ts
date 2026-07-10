@@ -9,7 +9,7 @@ export type ClientOptions = {
  */
 export type WorkspaceTeamSettings = {
     /**
-     * Whether the team is hidden in the leaderboard for this workspace
+     * Whether the team is hidden from the practice overview for this workspace
      */
     hidden: boolean;
     /**
@@ -27,7 +27,7 @@ export type WorkspaceTeamSettings = {
  */
 export type WorkspaceTeamRepositorySettings = {
     /**
-     * Whether contributions from this repository are hidden from leaderboard calculations
+     * Whether contributions from this repository are hidden from the practice overview
      */
     hiddenFromContributions: boolean;
     /**
@@ -91,13 +91,9 @@ export type WorkspaceMembership = {
      */
     createdAt?: Date;
     /**
-     * Whether the member is hidden from the leaderboard
+     * Whether the member is hidden from the practice roster / overview
      */
     hidden?: boolean;
-    /**
-     * League points earned by the user in this workspace
-     */
-    leaguePoints?: number;
     /**
      * Role of the user in this workspace (OWNER, ADMIN, MEMBER)
      */
@@ -129,6 +125,10 @@ export type WorkspaceListItem = {
      */
     achievementsEnabled: boolean;
     /**
+     * Audience for the k-anonymised cohort aggregate on the practice overview
+     */
+    cohortVisibility: 'MENTORS_ONLY' | 'EVERYONE';
+    /**
      * Timestamp when the workspace was created
      */
     createdAt: Date;
@@ -141,14 +141,6 @@ export type WorkspaceListItem = {
      */
     id: number;
     /**
-     * Whether the leaderboard is enabled
-     */
-    leaderboardEnabled: boolean;
-    /**
-     * Whether league tiers and rankings are enabled
-     */
-    leaguesEnabled: boolean;
-    /**
      * Whether the Pi mentor chat feature is enabled
      */
     mentorEnabled: boolean;
@@ -156,10 +148,6 @@ export type WorkspaceListItem = {
      * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
-    /**
-     * Whether the league/progression system is enabled
-     */
-    progressionEnabled: boolean;
     /**
      * High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound
      */
@@ -186,6 +174,10 @@ export type Workspace = {
      * Whether the achievements system is enabled
      */
     achievementsEnabled: boolean;
+    /**
+     * Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)
+     */
+    cohortVisibility: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Timestamp when the workspace was created
      */
@@ -227,34 +219,6 @@ export type Workspace = {
      */
     kind?: string;
     /**
-     * Whether the leaderboard is enabled
-     */
-    leaderboardEnabled: boolean;
-    /**
-     * Slack channel ID for leaderboard notifications
-     */
-    leaderboardNotificationChannelId?: string;
-    /**
-     * Whether leaderboard notifications are enabled
-     */
-    leaderboardNotificationEnabled?: boolean;
-    /**
-     * Team name for leaderboard notifications
-     */
-    leaderboardNotificationTeam?: string;
-    /**
-     * Day of week for leaderboard notifications (1=Monday, 7=Sunday)
-     */
-    leaderboardScheduleDay?: number;
-    /**
-     * Time for leaderboard notifications in HH:mm format
-     */
-    leaderboardScheduleTime?: string;
-    /**
-     * Whether league tiers and rankings are enabled
-     */
-    leaguesEnabled: boolean;
-    /**
      * Whether the Pi mentor chat feature is enabled
      */
     mentorEnabled: boolean;
@@ -271,13 +235,17 @@ export type Workspace = {
      */
     practicesEnabled: boolean;
     /**
-     * Whether the league/progression system is enabled
-     */
-    progressionEnabled: boolean;
-    /**
      * High-level git provider type for the workspace's SCM connection (null if none bound)
      */
     providerType?: 'GITHUB' | 'GITLAB';
+    /**
+     * Day of week for the weekly practice review cycle (1=Monday, 7=Sunday)
+     */
+    reviewCycleDay?: number;
+    /**
+     * Time for the weekly practice review cycle in HH:mm format
+     */
+    reviewCycleTime?: string;
     /**
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
@@ -319,7 +287,7 @@ export type TeamSummary = {
      */
     description?: string;
     /**
-     * Whether the team is hidden from leaderboard display
+     * Whether the team is hidden from the practice overview display
      */
     hidden: boolean;
     /**
@@ -383,10 +351,6 @@ export type UserInfo = {
      */
     id: number;
     /**
-     * League points earned by the user in the current scope
-     */
-    leaguePoints?: number;
-    /**
      * Login/username of the user
      */
     login: string;
@@ -417,20 +381,6 @@ export type UpdateWorkspaceStatusRequest = {
 };
 
 /**
- * Request to update the leaderboard notification schedule
- */
-export type UpdateWorkspaceScheduleRequest = {
-    /**
-     * Day of week (1=Monday, 7=Sunday)
-     */
-    day: number;
-    /**
-     * Time in 24-hour format (HH:mm)
-     */
-    time: string;
-};
-
-/**
  * Request to update workspace public visibility setting
  */
 export type UpdateWorkspacePublicVisibilityRequest = {
@@ -438,24 +388,6 @@ export type UpdateWorkspacePublicVisibilityRequest = {
      * Whether the workspace should be publicly viewable without authentication
      */
     isPubliclyViewable: boolean;
-};
-
-/**
- * Request to update leaderboard notification settings
- */
-export type UpdateWorkspaceNotificationsRequest = {
-    /**
-     * Slack channel ID for notifications
-     */
-    channelId?: string;
-    /**
-     * Whether leaderboard notifications are enabled
-     */
-    enabled?: boolean;
-    /**
-     * Team name for filtering leaderboard notifications
-     */
-    team?: string;
 };
 
 /**
@@ -467,13 +399,9 @@ export type UpdateWorkspaceFeaturesRequest = {
      */
     achievementsEnabled?: boolean;
     /**
-     * Enable the leaderboard ranking page
+     * Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)
      */
-    leaderboardEnabled?: boolean;
-    /**
-     * Enable league tiers and rankings
-     */
-    leaguesEnabled?: boolean;
+    cohortVisibility?: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Enable the Pi mentor chat feature
      */
@@ -490,10 +418,6 @@ export type UpdateWorkspaceFeaturesRequest = {
      * Enable the practice review feature
      */
     practicesEnabled?: boolean;
-    /**
-     * Enable the league/progression system
-     */
-    progressionEnabled?: boolean;
 };
 
 /**
@@ -501,9 +425,23 @@ export type UpdateWorkspaceFeaturesRequest = {
  */
 export type UpdateTeamSettingsRequest = {
     /**
-     * Whether the team should be hidden from the leaderboard
+     * Whether the team should be hidden from the practice overview
      */
     hidden: boolean;
+};
+
+/**
+ * Request to update the weekly practice review cycle schedule
+ */
+export type UpdateReviewCycleRequest = {
+    /**
+     * Day of week (1=Monday, 7=Sunday)
+     */
+    day: number;
+    /**
+     * Time in 24-hour format (HH:mm)
+     */
+    time: string;
 };
 
 /**
@@ -511,7 +449,7 @@ export type UpdateTeamSettingsRequest = {
  */
 export type UpdateRepositorySettingsRequest = {
     /**
-     * Whether contributions from this repository should be hidden from leaderboard calculations
+     * Whether contributions from this repository should be hidden from the practice overview
      */
     hiddenFromContributions: boolean;
 };
@@ -629,32 +567,6 @@ export type UpdateLoginProviderRequest = {
 };
 
 /**
- * Request to update the entire weekly leaderboard digest configuration atomically
- */
-export type UpdateLeaderboardDigestRequest = {
-    /**
-     * Slack channel ID for notifications
-     */
-    channelId?: string;
-    /**
-     * Day of week (1=Monday, 7=Sunday)
-     */
-    day: number;
-    /**
-     * Whether leaderboard notifications are enabled
-     */
-    enabled?: boolean;
-    /**
-     * Team name for filtering leaderboard notifications
-     */
-    team?: string;
-    /**
-     * Time in 24-hour format (HH:mm)
-     */
-    time: string;
-};
-
-/**
  * Request to update a connection's lifecycle status
  */
 export type UpdateConnectionStatusRequest = {
@@ -737,7 +649,7 @@ export type TeamInfo = {
      */
     description?: string;
     /**
-     * Whether the team is hidden from leaderboard display
+     * Whether the team is hidden from the practice overview display
      */
     hidden: boolean;
     /**
@@ -795,7 +707,7 @@ export type RepositoryInfo = {
      */
     description?: string;
     /**
-     * Whether contributions from this repository are hidden from leaderboard calculations
+     * Whether contributions from this repository are hidden from the practice overview
      */
     hiddenFromContributions: boolean;
     /**
@@ -911,82 +823,6 @@ export type RenameWorkspaceSlugRequest = {
      * New URL-friendly identifier for the workspace
      */
     newSlug: string;
-};
-
-/**
- * A developer's readable feedback for one practice
- */
-export type ReflectionPractice = {
-    /**
-     * Area name this practice belongs to, if any
-     */
-    areaName?: string;
-    /**
-     * Area slug this practice belongs to, if any
-     */
-    areaSlug?: string;
-    /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * Practice slug
-     */
-    slug: string;
-    /**
-     * Where the developer stands on this practice
-     */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
-    /**
-     * What the developer already does well here
-     */
-    strengths: Array<ReflectionItem>;
-    /**
-     * Specific feedback to act on (highest-impact first)
-     */
-    toWorkOn: Array<ReflectionItem>;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
-/**
- * A single piece of practice feedback to read and act on
- */
-export type ReflectionItem = {
-    /**
-     * Id of the PR / issue this is about
-     */
-    artifactId: number;
-    /**
-     * The kind of work this is about (PR / issue)
-     */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
-    /**
-     * What to do — the delivered feedback for this observation (null if nothing was delivered)
-     */
-    guidance?: string;
-    /**
-     * Where in the work, e.g. "FrameRecorder.swift:212", when known
-     */
-    locator?: string;
-    /**
-     * Observation id — handle to open the full detail
-     */
-    observationId: string;
-    /**
-     * Impact level (null unless assessed BAD)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * The headline of the feedback
-     */
-    title: string;
 };
 
 /**
@@ -1150,29 +986,7 @@ export type PullRequestBaseInfo = {
 };
 
 /**
- * User's XP and Level progress details
- */
-export type ProfileXpRecord = {
-    /**
-     * Current calculated level
-     */
-    currentLevel: number;
-    /**
-     * XP accumulated in the current level
-     */
-    currentLevelXP: number;
-    /**
-     * Overall total XP accumulated
-     */
-    totalXP: number;
-    /**
-     * XP needed to reach the next level
-     */
-    xpNeeded: number;
-};
-
-/**
- * A scored review activity entry with XP score for profile display
+ * A review activity entry for profile display
  */
 export type ProfileReviewActivity = {
     /**
@@ -1200,10 +1014,6 @@ export type ProfileReviewActivity = {
      */
     pullRequest?: PullRequestBaseInfo;
     /**
-     * XP score earned for this review
-     */
-    score: number;
-    /**
      * State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)
      */
     state: 'COMMENTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'PENDING' | 'DISMISSED' | 'UNKNOWN';
@@ -1214,7 +1024,7 @@ export type ProfileReviewActivity = {
 };
 
 /**
- * Aggregated activity statistics with XP scores for a user profile
+ * Aggregated activity statistics for a user profile
  */
 export type ProfileActivityStats = {
     /**
@@ -1265,10 +1075,6 @@ export type ProfileActivityStats = {
      * Number of reviews with unknown state
      */
     numberOfUnknowns: number;
-    /**
-     * Total XP score
-     */
-    score: number;
 };
 
 /**
@@ -1302,7 +1108,7 @@ export type ProfileActivityMonitor = {
 };
 
 /**
- * User profile header: identity, league standing, contribution surface, XP
+ * User profile header: identity and contribution surface
  */
 export type Profile = {
     /**
@@ -1317,10 +1123,166 @@ export type Profile = {
      * Basic information about the user
      */
     userInfo: UserInfo;
+};
+
+/**
+ * RFC 7807 / RFC 9457 problem detail response
+ */
+export type ProblemDetail = {
     /**
-     * XP progress information for the users' profile
+     * Human-readable detail
      */
-    xpRecord: ProfileXpRecord;
+    detail?: string;
+    /**
+     * Validation errors keyed by field name, when present
+     */
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Request instance URI
+     */
+    instance?: string;
+    /**
+     * HTTP status code
+     */
+    status?: number;
+    /**
+     * Short, human-readable summary
+     */
+    title?: string;
+    /**
+     * Problem type URI
+     */
+    type?: string;
+};
+
+/**
+ * A developer's standing on one reviewing practice
+ */
+export type PracticeStatusCell = {
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice (criterion-referenced, not a rank)
+     */
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NO_ACTIVITY';
+};
+
+/**
+ * A developer on the mentor roster (admin/owner-only; a triage view, never a ranking)
+ */
+export type PracticeReportSummary = {
+    /**
+     * Plain-language reasons behind needsAttention (empty when none)
+     */
+    attentionReasons: Array<string>;
+    /**
+     * Developer avatar URL
+     */
+    avatarUrl: string;
+    /**
+     * Developer display name (may be null; UI falls back to login)
+     */
+    name?: string;
+    /**
+     * Whether the developer has unresolved gaps a mentor should look at (a triage flag)
+     */
+    needsAttention?: boolean;
+    /**
+     * The developer's standing on each reviewing practice
+     */
+    standings: Array<PracticeStatusCell>;
+    /**
+     * Stable SCM user id for drill-down calls
+     */
+    userId: number;
+    /**
+     * Developer login
+     */
+    userLogin: string;
+};
+
+/**
+ * A single piece of practice feedback to read and act on
+ */
+export type PracticeReportItem = {
+    /**
+     * Id of the PR / issue this is about
+     */
+    artifactId: number;
+    /**
+     * The kind of work this is about (PR / issue)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
+     */
+    guidance?: string;
+    /**
+     * Where in the work, e.g. "FrameRecorder.swift:212", when known
+     */
+    locator?: string;
+    /**
+     * Observation id — handle to open the full detail
+     */
+    observationId: string;
+    /**
+     * Impact level (null unless assessed BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The headline of the feedback
+     */
+    title: string;
+};
+
+/**
+ * A developer's readable feedback for one practice
+ */
+export type PracticeReportCard = {
+    /**
+     * Area name this practice belongs to, if any
+     */
+    areaName?: string;
+    /**
+     * Area slug this practice belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice
+     */
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
+    /**
+     * What the developer already does well here
+     */
+    strengths: Array<PracticeReportItem>;
+    /**
+     * Specific feedback to act on (highest-impact first)
+     */
+    toWorkOn: Array<PracticeReportItem>;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
 };
 
 /**
@@ -1801,85 +1763,6 @@ export type LearnerPractice = {
      * Why this practice matters, in plain language
      */
     whyItMatters?: string;
-};
-
-export type LeagueChange = {
-    leaguePointsChange: number;
-    login: string;
-};
-
-/**
- * A ranked entry in the leaderboard (individual or team)
- */
-export type LeaderboardEntry = {
-    /**
-     * Count of review approvals
-     */
-    numberOfApprovals: number;
-    /**
-     * Count of change requests submitted
-     */
-    numberOfChangeRequests: number;
-    /**
-     * Count of issues closed in the timeframe
-     */
-    numberOfClosedIssues: number;
-    /**
-     * Count of authored pull requests closed without merge in the timeframe
-     */
-    numberOfClosedPullRequests: number;
-    /**
-     * Count of scored inline feedback comments on pull requests authored by someone else
-     */
-    numberOfCodeComments: number;
-    /**
-     * Count of comment-only review submissions
-     */
-    numberOfComments: number;
-    /**
-     * Count of authored pull requests merged in the timeframe
-     */
-    numberOfMergedPullRequests: number;
-    /**
-     * Count of authored pull requests opened in the timeframe that are still open
-     */
-    numberOfOpenPullRequests: number;
-    /**
-     * Count of issues opened in the timeframe
-     */
-    numberOfOpenedIssues: number;
-    /**
-     * Count of visible-only discussion replies and inline thread replies on the contributor's own pull requests
-     */
-    numberOfOwnReplies: number;
-    /**
-     * Count of distinct PRs reviewed
-     */
-    numberOfReviewedPRs: number;
-    /**
-     * Count of reviews with unknown/unrecognized state
-     */
-    numberOfUnknowns: number;
-    /**
-     * Position in the leaderboard (1-based)
-     */
-    rank: number;
-    /**
-     * Sample of reviewed PRs for display
-     */
-    reviewedPullRequests: Array<PullRequestInfo>;
-    /**
-     * Total XP score for the timeframe
-     */
-    score: number;
-    /**
-     * Team info (populated in TEAM mode, null in INDIVIDUAL mode)
-     */
-    team?: TeamInfo;
-    /**
-     * User info (populated in INDIVIDUAL mode, null in TEAM mode)
-     */
-    user?: UserInfo;
 };
 
 /**
@@ -2406,6 +2289,40 @@ export type ConnectionAuditEntry = {
     fromState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     occurredAt?: Date;
     toState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+};
+
+/**
+ * Cohort standing distribution for one reviewing practice (k-anonymised, never per-person)
+ */
+export type CohortPracticeStatus = {
+    /**
+     * Developers standing at DEVELOPING (null when suppressed)
+     */
+    developingCount?: number;
+    /**
+     * Developers standing at MIXED (null when suppressed)
+     */
+    mixedCount?: number;
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Developers with activity but no problems/strengths this window (null when suppressed)
+     */
+    noActivityCount?: number;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Developers standing at STRENGTH (null when suppressed)
+     */
+    strengthCount?: number;
+    /**
+     * True when suppressed for k-anonymity (< 5 developers active, or a non-zero bucket has < 5)
+     */
+    suppressed?: boolean;
 };
 
 /**
@@ -3899,122 +3816,6 @@ export type UpdateFeaturesResponses = {
 
 export type UpdateFeaturesResponse = UpdateFeaturesResponses[keyof UpdateFeaturesResponses];
 
-export type GetLeaderboardData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query: {
-        /**
-         * start of the time range (inclusive)
-         */
-        after: Date;
-        /**
-         * end of the time range (exclusive)
-         */
-        before: Date;
-        /**
-         * Team filter to apply in INDIVIDUAL mode; ignored when mode is TEAM.
-         */
-        team: string;
-        /**
-         * Determines the ranking metric. In TEAM mode SCORE uses summed contribution scores; LEAGUE_POINTS uses total league points.
-         */
-        sort: 'SCORE' | 'LEAGUE_POINTS';
-        /**
-         * aggregation mode (INDIVIDUAL or TEAM)
-         */
-        mode: 'INDIVIDUAL' | 'TEAM';
-    };
-    url: '/workspaces/{workspaceSlug}/leaderboard';
-};
-
-export type GetLeaderboardResponses = {
-    /**
-     * ranked list of leaderboard entries
-     */
-    200: Array<LeaderboardEntry>;
-};
-
-export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
-
-export type UpdateLeaderboardDigestData = {
-    body: UpdateLeaderboardDigestRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/leaderboard-digest';
-};
-
-export type UpdateLeaderboardDigestResponses = {
-    /**
-     * Workspace updated
-     */
-    200: Workspace;
-};
-
-export type UpdateLeaderboardDigestResponse = UpdateLeaderboardDigestResponses[keyof UpdateLeaderboardDigestResponses];
-
-export type ComputeUserLeagueStatsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
-        login: string;
-    };
-    query: {
-        /**
-         * start of the time range (inclusive)
-         */
-        after: Date;
-        /**
-         * end of the time range (exclusive)
-         */
-        before: Date;
-    };
-    url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats';
-};
-
-export type ComputeUserLeagueStatsResponses = {
-    /**
-     * league change statistics including projected point delta
-     */
-    200: LeagueChange;
-};
-
-export type ComputeUserLeagueStatsResponse = ComputeUserLeagueStatsResponses[keyof ComputeUserLeagueStatsResponses];
-
-export type ResetAndRecalculateLeaguesData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/league/reset';
-};
-
-export type ResetAndRecalculateLeaguesResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
 export type ListMembersData = {
     body?: never;
     path: {
@@ -4307,27 +4108,6 @@ export type VoteResponses = {
 
 export type VoteResponse = VoteResponses[keyof VoteResponses];
 
-export type UpdateNotificationsData = {
-    body: UpdateWorkspaceNotificationsRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/notifications';
-};
-
-export type UpdateNotificationsResponses = {
-    /**
-     * Workspace updated
-     */
-    200: Workspace;
-};
-
-export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
-
 export type ListAreasData = {
     body?: never;
     path: {
@@ -4555,6 +4335,36 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
+export type GetCohortPracticeStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/cohort';
+};
+
+export type GetCohortPracticeStatusErrors = {
+    /**
+     * Not permitted for this cohort visibility
+     */
+    403: ProblemDetail;
+};
+
+export type GetCohortPracticeStatusError = GetCohortPracticeStatusErrors[keyof GetCohortPracticeStatusErrors];
+
+export type GetCohortPracticeStatusResponses = {
+    /**
+     * Cohort status cards returned
+     */
+    200: Array<CohortPracticeStatus>;
+};
+
+export type GetCohortPracticeStatusResponse = GetCohortPracticeStatusResponses[keyof GetCohortPracticeStatusResponses];
+
 export type GetEngagementData = {
     body?: never;
     path: {
@@ -4721,28 +4531,7 @@ export type GetObservationsForPullRequestResponses = {
 
 export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
 
-export type GetReflectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/reflection';
-};
-
-export type GetReflectionResponses = {
-    /**
-     * Per-practice reflection cards returned
-     */
-    200: Array<ReflectionPractice>;
-};
-
-export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
-
-export type GetSummaryData = {
+export type GetMyPracticeSummaryData = {
     body?: never;
     path: {
         /**
@@ -4754,14 +4543,14 @@ export type GetSummaryData = {
     url: '/workspaces/{workspaceSlug}/practices/observations/summary';
 };
 
-export type GetSummaryResponses = {
+export type GetMyPracticeSummaryResponses = {
     /**
      * Practice summaries returned
      */
     200: Array<DeveloperPracticeSummary>;
 };
 
-export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
+export type GetMyPracticeSummaryResponse = GetMyPracticeSummaryResponses[keyof GetMyPracticeSummaryResponses];
 
 export type GetObservationData = {
     body?: never;
@@ -4819,6 +4608,101 @@ export type ReorderPracticesResponses = {
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type ListPracticeReportsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reports';
+};
+
+export type ListPracticeReportsErrors = {
+    /**
+     * Requires workspace ADMIN or OWNER
+     */
+    403: ProblemDetail;
+};
+
+export type ListPracticeReportsError = ListPracticeReportsErrors[keyof ListPracticeReportsErrors];
+
+export type ListPracticeReportsResponses = {
+    /**
+     * Report summaries returned
+     */
+    200: Array<PracticeReportSummary>;
+};
+
+export type ListPracticeReportsResponse = ListPracticeReportsResponses[keyof ListPracticeReportsResponses];
+
+export type GetMyPracticeReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reports/me';
+};
+
+export type GetMyPracticeReportErrors = {
+    /**
+     * Requires a synced developer identity in this workspace
+     */
+    403: ProblemDetail;
+};
+
+export type GetMyPracticeReportError = GetMyPracticeReportErrors[keyof GetMyPracticeReportErrors];
+
+export type GetMyPracticeReportResponses = {
+    /**
+     * Per-practice report cards returned
+     */
+    200: Array<PracticeReportCard>;
+};
+
+export type GetMyPracticeReportResponse = GetMyPracticeReportResponses[keyof GetMyPracticeReportResponses];
+
+export type GetDeveloperPracticeReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reports/{userId}';
+};
+
+export type GetDeveloperPracticeReportErrors = {
+    /**
+     * Requires workspace ADMIN or OWNER
+     */
+    403: ProblemDetail;
+    /**
+     * No current-cycle report subject exists for this user in the workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetDeveloperPracticeReportError = GetDeveloperPracticeReportErrors[keyof GetDeveloperPracticeReportErrors];
+
+export type GetDeveloperPracticeReportResponses = {
+    /**
+     * Report cards for the developer returned
+     */
+    200: Array<PracticeReportCard>;
+};
+
+export type GetDeveloperPracticeReportResponse = GetDeveloperPracticeReportResponses[keyof GetDeveloperPracticeReportResponses];
 
 export type DeletePracticeData = {
     body?: never;
@@ -5101,8 +4985,8 @@ export type AddRepositoryToMonitorResponses = {
     200: unknown;
 };
 
-export type UpdateScheduleData = {
-    body: UpdateWorkspaceScheduleRequest;
+export type UpdateReviewCycleData = {
+    body: UpdateReviewCycleRequest;
     path: {
         /**
          * Workspace slug
@@ -5110,17 +4994,17 @@ export type UpdateScheduleData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/schedule';
+    url: '/workspaces/{workspaceSlug}/review-cycle';
 };
 
-export type UpdateScheduleResponses = {
+export type UpdateReviewCycleResponses = {
     /**
      * Workspace updated
      */
     200: Workspace;
 };
 
-export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
+export type UpdateReviewCycleResponse = UpdateReviewCycleResponses[keyof UpdateReviewCycleResponses];
 
 export type RenameSlugData = {
     body: RenameWorkspaceSlugRequest;

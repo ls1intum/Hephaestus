@@ -58,7 +58,7 @@ import org.jspecify.annotations.Nullable;
     indexes = {
         // User achievements lookup: profile display, achievement progress
         @Index(name = "idx_user_achievement_user", columnList = "user_id"),
-        // Achievement holders: leaderboard of users with specific achievement
+        // Achievement holders: activity aggregation of users with specific achievement
         @Index(name = "idx_user_achievement_achievement", columnList = "achievement_id"),
     }
 )

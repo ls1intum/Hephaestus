@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Controller for user profile endpoints.
- * Provides workspace-scoped user activity data (open PRs, review activity, league points).
+ * Provides workspace-scoped user activity data (open PRs and review activity).
  */
 @WorkspaceScopedController
 @RequestMapping("/profile")
@@ -38,7 +38,7 @@ public class UserProfileController {
     @GetMapping("/{login}")
     @Operation(
         summary = "Get user profile",
-        description = "Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points"
+        description = "Returns user profile with workspace-scoped activity data including open PRs and review activity"
     )
     @SecurityRequirements
     public ResponseEntity<ProfileDTO> getUserProfile(

@@ -4,6 +4,13 @@
 **Date:** 2026-05-26
 **Authors:** Felix T.J. Dietrich
 
+> **Note (superseded detail):** The Slack weekly-leaderboard digest fan-out
+> (`SlackLeaderboardDigestPublisher`) described below was retired by the
+> practice-focused redesign, which removed the competitive leaderboard. The
+> unified integration framework and its package layout still stand; the digest
+> publisher no longer ships. The rest of this ADR is preserved as originally
+> recorded.
+
 ## Context
 
 Before #1198, each vendor (GitHub, GitLab, Slack-as-notification) had its own
@@ -107,11 +114,10 @@ Detail of the substrate packages:
   `credentials/`, `manifest/`, `connect/` (OAuth/PAT setup) subpackages;
   GitHub adds `app/`, `installation/`.
 - `integration/slack/` — Slack vendor adapter (messaging, OAuth connect,
-  webhook, lifecycle, leaderboard fan-out). Ships a live weekly-leaderboard
-  notification path; the `SlackMessage`/`SlackChannel` write-dead persistence
-  layer was removed in this epic (see Consequences). Declared
-  `Type.OPEN` by empirical necessity — the leaderboard fan-out crosses module
-  boundaries; full CLOSED is deferred. Opt-in (matchIfMissing=false).
+  webhook, lifecycle). The former weekly-leaderboard fan-out was removed by
+  the later practice-focused redesign; Slack remains for OAuth connection,
+  test messages, and future mentor interactions. Declared `Type.OPEN` by
+  empirical necessity while the adapter surface settles. Opt-in (matchIfMissing=false).
 
 `analytics/` is a sibling of `integration/`, not under it. PostHog is
 product analytics, not a vendor integration. Naming the package after the
@@ -175,12 +181,12 @@ Negative:
   key at migration time. If the key is absent the changeset fails loudly
   (not silently) before any legacy columns are dropped. Operators must ensure
   `hephaestus.security.encryption-key` is set before applying the migration.
-- Slack ships with a live weekly-leaderboard notification path
-  (`SlackLeaderboardDigestPublisher` → `SlackMessageService`), plus
-  connect/credentials/webhook/OAuth scaffolding. The write-dead Slack
-  persistence layer (`SlackMessage`/`SlackChannel` entities + repos +
-  deletion handler) was removed in this epic; `SlackLifecycleListener` is a
-  no-op stub. The Connection table accepts SLACK rows.
+- Slack now ships the connection/OAuth/test-message substrate only. The later
+  practice-focused redesign removed the weekly leaderboard digest path while
+  keeping Slack available for future mentor interactions and communication
+  content providers. The write-dead Slack persistence layer (`SlackMessage`/
+  `SlackChannel` entities + repos + deletion handler) was removed in this epic;
+  `SlackLifecycleListener` is a no-op stub. The Connection table accepts SLACK rows.
 
 ## Revisit trigger
 

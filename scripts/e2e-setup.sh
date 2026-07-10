@@ -90,8 +90,8 @@ if [ -z "$WS_ID" ]; then
 fi
 [ -n "$WS_ID" ] || die "workspace create/lookup failed"
 psql "$DB_URL" -tA >/dev/null <<SQL
-INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at)
-  VALUES ($WS_ID, $USER_ID, 'ADMIN', 0, false, now()) ON CONFLICT DO NOTHING;
+INSERT INTO workspace_membership (workspace_id, user_id, role, hidden, created_at)
+  VALUES ($WS_ID, $USER_ID, 'ADMIN', false, now()) ON CONFLICT DO NOTHING;
 SQL
 say "workspace ready: id $WS_ID, slug '$WS_SLUG' (dev account is ADMIN member)"
 # API-created workspaces default practices OFF — enable it (+ auto/manual triggers) so detection runs.

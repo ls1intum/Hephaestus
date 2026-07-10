@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextExecutor;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -27,6 +28,7 @@ public class WorkspaceSyncContextProvider implements SyncContextProvider {
             context.installationId(),
             false, // publiclyViewable not relevant for sync
             false, // mentorEnabled not relevant for sync
+            CohortVisibility.MENTORS_ONLY, // sync never serves practice surfaces; use the restrictive default
             Set.of() // No roles for system sync operations
         );
 

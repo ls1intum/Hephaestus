@@ -181,7 +181,10 @@ public class GitRepositoryManager {
             Path repoPath = getRepositoryPath(repositoryId);
 
             try {
-                if (!isRepositoryCloned(repositoryId)) {
+                // A reused repository id (e.g. after the DB is recreated) can leave a stale checkout of a
+                // DIFFERENT repo on disk. Fetching that would silently pull the wrong repository and feed the
+                // wrong diff into detection, so a clone that is present but points elsewhere is re-cloned.
+                if (!isRepositoryCloned(repositoryId) || !originMatches(repoPath, cloneUrl)) {
                     cloneRepository(repoPath, cloneUrl, token);
                 } else {
                     fetchRepository(repoPath, token);
@@ -225,6 +228,51 @@ public class GitRepositoryManager {
         try (Git ignored = cloneCommand.call()) {
             log.info("Successfully cloned repository: path={}", repoPath);
         }
+    }
+
+    /**
+     * True when the on-disk clone's {@code origin} points at the same repository as {@code cloneUrl}
+     * (compared without credentials or a trailing {@code .git}). A mismatch means a stale checkout of a
+     * different repo is occupying this id's path and must be re-cloned rather than fetched.
+     */
+    private boolean originMatches(Path repoPath, String cloneUrl) {
+        try (Git git = Git.open(repoPath.toFile())) {
+            String origin = git.getRepository().getConfig().getString("remote", "origin", "url");
+            boolean match = origin != null && normalizeRemote(origin).equals(normalizeRemote(cloneUrl));
+            if (!match) {
+                log.warn(
+                    "Clone origin mismatch — re-cloning: path={}, origin={}, expected={}",
+                    repoPath,
+                    sanitizeUrl(origin == null ? "" : origin),
+                    sanitizeUrl(cloneUrl)
+                );
+            }
+            return match;
+        } catch (IOException e) {
+            log.warn(
+                "Could not read origin to verify clone, forcing re-clone: path={}, error={}",
+                repoPath,
+                e.getMessage()
+            );
+            return false;
+        }
+    }
+
+    /** Strip credentials, a trailing {@code .git}, and a trailing slash so equivalent remotes compare equal. */
+    private static String normalizeRemote(String url) {
+        String u = url.trim();
+        int scheme = u.indexOf("://");
+        int at = u.indexOf('@');
+        if (scheme >= 0 && at > scheme) {
+            u = u.substring(0, scheme + 3) + u.substring(at + 1);
+        }
+        if (u.endsWith(".git")) {
+            u = u.substring(0, u.length() - 4);
+        }
+        if (u.endsWith("/")) {
+            u = u.substring(0, u.length() - 1);
+        }
+        return u;
     }
 
     /**

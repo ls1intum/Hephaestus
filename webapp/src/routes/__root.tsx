@@ -310,7 +310,6 @@ function AppSidebarContainer() {
 
 	return (
 		<AppSidebar
-			username={username}
 			isAdmin={workspaceAccess.isAdmin}
 			isAppAdmin={isAppAdmin}
 			hasMentorAccess={hasMentorAccess}

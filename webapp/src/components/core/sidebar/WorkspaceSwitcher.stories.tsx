@@ -7,9 +7,7 @@ const featureFlags = {
 	practicesEnabled: true,
 	mentorEnabled: true,
 	achievementsEnabled: true,
-	leaderboardEnabled: true,
-	progressionEnabled: false,
-	leaguesEnabled: false,
+	cohortVisibility: "MENTORS_ONLY",
 } as const;
 
 /**

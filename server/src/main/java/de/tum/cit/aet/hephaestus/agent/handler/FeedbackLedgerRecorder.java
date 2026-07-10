@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -50,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Non-regressing by construction.</b> This is a pure write-through side-effect invoked AFTER the
  * existing post, in its OWN {@link Propagation#REQUIRES_NEW} transaction, and callers wrap the call in a
  * try/catch that only logs — a ledger failure can therefore never roll back or alter the delivery the
- * student already received. Delete this recorder and delivery is byte-identical.
+ * student already received.
  *
  * <p>Idempotent: a job retry that re-delivers finds the unit already recorded ({@code (agent_job_id,
  * unit_ordinal)} guard) and does nothing.
@@ -132,7 +133,14 @@ public class FeedbackLedgerRecorder {
             // student sees. Do not write a phantom DELIVERED row or supersede the live prior.
             return;
         }
-        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
+        // Reviewer-audience findings are persisted but firewalled OUT of the artifact-page delivery (they
+        // feed the reviewer's own reflection, never the author's PR). Exclude them from the IN_CONTEXT ledger
+        // so the author's Feedback unit fuses ONLY what was actually delivered to them (ADR 0021 C2) — else a
+        // reviewer's craft observation leaks into the author's delivered-feedback record.
+        List<Observation> findings = observationRepository.findByAgentJobIdExcludingSlugs(
+            job.getId(),
+            ReviewerAudiencePractices.REVIEWER_AUDIENCE_SLUGS
+        );
         if (findings.isEmpty()) {
             return;
         }
@@ -339,7 +347,14 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<String> priorLiveSummaryRef(AgentJob job) {
-        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
+        // Exclude reviewer-audience findings so the thread key is derived from the SAME author-audience
+        // subject as record() (findings.get(0) is ordered by a random UUID; a mixed job could otherwise
+        // key on a reviewer's about_user_id, miss the author's prior DELIVERED unit, and post a fresh
+        // summary instead of editing the prior one in place).
+        List<Observation> findings = observationRepository.findByAgentJobIdExcludingSlugs(
+            job.getId(),
+            ReviewerAudiencePractices.REVIEWER_AUDIENCE_SLUGS
+        );
         if (findings.isEmpty()) {
             return Optional.empty();
         }

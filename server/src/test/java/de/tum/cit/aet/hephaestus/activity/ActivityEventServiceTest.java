@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -14,7 +13,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
@@ -29,9 +27,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private ExperiencePointProperties xpProperties;
-
-    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private MeterRegistry meterRegistry;
@@ -40,15 +35,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        // Use lenient stubbing since not all tests exercise XP clamping path
-        lenient().when(xpProperties.maxXpPerEvent()).thenReturn(1000.0);
-        service = new ActivityEventService(
-            eventRepository,
-            workspaceRepository,
-            xpProperties,
-            meterRegistry,
-            eventPublisher
-        );
+        service = new ActivityEventService(eventRepository, workspaceRepository, meterRegistry, eventPublisher);
     }
 
     @Test
@@ -65,8 +52,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
                 eq(1L),
                 any(),
                 anyString(),
-                anyLong(),
-                anyDouble()
+                anyLong()
             )
         ).thenReturn(1);
 
@@ -77,8 +63,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
             null,
             null,
             ActivityTargetType.PULL_REQUEST,
-            100L,
-            1.0
+            100L
         );
 
         assertThat(result).isTrue();
@@ -91,8 +76,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
             eq(1L),
             any(),
             anyString(),
-            anyLong(),
-            anyDouble()
+            anyLong()
         );
         assertThat(meterRegistry.counter("activity.events.recorded").count()).isEqualTo(1.0);
     }
@@ -111,8 +95,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
                 eq(1L),
                 any(),
                 anyString(),
-                anyLong(),
-                anyDouble()
+                anyLong()
             )
         ).thenReturn(0);
 
@@ -123,8 +106,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
             null,
             null,
             ActivityTargetType.PULL_REQUEST,
-            100L,
-            1.0
+            100L
         );
 
         assertThat(result).isFalse();
@@ -143,103 +125,10 @@ class ActivityEventServiceTest extends BaseUnitTest {
             null,
             null,
             ActivityTargetType.PULL_REQUEST,
-            100L,
-            1.0
+            100L
         );
 
         assertThat(result).isFalse();
         verifyNoInteractions(eventRepository);
-    }
-
-    @Test
-    void record_negativeXp_clampsToZero() {
-        when(workspaceRepository.existsById(1L)).thenReturn(true);
-        // Capture the XP value passed to insertIfAbsent
-        when(
-            eventRepository.insertIfAbsent(
-                any(UUID.class),
-                anyString(),
-                anyString(),
-                any(Instant.class),
-                any(),
-                eq(1L),
-                any(),
-                anyString(),
-                anyLong(),
-                eq(0.0)
-            )
-        ).thenReturn(1);
-
-        boolean result = service.record(
-            1L,
-            ActivityEventType.PULL_REQUEST_OPENED,
-            Instant.now(),
-            null,
-            null,
-            ActivityTargetType.PULL_REQUEST,
-            100L,
-            -50.0 // negative XP
-        );
-
-        assertThat(result).isTrue();
-        // Verify XP was clamped to 0.0
-        verify(eventRepository).insertIfAbsent(
-            any(UUID.class),
-            anyString(),
-            anyString(),
-            any(Instant.class),
-            any(),
-            eq(1L),
-            any(),
-            anyString(),
-            anyLong(),
-            eq(0.0)
-        );
-    }
-
-    @Test
-    void record_excessiveXp_clampsToMax() {
-        when(workspaceRepository.existsById(1L)).thenReturn(true);
-        // Verify XP was clamped to max (1000.0 as configured in setUp)
-        when(
-            eventRepository.insertIfAbsent(
-                any(UUID.class),
-                anyString(),
-                anyString(),
-                any(Instant.class),
-                any(),
-                eq(1L),
-                any(),
-                anyString(),
-                anyLong(),
-                eq(1000.0)
-            )
-        ).thenReturn(1);
-
-        boolean result = service.record(
-            1L,
-            ActivityEventType.PULL_REQUEST_OPENED,
-            Instant.now(),
-            null,
-            null,
-            ActivityTargetType.PULL_REQUEST,
-            100L,
-            9999.0 // excessive XP
-        );
-
-        assertThat(result).isTrue();
-        // Verify XP was clamped to 1000.0
-        verify(eventRepository).insertIfAbsent(
-            any(UUID.class),
-            anyString(),
-            anyString(),
-            any(Instant.class),
-            any(),
-            eq(1L),
-            any(),
-            anyString(),
-            anyLong(),
-            eq(1000.0)
-        );
     }
 }

@@ -33,14 +33,12 @@ export interface SkillTreeProps {
 	user: {
 		name: string;
 		avatarUrl: string;
-		level: number;
-		leaguePoints: number;
 	};
 	achievements: UIAchievement[];
 }
 
 export function SkillTree({ user, achievements }: SkillTreeProps) {
-	const { name, avatarUrl, level, leaguePoints } = user;
+	const { name, avatarUrl } = user;
 
 	const [nodes, setNodes, onNodesChange] = useNodesState<
 		AchievementNode | AvatarNode | CategoryLabelNode
@@ -52,13 +50,13 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 	// to avoid infinite re-renders when the parent creates a new object each render.
 	useEffect(() => {
 		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(
-			{ name, avatarUrl, level, leaguePoints },
+			{ name, avatarUrl },
 			achievements,
 		);
 
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [name, avatarUrl, level, leaguePoints, achievements, setNodes, setEdges]);
+	}, [name, avatarUrl, achievements, setNodes, setEdges]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 

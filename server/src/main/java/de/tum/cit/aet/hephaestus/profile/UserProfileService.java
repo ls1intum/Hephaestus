@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.profile;
 import de.tum.cit.aet.hephaestus.activity.ActivityEvent;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
-import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
@@ -23,9 +22,7 @@ import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
-import de.tum.cit.aet.hephaestus.profile.dto.ProfileXpRecordDTO;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceContributionActivityService;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,8 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Aggregates user profile data from the ActivityEvent ledger so profile and
- * leaderboard views stay consistent.
+ * Aggregates user profile data from the ActivityEvent ledger.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,13 +61,12 @@ public class UserProfileService {
     private final PullRequestReviewCommentRepository pullRequestReviewCommentRepository;
     private final IssueCommentRepository issueCommentRepository;
     private final ProfileReviewActivityAssembler reviewActivityAssembler;
-    private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceContributionActivityService workspaceContributionActivityService;
     private final ProfileActivityQueryService profileActivityQueryService;
     private final ActivityEventRepository activityEventRepository;
 
     /**
-     * Get the profile header for a user: identity, league standing, contribution surface, XP.
+     * Get the profile header for a user: identity and contribution surface.
      *
      * <p>Time-windowed activity (review activity, open PRs, badges) is served by
      * {@link #getActivityMonitor} so the header doesn't refetch when filters change.
@@ -99,8 +94,7 @@ public class UserProfileService {
         }
 
         User userEntity = optionalUser.get();
-        int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
-        UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
+        UserInfoDTO user = UserInfoDTO.fromUser(userEntity);
 
         Instant firstContribution =
             workspaceId == null
@@ -119,9 +113,7 @@ public class UserProfileService {
                       .sorted(Comparator.comparing(RepositoryInfoDTO::name))
                       .toList();
 
-        ProfileXpRecordDTO xpRecord = buildUserXpRecord(workspaceId, user.id());
-
-        return Optional.of(new ProfileDTO(user, firstContribution, contributedRepositories, xpRecord));
+        return Optional.of(new ProfileDTO(user, firstContribution, contributedRepositories));
     }
 
     @Transactional(readOnly = true)
@@ -211,28 +203,26 @@ public class UserProfileService {
     }
 
     /**
-     * Build review activity by querying ActivityEvent table (same source as leaderboard).
+     * Build review activity by querying the ActivityEvent table.
      *
      * <p>This queries the ActivityEvent table first to get review/comment events,
-     * then hydrates entity details. This ensures consistency with leaderboard counts
-     * since both use ActivityEvent as the source of truth.
+     * then hydrates entity details, using ActivityEvent as the single source of truth.
      *
      * <p>The ActivityEvent table uses direct workspace.id scoping (not RepositoryToMonitor),
-     * and applies the same filters as leaderboard queries:
+     * and applies these filters:
      * <ul>
      *   <li>Hidden repo exclusion via WorkspaceTeamRepositorySettings</li>
      *   <li>Human users only (type = USER)</li>
      * </ul>
      *
-     * <p><strong>Time range convention:</strong> Uses half-open interval [since, until)
-     * consistent with leaderboard queries.
+     * <p><strong>Time range convention:</strong> Uses half-open interval [since, until).
      */
     private List<ProfileReviewActivityDTO> buildReviewActivity(Long userId, Long workspaceId, TimeRange timeRange) {
         if (workspaceId == null || userId == null) {
             return List.of();
         }
 
-        // Query ActivityEvent table (same source as leaderboard)
+        // Query ActivityEvent table (single source of truth)
         List<ActivityEvent> activityEvents = activityEventRepository.findProfileActivityByActorInTimeframe(
             workspaceId,
             userId,
@@ -285,10 +275,6 @@ public class UserProfileService {
                   .stream()
                   .collect(Collectors.toMap(PullRequestReviewComment::getId, Function.identity()));
 
-        Map<ActivityTargetKey, Double> xpByTarget = activityEvents
-            .stream()
-            .collect(Collectors.toMap(ActivityTargetKey::from, ActivityEvent::getXp, Double::sum));
-
         List<ActivityEvent> distinctActivityEvents = new ArrayList<>(
             activityEvents
                 .stream()
@@ -306,21 +292,20 @@ public class UserProfileService {
         return distinctActivityEvents
             .stream()
             .map(event -> {
-                int xp = XpPrecision.roundToInt(xpByTarget.getOrDefault(ActivityTargetKey.from(event), 0.0));
                 if (ActivityTargetType.REVIEW.getValue().equals(event.getTargetType())) {
                     PullRequestReview review = reviewsById.get(event.getTargetId());
                     if (review != null) {
-                        return reviewActivityAssembler.assemble(review, xp);
+                        return reviewActivityAssembler.assemble(review);
                     }
                 } else if (ActivityTargetType.ISSUE_COMMENT.getValue().equals(event.getTargetType())) {
                     IssueComment comment = commentsById.get(event.getTargetId());
                     if (comment != null && isPullRequestComment(comment)) {
-                        return reviewActivityAssembler.assemble(comment, xp);
+                        return reviewActivityAssembler.assemble(comment);
                     }
                 } else if (ActivityTargetType.REVIEW_COMMENT.getValue().equals(event.getTargetType())) {
                     PullRequestReviewComment comment = reviewCommentsById.get(event.getTargetId());
                     if (comment != null && !isOwnPullRequestComment(comment)) {
-                        return reviewActivityAssembler.assemble(comment, xp);
+                        return reviewActivityAssembler.assemble(comment);
                     }
                 }
                 return null;
@@ -368,14 +353,6 @@ public class UserProfileService {
             .filter(Objects::nonNull)
             .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
         return byId.values().stream().sorted(Comparator.comparing(RepositoryInfoDTO::nameWithOwner)).toList();
-    }
-
-    private ProfileXpRecordDTO buildUserXpRecord(Long workspaceId, Long userId) {
-        if (workspaceId == null) {
-            return ProfileXpRecordDTO.empty();
-        }
-
-        return XpSystem.getLevelProgress(activityEventRepository.findTotalXpByWorkspaceAndActor(workspaceId, userId));
     }
 
     private boolean isPullRequestComment(IssueComment comment) {

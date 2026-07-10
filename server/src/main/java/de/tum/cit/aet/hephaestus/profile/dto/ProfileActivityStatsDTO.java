@@ -3,9 +3,8 @@ package de.tum.cit.aet.hephaestus.profile.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Aggregated activity statistics with XP scores for a user profile")
+@Schema(description = "Aggregated activity statistics for a user profile")
 public record ProfileActivityStatsDTO(
-    @NonNull @Schema(description = "Total XP score", example = "1250") Integer score,
     @NonNull
     @Schema(description = "Number of distinct pull requests reviewed", example = "42")
     Integer numberOfReviewedPRs,

@@ -9,7 +9,7 @@ import styles from './index.module.css';
 const guideLinks = [
   {
     title: 'User Guide',
-    description: 'Navigate weekly rituals, mentoring flows, and leaderboard insights.',
+    description: 'Navigate weekly rituals, mentoring flows, and practice reflection.',
     to: '/user/overview',
   },
   {
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, gamified reviews, and actionable analytics.">
+      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, practice reflection, and actionable insights.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

@@ -21,6 +21,12 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     }
 
     @Override
+    public List<String> sidecarScripts() {
+        // pi-runner.mjs imports `./pi-observation-normalize.mjs` at workspace-root; stage it alongside.
+        return List.of("pi-observation-normalize.mjs");
+    }
+
+    @Override
     public List<String> nodeFlags() {
         return FLAGS;
     }

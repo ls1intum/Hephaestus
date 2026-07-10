@@ -4,10 +4,10 @@
 -- Postgres after the backend has applied its schema.
 
 INSERT INTO workspace (id, account_login, account_type, created_at, display_name, is_publicly_viewable, slug, status,
-  practices_enabled, achievements_enabled, leaderboard_enabled, progression_enabled, leagues_enabled,
+  practices_enabled, achievements_enabled,
   practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled, mentor_enabled)
 VALUES (1, 'hephaestustest', 'ORG', now(), 'E2E Practice Detection', false, 'e2e', 'ACTIVE',
-  true, false, false, false, false, true, true, true)
+  true, false, true, true, true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO agent_config (id, workspace_id, name, enabled, llm_provider, model_name, timeout_seconds, max_concurrent_jobs, allow_internet, created_at, credential_mode)
@@ -30,8 +30,8 @@ INSERT INTO identity_link (id, account_id, git_provider_id, subject, linked_at, 
 SELECT 1, a.id, 1, '900001', now(), 'OAUTH_LOGIN', 900001, 'e2e'
 FROM account a WHERE a.primary_email = 'e2e@dev.invalid'
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at)
-VALUES (1, 900001, 'ADMIN', 0, false, now())
+INSERT INTO workspace_membership (workspace_id, user_id, role, hidden, created_at)
+VALUES (1, 900001, 'ADMIN', false, now())
 ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('agent_config', 'id'), 10, true);

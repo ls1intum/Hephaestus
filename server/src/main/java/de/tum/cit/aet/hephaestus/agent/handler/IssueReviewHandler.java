@@ -152,11 +152,11 @@ public class IssueReviewHandler implements JobTypeHandler {
             ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files " +
             "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json, and " +
             "inputs/context/project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then " +
-            "evaluate each practice in inputs/practices/ against the issue and persist every justified finding via the " +
-            "report_finding tool. Evidence locations should reference the issue thread/metadata, not source files. " +
+            "evaluate each practice in inputs/practices/ against the issue and persist every justified observation via the " +
+            "report_observation tool. Evidence locations should reference the issue thread/metadata, not source files. " +
             "Follow " +
             WorkspaceAbi.ORCHESTRATOR_PATH +
-            " for the finding schema and rules.";
+            " for the observation schema and rules.";
         log.info("Built issue orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
     }
@@ -167,7 +167,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (!parsed.discarded().isEmpty()) {
             log.info("Discarded {} findings during parsing: jobId={}", parsed.discarded().size(), job.getId());
         }
-        if (parsed.validFindings().isEmpty()) {
+        if (parsed.validObservations().isEmpty()) {
             throw new JobDeliveryException(
                 "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
             );
@@ -179,8 +179,8 @@ public class IssueReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Set.of()
                 : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.ISSUE);
-        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
-            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
+        List<PracticeDetectionResultParser.ValidatedObservation> coercedFindings =
+            PracticeDetectionResultParser.coerceCoherence(parsed.validObservations(), defectDetectorSlugs);
         PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
             "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",

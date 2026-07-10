@@ -219,7 +219,7 @@ public class GitLabMilestoneSyncService {
      * every discovered milestone to each repository in {@code repositoriesInGroup}.
      * <p>
      * <b>Scoping tradeoff (pattern b):</b> GitLab group milestones span all projects in a group,
-     * but the {@code milestone} table is rooted at {@code repository_id} for profile / XP
+     * but the {@code milestone} table is rooted at {@code repository_id} for profile
      * aggregation. We therefore fan out each group milestone to every repo in the group.
      * Each fan-out row uses a deterministic negative {@code nativeId} keyed on
      * {@code (repositoryId, iid)} (see {@link GitLabMilestoneProcessor#process}), which avoids

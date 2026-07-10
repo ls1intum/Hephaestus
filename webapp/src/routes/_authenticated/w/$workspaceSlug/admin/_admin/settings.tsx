@@ -7,10 +7,9 @@ import {
 	getWorkspaceOptions,
 	listWorkspacesQueryKey,
 	removeRepositoryToMonitorMutation,
-	resetAndRecalculateLeaguesMutation,
 	updateFeaturesMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
+import type { CohortVisibility, FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -35,7 +34,7 @@ function AdminSettings() {
 	const workspaceQueryOptions = getWorkspaceOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
-	const { data: workspaceData } = useQuery({
+	const { data: workspaceData, error: workspaceDataError } = useQuery({
 		...workspaceQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
@@ -86,14 +85,6 @@ function AdminSettings() {
 		},
 	});
 
-	// Reset leagues mutation
-	const resetLeagues = useMutation({
-		...resetAndRecalculateLeaguesMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["workspace"] });
-		},
-	});
-
 	// Update features mutation
 	const updateFeatures = useMutation({
 		...updateFeaturesMutation(),
@@ -116,6 +107,15 @@ function AdminSettings() {
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
+	}
+
+	if (workspaceSlug && !workspaceData && !workspaceDataError) {
+		return <div className="container mx-auto max-w-4xl py-6">Loading workspace settings…</div>;
+	}
+	if (workspaceSlug && workspaceDataError) {
+		return (
+			<div className="container mx-auto max-w-4xl py-6">Could not load workspace settings.</div>
+		);
 	}
 
 	// Handle add repository
@@ -151,6 +151,17 @@ function AdminSettings() {
 		});
 	};
 
+	// Handle cohort-visibility change
+	const handleCohortVisibilityChange = (cohortVisibility: CohortVisibility) => {
+		if (!workspaceSlug) {
+			return;
+		}
+		updateFeatures.mutate({
+			path: { workspaceSlug },
+			body: { cohortVisibility },
+		});
+	};
+
 	// Format repositories data for the UI component
 	const formattedRepositories: RepositoryItem[] = (repositories || []).map((repo: string) => ({
 		nameWithOwner: repo,
@@ -160,42 +171,36 @@ function AdminSettings() {
 		<AdminSettingsPage
 			repositories={formattedRepositories}
 			isLoadingRepositories={isWorkspaceLoading || isLoadingRepositories || !workspaceSlug}
-			repositoriesError={(workspaceError as Error | null) ?? (repositoriesError as Error | null)}
+			repositoriesError={
+				(workspaceError as Error | null) ??
+				(workspaceDataError as Error | null) ??
+				(repositoriesError as Error | null)
+			}
 			addRepositoryError={addRepository.error as Error | null}
 			isAddingRepository={addRepository.isPending}
 			isRemovingRepository={removeRepository.isPending}
-			isResettingLeagues={resetLeagues.isPending}
 			isAppInstallationWorkspace={isAppInstallationWorkspace}
 			onAddRepository={handleAddRepository}
 			onRemoveRepository={handleRemoveRepository}
-			onResetLeagues={() => {
-				if (!workspaceSlug) {
-					return;
-				}
-				resetLeagues.mutate({ path: { workspaceSlug } });
-			}}
 			features={{
 				practicesEnabled: workspaceData?.practicesEnabled ?? false,
 				mentorEnabled: workspaceData?.mentorEnabled ?? false,
 				achievementsEnabled: workspaceData?.achievementsEnabled ?? false,
-				leaderboardEnabled: workspaceData?.leaderboardEnabled ?? false,
-				progressionEnabled: workspaceData?.progressionEnabled ?? false,
-				leaguesEnabled: workspaceData?.leaguesEnabled ?? false,
 				practiceReviewAutoTriggerEnabled: workspaceData?.practiceReviewAutoTriggerEnabled ?? true,
 				practiceReviewManualTriggerEnabled:
 					workspaceData?.practiceReviewManualTriggerEnabled ?? true,
 			}}
+			cohortVisibility={workspaceData?.cohortVisibility ?? "MENTORS_ONLY"}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
+			onCohortVisibilityChange={handleCohortVisibilityChange}
 			workspaceSlug={workspaceSlug ?? undefined}
+			reviewCycleDay={workspaceData?.reviewCycleDay ?? undefined}
+			reviewCycleTime={workspaceData?.reviewCycleTime ?? undefined}
 			hasSlackConnection={workspaceData?.hasSlackToken ?? false}
 			slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
-			slackChannelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
-			slackTeamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
-			slackNotificationsEnabled={workspaceData?.leaderboardNotificationEnabled ?? false}
-			slackScheduleDay={workspaceData?.leaderboardScheduleDay ?? undefined}
-			slackScheduleTime={workspaceData?.leaderboardScheduleTime ?? undefined}
-			onSlackSaved={() =>
+			slackChannelId={undefined}
+			onWorkspaceRefetch={() =>
 				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
 			}
 		/>

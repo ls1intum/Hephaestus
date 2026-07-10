@@ -74,6 +74,11 @@ public class PiRuntimeFactory {
         );
         inputFiles.put(WorkspaceAbi.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
         inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerProfile().runnerScript()));
+        // Stage sibling helper scripts the runner imports relatively (e.g. ./pi-observation-normalize.mjs)
+        // at workspace-root under their own filename so the runner's ESM imports resolve in the sandbox.
+        for (String sidecar : spec.runnerProfile().sidecarScripts()) {
+            inputFiles.put(sidecar, loadClasspathResource(sidecar));
+        }
         inputFiles.putAll(spec.extraInputs());
 
         long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);

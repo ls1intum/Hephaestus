@@ -15,16 +15,16 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Code Review Gamification',
+    title: 'Practice-Focused Reflection',
     kicker: 'Transform code reviews into learning opportunities',
     description:
-      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+      'Non-competitive reflection keeps healthy review habits visible without ranking anyone against their peers.',
     bullets: [
-      'Weekly leaderboards with GitHub integration',
-      'Team competitions across multiple repositories',
-      'Structured league system for ongoing engagement',
+      'My Practices reflection tied to your review cycle',
+      'Achievements for consistent contributions',
+      'Activity Monitor for a transparent contribution log',
     ],
-    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
+    cta: {label: 'Explore your practices', to: '/user/achievements'},
   },
   {
     title: 'Process-Aware AI Mentoring',

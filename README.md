@@ -17,15 +17,15 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 
 ## Main Features
 
-1. **Code Review Gamification**
+1. **Practice-Focused Reflection**
 
-   - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
+   - **My Practices:** Reflect on your own review habits with criterion-referenced practice cards tied to your review cycle. Nothing is ranked or scored against your peers.
 
-   - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
+   - **Practice Overview:** Give mentors an audited, k-anonymised view of cohort health and a needs-attention roster — no ranking, no leaderboard — with a per-developer drill-down that records every access.
 
-   - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
+   - **Activity Monitor:** Follow an append-only, idempotent activity event log that surfaces a transparent record of your contributions.
 
-   - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
+   - **Achievements:** Celebrate consistent contributions and milestones that recognize healthy habits without competition.
 
 2. **Heph (Conversational AI Mentor)**
 
@@ -40,7 +40,6 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 - **Medium Term:** Expand multi-workspace capabilities to allow configuration of multiple organizations and selected open-source repositories, enabling seamless integration into diverse GitHub projects.
 - **Medium Term:** Integrate GitLab support to cater to self-hosted Git platforms, particularly for educational contexts.
 - **Medium Term:** Develop an advanced mentor prompt scheduler tailored for project-based courses, enabling daily reflective sessions and guided adaptation to evolving project requirements.
-- **Medium Term:** Enhance the gamification system with additional features and further expand Heph's capabilities.
 - **Long Term:** Proactively integrate with GitHub and GitLab to deliver feedback directly via comments on issues or pull requests.
 - **Long Term:** Launch a peer-to-peer recognition system to reward high-quality reviews and establish a review quality assurance mechanism.
 

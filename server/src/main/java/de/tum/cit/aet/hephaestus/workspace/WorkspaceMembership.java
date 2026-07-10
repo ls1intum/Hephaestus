@@ -12,7 +12,7 @@ import org.hibernate.annotations.DynamicUpdate;
  * Join entity representing a user's membership in a workspace with role-based access control.
  *
  * <p>This entity implements the many-to-many relationship between {@link User} and {@link Workspace},
- * enriched with role information and workspace-scoped gamification data (league points).
+ * enriched with role information.
  *
  * <h2>Composite Primary Key</h2>
  * Uses {@link Id} as an embedded composite key of (workspaceId, userId), ensuring:
@@ -31,11 +31,6 @@ import org.hibernate.annotations.DynamicUpdate;
  *   <li><b>ADMIN:</b> Manage settings, members, and repositories</li>
  *   <li><b>MEMBER:</b> View access and participation in tracked activities</li>
  * </ul>
- *
- * <h2>League Points</h2>
- * The {@link #leaguePoints} field stores workspace-scoped gamification points,
- * calculated by {@link LeaguePointsRecalculator} based on user contributions.
- * Points are workspace-specific (a user has separate point totals per workspace).
  *
  * @see WorkspaceRole
  * @see WorkspaceMembershipService
@@ -79,15 +74,7 @@ public class WorkspaceMembership {
     @Column(name = "role", nullable = false, length = 16)
     private WorkspaceRole role = WorkspaceRole.MEMBER;
 
-    /**
-     * Workspace-scoped gamification points.
-     * Accumulated based on contributions (PRs merged, reviews, etc.).
-     * Recalculated by {@link LeaguePointsRecalculator}.
-     */
-    @Column(name = "league_points", nullable = false)
-    private int leaguePoints = 0;
-
-    /** Whether this member is hidden from the leaderboard */
+    /** Whether this member is hidden from the practice roster / overview */
     @Column(name = "hidden", nullable = false)
     private boolean hidden = false;
 

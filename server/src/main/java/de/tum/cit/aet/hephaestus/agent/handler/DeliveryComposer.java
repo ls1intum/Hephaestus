@@ -10,7 +10,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.REPO_MOUNT_RE
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.practices.feedback.StudentTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -156,18 +156,18 @@ class DeliveryComposer {
     );
 
     /** A finding is a problem when its detector-resolved assessment is {@link Assessment#BAD} (ADR 0022). */
-    private static boolean isProblem(ValidatedFinding f) {
+    private static boolean isProblem(ValidatedObservation f) {
         return f.assessment() == Assessment.BAD;
     }
 
     /** A finding is a strength when its detector-resolved assessment is {@link Assessment#GOOD} (ADR 0022). */
-    private static boolean isStrength(ValidatedFinding f) {
+    private static boolean isStrength(ValidatedObservation f) {
         return f.assessment() == Assessment.GOOD;
     }
 
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
-    static DeliveryContent compose(List<ValidatedFinding> findings) {
+    static DeliveryContent compose(List<ValidatedObservation> findings) {
         return compose(findings, WorkArtifact.PULL_REQUEST);
     }
 
@@ -177,7 +177,7 @@ class DeliveryComposer {
      * problem vs a strength?" is decided per finding by its {@code assessment} (ADR 0022).
      */
     @Nullable
-    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
+    static DeliveryContent compose(List<ValidatedObservation> findings, WorkArtifact artifact) {
         return compose(findings, artifact, Map.of());
     }
 
@@ -190,7 +190,7 @@ class DeliveryComposer {
      */
     @Nullable
     static DeliveryContent compose(
-        List<ValidatedFinding> findings,
+        List<ValidatedObservation> findings,
         WorkArtifact artifact,
         Map<String, String> whyBySlug
     ) {
@@ -211,7 +211,7 @@ class DeliveryComposer {
      */
     @Nullable
     static DeliveryContent compose(
-        List<ValidatedFinding> findings,
+        List<ValidatedObservation> findings,
         WorkArtifact artifact,
         Map<String, String> whyBySlug,
         @Nullable String unifiedDiff
@@ -229,7 +229,7 @@ class DeliveryComposer {
      */
     @Nullable
     static String recomposeMrNote(
-        List<ValidatedFinding> findings,
+        List<ValidatedObservation> findings,
         WorkArtifact artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
@@ -240,7 +240,7 @@ class DeliveryComposer {
 
     @Nullable
     private static DeliveryContent compose(
-        List<ValidatedFinding> findings,
+        List<ValidatedObservation> findings,
         WorkArtifact artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
@@ -250,7 +250,7 @@ class DeliveryComposer {
 
     @Nullable
     private static DeliveryContent compose(
-        List<ValidatedFinding> findings,
+        List<ValidatedObservation> findings,
         WorkArtifact artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys,
@@ -263,7 +263,7 @@ class DeliveryComposer {
         // diff notes so a slug's "Why this matters" lands exactly once, wherever that finding renders in full.
         Set<String> emittedWhy = new HashSet<>();
 
-        List<ValidatedFinding> negatives = findings
+        List<ValidatedObservation> negatives = findings
             .stream()
             .filter(DeliveryComposer::isProblem)
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
@@ -309,7 +309,7 @@ class DeliveryComposer {
 
         // No problems → an observation note over the strength findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
-            List<ValidatedFinding> observed = findings.stream().filter(DeliveryComposer::isStrength).toList();
+            List<ValidatedObservation> observed = findings.stream().filter(DeliveryComposer::isStrength).toList();
             if (observed.isEmpty()) {
                 // Every finding abstained (all NOT_APPLICABLE): the artifact could not be assessed against
                 // any active practice, so deliver nothing rather than a misleading "nothing to change here"
@@ -324,9 +324,9 @@ class DeliveryComposer {
         // must be expanded in full in the issue note itself rather than demoted to a diff note that
         // silently vanishes, leaving the student a bare title with no reasoning or guidance.
         boolean inlineSupported = artifact == WorkArtifact.PULL_REQUEST;
-        List<ValidatedFinding> inlinable = new ArrayList<>();
-        List<ValidatedFinding> nonInlinable = new ArrayList<>();
-        for (ValidatedFinding f : negatives) {
+        List<ValidatedObservation> inlinable = new ArrayList<>();
+        List<ValidatedObservation> nonInlinable = new ArrayList<>();
+        for (ValidatedObservation f : negatives) {
             if (inlineSupported && !isNonInlinable(f)) {
                 inlinable.add(f);
             } else {
@@ -336,7 +336,7 @@ class DeliveryComposer {
 
         // Strength findings the same job produced — surfaced as a brief strengths line before the
         // critiques so the note acknowledges effort (task-level, not person-level praise).
-        List<ValidatedFinding> positives = findings.stream().filter(DeliveryComposer::isStrength).toList();
+        List<ValidatedObservation> positives = findings.stream().filter(DeliveryComposer::isStrength).toList();
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview. The inline
         // overview is signal-driven (deliveredKeys): a finding whose inline comment landed collapses to a
@@ -364,7 +364,7 @@ class DeliveryComposer {
      * highest-severity lead) and drops the rest; every non-epic-structure finding passes through
      * untouched and in order. No-op when fewer than two epic-structure findings are present.
      */
-    private static List<ValidatedFinding> dedupEpicStructure(List<ValidatedFinding> negatives) {
+    private static List<ValidatedObservation> dedupEpicStructure(List<ValidatedObservation> negatives) {
         long epicCount = negatives
             .stream()
             .filter(f -> EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug()))
@@ -372,9 +372,9 @@ class DeliveryComposer {
         if (epicCount < 2) {
             return negatives;
         }
-        List<ValidatedFinding> kept = new ArrayList<>(negatives.size());
+        List<ValidatedObservation> kept = new ArrayList<>(negatives.size());
         boolean epicKept = false;
-        for (ValidatedFinding f : negatives) {
+        for (ValidatedObservation f : negatives) {
             if (EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug())) {
                 if (epicKept) {
                     continue; // redundant sibling — same epic-structure lesson as the lead already kept
@@ -394,8 +394,8 @@ class DeliveryComposer {
      * only one member present is left alone (no over-merge). Order-preserving over the incoming
      * severity-sorted list.
      */
-    private static List<ValidatedFinding> dedupCoOccurringNegatives(List<ValidatedFinding> negatives) {
-        Set<String> present = negatives.stream().map(ValidatedFinding::practiceSlug).collect(Collectors.toSet());
+    private static List<ValidatedObservation> dedupCoOccurringNegatives(List<ValidatedObservation> negatives) {
+        Set<String> present = negatives.stream().map(ValidatedObservation::practiceSlug).collect(Collectors.toSet());
         // Drop a redundant slug only when its preferred partner is also present in THIS delivery.
         Set<String> toDrop = CO_OCCURRENCE_REDUNDANT_TO_PREFERRED.entrySet()
             .stream()
@@ -419,10 +419,10 @@ class DeliveryComposer {
      * the incoming severity ordering so the existing lead-with-blocking layout is untouched. Caller only
      * invokes this when the non-blocking count actually exceeds the cap.
      */
-    private static List<ValidatedFinding> capImprovementTail(List<ValidatedFinding> negatives) {
-        List<ValidatedFinding> blocking = new ArrayList<>();
-        List<ValidatedFinding> improvements = new ArrayList<>();
-        for (ValidatedFinding f : negatives) {
+    private static List<ValidatedObservation> capImprovementTail(List<ValidatedObservation> negatives) {
+        List<ValidatedObservation> blocking = new ArrayList<>();
+        List<ValidatedObservation> improvements = new ArrayList<>();
+        for (ValidatedObservation f : negatives) {
             if (f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR) {
                 blocking.add(f);
             } else {
@@ -430,23 +430,23 @@ class DeliveryComposer {
             }
         }
         // Pick the few highest-leverage improvements: severity (MINOR before INFO) then confidence desc.
-        // Collect by reference IDENTITY (not value-equality): ValidatedFinding is a record, so two findings
+        // Collect by reference IDENTITY (not value-equality): ValidatedObservation is a record, so two findings
         // with identical content are equal — a value-set would collapse them into one slot, letting the
         // order-preserving re-emit below match BOTH and overshoot the cap. Identity keeps exactly the
         // limit()-selected instances.
-        Set<ValidatedFinding> keptImprovements = improvements
+        Set<ValidatedObservation> keptImprovements = improvements
             .stream()
             .sorted(
-                Comparator.comparingInt((ValidatedFinding f) -> f.severity().ordinal()).thenComparing(
-                    Comparator.comparingDouble(ValidatedFinding::confidence).reversed()
+                Comparator.comparingInt((ValidatedObservation f) -> f.severity().ordinal()).thenComparing(
+                    Comparator.comparingDouble(ValidatedObservation::confidence).reversed()
                 )
             )
             .limit(MAX_IMPROVEMENT_SUGGESTIONS)
             .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
 
         // Re-emit in the original (severity-sorted) order, dropping the improvements that did not survive.
-        List<ValidatedFinding> kept = new ArrayList<>(blocking.size() + keptImprovements.size());
-        for (ValidatedFinding f : negatives) {
+        List<ValidatedObservation> kept = new ArrayList<>(blocking.size() + keptImprovements.size());
+        for (ValidatedObservation f : negatives) {
             if (blocking.contains(f) || keptImprovements.contains(f)) {
                 kept.add(f);
             }
@@ -471,16 +471,16 @@ class DeliveryComposer {
      * and it lands at most once per delivery via the shared {@code emittedWhy} ledger.
      */
     private static String composeNoIssuesNote(
-        List<ValidatedFinding> observed,
+        List<ValidatedObservation> observed,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy
     ) {
         // Findings whose reasoning lets us cite a concrete observation, ranked most-certain first so the
         // highest-confidence reinforcements survive the cap.
-        List<ValidatedFinding> withReasoning = observed
+        List<ValidatedObservation> withReasoning = observed
             .stream()
             .filter(f -> f.reasoning() != null && !f.reasoning().isBlank())
-            .sorted(Comparator.comparingDouble((ValidatedFinding f) -> f.confidence()).reversed())
+            .sorted(Comparator.comparingDouble((ValidatedObservation f) -> f.confidence()).reversed())
             .toList();
 
         if (withReasoning.isEmpty()) {
@@ -490,7 +490,7 @@ class DeliveryComposer {
         var bullets = new StringBuilder(1024);
         int shown = 0;
         boolean principleShown = false;
-        for (ValidatedFinding f : withReasoning) {
+        for (ValidatedObservation f : withReasoning) {
             if (shown >= MAX_STRENGTH_REINFORCEMENTS) break;
             // Whole-sentence budget clamp: never clip a multi-clause observation mid-enumeration.
             String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), STRENGTH_BUDGET);
@@ -536,7 +536,7 @@ class DeliveryComposer {
      * once-per-delivery via the shared {@code emittedWhy} ledger so the same slug never repeats its principle.
      */
     private static String strengthPrincipleText(
-        ValidatedFinding f,
+        ValidatedObservation f,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy
     ) {
@@ -606,7 +606,7 @@ class DeliveryComposer {
      * couple of things to tighten:". Returns "" when there are no positives. Strictly task-level: it
      * names what the work does, never grades the author.
      */
-    static String composeAcknowledgement(List<ValidatedFinding> positives, int improvementCount) {
+    static String composeAcknowledgement(List<ValidatedObservation> positives, int improvementCount) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
@@ -647,7 +647,7 @@ class DeliveryComposer {
      * dropped — a real strength then vanishes — or (b) dumped as a raw ungrammatical slug. Returns "" only
      * when there is genuinely no GOOD finding to surface.
      */
-    static String composeSubordinatePositive(List<ValidatedFinding> positives) {
+    static String composeSubordinatePositive(List<ValidatedObservation> positives) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
@@ -655,13 +655,13 @@ class DeliveryComposer {
         return positives
             .stream()
             .filter(DeliveryComposer::isStrength)
-            .max(Comparator.comparingDouble(ValidatedFinding::confidence))
+            .max(Comparator.comparingDouble(ValidatedObservation::confidence))
             .map(DeliveryComposer::subordinateStrengthLine)
             .orElse("");
     }
 
     /** Renders one GOOD finding as the subordinate "Worth keeping: …" line (curated phrase or generic fallback). */
-    private static String subordinateStrengthLine(ValidatedFinding f) {
+    private static String subordinateStrengthLine(ValidatedObservation f) {
         String phrase = SUBORDINATE_STRENGTH_PHRASES.get(f.practiceSlug());
         if (phrase != null && !phrase.isBlank()) {
             return "Worth keeping: you're " + phrase + ".";
@@ -725,7 +725,7 @@ class DeliveryComposer {
      * Non-inlinable if: practice is inherently non-inlinable, OR finding has neither a
      * usable evidence location nor an agent-supplied {@code suggestedDiffNote}.
      */
-    private static boolean isNonInlinable(ValidatedFinding f) {
+    private static boolean isNonInlinable(ValidatedObservation f) {
         if (NON_INLINABLE_PRACTICES.contains(f.practiceSlug())) {
             return true;
         }
@@ -749,10 +749,10 @@ class DeliveryComposer {
      * somewhere. An empty set means "nothing delivered yet" → every inlinable finding keeps its full line.
      */
     static String composeMrNote(
-        List<ValidatedFinding> positives,
-        List<ValidatedFinding> allNegatives,
-        List<ValidatedFinding> nonInlinable,
-        List<ValidatedFinding> inlinable,
+        List<ValidatedObservation> positives,
+        List<ValidatedObservation> allNegatives,
+        List<ValidatedObservation> nonInlinable,
+        List<ValidatedObservation> inlinable,
         int improvementOverflow,
         Set<String> deliveredKeys,
         Map<String, String> whyBySlug,
@@ -810,7 +810,7 @@ class DeliveryComposer {
         if (!inlinable.isEmpty()) {
             // A null/blank correlation key can never match a delivered key (and Set.of().contains(null)
             // throws), so a keyless finding is always treated as undelivered → keeps its full summary line.
-            List<ValidatedFinding> undelivered = inlinable
+            List<ValidatedObservation> undelivered = inlinable
                 .stream()
                 .filter(f -> f.recurrenceKey() == null || !deliveredKeys.contains(f.recurrenceKey()))
                 .toList();
@@ -824,7 +824,7 @@ class DeliveryComposer {
                     .append(" below.");
             }
             sb.append("\n\n");
-            for (ValidatedFinding f : undelivered) {
+            for (ValidatedObservation f : undelivered) {
                 appendFindingHeader(sb, f, true);
                 sb.append("\n");
             }
@@ -834,7 +834,11 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, int improvementOverflow) {
+    private static void composeOpening(
+        StringBuilder sb,
+        List<ValidatedObservation> negatives,
+        int improvementOverflow
+    ) {
         // Hephaestus is a NON-BLOCKING, feedback-first mentor — it never gates a merge. "to fix before
         // merging" is gatekeeping language that is wrong on every PR (and absurd on an already-merged one),
         // so the call-to-action is state-neutral feed-forward: name what is worth tightening, not a gate to
@@ -889,7 +893,7 @@ class DeliveryComposer {
      * Renders the canonical finding header — emoji inside the bold, optional {@code · `location`} — used by
      * every surface (MR summary list, full finding, diff note) so the format cannot drift between them.
      */
-    private static void appendFindingHeader(StringBuilder sb, ValidatedFinding f, boolean withLocation) {
+    private static void appendFindingHeader(StringBuilder sb, ValidatedObservation f, boolean withLocation) {
         sb.append("**").append(severityEmoji(f.severity())).append(" ").append(f.title()).append("**");
         if (withLocation) {
             String location = extractPrimaryLocation(f);
@@ -901,7 +905,7 @@ class DeliveryComposer {
 
     private static void composeFinding(
         StringBuilder sb,
-        ValidatedFinding f,
+        ValidatedObservation f,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy
     ) {
@@ -961,7 +965,7 @@ class DeliveryComposer {
      */
     private static void appendPrinciple(
         StringBuilder sb,
-        ValidatedFinding f,
+        ValidatedObservation f,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy
     ) {
@@ -980,7 +984,7 @@ class DeliveryComposer {
      * no authored principle, already emitted this delivery, or a second advisory principle). Mutates
      * {@code emittedWhy} on success. See {@link #appendPrinciple}.
      */
-    private static String principleText(ValidatedFinding f, Map<String, String> whyBySlug, Set<String> emittedWhy) {
+    private static String principleText(ValidatedObservation f, Map<String, String> whyBySlug, Set<String> emittedWhy) {
         if (f.severity() == Severity.INFO) {
             return "";
         }
@@ -1060,7 +1064,7 @@ class DeliveryComposer {
     );
 
     /** Detect code language from the primary file extension in evidence. */
-    private static String detectLanguage(ValidatedFinding f) {
+    private static String detectLanguage(ValidatedObservation f) {
         String location = extractPrimaryLocation(f);
         if (location == null) return "";
         String path = location.contains(":") ? location.substring(0, location.lastIndexOf(':')) : location;
@@ -1080,7 +1084,7 @@ class DeliveryComposer {
     }
 
     @Nullable
-    private static String extractPrimaryLocation(ValidatedFinding f) {
+    private static String extractPrimaryLocation(ValidatedObservation f) {
         JsonNode evidence = f.evidence();
         if (evidence == null || evidence.isNull()) return null;
         JsonNode locations = evidence.get("locations");
@@ -1098,7 +1102,7 @@ class DeliveryComposer {
     }
 
     @Nullable
-    private static String extractPrimarySnippet(ValidatedFinding f) {
+    private static String extractPrimarySnippet(ValidatedObservation f) {
         JsonNode evidence = f.evidence();
         if (evidence == null || evidence.isNull()) return null;
         JsonNode snippets = evidence.get("snippets");
@@ -1119,14 +1123,14 @@ class DeliveryComposer {
      * agent did not supply one.
      */
     private static List<DiffNote> collectDiffNotes(
-        List<ValidatedFinding> negatives,
+        List<ValidatedObservation> negatives,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy,
         GroundingContext grounding
     ) {
         List<DiffNote> notes = new ArrayList<>();
 
-        for (ValidatedFinding f : negatives) {
+        for (ValidatedObservation f : negatives) {
             if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
 
             // Prefer the agent's suggestedDiffNotes — but at most ONE per finding (its primary anchor). A
@@ -1214,7 +1218,7 @@ class DeliveryComposer {
      */
     @Nullable
     private static String composeDiffNoteBody(
-        ValidatedFinding f,
+        ValidatedObservation f,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy
     ) {

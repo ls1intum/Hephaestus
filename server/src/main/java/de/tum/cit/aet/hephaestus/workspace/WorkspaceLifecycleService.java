@@ -195,7 +195,7 @@ public class WorkspaceLifecycleService {
         workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
         log.debug("Deleted workspace memberships: workspaceId={}", workspaceId);
 
-        // Step 4: Invoke purge contributors (e.g., activity events, leaderboard data)
+        // Step 4: Invoke purge contributors (e.g., activity events, practice data)
         // Contributors are sorted by order and handle their own module's cleanup
         purgeContributors
             .stream()

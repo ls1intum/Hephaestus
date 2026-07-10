@@ -25,8 +25,6 @@ type Story = StoryObj<typeof meta>;
 
 const defaultArgs = {
 	data: {
-		level: 42,
-		leaguePoints: 1600,
 		avatarUrl: "https://github.com/github.png",
 		name: "Zeus",
 	},
@@ -45,13 +43,6 @@ const defaultArgs = {
 
 export const Default: Story = {
 	args: defaultArgs,
-};
-
-export const HighLevel: Story = {
-	args: {
-		...defaultArgs,
-		data: { ...defaultArgs.data, level: 99, leaguePoints: 4200, name: "Athena" },
-	},
 };
 
 export const FallbackAvatar: Story = {

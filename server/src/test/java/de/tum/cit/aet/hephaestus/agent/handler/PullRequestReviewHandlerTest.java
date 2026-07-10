@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -397,14 +398,18 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(filtered).isEmpty();
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Presence presence, String path) {
+        private PracticeDetectionResultParser.ValidatedObservation finding(
+            String slug,
+            Presence presence,
+            String path
+        ) {
             // Assessment mapping: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
             Assessment assessment = switch (presence) {
                 case PRESENT -> Assessment.GOOD;
                 case ABSENT -> Assessment.BAD;
                 case NOT_APPLICABLE -> null;
             };
-            return new PracticeDetectionResultParser.ValidatedFinding(
+            return new PracticeDetectionResultParser.ValidatedObservation(
                 slug,
                 "title",
                 presence,
@@ -461,7 +466,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void delegatesToDeliveryService() {
             String rawOutput = """
                 {
-                  "findings": [{
+                  "observations": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Good PR description",
                     "presence": "PRESENT",
@@ -482,7 +487,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void throwsWhenNoValidFindings() {
-            AgentJob job = jobWithOutput("{\"findings\":[]}");
+            AgentJob job = jobWithOutput("{\"observations\":[]}");
             assertThatThrownBy(() -> handler.deliver(job))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No valid findings");
@@ -496,7 +501,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // what persists + delivers, so assert it there.
             String rawOutput = """
                 {
-                  "findings": [{
+                  "observations": [{
                     "practiceSlug": "hardcoded-secrets",
                     "title": "Hard-coded credential",
                     "presence": "PRESENT",
@@ -509,14 +514,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
                 List.class
             );
             when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
 
             handler.deliver(job);
 
-            List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
+            List<PracticeDetectionResultParser.ValidatedObservation> delivered = captor.getValue();
             var secret = delivered
                 .stream()
                 .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
@@ -548,7 +553,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // post over an artifact that did change.
             String rawOutput = """
                 {
-                  "findings": [{
+                  "observations": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Not applicable here",
                     "presence": "NOT_APPLICABLE",
@@ -579,7 +584,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // nothing to deliver. That is a refuse-to-deliver, not a silent empty post.
             String rawOutput = """
                 {
-                  "findings": [{
+                  "observations": [{
                     "practiceSlug": "error-handling",
                     "title": "Unhandled error path",
                     "presence": "ABSENT",
@@ -617,7 +622,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // weak model missed.
             String rawOutput = """
                 {
-                  "findings": [{
+                  "observations": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Clear description",
                     "presence": "PRESENT",
@@ -640,14 +645,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 "Sources/Config.swift\n"
             );
 
-            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
                 List.class
             );
             when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
 
             handler.deliver(job);
 
-            List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
+            List<PracticeDetectionResultParser.ValidatedObservation> delivered = captor.getValue();
             var secret = delivered
                 .stream()
                 .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
@@ -665,7 +670,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).
             String rawOutput = """
                 {
-                  "findings": [{
+                  "observations": [{
                     "practiceSlug": "error-handling",
                     "title": "Unhandled error path",
                     "presence": "ABSENT",
@@ -686,8 +691,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // Stub deliver() to return the SAME identity-keyed map the real service would: key every finding
             // it received with a deterministic correlation key derived from the instance the handler passed.
             when(deliveryService.deliver(eq(job), any())).thenAnswer(invocation -> {
-                List<PracticeDetectionResultParser.ValidatedFinding> received = invocation.getArgument(1);
-                Map<PracticeDetectionResultParser.ValidatedFinding, String> keys = new java.util.IdentityHashMap<>();
+                List<PracticeDetectionResultParser.ValidatedObservation> received = invocation.getArgument(1);
+                Map<PracticeDetectionResultParser.ValidatedObservation, String> keys =
+                    new java.util.IdentityHashMap<>();
                 for (var f : received) {
                     keys.put(f, "corr-" + f.practiceSlug());
                 }
@@ -704,6 +710,142 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(delivered).isNotNull();
             assertThat(delivered.diffNotes()).hasSize(1);
             assertThat(delivered.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-error-handling");
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void reviewerAudienceOnlyJobPersistsButPostsNothing() {
+            // Reviewer-craft firewall: a 100%-reviewer-audience job (the ReviewSubmitted case) PERSISTS the
+            // reviewer observations (deliver() receives them) but posts NOTHING back to the author's PR —
+            // feedbackService is never invoked.
+            String rawOutput = """
+                {
+                  "observations": [{
+                    "practiceSlug": "leaves-useful-specific-review-comments",
+                    "title": "Vague review comment",
+                    "presence": "ABSENT",
+                    "assessment": "BAD",
+                    "severity": "MINOR",
+                    "confidence": 0.9,
+                    "reasoning": "The comment just says 'fix this'.",
+                    "guidance": "Name the concrete construct and the change.",
+                    "subjectLogin": "reviewer-bob"
+                  }]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, true));
+
+            handler.deliver(job);
+
+            // Persisted: the reviewer finding reached deliver().
+            List<PracticeDetectionResultParser.ValidatedObservation> persisted = captor.getValue();
+            assertThat(persisted).allMatch(f -> ReviewerAudiencePractices.isReviewerAudience(f.practiceSlug()));
+            // Firewall: nothing posts to the author's PR.
+            verifyNoInteractions(feedbackService);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void mixedJobPersistsBothButDeliversOnlyAuthorAudience() {
+            // A mixed job persists BOTH the author-audience and reviewer-audience findings, but the composed
+            // delivery (what posts to the author's PR) must carry only the author-audience finding — the
+            // reviewer-craft finding's label must never appear in the summary.
+            String rawOutput = """
+                {
+                  "observations": [
+                    {
+                      "practiceSlug": "pr-description-quality",
+                      "title": "Clear description",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
+                      "severity": "INFO",
+                      "confidence": 0.9,
+                      "reasoning": "The description spells out the authentication fix and why it was needed."
+                    },
+                    {
+                      "practiceSlug": "leaves-useful-specific-review-comments",
+                      "title": "Vague review comment",
+                      "presence": "ABSENT",
+                      "assessment": "BAD",
+                      "severity": "MINOR",
+                      "confidence": 0.9,
+                      "reasoning": "The comment just says 'fix this'.",
+                      "guidance": "Name the concrete construct and the change.",
+                      "subjectLogin": "reviewer-bob"
+                    }
+                  ]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(2, 0, 0, true));
+
+            handler.deliver(job);
+
+            // Persisted: both audiences reached deliver().
+            List<PracticeDetectionResultParser.ValidatedObservation> persisted = captor.getValue();
+            assertThat(persisted).anyMatch(f -> "pr-description-quality".equals(f.practiceSlug()));
+            assertThat(persisted).anyMatch(f -> "leaves-useful-specific-review-comments".equals(f.practiceSlug()));
+
+            // Delivered: the composed summary carries the author-audience finding, never the reviewer label.
+            ArgumentCaptor<PracticeDetectionResultParser.DeliveryContent> deliveryCaptor = ArgumentCaptor.forClass(
+                PracticeDetectionResultParser.DeliveryContent.class
+            );
+            verify(feedbackService).deliverFeedback(eq(job), deliveryCaptor.capture(), any());
+            String mrNote = deliveryCaptor.getValue().mrNote();
+            // Reviewer-craft firewall: the reviewer-audience finding's label must NOT leak into the author's note.
+            assertThat(mrNote == null ? "" : mrNote).doesNotContainIgnoringCase("review comment");
+            // …AND the author-audience finding's substance MUST reach it — otherwise a firewall that dropped
+            // EVERYTHING (an empty/blank note) would silently pass the negative assertion above. This positive
+            // pin fails on both a reviewer-craft leak and an over-filter that delivers nothing.
+            assertThat(mrNote).isNotNull();
+            assertThat(mrNote).containsIgnoringCase("authentication fix");
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void allNotApplicableReviewerAudienceOnNonEmptyDiffDoesNotThrowAndPersists() {
+            // Audience-aware stale-diff guard: a reviewer job whose reviewer left nothing substantive returns
+            // all-NA reviewer-audience findings on a NON-EMPTY diff. That is legitimately quiet, not a stale
+            // diff — it must NOT throw, and the NA observations must still persist.
+            String rawOutput = """
+                {
+                  "observations": [{
+                    "practiceSlug": "reviews-substantively-with-understanding",
+                    "title": "No reviewer signal to assess",
+                    "presence": "NOT_APPLICABLE",
+                    "confidence": 0.9,
+                    "reasoning": "No reviewer comments were present."
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            // Non-empty, secret-free diff so the stale-diff guard would fire if it (wrongly) counted the
+            // reviewer-audience NA findings.
+            stubDiff(
+                "diff --git a/README.md b/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n+docs update\n",
+                "README.md\n"
+            );
+
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedObservation>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
+
+            handler.deliver(job); // must NOT throw
+
+            assertThat(captor.getValue()).allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
+            // Reviewer-only → firewall short-circuits; nothing posts.
+            verifyNoInteractions(feedbackService);
         }
     }
 }

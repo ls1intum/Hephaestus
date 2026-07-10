@@ -77,7 +77,7 @@ Option 1. Concretely:
   `Locale.getDefault()` inside the same scope. `RuntimeRoleBoundaryTest` asserts the correct
   property gates on `WebhookConfiguration`, `ServerSchedulingConfig`, `NatsConsumerService`, and
   `WorkspaceStartupListener`, plus role isolation (webhook package cannot depend on
-  workspace/leaderboard/agent) and `@EnableScheduling` uniqueness (only on
+  workspace/practices/agent) and `@EnableScheduling` uniqueness (only on
   `ServerSchedulingConfig`).
 
 ## Consequences

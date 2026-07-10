@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -81,63 +80,19 @@ public class WorkspaceController {
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/schedule")
-    @Operation(summary = "Update leaderboard schedule configuration")
+    @PatchMapping("/review-cycle")
+    @Operation(summary = "Update the weekly practice review cycle schedule")
     @ApiResponse(
         responseCode = "200",
         description = "Workspace updated",
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<WorkspaceDTO> updateSchedule(
+    public ResponseEntity<WorkspaceDTO> updateReviewCycle(
         WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
+        @Valid @RequestBody UpdateReviewCycleRequestDTO request
     ) {
-        Workspace workspace = workspaceService.updateSchedule(workspaceContext, request.day(), request.time());
-        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
-    }
-
-    @PatchMapping("/notifications")
-    @Operation(summary = "Update leaderboard notification preferences")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<WorkspaceDTO> updateNotifications(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request
-    ) {
-        Workspace workspace = workspaceService.updateNotifications(
-            workspaceContext,
-            request.enabled(),
-            request.team(),
-            request.channelId()
-        );
-        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
-    }
-
-    @PatchMapping("/leaderboard-digest")
-    @Operation(summary = "Update the whole weekly leaderboard digest config (schedule + notifications) atomically")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<WorkspaceDTO> updateLeaderboardDigest(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateLeaderboardDigestRequestDTO request
-    ) {
-        Workspace workspace = workspaceService.updateLeaderboardDigest(
-            workspaceContext,
-            request.day(),
-            request.time(),
-            request.enabled(),
-            request.team(),
-            request.channelId()
-        );
+        Workspace workspace = workspaceService.updateReviewCycle(workspaceContext, request.day(), request.time());
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
@@ -279,13 +234,5 @@ public class WorkspaceController {
             .removeLabelFromTeam(workspaceContext, teamId, labelId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
-    @PutMapping("/league/reset")
-    @Operation(summary = "Reset and recalculate workspace leagues")
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<Void> resetAndRecalculateLeagues(WorkspaceContext workspaceContext) {
-        workspaceService.resetAndRecalculateLeagues(workspaceContext);
-        return ResponseEntity.ok().build();
     }
 }

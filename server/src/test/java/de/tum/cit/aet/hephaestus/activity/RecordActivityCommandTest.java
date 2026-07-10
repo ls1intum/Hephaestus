@@ -23,7 +23,6 @@ class RecordActivityCommandTest extends BaseUnitTest {
             ActivityEventType eventType = ActivityEventType.REVIEW_APPROVED;
             Instant occurredAt = Instant.parse("2025-01-01T12:00:00Z");
             Long targetId = 100L;
-            double xp = 5.0;
 
             var command = RecordActivityCommand.builder()
                 .workspaceId(workspaceId)
@@ -33,7 +32,6 @@ class RecordActivityCommandTest extends BaseUnitTest {
                 .repository(null)
                 .targetType(ActivityTargetType.REVIEW)
                 .targetId(targetId)
-                .xp(xp)
                 .build();
 
             assertThat(command.workspaceId()).isEqualTo(workspaceId);
@@ -43,21 +41,6 @@ class RecordActivityCommandTest extends BaseUnitTest {
             assertThat(command.repository()).isNull();
             assertThat(command.targetType()).isEqualTo(ActivityTargetType.REVIEW);
             assertThat(command.targetId()).isEqualTo(targetId);
-            assertThat(command.xp()).isEqualTo(xp);
-        }
-
-        @Test
-        void shouldSupportZeroXp() {
-            var command = RecordActivityCommand.builder()
-                .workspaceId(1L)
-                .eventType(ActivityEventType.REVIEW_DISMISSED)
-                .occurredAt(Instant.now())
-                .targetType(ActivityTargetType.REVIEW)
-                .targetId(100L)
-                .xp(0.0)
-                .build();
-
-            assertThat(command.xp()).isZero();
         }
     }
 
@@ -72,12 +55,11 @@ class RecordActivityCommandTest extends BaseUnitTest {
                 Instant.now(),
                 null,
                 ActivityTargetType.PULL_REQUEST,
-                100L,
-                2.0
+                100L
             );
 
             assertThat(command.repository()).isNull();
-            assertThat(command.xp()).isEqualTo(2.0);
+            assertThat(command.targetId()).isEqualTo(100L);
         }
     }
 
@@ -93,7 +75,6 @@ class RecordActivityCommandTest extends BaseUnitTest {
                 .occurredAt(now)
                 .targetType(ActivityTargetType.PULL_REQUEST)
                 .targetId(100L)
-                .xp(5.0)
                 .build();
 
             var command2 = RecordActivityCommand.builder()
@@ -102,7 +83,6 @@ class RecordActivityCommandTest extends BaseUnitTest {
                 .occurredAt(now)
                 .targetType(ActivityTargetType.PULL_REQUEST)
                 .targetId(100L)
-                .xp(5.0)
                 .build();
 
             assertThat(command1).isEqualTo(command2);

@@ -1,5 +1,5 @@
 {
-  "findings": [
+  "observations": [
     {
       "practiceSlug": "pr-description-quality",
       "title": "Well-structured PR description with context",

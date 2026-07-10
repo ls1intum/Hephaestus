@@ -14,9 +14,8 @@ public record WorkspaceMembershipDTO(
     @Schema(description = "Login/username of the user") String userLogin,
     @Schema(description = "Display name of the user") String userName,
     @Schema(description = "Role of the user in this workspace (OWNER, ADMIN, MEMBER)") WorkspaceRole role,
-    @Schema(description = "League points earned by the user in this workspace", example = "150") int leaguePoints,
     @Schema(description = "Timestamp when the membership was created") Instant createdAt,
-    @Schema(description = "Whether the member is hidden from the leaderboard") boolean hidden
+    @Schema(description = "Whether the member is hidden from the practice roster / overview") boolean hidden
 ) {
     public static WorkspaceMembershipDTO from(WorkspaceMembership membership) {
         return from(membership, membership.getRole());
@@ -29,7 +28,6 @@ public record WorkspaceMembershipDTO(
             user.getLogin(),
             user.getName(),
             effectiveRole,
-            membership.getLeaguePoints(),
             membership.getCreatedAt(),
             membership.isHidden()
         );

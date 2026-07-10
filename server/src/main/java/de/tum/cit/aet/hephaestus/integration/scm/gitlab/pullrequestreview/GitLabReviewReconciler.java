@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  * with state {@link PullRequestReview.State#COMMENTED}.
  * <p>
  * Unlike GitHub, GitLab has no first-class "review" entity. We derive one COMMENTED
- * review per {@code (author, discussion)} cluster so that leaderboard and profile
+ * review per {@code (author, discussion)} cluster so that the practice overview and profile
  * scoring can attribute inline feedback submissions to a review and stay at parity
  * with GitHub. Approvals are handled separately (see {@code GitLabMergeRequestProcessor}).
  * <p>
@@ -86,7 +86,7 @@ public class GitLabReviewReconciler {
 
         // Parity with GitHub: a PR author replying to their own MR does not produce a
         // Review entity. Those notes are attributed via numberOfOwnReplies on the
-        // leaderboard; synthesising a COMMENTED review here would inflate peer-review
+        // activity aggregation; synthesising a COMMENTED review here would inflate peer-review
         // counts (students whose only discussion activity is on their own MR would
         // appear to have reviewed peers).
         if (pr.getAuthor() != null && pr.getAuthor().getId() != null && pr.getAuthor().getId().equals(author.getId())) {

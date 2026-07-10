@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -21,7 +20,7 @@ import org.hibernate.annotations.Immutable;
  *
  * <p>Supports:
  * <ul>
- *   <li>Leaderboard: COUNT(*) GROUP BY actor_id, event_type</li>
+ *   <li>Activity aggregation: COUNT(*) GROUP BY actor_id, event_type</li>
  *   <li>Mentor context: SELECT * WHERE actor_id = ? ORDER BY occurred_at DESC</li>
  *   <li>DX Core 4: Maps to Speed (lead time), Effectiveness (review cycle), Quality metrics</li>
  * </ul>
@@ -30,12 +29,11 @@ import org.hibernate.annotations.Immutable;
  * <p>Deduplicated by {@code (workspace_id, event_key)}.
  *
  * <h3>Indexes</h3>
- * <p>Optimized for leaderboard and activity queries:
+ * <p>Optimized for activity aggregation and activity queries:
  * <ul>
- *   <li>workspace_id + occurred_at: Leaderboard aggregations with time range</li>
+ *   <li>workspace_id + occurred_at: Activity aggregations with time range</li>
  *   <li>actor_id + occurred_at: User activity feed (mentor context)</li>
  *   <li>workspace_id + actor_id + occurred_at: Combined workspace + user queries</li>
- *   <li>workspace_id + target_type + target_id: XP lookup for profile hydration</li>
  * </ul>
  *
  * <h3>Immutability</h3>
@@ -50,7 +48,7 @@ import org.hibernate.annotations.Immutable;
         @UniqueConstraint(name = "uk_activity_event_workspace_key", columnNames = { "workspace_id", "event_key" }),
     },
     indexes = {
-        // Leaderboard queries: workspace aggregations with time range
+        // Activity aggregation queries: workspace aggregations with time range
         @Index(name = "idx_activity_event_workspace_occurred", columnList = "workspace_id, occurred_at DESC"),
         // User activity queries: mentor context with time range
         @Index(name = "idx_activity_event_actor_occurred", columnList = "actor_id, occurred_at DESC"),
@@ -59,8 +57,6 @@ import org.hibernate.annotations.Immutable;
             name = "idx_activity_event_workspace_actor_occurred",
             columnList = "workspace_id, actor_id, occurred_at DESC"
         ),
-        // XP lookup for profile hydration: batch load XP by target
-        @Index(name = "idx_activity_event_xp_lookup", columnList = "workspace_id, target_type, target_id"),
     }
 )
 @Getter
@@ -110,24 +106,6 @@ public class ActivityEvent {
     /** ID of the target object */
     @Column(name = "target_id")
     private Long targetId;
-
-    /**
-     * XP points earned for this activity (computed at event time).
-     *
-     * <p><strong>Precision policy:</strong> Values are rounded to 2 decimal places
-     * using HALF_UP rounding before storage. This ensures consistent aggregation
-     * and fair leaderboard scoring.
-     *
-     * <p><strong>Validation:</strong> Enforced non-negative via {@code @PositiveOrZero}
-     * and database CHECK constraint. Negative XP is only allowed for correction
-     * events (e.g., {@code REVIEW_DISMISSED}) which are handled specially.
-     *
-     * @see de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision
-     */
-    @Builder.Default
-    @PositiveOrZero
-    @Column(name = "xp", nullable = false)
-    private double xp = 0.0;
 
     /** When we persisted to the database */
     @NotNull

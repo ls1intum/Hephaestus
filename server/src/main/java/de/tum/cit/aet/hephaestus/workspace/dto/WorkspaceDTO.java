@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -31,13 +32,10 @@ public record WorkspaceDTO(
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the workspace was last updated") Instant updatedAt,
     @Schema(description = "Timestamp when the GitHub App installation was linked") Instant installationLinkedAt,
-    @Schema(description = "Day of week for leaderboard notifications (1=Monday, 7=Sunday)", example = "1")
-    Integer leaderboardScheduleDay,
-    @Schema(description = "Time for leaderboard notifications in HH:mm format", example = "09:00")
-    String leaderboardScheduleTime,
-    @Schema(description = "Whether leaderboard notifications are enabled") Boolean leaderboardNotificationEnabled,
-    @Schema(description = "Team name for leaderboard notifications") String leaderboardNotificationTeam,
-    @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
+    @Schema(description = "Day of week for the weekly practice review cycle (1=Monday, 7=Sunday)", example = "2")
+    Integer reviewCycleDay,
+    @Schema(description = "Time for the weekly practice review cycle in HH:mm format", example = "09:00")
+    String reviewCycleTime,
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
     @Schema(description = "ID of the active Slack connection, if any — addresses PATCH /connections/{id}/status")
@@ -48,15 +46,17 @@ public record WorkspaceDTO(
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
     @NonNull @Schema(description = "Whether the Pi mentor chat feature is enabled") Boolean mentorEnabled,
     @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
-    @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
-    @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled,
-    @NonNull @Schema(description = "Whether league tiers and rankings are enabled") Boolean leaguesEnabled,
     @NonNull
     @Schema(description = "Whether automatic practice reviews triggered by PR events are enabled")
     Boolean practiceReviewAutoTriggerEnabled,
     @NonNull
     @Schema(description = "Whether manual practice reviews triggered via bot command are enabled")
-    Boolean practiceReviewManualTriggerEnabled
+    Boolean practiceReviewManualTriggerEnabled,
+    @NonNull
+    @Schema(
+        description = "Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)"
+    )
+    CohortVisibility cohortVisibility
 ) {
     /** Builds a DTO pulling integration metadata from the Connection registry. */
     public static WorkspaceDTO from(Workspace workspace, ConnectionService connectionService) {
@@ -66,7 +66,6 @@ public record WorkspaceDTO(
         var gitHubApp = connectionService.findActiveGitHubAppConfig(workspaceId);
         var gitHubPat = connectionService.findActiveGitHubPatConfig(workspaceId);
         var gitLab = connectionService.findActiveGitLabConfig(workspaceId);
-        var slackCfg = connectionService.findSlackNotificationConfig(workspaceId);
 
         String serverUrl = gitLab
             .map(ConnectionConfig.GitLabConfig::serverUrl)
@@ -102,9 +101,6 @@ public record WorkspaceDTO(
             .map(c -> c.getId())
             .orElse(null);
 
-        String leaderboardTeam = slackCfg.map(s -> s.teamLabel() != null ? s.teamLabel() : s.teamName()).orElse(null);
-        String leaderboardChannelId = slackCfg.map(ConnectionConfig.SlackConfig::notificationChannelId).orElse(null);
-
         boolean gitlabWebhookRegistered = gitLab.map(c -> c.gitlabWebhookId() != null).orElse(false);
 
         return new WorkspaceDTO(
@@ -121,11 +117,8 @@ public record WorkspaceDTO(
             workspace.getCreatedAt(),
             workspace.getUpdatedAt(),
             installationLinkedAt,
-            workspace.getLeaderboardScheduleDay(),
-            workspace.getLeaderboardScheduleTime(),
-            workspace.getLeaderboardNotificationEnabled(),
-            leaderboardTeam,
-            leaderboardChannelId,
+            workspace.getReviewCycleDay(),
+            workspace.getReviewCycleTime(),
             hasPat,
             hasSlackToken,
             slackConnectionId,
@@ -133,11 +126,9 @@ public record WorkspaceDTO(
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getMentorEnabled(),
             workspace.getFeatures().getAchievementsEnabled(),
-            workspace.getFeatures().getLeaderboardEnabled(),
-            workspace.getFeatures().getProgressionEnabled(),
-            workspace.getFeatures().getLeaguesEnabled(),
             workspace.getFeatures().getPracticeReviewAutoTriggerEnabled(),
-            workspace.getFeatures().getPracticeReviewManualTriggerEnabled()
+            workspace.getFeatures().getPracticeReviewManualTriggerEnabled(),
+            workspace.getFeatures().getCohortVisibility()
         );
     }
 }

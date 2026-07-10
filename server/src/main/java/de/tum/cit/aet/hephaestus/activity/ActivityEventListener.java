@@ -1,15 +1,8 @@
 package de.tum.cit.aet.hephaestus.activity;
 
-import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -31,7 +24,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Event listener service that translates domain events into activity ledger entries.
  *
  * <p>Listens for domain events (PR created, merged, review submitted, etc.) and
- * records them in the activity event log with calculated XP values.
+ * records them in the append-only activity event log.
  *
  * <p>Uses {@code @Async} to avoid blocking the main transaction and
  * {@code @TransactionalEventListener(AFTER_COMMIT)} to ensure events are only
@@ -50,10 +43,6 @@ public class ActivityEventListener {
 
     private final ActivityEventService activityEventService;
     private final ActivityEventRepository activityEventRepository;
-    private final ExperiencePointCalculator xpCalc;
-    private final PullRequestReviewRepository reviewRepository;
-    private final PullRequestRepository pullRequestRepository;
-    private final IssueCommentRepository issueCommentRepository;
     private final PullRequestReviewThreadRepository reviewThreadRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
@@ -93,7 +82,7 @@ public class ActivityEventListener {
      *
      * <p>When an author ID is null (e.g., GitHub user deleted, organization bot, etc.),
      * we return null rather than skipping the event. This preserves the activity record
-     * for audit trail and repository metrics while correctly attributing no XP.
+     * for audit trail and repository metrics while leaving the actor unattributed.
      *
      * <p>Uses {@code findById()} to verify the user exists before returning a reference.
      * This prevents FK constraint violations when webhook events reference users
@@ -112,21 +101,6 @@ public class ActivityEventListener {
             return null;
         }
         return userRepository.findById(authorId).orElse(null);
-    }
-
-    /**
-     * Calculates XP for an event, returning 0 if the actor is unknown.
-     *
-     * <p>When we don't know who performed an action (author deleted, bot, etc.),
-     * no XP should be awarded. The event is still recorded for audit purposes,
-     * but deleted users cannot earn XP posthumously.
-     *
-     * @param actor the actor user (nullable)
-     * @param xpIfKnown the XP to award if the actor is known
-     * @return xpIfKnown if actor is present, 0.0 otherwise
-     */
-    private double xpForActor(@Nullable User actor, double xpIfKnown) {
-        return actor != null ? xpIfKnown : 0.0;
     }
 
     @Async
@@ -154,8 +128,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                xpCalc.getXpPullRequestOpened()
+                pr.id()
             )
         );
     }
@@ -187,8 +160,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(awardeeId),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                xpCalc.getXpPullRequestMerged()
+                pr.id()
             )
         );
     }
@@ -221,8 +193,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                0.0
+                pr.id()
             )
         );
     }
@@ -248,8 +219,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                0.0 // Reopening is lifecycle tracking, no XP reward
+                pr.id()
             )
         );
     }
@@ -275,8 +245,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                xpCalc.getXpPullRequestReady()
+                pr.id()
             )
         );
     }
@@ -284,8 +253,8 @@ public class ActivityEventListener {
     /**
      * Handle pull request converted to draft (ready->draft transition).
      *
-     * <p>Records lifecycle event with 0 XP - converting back to draft is
-     * a workflow tracking event, not a value-adding activity.
+     * <p>Records a lifecycle event. Converting back to draft is a workflow
+     * tracking event.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -308,8 +277,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                0.0 // Draft conversion is lifecycle tracking, no XP reward
+                pr.id()
             )
         );
     }
@@ -317,8 +285,8 @@ public class ActivityEventListener {
     /**
      * Handle pull request synchronized (new commits pushed to the branch).
      *
-     * <p>Records lifecycle event with 0 XP - pushing new commits is tracked
-     * for activity completeness but doesn't award XP (the PR creation already did).
+     * <p>Records a lifecycle event. Pushing new commits is tracked for activity
+     * completeness.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -341,8 +309,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                0.0 // Synchronization is lifecycle tracking, no XP reward
+                pr.id()
             )
         );
     }
@@ -350,8 +317,8 @@ public class ActivityEventListener {
     /**
      * Handle label added to pull request.
      *
-     * <p>Records workflow tracking event with 0 XP - labeling is organizational
-     * activity that helps with workflow but doesn't directly add value.
+     * <p>Records a workflow tracking event. Labeling is organizational activity
+     * that helps with workflow.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -374,8 +341,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                0.0 // Labeling is workflow tracking, no XP reward
+                pr.id()
             )
         );
     }
@@ -383,8 +349,8 @@ public class ActivityEventListener {
     /**
      * Handle label removed from pull request.
      *
-     * <p>Records workflow tracking event with 0 XP - unlabeling is organizational
-     * activity that helps with workflow but doesn't directly add value.
+     * <p>Records a workflow tracking event. Unlabeling is organizational activity
+     * that helps with workflow.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -407,8 +373,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(pr.authorId()),
                 repositoryRepository.getReferenceById(pr.repository().id()),
                 ActivityTargetType.PULL_REQUEST,
-                pr.id(),
-                0.0 // Unlabeling is workflow tracking, no XP reward
+                pr.id()
             )
         );
     }
@@ -438,14 +403,6 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Calculate XP for THIS single review only - not cumulative across all reviews.
-        // Each event stores XP for its own review to avoid double-counting when aggregated.
-        PullRequestReview review = reviewRepository.findById(reviewData.id()).orElse(null);
-        if (review == null) {
-            log.warn("Review not found for XP calculation: reviewId={}", reviewData.id());
-            return;
-        }
-        double xp = xpCalc.calculateReviewExperiencePoints(review);
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review", reviewData.id(), () ->
             activityEventService.record(
@@ -455,8 +412,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(reviewData.authorId()),
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
-                reviewData.id(),
-                xp
+                reviewData.id()
             )
         );
     }
@@ -478,10 +434,7 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Record a REVIEW_DISMISSED event with 0 XP - dismissals don't affect XP
-        // since dismissed reviews still count for the leaderboard
-        double xpAdjustment = 0.0;
-
+        // Record a REVIEW_DISMISSED event — dismissed reviews still count for the activity aggregation.
         safeRecord("review dismissed", reviewData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -490,8 +443,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(reviewData.authorId()),
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
-                reviewData.id(),
-                xpAdjustment
+                reviewData.id()
             )
         );
     }
@@ -500,9 +452,8 @@ public class ActivityEventListener {
      * Handle review edited events.
      *
      * <p>When a review is edited (e.g., body text changes), we record a new event
-     * for audit trail purposes with 0 XP. The original REVIEW_SUBMITTED event
-     * already captured the XP, so edited events should not add more XP to avoid
-     * double-counting in leaderboard aggregation.
+     * for audit-trail purposes. The original REVIEW_SUBMITTED event already
+     * captured the review.
      *
      * <p>Note: This creates a new event rather than updating the original,
      * maintaining an immutable audit trail of all review activity.
@@ -524,8 +475,6 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Record with 0 XP - the original review submission already captured XP.
-        // Editing a review should not grant additional XP to avoid double-counting.
         Instant occurredAt = reviewData.submittedAt() != null ? reviewData.submittedAt() : Instant.now();
         safeRecord("review edited", reviewData.id(), () ->
             activityEventService.record(
@@ -535,8 +484,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(reviewData.authorId()),
                 repositoryRepository.getReferenceById(reviewData.repositoryId()),
                 ActivityTargetType.REVIEW,
-                reviewData.id(),
-                0.0 // No XP for edits - original submission already counted
+                reviewData.id()
             )
         );
     }
@@ -558,17 +506,7 @@ public class ActivityEventListener {
             );
             return;
         }
-        // Fetch the full IssueComment entity to calculate complexity-weighted XP
-        IssueComment issueComment = issueCommentRepository.findById(commentData.id()).orElse(null);
-        double xp;
-        if (issueComment != null) {
-            xp = xpCalc.calculateIssueCommentExperiencePoints(issueComment);
-        } else {
-            log.warn("IssueComment not found for XP calculation, using fallback: commentId={}", commentData.id());
-            xp = xpCalc.getXpReviewComment();
-        }
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
-        final double finalXp = xp;
         safeRecord("comment", commentData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -577,8 +515,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(commentData.authorId()),
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.ISSUE_COMMENT,
-                commentData.id(),
-                finalXp
+                commentData.id()
             )
         );
     }
@@ -586,8 +523,8 @@ public class ActivityEventListener {
     /**
      * Handle comment updated events.
      *
-     * <p>Records audit trail event with 0 XP - the original comment creation
-     * already captured XP, edits don't add additional value.
+     * <p>Records an audit-trail event. The original comment creation already
+     * captured the comment.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -615,8 +552,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(commentData.authorId()),
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.ISSUE_COMMENT,
-                commentData.id(),
-                0.0 // No XP for edits - original creation already counted
+                commentData.id()
             )
         );
     }
@@ -624,8 +560,8 @@ public class ActivityEventListener {
     /**
      * Handle comment deleted events.
      *
-     * <p>Records audit trail event with 0 XP. Note that we may not have full
-     * comment data since the entity was deleted - we rely on the event metadata.
+     * <p>Records an audit-trail event. Note that we may not have full comment
+     * data since the entity was deleted - we rely on the event metadata.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -652,13 +588,8 @@ public class ActivityEventListener {
     /**
      * Handle review comment (inline code comment) created events.
      *
-     * <p>For comments linked to a review (GitHub-style), records with 0 XP because
-     * the review's XP calculation already factors in inline comments via
-     * {@code calculateCodeReviewBonus()}.
-     *
-     * <p>For standalone comments without a parent review (GitLab diff notes),
-     * awards flat-rate XP directly since there is no parent review
-     * to carry the code review bonus.
+     * <p>Covers both comments linked to a review (GitHub-style) and standalone
+     * comments without a parent review (GitLab diff notes).
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -678,16 +609,6 @@ public class ActivityEventListener {
             return;
         }
         Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
-
-        // Standalone review comments (GitLab diff notes without a parent review) get
-        // flat-rate XP directly. Comments linked to a review get 0 XP since
-        // the review's calculateCodeReviewBonus() already factors in comment count.
-        double xp = 0.0;
-        if (commentData.reviewId() == null && commentData.pullRequestId() != null) {
-            xp = calculateStandaloneReviewCommentXp(commentData);
-        }
-
-        final double finalXp = xp;
         safeRecord("review comment", commentData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -696,36 +617,15 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(commentData.authorId()),
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.REVIEW_COMMENT,
-                commentData.id(),
-                finalXp
+                commentData.id()
             )
-        );
-    }
-
-    /**
-     * Calculates XP for a standalone review comment (not linked to a review).
-     * Self-review check and XP formula are handled inside the calculator
-     * to maintain the single-source-of-truth contract.
-     */
-    private double calculateStandaloneReviewCommentXp(ScmEventPayload.ReviewCommentData commentData) {
-        PullRequest pr = pullRequestRepository.findById(commentData.pullRequestId()).orElse(null);
-        if (pr == null) {
-            log.warn("PR not found for standalone review comment XP: prId={}", commentData.pullRequestId());
-            return 0.0;
-        }
-
-        return xpCalc.calculateStandaloneReviewCommentXp(
-            pr,
-            commentData.authorId(),
-            commentData.body() != null ? commentData.body().length() : 0
         );
     }
 
     /**
      * Handle review comment edited events.
      *
-     * <p>Records audit trail event with 0 XP - edits are tracked for completeness
-     * but don't affect XP since the review bonus already accounted for the comment.
+     * <p>Records an audit-trail event. Edits are tracked for completeness.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -753,8 +653,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(commentData.authorId()),
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.REVIEW_COMMENT,
-                commentData.id(),
-                0.0 // No XP for edits
+                commentData.id()
             )
         );
     }
@@ -762,8 +661,8 @@ public class ActivityEventListener {
     /**
      * Handle review comment deleted events.
      *
-     * <p>Records audit trail event with 0 XP. Note that we may not have full
-     * comment data since the entity was deleted.
+     * <p>Records an audit-trail event. Note that we may not have full comment
+     * data since the entity was deleted.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -792,8 +691,6 @@ public class ActivityEventListener {
      *
      * <p>Resolving a review thread indicates that code review feedback has been
      * addressed. This is valuable for tracking code review effectiveness metrics.
-     * Records with 0 XP since the value is in the resolution of feedback, not
-     * in the act of marking it resolved.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -831,8 +728,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(resolverId),
                 repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW_THREAD,
-                threadData.id(),
-                0.0 // Lifecycle tracking, no XP reward
+                threadData.id()
             )
         );
     }
@@ -841,7 +737,7 @@ public class ActivityEventListener {
      * Handle review thread unresolved events.
      *
      * <p>Unresolving a review thread indicates that previously addressed feedback
-     * needs more attention. Records with 0 XP since this is workflow tracking.
+     * needs more attention. This is workflow tracking.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -879,8 +775,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(userId),
                 repositoryRepository.getReferenceById(repositoryId),
                 ActivityTargetType.REVIEW_THREAD,
-                threadData.id(),
-                0.0 // Lifecycle tracking, no XP reward
+                threadData.id()
             )
         );
     }
@@ -889,10 +784,9 @@ public class ActivityEventListener {
      * Handle issue created events.
      *
      * <p>Records ISSUE_CREATED activity event. If the author is unknown (null),
-     * the event is still recorded for audit purposes but with 0 XP. This handles
-     * cases where the GitHub user was deleted or the issue was created by a bot.
-     *
-     * <p>XP is only awarded when we can attribute the action to a known user.
+     * the event is still recorded for audit purposes with no attributed actor.
+     * This handles cases where the GitHub user was deleted or the issue was
+     * created by a bot.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -910,7 +804,7 @@ public class ActivityEventListener {
         // Log unknown authors for observability, but don't skip the event
         if (actor == null) {
             log.info(
-                "Recording issue created event with unknown author (user deleted or bot): issueId={}, xp=0",
+                "Recording issue created event with unknown author (user deleted or bot): issueId={}",
                 issueData.id()
             );
         }
@@ -923,8 +817,7 @@ public class ActivityEventListener {
                 actor,
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                xpForActor(actor, xpCalc.getXpIssueCreated())
+                issueData.id()
             )
         );
     }
@@ -932,8 +825,8 @@ public class ActivityEventListener {
     /**
      * Handle issue closed events.
      *
-     * <p>Records lifecycle event with 0 XP - issue closure is tracked for
-     * activity completeness but doesn't award XP.
+     * <p>Records a lifecycle event. Issue closure is tracked for activity
+     * completeness.
      *
      * <p>Events are recorded even when author is unknown (null actor).
      */
@@ -962,8 +855,7 @@ public class ActivityEventListener {
                 getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                0.0 // Issue closure is lifecycle tracking, no XP reward
+                issueData.id()
             )
         );
     }
@@ -971,8 +863,8 @@ public class ActivityEventListener {
     /**
      * Handle issue reopened events.
      *
-     * <p>Records lifecycle event with 0 XP - reopening an issue is workflow
-     * tracking indicating work resumption.
+     * <p>Records a lifecycle event. Reopening an issue is workflow tracking
+     * indicating work resumption.
      *
      * <p>Events are recorded even when author is unknown (null actor).
      */
@@ -997,8 +889,7 @@ public class ActivityEventListener {
                 getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                0.0 // Reopening is lifecycle tracking, no XP reward
+                issueData.id()
             )
         );
     }
@@ -1006,7 +897,7 @@ public class ActivityEventListener {
     /**
      * Handle issue deleted events.
      *
-     * <p>Records audit trail event with 0 XP. Note that we only have the issue ID
+     * <p>Records an audit-trail event. Note that we only have the issue ID
      * since the entity was deleted.
      */
     @Async
@@ -1032,8 +923,8 @@ public class ActivityEventListener {
     /**
      * Handle label added to issue events.
      *
-     * <p>Records workflow tracking event with 0 XP - labeling is organizational
-     * activity that helps with categorization but doesn't directly add value.
+     * <p>Records a workflow tracking event. Labeling is organizational activity
+     * that helps with categorization.
      *
      * <p>Events are recorded even when author is unknown (null actor).
      */
@@ -1058,8 +949,7 @@ public class ActivityEventListener {
                 getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                0.0 // Labeling is workflow tracking, no XP reward
+                issueData.id()
             )
         );
     }
@@ -1067,8 +957,8 @@ public class ActivityEventListener {
     /**
      * Handle label removed from issue events.
      *
-     * <p>Records workflow tracking event with 0 XP - unlabeling is organizational
-     * activity that helps with categorization but doesn't directly add value.
+     * <p>Records a workflow tracking event. Unlabeling is organizational activity
+     * that helps with categorization.
      *
      * <p>Events are recorded even when author is unknown (null actor).
      */
@@ -1093,8 +983,7 @@ public class ActivityEventListener {
                 getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                0.0 // Unlabeling is workflow tracking, no XP reward
+                issueData.id()
             )
         );
     }
@@ -1102,7 +991,7 @@ public class ActivityEventListener {
     /**
      * Handle issue type assigned events.
      *
-     * <p>Records workflow tracking event with 0 XP - assigning issue types
+     * <p>Records a workflow tracking event. Assigning issue types
      * (bug, feature, task, etc.) is categorization that helps with work tracking.
      *
      * <p>Events are recorded even when author is unknown (null actor).
@@ -1128,8 +1017,7 @@ public class ActivityEventListener {
                 getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                0.0 // Type assignment is workflow tracking, no XP reward
+                issueData.id()
             )
         );
     }
@@ -1137,7 +1025,7 @@ public class ActivityEventListener {
     /**
      * Handle issue type removed events.
      *
-     * <p>Records workflow tracking event with 0 XP - removing issue types
+     * <p>Records a workflow tracking event. Removing issue types
      * is a categorization change for work tracking purposes.
      *
      * <p>Events are recorded even when author is unknown (null actor).
@@ -1163,8 +1051,7 @@ public class ActivityEventListener {
                 getActorOrNull(issueData.authorId()),
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
-                issueData.id(),
-                0.0 // Type removal is workflow tracking, no XP reward
+                issueData.id()
             )
         );
     }
@@ -1188,9 +1075,7 @@ public class ActivityEventListener {
      * Handle commit created events.
      *
      * <p>Records COMMIT_CREATED activity event. If the author is unknown (null),
-     * the event is still recorded for audit purposes but with 0 XP.
-     *
-     * <p>XP is only awarded when we can attribute the commit to a known user.
+     * the event is still recorded for audit purposes with no attributed actor.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1210,8 +1095,7 @@ public class ActivityEventListener {
                 actor,
                 repositoryRepository.getReferenceById(commitData.repositoryId()),
                 ActivityTargetType.COMMIT,
-                commitData.id(),
-                xpForActor(actor, xpCalc.getXpCommitCreated())
+                commitData.id()
             )
         );
     }
@@ -1222,9 +1106,9 @@ public class ActivityEventListener {
      * user API, or server-side author harvest) for a repository.
      *
      * <p>COMMIT_CREATED activity events ingested before author resolution were
-     * recorded with {@code actor_id=NULL} and {@code xp=0}. This handler rewrites
-     * those ledger rows so the newly attributed contributor receives XP and appears
-     * on the leaderboard. Scoped per-repository to keep the UPDATE bounded.
+     * recorded with {@code actor_id=NULL}. This handler rewrites those ledger rows so
+     * the newly attributed contributor appears on the activity aggregation. Scoped
+     * per-repository to keep the UPDATE bounded.
      *
      * <p>Uses {@link EventListener} (not {@code @TransactionalEventListener}) because
      * the publishers ({@code CommitAuthorEnrichmentService}, {@code GitLabCommitMergeRequestLinker})
@@ -1232,9 +1116,6 @@ public class ActivityEventListener {
      * {@code AFTER_COMMIT} would silently drop the event when no transaction is active.
      * The underlying {@code backfillCommitActors} UPDATE is idempotent (guarded by
      * {@code actor_id IS NULL}), so replay safety is preserved.
-     *
-     * <p>The XP rate is resolved at receive time, not publish time; this is acceptable
-     * because the XP-per-commit policy is static in practice.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1246,7 +1127,7 @@ public class ActivityEventListener {
         }
         String correlationId = event.context() != null ? event.context().correlationId() : null;
         try {
-            int updated = activityEventRepository.backfillCommitActors(repositoryId, xpCalc.getXpCommitCreated());
+            int updated = activityEventRepository.backfillCommitActors(repositoryId);
             log.info(
                 "Backfilled {} COMMIT_CREATED activity events: repoId={}, correlationId={}",
                 updated,
@@ -1264,7 +1145,7 @@ public class ActivityEventListener {
      * Handle discussion created events.
      *
      * <p>Records DISCUSSION_CREATED activity event. Discussions are a community
-     * engagement signal, tracked for activity completeness and optional XP.
+     * engagement signal, tracked for activity completeness.
      *
      * <p>Events are recorded even when author is unknown (null actor).
      */
@@ -1286,8 +1167,7 @@ public class ActivityEventListener {
                 actor,
                 repositoryRepository.getReferenceById(discussion.repository().id()),
                 ActivityTargetType.DISCUSSION,
-                discussion.id(),
-                xpForActor(actor, xpCalc.getXpDiscussionCreated())
+                discussion.id()
             )
         );
     }
@@ -1295,8 +1175,8 @@ public class ActivityEventListener {
     /**
      * Handle discussion closed events.
      *
-     * <p>Records DISCUSSION_CLOSED activity event with 0 XP. Closing a discussion
-     * is lifecycle tracking, not a value-adding activity.
+     * <p>Records DISCUSSION_CLOSED activity event. Closing a discussion
+     * is lifecycle tracking.
      *
      * <p>Events are recorded even when author is unknown (null actor).
      */
@@ -1322,8 +1202,7 @@ public class ActivityEventListener {
                 getActorOrNull(discussion.authorId()),
                 repositoryRepository.getReferenceById(discussion.repository().id()),
                 ActivityTargetType.DISCUSSION,
-                discussion.id(),
-                0.0 // Discussion closure is lifecycle tracking, no XP reward
+                discussion.id()
             )
         );
     }
@@ -1331,7 +1210,7 @@ public class ActivityEventListener {
     /**
      * Handle discussion reopened events.
      *
-     * <p>Records DISCUSSION_REOPENED activity event with 0 XP. Reopening is
+     * <p>Records DISCUSSION_REOPENED activity event. Reopening is
      * lifecycle tracking indicating resumed community engagement.
      *
      * <p>Events are recorded even when author is unknown (null actor).
@@ -1353,8 +1232,7 @@ public class ActivityEventListener {
                 getActorOrNull(discussion.authorId()),
                 repositoryRepository.getReferenceById(discussion.repository().id()),
                 ActivityTargetType.DISCUSSION,
-                discussion.id(),
-                0.0 // Reopening is lifecycle tracking, no XP reward
+                discussion.id()
             )
         );
     }
@@ -1366,9 +1244,8 @@ public class ActivityEventListener {
      * is a valuable community engagement signal, indicating that the discussion
      * author's question was resolved.
      *
-     * <p>XP is awarded to the discussion author (the person who asked the question)
-     * when an answer is chosen, since creating discussions that get answered
-     * demonstrates effective community engagement. The actual answerer would be
+     * <p>The event is attributed to the discussion author (the person who asked
+     * the question) when an answer is chosen. The actual answerer would be
      * tracked via discussion comment events (future enhancement).
      *
      * <p>Events are recorded even when author is unknown (null actor).
@@ -1396,8 +1273,7 @@ public class ActivityEventListener {
                 actor,
                 repositoryRepository.getReferenceById(discussion.repository().id()),
                 ActivityTargetType.DISCUSSION,
-                discussion.id(),
-                xpForActor(actor, xpCalc.getXpDiscussionAnswered())
+                discussion.id()
             )
         );
     }
@@ -1405,7 +1281,7 @@ public class ActivityEventListener {
     /**
      * Handle discussion deleted events.
      *
-     * <p>Records audit trail event with 0 XP. Note that we only have the
+     * <p>Records an audit-trail event. Note that we only have the
      * discussion ID since the entity was deleted.
      */
     @Async
@@ -1434,7 +1310,7 @@ public class ActivityEventListener {
      * Handle discussion comment created events.
      *
      * <p>Records DISCUSSION_COMMENT_CREATED activity event. Discussion comments
-     * are a community engagement signal, tracked for activity and XP.
+     * are a community engagement signal, tracked for activity.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1462,8 +1338,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(commentData.authorId()),
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.DISCUSSION_COMMENT,
-                commentData.id(),
-                xpCalc.getXpDiscussionCommentCreated()
+                commentData.id()
             )
         );
     }
@@ -1471,8 +1346,8 @@ public class ActivityEventListener {
     /**
      * Handle discussion comment edited events.
      *
-     * <p>Records audit trail event with 0 XP - the original comment creation
-     * already captured XP, edits don't add additional value.
+     * <p>Records an audit-trail event. The original comment creation already
+     * captured the comment.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1500,8 +1375,7 @@ public class ActivityEventListener {
                 userRepository.getReferenceById(commentData.authorId()),
                 repositoryRepository.getReferenceById(commentData.repositoryId()),
                 ActivityTargetType.DISCUSSION_COMMENT,
-                commentData.id(),
-                0.0 // No XP for edits - original creation already counted
+                commentData.id()
             )
         );
     }
@@ -1509,8 +1383,8 @@ public class ActivityEventListener {
     /**
      * Handle discussion comment deleted events.
      *
-     * <p>Records audit trail event with 0 XP. Note that we may not have full
-     * comment data since the entity was deleted - we rely on the event metadata.
+     * <p>Records an audit-trail event. Note that we may not have full comment
+     * data since the entity was deleted - we rely on the event metadata.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)

@@ -7,13 +7,11 @@ const allOff: FeatureValues = {
 	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
-	leaderboardEnabled: false,
-	progressionEnabled: false,
-	leaguesEnabled: false,
 	practiceReviewAutoTriggerEnabled: true,
 	practiceReviewManualTriggerEnabled: true,
 };
 
+/** Admin workspace settings page composing the feature, repository, team, and review-cycle editors. */
 const meta = {
 	component: AdminSettingsPage,
 	parameters: { layout: "padded" },
@@ -29,18 +27,19 @@ const meta = {
 		addRepositoryError: null,
 		isAddingRepository: false,
 		isRemovingRepository: false,
-		isResettingLeagues: false,
 		isAppInstallationWorkspace: false,
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
-		onResetLeagues: fn(),
 		features: allOff,
+		cohortVisibility: "MENTORS_ONLY",
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
+		onCohortVisibilityChange: fn(),
 		workspaceSlug: "demo",
+		reviewCycleDay: 1,
+		reviewCycleTime: "09:00",
 		hasSlackConnection: false,
-		slackNotificationsEnabled: false,
-		onSlackSaved: fn(),
+		onWorkspaceRefetch: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
@@ -59,8 +58,6 @@ export const RepositoriesError: Story = {
 
 export const AddingRepository: Story = { args: { isAddingRepository: true } };
 
-export const ResettingLeagues: Story = { args: { isResettingLeagues: true } };
-
 /** GitHub App Installation workspace — repository management is read-only. */
 export const AppInstallationWorkspace: Story = { args: { isAppInstallationWorkspace: true } };
 
@@ -76,13 +73,16 @@ export const PracticeReviewWithSubToggles: Story = {
 	},
 };
 
-/** Slack connected + configured — pins that the Slack digest card renders within the page. */
+/** Slack connected — pins that the Slack connection card renders within the page. */
 export const SlackConfigured: Story = {
 	args: {
 		hasSlackConnection: true,
+		slackConnectionId: 7,
 		slackChannelId: "C0974LJBPBK",
-		slackNotificationsEnabled: true,
-		slackScheduleDay: 3,
-		slackScheduleTime: "09:00",
 	},
+};
+
+/** Everyone — members can additionally see the anonymised cohort insights. */
+export const EveryoneVisibility: Story = {
+	args: { cohortVisibility: "EVERYONE" },
 };

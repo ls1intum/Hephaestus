@@ -57,7 +57,7 @@ export const Route = createFileRoute("/_authenticated/admin/audit")({
 // a deepObject on the wire; the server expects an ISO-8601 instant (@DateTimeFormat). So we build the
 // instant string the server wants and cast to satisfy the generated type. The bounds are the picked
 // day in the USER's LOCAL timezone (matching the "shown in your local timezone" copy and the
-// leaderboard's TimeframeFilter) — `formatISO` carries the local offset, so "Jun 2" means the user's
+// the profile TimeframeFilter) — `formatISO` carries the local offset, so "Jun 2" means the user's
 // local Jun 2, not UTC. `to` is end-of-day so the picked day is inclusive (predicate is `occurred_at < :to`).
 function dayStartIso(date: Date): Date {
 	return formatISO(startOfDay(date)) as unknown as Date;
@@ -66,7 +66,7 @@ function dayEndIso(date: Date): Date {
 	return formatISO(endOfDay(date)) as unknown as Date;
 }
 
-// Compact label for the date-range trigger, mirroring the leaderboard's TimeframeFilter.
+// Compact label for the date-range trigger, mirroring the the profile TimeframeFilter.
 function formatRangeLabel(range: DateRange | undefined): string {
 	if (!range?.from) {
 		return "Any date";

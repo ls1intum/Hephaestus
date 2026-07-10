@@ -27,3 +27,21 @@ export function problemDetailOf(
 	}
 	return fallback;
 }
+
+/**
+ * Extract the HTTP status code from a thrown request error.
+ *
+ * With `throwOnError`, the generated client throws the parsed response body. RFC 9457
+ * problem+json failures carry the numeric `status` (e.g. `403`, `500`); network failures
+ * and non-JSON gateway errors have none, so this returns `undefined` for them. Callers use
+ * it to distinguish an authorization refusal from a transient error.
+ */
+export function httpStatusOf(err: unknown): number | undefined {
+	if (err && typeof err === "object") {
+		const status = (err as Record<string, unknown>).status;
+		if (typeof status === "number") {
+			return status;
+		}
+	}
+	return undefined;
+}

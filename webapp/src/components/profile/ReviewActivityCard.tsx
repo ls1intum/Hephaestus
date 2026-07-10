@@ -1,10 +1,8 @@
 import { CheckIcon, CommentIcon, FileDiffIcon } from "@primer/octicons-react";
 import { formatDistanceToNow } from "date-fns";
-import { AwardIcon } from "lucide-react";
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getPullRequestStateIcon, type IconComponent, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +77,6 @@ export interface ReviewActivityCardProps {
 		};
 	};
 	repositoryName?: string;
-	score?: number;
 	providerType?: ProviderType;
 }
 
@@ -89,7 +86,6 @@ export function ReviewActivityCard({
 	submittedAt,
 	htmlUrl,
 	pullRequest,
-	score,
 	providerType = "GITHUB",
 }: ReviewActivityCardProps) {
 	// Get the style for the current review state
@@ -108,7 +104,7 @@ export function ReviewActivityCard({
 		<a href={htmlUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
 			<Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer py-0 gap-0">
 				<div className="flex flex-col gap-1 p-4">
-					{/* Repository, PR number and points */}
+					{/* Repository, PR number and relative time */}
 					<div className="flex justify-between gap-2 items-center text-sm text-provider-muted-foreground">
 						<span className="font-medium flex justify-center items-center space-x-1">
 							{isLoading ? (
@@ -127,18 +123,6 @@ export function ReviewActivityCard({
 								</>
 							)}
 						</span>
-
-						{!isLoading && score !== undefined && score > 0 && (
-							<span className="flex items-center gap-1 text-provider-done-foreground font-semibold">
-								<Tooltip>
-									<TooltipTrigger className="flex items-center gap-1">
-										<AwardIcon size={16} />
-										<span>+{score}</span>
-									</TooltipTrigger>
-									<TooltipContent side="top">Points awarded for this activity</TooltipContent>
-								</Tooltip>
-							</span>
-						)}
 					</div>
 
 					{/* PR title */}

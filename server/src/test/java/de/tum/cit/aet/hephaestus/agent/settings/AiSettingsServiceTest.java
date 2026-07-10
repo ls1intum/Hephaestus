@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -53,7 +54,17 @@ class AiSettingsServiceTest extends BaseUnitTest {
         workspace = new Workspace();
         workspace.setId(1L);
         workspace.setWorkspaceSlug("ws");
-        context = new WorkspaceContext(1L, "ws", "Ws", AccountType.ORG, null, false, false, Set.of());
+        context = new WorkspaceContext(
+            1L,
+            "ws",
+            "Ws",
+            AccountType.ORG,
+            null,
+            false,
+            false,
+            CohortVisibility.MENTORS_ONLY,
+            Set.of()
+        );
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
     }
 

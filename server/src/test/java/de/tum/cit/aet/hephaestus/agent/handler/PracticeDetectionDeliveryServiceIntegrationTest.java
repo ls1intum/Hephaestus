@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
@@ -202,13 +202,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
      * Build a finding whose valence follows the former-GOOD practice convention used by these
      * fixtures (pr-description-quality, error-handling): PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
      */
-    private ValidatedFinding finding(String slug, Presence presence) {
+    private ValidatedObservation finding(String slug, Presence presence) {
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
             case NOT_APPLICABLE -> null;
         };
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             slug,
             "Test: " + slug,
             presence,
@@ -226,7 +226,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     class EndToEnd {
 
         @Test
-        void validFindingsPersistedToDb() {
+        void validObservationsPersistedToDb() {
             var findings = List.of(
                 finding("pr-description-quality", Presence.PRESENT),
                 finding("error-handling", Presence.ABSENT)
@@ -347,10 +347,10 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             // Each finding gets a unique idempotency key (includes index), so all 7 are
             // distinct. There is NO per-practice cap on BAD findings: every distinct one
             // is persisted (none discarded as a duplicate).
-            var findings = new ArrayList<ValidatedFinding>();
+            var findings = new ArrayList<ValidatedObservation>();
             for (int i = 0; i < 7; i++) {
                 findings.add(
-                    new ValidatedFinding(
+                    new ValidatedObservation(
                         "pr-description-quality",
                         "Negative finding " + i,
                         Presence.ABSENT,

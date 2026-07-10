@@ -26,20 +26,18 @@ export type TimeframePreset =
 	| "last-month"
 	| "custom";
 
-export interface LeaderboardSchedule {
+export interface ReviewCycleSchedule {
 	/** 1 = Monday, 7 = Sunday (ISO weekday) */
 	day: number;
 	hour: number;
 	minute: number;
 }
 
-export const DEFAULT_SCHEDULE: LeaderboardSchedule = {
-	day: 1, // Monday
+export const DEFAULT_REVIEW_CYCLE: ReviewCycleSchedule = {
+	day: 2, // Tuesday
 	hour: 9,
 	minute: 0,
 };
-
-const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /**
  * Set a date to a specific ISO weekday and time.
@@ -58,11 +56,11 @@ export function setToScheduledTime(
 }
 
 /**
- * Calculate the start of the current leaderboard week based on schedule.
+ * Calculate the start of the current review-cycle week based on schedule.
  */
-export function getLeaderboardWeekStart(
+export function getReviewCycleWeekStart(
 	now: Date,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
+	schedule: ReviewCycleSchedule = DEFAULT_REVIEW_CYCLE,
 ): Date {
 	const currentISODay = getISODay(now);
 	const currentTime = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
@@ -81,20 +79,20 @@ export function getLeaderboardWeekStart(
 }
 
 /**
- * Calculate the start of last leaderboard week.
+ * Calculate the start of last review-cycle week.
  */
-export function getLastLeaderboardWeekStart(
+export function getLastReviewCycleWeekStart(
 	now: Date,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
+	schedule: ReviewCycleSchedule = DEFAULT_REVIEW_CYCLE,
 ): Date {
-	const thisWeekStart = getLeaderboardWeekStart(now, schedule);
+	const thisWeekStart = getReviewCycleWeekStart(now, schedule);
 	return subWeeks(thisWeekStart, 1);
 }
 
 /**
- * Get the end of a leaderboard week (start + 1 week).
+ * Get the end of a review-cycle week (start + 1 week).
  */
-export function getLeaderboardWeekEnd(weekStart: Date): Date {
+export function getReviewCycleWeekEnd(weekStart: Date): Date {
 	return addWeeks(weekStart, 1);
 }
 
@@ -104,7 +102,7 @@ export function getLeaderboardWeekEnd(weekStart: Date): Date {
  */
 export function getDateRangeForPreset(
 	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
+	schedule: ReviewCycleSchedule = DEFAULT_REVIEW_CYCLE,
 	customRange?: { from: Date; to?: Date },
 ): { after: Date; before: Date | undefined } {
 	const now = new Date();
@@ -118,7 +116,7 @@ export function getDateRangeForPreset(
 			};
 
 		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
+			const weekStart = getReviewCycleWeekStart(now, schedule);
 			return {
 				after: weekStart,
 				before: undefined, // Open-ended to show activity "so far"
@@ -126,8 +124,8 @@ export function getDateRangeForPreset(
 		}
 
 		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = getLeaderboardWeekEnd(lastWeekStart);
+			const lastWeekStart = getLastReviewCycleWeekStart(now, schedule);
+			const lastWeekEnd = getReviewCycleWeekEnd(lastWeekStart);
 			return {
 				after: lastWeekStart,
 				before: lastWeekEnd, // Bounded - it's a completed week
@@ -185,13 +183,6 @@ export function formatDateRangeForApi(range: { after: Date; before: Date | undef
 }
 
 /**
- * Get weekday name from ISO day number (1-7).
- */
-function getWeekdayName(isoDay: number): string {
-	return WEEKDAY_NAMES[isoDay - 1] ?? "Unknown";
-}
-
-/**
  * Simple label for dropdown items - clean and scannable.
  * Used inside SelectItem components.
  */
@@ -219,7 +210,7 @@ export function formatDropdownLabel(preset: TimeframePreset): string {
  */
 export function formatSelectedLabel(
 	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
+	schedule: ReviewCycleSchedule = DEFAULT_REVIEW_CYCLE,
 ): string {
 	const now = new Date();
 
@@ -228,14 +219,14 @@ export function formatSelectedLabel(
 			return "All time";
 
 		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
+			const weekStart = getReviewCycleWeekStart(now, schedule);
 			// "This week, since Tue Dec 3"
 			return `This week, since ${format(weekStart, "EEE MMM d")}`;
 		}
 
 		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = addDays(getLeaderboardWeekStart(now, schedule), -1);
+			const lastWeekStart = getLastReviewCycleWeekStart(now, schedule);
+			const lastWeekEnd = addDays(getReviewCycleWeekStart(now, schedule), -1);
 			// "Last week, Nov 25 – Dec 1" or "Nov 25 – 30" if same month
 			const sameMonth =
 				lastWeekStart.getMonth() === lastWeekEnd.getMonth() &&
@@ -259,68 +250,6 @@ export function formatSelectedLabel(
 		case "custom":
 			return "Custom range";
 	}
-}
-
-/**
- * Format a human-readable label for a preset.
- * Includes weekday and duration context. Used for detailed displays.
- * @deprecated Use formatSelectedLabel for the trigger, formatDropdownLabel for dropdown items
- */
-export function formatPresetLabel(
-	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
-): string {
-	const now = new Date();
-	const weekdayName = getWeekdayName(schedule.day);
-
-	switch (preset) {
-		case "all-activity":
-			return "All time";
-
-		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
-			const daysSinceStart = differenceInCalendarDays(now, weekStart);
-			const startLabel = format(weekStart, "LLL d");
-			return `This week · ${weekdayName} ${startLabel} (${daysSinceStart} days)`;
-		}
-
-		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = getLeaderboardWeekEnd(lastWeekStart);
-			const startLabel = format(lastWeekStart, "LLL d");
-			const endLabel = format(addDays(lastWeekEnd, -1), "LLL d");
-			return `Last week · ${weekdayName} ${startLabel} – ${endLabel}`;
-		}
-
-		case "this-month": {
-			const monthStart = startOfMonth(now);
-			const daysSinceStart = differenceInCalendarDays(now, monthStart);
-			const monthName = format(now, "LLLL");
-			return `This month · ${monthName} (${daysSinceStart + 1} days)`;
-		}
-
-		case "last-month": {
-			const lastMonth = subMonths(now, 1);
-			const monthName = format(lastMonth, "LLLL");
-			const daysInMonth = differenceInCalendarDays(startOfMonth(now), startOfMonth(lastMonth));
-			return `Last month · ${monthName} (${daysInMonth} days)`;
-		}
-
-		case "custom":
-			return "Custom range";
-	}
-}
-
-/**
- * Format a short label for the preset (for compact displays like selects).
- * @deprecated Use formatDropdownLabel for dropdown items, formatSelectedLabel for trigger
- */
-export function formatPresetShortLabel(
-	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
-): string {
-	// Delegate to the new function for backwards compatibility
-	return formatSelectedLabel(preset, schedule);
 }
 
 /**
@@ -349,7 +278,7 @@ export function formatCustomRangeLabel(from?: Date, to?: Date): string {
 export function detectPresetFromDates(
 	afterStr?: string,
 	beforeStr?: string,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
+	schedule: ReviewCycleSchedule = DEFAULT_REVIEW_CYCLE,
 	enableAllActivity = false,
 ): TimeframePreset {
 	if (!afterStr) {
@@ -371,20 +300,20 @@ export function detectPresetFromDates(
 	};
 
 	// Check this week (open-ended)
-	const thisWeekStart = getLeaderboardWeekStart(now, schedule);
+	const thisWeekStart = getReviewCycleWeekStart(now, schedule);
 	if (datesAreClose(after, thisWeekStart) && !before) {
 		return "this-week";
 	}
 
-	// Check this week (bounded - for leaderboard)
-	const thisWeekEnd = getLeaderboardWeekEnd(thisWeekStart);
+	// Check this week (bounded - for the review cycle)
+	const thisWeekEnd = getReviewCycleWeekEnd(thisWeekStart);
 	if (datesAreClose(after, thisWeekStart) && before && datesAreClose(before, thisWeekEnd)) {
 		return "this-week";
 	}
 
 	// Check last week
-	const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-	const lastWeekEnd = getLeaderboardWeekEnd(lastWeekStart);
+	const lastWeekStart = getLastReviewCycleWeekStart(now, schedule);
+	const lastWeekEnd = getReviewCycleWeekEnd(lastWeekStart);
 	if (datesAreClose(after, lastWeekStart) && before && datesAreClose(before, lastWeekEnd)) {
 		return "last-week";
 	}
@@ -415,7 +344,7 @@ export function detectPresetFromDates(
  */
 export function formatTimeframeButtonLabel(
 	preset: TimeframePreset,
-	schedule: LeaderboardSchedule = DEFAULT_SCHEDULE,
+	schedule: ReviewCycleSchedule = DEFAULT_REVIEW_CYCLE,
 	customRange?: { from?: Date; to?: Date },
 ): string {
 	if (preset === "custom") {
@@ -429,15 +358,15 @@ export function formatTimeframeButtonLabel(
 			return "All activity";
 
 		case "this-week": {
-			const weekStart = getLeaderboardWeekStart(now, schedule);
+			const weekStart = getReviewCycleWeekStart(now, schedule);
 			const daysSinceStart = differenceInCalendarDays(now, weekStart);
 			const startLabel = format(weekStart, "EEE, LLL d");
 			return `Since ${startLabel} (${daysSinceStart}d)`;
 		}
 
 		case "last-week": {
-			const lastWeekStart = getLastLeaderboardWeekStart(now, schedule);
-			const lastWeekEnd = addDays(getLeaderboardWeekEnd(lastWeekStart), -1);
+			const lastWeekStart = getLastReviewCycleWeekStart(now, schedule);
+			const lastWeekEnd = addDays(getReviewCycleWeekEnd(lastWeekStart), -1);
 			return `${format(lastWeekStart, "LLL d")} – ${format(lastWeekEnd, "LLL d")}`;
 		}
 

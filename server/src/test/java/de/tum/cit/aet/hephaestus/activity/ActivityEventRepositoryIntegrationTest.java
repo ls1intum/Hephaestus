@@ -23,12 +23,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Integration tests for {@link ActivityEventRepository#backfillCommitActors(Long, double)}.
+ * Integration tests for {@link ActivityEventRepository#backfillCommitActors(Long)}.
  *
  * <p>Gap #6 reconciliation: commits ingested before GitLab authors are resolved
- * land COMMIT_CREATED activity events with {@code actor_id = NULL, xp = 0}. Once
+ * land COMMIT_CREATED activity events with {@code actor_id = NULL}. Once
  * {@code git_commit.author_id} is backfilled via email match, this native UPDATE
- * rewrites the activity-event columns so the contributor actually receives XP.
+ * rewrites the actor column so the contributor appears on the activity aggregation.
  */
 class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
@@ -114,7 +114,7 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         return commitRepository.save(commit);
     }
 
-    private ActivityEvent persistCommitCreatedEvent(Commit commit, User actor, double xp) {
+    private ActivityEvent persistCommitCreatedEvent(Commit commit, User actor) {
         Instant occurredAt = commit.getAuthoredAt();
         ActivityEvent event = ActivityEvent.builder()
             .id(UUID.randomUUID())
@@ -134,7 +134,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
             .repository(commit.getRepository())
             .targetType(ActivityTargetType.COMMIT.getValue())
             .targetId(commit.getId())
-            .xp(xp)
             .ingestedAt(Instant.now())
             .build();
         return activityEventRepository.save(event);
@@ -143,28 +142,27 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     @Test
     void backfillsOrphanCommitEvents() {
         Commit commit = persistCommit("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", targetRepository, null);
-        ActivityEvent persisted = persistCommitCreatedEvent(commit, null, 0.0);
+        ActivityEvent persisted = persistCommitCreatedEvent(commit, null);
 
         // Simulate the post-enrichment state: author_id resolved on git_commit.
         commit.setAuthor(author);
         commitRepository.save(commit);
 
-        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
+        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId());
 
         assertThat(updated).isEqualTo(1);
         ActivityEvent refreshed = activityEventRepository.findById(persisted.getId()).orElseThrow();
         assertThat(refreshed.getActor()).isNotNull();
         assertThat(refreshed.getActor().getId()).isEqualTo(author.getId());
-        assertThat(refreshed.getXp()).isEqualTo(5.0);
     }
 
     @Test
     @DisplayName("does not touch events whose git_commit still has a null author_id")
     void skipsCommitsWithUnresolvedAuthor() {
         Commit commit = persistCommit("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", targetRepository, null);
-        persistCommitCreatedEvent(commit, null, 0.0);
+        persistCommitCreatedEvent(commit, null);
 
-        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
+        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId());
 
         assertThat(updated).isZero();
     }
@@ -172,37 +170,35 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     @Test
     void skipsEventsAlreadyHavingActor() {
         Commit commit = persistCommit("cccccccccccccccccccccccccccccccccccccccc", targetRepository, author);
-        ActivityEvent persisted = persistCommitCreatedEvent(commit, author, 5.0);
+        ActivityEvent persisted = persistCommitCreatedEvent(commit, author);
 
-        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 7.0);
+        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId());
 
         assertThat(updated).isZero();
         ActivityEvent refreshed = activityEventRepository.findById(persisted.getId()).orElseThrow();
-        assertThat(refreshed.getXp()).isEqualTo(5.0);
+        assertThat(refreshed.getActor()).isNotNull();
     }
 
     @Test
     void scopesBackfillToRequestedRepository() {
         Commit targetCommit = persistCommit("dddddddddddddddddddddddddddddddddddddddd", targetRepository, null);
         Commit otherCommit = persistCommit("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", otherRepository, null);
-        ActivityEvent targetEvent = persistCommitCreatedEvent(targetCommit, null, 0.0);
-        ActivityEvent otherEvent = persistCommitCreatedEvent(otherCommit, null, 0.0);
+        ActivityEvent targetEvent = persistCommitCreatedEvent(targetCommit, null);
+        ActivityEvent otherEvent = persistCommitCreatedEvent(otherCommit, null);
 
         targetCommit.setAuthor(author);
         otherCommit.setAuthor(author);
         commitRepository.save(targetCommit);
         commitRepository.save(otherCommit);
 
-        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
+        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId());
 
         assertThat(updated).isEqualTo(1);
         ActivityEvent refreshedTarget = activityEventRepository.findById(targetEvent.getId()).orElseThrow();
         ActivityEvent refreshedOther = activityEventRepository.findById(otherEvent.getId()).orElseThrow();
         assertThat(refreshedTarget.getActor()).isNotNull();
         assertThat(refreshedTarget.getActor().getId()).isEqualTo(author.getId());
-        assertThat(refreshedTarget.getXp()).isEqualTo(5.0);
         assertThat(refreshedOther.getActor()).isNull();
-        assertThat(refreshedOther.getXp()).isZero();
     }
 
     @Test
@@ -218,16 +214,14 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
             .repository(targetRepository)
             .targetType(ActivityTargetType.PULL_REQUEST.getValue())
             .targetId(42L)
-            .xp(0.0)
             .ingestedAt(Instant.now())
             .build();
         activityEventRepository.save(prEvent);
 
-        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
+        int updated = activityEventRepository.backfillCommitActors(targetRepository.getId());
 
         assertThat(updated).isZero();
         ActivityEvent refreshed = activityEventRepository.findById(prEvent.getId()).orElseThrow();
         assertThat(refreshed.getActor()).isNull();
-        assertThat(refreshed.getXp()).isZero();
     }
 }

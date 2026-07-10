@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -38,6 +39,11 @@ public class AccountPurger {
     /** Purge one account in its OWN transaction. Throws on failure so the caller can isolate it. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void purge(Long accountId) {
+        List<Long> scmUserIds = jdbcTemplate.queryForList(
+            "SELECT external_actor_id FROM identity_link WHERE account_id = ? AND external_actor_id IS NOT NULL",
+            Long.class,
+            accountId
+        );
         // Children carry ON DELETE CASCADE on account_id, but we keep the account tombstone, so the
         // cascade is not triggered — delete the personal/auth child rows explicitly.
         jdbcTemplate.update("DELETE FROM account_feature WHERE account_id = ?", accountId);
@@ -45,6 +51,7 @@ public class AccountPurger {
         jdbcTemplate.update("DELETE FROM issued_jwt WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM account_export WHERE account_id = ?", accountId);
         anonymizeAuditRows(accountId);
+        anonymizeDataAccessEvents(accountId, scmUserIds);
 
         Account account = accountRepository.findById(accountId).orElse(null);
         if (account == null) {
@@ -78,6 +85,31 @@ public class AccountPurger {
         );
         if (redacted > 0) {
             log.info("auth.account: anonymized {} auth_event row(s) for erased accountId={}", redacted, accountId);
+        }
+    }
+
+    private void anonymizeDataAccessEvents(Long accountId, List<Long> scmUserIds) {
+        if (scmUserIds.isEmpty()) {
+            return;
+        }
+        jdbcTemplate.execute("SET LOCAL hephaestus.audit_redact = 'on'");
+        int redacted = 0;
+        for (Long scmUserId : scmUserIds) {
+            redacted += jdbcTemplate.update(
+                "UPDATE data_access_event SET actor_user_id = 0 WHERE actor_user_id = ?",
+                scmUserId
+            );
+            redacted += jdbcTemplate.update(
+                "UPDATE data_access_event SET subject_user_id = NULL WHERE subject_user_id = ?",
+                scmUserId
+            );
+        }
+        if (redacted > 0) {
+            log.info(
+                "auth.account: anonymized {} data_access_event reference(s) for erased accountId={}",
+                redacted,
+                accountId
+            );
         }
     }
 }

@@ -10,13 +10,16 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportItemDTO;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,6 +54,8 @@ public class ObservationService {
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final UserRepository userRepository;
+    private final WorkspaceRepository workspaceRepository;
+    private final ReviewCycleWindowResolver reviewCycleWindowResolver;
 
     /**
      * Paginated findings for the current user in a workspace, with optional filters.
@@ -91,17 +96,15 @@ public class ObservationService {
         return observationRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
     }
 
-    /** Look-back for the reflection surface — mirrors the mentor's findings window. */
-    private static final int REFLECTION_LOOKBACK_DAYS = 90;
     /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
     /** Per-practice cap on acknowledged strengths — enough to affirm, bounded so affirmations don't drown signal. */
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
     /**
-     * Upstream-quality floor (P4) for the reflective surface, mirroring the live mentor standing path. Below
+     * Upstream-quality floor for the reflective surface, mirroring the live mentor standing path. Below
      * this confidence a single-target BAD is quarantined and EXCLUDED from {@code toWorkOn} entirely: a coin-flip
-     * detector hunch seen on one artifact must never reach the learner's dashboard (audit gap #1c), not merely
+     * detector hunch seen on one artifact must never reach the learner's dashboard, not merely
      * sort last.
      */
     private static final float QUARANTINE_CONFIDENCE = 0.5f;
@@ -112,7 +115,7 @@ public class ObservationService {
      * The reflective-dashboard read-model for the current developer: per-practice cards they can READ —
      * why the practice matters, what good looks like, where they stand, what to act on, and what they
      * already do well. This is the third feedback channel (alongside in-context SCM notes and the mentor),
-     * reorganising the SAME findings by practice for self-paced reflection — not a scoreboard.
+     * reorganising the SAME findings by practice for self-paced reflection.
      *
      * <p>Sourced from each target's LATEST review run with {@code NOT_APPLICABLE} already excluded (the
      * repository query), so the surface carries only feedback the developer can act on or be affirmed by.
@@ -123,19 +126,40 @@ public class ObservationService {
      * @return empty list if the user is not a synced developer
      */
     @Transactional(readOnly = true)
-    public List<ReflectionPracticeDTO> getReflection(Long workspaceId) {
+    public List<PracticeReportCardDTO> getPracticeReport(Long workspaceId) {
         Optional<User> currentUser = userRepository.getCurrentUser();
         if (currentUser.isEmpty()) {
             return List.of();
         }
-        Instant since = Instant.now().minus(REFLECTION_LOOKBACK_DAYS, ChronoUnit.DAYS);
+        return getPracticeReport(workspaceId, currentUser.get().getId());
+    }
+
+    /**
+     * The same per-practice reflection cards as {@link #getPracticeReport(Long)}, computed for an ARBITRARY
+     * developer rather than the authenticated user. The mentor drill-down (an admin/owner viewing one
+     * developer's practice standing) calls this; the self-view is the {@code (workspaceId)} overload passing
+     * the caller's own id. Access control (who may name a given developer) is enforced by the caller — this
+     * method is unscoped by design so both surfaces share one derivation.
+     *
+     * @return empty list if the workspace does not exist
+     */
+    @Transactional(readOnly = true)
+    public List<PracticeReportCardDTO> getPracticeReport(Long workspaceId, Long developerUserId) {
+        // The recency window is the just-closed review cycle's opening bound, left open to now so the freshest
+        // feedback (produced after the cycle boundary) is always included — a developer/mentor reads the current
+        // state, not a frozen snapshot.
+        Optional<Workspace> workspace = workspaceRepository.findById(workspaceId);
+        if (workspace.isEmpty()) {
+            return List.of();
+        }
+        Instant since = reviewCycleWindowResolver.previousCycleWindow(workspace.get()).after();
         // No pre-group LIMIT: a global recency cap would silently drop WHOLE practice cards whose findings fall
         // past the cap row, making a missing card indistinguishable from "no findings". The query is already
-        // latest-run-deduped within a 90-day window (so cardinality is bounded by a developer's distinct
-        // latest-run findings, not their full history), and the per-practice caps below do the real trimming —
-        // so every practice with at least one actionable finding gets a card regardless of overall volume.
+        // latest-run-deduped within the window (so cardinality is bounded by a developer's distinct latest-run
+        // findings, not their full history), and the per-practice caps below do the real trimming — so every
+        // practice with at least one actionable finding gets a card regardless of overall volume.
         List<Observation> observations = observationRepository.findRecentByDeveloperAndWorkspace(
-            currentUser.get().getId(),
+            developerUserId,
             workspaceId,
             since,
             Pageable.unpaged()
@@ -154,7 +178,7 @@ public class ObservationService {
             byPractice.computeIfAbsent(f.getPractice().getSlug(), k -> new ArrayList<>()).add(f);
         }
 
-        List<ReflectionPracticeDTO> cards = new ArrayList<>();
+        List<PracticeReportCardDTO> cards = new ArrayList<>();
         for (List<Observation> group : byPractice.values()) {
             Practice practice = group.get(0).getPractice();
 
@@ -163,7 +187,7 @@ public class ObservationService {
             boolean isDefectDetector = practice.isDefectDetector();
 
             // The "to work on" headline must be the highest-impact CORROBORATED item, not just the highest
-            // severity (P4): a single low-confidence BAD on one artifact must sink below a confident or
+            // severity: a single low-confidence BAD on one artifact must sink below a confident or
             // multi-target gap so it never leads the card. Rank a gap that is quarantined (low confidence on a
             // single target) last, then by (confidence × severity-weight) descending.
             List<Observation> bad = group
@@ -185,24 +209,24 @@ public class ObservationService {
                         .add(f.getArtifactId());
                 }
             }
-            // P4 firewall on the read model (audit gap #1c): a quarantined BAD (low-confidence AND seen on a
+            // Firewall on the read model: a quarantined BAD (low-confidence AND seen on a
             // single target) must not just sort last — it must NOT be DISPLAYED at all. Otherwise the dashboard's
             // bounded MAX_ITEMS list still surfaces a coin-flip detector hunch as something to work on, bypassing
             // the same floor the mentor standing surface already enforces. Filter first, then rank what survives.
-            List<ReflectionItemDTO> toWorkOn = bad
+            List<PracticeReportItemDTO> toWorkOn = bad
                 .stream()
                 .filter(f -> !quarantined(f, locusSingleTarget(f, targetsByLocus, groupSingleTarget)))
                 .sorted(Comparator.comparingDouble(ObservationService::priorityScore).reversed())
                 .limit(MAX_ITEMS_PER_PRACTICE)
-                .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
+                .map(f -> PracticeReportItemDTO.from(f, deliveredGuidance.get(f.getId())))
                 .toList();
-            List<ReflectionItemDTO> strengths = isDefectDetector
+            List<PracticeReportItemDTO> strengths = isDefectDetector
                 ? List.of()
                 : group
                       .stream()
                       .filter(f -> f.getAssessment() == Assessment.GOOD)
                       .limit(MAX_STRENGTHS_PER_PRACTICE)
-                      .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
+                      .map(f -> PracticeReportItemDTO.from(f, deliveredGuidance.get(f.getId())))
                       .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
                 // This fires for a defect-detector practice whose only rows are GOOD: strengths are suppressed
@@ -211,16 +235,19 @@ public class ObservationService {
                 continue;
             }
 
-            ReflectionPracticeDTO.Standing standing =
-                !toWorkOn.isEmpty() && !strengths.isEmpty()
-                    ? ReflectionPracticeDTO.Standing.MIXED
-                    : !toWorkOn.isEmpty()
-                        ? ReflectionPracticeDTO.Standing.DEVELOPING
-                        : ReflectionPracticeDTO.Standing.STRENGTH;
+            // Map the standing through the shared deriver so the reflection cards and the mentor roster/cohort
+            // apply the SAME (hasProblems, hasStrengths) -> standing decision. The two inputs are computed
+            // per-surface (here in Java over the quarantine-filtered toWorkOn; the cohort/roster in SQL applying
+            // the same quarantine floor). A card with neither problems nor strengths is skipped above, so
+            // NO_ACTIVITY never reaches here — map it defensively to STRENGTH (the "nothing to act on" reading)
+            // rather than leaking a fourth value into the 3-value card enum.
+            PracticeStatus standing = toCardStanding(
+                PracticeStatusDeriver.derive(!toWorkOn.isEmpty(), !strengths.isEmpty())
+            );
 
             PracticeArea area = practice.getArea();
             cards.add(
-                new ReflectionPracticeDTO(
+                new PracticeReportCardDTO(
                     practice.getSlug(),
                     practice.getName(),
                     area != null ? area.getSlug() : null,
@@ -236,22 +263,33 @@ public class ObservationService {
 
         // Lead with what needs attention (worst severity first), then mixed, then pure strengths.
         cards.sort(
-            Comparator.<ReflectionPracticeDTO>comparingInt(c -> standingRank(c.standing())).thenComparingInt(
+            Comparator.<PracticeReportCardDTO>comparingInt(c -> standingRank(c.standing())).thenComparingInt(
                 ObservationService::worstSeverityOrdinal
             )
         );
         return cards;
     }
 
-    private static int standingRank(ReflectionPracticeDTO.Standing s) {
+    /**
+     * Normalises the derived {@link PracticeStatus} for a reflection card. A card with neither problems nor
+     * strengths is skipped upstream, so {@link PracticeStatus#NO_ACTIVITY} never reaches a card; it folds
+     * defensively to {@link PracticeStatus#STRENGTH} — the "nothing to act on" reading — so the reflection
+     * surface only ever shows DEVELOPING / STRENGTH / MIXED.
+     */
+    private static PracticeStatus toCardStanding(PracticeStatus standing) {
+        return standing == PracticeStatus.NO_ACTIVITY ? PracticeStatus.STRENGTH : standing;
+    }
+
+    private static int standingRank(PracticeStatus s) {
         return switch (s) {
             case DEVELOPING -> 0;
             case MIXED -> 1;
             case STRENGTH -> 2;
+            case NO_ACTIVITY -> 3; // never reaches a card (folded to STRENGTH above); ordered last defensively
         };
     }
 
-    private static int worstSeverityOrdinal(ReflectionPracticeDTO card) {
+    private static int worstSeverityOrdinal(PracticeReportCardDTO card) {
         return card
             .toWorkOn()
             .stream()
@@ -262,8 +300,8 @@ public class ObservationService {
 
     /**
      * A gap is quarantined when it is low-confidence AND uncorroborated (only seen on a single target). Returns
-     * {@code true} for quarantined items so they are FILTERED OUT of the displayed {@code toWorkOn} list (audit
-     * gap #1c) — a coin-flip detector hunch on one artifact must never reach the learner's dashboard. A confident
+     * {@code true} for quarantined items so they are FILTERED OUT of the displayed {@code toWorkOn} list —
+     * a coin-flip detector hunch on one artifact must never reach the learner's dashboard. A confident
      * gap, or one corroborated across ≥2 targets, is never quarantined.
      */
     private static boolean quarantined(Observation f, boolean singleTarget) {
@@ -357,10 +395,14 @@ public class ObservationService {
      */
     @Transactional(readOnly = true)
     public List<Observation> getObservationsForPullRequest(Long workspaceId, Long pullRequestId) {
-        return observationRepository.findByPullRequestAndWorkspace(
-            WorkArtifact.PULL_REQUEST,
-            pullRequestId,
-            workspaceId
-        );
+        // Reviewer-audience findings are about the REVIEWERS' craft, not the PR itself — they are firewalled
+        // out of everything author/PR-facing (ADR 0021 C2). This per-PR endpoint is workspace-member-readable,
+        // so exclude them here too: a reviewer's craft assessment must never surface on the PR it was made on.
+        // practice is JOIN-FETCHed by the query, so reading its slug adds no round-trip.
+        return observationRepository
+            .findByPullRequestAndWorkspace(WorkArtifact.PULL_REQUEST, pullRequestId, workspaceId)
+            .stream()
+            .filter(o -> !ReviewerAudiencePractices.isReviewerAudience(o.getPractice().getSlug()))
+            .toList();
     }
 }

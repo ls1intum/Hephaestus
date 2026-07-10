@@ -174,7 +174,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
-                    "..leaderboard..",
                     "..activity..",
                     "..mentor..",
                     "..notification..",
@@ -408,7 +407,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
 
             ArchRule rule = noClasses()
                 .that()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
+                .resideInAnyPackage("..activity..", "..profile..", "..practices..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(forbiddenInternalPackages)
@@ -443,7 +442,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
             // they can't bypass an SPI because they don't have one.
             ArchRule rule = noClasses()
                 .that()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
+                .resideInAnyPackage("..activity..", "..profile..", "..practices..")
                 .should()
                 .dependOnClassesThat(
                     com.tngtech.archunit.base.DescribedPredicate.describe(
@@ -470,41 +469,6 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
     class FeatureModuleBoundaryTests {
 
         /**
-         * Leaderboard should not depend on workspace internal implementation.
-         *
-         * <p>Feature modules should depend on public APIs, not internal details.
-         */
-        @Test
-        void leaderboardDoesNotDependOnWorkspaceInternals() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..leaderboard..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..workspace..internal..", "..workspace..adapter..")
-                .because("Leaderboard should depend on workspace public API, not internals");
-            rule.check(classes);
-        }
-
-        /**
-         * Activity module should not depend on leaderboard internals.
-         *
-         * <p>Activity and leaderboard are peer modules - they should not
-         * have direct dependencies on each other's internal implementation.
-         */
-        @Test
-        void activityDoesNotDependOnLeaderboardInternals() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..internal..", "..leaderboard..repository..")
-                .because("Activity should not depend on leaderboard internal classes");
-            rule.check(classes);
-        }
-
-        /**
          * Mentor module should only depend on integration.scm and shared modules.
          *
          * <p>Mentor is a standalone feature that consumes pull request data.
@@ -516,7 +480,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..mentor..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..notification..")
+                .resideInAnyPackage("..activity..", "..notification..")
                 .because("Mentor should be isolated from other feature modules");
             rule.check(classes);
         }
@@ -552,7 +516,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..notification..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..service..", "..activity..service..", "..mentor..service..")
+                .resideInAnyPackage("..activity..service..", "..mentor..service..")
                 .because("Notification should use domain events for cross-module communication");
             rule.check(classes);
         }

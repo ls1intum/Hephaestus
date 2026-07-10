@@ -88,7 +88,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 			id: "e72a329b-e4c2-4fc0-bf22-9d7f651d8d4a",
 			type: "open",
 			question:
-				"What specific changes to the Leaderboard (e.g., scoring logic, league thresholds, visibility) would make the competition feel fairer or more motivating for you?",
+				"What specific changes to the practice overview (e.g., cohort visibility, mentoring signals, or reflection cards) would make the feedback more useful without feeling competitive?",
 			buttonText: "Submit",
 			description: "",
 			descriptionContentType: "text",
@@ -108,7 +108,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 			id: "bf45ae86-3980-469e-8b5b-0ca3568ec938",
 			type: "open",
 			question:
-				"Which page (Leaderboard vs. Profile) would you prefer as your default landing view upon login, and specifically how does that view better support your decision on what to do next?",
+				"Which page (Practice Overview vs. Profile) would you prefer as your default landing view upon login, and specifically how does that view better support your decision on what to do next?",
 			buttonText: "Submit",
 			description: "",
 			descriptionContentType: "text",

@@ -8,9 +8,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 
-/** Review activity with XP score sourced from the activity_event ledger (CQRS read model). */
+/** Review activity sourced from the activity_event ledger (CQRS read model). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "A scored review activity entry with XP score for profile display")
+@Schema(description = "A review activity entry for profile display")
 public record ProfileReviewActivityDTO(
     @NonNull @Schema(description = "Unique identifier of the review") Long id,
     @NonNull @Schema(description = "Whether the review was dismissed") Boolean isDismissed,
@@ -20,6 +20,5 @@ public record ProfileReviewActivityDTO(
     @Schema(description = "Author of the review") UserInfoDTO author,
     @Schema(description = "Pull request that was reviewed") PullRequestBaseInfoDTO pullRequest,
     @NonNull @Schema(description = "URL to the review on the git provider") String htmlUrl,
-    @NonNull @Schema(description = "XP score earned for this review", example = "25") Integer score,
     @NonNull @Schema(description = "Timestamp when the review was submitted") Instant submittedAt
 ) {}

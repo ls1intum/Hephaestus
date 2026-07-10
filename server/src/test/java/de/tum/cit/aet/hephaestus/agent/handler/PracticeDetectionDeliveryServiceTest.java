@@ -11,9 +11,10 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionComplete
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +66,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
 
     @Mock
+    private ReviewerResolver reviewerResolver;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Captor
@@ -84,6 +89,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             observationRepository,
             pullRequestRepository,
             issueRepository,
+            reviewerResolver,
             eventPublisher,
             objectMapper
         );
@@ -139,15 +145,15 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     /**
      * Build a finding whose valence follows the former-GOOD practice convention used across these
      * fixtures (pr-description-quality, error-handling): PRESENT→GOOD strength, ABSENT→BAD gap,
-     * NOT_APPLICABLE→null. The assessment slot sits right after presence on {@link ValidatedFinding}.
+     * NOT_APPLICABLE→null. The assessment slot sits right after presence on {@link ValidatedObservation}.
      */
-    private ValidatedFinding validFinding(String slug, Presence presence) {
+    private ValidatedObservation validFinding(String slug, Presence presence) {
         Assessment assessment = switch (presence) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
             case NOT_APPLICABLE -> null;
         };
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             slug,
             "Test finding",
             presence,
@@ -312,7 +318,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void persistsAllNegativesForPractice() {
-            var findings = new java.util.ArrayList<ValidatedFinding>();
+            var findings = new java.util.ArrayList<ValidatedObservation>();
             for (int i = 0; i < 7; i++) {
                 findings.add(validFinding("pr-description-quality", Presence.ABSENT));
             }
@@ -325,7 +331,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void persistsManyPositiveFindings() {
-            var findings = new java.util.ArrayList<ValidatedFinding>();
+            var findings = new java.util.ArrayList<ValidatedObservation>();
             for (int i = 0; i < 10; i++) {
                 findings.add(validFinding("pr-description-quality", Presence.PRESENT));
             }
@@ -345,7 +351,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 List.of(testPractice, otherPractice)
             );
 
-            var findings = new java.util.ArrayList<ValidatedFinding>();
+            var findings = new java.util.ArrayList<ValidatedObservation>();
             for (int i = 0; i < 5; i++) {
                 findings.add(validFinding("pr-description-quality", Presence.ABSENT));
                 findings.add(validFinding("error-handling", Presence.ABSENT));
@@ -373,7 +379,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void persistsManyNotApplicableFindings() {
-            var findings = new java.util.ArrayList<ValidatedFinding>();
+            var findings = new java.util.ArrayList<ValidatedObservation>();
             for (int i = 0; i < 10; i++) {
                 findings.add(validFinding("pr-description-quality", Presence.NOT_APPLICABLE));
             }
@@ -388,7 +394,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     class SeverityCoherence {
 
         /** Captures the severity (position 12) the native insert receives for one delivered finding. */
-        private String capturedSeverityFor(ValidatedFinding finding) {
+        private String capturedSeverityFor(ValidatedObservation finding) {
             service.deliver(testJob, List.of(finding));
             ArgumentCaptor<String> severityCaptor = ArgumentCaptor.forClass(String.class);
             verify(observationRepository).insertIfAbsent(
@@ -575,6 +581,161 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().artifactType()).isEqualTo(WorkArtifact.ISSUE);
             assertThat(eventCaptor.getValue().artifactId()).isEqualTo(999L);
+        }
+    }
+
+    /**
+     * Per-finding subject attribution for the reviewer-audience practices: the finding is filed against the
+     * resolved REVIEWER, never the PR author. When the reviewer cannot be resolved, the finding is DISCARDED
+     * (correctness rule #1: never misattribute a reviewer's craft to the author).
+     */
+    @Nested
+    class ReviewerAudienceAttribution {
+
+        private static final String REVIEWER_SLUG = "leaves-useful-specific-review-comments";
+
+        private User reviewer(long id, String login) {
+            User u = new User();
+            ReflectionTestUtils.setField(u, "id", id);
+            u.setLogin(login);
+            return u;
+        }
+
+        private Practice reviewerPractice() {
+            Practice p = new Practice();
+            ReflectionTestUtils.setField(p, "id", 20L);
+            p.setSlug(REVIEWER_SLUG);
+            return p;
+        }
+
+        private ValidatedObservation reviewerFinding(String subjectLogin) {
+            return new ValidatedObservation(
+                REVIEWER_SLUG,
+                "Reviewer finding",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MINOR,
+                0.9f,
+                null,
+                null,
+                null,
+                List.of()
+            ).withSubjectLogin(subjectLogin);
+        }
+
+        /** Captures the {@code about_user_id} (8th arg) persisted for the single inserted row. */
+        private Long capturedAboutUserId() {
+            ArgumentCaptor<Long> about = ArgumentCaptor.forClass(Long.class);
+            verify(observationRepository).insertIfAbsent(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                about.capture(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+            return about.getValue();
+        }
+
+        @Test
+        void singleReviewerAttributesEvenWithNullSubjectLogin() {
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
+                List.of(testPractice, reviewerPractice())
+            );
+            when(reviewerResolver.reviewersByLogin(anyLong(), any())).thenReturn(
+                Map.of("reviewer-bob", reviewer(500L, "reviewer-bob"))
+            );
+
+            var result = service.deliver(testJob, List.of(reviewerFinding(null)));
+
+            assertThat(result.inserted()).isEqualTo(1);
+            // Deterministic fast path: exactly one reviewer, so no model trust needed — attributed to the reviewer.
+            assertThat(capturedAboutUserId()).isEqualTo(500L);
+        }
+
+        @Test
+        void multiReviewerAttributesToTheProposedReviewer() {
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
+                List.of(testPractice, reviewerPractice())
+            );
+            when(reviewerResolver.reviewersByLogin(anyLong(), any())).thenReturn(
+                Map.of(
+                    "reviewer-bob",
+                    reviewer(500L, "reviewer-bob"),
+                    "reviewer-carol",
+                    reviewer(600L, "reviewer-carol")
+                )
+            );
+
+            // Mixed-case subjectLogin normalizes to the "reviewer-carol" key.
+            var result = service.deliver(testJob, List.of(reviewerFinding("Reviewer-Carol")));
+
+            assertThat(result.inserted()).isEqualTo(1);
+            assertThat(capturedAboutUserId()).isEqualTo(600L);
+        }
+
+        @Test
+        void multiReviewerWithUnresolvedSubjectLoginIsDiscardedNotAttributedToAuthor() {
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(
+                List.of(testPractice, reviewerPractice())
+            );
+            when(reviewerResolver.reviewersByLogin(anyLong(), any())).thenReturn(
+                Map.of(
+                    "reviewer-bob",
+                    reviewer(500L, "reviewer-bob"),
+                    "reviewer-carol",
+                    reviewer(600L, "reviewer-carol")
+                )
+            );
+
+            // subjectLogin names nobody in the reviewer set, and there are 2 reviewers → cannot attribute.
+            var result = service.deliver(testJob, List.of(reviewerFinding("someone-else")));
+
+            assertThat(result.inserted()).isZero();
+            // NEVER persisted — and specifically never attributed to the author (789L).
+            verify(observationRepository, never()).insertIfAbsent(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+            // The completion event still fires, author-scoped, counting the discard.
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().developerId()).isEqualTo(789L);
+            assertThat(eventCaptor.getValue().findingsDiscarded()).isEqualTo(1);
+        }
+
+        @Test
+        void authorAudienceGoesToAuthorAndNeverConsultsReviewerResolver() {
+            var result = service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
+
+            assertThat(result.inserted()).isEqualTo(1);
+            assertThat(capturedAboutUserId()).isEqualTo(789L); // the PR author
+            verifyNoInteractions(reviewerResolver); // reviewer set is resolved only when a reviewer finding exists
         }
     }
 }

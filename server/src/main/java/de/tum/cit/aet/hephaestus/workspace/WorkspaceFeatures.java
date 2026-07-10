@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -37,21 +39,6 @@ public class WorkspaceFeatures {
     private Boolean achievementsEnabled = false;
 
     @NotNull
-    @ColumnDefault("false")
-    @Column(name = "leaderboard_enabled", nullable = false)
-    private Boolean leaderboardEnabled = false;
-
-    @NotNull
-    @ColumnDefault("false")
-    @Column(name = "progression_enabled", nullable = false)
-    private Boolean progressionEnabled = false;
-
-    @NotNull
-    @ColumnDefault("false")
-    @Column(name = "leagues_enabled", nullable = false)
-    private Boolean leaguesEnabled = false;
-
-    @NotNull
     @ColumnDefault("true")
     @Column(name = "practice_review_auto_trigger_enabled", nullable = false)
     private Boolean practiceReviewAutoTriggerEnabled = true;
@@ -61,19 +48,30 @@ public class WorkspaceFeatures {
     @Column(name = "practice_review_manual_trigger_enabled", nullable = false)
     private Boolean practiceReviewManualTriggerEnabled = true;
 
+    /**
+     * Audience for the k-anonymised cohort aggregate on the practice overview (a privacy control, never a
+     * ranking control). Defaults to {@link CohortVisibility#MENTORS_ONLY}. The roster and per-developer
+     * drill-down stay admin/owner-only in both values; see {@link CohortVisibility}.
+     */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'MENTORS_ONLY'")
+    @Column(name = "cohort_visibility", nullable = false, length = 32)
+    private CohortVisibility cohortVisibility = CohortVisibility.MENTORS_ONLY;
+
     /** PATCH semantics: null fields are ignored, non-null fields overwrite. */
     public void applyPatch(UpdateWorkspaceFeaturesRequestDTO request) {
         if (request.practicesEnabled() != null) this.practicesEnabled = request.practicesEnabled();
         if (request.mentorEnabled() != null) this.mentorEnabled = request.mentorEnabled();
         if (request.achievementsEnabled() != null) this.achievementsEnabled = request.achievementsEnabled();
-        if (request.leaderboardEnabled() != null) this.leaderboardEnabled = request.leaderboardEnabled();
-        if (request.progressionEnabled() != null) this.progressionEnabled = request.progressionEnabled();
-        if (request.leaguesEnabled() != null) this.leaguesEnabled = request.leaguesEnabled();
         if (request.practiceReviewAutoTriggerEnabled() != null) {
             this.practiceReviewAutoTriggerEnabled = request.practiceReviewAutoTriggerEnabled();
         }
         if (request.practiceReviewManualTriggerEnabled() != null) {
             this.practiceReviewManualTriggerEnabled = request.practiceReviewManualTriggerEnabled();
+        }
+        if (request.cohortVisibility() != null) {
+            this.cohortVisibility = request.cohortVisibility();
         }
     }
 }

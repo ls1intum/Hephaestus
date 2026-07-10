@@ -71,7 +71,7 @@ public class GeneralReviewCommentContentProvider implements ContentProvider {
      * re-review ping). A general comment containing it is the bot's own output and must never be surfaced as
      * reviewer input. Matches the whole {@code <!-- hephaestus:* -->} namespace so a new marker can't leak back.
      */
-    static final String HEPHAESTUS_MARKER = "<!-- hephaestus:";
+    public static final String HEPHAESTUS_MARKER = "<!-- hephaestus:";
 
     private final ObjectMapper objectMapper;
     private final IssueCommentRepository issueCommentRepository;

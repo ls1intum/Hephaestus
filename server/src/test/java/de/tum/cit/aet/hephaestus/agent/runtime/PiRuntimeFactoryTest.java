@@ -89,8 +89,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void loadsClasspathResources() {
             var inputs = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).inputFiles();
             assertThat(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH)).isNotNull();
+            // Anchor on a stable schema field rather than the reported-unit noun: pi-orchestrator.md is
+            // human-owned prose (still says "findings" until the human aligns it to "observations"), so a
+            // "observations"/"findings" sentinel would be brittle. suggestedDiffNotes is part of the
+            // observation schema and is not renamed.
             assertThat(new String(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
-                "findings"
+                "suggestedDiffNotes"
             );
             assertThat(inputs.get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
         }

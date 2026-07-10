@@ -22,8 +22,6 @@ export type MockUIAchievement = Omit<UIAchievement, "id" | "unlockedAt"> & {
 export const mockUser = {
 	name: "Hephaestus_Forge_Master",
 	avatarUrl: "https://github.com/github.png",
-	level: 42,
-	leaguePoints: 9001,
 };
 
 export const hephaestusInit: MockUIAchievement = {

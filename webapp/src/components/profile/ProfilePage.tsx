@@ -1,9 +1,10 @@
 import { XCircleIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
-import type { LeaderboardSchedule } from "@/lib/timeframe";
+import type { ReviewCycleSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
@@ -21,11 +22,15 @@ interface ProfileProps {
 	after?: string;
 	before?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	/** Leaderboard schedule for proper week calculations */
-	schedule?: LeaderboardSchedule;
+	/** Review-cycle schedule for proper week calculations */
+	schedule?: ReviewCycleSchedule;
 	achievementsEnabled?: boolean;
-	progressionEnabled?: boolean;
-	leaguesEnabled?: boolean;
+	/**
+	 * Optional private practice-reflection section rendered between the header and the activity
+	 * monitor. Only the self-view (workspace home) fills this — it is fed exclusively by the
+	 * server-gated `GET /practices/reports/me`, so another developer's cards can never appear here.
+	 */
+	practicesSlot?: ReactNode;
 }
 
 export function ProfilePage({
@@ -44,8 +49,7 @@ export function ProfilePage({
 	onTimeframeChange,
 	schedule,
 	achievementsEnabled = true,
-	progressionEnabled = true,
-	leaguesEnabled = true,
+	practicesSlot,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -63,16 +67,15 @@ export function ProfilePage({
 		<div className="pt-4 flex flex-col gap-8">
 			<ProfileHeader
 				user={profileData?.userInfo}
-				firstContribution={profileData?.firstContribution}
-				contributedRepositories={profileData?.contributedRepositories}
-				leaguePoints={profileData?.userInfo?.leaguePoints}
-				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
 				workspaceSlug={workspaceSlug}
 				achievementsEnabled={achievementsEnabled}
-				progressionEnabled={progressionEnabled}
-				leaguesEnabled={leaguesEnabled}
 			/>
+			{practicesSlot && (
+				<section aria-label="My practices" className="mx-8">
+					{practicesSlot}
+				</section>
+			)}
 			<ProfileContent
 				providerType={providerType}
 				activityMonitorData={activityMonitorData}

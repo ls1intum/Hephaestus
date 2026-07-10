@@ -64,7 +64,7 @@ class PracticeCatalogInjector {
      * their criteria — i.e. practices with no legal {@code (PRESENT, GOOD)} clean-bill-of-health observation
      * (a clean surface is {@code NOT_APPLICABLE}, never a good reading). The delivery layer uses this to coerce
      * a model-emitted {@code (PRESENT, GOOD)} to {@code NOT_APPLICABLE} before it ships to the student as a
-     * false strength (see {@code ValidatedFinding#coerceCoherence}).
+     * false strength (see {@code ValidatedObservation#coerceCoherence}).
      */
     Set<String> defectDetectorSlugs(Long workspaceId, WorkArtifact focus) {
         return practiceRepository

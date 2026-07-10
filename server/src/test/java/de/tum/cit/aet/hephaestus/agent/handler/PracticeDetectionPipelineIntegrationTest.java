@@ -225,7 +225,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private String validAgentOutput() {
         String findings = """
             {
-              "findings": [
+              "observations": [
                 {
                   "practiceSlug": "pr-description-quality",
                   "title": "Good PR description",
@@ -291,7 +291,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void allPositiveFindingsPostsApproval() {
             String output = """
                 {
-                  "findings": [
+                  "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
@@ -344,7 +344,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void unknownSlugDiscardedOthersKept() {
             String output = """
                 {
-                  "findings": [
+                  "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",

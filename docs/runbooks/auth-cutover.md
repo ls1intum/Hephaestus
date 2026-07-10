@@ -87,7 +87,7 @@ empty, and there is no backfill changeset. On a user's first post-cutover login 
 `IdentityLink` are JIT-created. This is safe because **workspace authorization never keys on
 `account_id`**: the issued JWT carries `preferred_username` = the git login, and
 `WorkspaceContextFilter` resolves the current `User` by login (case-insensitive) → the existing
-`workspace_membership` rows (still keyed on `user_id`). Memberships, roles, leaderboard points and
+`workspace_membership` rows (still keyed on `user_id`). Memberships, roles, profile visibility and
 activity history therefore carry over automatically.
 
 - ⚠️ **Risk — username drift.** The bridge is git-login string equality. GitHub / GitLab

@@ -18,7 +18,7 @@ public record WorkspaceTeamRepositorySettingsDTO(
     @NonNull @Schema(description = "The team ID these settings apply to") Long teamId,
     @NonNull @Schema(description = "The repository ID these settings apply to") Long repositoryId,
     @NonNull
-    @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
+    @Schema(description = "Whether contributions from this repository are hidden from the practice overview")
     Boolean hiddenFromContributions
 ) {
     /**

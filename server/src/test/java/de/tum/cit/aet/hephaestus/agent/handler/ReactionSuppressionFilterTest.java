@@ -10,7 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -66,7 +66,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void flagOff_passesThroughUnchanged_noRepoCalls() {
-        List<ValidatedFinding> in = List.of(vf(SLUG, Presence.ABSENT));
+        List<ValidatedObservation> in = List.of(vf(SLUG, Presence.ABSENT));
 
         var d = filter(false).evaluate(TestEntities.agentJob(), in);
 
@@ -197,11 +197,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
-    private static ValidatedFinding vf(String slug, Presence presence) {
+    private static ValidatedObservation vf(String slug, Presence presence) {
         return vf(slug, presence, CK);
     }
 
-    private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey) {
+    private static ValidatedObservation vf(String slug, Presence presence, String recurrenceKey) {
         // Assessment mapping: PRESENT->GOOD (strength), ABSENT->BAD (gap), NA->null.
         Assessment assessment =
             presence == Presence.NOT_APPLICABLE
@@ -211,7 +211,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
                     : Assessment.BAD;
         // The handler stamps the persisted recurrence_key onto each finding before the filter runs; the filter
         // matches reactions on that stamped key (never a recompute), so the test feeds it the same way.
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             slug,
             slug + " title",
             presence,

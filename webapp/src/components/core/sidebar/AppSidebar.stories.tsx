@@ -15,9 +15,7 @@ const mockWorkspace = {
 	practicesEnabled: true,
 	mentorEnabled: true,
 	achievementsEnabled: true,
-	leaderboardEnabled: true,
-	progressionEnabled: false,
-	leaguesEnabled: false,
+	cohortVisibility: "MENTORS_ONLY",
 } as const;
 
 /**
@@ -37,7 +35,6 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	args: {
-		username: "johnDoe",
 		isAdmin: false,
 		isAppAdmin: false,
 		hasMentorAccess: false,
@@ -46,10 +43,6 @@ const meta = {
 		activeWorkspace: mockWorkspace,
 	},
 	argTypes: {
-		username: {
-			control: "text",
-			description: "Username of the current user",
-		},
 		isAdmin: {
 			control: "boolean",
 			description: "Whether the user has administrative privileges",
@@ -76,7 +69,6 @@ type Story = StoryObj<typeof meta>;
  */
 export const RegularUser: Story = {
 	args: {
-		username: "johndoe",
 		isAdmin: false,
 		hasMentorAccess: false,
 		context: "main",
@@ -89,7 +81,6 @@ export const RegularUser: Story = {
  */
 export const AdminUser: Story = {
 	args: {
-		username: "admin",
 		isAdmin: true,
 		isAppAdmin: true,
 		hasMentorAccess: true,
@@ -104,7 +95,6 @@ export const AdminUser: Story = {
  */
 export const AdminContext: Story = {
 	args: {
-		username: "admin",
 		isAppAdmin: true,
 		context: "admin",
 		activeWorkspace: mockWorkspace,
@@ -118,7 +108,6 @@ export const AdminContext: Story = {
  */
 export const AdminContextNoWorkspace: Story = {
 	args: {
-		username: "admin",
 		isAppAdmin: true,
 		context: "admin",
 		workspaces: [],
@@ -140,7 +129,6 @@ export const AdminContextNoWorkspace: Story = {
  */
 export const MentorContext: Story = {
 	args: {
-		username: "mentor",
 		isAdmin: false,
 		hasMentorAccess: true,
 		context: "mentor",
@@ -170,7 +158,6 @@ export const MentorContext: Story = {
  */
 export const MentorLoading: Story = {
 	args: {
-		username: "mentor",
 		isAdmin: false,
 		hasMentorAccess: true,
 		context: "mentor",
@@ -186,13 +173,11 @@ export const AllFeaturesDisabled: Story = {
 		activeWorkspace: {
 			...mockWorkspace,
 			achievementsEnabled: false,
-			leaderboardEnabled: false,
 		},
 		workspaces: [
 			{
 				...mockWorkspace,
 				achievementsEnabled: false,
-				leaderboardEnabled: false,
 			},
 		],
 	},

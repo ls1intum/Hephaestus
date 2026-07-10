@@ -127,7 +127,7 @@ public class WorkspaceMembershipController {
 
     /**
      * Toggle the hidden flag for a workspace member.
-     * Hidden members are excluded from the leaderboard.
+     * Hidden members are excluded from the practice overview.
      *
      * @param context the workspace context
      * @param userId User ID

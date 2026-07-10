@@ -49,7 +49,6 @@ erDiagram
         BIGINT repository_id FK
         VARCHAR(32) target_type
         BIGINT target_id
-        DOUBLE xp "NOT NULL"
         TIMESTAMPTZ ingested_at "NOT NULL"
     }
 
@@ -213,6 +212,15 @@ erDiagram
         VARCHAR(64) correlation_id
         JSONB detail
         TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
+    DataAccessEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT workspace_id "NOT NULL"
+        BIGINT actor_user_id "NOT NULL"
+        BIGINT subject_user_id
+        VARCHAR(48) resource_type "NOT NULL"
     }
 
     Discussion {
@@ -918,9 +926,8 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         VARCHAR(120) display_name "NOT NULL"
         BOOLEAN is_publicly_viewable "NOT NULL"
-        BOOLEAN leaderboard_notification_enabled
-        INTEGER leaderboard_schedule_day
-        VARCHAR(10) leaderboard_schedule_time
+        INTEGER review_cycle_day
+        VARCHAR(10) review_cycle_time
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -931,24 +938,20 @@ erDiagram
         TIMESTAMPTZ issue_dependencies_synced_at
         BOOLEAN practices_enabled "NOT NULL"
         BOOLEAN achievements_enabled "NOT NULL"
-        BOOLEAN leaderboard_enabled "NOT NULL"
-        BOOLEAN progression_enabled "NOT NULL"
-        BOOLEAN leagues_enabled "NOT NULL"
         BOOLEAN practice_review_auto_trigger_enabled "NOT NULL"
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
-        TIMESTAMPTZ leaderboard_league_cycle_at
         BIGINT practice_config_id FK
         BIGINT mentor_config_id FK
         BOOLEAN practice_run_for_all_users
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
+        VARCHAR(32) cohort_visibility "NOT NULL"
     }
 
     WorkspaceMembership {
         TIMESTAMPTZ created_at "NOT NULL"
-        INTEGER league_points "NOT NULL"
         VARCHAR(16) role "NOT NULL"
         BIGINT user_id PK,FK
         BIGINT workspace_id PK,FK

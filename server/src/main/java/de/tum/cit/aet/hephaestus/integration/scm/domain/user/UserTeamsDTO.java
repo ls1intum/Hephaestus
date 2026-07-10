@@ -34,7 +34,7 @@ public record UserTeamsDTO(
      *
      * @param user the user entity
      * @param hiddenTeamIds set of team IDs that are hidden in this scope
-     * @param hidden whether this member is hidden from the leaderboard
+     * @param hidden whether this member is hidden from the practice overview
      * @return the DTO with scope-specific settings applied
      */
     public static UserTeamsDTO fromUserWithScopeSettings(User user, Set<Long> hiddenTeamIds, boolean hidden) {

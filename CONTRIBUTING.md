@@ -113,11 +113,12 @@ We use **Semantic Release** to automatically version and release our application
 
 - `integration`: Cross-cutting integration framework (webhook, oauth, registry, SPI)
 - `scm`: Source-control management (GitHub, GitLab) — formerly `gitprovider`
-- `leaderboard`: Leaderboard and rankings
+- `activity`: Activity event log and achievements
+- `practices`: Practice reflection and reports
 - `mentor`: AI mentor (Heph)
 - `notifications`: Email/notification system
 - `profile`: User profiles
-- `teams`: Team competitions
+- `teams`: Team management
 - `workspace`: Workspace management
 
 ### Examples
@@ -125,7 +126,7 @@ We use **Semantic Release** to automatically version and release our application
 **Valid pull request titles:**
 
 - `fix(profile): correct avatar upload logic`
-- `feat(leaderboard): add sorting functionality`
+- `feat(activity): add achievement progress endpoint`
 - `feat(mentor): add conversation history`
 - `feat(server): add user profile endpoint`
 - `docs: update installation instructions`

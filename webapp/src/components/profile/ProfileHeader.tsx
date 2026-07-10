@@ -1,60 +1,32 @@
 import { Link } from "@tanstack/react-router";
-import { format } from "date-fns";
 import { Sparkles } from "lucide-react";
-import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
-import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
-import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils.ts";
+import type { UserInfo } from "@/api/types.gen";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getInitials } from "@/lib/avatar";
-import { cn } from "@/lib/utils.ts";
-import { XpProgress } from "./XpProgress";
 
 export interface ProfileHeaderProps {
 	user?: UserInfo;
-	firstContribution?: Date;
-	contributedRepositories?: RepositoryInfo[];
-	leaguePoints?: number;
-	userXpRecord?: ProfileXpRecord;
 	isLoading: boolean;
 	/** Workspace slug for routing to achievement page. */
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
-	progressionEnabled?: boolean;
-	leaguesEnabled?: boolean;
 }
 
 export function ProfileHeader({
 	user,
-	firstContribution,
-	leaguePoints = 0,
-	userXpRecord = { currentLevel: 1, currentLevelXP: 0, totalXP: 0, xpNeeded: 150 },
 	isLoading,
 	workspaceSlug,
 	achievementsEnabled = true,
-	progressionEnabled = true,
-	leaguesEnabled = true,
 }: ProfileHeaderProps) {
-	// Unpack XP data
-	const { currentLevel: level, currentLevelXP: currentXp, xpNeeded, totalXP } = userXpRecord;
-
-	// Format the first contribution date if available
-	const formattedFirstContribution = firstContribution
-		? format(firstContribution, "MMMM yyyy")
-		: undefined;
-
-	const rawTier = getLeagueTier(leaguePoints);
-	const leagueTier = rawTier === "none" ? "bronze" : rawTier;
-
 	return (
 		<div className="flex items-start justify-between gap-6 mx-8">
-			{/* Left section: Avatar + User Info + XP */}
+			{/* Left section: Avatar + User Info */}
 			<div className="flex flex-col gap-4 w-full max-w-xl">
-				{/* Row 1: Avatar + Name + GitHub Link */}
+				{/* Avatar + Name + GitHub Link */}
 				<div className="flex items-center gap-4">
-					{/* Avatar with Level Badge */}
+					{/* Avatar */}
 					<div className="relative shrink-0">
 						{isLoading ? (
 							<Avatar className="size-16">
@@ -65,29 +37,6 @@ export function ProfileHeader({
 								<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
 								<AvatarFallback>{getInitials(user?.name, user?.login)}</AvatarFallback>
 							</Avatar>
-						)}
-
-						{/* Level Badge */}
-						{isLoading ? (
-							<Skeleton className="absolute -bottom-1 -right-1 size-7 rounded-full" />
-						) : (
-							<Tooltip>
-								<TooltipTrigger
-									render={
-										<div
-											className={cn(
-												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
-												getLeagueColor(leagueTier),
-											)}
-										/>
-									}
-								>
-									{level}
-								</TooltipTrigger>
-								<TooltipContent side="bottom">
-									<p>Level {level}</p>
-								</TooltipContent>
-							</Tooltip>
 						)}
 					</div>
 
@@ -129,43 +78,7 @@ export function ProfileHeader({
 						</div>
 					) : null}
 				</div>
-
-				{/* Row 2: XP Progress Bar with Contributing Since */}
-				{progressionEnabled &&
-					(isLoading ? (
-						<div className="flex flex-col gap-2">
-							<Skeleton className="h-4 w-48" />
-							<Skeleton className="h-2.5 w-full max-w-sm" />
-							<Skeleton className="h-4 w-40" />
-						</div>
-					) : (
-						<XpProgress
-							className="max-w-sm"
-							currentXP={currentXp}
-							xpNeeded={xpNeeded}
-							nextLevel={level + 1}
-							totalXP={totalXP}
-							contributingSince={formattedFirstContribution}
-						/>
-					))}
 			</div>
-
-			{/* Right section: League Icon + Points */}
-			{leaguesEnabled && (
-				<div className="flex flex-col items-center gap-1 shrink-0">
-					{isLoading ? (
-						<>
-							<Skeleton className="size-16 rounded-full" />
-							<Skeleton className="h-5 w-12" />
-						</>
-					) : (
-						<>
-							<LeagueIcon leaguePoints={leaguePoints} size="lg" />
-							<span className="text-muted-foreground text-base font-semibold">{leaguePoints}</span>
-						</>
-					)}
-				</div>
-			)}
 		</div>
 	);
 }

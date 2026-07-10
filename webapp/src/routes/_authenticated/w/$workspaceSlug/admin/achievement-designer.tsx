@@ -86,8 +86,6 @@ function AchievementDesignerPage() {
 	const user = {
 		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username || "",
 		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserProfilePictureUrl(),
-		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
-		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
 	};
 
 	return (

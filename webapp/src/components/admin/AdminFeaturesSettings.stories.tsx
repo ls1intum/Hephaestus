@@ -6,9 +6,6 @@ const allOff: FeatureValues = {
 	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
-	leaderboardEnabled: false,
-	progressionEnabled: false,
-	leaguesEnabled: false,
 	practiceReviewAutoTriggerEnabled: false,
 	practiceReviewManualTriggerEnabled: false,
 };
@@ -19,8 +16,10 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		values: allOff,
+		cohortVisibility: "MENTORS_ONLY",
 		isSaving: false,
 		onToggle: fn(),
+		onCohortVisibilityChange: fn(),
 	},
 } satisfies Meta<typeof AdminFeaturesSettings>;
 
@@ -36,21 +35,16 @@ export const AllEnabled: Story = {
 			practicesEnabled: true,
 			mentorEnabled: true,
 			achievementsEnabled: true,
-			leaderboardEnabled: true,
-			progressionEnabled: true,
-			leaguesEnabled: true,
 			practiceReviewAutoTriggerEnabled: true,
 			practiceReviewManualTriggerEnabled: true,
 		},
 	},
 };
 
-/** Mentor chat enabled only — proves the new toggle renders next to Practice Review. */
 export const MentorEnabled: Story = {
 	args: { values: { ...allOff, mentorEnabled: true } },
 };
 
-/** Practice Review enabled with both sub-triggers on — shows the nested toggle layout. */
 export const PracticesWithBothTriggers: Story = {
 	args: {
 		values: {
@@ -62,12 +56,18 @@ export const PracticesWithBothTriggers: Story = {
 	},
 };
 
-/** Practice Review parent on, both children off — reviews can't fire (UI edge case). */
 export const PracticesBothTriggersOff: Story = {
 	args: { values: { ...allOff, practicesEnabled: true } },
 };
 
-/** Save in progress — every switch disabled. */
+export const MentorsOnlyVisibility: Story = {
+	args: { cohortVisibility: "MENTORS_ONLY" },
+};
+
+export const EveryoneVisibility: Story = {
+	args: { cohortVisibility: "EVERYONE" },
+};
+
 export const Saving: Story = {
 	args: {
 		values: {

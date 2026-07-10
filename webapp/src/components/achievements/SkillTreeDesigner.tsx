@@ -42,14 +42,12 @@ export interface SkillTreeDesignerProps {
 	user: {
 		name: string;
 		avatarUrl: string;
-		level: number;
-		leaguePoints: number;
 	};
 	allDefinitions?: Achievement[];
 }
 
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
-	const { name, avatarUrl, level, leaguePoints } = user;
+	const { name, avatarUrl } = user;
 	const [nodes, setNodes, onNodesChangeRef] = useNodesState<
 		AchievementNode | AvatarNode | CategoryLabelNode
 	>([]);
@@ -140,14 +138,14 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 		}
 
 		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(
-			{ name, avatarUrl, level, leaguePoints },
+			{ name, avatarUrl },
 			displayAchievements,
 			edgeDisplayMode,
 		);
 
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [name, avatarUrl, level, leaguePoints, allDefinitions, setNodes, setEdges, edgeDisplayMode]);
+	}, [name, avatarUrl, allDefinitions, setNodes, setEdges, edgeDisplayMode]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 

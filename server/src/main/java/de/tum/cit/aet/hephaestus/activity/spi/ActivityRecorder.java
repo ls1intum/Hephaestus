@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  */
 public interface ActivityRecorder {
     /**
-     * @see de.tum.cit.aet.hephaestus.activity.ActivityEventService#record(Long, ActivityEventType, Instant, User, Repository, ActivityTargetType, Long, double)
+     * @see de.tum.cit.aet.hephaestus.activity.ActivityEventService#record(Long, ActivityEventType, Instant, User, Repository, ActivityTargetType, Long)
      */
     boolean record(
         Long workspaceId,
@@ -33,8 +33,7 @@ public interface ActivityRecorder {
         @Nullable User actor,
         @Nullable Repository repository,
         ActivityTargetType targetType,
-        Long targetId,
-        double xp
+        Long targetId
     );
 
     /**

@@ -2,10 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavDashboards } from "./NavDashboards";
 
-/**
- * Navigation component for dashboard features, providing access to various user
- * dashboards and analytics views.
- */
 const meta = {
 	component: NavDashboards,
 	parameters: {
@@ -13,22 +9,18 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"Dashboard navigation sidebar component with links to different analytics views and user dashboards.",
+					"Dashboard navigation sidebar component with links to profile, practice overview, achievements, and teams.",
 			},
 		},
 	},
 	tags: ["autodocs"],
 	args: {
-		username: "johnDoe",
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
-		leaderboardEnabled: true,
+		practicesEnabled: true,
+		isAdmin: false,
 	},
 	argTypes: {
-		username: {
-			control: "text",
-			description: "Username of the current user",
-		},
 		workspaceSlug: {
 			control: "text",
 			description: "Active workspace slug",
@@ -37,9 +29,13 @@ const meta = {
 			control: "boolean",
 			description: "Whether achievements sidebar item is visible",
 		},
-		leaderboardEnabled: {
+		practicesEnabled: {
 			control: "boolean",
-			description: "Whether leaderboard sidebar item is visible",
+			description: "Whether the practice overview surface is visible",
+		},
+		isAdmin: {
+			control: "boolean",
+			description: "Whether the admin-only Practice Overview item is visible",
 		},
 	},
 	decorators: [
@@ -54,27 +50,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default view of the dashboards navigation sidebar.
- */
 export const Default: Story = {};
 
-/**
- * Different user's dashboard navigation.
- */
-export const DifferentUser: Story = {
+export const AdminView: Story = {
 	args: {
-		username: "janeDoe",
-		workspaceSlug: "aet",
+		isAdmin: true,
 	},
 };
 
-/**
- * All optional features disabled — only Profile and Teams remain.
- */
 export const AllFeaturesDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
-		leaderboardEnabled: false,
+		practicesEnabled: false,
 	},
 };

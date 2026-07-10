@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Set;
@@ -122,6 +123,7 @@ class MentorChatControllerTest extends BaseUnitTest {
             null,
             false,
             false,
+            CohortVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
         assertThatThrownBy(() ->
@@ -139,6 +141,7 @@ class MentorChatControllerTest extends BaseUnitTest {
             null,
             false,
             true,
+            CohortVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
     }

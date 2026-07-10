@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Repository for managing user achievement unlocks.
  *
  * <p>Provides queries for checking existing achievements, retrieving user
- * progress, and supporting achievement leaderboards.
+ * progress, and supporting achievement activity aggregations.
  */
 @Repository
 @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments, not workspace-scoped")

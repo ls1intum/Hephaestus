@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>This repository contains only domain-agnostic queries for the integration.scm domain.
  * Scope-filtered queries (those that join with RepositoryToMonitor or other consuming module
- * entities) belong in the consuming packages (leaderboard, profile, etc.) to maintain
+ * entities) belong in the consuming packages (profile, practices, etc.) to maintain
  * clean architecture boundaries.
  *
  * <p>Workspace-agnostic by design: provider-domain lookups (by native ID, full name) run

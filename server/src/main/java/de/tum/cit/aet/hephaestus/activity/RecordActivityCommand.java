@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import lombok.Builder;
@@ -24,7 +23,6 @@ import org.jspecify.annotations.Nullable;
  *     .repository(repo)
  *     .targetType(ActivityTargetType.REVIEW)
  *     .targetId(456L)
- *     .xp(5.0)
  *     .build();
  *
  * activityEventService.record(command);
@@ -38,8 +36,7 @@ public record RecordActivityCommand(
     @Nullable User actor,
     @Nullable Repository repository,
     @NotNull ActivityTargetType targetType,
-    @NotNull Long targetId,
-    @Min(0) double xp
+    @NotNull Long targetId
 ) {
     /**
      * Create a simple command for events without a repository context.
@@ -50,8 +47,7 @@ public record RecordActivityCommand(
         Instant occurredAt,
         User actor,
         ActivityTargetType targetType,
-        Long targetId,
-        double xp
+        Long targetId
     ) {
         return RecordActivityCommand.builder()
             .workspaceId(workspaceId)
@@ -60,7 +56,6 @@ public record RecordActivityCommand(
             .actor(actor)
             .targetType(targetType)
             .targetId(targetId)
-            .xp(xp)
             .build();
     }
 }

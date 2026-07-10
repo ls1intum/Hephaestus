@@ -27,7 +27,6 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 export type SidebarContext = "main" | "mentor" | "admin";
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-	username: string;
 	isAdmin: boolean;
 	/** Application-wide super-admin (APP_ADMIN). Gates the cross-workspace Admin nav group. */
 	isAppAdmin: boolean;
@@ -45,7 +44,6 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({
-	username,
 	isAdmin,
 	isAppAdmin,
 	hasMentorAccess,
@@ -114,10 +112,11 @@ export function AppSidebar({
 		sidebarContent = (
 			<>
 				<NavDashboards
-					username={username}
 					workspaceSlug={activeWorkspace.workspaceSlug}
 					achievementsEnabled={activeWorkspace.achievementsEnabled}
-					leaderboardEnabled={activeWorkspace.leaderboardEnabled}
+					practicesEnabled={activeWorkspace.practicesEnabled}
+					cohortVisibility={activeWorkspace.cohortVisibility}
+					isAdmin={isAdmin}
 				/>
 				{/* Mentor link requires BOTH the user-scoped account_feature flag and the per-workspace toggle. */}
 				{hasMentorAccess && activeWorkspace.mentorEnabled && (

@@ -16,14 +16,15 @@ and why it's fail-closed in prod, see
    pnpm dev:server:e2e        # = ./mvnw -f server spring-boot:run -Dapp.profiles=local,e2e
    ```
 
-3. **Seed** the workspace + a member account (the dev-login creates account id 1; the SPA navigates by
-   membership). Sign in once so the account exists, then seed:
+3. **Seed** the workspace + member account with the shared setup script (preferred; keeps API-created
+   workspaces, memberships, and practice catalog seeding in sync with the backend):
 
    ```bash
-   curl -s -X POST localhost:38080/auth/dev-login -H 'content-type: application/json' \
-     -d '{"username":"e2e","admin":true}' -o /dev/null
-   psql "$DATABASE_URL" -f webapp/e2e/seed.sql
+   scripts/e2e-setup.sh
    ```
+
+   `webapp/e2e/seed.sql` is a small fallback fixture for browser-only development against an already
+   migrated local database; prefer the script for full-stack E2E runs.
 
 ## Run
 

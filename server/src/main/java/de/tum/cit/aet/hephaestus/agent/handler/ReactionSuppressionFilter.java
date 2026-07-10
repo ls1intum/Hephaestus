@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -66,12 +66,12 @@ class ReactionSuppressionFilter {
     }
 
     /** Which findings to still deliver (escalated ones already rewritten) and how many were suppressed. */
-    record ReactionDecision(List<ValidatedFinding> deliverable, int suppressedCount) {}
+    record ReactionDecision(List<ValidatedObservation> deliverable, int suppressedCount) {}
 
     // Read-only tx: we run outside the handler's transaction and read scalar identity columns off the
     // persisted observations. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
-    public ReactionDecision evaluate(AgentJob job, List<ValidatedFinding> scopedFindings) {
+    public ReactionDecision evaluate(AgentJob job, List<ValidatedObservation> scopedFindings) {
         if (!reviewProperties.reactionSuppression()) {
             return new ReactionDecision(scopedFindings, 0);
         }
@@ -109,10 +109,10 @@ class ReactionSuppressionFilter {
             return new ReactionDecision(scopedFindings, 0);
         }
 
-        List<ValidatedFinding> deliverable = new ArrayList<>(scopedFindings.size());
+        List<ValidatedObservation> deliverable = new ArrayList<>(scopedFindings.size());
         int suppressed = 0;
         int suppressedIndex = 0;
-        for (ValidatedFinding vf : scopedFindings) {
+        for (ValidatedObservation vf : scopedFindings) {
             // Use the recurrence_key the handler already stamped from the value deliver() persisted (it runs
             // strictly after that stamp loop), so the match is provably identical to the persisted row a
             // reaction is keyed to — not a parallel recompute that could drift. A finding with no stamped key
@@ -157,12 +157,12 @@ class ReactionSuppressionFilter {
     }
 
     /** A copy of the finding with a stiffer opener, for a locus the student said was fixed but that recurs. */
-    private static ValidatedFinding withEscalatedReasoning(ValidatedFinding vf) {
+    private static ValidatedObservation withEscalatedReasoning(ValidatedObservation vf) {
         String prefix = "You previously marked this as fixed, but it is still present. ";
         String reasoning = vf.reasoning() == null || vf.reasoning().isBlank() ? prefix.trim() : prefix + vf.reasoning();
         // Preserve the correlation key the handler stamped on the input so the escalated copy keeps the same
         // cross-run identity as the locus it re-nags.
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             vf.practiceSlug(),
             vf.title(),
             vf.presence(),

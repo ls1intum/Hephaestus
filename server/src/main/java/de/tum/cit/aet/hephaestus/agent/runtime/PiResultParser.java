@@ -58,7 +58,7 @@ public class PiResultParser {
         }
 
         String rawContent = sanitizeSwiftEscapes(new String(resultFile, StandardCharsets.UTF_8));
-        if (isValidJsonWithFindings(rawContent)) {
+        if (isValidJsonWithObservations(rawContent)) {
             output.put("rawOutput", rawContent);
             return new AgentResult(success, output, usage);
         }
@@ -132,12 +132,12 @@ public class PiResultParser {
         }
         try {
             JsonNode root = objectMapper.readTree(reviewStateFile);
-            JsonNode findings = root.get("findings");
-            if (findings == null || !findings.isArray() || findings.isEmpty()) {
+            JsonNode observations = root.get("observations");
+            if (observations == null || !observations.isArray() || observations.isEmpty()) {
                 return null;
             }
             Map<String, Object> assembled = new LinkedHashMap<>();
-            assembled.put("findings", objectMapper.treeToValue(findings, Object.class));
+            assembled.put("observations", objectMapper.treeToValue(observations, Object.class));
             return objectMapper.writeValueAsBytes(assembled);
         } catch (JacksonException e) {
             recordFailure("review_state", e);
@@ -177,7 +177,7 @@ public class PiResultParser {
         return sb.toString();
     }
 
-    /** Find the first '{'…'}' object containing 'findings' (max {@value MAX_BRACE_ATTEMPTS} attempts). */
+    /** Find the first '{'…'}' object containing 'observations' (max {@value MAX_BRACE_ATTEMPTS} attempts). */
     String extractJsonFromText(String text) {
         int searchFrom = 0;
         char[] chars = text.toCharArray();
@@ -192,7 +192,7 @@ public class PiResultParser {
                 var parser = objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)
             ) {
                 JsonNode node = objectMapper.readTree(parser);
-                if (node != null && node.isObject() && node.has("findings")) {
+                if (node != null && node.isObject() && node.has("observations")) {
                     return objectMapper.writeValueAsString(node);
                 }
             } catch (JacksonException e) {
@@ -203,10 +203,10 @@ public class PiResultParser {
         return null;
     }
 
-    boolean isValidJsonWithFindings(String text) {
+    boolean isValidJsonWithObservations(String text) {
         try {
             JsonNode node = objectMapper.readTree(text);
-            return node != null && node.isObject() && node.has("findings");
+            return node != null && node.isObject() && node.has("observations");
         } catch (JacksonException e) {
             return false;
         }

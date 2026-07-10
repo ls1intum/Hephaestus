@@ -37,6 +37,8 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Per-developer practice reports and the anonymised cohort rollup
+  name: Practice Reports
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
 - description: Instance-admin account management
@@ -58,8 +60,6 @@ tags:
   name: webhook-controller
 - description: User profile and activity data
   name: Profile
-- description: Contributor rankings and league statistics
-  name: Leaderboard
 - description: Session lifecycle
   name: Auth
 - description: Active sessions
@@ -1519,161 +1519,6 @@ paths:
       summary: Update workspace feature flags
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/leaderboard:
-    get:
-      description: Creates a ranked contributor list for the specified time range
-      operationId: getLeaderboard
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: start of the time range (inclusive)
-        in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - description: end of the time range (exclusive)
-        in: query
-        name: before
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - description: Team filter to apply in INDIVIDUAL mode; ignored when mode is
-          TEAM.
-        in: query
-        name: team
-        required: true
-        schema:
-          type: string
-          minLength: 1
-      - description: Determines the ranking metric. In TEAM mode SCORE uses summed
-          contribution scores; LEAGUE_POINTS uses total league points.
-        in: query
-        name: sort
-        required: true
-        schema:
-          type: string
-          enum:
-          - SCORE
-          - LEAGUE_POINTS
-      - description: aggregation mode (INDIVIDUAL or TEAM)
-        in: query
-        name: mode
-        required: true
-        schema:
-          type: string
-          enum:
-          - INDIVIDUAL
-          - TEAM
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
-          description: ranked list of leaderboard entries
-      security: []
-      summary: Generate leaderboard
-      tags:
-      - Leaderboard
-  /workspaces/{workspaceSlug}/leaderboard-digest:
-    patch:
-      operationId: updateLeaderboardDigest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateLeaderboardDigestRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update the whole weekly leaderboard digest config (schedule + notifications)
-        atomically
-      tags:
-      - workspace
-  /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
-    get:
-      description: Computes projected league point changes for a specific user using
-        the global leaderboard
-      operationId: computeUserLeagueStats
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: the user's GitHub login
-        in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      - description: start of the time range (inclusive)
-        in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      - description: end of the time range (exclusive)
-        in: query
-        name: before
-        required: true
-        schema:
-          type: string
-          format: date-time
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeagueChange"
-          description: league change statistics including projected point delta
-      security: []
-      summary: Calculate user league stats
-      tags:
-      - Leaderboard
-  /workspaces/{workspaceSlug}/league/reset:
-    put:
-      operationId: resetAndRecalculateLeagues
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          description: OK
-      summary: Reset and recalculate workspace leagues
-      tags:
-      - workspace
   /workspaces/{workspaceSlug}/members:
     get:
       description: |-
@@ -1838,7 +1683,7 @@ paths:
     patch:
       description: |-
         Toggle the hidden flag for a workspace member.
-         Hidden members are excluded from the leaderboard.
+         Hidden members are excluded from the practice overview.
       operationId: updateMemberVisibility
       parameters:
       - description: Workspace slug
@@ -2018,33 +1863,6 @@ paths:
       summary: Upsert a vote on an assistant message
       tags:
       - Mentor Votes
-  /workspaces/{workspaceSlug}/notifications:
-    patch:
-      operationId: updateNotifications
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceNotificationsRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update leaderboard notification preferences
-      tags:
-      - workspace
   /workspaces/{workspaceSlug}/practice-areas:
     get:
       description: Returns the workspace's practice areas
@@ -2286,6 +2104,39 @@ paths:
       summary: Create a new practice definition
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/cohort:
+    get:
+      description: "Per reviewing practice, how many developers stand at each status\
+        \ (k-anonymised, K=5 with small-bucket suppression). Admins/owners always;\
+        \ members only when the workspace cohort visibility is EVERYONE."
+      operationId: getCohortPracticeStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CohortPracticeStatus"
+          description: Cohort status cards returned
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Not permitted for this cohort visibility
+      security: []
+      summary: Cohort practice status
+      tags:
+      - Practice Reports
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
     get:
       description: Returns the current user's reaction action counts across all feedback
@@ -2495,39 +2346,10 @@ paths:
       summary: List observations for a pull request
       tags:
       - Practice Observations
-  /workspaces/{workspaceSlug}/practices/observations/reflection:
-    get:
-      description: "Per-practice cards a developer can READ — why the practice matters,\
-        \ what good looks like, where they stand, the specific feedback to act on,\
-        \ and what they already do well. The third feedback channel alongside in-context\
-        \ SCM notes and the conversational mentor; the same findings reorganised by\
-        \ practice for self-paced reflection, not a scoreboard of counts."
-      operationId: getReflection
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ReflectionPractice"
-          description: Per-practice reflection cards returned
-      security: []
-      summary: Reflective dashboard feedback for the current developer
-      tags:
-      - Practice Observations
   /workspaces/{workspaceSlug}/practices/observations/summary:
     get:
       description: Aggregated observation counts per practice for dashboard cards
-      operationId: getSummary
+      operationId: getMyPracticeSummary
       parameters:
       - description: Workspace slug
         in: path
@@ -2613,6 +2435,119 @@ paths:
       summary: Reorder the practices within an area
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/reports:
+    get:
+      description: "One summary per developer with activity in the window: per-practice\
+        \ status + a needs-attention triage flag. Sorted needs-attention-first then\
+        \ login. Not a scoreboard — no score/rank."
+      operationId: listPracticeReports
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeReportSummary"
+          description: Report summaries returned
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Requires workspace ADMIN or OWNER
+      security: []
+      summary: List developer practice reports (admin/owner only)
+      tags:
+      - Practice Reports
+  /workspaces/{workspaceSlug}/practices/reports/me:
+    get:
+      description: "Per-practice cards a developer can READ — why the practice matters,\
+        \ what good looks like, where they stand, the specific feedback to act on,\
+        \ and what they already do well. The third feedback channel alongside in-context\
+        \ SCM notes and the conversational mentor; the same findings reorganised by\
+        \ practice for self-paced reflection."
+      operationId: getMyPracticeReport
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeReportCard"
+          description: Per-practice report cards returned
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Requires a synced developer identity in this workspace
+      security: []
+      summary: The current developer's own practice report
+      tags:
+      - Practice Reports
+  /workspaces/{workspaceSlug}/practices/reports/{userId}:
+    get:
+      description: "The developer's own practice report cards, for a mentor. Records\
+        \ an append-only transparency audit row (actor → subject) for compliance."
+      operationId: getDeveloperPracticeReport
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeReportCard"
+          description: Report cards for the developer returned
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Requires workspace ADMIN or OWNER
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No current-cycle report subject exists for this user in the
+            workspace
+      security: []
+      summary: Per-developer practice report drill-down (admin/owner only)
+      tags:
+      - Practice Reports
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -2770,8 +2705,8 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
-      description: "Returns user profile with workspace-scoped activity data including\
-        \ open PRs, review activity, and league points"
+      description: Returns user profile with workspace-scoped activity data including
+        open PRs and review activity
       operationId: getUserProfile
       parameters:
       - description: Workspace slug
@@ -2962,9 +2897,9 @@ paths:
       summary: Add a repository to a workspace monitor list
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/schedule:
+  /workspaces/{workspaceSlug}/review-cycle:
     patch:
-      operationId: updateSchedule
+      operationId: updateReviewCycle
       parameters:
       - description: Workspace slug
         in: path
@@ -2977,7 +2912,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateWorkspaceScheduleRequest"
+              $ref: "#/components/schemas/UpdateReviewCycleRequest"
         required: true
       responses:
         "200":
@@ -2986,7 +2921,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Workspace"
           description: Workspace updated
-      summary: Update leaderboard schedule configuration
+      summary: Update the weekly practice review cycle schedule
       tags:
       - workspace
   /workspaces/{workspaceSlug}/slug:
@@ -3070,7 +3005,7 @@ paths:
       - Teams
   /workspaces/{workspaceSlug}/team/{id}/visibility:
     post:
-      description: Show or hide a team in leaderboard calculations
+      description: Show or hide a team in the practice overview
       operationId: updateTeamVisibility
       parameters:
       - description: Workspace slug
@@ -4209,6 +4144,41 @@ components:
           format: uuid
         title:
           type: string
+    CohortPracticeStatus:
+      type: object
+      description: "Cohort standing distribution for one reviewing practice (k-anonymised,\
+        \ never per-person)"
+      properties:
+        developingCount:
+          type: integer
+          format: int32
+          description: Developers standing at DEVELOPING (null when suppressed)
+        mixedCount:
+          type: integer
+          format: int32
+          description: Developers standing at MIXED (null when suppressed)
+        name:
+          type: string
+          description: Practice name
+        noActivityCount:
+          type: integer
+          format: int32
+          description: Developers with activity but no problems/strengths this window
+            (null when suppressed)
+        slug:
+          type: string
+          description: Practice slug
+        strengthCount:
+          type: integer
+          format: int32
+          description: Developers standing at STRENGTH (null when suppressed)
+        suppressed:
+          type: boolean
+          description: "True when suppressed for k-anonymity (< 5 developers active,\
+            \ or a non-zero bucket has < 5)"
+      required:
+      - name
+      - slug
     ConnectionAuditEntry:
       type: object
       description: |-
@@ -5007,122 +4977,6 @@ components:
       - color
       - id
       - name
-    LeaderboardEntry:
-      type: object
-      description: A ranked entry in the leaderboard (individual or team)
-      properties:
-        numberOfApprovals:
-          type: integer
-          format: int32
-          description: Count of review approvals
-          example: 3
-        numberOfChangeRequests:
-          type: integer
-          format: int32
-          description: Count of change requests submitted
-          example: 1
-        numberOfClosedIssues:
-          type: integer
-          format: int32
-          description: Count of issues closed in the timeframe
-          example: 2
-        numberOfClosedPullRequests:
-          type: integer
-          format: int32
-          description: Count of authored pull requests closed without merge in the
-            timeframe
-          example: 1
-        numberOfCodeComments:
-          type: integer
-          format: int32
-          description: Count of scored inline feedback comments on pull requests authored
-            by someone else
-          example: 7
-        numberOfComments:
-          type: integer
-          format: int32
-          description: Count of comment-only review submissions
-          example: 10
-        numberOfMergedPullRequests:
-          type: integer
-          format: int32
-          description: Count of authored pull requests merged in the timeframe
-          example: 6
-        numberOfOpenPullRequests:
-          type: integer
-          format: int32
-          description: Count of authored pull requests opened in the timeframe that
-            are still open
-          example: 2
-        numberOfOpenedIssues:
-          type: integer
-          format: int32
-          description: Count of issues opened in the timeframe
-          example: 3
-        numberOfOwnReplies:
-          type: integer
-          format: int32
-          description: Count of visible-only discussion replies and inline thread
-            replies on the contributor's own pull requests
-          example: 4
-        numberOfReviewedPRs:
-          type: integer
-          format: int32
-          description: Count of distinct PRs reviewed
-          example: 5
-        numberOfUnknowns:
-          type: integer
-          format: int32
-          description: Count of reviews with unknown/unrecognized state
-          example: 0
-        rank:
-          type: integer
-          format: int32
-          description: Position in the leaderboard (1-based)
-          example: 1
-        reviewedPullRequests:
-          type: array
-          description: Sample of reviewed PRs for display
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        score:
-          type: integer
-          format: int32
-          description: Total XP score for the timeframe
-          example: 150
-        team:
-          $ref: "#/components/schemas/TeamInfo"
-          description: "Team info (populated in TEAM mode, null in INDIVIDUAL mode)"
-        user:
-          $ref: "#/components/schemas/UserInfo"
-          description: "User info (populated in INDIVIDUAL mode, null in TEAM mode)"
-      required:
-      - numberOfApprovals
-      - numberOfChangeRequests
-      - numberOfClosedIssues
-      - numberOfClosedPullRequests
-      - numberOfCodeComments
-      - numberOfComments
-      - numberOfMergedPullRequests
-      - numberOfOpenPullRequests
-      - numberOfOpenedIssues
-      - numberOfOwnReplies
-      - numberOfReviewedPRs
-      - numberOfUnknowns
-      - rank
-      - reviewedPullRequests
-      - score
-    LeagueChange:
-      type: object
-      properties:
-        leaguePointsChange:
-          type: integer
-          format: int32
-        login:
-          type: string
-      required:
-      - leaguePointsChange
-      - login
     LearnerPractice:
       type: object
       description: Learner-facing view of a practice — criteria absent by construction
@@ -5575,10 +5429,191 @@ components:
       - id
       - name
       - slug
+    PracticeReportCard:
+      type: object
+      description: A developer's readable feedback for one practice
+      properties:
+        areaName:
+          type: string
+          description: "Area name this practice belongs to, if any"
+        areaSlug:
+          type: string
+          description: "Area slug this practice belongs to, if any"
+        name:
+          type: string
+          description: Practice name
+        slug:
+          type: string
+          description: Practice slug
+        standing:
+          type: string
+          description: Where the developer stands on this practice
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+        strengths:
+          type: array
+          description: What the developer already does well here
+          items:
+            $ref: "#/components/schemas/PracticeReportItem"
+        toWorkOn:
+          type: array
+          description: Specific feedback to act on (highest-impact first)
+          items:
+            $ref: "#/components/schemas/PracticeReportItem"
+        whatGoodLooksLike:
+          type: string
+          description: A concrete picture of doing this well
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in plain language"
+      required:
+      - name
+      - slug
+      - standing
+      - strengths
+      - toWorkOn
+    PracticeReportItem:
+      type: object
+      description: A single piece of practice feedback to read and act on
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Id of the PR / issue this is about
+        artifactType:
+          type: string
+          description: The kind of work this is about (PR / issue)
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+        guidance:
+          type: string
+          description: What to do — the delivered feedback for this observation (null
+            if nothing was delivered)
+        locator:
+          type: string
+          description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
+            \ known"
+        observationId:
+          type: string
+          format: uuid
+          description: Observation id — handle to open the full detail
+        severity:
+          type: string
+          description: Impact level (null unless assessed BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+          description: The headline of the feedback
+      required:
+      - artifactId
+      - artifactType
+      - observationId
+      - title
+    PracticeReportSummary:
+      type: object
+      description: "A developer on the mentor roster (admin/owner-only; a triage view,\
+        \ never a ranking)"
+      properties:
+        attentionReasons:
+          type: array
+          description: Plain-language reasons behind needsAttention (empty when none)
+          items:
+            type: string
+        avatarUrl:
+          type: string
+          description: Developer avatar URL
+        name:
+          type: string
+          description: Developer display name (may be null; UI falls back to login)
+        needsAttention:
+          type: boolean
+          description: Whether the developer has unresolved gaps a mentor should look
+            at (a triage flag)
+        standings:
+          type: array
+          description: The developer's standing on each reviewing practice
+          items:
+            $ref: "#/components/schemas/PracticeStatusCell"
+        userId:
+          type: integer
+          format: int64
+          description: Stable SCM user id for drill-down calls
+        userLogin:
+          type: string
+          description: Developer login
+      required:
+      - attentionReasons
+      - avatarUrl
+      - standings
+      - userId
+      - userLogin
+    PracticeStatusCell:
+      type: object
+      description: A developer's standing on one reviewing practice
+      properties:
+        name:
+          type: string
+          description: Practice name
+        slug:
+          type: string
+          description: Practice slug
+        standing:
+          type: string
+          description: "Where the developer stands on this practice (criterion-referenced,\
+            \ not a rank)"
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NO_ACTIVITY
+      required:
+      - name
+      - slug
+      - standing
+    ProblemDetail:
+      type: object
+      description: RFC 7807 / RFC 9457 problem detail response
+      properties:
+        detail:
+          type: string
+          description: Human-readable detail
+          example: Workspace ADMIN or OWNER is required
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: "Validation errors keyed by field name, when present"
+        instance:
+          type: string
+          format: uri
+          description: Request instance URI
+          example: /workspaces/demo/practices/reports
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code
+          example: 403
+        title:
+          type: string
+          description: "Short, human-readable summary"
+          example: Forbidden
+        type:
+          type: string
+          format: uri
+          description: Problem type URI
+          example: about:blank
     Profile:
       type: object
-      description: "User profile header: identity, league standing, contribution surface,\
-        \ XP"
+      description: "User profile header: identity and contribution surface"
       properties:
         contributedRepositories:
           type: array
@@ -5592,13 +5627,9 @@ components:
         userInfo:
           $ref: "#/components/schemas/UserInfo"
           description: Basic information about the user
-        xpRecord:
-          $ref: "#/components/schemas/ProfileXpRecord"
-          description: XP progress information for the users' profile
       required:
       - contributedRepositories
       - userInfo
-      - xpRecord
     ProfileActivityMonitor:
       type: object
       description: Configurable activity monitor data for a contributor profile
@@ -5641,7 +5672,7 @@ components:
       - totalReviewActivityCount
     ProfileActivityStats:
       type: object
-      description: Aggregated activity statistics with XP scores for a user profile
+      description: Aggregated activity statistics for a user profile
       properties:
         numberOfApprovals:
           type: integer
@@ -5707,11 +5738,6 @@ components:
           format: int32
           description: Number of reviews with unknown state
           example: 0
-        score:
-          type: integer
-          format: int32
-          description: Total XP score
-          example: 1250
       required:
       - numberOfApprovals
       - numberOfChangeRequests
@@ -5725,10 +5751,9 @@ components:
       - numberOfOwnReplies
       - numberOfReviewedPRs
       - numberOfUnknowns
-      - score
     ProfileReviewActivity:
       type: object
-      description: A scored review activity entry with XP score for profile display
+      description: A review activity entry for profile display
       properties:
         author:
           $ref: "#/components/schemas/UserInfo"
@@ -5751,11 +5776,6 @@ components:
         pullRequest:
           $ref: "#/components/schemas/PullRequestBaseInfo"
           description: Pull request that was reviewed
-        score:
-          type: integer
-          format: int32
-          description: XP score earned for this review
-          example: 25
         state:
           type: string
           description: "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED,\
@@ -5776,38 +5796,8 @@ components:
       - htmlUrl
       - id
       - isDismissed
-      - score
       - state
       - submittedAt
-    ProfileXpRecord:
-      type: object
-      description: User's XP and Level progress details
-      properties:
-        currentLevel:
-          type: integer
-          format: int32
-          description: Current calculated level
-          example: 5
-        currentLevelXP:
-          type: integer
-          format: int64
-          description: XP accumulated in the current level
-          example: 450
-        totalXP:
-          type: integer
-          format: int64
-          description: Overall total XP accumulated
-          example: 5450
-        xpNeeded:
-          type: integer
-          format: int64
-          description: XP needed to reach the next level
-          example: 1000
-      required:
-      - currentLevel
-      - currentLevelXP
-      - totalXP
-      - xpNeeded
     PullRequestBaseInfo:
       type: object
       description: Basic information about a pull request
@@ -5996,93 +5986,6 @@ components:
       - addressed
       - disputed
       - notApplicable
-    ReflectionItem:
-      type: object
-      description: A single piece of practice feedback to read and act on
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Id of the PR / issue this is about
-        artifactType:
-          type: string
-          description: The kind of work this is about (PR / issue)
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-        guidance:
-          type: string
-          description: What to do — the delivered feedback for this observation (null
-            if nothing was delivered)
-        locator:
-          type: string
-          description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
-            \ known"
-        observationId:
-          type: string
-          format: uuid
-          description: Observation id — handle to open the full detail
-        severity:
-          type: string
-          description: Impact level (null unless assessed BAD)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        title:
-          type: string
-          description: The headline of the feedback
-      required:
-      - artifactId
-      - artifactType
-      - observationId
-      - title
-    ReflectionPractice:
-      type: object
-      description: A developer's readable feedback for one practice
-      properties:
-        areaName:
-          type: string
-          description: "Area name this practice belongs to, if any"
-        areaSlug:
-          type: string
-          description: "Area slug this practice belongs to, if any"
-        name:
-          type: string
-          description: Practice name
-        slug:
-          type: string
-          description: Practice slug
-        standing:
-          type: string
-          description: Where the developer stands on this practice
-          enum:
-          - DEVELOPING
-          - STRENGTH
-          - MIXED
-        strengths:
-          type: array
-          description: What the developer already does well here
-          items:
-            $ref: "#/components/schemas/ReflectionItem"
-        toWorkOn:
-          type: array
-          description: Specific feedback to act on (highest-impact first)
-          items:
-            $ref: "#/components/schemas/ReflectionItem"
-        whatGoodLooksLike:
-          type: string
-          description: A concrete picture of doing this well
-        whyItMatters:
-          type: string
-          description: "Why this practice matters, in plain language"
-      required:
-      - name
-      - slug
-      - standing
-      - strengths
-      - toWorkOn
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -6144,7 +6047,7 @@ components:
         hiddenFromContributions:
           type: boolean
           description: Whether contributions from this repository are hidden from
-            leaderboard calculations
+            the practice overview
         htmlUrl:
           type: string
           description: URL to the repository on the git provider
@@ -6232,7 +6135,7 @@ components:
           description: Description of the team
         hidden:
           type: boolean
-          description: Whether the team is hidden from leaderboard display
+          description: Whether the team is hidden from the practice overview display
         htmlUrl:
           type: string
           description: URL to the team's page on the git provider
@@ -6297,7 +6200,7 @@ components:
           description: Description of the team
         hidden:
           type: boolean
-          description: Whether the team is hidden from leaderboard display
+          description: Whether the team is hidden from the practice overview display
         htmlUrl:
           type: string
           description: URL to the team's page on the git provider
@@ -6413,37 +6316,6 @@ components:
           - UNINSTALLED
       required:
       - state
-    UpdateLeaderboardDigestRequest:
-      type: object
-      description: Request to update the entire weekly leaderboard digest configuration
-        atomically
-      properties:
-        channelId:
-          type: string
-          description: Slack channel ID for notifications
-          example: C01234567AB
-          pattern: "^[CGD][A-Z0-9]{8,}$"
-        day:
-          type: integer
-          format: int32
-          description: "Day of week (1=Monday, 7=Sunday)"
-          example: 1
-          maximum: 7
-          minimum: 1
-        enabled:
-          type: boolean
-          description: Whether leaderboard notifications are enabled
-        team:
-          type: string
-          description: Team name for filtering leaderboard notifications
-        time:
-          type: string
-          description: Time in 24-hour format (HH:mm)
-          example: 09:00
-          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
-      required:
-      - day
-      - time
     UpdateLoginProviderRequest:
       type: object
       properties:
@@ -6597,74 +6469,12 @@ components:
         hiddenFromContributions:
           type: boolean
           description: Whether contributions from this repository should be hidden
-            from leaderboard calculations
+            from the practice overview
       required:
       - hiddenFromContributions
-    UpdateTeamSettingsRequest:
+    UpdateReviewCycleRequest:
       type: object
-      description: Request to update team visibility settings in a workspace
-      properties:
-        hidden:
-          type: boolean
-          description: Whether the team should be hidden from the leaderboard
-      required:
-      - hidden
-    UpdateWorkspaceFeaturesRequest:
-      type: object
-      description: Request to update workspace feature flags. Null fields are left
-        unchanged.
-      properties:
-        achievementsEnabled:
-          type: boolean
-          description: Enable the achievements system
-        leaderboardEnabled:
-          type: boolean
-          description: Enable the leaderboard ranking page
-        leaguesEnabled:
-          type: boolean
-          description: Enable league tiers and rankings
-        mentorEnabled:
-          type: boolean
-          description: Enable the Pi mentor chat feature
-        practiceReviewAutoTriggerEnabled:
-          type: boolean
-          description: Enable automatic practice reviews triggered by PR events
-        practiceReviewManualTriggerEnabled:
-          type: boolean
-          description: Enable manual practice reviews triggered via bot command
-        practicesEnabled:
-          type: boolean
-          description: Enable the practice review feature
-        progressionEnabled:
-          type: boolean
-          description: Enable the league/progression system
-    UpdateWorkspaceNotificationsRequest:
-      type: object
-      description: Request to update leaderboard notification settings
-      properties:
-        channelId:
-          type: string
-          description: Slack channel ID for notifications
-          example: C01234567AB
-          pattern: "^[CGD][A-Z0-9]{8,}$"
-        enabled:
-          type: boolean
-          description: Whether leaderboard notifications are enabled
-        team:
-          type: string
-          description: Team name for filtering leaderboard notifications
-    UpdateWorkspacePublicVisibilityRequest:
-      type: object
-      description: Request to update workspace public visibility setting
-      properties:
-        isPubliclyViewable:
-          type: boolean
-          description: Whether the workspace should be publicly viewable without authentication
-      required:
-      - isPubliclyViewable
-    UpdateWorkspaceScheduleRequest:
-      type: object
-      description: Request to update the leaderboard notification schedule
+      description: Request to update the weekly practice review cycle schedule
       properties:
         day:
           type: integer
@@ -6681,6 +6491,51 @@ components:
       required:
       - day
       - time
+    UpdateTeamSettingsRequest:
+      type: object
+      description: Request to update team visibility settings in a workspace
+      properties:
+        hidden:
+          type: boolean
+          description: Whether the team should be hidden from the practice overview
+      required:
+      - hidden
+    UpdateWorkspaceFeaturesRequest:
+      type: object
+      description: Request to update workspace feature flags. Null fields are left
+        unchanged.
+      properties:
+        achievementsEnabled:
+          type: boolean
+          description: Enable the achievements system
+        cohortVisibility:
+          type: string
+          description: "Audience for the k-anonymised cohort aggregate on the practice\
+            \ overview (MENTORS_ONLY, EVERYONE)"
+          enum:
+          - MENTORS_ONLY
+          - EVERYONE
+        mentorEnabled:
+          type: boolean
+          description: Enable the Pi mentor chat feature
+        practiceReviewAutoTriggerEnabled:
+          type: boolean
+          description: Enable automatic practice reviews triggered by PR events
+        practiceReviewManualTriggerEnabled:
+          type: boolean
+          description: Enable manual practice reviews triggered via bot command
+        practicesEnabled:
+          type: boolean
+          description: Enable the practice review feature
+    UpdateWorkspacePublicVisibilityRequest:
+      type: object
+      description: Request to update workspace public visibility setting
+      properties:
+        isPubliclyViewable:
+          type: boolean
+          description: Whether the workspace should be publicly viewable without authentication
+      required:
+      - isPubliclyViewable
     UpdateWorkspaceStatusRequest:
       type: object
       description: Request to update the workspace lifecycle status
@@ -6721,11 +6576,6 @@ components:
           type: integer
           format: int64
           description: Unique identifier of the user
-        leaguePoints:
-          type: integer
-          format: int32
-          description: League points earned by the user in the current scope
-          example: 150
         login:
           type: string
           description: Login/username of the user
@@ -6789,6 +6639,13 @@ components:
         achievementsEnabled:
           type: boolean
           description: Whether the achievements system is enabled
+        cohortVisibility:
+          type: string
+          description: "Audience for the k-anonymised cohort aggregate on the practice\
+            \ overview (MENTORS_ONLY, EVERYONE)"
+          enum:
+          - MENTORS_ONLY
+          - EVERYONE
         createdAt:
           type: string
           format: date-time
@@ -6824,30 +6681,6 @@ components:
         kind:
           type: string
           description: Integration kind backing this workspace (GITHUB or GITLAB)
-        leaderboardEnabled:
-          type: boolean
-          description: Whether the leaderboard is enabled
-        leaderboardNotificationChannelId:
-          type: string
-          description: Slack channel ID for leaderboard notifications
-        leaderboardNotificationEnabled:
-          type: boolean
-          description: Whether leaderboard notifications are enabled
-        leaderboardNotificationTeam:
-          type: string
-          description: Team name for leaderboard notifications
-        leaderboardScheduleDay:
-          type: integer
-          format: int32
-          description: "Day of week for leaderboard notifications (1=Monday, 7=Sunday)"
-          example: 1
-        leaderboardScheduleTime:
-          type: string
-          description: Time for leaderboard notifications in HH:mm format
-          example: 09:00
-        leaguesEnabled:
-          type: boolean
-          description: Whether league tiers and rankings are enabled
         mentorEnabled:
           type: boolean
           description: Whether the Pi mentor chat feature is enabled
@@ -6862,9 +6695,6 @@ components:
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
-        progressionEnabled:
-          type: boolean
-          description: Whether the league/progression system is enabled
         providerType:
           type: string
           description: High-level git provider type for the workspace's SCM connection
@@ -6872,6 +6702,16 @@ components:
           enum:
           - GITHUB
           - GITLAB
+        reviewCycleDay:
+          type: integer
+          format: int32
+          description: "Day of week for the weekly practice review cycle (1=Monday,\
+            \ 7=Sunday)"
+          example: 2
+        reviewCycleTime:
+          type: string
+          description: Time for the weekly practice review cycle in HH:mm format
+          example: 09:00
         serverUrl:
           type: string
           description: Custom server URL for self-hosted instances (null for cloud
@@ -6896,6 +6736,7 @@ components:
       required:
       - accountLogin
       - achievementsEnabled
+      - cohortVisibility
       - createdAt
       - displayName
       - gitlabWebhookRegistered
@@ -6903,13 +6744,10 @@ components:
       - hasSlackToken
       - id
       - isPubliclyViewable
-      - leaderboardEnabled
-      - leaguesEnabled
       - mentorEnabled
       - practiceReviewAutoTriggerEnabled
       - practiceReviewManualTriggerEnabled
       - practicesEnabled
-      - progressionEnabled
       - status
       - updatedAt
       - workspaceSlug
@@ -6923,6 +6761,13 @@ components:
         achievementsEnabled:
           type: boolean
           description: Whether the achievements system is enabled
+        cohortVisibility:
+          type: string
+          description: Audience for the k-anonymised cohort aggregate on the practice
+            overview
+          enum:
+          - MENTORS_ONLY
+          - EVERYONE
         createdAt:
           type: string
           format: date-time
@@ -6934,21 +6779,12 @@ components:
           type: integer
           format: int64
           description: Unique identifier of the workspace
-        leaderboardEnabled:
-          type: boolean
-          description: Whether the leaderboard is enabled
-        leaguesEnabled:
-          type: boolean
-          description: Whether league tiers and rankings are enabled
         mentorEnabled:
           type: boolean
           description: Whether the Pi mentor chat feature is enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
-        progressionEnabled:
-          type: boolean
-          description: Whether the league/progression system is enabled
         providerType:
           type: string
           description: "High-level git provider type (GITHUB or GITLAB), or null if\
@@ -6967,14 +6803,12 @@ components:
       required:
       - accountLogin
       - achievementsEnabled
+      - cohortVisibility
       - createdAt
       - displayName
       - id
-      - leaderboardEnabled
-      - leaguesEnabled
       - mentorEnabled
       - practicesEnabled
-      - progressionEnabled
       - status
       - workspaceSlug
     WorkspaceMembership:
@@ -6987,12 +6821,7 @@ components:
           description: Timestamp when the membership was created
         hidden:
           type: boolean
-          description: Whether the member is hidden from the leaderboard
-        leaguePoints:
-          type: integer
-          format: int32
-          description: League points earned by the user in this workspace
-          example: 150
+          description: Whether the member is hidden from the practice roster / overview
         role:
           type: string
           description: "Role of the user in this workspace (OWNER, ADMIN, MEMBER)"
@@ -7035,7 +6864,7 @@ components:
         hiddenFromContributions:
           type: boolean
           description: Whether contributions from this repository are hidden from
-            leaderboard calculations
+            the practice overview
         repositoryId:
           type: integer
           format: int64
@@ -7059,7 +6888,8 @@ components:
       properties:
         hidden:
           type: boolean
-          description: Whether the team is hidden in the leaderboard for this workspace
+          description: Whether the team is hidden from the practice overview for this
+            workspace
         teamId:
           type: integer
           format: int64

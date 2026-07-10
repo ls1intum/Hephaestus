@@ -1,17 +1,17 @@
 import { CodeReviewIcon } from "@primer/octicons-react";
 import { ArrowRightIcon } from "lucide-react";
 import type { ProfileActivityMonitor, PullRequestBaseInfo } from "@/api/types.gen";
-import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
 import { type ActivityMonitorFilters, MAX_ACTIVITY_MONITOR_LIMIT } from "@/lib/activity-monitor";
 import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
-import type { LeaderboardSchedule } from "@/lib/timeframe";
-import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
+import type { ReviewCycleSchedule } from "@/lib/timeframe";
 import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
+import { ActivityBadges } from "./ActivityBadges";
 import { ActivityMonitorConfiguration } from "./ActivityMonitorConfiguration";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
+import type { ReviewedPullRequest } from "./ReviewsPopover";
 
 export interface ProfileContentProps {
 	providerType?: ProviderType;
@@ -26,7 +26,7 @@ export interface ProfileContentProps {
 	afterDate?: string;
 	beforeDate?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	schedule?: LeaderboardSchedule;
+	schedule?: ReviewCycleSchedule;
 }
 
 export function ProfileContent({
@@ -46,9 +46,7 @@ export function ProfileContent({
 	const stats = activityMonitorData?.activityStats;
 	const repositories = activityMonitorData?.repositories ?? [];
 
-	const reviewActivity = (activityMonitorData?.reviewActivity ?? []).filter(
-		(activity) => (activity.score ?? 0) > 0,
-	);
+	const reviewActivity = activityMonitorData?.reviewActivity ?? [];
 	const pullRequests = activityMonitorData?.authoredPullRequests ?? [];
 	const totalReviewActivityCount = activityMonitorData?.totalReviewActivityCount ?? 0;
 	const totalAuthoredPullRequestCount = activityMonitorData?.totalAuthoredPullRequestCount ?? 0;
@@ -129,7 +127,6 @@ export function ProfileContent({
 									htmlUrl={activity.htmlUrl}
 									pullRequest={activity.pullRequest}
 									repositoryName={activity.pullRequest?.repository?.name}
-									score={activity.score}
 									providerType={providerType}
 								/>
 							))
@@ -139,8 +136,8 @@ export function ProfileContent({
 								title="No review activity"
 								description={
 									currUserIsDashboardUser
-										? `No review activity that counts yet. Try a wider timeframe.`
-										: `${displayName || username} has no review activity that counts in this timeframe.`
+										? `No review activity yet. Try a wider timeframe.`
+										: `${displayName || username} has no review activity in this timeframe.`
 								}
 							/>
 						)}

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -24,9 +25,9 @@ public record WorkspaceListItemDTO(
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
     @NonNull @Schema(description = "Whether the Pi mentor chat feature is enabled") Boolean mentorEnabled,
     @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
-    @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
-    @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled,
-    @NonNull @Schema(description = "Whether league tiers and rankings are enabled") Boolean leaguesEnabled
+    @NonNull
+    @Schema(description = "Audience for the k-anonymised cohort aggregate on the practice overview")
+    CohortVisibility cohortVisibility
 ) {
     public static WorkspaceListItemDTO from(Workspace workspace, ConnectionService connectionService) {
         GitProviderType providerType = connectionService
@@ -44,9 +45,7 @@ public record WorkspaceListItemDTO(
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getMentorEnabled(),
             workspace.getFeatures().getAchievementsEnabled(),
-            workspace.getFeatures().getLeaderboardEnabled(),
-            workspace.getFeatures().getProgressionEnabled(),
-            workspace.getFeatures().getLeaguesEnabled()
+            workspace.getFeatures().getCohortVisibility()
         );
     }
 }

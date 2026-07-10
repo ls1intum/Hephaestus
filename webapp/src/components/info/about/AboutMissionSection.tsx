@@ -6,10 +6,10 @@ const FEATURES_DATA: FeatureData[] = [
 	{
 		icon: Code,
 		badge: "Core Feature",
-		title: "Code Review Gamification",
-		description: "Turning technical work into team growth",
+		title: "Practice Feedback",
+		description: "Turning technical work into personal growth",
 		content:
-			"Transform code reviews into engaging experiences with dynamic leaderboards, team competitions, and a structured league system that recognizes excellence and encourages participation from developers at all skill levels.",
+			"Transform code reviews into personal, practice-by-practice feedback on each developer's own work, with a mentoring overview across the cohort. It highlights strengths and what to work on — growth signals for everyone, never scores or rankings.",
 	},
 	{
 		icon: Sparkles,

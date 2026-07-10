@@ -1,119 +1,41 @@
 import { ChevronDown } from "lucide-react";
-import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
-import aliceAvatar from "@/assets/alice_developer.jpg";
-import bobAvatar from "@/assets/bob_builder.jpg";
-import charlieAvatar from "@/assets/charlie_coder.jpg";
+import type { PracticeReportCard } from "@/api/types.gen";
 import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
-import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { PracticeReflectionCard } from "@/components/practices/reflection/PracticeReflectionCard";
 import { Button } from "@/components/ui/button";
 
-function createMockReviewedPullRequest(amount: number) {
-	return Array.from(
-		{ length: amount },
-		() =>
-			({
-				id: 1,
-				title: "Fix bug in user authentication",
-				number: 42,
-				htmlUrl: "https://example.com/pull/42",
-				state: "CLOSED",
-				isDraft: false,
-				isMerged: true,
-				commentsCount: 5,
-				createdAt: new Date("2023-01-01T00:00:00Z"),
-				updatedAt: new Date("2023-01-02T00:00:00Z"),
-				additions: 10,
-				deletions: 2,
-				repository: {
-					id: 1,
-					name: "example/repo",
-					nameWithOwner: "example/repo",
-					htmlUrl: "https://example.com/repo",
-					hiddenFromContributions: false,
-				},
-			}) satisfies PullRequestInfo,
-	);
-}
-
-// Sample data for the leaderboard preview
-const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
-	{
-		rank: 1,
-		score: 520,
-		user: {
-			id: 0,
-			leaguePoints: 2000,
-			login: "codeMaster",
-			avatarUrl: aliceAvatar,
-			name: "Alice Developer",
-			htmlUrl: "https://example.com/alice",
+// Sample practice reflection for the marketing preview — non-competitive, no scores or ranks.
+const SAMPLE_PRACTICE: PracticeReportCard = {
+	name: "Write a clear pull request description",
+	areaName: "Pull requests",
+	slug: "clear-pr-description",
+	standing: "DEVELOPING",
+	whyItMatters:
+		"A clear description helps reviewers understand the change quickly and gives future readers the context behind it.",
+	strengths: [
+		{
+			artifactId: 42,
+			artifactType: "PULL_REQUEST",
+			observationId: "sample-strength-1",
+			title: "Explained the user-facing impact up front",
+			guidance: "You opened with what changes for the user — reviewers get oriented fast.",
+			locator: "PR #42",
+			severity: "INFO",
 		},
-		numberOfReviewedPRs: 15,
-		numberOfApprovals: 8,
-		numberOfChangeRequests: 3,
-		numberOfComments: 4,
-		numberOfCodeComments: 6,
-		numberOfOwnReplies: 2,
-		numberOfOpenPullRequests: 1,
-		numberOfMergedPullRequests: 3,
-		numberOfClosedPullRequests: 0,
-		numberOfOpenedIssues: 2,
-		numberOfClosedIssues: 1,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(12),
-	},
-	{
-		rank: 2,
-		score: 431,
-		user: {
-			id: 1,
-			leaguePoints: 1000,
-			login: "devWizard",
-			avatarUrl: bobAvatar,
-			name: "Bob Builder",
-			htmlUrl: "https://example.com/bob",
+	],
+	toWorkOn: [
+		{
+			artifactId: 42,
+			artifactType: "PULL_REQUEST",
+			observationId: "sample-work-1",
+			title: "Link the issue this pull request closes",
+			guidance: "Add a closing keyword (e.g. “Closes #17”) so the issue and PR stay connected.",
+			locator: "PR #42",
+			severity: "MINOR",
 		},
-		numberOfReviewedPRs: 12,
-		numberOfApprovals: 5,
-		numberOfChangeRequests: 2,
-		numberOfComments: 5,
-		numberOfCodeComments: 3,
-		numberOfOwnReplies: 1,
-		numberOfOpenPullRequests: 2,
-		numberOfMergedPullRequests: 1,
-		numberOfClosedPullRequests: 1,
-		numberOfOpenedIssues: 1,
-		numberOfClosedIssues: 0,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(5),
-	},
-	{
-		rank: 3,
-		score: 302,
-		user: {
-			id: 2,
-			leaguePoints: 1500,
-			login: "codeNinja",
-			avatarUrl: charlieAvatar,
-			name: "Charlie Coder",
-			htmlUrl: "https://example.com/charlie",
-		},
-		numberOfReviewedPRs: 9,
-		numberOfApprovals: 4,
-		numberOfChangeRequests: 1,
-		numberOfComments: 4,
-		numberOfCodeComments: 2,
-		numberOfOwnReplies: 0,
-		numberOfOpenPullRequests: 1,
-		numberOfMergedPullRequests: 1,
-		numberOfClosedPullRequests: 0,
-		numberOfOpenedIssues: 0,
-		numberOfClosedIssues: 1,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(2),
-	},
-];
+	],
+};
 
 interface LandingHeroSectionProps {
 	onSignIn: (idpHint: string) => void;
@@ -162,27 +84,19 @@ export function LandingHeroSection({
 				</div>
 			</div>
 
-			{/* Leaderboard Preview */}
-			<div className="mx-auto max-w-4xl px-4 md:px-6">
+			{/* Practice reflection preview */}
+			<div className="mx-auto max-w-2xl px-4 md:px-6">
 				<div
 					aria-hidden="true"
-					className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3"
+					className="pointer-events-none -mb-3 overflow-hidden rounded-md border border-muted shadow-xl"
+					style={{
+						maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0))",
+					}}
 				>
-					<div
-						className="overflow-auto pointer-events-none"
-						style={{
-							maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0))",
-						}}
-					>
-						<LeaderboardTable
-							leaderboard={SAMPLE_LEADERBOARD_ENTRIES}
-							isLoading={false}
-							variant="INDIVIDUAL"
-						/>
-					</div>
+					<PracticeReflectionCard practice={SAMPLE_PRACTICE} />
 				</div>
 				<p className="mt-3 text-center text-sm text-muted-foreground">
-					Review activity drives score. Additional badges highlight authored work and collaboration.
+					Personal, practice-by-practice feedback on your own work — for your growth, never a score.
 				</p>
 			</div>
 		</section>

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Activity event repository — single source of truth for pre-computed XP.
+ * Activity event repository — the append-only activity ledger.
  *
  * <p>Timeframe queries use half-open intervals [since, until): inclusive start, exclusive end.
  */
@@ -39,11 +39,11 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         value = """
         INSERT INTO activity_event (
             id, event_key, event_type, occurred_at, actor_id,
-            workspace_id, repository_id, target_type, target_id, xp, ingested_at
+            workspace_id, repository_id, target_type, target_id, ingested_at
         )
         VALUES (
             :id, :eventKey, :eventType, :occurredAt, :actorId,
-            :workspaceId, :repositoryId, :targetType, :targetId, :xp, CURRENT_TIMESTAMP
+            :workspaceId, :repositoryId, :targetType, :targetId, CURRENT_TIMESTAMP
         )
         ON CONFLICT (workspace_id, event_key) DO NOTHING
         """,
@@ -58,14 +58,13 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("workspaceId") Long workspaceId,
         @Param("repositoryId") Long repositoryId,
         @Param("targetType") String targetType,
-        @Param("targetId") Long targetId,
-        @Param("xp") double xp
+        @Param("targetId") Long targetId
     );
 
     /**
-     * Backfills {@code actor_id} and {@code xp} for COMMIT_CREATED events whose actor
-     * was unresolved at ingest. Without this, commits ingested before their GitLab authors
-     * are resolved via email match stay orphaned and never award XP.
+     * Backfills {@code actor_id} for COMMIT_CREATED events whose actor was unresolved at
+     * ingest. Without this, commits ingested before their GitLab authors are resolved via
+     * email match stay orphaned and never appear on the activity aggregation.
      */
     @WorkspaceAgnostic("Scoped by repository_id (repository belongs to one workspace)")
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -73,8 +72,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     @Query(
         value = """
         UPDATE activity_event
-        SET actor_id = gc.author_id,
-            xp = :xpPerCommit
+        SET actor_id = gc.author_id
         FROM git_commit gc
         WHERE activity_event.target_type = 'commit'
           AND activity_event.event_type = 'COMMIT_CREATED'
@@ -85,107 +83,16 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         """,
         nativeQuery = true
     )
-    int backfillCommitActors(@Param("repositoryId") Long repositoryId, @Param("xpPerCommit") double xpPerCommit);
+    int backfillCommitActors(@Param("repositoryId") Long repositoryId);
 
-    // Leaderboard Aggregation Queries
-
-    /**
-     * Workspace-level XP aggregation. Does NOT apply per-team hidden-repo settings; use
-     * {@link #findExperiencePointsByWorkspaceAndTeamsAndTimeframe} for team-filtered results.
-     */
-    @Query(
-        """
-        SELECT e.actor.id as actorId,
-               SUM(e.xp) as totalExperiencePoints,
-               COUNT(e) as eventCount
-        FROM ActivityEvent e
-        WHERE e.workspace.id = :workspaceId
-        AND e.actor IS NOT NULL
-        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
-        AND e.occurredAt >= :since
-        AND e.occurredAt < :until
-        GROUP BY e.actor.id
-        """
-    )
-    List<ActivityXpProjection> findExperiencePointsByWorkspaceAndTimeframe(
-        @Param("workspaceId") Long workspaceId,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
-
-    /**
-     * Team-filtered XP aggregation. Applies label filtering to review events only:
-     * if a team has label filters for a repo, review events are kept only when the PR
-     * has at least one matching label. Non-review events are not label-filtered.
-     */
-    @Query(
-        """
-        SELECT e.actor.id as actorId,
-               SUM(e.xp) as totalExperiencePoints,
-               COUNT(e) as eventCount
-        FROM ActivityEvent e
-        WHERE e.workspace.id = :workspaceId
-        AND e.actor IS NOT NULL
-        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
-        AND EXISTS (
-            SELECT 1 FROM TeamMembership tm
-            WHERE tm.user = e.actor
-            AND tm.team.id IN :teamIds
-        )
-        AND e.occurredAt >= :since
-        AND e.occurredAt < :until
-        AND (e.repository IS NULL OR EXISTS (
-            SELECT 1 FROM TeamRepositoryPermission trp
-            WHERE trp.repository = e.repository
-            AND trp.team.id IN :teamIds
-        ))
-        AND (e.repository IS NULL OR NOT EXISTS (
-            SELECT 1 FROM WorkspaceTeamRepositorySettings wtrs
-            WHERE wtrs.repository = e.repository
-            AND wtrs.workspace.id = :workspaceId
-            AND wtrs.team.id IN :teamIds
-            AND wtrs.hiddenFromContributions = true
-        ))
-        AND (
-            e.targetType <> 'review'
-            OR EXISTS (
-                SELECT 1 FROM PullRequestReview prr
-                WHERE prr.id = e.targetId
-                AND (
-                    NOT EXISTS (
-                        SELECT 1 FROM WorkspaceTeamLabelFilter wtlf
-                        WHERE wtlf.workspace.id = :workspaceId
-                        AND wtlf.team.id IN :teamIds
-                        AND wtlf.label.repository = prr.pullRequest.repository
-                    )
-                    OR EXISTS (
-                        SELECT 1 FROM WorkspaceTeamLabelFilter wtlf
-                        JOIN wtlf.label lbl
-                        WHERE wtlf.workspace.id = :workspaceId
-                        AND wtlf.team.id IN :teamIds
-                        AND wtlf.label.repository = prr.pullRequest.repository
-                        AND lbl MEMBER OF prr.pullRequest.labels
-                    )
-                )
-            )
-        )
-        GROUP BY e.actor.id
-        """
-    )
-    List<ActivityXpProjection> findExperiencePointsByWorkspaceAndTeamsAndTimeframe(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+    // Activity Aggregation Queries
 
     /** Workspace-level activity breakdown by event type. Does NOT apply per-team hidden-repo settings. */
     @Query(
         """
         SELECT e.actor.id as actorId,
                e.eventType as eventType,
-               COUNT(e) as count,
-               SUM(e.xp) as experiencePoints
+               COUNT(e) as count
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
@@ -288,8 +195,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         """
         SELECT e.actor.id as actorId,
                e.eventType as eventType,
-               COUNT(e) as count,
-               SUM(e.xp) as experiencePoints
+               COUNT(e) as count
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.actor.id IN :actorIds
@@ -588,7 +494,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
 
     /**
      * DISTINCT PR IDs reviewed by a single actor for profile display.
-     * Unlike leaderboard queries, does NOT apply hidden-repo settings (profile shows all
+     * Unlike activity-aggregation queries, does NOT apply hidden-repo settings (profile shows all
      * of the user's work). Self-reviews are still excluded.
      */
     @Query(
@@ -628,51 +534,6 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Long getCount();
     }
 
-    // Profile XP Lookups
-
-    /** Total lifetime XP for an actor in a workspace. Returns 0 if no events exist. */
-    @Query(
-        """
-        SELECT COALESCE(SUM(e.xp), 0)
-        FROM ActivityEvent e
-        WHERE e.workspace.id = :workspaceId
-        AND e.actor IS NOT NULL
-        AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
-        AND e.actor.id = :actorId
-        AND e.xp > 0
-        """
-    )
-    long findTotalXpByWorkspaceAndActor(@Param("workspaceId") Long workspaceId, @Param("actorId") Long actorId);
-
-    @Query(
-        """
-        SELECT e.targetId as targetId, e.xp as xp
-        FROM ActivityEvent e
-        WHERE e.workspace.id = :workspaceId
-        AND e.targetId IN :targetIds
-        AND e.targetType IN :targetTypes
-        """
-    )
-    List<TargetXpProjection> findXpByTargetIdsAndTypesInternal(
-        @Param("workspaceId") Long workspaceId,
-        @Param("targetIds") Set<Long> targetIds,
-        @Param("targetTypes") Set<String> targetTypes
-    );
-
-    default List<TargetXpProjection> findXpByTargetIdsAndTypes(
-        Long workspaceId,
-        Set<Long> targetIds,
-        Set<ActivityTargetType> targetTypes
-    ) {
-        Set<String> typeValues = targetTypes.stream().map(ActivityTargetType::getValue).collect(Collectors.toSet());
-        return findXpByTargetIdsAndTypesInternal(workspaceId, targetIds, typeValues);
-    }
-
-    interface TargetXpProjection {
-        Long getTargetId();
-        Double getXp();
-    }
-
     @Query(value = "SELECT COUNT(*) FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
     long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
@@ -686,7 +547,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     /**
      * Profile activity history (review + comment events, PR events excluded).
      * Does NOT apply hidden-repo settings: "hidden from contributions" only affects team
-     * leaderboard ranking, not personal profile visibility.
+     * activity aggregation, not personal profile visibility.
      */
     @Query(
         """

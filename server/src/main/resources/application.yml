@@ -303,17 +303,13 @@ hephaestus:
     webapp:
         url: ${APPLICATION_HOST_URL:http://localhost:4200}
 
-    leaderboard:
-        schedule:
+    practices:
+        # Day/time at which a workspace's weekly practice review recency window closes.
+        # Each workspace may override these; unset falls back to this global default.
+        review-cycle:
             day: 2
             time: "9:00"
-        notification:
-            # Global on/off for the weekly Slack post; per-workspace channel + team filter
-            # live on the Slack Connection's SlackConfig (set via the connection admin API).
-            enabled: false
-        # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
-        self-review-author-logins:
-            - Copilot
+            zone: "Europe/Berlin"
 
     # PAT-mode bootstrap for local dev. init-default only gates PAT workspace creation;
     # GitHub App installations are always processed regardless. Mode docs + cross-field
@@ -344,9 +340,6 @@ hephaestus:
         contributors:
             # Eviction rate in milliseconds (1 hour)
             evict-rate: 3600000
-        leaderboard-xp:
-            # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
-            evict-rate: 60000
 
     # ═══════════════════════════════════════════════════════════════════════════
     # FEATURE FLAGS (operational / development toggles)

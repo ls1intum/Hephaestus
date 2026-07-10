@@ -1,0 +1,339 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ONE consolidated branch changelog (practice-focused-leaderboard-redesign): remove the
+        competitive gamification read-model (ranked leaderboard + ELO "league points" + weekly Slack
+        top-3 digest). The event ledger (activity_event) is untouched; only the leaderboard/league
+        read-model columns on workspace, workspace_membership, and workspace_features are dropped, and
+        the two surviving schedule columns are renamed to the practices review-cycle vocabulary.
+
+        Each changeSet is preconditioned (onFail="MARK_RAN") + has a <rollback>. Dropped-column data is
+        NOT recoverable; the rollbacks recreate only the column shape (see each <comment>).
+    -->
+
+    <!-- 1. Rename the surviving schedule day column: leaderboard_schedule_day -> review_cycle_day. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.review_cycle_day already present">
+            <columnExists tableName="workspace" columnName="leaderboard_schedule_day"/>
+        </preConditions>
+        <comment>Rename workspace.leaderboard_schedule_day to review_cycle_day (salvaged review-cycle window math).</comment>
+        <renameColumn tableName="workspace" oldColumnName="leaderboard_schedule_day" newColumnName="review_cycle_day" columnDataType="INTEGER"/>
+        <rollback>
+            <renameColumn tableName="workspace" oldColumnName="review_cycle_day" newColumnName="leaderboard_schedule_day" columnDataType="INTEGER"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 2. Rename the surviving schedule time column: leaderboard_schedule_time -> review_cycle_time. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.review_cycle_time already present">
+            <columnExists tableName="workspace" columnName="leaderboard_schedule_time"/>
+        </preConditions>
+        <comment>Rename workspace.leaderboard_schedule_time to review_cycle_time (salvaged review-cycle window math).</comment>
+        <renameColumn tableName="workspace" oldColumnName="leaderboard_schedule_time" newColumnName="review_cycle_time" columnDataType="VARCHAR(10)"/>
+        <rollback>
+            <renameColumn tableName="workspace" oldColumnName="review_cycle_time" newColumnName="leaderboard_schedule_time" columnDataType="VARCHAR(10)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Drop the leaderboard Slack-notification UI toggle. Rollback recreates the column shape only
+         (the boolean values are not recoverable). -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_enabled already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_notification_enabled"/>
+        </preConditions>
+        <comment>Drop workspace.leaderboard_notification_enabled (weekly Slack digest removed). Data is NOT recoverable; rollback recreates the column shape only.</comment>
+        <dropColumn tableName="workspace" columnName="leaderboard_notification_enabled"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_notification_enabled" type="BOOLEAN"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- 4. Drop the leaderboard Slack-notification channel id (the Slack target now lives on the Slack
+         Connection's SlackConfig, never on the workspace row). Rollback recreates the column shape only. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_channel_id already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_notification_channel_id"/>
+        </preConditions>
+        <comment>Drop workspace.leaderboard_notification_channel_id (weekly Slack digest removed). Data is NOT recoverable; rollback recreates the column shape only.</comment>
+        <dropColumn tableName="workspace" columnName="leaderboard_notification_channel_id"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_notification_channel_id" type="VARCHAR(100)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- 5. Drop the leaderboard Slack-notification team filter. Rollback recreates the column shape only. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_team already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_notification_team"/>
+        </preConditions>
+        <comment>Drop workspace.leaderboard_notification_team (weekly Slack digest removed). Data is NOT recoverable; rollback recreates the column shape only.</comment>
+        <dropColumn tableName="workspace" columnName="leaderboard_notification_team"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_notification_team" type="VARCHAR(100)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- 6. Drop the per-workspace league-cycle idempotency marker (league-points update removed). -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-6">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_league_cycle_at already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_league_cycle_at"/>
+        </preConditions>
+        <comment>Drop workspace.leaderboard_league_cycle_at (ELO league-points update removed). Data is NOT recoverable; rollback recreates the column shape only.</comment>
+        <dropColumn tableName="workspace" columnName="leaderboard_league_cycle_at"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_league_cycle_at" type="TIMESTAMP WITH TIME ZONE"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- 7. Drop the per-membership ELO league points. Rollback recreates the column shape (NOT NULL,
+         default 0); the accumulated point values are NOT recoverable. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-7">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace_membership.league_points already dropped">
+            <columnExists tableName="workspace_membership" columnName="league_points"/>
+        </preConditions>
+        <comment>Drop workspace_membership.league_points (ELO league points removed). Point values are NOT recoverable; rollback recreates the column shape (NOT NULL default 0).</comment>
+        <dropColumn tableName="workspace_membership" columnName="league_points"/>
+        <rollback>
+            <addColumn tableName="workspace_membership">
+                <column name="league_points" type="INTEGER" defaultValueNumeric="0">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- 8. Drop the leagues_enabled feature flag. Rollback recreates the column shape (NOT NULL, default false). -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace_features.leagues_enabled already dropped">
+            <columnExists tableName="workspace" columnName="leagues_enabled"/>
+        </preConditions>
+        <comment>Drop workspace.leagues_enabled feature flag (league tiers/rankings removed). Data is NOT recoverable; rollback recreates the column shape (NOT NULL default false).</comment>
+        <dropColumn tableName="workspace" columnName="leagues_enabled"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leagues_enabled" type="BOOLEAN" defaultValueBoolean="false">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- 9. Drop the leaderboard_enabled feature flag. Rollback recreates the column shape (NOT NULL, default false). -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-9">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace_features.leaderboard_enabled already dropped">
+            <columnExists tableName="workspace" columnName="leaderboard_enabled"/>
+        </preConditions>
+        <comment>Drop workspace.leaderboard_enabled feature flag (ranked leaderboard page removed). Existing leaderboard-enabled workspaces keep the replacement practices surface enabled.</comment>
+        <sql>UPDATE workspace SET practices_enabled = true WHERE leaderboard_enabled = true AND practices_enabled = false</sql>
+        <dropColumn tableName="workspace" columnName="leaderboard_enabled"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="leaderboard_enabled" type="BOOLEAN" defaultValueBoolean="false">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- ============================================================================================
+         Pass B — build the non-competitive replacement for the removed leaderboard.
+         ============================================================================================ -->
+
+    <!-- 10. Generalized, append-only data-access disclosure audit (core.audit.DataAccessEvent). Replaces the
+         bespoke practice_overview_access: one row each time a privileged actor is shown a subject's (or a
+         named cohort's) data, resource-typed so any future disclosure surface reuses the same table. Scalar
+         identity columns (no FK) mirror observation.about_user_id (avoids a Modulith cycle + stays off the
+         drift gate). subject_user_id is nullable — a bulk/list view (the roster) has no single subject.
+
+         SECURITY — storage-layer append-only. A BEFORE UPDATE OR DELETE trigger RAISEs so the app cannot
+         silently alter or erase a disclosure record. UPDATE is allowed only for the account-erasure redaction
+         marker hephaestus.audit_redact='on'; DELETE is allowed only for the workspace-purge marker
+         hephaestus.audit_purge='on'.
+
+         Unlike auth_event's trigger (context="prod"), this one carries NO context: the integration test tier
+         runs on Hibernate ddl-auto (Liquibase disabled) so the trigger is simply absent there and cannot
+         interfere, while the DataAccessEventAppendOnlyLiquibaseTest proof runs the real changelog and needs it. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-10">
+        <preConditions onFail="MARK_RAN" onFailMessage="data_access_event already present">
+            <not>
+                <tableExists tableName="data_access_event"/>
+            </not>
+        </preConditions>
+        <comment>Create data_access_event (generalized append-only disclosure audit) + subject index + append-only trigger.</comment>
+        <createTable tableName="data_access_event">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_data_access_event" nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Nullable: NULL for a bulk/list view (e.g. the roster) which discloses many subjects at once. -->
+            <column name="subject_user_id" type="BIGINT"/>
+            <column name="resource_type" type="VARCHAR(48)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="data_access_event" indexName="idx_data_access_event_subject">
+            <column name="workspace_id"/>
+            <column name="subject_user_id"/>
+            <column name="resource_type"/>
+        </createIndex>
+        <sql splitStatements="false"><![CDATA[
+            CREATE OR REPLACE FUNCTION data_access_event_block_mutation() RETURNS trigger AS $data_access_immut$
+            BEGIN
+                IF TG_OP = 'UPDATE' THEN
+                    IF current_setting('hephaestus.audit_redact', true) IS DISTINCT FROM 'on' THEN
+                        RAISE EXCEPTION 'data_access_event is append-only: UPDATE is permitted only via account erasure';
+                    END IF;
+                    RETURN NEW;
+                END IF;
+                IF current_setting('hephaestus.audit_purge', true) IS DISTINCT FROM 'on' THEN
+                    RAISE EXCEPTION 'data_access_event is append-only: DELETE is permitted only via the workspace purge';
+                END IF;
+                RETURN OLD;
+            END;
+            $data_access_immut$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_data_access_event_block_mutation
+                BEFORE UPDATE OR DELETE ON data_access_event
+                FOR EACH ROW EXECUTE FUNCTION data_access_event_block_mutation();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER IF EXISTS trg_data_access_event_block_mutation ON data_access_event;
+                DROP FUNCTION IF EXISTS data_access_event_block_mutation();
+            ]]></sql>
+            <dropIndex tableName="data_access_event" indexName="idx_data_access_event_subject"/>
+            <dropTable tableName="data_access_event"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-10b">
+        <preConditions onFail="MARK_RAN" onFailMessage="data_access_event absent; base table changeset handles creation">
+            <tableExists tableName="data_access_event"/>
+        </preConditions>
+        <comment>Ensure data_access_event has the current mutation guard even on partially migrated databases.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE INDEX IF NOT EXISTS idx_data_access_event_subject
+                ON data_access_event (workspace_id, subject_user_id, resource_type);
+
+            CREATE OR REPLACE FUNCTION data_access_event_block_mutation() RETURNS trigger AS $data_access_immut$
+            BEGIN
+                IF TG_OP = 'UPDATE' THEN
+                    IF current_setting('hephaestus.audit_redact', true) IS DISTINCT FROM 'on' THEN
+                        RAISE EXCEPTION 'data_access_event is append-only: UPDATE is permitted only via account erasure';
+                    END IF;
+                    RETURN NEW;
+                END IF;
+                IF current_setting('hephaestus.audit_purge', true) IS DISTINCT FROM 'on' THEN
+                    RAISE EXCEPTION 'data_access_event is append-only: DELETE is permitted only via the workspace purge';
+                END IF;
+                RETURN OLD;
+            END;
+            $data_access_immut$ LANGUAGE plpgsql;
+
+            DROP TRIGGER IF EXISTS trg_data_access_event_block_mutation ON data_access_event;
+            CREATE TRIGGER trg_data_access_event_block_mutation
+                BEFORE UPDATE OR DELETE ON data_access_event
+                FOR EACH ROW EXECUTE FUNCTION data_access_event_block_mutation();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER IF EXISTS trg_data_access_event_block_mutation ON data_access_event;
+                DROP FUNCTION IF EXISTS data_access_event_block_mutation();
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!-- 11. Per-workspace cohort-aggregate visibility (privacy control, NOT a ranking control). Gates only
+         whether ordinary members see the k-anonymised cohort card; roster + drill-down stay admin/owner-only
+         in both values. NOT NULL, default 'MENTORS_ONLY'. The workspace_features embeddable maps onto the
+         workspace table (like every other *_enabled feature flag dropped above), so the column lives on
+         workspace. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-11">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.cohort_visibility already present">
+            <not>
+                <columnExists tableName="workspace" columnName="cohort_visibility"/>
+            </not>
+        </preConditions>
+        <comment>Add workspace.cohort_visibility (MENTORS_ONLY | EVERYONE), NOT NULL default MENTORS_ONLY.</comment>
+        <addColumn tableName="workspace">
+            <column name="cohort_visibility" type="VARCHAR(32)" defaultValue="MENTORS_ONLY">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="cohort_visibility"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 12. Drop the activity_event.xp column and everything that references it. XP scoring/leveling is
+         removed; the activity ledger itself (event_type, occurred_at, actor/target, event_key idempotency)
+         stays. Order matters: drop the two xp-touching indexes and the CHECK constraint before the column. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="activity_event.xp already removed">
+            <columnExists tableName="activity_event" columnName="xp"/>
+        </preConditions>
+        <comment>Drop activity_event.xp, its CHECK constraint, and the two indexes that reference it.</comment>
+        <sql>DROP INDEX IF EXISTS idx_activity_event_leaderboard_covering</sql>
+        <sql>DROP INDEX IF EXISTS idx_activity_event_xp_lookup</sql>
+        <sql>ALTER TABLE activity_event DROP CONSTRAINT IF EXISTS chk_activity_event_xp_non_negative</sql>
+        <dropColumn tableName="activity_event" columnName="xp"/>
+        <rollback>
+            <addColumn tableName="activity_event">
+                <column name="xp" type="DOUBLE PRECISION" defaultValueNumeric="0.0">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+            <sql>ALTER TABLE activity_event ADD CONSTRAINT chk_activity_event_xp_non_negative CHECK (xp &gt;= 0)</sql>
+            <createIndex tableName="activity_event" indexName="idx_activity_event_xp_lookup">
+                <column name="workspace_id"/>
+                <column name="target_type"/>
+                <column name="target_id"/>
+            </createIndex>
+            <createIndex tableName="activity_event" indexName="idx_activity_event_leaderboard_covering">
+                <column name="workspace_id"/>
+                <column name="occurred_at" descending="true"/>
+                <column name="actor_id"/>
+                <column name="xp"/>
+            </createIndex>
+        </rollback>
+    </changeSet>
+
+    <!-- 13. Drop the workspace.progression_enabled feature flag. The XP progression/leveling feature is
+         removed; the flag no longer maps to any WorkspaceFeatures field. -->
+    <changeSet author="hephaestus-leaderboard-redesign" id="1782937242432-13">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.progression_enabled already removed">
+            <columnExists tableName="workspace" columnName="progression_enabled"/>
+        </preConditions>
+        <comment>Drop workspace.progression_enabled (XP progression feature removed).</comment>
+        <dropColumn tableName="workspace" columnName="progression_enabled"/>
+        <rollback>
+            <addColumn tableName="workspace">
+                <column name="progression_enabled" type="BOOLEAN" defaultValueBoolean="false">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

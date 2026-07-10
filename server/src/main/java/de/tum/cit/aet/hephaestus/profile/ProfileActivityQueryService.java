@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.profile;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityBreakdownProjection;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
-import de.tum.cit.aet.hephaestus.activity.ActivityXpProjection;
-import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
 import de.tum.cit.aet.hephaestus.profile.ProfilePullRequestQueryRepository.AuthorCountProjection;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import java.time.Instant;
@@ -17,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Profile-scoped counterpart to {@code LeaderboardXpQueryService}, using the same activity ledger. */
+/** Profile-scoped counterpart to the activity ledger, using the same activity ledger. */
 @Service
 @RequiredArgsConstructor
 public class ProfileActivityQueryService {
@@ -39,22 +37,7 @@ public class ProfileActivityQueryService {
 
         Set<Long> actorIds = Set.of(actorId);
 
-        // 1. Get XP totals from activity_event table
-        List<ActivityXpProjection> xpData = activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(
-            workspaceId,
-            since,
-            until
-        );
-
-        int totalScore = xpData
-            .stream()
-            .filter(xp -> actorId.equals(xp.getActorId()))
-            .findFirst()
-            .map(ActivityXpProjection::getTotalExperiencePoints)
-            .map(XpPrecision::roundToInt)
-            .orElse(0);
-
-        // 2. Get activity breakdown by type
+        // Get activity breakdown by type
         List<ActivityBreakdownProjection> breakdown = activityEventRepository.findActivityBreakdown(
             workspaceId,
             actorIds,
@@ -78,7 +61,7 @@ public class ProfileActivityQueryService {
             profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(workspaceId, actorIds, since, until)
         );
 
-        // 3. Aggregate breakdown stats
+        // Aggregate breakdown stats
         int approvals = 0;
         int changeRequests = 0;
         int comments = 0;
@@ -104,7 +87,7 @@ public class ProfileActivityQueryService {
             }
         }
 
-        // 4. Query distinct PR count (with self-review exclusion)
+        // Query distinct PR count (with self-review exclusion)
         Map<Long, Long> distinctPrCounts = activityEventRepository.countDistinctReviewedPullRequestsByActors(
             workspaceId,
             actorIds,
@@ -113,15 +96,9 @@ public class ProfileActivityQueryService {
         );
         int reviewedPrCount = distinctPrCounts.getOrDefault(actorId, 0L).intValue();
 
-        log.debug(
-            "Built profile activity stats: actorId={}, totalScore={}, reviewedPrCount={}",
-            actorId,
-            totalScore,
-            reviewedPrCount
-        );
+        log.debug("Built profile activity stats: actorId={}, reviewedPrCount={}", actorId, reviewedPrCount);
 
         return new ProfileActivityStatsDTO(
-            totalScore,
             reviewedPrCount,
             approvals,
             changeRequests,

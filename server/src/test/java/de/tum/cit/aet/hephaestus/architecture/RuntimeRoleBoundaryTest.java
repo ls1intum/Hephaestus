@@ -201,13 +201,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.webhook..")
             .should()
             .dependOnClassesThat()
-            .resideInAnyPackage(
-                "de.tum.cit.aet.hephaestus.workspace..",
-                "de.tum.cit.aet.hephaestus.leaderboard..",
-                "de.tum.cit.aet.hephaestus.agent.."
-            )
+            .resideInAnyPackage("de.tum.cit.aet.hephaestus.workspace..", "de.tum.cit.aet.hephaestus.agent..")
             .because(
-                "webhook receiver is a pure publish-only role; depending on workspace/leaderboard/agent would re-introduce " +
+                "webhook receiver is a pure publish-only role; depending on workspace/agent would re-introduce " +
                     "the wiring leaks runtime testing already exposed (ObjectProvider cascade, etc.) and break role isolation"
             )
             .check(classes);

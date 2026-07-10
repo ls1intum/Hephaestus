@@ -13,12 +13,12 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import {
-	DEFAULT_SCHEDULE,
+	DEFAULT_REVIEW_CYCLE,
 	detectPresetFromDates,
 	formatDateRangeForApi,
 	formatDropdownLabel,
 	getDateRangeForPreset,
-	type LeaderboardSchedule,
+	type ReviewCycleSchedule,
 	type TimeframePreset,
 } from "@/lib/timeframe";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ export interface ProfileTimeframePickerProps {
 	beforeDate?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
 	enableAllActivity?: boolean;
-	schedule?: LeaderboardSchedule;
+	schedule?: ReviewCycleSchedule;
 }
 
 /** Icon component for each preset type */
@@ -54,7 +54,7 @@ export function ProfileTimeframePicker({
 	beforeDate,
 	onTimeframeChange,
 	enableAllActivity = true,
-	schedule = DEFAULT_SCHEDULE,
+	schedule = DEFAULT_REVIEW_CYCLE,
 }: ProfileTimeframePickerProps) {
 	const [userInteracted, setUserInteracted] = useState(false);
 

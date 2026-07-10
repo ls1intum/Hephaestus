@@ -8,12 +8,10 @@ export interface WorkspaceFeatures {
 	practicesEnabled: boolean;
 	mentorEnabled: boolean;
 	achievementsEnabled: boolean;
-	leaderboardEnabled: boolean;
-	progressionEnabled: boolean;
-	leaguesEnabled: boolean;
+	cohortVisibility: WorkspaceListItem["cohortVisibility"];
 }
 
-export function useWorkspaceFeatures(): WorkspaceFeatures & {
+export function useWorkspaceFeatures(workspaceSlug?: string): WorkspaceFeatures & {
 	isLoading: boolean;
 	isError: boolean;
 } {
@@ -27,7 +25,9 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & {
 	});
 
 	const workspaces = Array.isArray(query.data) ? query.data : [];
-	const activeWorkspace = workspaces.find((ws) => ws.workspaceSlug === selectedSlug);
+	const activeWorkspace = workspaces.find(
+		(ws) => ws.workspaceSlug === (workspaceSlug ?? selectedSlug),
+	);
 
 	return {
 		...getWorkspaceFeatures(activeWorkspace),
@@ -36,18 +36,11 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & {
 	};
 }
 
-// Loading defaults: optimistic (true) for features whose UI surfaces are visible by default —
-// flickering them off-then-on during load is worse than briefly showing a row that's about to
-// be hidden. Pessimistic (false) for opt-in features whose UI must NOT appear unless explicitly
-// granted (mentor, leagues). The chosen value for each field is the same as the post-load
-// behavior most workspaces will see, so the typical render is flicker-free.
 export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFeatures {
 	return {
-		practicesEnabled: workspace?.practicesEnabled ?? true,
+		practicesEnabled: workspace?.practicesEnabled ?? false,
 		mentorEnabled: workspace?.mentorEnabled ?? false,
 		achievementsEnabled: workspace?.achievementsEnabled ?? true,
-		leaderboardEnabled: workspace?.leaderboardEnabled ?? true,
-		progressionEnabled: workspace?.progressionEnabled ?? true,
-		leaguesEnabled: workspace?.leaguesEnabled ?? false,
+		cohortVisibility: workspace?.cohortVisibility ?? "MENTORS_ONLY",
 	};
 }

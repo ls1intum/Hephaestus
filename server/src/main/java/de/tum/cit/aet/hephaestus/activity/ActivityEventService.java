@@ -1,13 +1,10 @@
 package de.tum.cit.aet.hephaestus.activity;
 
-import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointProperties;
-import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
 import de.tum.cit.aet.hephaestus.activity.spi.ActivityRecorder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.annotation.Observed;
@@ -23,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Records activity events with XP.
+ * Records activity events.
  *
  * <p>Idempotent via unique constraint on event_key.
  *
@@ -51,12 +48,10 @@ public class ActivityEventService implements ActivityRecorder {
 
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final ExperiencePointProperties xpProperties;
     private final ApplicationEventPublisher eventPublisher;
     private final Counter eventsRecordedCounter;
     private final Counter eventsDuplicateCounter;
     private final Counter eventsFailedCounter;
-    private final DistributionSummary xpDistribution;
     private final MeterRegistry meterRegistry;
 
     // Pre-registered timers per event type to avoid cardinality bomb
@@ -65,13 +60,11 @@ public class ActivityEventService implements ActivityRecorder {
     public ActivityEventService(
         ActivityEventRepository eventRepository,
         WorkspaceRepository workspaceRepository,
-        ExperiencePointProperties xpProperties,
         MeterRegistry meterRegistry,
         ApplicationEventPublisher eventPublisher
     ) {
         this.eventRepository = eventRepository;
         this.workspaceRepository = workspaceRepository;
-        this.xpProperties = xpProperties;
         this.eventPublisher = eventPublisher;
         this.eventsRecordedCounter = Counter.builder("activity.events.recorded")
             .description("Number of activity events recorded")
@@ -81,10 +74,6 @@ public class ActivityEventService implements ActivityRecorder {
             .register(meterRegistry);
         this.eventsFailedCounter = Counter.builder("activity.events.failed")
             .description("Number of activity events that failed to record after retries")
-            .register(meterRegistry);
-        this.xpDistribution = DistributionSummary.builder("activity.xp.distribution")
-            .description("Distribution of XP values recorded")
-            .publishPercentiles(0.5, 0.95, 0.99)
             .register(meterRegistry);
         this.meterRegistry = meterRegistry;
     }
@@ -124,8 +113,7 @@ public class ActivityEventService implements ActivityRecorder {
         @Nullable User actor,
         @Nullable Repository repository,
         ActivityTargetType targetType,
-        Long targetId,
-        double xp
+        Long targetId
     ) {
         // Validate workspace exists first (cheap lookup)
         if (!workspaceRepository.existsById(workspaceId)) {
@@ -138,16 +126,6 @@ public class ActivityEventService implements ActivityRecorder {
             );
             return false;
         }
-
-        // Clamp XP to valid bounds: minimum 0, configurable maximum (safety cap)
-        double maxXp = xpProperties.maxXpPerEvent();
-        double clampedXp = Math.max(0.0, Math.min(xp, maxXp));
-        if (clampedXp != xp) {
-            log.debug("Clamped XP value: originalXp={}, clampedXp={}, eventType={}", xp, clampedXp, eventType);
-        }
-
-        // Round to 2 decimal places for consistent precision (HALF_UP rounding)
-        double roundedXp = XpPrecision.round(clampedXp);
 
         String eventKey = ActivityEvent.buildKey(eventType, targetId, occurredAt);
 
@@ -164,8 +142,7 @@ public class ActivityEventService implements ActivityRecorder {
             workspaceId,
             repository != null ? repository.getId() : null,
             targetType.getValue(),
-            targetId,
-            roundedXp
+            targetId
         );
         eventTimer.record(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 
@@ -176,7 +153,6 @@ public class ActivityEventService implements ActivityRecorder {
         }
 
         eventsRecordedCounter.increment();
-        xpDistribution.record(roundedXp);
 
         // Publish event for downstream listeners (e.g., achievement system)
         eventPublisher.publishEvent(
@@ -184,13 +160,12 @@ public class ActivityEventService implements ActivityRecorder {
         );
 
         // One line per recorded event — DEBUG by default (per-event bookkeeping; the
-        // eventsRecordedCounter / xpDistribution metrics already track volume). Per-repo
-        // sync rollups carry the INFO-level summary.
+        // eventsRecordedCounter metric already tracks volume). Per-repo sync rollups
+        // carry the INFO-level summary.
         log.debug(
-            "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
+            "Recorded activity event: eventType={}, targetId={}, scopeId={}, actorId={}",
             eventType,
             targetId,
-            roundedXp,
             workspaceId,
             actor != null ? actor.getId() : null
         );
@@ -215,8 +190,7 @@ public class ActivityEventService implements ActivityRecorder {
             command.actor(),
             command.repository(),
             command.targetType(),
-            command.targetId(),
-            command.xp()
+            command.targetId()
         );
     }
 
@@ -226,9 +200,6 @@ public class ActivityEventService implements ActivityRecorder {
      * <p>When an entity is deleted, we may not have access to the actor or repository
      * information from the entity itself. This method records the deletion event
      * with null actor and repository - it's still valuable for audit trail purposes.
-     *
-     * <p>Deleted events always have 0 XP since they represent data removal, not
-     * value-adding activity.
      *
      * @param workspaceId the workspace ID
      * @param eventType   the event type (e.g., COMMENT_DELETED, ISSUE_DELETED)
@@ -255,8 +226,7 @@ public class ActivityEventService implements ActivityRecorder {
             null, // actor unknown for deleted entities
             null, // repository unknown for deleted entities
             targetType,
-            targetId,
-            0.0 // deletions have no XP value
+            targetId
         );
     }
 }

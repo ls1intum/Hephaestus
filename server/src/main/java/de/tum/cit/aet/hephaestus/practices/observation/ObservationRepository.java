@@ -47,6 +47,20 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId);
 
     /**
+     * Job observations EXCLUDING the given practice slugs, ordered by id (see {@link #findByAgentJobId}).
+     * Used by the in-context feedback ledger to fuse ONLY what was actually delivered to the artifact's
+     * page: reviewer-audience findings are persisted but firewalled OUT of the author's delivery, so they
+     * must never be linked into the author's IN_CONTEXT {@code Feedback} unit (ADR 0021 C2).
+     */
+    @Query(
+        "SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId AND f.practice.slug NOT IN :excludedSlugs ORDER BY f.id ASC"
+    )
+    List<Observation> findByAgentJobIdExcludingSlugs(
+        @Param("agentJobId") UUID agentJobId,
+        @Param("excludedSlugs") Collection<String> excludedSlugs
+    );
+
+    /**
      * Atomically inserts a practice finding if absent (race-condition safe).
      *
      * <p>Uses PostgreSQL's ON CONFLICT DO NOTHING to handle concurrent inserts.
@@ -149,7 +163,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * re-review multiplier (a target re-reviewed N times shows N× the findings). The dashboard reflects each
      * target's CURRENT state, so this query keeps only the findings from each target's LATEST detection run
      * ({@code agent_job_id} with the most recent {@code observed_at} for that
-     * {@code (artifact_type, artifact_id)}). Superseded runs do not count toward the habit signal.
+     * {@code (artifact_type, artifact_id, about_user_id)}). The {@code about_user_id} is part of the grain
+     * (reviewer attribution, ADR 0021 C2): a later AUTHOR job on the same PR must not evict a REVIEWER's
+     * observations from that PR — "latest run" is per SUBJECT, not per artifact. Superseded runs for the same
+     * subject do not count toward the habit signal.
      *
      * <p>Native (not JPQL) because the latest-run-per-target selection needs {@code ORDER BY ... LIMIT 1} in a
      * correlated subquery, which JPQL cannot express. Aliases are quoted so the JDBC column labels match the
@@ -171,8 +188,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND p.workspace_id = :workspaceId
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type
                 AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
               ORDER BY f2.observed_at DESC
               LIMIT 1
           )
@@ -257,7 +277,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND p.workspace_id = :workspaceId
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
         GROUP BY p.slug, f.presence, f.assessment
@@ -295,7 +318,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND f.presence <> 'NOT_APPLICABLE'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
         ORDER BY f.observed_at DESC
@@ -328,7 +354,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND f.severity IS NOT NULL
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
         GROUP BY f.severity
@@ -356,7 +385,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND f.observed_at >= :since
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
         GROUP BY f.presence
@@ -473,7 +505,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND p.practice_area_id IS NOT NULL
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              JOIN practice p2 ON p2.id = f2.practice_id
+              WHERE p2.workspace_id = p.workspace_id
+                AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                AND f2.about_user_id = f.about_user_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
         GROUP BY pa.slug, pa.name, f.presence, f.assessment, f.severity
@@ -487,6 +522,165 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("recentSince") Instant recentSince
     );
 
+    /**
+     * Per-(developer, practice) good/bad activity for the mentor overview. Keeps parity with the reflection
+     * surface by deduping re-reviews to the target's latest run and excluding low-confidence uncorroborated
+     * BAD observations from {@code badCount}.
+     */
+    @Query(
+        value = """
+        WITH filtered AS (
+            SELECT f.about_user_id AS about_user_id,
+                   u.login AS login,
+                   u.name AS name,
+                   u.avatar_url AS avatar_url,
+                   p.id AS practice_id,
+                   p.slug AS slug,
+                   p.name AS practice_name,
+                   p.display_order AS display_order,
+                   f.assessment AS assessment,
+                   f.confidence AS confidence,
+                   f.artifact_id AS artifact_id,
+                   f.recurrence_key AS recurrence_key
+            FROM observation f
+            JOIN practice p ON p.id = f.practice_id
+            JOIN practice_area pa ON pa.id = p.practice_area_id
+            JOIN "user" u ON u.id = f.about_user_id
+            JOIN workspace_membership wm
+              ON wm.workspace_id = p.workspace_id
+             AND wm.user_id = f.about_user_id
+             AND wm.hidden = false
+            LEFT JOIN issue target_issue
+              ON f.artifact_type = 'PULL_REQUEST'
+             AND target_issue.id = f.artifact_id
+            WHERE p.workspace_id = :workspaceId
+              AND pa.slug = :areaSlug
+              AND p.is_active = true
+              AND u.type = 'USER'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM workspace_team_repository_settings wtrs
+                  WHERE wtrs.workspace_id = p.workspace_id
+                    AND wtrs.repository_id = target_issue.repository_id
+                    AND wtrs.hidden_from_contributions = true
+              )
+              AND f.observed_at >= :since
+              AND f.presence <> 'NOT_APPLICABLE'
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  JOIN practice p2 ON p2.id = f2.practice_id
+                  WHERE p2.workspace_id = p.workspace_id
+                    AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                    AND f2.about_user_id = f.about_user_id
+                  ORDER BY f2.observed_at DESC LIMIT 1
+              )
+        ),
+        locus_targets AS (
+            SELECT about_user_id, practice_id, recurrence_key, COUNT(DISTINCT artifact_id) AS n
+            FROM filtered
+            WHERE assessment = 'BAD' AND recurrence_key IS NOT NULL
+            GROUP BY about_user_id, practice_id, recurrence_key
+        ),
+        group_targets AS (
+            SELECT about_user_id, practice_id, COUNT(DISTINCT artifact_id) AS n
+            FROM filtered
+            WHERE assessment = 'BAD'
+            GROUP BY about_user_id, practice_id
+        )
+        SELECT f.about_user_id AS "aboutUserId",
+               f.login AS "userLogin",
+               f.name AS "userName",
+               f.avatar_url AS "avatarUrl",
+               f.slug AS "practiceSlug",
+               f.practice_name AS "practiceName",
+               f.display_order AS "practiceDisplayOrder",
+               SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
+               SUM(CASE WHEN f.assessment = 'BAD' AND NOT (
+                       COALESCE(f.confidence, 0) < 0.5
+                       AND (CASE WHEN f.recurrence_key IS NOT NULL
+                                 THEN COALESCE(lt.n, 0) ELSE COALESCE(gt.n, 0) END) < 2
+                   ) THEN 1 ELSE 0 END) AS "badCount"
+        FROM filtered f
+        LEFT JOIN locus_targets lt
+               ON lt.about_user_id = f.about_user_id AND lt.practice_id = f.practice_id
+              AND lt.recurrence_key = f.recurrence_key
+        LEFT JOIN group_targets gt
+               ON gt.about_user_id = f.about_user_id AND gt.practice_id = f.practice_id
+        GROUP BY f.about_user_id, f.login, f.name, f.avatar_url, f.slug, f.practice_name, f.display_order
+        ORDER BY f.login ASC, f.display_order ASC, f.slug ASC
+        """,
+        nativeQuery = true
+    )
+    List<CohortStandingRow> findCohortStandingByAreaAndWorkspace(
+        @Param("workspaceId") Long workspaceId,
+        @Param("areaSlug") String areaSlug,
+        @Param("since") Instant since
+    );
+
+    @Query(
+        value = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM observation f
+            JOIN practice p ON p.id = f.practice_id
+            JOIN practice_area pa ON pa.id = p.practice_area_id
+            JOIN "user" u ON u.id = f.about_user_id
+            JOIN workspace_membership wm
+              ON wm.workspace_id = p.workspace_id
+             AND wm.user_id = f.about_user_id
+             AND wm.hidden = false
+            LEFT JOIN issue target_issue
+              ON f.artifact_type = 'PULL_REQUEST'
+             AND target_issue.id = f.artifact_id
+            WHERE p.workspace_id = :workspaceId
+              AND pa.slug = :areaSlug
+              AND f.about_user_id = :aboutUserId
+              AND p.is_active = true
+              AND u.type = 'USER'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM workspace_team_repository_settings wtrs
+                  WHERE wtrs.workspace_id = p.workspace_id
+                    AND wtrs.repository_id = target_issue.repository_id
+                    AND wtrs.hidden_from_contributions = true
+              )
+              AND f.observed_at >= :since
+              AND f.presence <> 'NOT_APPLICABLE'
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  JOIN practice p2 ON p2.id = f2.practice_id
+                  WHERE p2.workspace_id = p.workspace_id
+                    AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                    AND f2.about_user_id = f.about_user_id
+                  ORDER BY f2.observed_at DESC LIMIT 1
+              )
+        )
+        """,
+        nativeQuery = true
+    )
+    boolean existsVisibleReportSubjectByAreaAndWorkspace(
+        @Param("workspaceId") Long workspaceId,
+        @Param("areaSlug") String areaSlug,
+        @Param("since") Instant since,
+        @Param("aboutUserId") Long aboutUserId
+    );
+
+    /**
+     * Projection: one developer's good/bad activity on one practice in the window — the standing input the
+     * mentor overview derives a {@link de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus} from.
+     */
+    interface CohortStandingRow {
+        Long getAboutUserId();
+        String getUserLogin();
+        String getUserName();
+        String getAvatarUrl();
+        String getPracticeSlug();
+        String getPracticeName();
+        Integer getPracticeDisplayOrder();
+        Long getGoodCount();
+        Long getBadCount();
+    }
+
     /** Projection: per (area, presence, assessment, severity) standing for a developer. */
     interface AreaStandingRow {
         String getAreaSlug();
@@ -499,14 +693,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
         /**
          * Distinct review targets (artifact_id) contributing to this row — the corroboration signal the
-         * standing floor keys on (P4). One BAD on one PR is {@code 1}; the same gap on two distinct PRs is
+         * standing floor keys on. One BAD on one PR is {@code 1}; the same gap on two distinct PRs is
          * {@code 2}. A single-target gap must not set MAJOR area-priority on its own (see
          * {@code PracticeStandingAspectProvider}).
          */
         Long getDistinctTargets();
 
         /**
-         * The strongest (highest) confidence in this row's group — the quarantine signal (P4). A very
+         * The strongest (highest) confidence in this row's group — the quarantine signal. A very
          * low-confidence BAD must not become a headline priority on the detector's hunch alone.
          */
         Float getMaxConfidence();

@@ -1,57 +1,26 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
-import { z } from "zod";
-import {
-	getActivityMonitorOptions,
-	getUserProfileOptions,
-	getWorkspaceOptions,
-} from "@/api/@tanstack/react-query.gen";
+import { createFileRoute, redirect, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { ProfilePage } from "@/components/profile/ProfilePage";
+import {
+	type ProfileSearchInput,
+	type ProfileSearchParams,
+	profileSearchSchema,
+	useProfileData,
+} from "@/hooks/use-profile-data";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
-import { useAuth } from "@/integrations/auth/AuthContext";
-import {
-	type ActivityMonitorFilters,
-	DEFAULT_ACTIVITY_MONITOR_LIMIT,
-	MAX_ACTIVITY_MONITOR_LIMIT,
-} from "@/lib/activity-monitor";
-import {
-	DEFAULT_SCHEDULE,
-	formatDateRangeForApi,
-	getDateRangeForPreset,
-	type LeaderboardSchedule,
-} from "@/lib/timeframe";
-
-const profileSearchSchema = z.object({
-	after: z.string().optional(),
-	before: z.string().optional(),
-	monitorRepositories: z.string().optional(),
-	monitorLimit: z.coerce
-		.number()
-		.int()
-		.min(1)
-		.max(MAX_ACTIVITY_MONITOR_LIMIT)
-		.default(DEFAULT_ACTIVITY_MONITOR_LIMIT),
-});
-
-type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
-
-const parseRepositoryIds = (value?: string): number[] => {
-	if (!value) return [];
-
-	return value
-		.split(",")
-		.map((id) => id.trim())
-		.filter((id) => /^\d+$/.test(id))
-		.map((id) => Number(id))
-		.filter((id) => Number.isSafeInteger(id) && id > 0);
-};
-
-const serializeRepositoryIds = (repositoryIds: number[]) => {
-	if (repositoryIds.length === 0) return undefined;
-	return repositoryIds.join(",");
-};
+import { resolveCurrentUser } from "@/integrations/auth/guard";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$username/")({
+	// The self-view is the unified workspace home. Redirect the viewer's OWN page there BEFORE render
+	// so no self queries fire and no empty frame flashes — there is one canonical self surface.
+	beforeLoad: async ({ context, params }) => {
+		const currentUser = await resolveCurrentUser(context.queryClient);
+		if (
+			currentUser?.username &&
+			currentUser.username.toLowerCase() === params.username.toLowerCase()
+		) {
+			throw redirect({ to: "/w/$workspaceSlug", params: { workspaceSlug: params.workspaceSlug } });
+		}
+	},
 	component: UserProfile,
 	validateSearch: profileSearchSchema,
 	search: {
@@ -59,136 +28,42 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 	},
 });
 
+/**
+ * The other-developer profile (mentor/peer view): identity + the member-visible Activity Monitor.
+ * It NEVER renders the private practice-reflection cards — those live only on the self-view
+ * (workspace home) and are fetched via the server-gated `GET /practices/reports/me`. The viewer's
+ * own page is redirected to the unified home in `beforeLoad`, so reaching this component implies the
+ * profile belongs to a DIFFERENT developer.
+ */
 function UserProfile() {
 	const { username, workspaceSlug } = Route.useParams();
-	const { isCurrentUser } = useAuth();
-	const { achievementsEnabled, progressionEnabled, leaguesEnabled } = useWorkspaceFeatures();
-	const { after, before, monitorRepositories, monitorLimit } = Route.useSearch();
+	const { achievementsEnabled } = useWorkspaceFeatures();
+	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Query for workspace to get leaderboard schedule
-	const workspaceQuery = useQuery({
-		...getWorkspaceOptions({
-			path: { workspaceSlug },
-		}),
-		enabled: Boolean(workspaceSlug),
-	});
-
-	// Extract leaderboard schedule from workspace config
-	// React Compiler handles memoization automatically
-	const getSchedule = (): LeaderboardSchedule => {
-		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
-
-		const scheduledTime = workspaceQuery.data.leaderboardScheduleTime || "9:00";
-		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
-		const [hours, minutes] = scheduledTime
-			.split(":")
-			.map((part: string) => Number.parseInt(part, 10));
-
-		return {
-			day: scheduledDay,
-			hour: Number.isNaN(hours) ? 9 : hours,
-			minute: Number.isNaN(minutes) ? 0 : minutes,
-		};
-	};
-	const schedule = getSchedule();
-
-	// Compute effective date range - default to "this week" based on schedule
-	const getEffectiveDates = () => {
-		if (after) {
-			return { after, before };
-		}
-		// Default to "this week" using the leaderboard schedule
-		const range = getDateRangeForPreset("this-week", schedule);
-		return formatDateRangeForApi(range);
-	};
-	const effectiveDates = getEffectiveDates();
-
-	const parseDateParam = (value?: string) => {
-		if (!value) return undefined;
-		const parsed = new Date(value);
-		return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-	};
-	const parsedAfter = parseDateParam(effectiveDates.after);
-	const parsedBefore = parseDateParam(effectiveDates.before);
-	const selectedRepositoryIds = parseRepositoryIds(monitorRepositories);
-
-	// Check if current user is the dashboard user
-	const currUserIsDashboardUser = isCurrentUser(username);
-
-	// Query for user profile data
-	const profileQuery = useQuery({
-		...getUserProfileOptions({
-			path: { workspaceSlug, login: username },
-			query: {
-				after: parsedAfter,
-				before: parsedBefore,
-			},
-		}),
-		placeholderData: (previousData) => previousData,
-		enabled: Boolean(username) && Boolean(workspaceSlug),
-	});
-
-	const activityMonitorQuery = useQuery({
-		...getActivityMonitorOptions({
-			path: { workspaceSlug, login: username },
-			query: {
-				after: parsedAfter,
-				before: parsedBefore,
-				repositoryIds: selectedRepositoryIds.length > 0 ? selectedRepositoryIds : undefined,
-				limit: monitorLimit,
-			},
-		}),
-		placeholderData: (previousData) => previousData,
-		enabled: Boolean(username) && Boolean(workspaceSlug),
-	});
-
-	const handleTimeframeChange = (nextAfter: string, nextBefore?: string) => {
-		navigate({
-			search: (prev: ProfileSearchParams) => ({
-				...prev,
-				after: nextAfter,
-				before: nextBefore,
-			}),
-		});
+	const updateSearch = (updater: (prev: ProfileSearchParams) => ProfileSearchInput) => {
+		navigate({ search: updater });
 	};
 
-	const handleActivityMonitorFiltersChange = (filters: ActivityMonitorFilters) => {
-		navigate({
-			search: (prev: ProfileSearchParams) => ({
-				...prev,
-				monitorRepositories: serializeRepositoryIds(filters.repositoryIds),
-				monitorLimit: filters.limit === DEFAULT_ACTIVITY_MONITOR_LIMIT ? undefined : filters.limit,
-			}),
-		});
-	};
+	const profile = useProfileData({ workspaceSlug, username, search, updateSearch });
 
 	return (
 		<ProfilePage
-			providerType={workspaceQuery.data?.providerType ?? "GITHUB"}
-			profileData={profileQuery.data}
-			activityMonitorData={activityMonitorQuery.data}
-			activityMonitorFilters={{
-				repositoryIds: selectedRepositoryIds,
-				limit: monitorLimit,
-			}}
-			onActivityMonitorFiltersChange={handleActivityMonitorFiltersChange}
-			isLoading={
-				(profileQuery.isPending && !profileQuery.data) ||
-				(workspaceQuery.isPending && !workspaceQuery.data) ||
-				(activityMonitorQuery.isPending && !activityMonitorQuery.data)
-			}
-			error={profileQuery.isError}
+			providerType={profile.providerType}
+			profileData={profile.profileData}
+			activityMonitorData={profile.activityMonitorData}
+			activityMonitorFilters={profile.activityMonitorFilters}
+			onActivityMonitorFiltersChange={profile.handleActivityMonitorFiltersChange}
+			isLoading={profile.isLoading}
+			error={profile.isError}
 			username={username}
-			currUserIsDashboardUser={currUserIsDashboardUser}
+			currUserIsDashboardUser={false}
 			workspaceSlug={workspaceSlug}
-			after={effectiveDates.after}
-			before={effectiveDates.before}
-			onTimeframeChange={handleTimeframeChange}
-			schedule={schedule}
+			after={profile.after}
+			before={profile.before}
+			onTimeframeChange={profile.handleTimeframeChange}
+			schedule={profile.schedule}
 			achievementsEnabled={achievementsEnabled}
-			progressionEnabled={progressionEnabled}
-			leaguesEnabled={leaguesEnabled}
 		/>
 	);
 }

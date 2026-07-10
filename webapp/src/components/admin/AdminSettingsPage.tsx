@@ -1,10 +1,11 @@
 import {
 	AdminFeaturesSettings,
+	type CohortVisibility,
 	type FeatureKey,
 	type FeatureValues,
 } from "./AdminFeaturesSettings";
-import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
+import { AdminReviewCycleSettings } from "./AdminReviewCycleSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 type RepositoryItem = {
@@ -18,26 +19,26 @@ export interface AdminSettingsPageProps {
 	addRepositoryError: Error | null;
 	isAddingRepository: boolean;
 	isRemovingRepository: boolean;
-	isResettingLeagues: boolean;
 	/** Whether repository management is disabled (for GitHub App Installation workspaces) */
 	isAppInstallationWorkspace?: boolean;
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
-	onResetLeagues: () => void;
 	features: FeatureValues;
+	cohortVisibility: CohortVisibility;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	// Slack notification card props (rendered for any workspace with a slug — the weekly
-	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
+	onCohortVisibilityChange: (visibility: CohortVisibility) => void;
+	// Review cycle (weekly practice-review window)
 	workspaceSlug?: string;
+	reviewCycleDay?: number;
+	reviewCycleTime?: string;
+	// Slack connection card props (rendered for any workspace with a slug — the Slack connection is
+	// independent of the review cycle).
 	hasSlackConnection: boolean;
 	slackConnectionId?: number;
 	slackChannelId?: string;
-	slackTeamLabel?: string;
-	slackNotificationsEnabled: boolean;
-	slackScheduleDay?: number;
-	slackScheduleTime?: string;
-	onSlackSaved: () => void;
+	/** Refetch the workspace snapshot after any settings card saves (Slack, review cycle, …). */
+	onWorkspaceRefetch: () => void;
 }
 
 export function AdminSettingsPage({
@@ -47,23 +48,21 @@ export function AdminSettingsPage({
 	addRepositoryError,
 	isAddingRepository,
 	isRemovingRepository,
-	isResettingLeagues,
 	isAppInstallationWorkspace = false,
 	onAddRepository,
 	onRemoveRepository,
-	onResetLeagues,
 	features,
+	cohortVisibility,
 	isSavingFeatures,
 	onToggleFeature,
+	onCohortVisibilityChange,
 	workspaceSlug,
+	reviewCycleDay,
+	reviewCycleTime,
 	hasSlackConnection,
 	slackConnectionId,
 	slackChannelId,
-	slackTeamLabel,
-	slackNotificationsEnabled,
-	slackScheduleDay,
-	slackScheduleTime,
-	onSlackSaved,
+	onWorkspaceRefetch,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -72,8 +71,10 @@ export function AdminSettingsPage({
 			<div className="space-y-10">
 				<AdminFeaturesSettings
 					values={features}
+					cohortVisibility={cohortVisibility}
 					isSaving={isSavingFeatures}
 					onToggle={onToggleFeature}
+					onCohortVisibilityChange={onCohortVisibilityChange}
 				/>
 
 				<AdminRepositoriesSettings
@@ -88,8 +89,14 @@ export function AdminSettingsPage({
 					onRemoveRepository={onRemoveRepository}
 				/>
 
-				{features.leaguesEnabled && (
-					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
+				{workspaceSlug != null && (
+					<AdminReviewCycleSettings
+						key={`review-cycle:${reviewCycleDay ?? ""}:${reviewCycleTime ?? ""}`}
+						workspaceSlug={workspaceSlug}
+						day={reviewCycleDay}
+						time={reviewCycleTime}
+						onSaved={onWorkspaceRefetch}
+					/>
 				)}
 
 				{workspaceSlug != null && (
@@ -97,16 +104,12 @@ export function AdminSettingsPage({
 					// the key changes and React remounts the form with fresh server truth instead
 					// of leaning on prop→state sync effects.
 					<AdminSlackNotificationSettings
-						key={`slack:${slackConnectionId ?? "none"}:${slackChannelId ?? ""}:${slackNotificationsEnabled}:${slackScheduleDay ?? ""}:${slackScheduleTime ?? ""}:${slackTeamLabel ?? ""}`}
+						key={`slack:${slackConnectionId ?? "none"}:${slackChannelId ?? ""}`}
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
 						slackConnectionId={slackConnectionId}
 						channelId={slackChannelId}
-						teamLabel={slackTeamLabel}
-						enabled={slackNotificationsEnabled}
-						scheduleDay={slackScheduleDay}
-						scheduleTime={slackScheduleTime}
-						onSaved={onSlackSaved}
+						onSaved={onWorkspaceRefetch}
 					/>
 				)}
 			</div>
