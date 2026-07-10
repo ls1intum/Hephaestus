@@ -55,7 +55,9 @@ class ReviewCycleWindowResolverTest extends BaseUnitTest {
     void windowLandsOnTheScheduledDayHourAndMinute() {
         Workspace w = workspace(7, "09:00");
         ReviewCycleWindowResolver.CycleWindow window = resolver.previousCycleWindow(w);
-        ZonedDateTime before = ZonedDateTime.ofInstant(window.before(), ZoneId.systemDefault());
+        // Assert in the resolver's CONFIGURED zone — the schedule is defined there, and the test
+        // must pass identically on a UTC CI runner and a Berlin-time dev machine.
+        ZonedDateTime before = ZonedDateTime.ofInstant(window.before(), ZoneId.of(globalDefault.zone()));
         assertThat(before.getDayOfWeek()).isEqualTo(DayOfWeek.SUNDAY);
         assertThat(before.getHour()).isEqualTo(9);
         assertThat(before.getMinute()).isZero();
@@ -65,7 +67,7 @@ class ReviewCycleWindowResolverTest extends BaseUnitTest {
     void windowDefaultsMinuteToZeroWhenTimeHasNoMinuteComponent() {
         Workspace w = workspace(3, "8");
         ReviewCycleWindowResolver.CycleWindow window = resolver.previousCycleWindow(w);
-        ZonedDateTime before = ZonedDateTime.ofInstant(window.before(), ZoneId.systemDefault());
+        ZonedDateTime before = ZonedDateTime.ofInstant(window.before(), ZoneId.of(globalDefault.zone()));
         assertThat(before.getDayOfWeek()).isEqualTo(DayOfWeek.WEDNESDAY);
         assertThat(before.getHour()).isEqualTo(8);
         assertThat(before.getMinute()).isZero();
