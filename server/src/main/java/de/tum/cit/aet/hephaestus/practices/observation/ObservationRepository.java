@@ -260,6 +260,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
@@ -349,6 +359,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               JOIN practice p2 ON p2.id = f2.practice_id
@@ -388,6 +408,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND f.presence <> 'NOT_APPLICABLE'
           AND f.agent_job_id = (
@@ -424,6 +454,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND f.severity IS NOT NULL
           AND f.agent_job_id = (
@@ -456,6 +496,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
@@ -575,6 +625,16 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice_area pa ON pa.id = p.practice_area_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND p.practice_area_id IS NOT NULL
           AND f.agent_job_id = (

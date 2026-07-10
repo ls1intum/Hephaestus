@@ -10,7 +10,14 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Writes disclosure-audit rows. Failures propagate so named report data is not served unaudited. */
+/**
+ * Writes disclosure-audit rows. Failures propagate so named report data is not served unaudited.
+ *
+ * <p>Grain: one row per served response, deliberately without time-window dedup — every HTTP response
+ * that discloses a named report IS a disclosure, so repeated rows from a re-opened dialog are true
+ * events, not noise. The client avoids gratuitous refetches (focus/reconnect refetch disabled) rather
+ * than the writer suppressing real ones.
+ */
 @Service
 public class DataAccessAuditWriter {
 

@@ -8,6 +8,12 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
@@ -31,6 +37,8 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamRepositorySettings;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamRepositorySettingsRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +81,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObservationService observationService;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
 
     @Autowired
     private ReviewCycleWindowResolver reviewCycleWindowResolver;
@@ -1234,6 +1254,74 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                     since
                 )
             ).isEmpty();
+        }
+
+        @Test
+        @DisplayName("observations from a repository hidden from contributions are excluded on cohort AND reflection")
+        void hiddenRepositoryObservationsAreExcludedOnBothSurfaces() {
+            seedReviewingArea();
+            PullRequest visiblePr = persistPullRequest("visible-org/visible-repo", 201L, false);
+            PullRequest hiddenPr = persistPullRequest("hidden-org/hidden-repo", 202L, true);
+            insertBad("visible-repo-bad", visiblePr.getId(), 0.8f);
+            insertBad("hidden-repo-bad", hiddenPr.getId(), 0.8f);
+
+            // (i) reflection/drill-down: only the visible-repo observation reaches the developer surface.
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                since,
+                org.springframework.data.domain.Pageable.unpaged()
+            );
+            assertThat(recent)
+                .extracting(o -> o.getArtifactId())
+                .containsExactly(visiblePr.getId());
+
+            // (ii) cohort: same verdict — the hidden-repo BAD never counts.
+            long badCount = cohortBadCount();
+            assertThat(badCount).isEqualTo(1L);
+        }
+
+        private PullRequest persistPullRequest(String nameWithOwner, long nativeId, boolean hiddenFromContributions) {
+            IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+
+            Repository repo = new Repository();
+            repo.setNativeId(nativeId);
+            repo.setProvider(provider);
+            repo.setName(nameWithOwner.substring(nameWithOwner.indexOf('/') + 1));
+            repo.setNameWithOwner(nameWithOwner);
+            repo.setHtmlUrl("https://github.com/" + nameWithOwner);
+            repo.setDefaultBranch("main");
+            repo.setCreatedAt(Instant.now());
+            repo.setUpdatedAt(Instant.now());
+            repo.setPushedAt(Instant.now());
+            repo = repositoryRepository.save(repo);
+
+            if (hiddenFromContributions) {
+                Team team = new Team();
+                team.setNativeId(nativeId);
+                team.setProvider(provider);
+                team.setName("team-" + nativeId);
+                team.setSlug("team-" + nativeId);
+                team.setPrivacy(Team.Privacy.VISIBLE);
+                team = teamRepository.save(team);
+
+                WorkspaceTeamRepositorySettings settings = new WorkspaceTeamRepositorySettings(workspace, team, repo);
+                settings.setHiddenFromContributions(true);
+                workspaceTeamRepositorySettingsRepository.save(settings);
+            }
+
+            PullRequest pr = new PullRequest();
+            pr.setNativeId(nativeId);
+            pr.setProvider(provider);
+            pr.setNumber((int) nativeId);
+            pr.setTitle("PR " + nativeId);
+            pr.setState(PullRequest.State.OPEN);
+            pr.setRepository(repo);
+            pr.setCreatedAt(Instant.now());
+            pr.setUpdatedAt(Instant.now());
+            return pullRequestRepository.save(pr);
         }
     }
 }
