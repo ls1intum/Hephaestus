@@ -13,10 +13,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Rejects oversized webhook POSTs before Spring buffers the body. Tomcat's
+ * Rejects oversized inbound POSTs before Spring buffers the body. Tomcat's
  * {@code max-http-post-size} only enforces on form bodies, so JSON webhooks would
  * otherwise be unconstrained. Missing {@code Content-Length} is rejected with 411.
- * Bound to {@code /webhooks/<kind>}.
+ *
+ * <p>Prefix-aware over the public, unauthenticated ingest surface: {@code /webhooks/**}. This includes
+ * GitHub/GitLab/Slack Events API callbacks and Slack interactivity callbacks. Any other URI falls through
+ * untouched.
  */
 public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
 
@@ -36,7 +39,11 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
         if (!"POST".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
-        return !request.getRequestURI().startsWith(UNIFIED_WEBHOOK_PREFIX);
+        return !isGuardedUri(request.getRequestURI());
+    }
+
+    private static boolean isGuardedUri(String uri) {
+        return uri.startsWith(UNIFIED_WEBHOOK_PREFIX);
     }
 
     @Override
@@ -58,7 +65,7 @@ public class WebhookPayloadSizeFilter extends OncePerRequestFilter {
     }
 
     private static String providerTag(String uri) {
-        // Filter only binds to /webhooks/*, so the prefix is guaranteed here.
+        // The filter only runs for /webhooks/<kind>(/...) (see shouldNotFilter), tagged on <kind>.
         String tail = uri.substring(UNIFIED_WEBHOOK_PREFIX.length());
         int slash = tail.indexOf('/');
         return slash >= 0 ? tail.substring(0, slash) : tail;

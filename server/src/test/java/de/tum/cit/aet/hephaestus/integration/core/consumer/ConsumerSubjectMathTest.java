@@ -73,8 +73,8 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
                 IntegrationKind.GITHUB
             );
             assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z")).contains(IntegrationKind.GITLAB);
-            // Slack is messaging-only — not in the NATS subject allow-list, so it never resolves.
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.m")).isEmpty();
+            // Slack now rides the durable transport (slack.<team>.<channel>.message), so it IS in the allow-list.
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.message")).contains(IntegrationKind.SLACK);
         }
 
         @Test
@@ -104,17 +104,17 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
     class StreamNameFor {
 
         @Test
-        void scmKindsHaveStreamNames() {
+        void streamingKindsHaveStreamNames() {
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITHUB)).contains("github");
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITLAB)).contains("gitlab");
+            // Slack maps to the "slack" stream (monitored-channel message ingest).
+            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).contains("slack");
         }
 
         @Test
-        void nonStreamingKindsReturnEmpty() {
-            // Slack doesn't flow through the per-kind JetStream subjects this consumer
-            // wires up. Returning Optional.empty() (rather than throwing) lets callers
-            // short-circuit without surrounding try/catch on the hot path.
-            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).isEmpty();
+        void nullKindReturnsEmpty() {
+            // Returning Optional.empty() (rather than throwing) lets callers short-circuit without a
+            // surrounding try/catch on the hot path.
             assertThat(ConsumerSubjectMath.streamNameFor(null)).isEmpty();
         }
     }

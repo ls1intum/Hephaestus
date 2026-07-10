@@ -13,13 +13,16 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentMatchers;
 
 class WorkerJwtTest extends BaseUnitTest {
 
@@ -42,7 +45,7 @@ class WorkerJwtTest extends BaseUnitTest {
         keyRing = WorkerKeyRing.fromConfig(properties);
         issuer = new WorkerJwtIssuer(keyRing, properties);
         denylist = mock(WorkerTokenDenylistService.class);
-        lenient().when(denylist.isRevoked(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
+        lenient().when(denylist.isRevoked(ArgumentMatchers.anyString())).thenReturn(false);
         verifier = new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, new SimpleMeterRegistry());
     }
 
@@ -55,7 +58,7 @@ class WorkerJwtTest extends BaseUnitTest {
         assertThat(jwt.jti()).isEqualTo(issued.jti());
         assertThat(jwt.expiresAt()).isCloseTo(
             issued.expiresAt(),
-            org.assertj.core.api.Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS)
+            Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS)
         );
     }
 
@@ -220,7 +223,7 @@ class WorkerJwtTest extends BaseUnitTest {
     private static String toPemPkcs8(java.security.interfaces.RSAPrivateKey key) {
         return (
             "-----BEGIN PRIVATE KEY-----\n" +
-            java.util.Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(key.getEncoded()) +
+            Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(key.getEncoded()) +
             "\n-----END PRIVATE KEY-----\n"
         );
     }

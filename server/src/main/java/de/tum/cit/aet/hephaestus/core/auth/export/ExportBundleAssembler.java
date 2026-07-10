@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
@@ -143,7 +144,7 @@ public class ExportBundleAssembler {
     }
 
     private ExportBundle.Identity toIdentity(IdentityLink il) {
-        String provider = gitProviderRegistry.providerTypeName(il.getGitProviderId());
+        String provider = gitProviderRegistry.providerTypeName(il.getProviderId());
         return new ExportBundle.Identity(
             provider,
             il.getSubject(),
@@ -155,7 +156,7 @@ public class ExportBundleAssembler {
         );
     }
 
-    private static ExportBundle.AuthEvent toAuthEvent(de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent e) {
+    private static ExportBundle.AuthEvent toAuthEvent(AuthEvent e) {
         // NOTE (Art. 20(4) chokepoint): this mapper deliberately never reads e.getActingAccountId()
         // or e.getDetails() — both can reference / be authored by another account. Do NOT add them.
         return new ExportBundle.AuthEvent(
@@ -168,11 +169,8 @@ public class ExportBundleAssembler {
     }
 
     /** Impersonation events are operator-authored records about the subject; excluded under Art. 20(4). */
-    private static boolean isImpersonationEvent(de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent e) {
-        de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType t = e.getEventType();
-        return (
-            t == de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType.IMPERSONATION_BEGIN ||
-            t == de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType.IMPERSONATION_END
-        );
+    private static boolean isImpersonationEvent(AuthEvent e) {
+        AuthEvent.EventType t = e.getEventType();
+        return (t == AuthEvent.EventType.IMPERSONATION_BEGIN || t == AuthEvent.EventType.IMPERSONATION_END);
     }
 }

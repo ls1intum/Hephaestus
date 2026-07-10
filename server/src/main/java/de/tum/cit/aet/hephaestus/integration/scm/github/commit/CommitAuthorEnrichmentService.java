@@ -5,7 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -209,7 +209,7 @@ public class CommitAuthorEnrichmentService {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
-                    EventContext.forSync(scopeId, RepositoryRef.from(repository), GitProviderType.GITHUB)
+                    EventContext.forSync(scopeId, RepositoryRef.from(repository), IdentityProviderType.GITHUB)
                 )
             );
         }

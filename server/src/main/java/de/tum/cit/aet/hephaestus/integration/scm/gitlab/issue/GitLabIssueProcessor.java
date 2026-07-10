@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhook
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -511,7 +512,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
      */
     private boolean updateSyncLabels(
         @Nullable List<SyncLabelData> syncLabels,
-        java.util.Collection<Label> currentLabels,
+        Collection<Label> currentLabels,
         Repository repository
     ) {
         if (syncLabels == null) {

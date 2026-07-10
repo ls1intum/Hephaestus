@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorAspects;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
@@ -17,8 +17,10 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslat
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
+import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -56,7 +58,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
  */
 @Service
 @RequiredArgsConstructor
-public class MentorChatService {
+public class MentorChatService implements MentorTurnRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatService.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -104,9 +106,36 @@ public class MentorChatService {
         }
     }
 
+    /**
+     * Transport-neutral entry for a non-HTTP surface (e.g. a Slack DM). Runs one turn for the developer
+     * identified by {@code developerLogin} against the caller-supplied {@link MentorChannel}. The shared turn
+     * body resolves the {@code User} from the SCM-identity holder, so — because there is no HTTP security
+     * context here — we set that holder on the turn thread and clear it afterwards. Mirrors {@link #start}.
+     */
+    @Override
+    public void run(MentorTurnRequest request, MentorChannel channel, String developerLogin) {
+        metrics.recordStarted();
+        try {
+            turnExecutor
+                .executor()
+                .execute(() -> {
+                    CurrentScmIdentityHolder.set(developerLogin);
+                    try {
+                        dispatchTurn(request, channel, new AtomicReference<>());
+                    } finally {
+                        CurrentScmIdentityHolder.clear();
+                    }
+                });
+        } catch (RejectedExecutionException rejected) {
+            log.warn("Slack mentor turn rejected by executor: {}", rejected.getMessage());
+            metrics.recordCompleted(MentorChatMetrics.Outcome.REJECTED);
+            channel.completeWithError("Mentor service is shutting down — please retry shortly.");
+        }
+    }
+
     private void dispatchTurn(
         MentorTurnRequest request,
-        MentorSseChannel channel,
+        MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         MentorTurnLock.ThreadKey key = new MentorTurnLock.ThreadKey(request.workspaceId(), request.threadId());
@@ -170,7 +199,7 @@ public class MentorChatService {
 
     private MentorChatMetrics.Outcome runTurn(
         MentorTurnRequest request,
-        MentorSseChannel channel,
+        MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         // Push thread + workspace ids into MDC so every WARN/ERROR in this turn carries the
@@ -187,7 +216,7 @@ public class MentorChatService {
 
     private MentorChatMetrics.Outcome runTurnInternal(
         MentorTurnRequest request,
-        MentorSseChannel channel,
+        MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
         User user = userRepository.getCurrentUserElseThrow();
@@ -213,7 +242,7 @@ public class MentorChatService {
         MentorRunnerClient client = null;
         CompletableFuture<Void> turnComplete = new CompletableFuture<>();
         java.util.concurrent.atomic.AtomicBoolean errorChunkSeen = new java.util.concurrent.atomic.AtomicBoolean();
-        channel.startHeartbeat();
+        channel.startKeepAlive();
         boolean poisoned = false;
         MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
         try {
@@ -227,55 +256,31 @@ public class MentorChatService {
             state.markStarted();
             channel.send(UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"));
 
-            Map<String, byte[]> aspectInputs = buildAspectContext(request, user);
+            Map<String, byte[]> contextInputs = buildMentorContext(request, user, cookie.userMessageId());
+            MentorAgentRequest agentRequest = new MentorAgentRequest(request.workspaceId(), user.getId());
             SessionRestore sessionRestore = priorSessionBytes
                 .filter(bytes -> bytes.length > 0)
                 .map(bytes -> new SessionRestore(request.threadId(), bytes))
                 .orElse(null);
             InteractiveSandboxSpec spec = mentorPiAdapter.buildSandboxSpec(
-                new MentorAgentRequest(request.workspaceId(), user.getId()),
+                agentRequest,
                 llmConfig,
-                aspectInputs,
+                contextInputs,
                 sessionRestore
             );
-            sandbox = interactiveSandboxServiceProvider.getObject().attach(spec);
-
-            // If the client disconnected during the (potentially seconds-long) cold-start
-            // attach, short-circuit BEFORE wiring up the runner subscription + 20s hello
-            // deadline. Without this, a dead client would hold an entire turn for the full
-            // hello timeout. The outer ClientDisconnectedException catch closes the channel
-            // and runs the finally — sandbox/client get cleaned up there.
-            if (channel.isClientGone()) {
-                throw new ClientDisconnectedException("Client disconnected during sandbox attach");
-            }
-
-            client = new MentorRunnerClient(
-                sandbox,
-                objectMapper,
-                event -> handleEvent(event, state, channel, cookie, turnComplete, errorChunkSeen),
-                callback -> handleFetchContext(callback, aspectInputs),
-                runnerTimeoutScheduler.scheduler(),
-                // Per-thread event filter: the sandbox is shared by (userId, workspaceId), so
-                // a second tab in the same workspace would otherwise see this tab's events.
-                request.threadId()
+            RunnerHandle runner = startRunner(
+                spec,
+                request,
+                channel,
+                clientHolder,
+                state,
+                cookie,
+                turnComplete,
+                errorChunkSeen,
+                contextInputs
             );
-            // Publish to the disconnect hook BEFORE start(): if start() throws (rare — frame
-            // queue full, listener exception on the very first emit) the hook still finds the
-            // client and aborts cleanly. The hook's abort is idempotent on Pi's side.
-            clientHolder.set(client);
-            client.start();
-            // SSE lifecycle may have flipped the channel between bindLifecycle and clientHolder.set.
-            // Re-fire the abort AND short-circuit: without the throw, execution falls through into the
-            // 20s hello + 195s prompt deadline while still holding the per-thread lock — the exact cost
-            // the pre-attach guard at isClientGone() above was added to avoid. The outer
-            // ClientDisconnectedException catch takes the cheap drain-with-20s-timeout path instead.
-            if (channel.isClientGone()) {
-                abortRunnerOnDisconnect(client, request.threadId());
-                throw new ClientDisconnectedException("Client disconnected after runner start");
-            }
-
-            JsonNode hello = client.hello().get(20, TimeUnit.SECONDS);
-            verifyProtocol(hello);
+            sandbox = runner.sandbox();
+            client = runner.client();
 
             // Per-sandbox FIFO serialisation: Pi's AgentSessionRuntime is single-session.
             // `runtime.switchSession(...)` (fired by every `open_thread`) unsubscribes the
@@ -287,9 +292,44 @@ public class MentorChatService {
             // outer single-flight guard (concurrent SAME-thread attempts return 409).
             MentorTurnLock.SandboxKey sandboxKey = new MentorTurnLock.SandboxKey(request.workspaceId(), user.getId());
             try (var ignored = turnLock.acquireSandboxLock(sandboxKey)) {
-                client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
+                try {
+                    client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
+                } catch (Exception openFailure) {
+                    if (sessionRestore == null) {
+                        throw openFailure;
+                    }
+                    log.warn(
+                        "Mentor session restore failed for thread {}; clearing session_jsonl and retrying once: {}",
+                        request.threadId(),
+                        openFailure.toString()
+                    );
+                    chatThreadRepository.clearSessionJsonl(thread.getId());
+                    closeFailedRestoreRunner(client, sandbox);
+                    clientHolder.set(null);
+
+                    InteractiveSandboxSpec cleanSpec = mentorPiAdapter.buildSandboxSpec(
+                        agentRequest,
+                        llmConfig,
+                        contextInputs,
+                        null
+                    );
+                    runner = startRunner(
+                        cleanSpec,
+                        request,
+                        channel,
+                        clientHolder,
+                        state,
+                        cookie,
+                        turnComplete,
+                        errorChunkSeen,
+                        contextInputs
+                    );
+                    sandbox = runner.sandbox();
+                    client = runner.client();
+                    client.openThread(request.threadId()).get(10, TimeUnit.SECONDS);
+                }
                 client
-                    .prompt(request.threadId(), request.userMessage())
+                    .prompt(request.threadId(), MentorTurnPromptFactory.forRunner(request, contextInputs))
                     .whenComplete((result, ex) -> {
                         if (ex != null && !turnComplete.isDone()) {
                             turnComplete.completeExceptionally(ex);
@@ -378,6 +418,90 @@ public class MentorChatService {
         return outcome;
     }
 
+    private RunnerHandle startRunner(
+        InteractiveSandboxSpec spec,
+        MentorTurnRequest request,
+        MentorChannel channel,
+        AtomicReference<MentorRunnerClient> clientHolder,
+        TranslatorState state,
+        MentorTurnPersistence.TurnPersistenceCookie cookie,
+        CompletableFuture<Void> turnComplete,
+        java.util.concurrent.atomic.AtomicBoolean errorChunkSeen,
+        Map<String, byte[]> contextInputs
+    ) throws InterruptedException, java.util.concurrent.ExecutionException, TimeoutException {
+        AttachedSandbox sandbox = attachSandbox(spec);
+
+        // If the client disconnected during the (potentially seconds-long) cold-start
+        // attach, short-circuit BEFORE wiring up the runner subscription + 20s hello
+        // deadline. Without this, a dead client would hold an entire turn for the full
+        // hello timeout. The outer ClientDisconnectedException catch closes the channel
+        // and runs the finally — sandbox/client get cleaned up there.
+        if (channel.isClientGone()) {
+            throw new ClientDisconnectedException("Client disconnected during sandbox attach");
+        }
+
+        MentorRunnerClient client = new MentorRunnerClient(
+            sandbox,
+            objectMapper,
+            event -> handleEvent(event, state, channel, cookie, turnComplete, errorChunkSeen),
+            callback -> handleFetchContext(callback, contextInputs),
+            runnerTimeoutScheduler.scheduler(),
+            // Per-thread event filter: the sandbox is shared by (userId, workspaceId), so
+            // a second tab in the same workspace would otherwise see this tab's events.
+            request.threadId()
+        );
+        // Publish to the disconnect hook BEFORE start(): if start() throws (rare — frame
+        // queue full, listener exception on the very first emit) the hook still finds the
+        // client and aborts cleanly. The hook's abort is idempotent on Pi's side.
+        clientHolder.set(client);
+        client.start();
+        // SSE lifecycle may have flipped the channel between bindLifecycle and clientHolder.set.
+        // Re-fire the abort AND short-circuit: without the throw, execution falls through into the
+        // 20s hello + 195s prompt deadline while still holding the per-thread lock — the exact cost
+        // the pre-attach guard at isClientGone() above was added to avoid.
+        if (channel.isClientGone()) {
+            abortRunnerOnDisconnect(client, request.threadId());
+            throw new ClientDisconnectedException("Client disconnected after runner start");
+        }
+
+        JsonNode hello = client.hello().get(20, TimeUnit.SECONDS);
+        verifyProtocol(hello);
+        return new RunnerHandle(sandbox, client);
+    }
+
+    private static void closeFailedRestoreRunner(MentorRunnerClient client, AttachedSandbox sandbox) {
+        try {
+            client.close();
+        } catch (RuntimeException ignored) {
+            // Best-effort cleanup before retrying with a clean session.
+        }
+        try {
+            sandbox.close(Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // Best-effort cleanup before retrying with a clean session.
+        }
+    }
+
+    private record RunnerHandle(AttachedSandbox sandbox, MentorRunnerClient client) {}
+
+    private AttachedSandbox attachSandbox(InteractiveSandboxSpec spec) {
+        InteractiveSandboxService sandboxService = interactiveSandboxServiceProvider.getObject();
+        try {
+            return sandboxService.attach(spec);
+        } catch (InteractiveSandboxException first) {
+            if (!isStillbornContainerAttach(first)) {
+                throw first;
+            }
+            log.warn("Mentor sandbox died during attach; retrying once: {}", first.getMessage());
+            return sandboxService.attach(spec);
+        }
+    }
+
+    private static boolean isStillbornContainerAttach(InteractiveSandboxException e) {
+        String message = e.getMessage();
+        return message != null && message.contains("container") && message.contains("is not running");
+    }
+
     /**
      * Ask the runner to stop generating tokens because the client is gone. The cost of tokens
      * already in flight is still charged (Pi can't unsend the LLM request), but no further
@@ -417,7 +541,7 @@ public class MentorChatService {
     private void handleEvent(
         JsonNode piEvent,
         TranslatorState state,
-        MentorSseChannel channel,
+        MentorChannel channel,
         MentorTurnPersistence.TurnPersistenceCookie cookie,
         CompletableFuture<Void> turnComplete,
         java.util.concurrent.atomic.AtomicBoolean errorChunkSeen
@@ -512,7 +636,7 @@ public class MentorChatService {
      */
     private static String userFacingError(Throwable e) {
         if (e instanceof MentorRunnerException) {
-            return "Mentor service hit an unexpected error — please retry.";
+            return "The mentor hit an unexpected error. Please try again.";
         }
         if (e instanceof java.util.concurrent.TimeoutException) {
             return "Mentor turn timed out before completion.";
@@ -521,12 +645,27 @@ public class MentorChatService {
             // Should never surface to a still-connected client, but guard anyway.
             return "Connection lost.";
         }
+        if (e instanceof IllegalStateException && isMissingMentorConfig(e.getMessage())) {
+            return "Hephaestus is not ready to mentor in this workspace yet. Connect a mentor model, then try again.";
+        }
+        if (e instanceof InteractiveSandboxException) {
+            return "I couldn't start the mentor runtime. Please try again in a moment.";
+        }
         return "Mentor turn failed unexpectedly.";
     }
 
-    private Map<String, byte[]> buildAspectContext(MentorTurnRequest request, User user) {
+    private static boolean isMissingMentorConfig(@Nullable String message) {
+        return message != null && message.startsWith("No enabled AgentConfig for workspace ");
+    }
+
+    private Map<String, byte[]> buildMentorContext(MentorTurnRequest request, User user, UUID currentUserMessageId) {
         return workspaceContextBuilder.build(
-            new ContextRequest.MentorChatRequest(request.workspaceId(), user.getId(), request.threadId())
+            new ContextRequest.MentorChatRequest(
+                request.workspaceId(),
+                user.getId(),
+                request.threadId(),
+                currentUserMessageId
+            )
         );
     }
 
@@ -561,39 +700,19 @@ public class MentorChatService {
             );
     }
 
-    private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> aspectInputs) {
+    private JsonNode handleFetchContext(MentorRunnerClient.FetchContextRequest req, Map<String, byte[]> contextInputs) {
         String path = req.path();
-        String key = path.startsWith(MentorPiAdapter.ASPECT_INPUT_PREFIX)
-            ? path
-            : MentorPiAdapter.ASPECT_INPUT_PREFIX + stripLeadingPath(path);
-        if (!MentorAspects.ALLOWED_OUTPUT_KEYS.contains(key)) {
+        if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(path)) {
             throw new IllegalArgumentException("fetch_context path not allowed: " + path);
         }
-        byte[] bytes = aspectInputs.get(key);
+        byte[] bytes = contextInputs.get(path);
         if (bytes == null) {
             return NODES.nullNode();
         }
         try {
             return objectMapper.readTree(bytes);
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to parse aspect JSON for path " + path, e);
+            throw new IllegalStateException("Failed to parse context JSON for path " + path, e);
         }
     }
-
-    private static String stripLeadingPath(String path) {
-        int slash = path.lastIndexOf('/');
-        return slash >= 0 ? path.substring(slash + 1) : path;
-    }
-
-    /**
-     * Service-facing request: extracted from the controller body + workspace context. The
-     * optional {@code clientUserMessageId} is the UUID the AI SDK transport minted for the
-     * user message — persistence honours it so optimistic UI on the client reconciles.
-     */
-    public record MentorTurnRequest(
-        long workspaceId,
-        UUID threadId,
-        String userMessage,
-        @Nullable UUID clientUserMessageId
-    ) {}
 }

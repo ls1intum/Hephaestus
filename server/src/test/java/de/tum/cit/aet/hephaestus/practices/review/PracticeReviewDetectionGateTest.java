@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -122,7 +123,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         user.setLogin(login);
         // The gate resolves the role by the stable (gitProviderId, subject) identity, not the login.
         user.setNativeId(nativeIdOf(login));
-        GitProvider provider = new GitProvider();
+        IdentityProvider provider = new IdentityProvider();
         provider.setId(TEST_PROVIDER_ID);
         user.setProvider(provider);
         return user;
@@ -715,18 +716,14 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void detectThrowsOnNullWorkspace() {
             Practice practice = createPractice(TRIGGER_EVENT);
 
-            org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () ->
-                new GateDecision.Detect(null, List.of(practice))
-            );
+            Assertions.assertThrows(NullPointerException.class, () -> new GateDecision.Detect(null, List.of(practice)));
         }
 
         @Test
         void detectThrowsOnNullMatchedPractices() {
             Workspace workspace = createWorkspace();
 
-            org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () ->
-                new GateDecision.Detect(workspace, null)
-            );
+            Assertions.assertThrows(NullPointerException.class, () -> new GateDecision.Detect(workspace, null));
         }
 
         @Test
@@ -736,7 +733,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             GateDecision.Detect detect = new GateDecision.Detect(workspace, List.of(practice));
 
-            org.junit.jupiter.api.Assertions.assertThrows(UnsupportedOperationException.class, () ->
+            Assertions.assertThrows(UnsupportedOperationException.class, () ->
                 detect.matchedPractices().add(new Practice())
             );
         }

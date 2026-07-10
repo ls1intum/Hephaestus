@@ -28,6 +28,8 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -497,7 +499,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
     void duplicateStrategy_throwsAtWiringTime() {
         FakeStrategy a = new FakeStrategy(IntegrationKind.SLACK);
         FakeStrategy b = new FakeStrategy(IntegrationKind.SLACK);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+        Assertions.assertThatThrownBy(() ->
             new OAuthCallbackController(routing, oauthStateService, callbackService, List.of(a, b), PROPS)
         )
             .isInstanceOf(IllegalStateException.class)
@@ -532,15 +534,15 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
-            case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
+            case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
                 "https://gitlab.com",
                 null,
                 null,
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                java.util.Set.of()
+                Set.of()
             );
-            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
+            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

@@ -23,7 +23,6 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
@@ -37,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -78,6 +78,15 @@ public class IntegrationNatsConsumer {
      */
     private static final IntegrationKind INSTALLATION_AWARE_KIND = IntegrationKind.GITHUB;
 
+    /**
+     * Kind whose stream backs the fleet-wide flat (non-repository-scoped) consumer. Today only
+     * the messaging kind (Slack) publishes to a flat {@code <stream>.>} subject space; we go
+     * through {@link ConsumerSubjectMath#streamNameFor} so the field name and wiring stay
+     * vendor-neutral while the singular supported value stays explicit (mirrors
+     * {@link #INSTALLATION_AWARE_KIND}). New flat-stream vendors will need a sibling consumer.
+     */
+    private static final IntegrationKind FLAT_STREAM_KIND = IntegrationKind.SLACK;
+
     /** NATS client connection timeout — keep short; reconnect handles long outages. */
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(10);
 
@@ -105,6 +114,14 @@ public class IntegrationNatsConsumer {
     /** Installation consumer — single-instance, mutable across restarts. */
     private volatile ScopeConsumer installationConsumer;
 
+    /**
+     * Fleet-wide flat-stream consumer — single-instance, subscribes to {@code <stream>.>} for
+     * {@link #FLAT_STREAM_KIND}. Flat-stream subjects are not repository-scoped, so (like the
+     * installation consumer) one consumer resolves the tenant inside its handler. Null unless the
+     * flat-stream kind is enabled.
+     */
+    private volatile ScopeConsumer flatStreamConsumer;
+
     /** Virtual-thread executor for scope setup and installation kicks. */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -117,13 +134,22 @@ public class IntegrationNatsConsumer {
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
 
+    /**
+     * Whether the fleet-wide flat-stream consumer should be started. Gated on the vendor-neutral
+     * {@code hephaestus.integration.flat-stream.enabled} (driven by the messaging integrations —
+     * today only Slack) so deployments without a flat-stream kind never create a consumer on the
+     * flat stream (which they also never bootstrap).
+     */
+    private final boolean flatStreamConsumerEnabled;
+
     public IntegrationNatsConsumer(
         NatsConnectionProperties connectionProperties,
         NatsConsumerProperties consumerProperties,
         NatsSubscriptionProvider subscriptionProvider,
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats
+        IntegrationConsumerStats stats,
+        @Value("${hephaestus.integration.flat-stream.enabled:false}") boolean flatStreamConsumerEnabled
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
@@ -131,6 +157,7 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
+        this.flatStreamConsumerEnabled = flatStreamConsumerEnabled;
     }
 
     // Lifecycle
@@ -179,6 +206,16 @@ public class IntegrationNatsConsumer {
                 log.error("Failed to start installation consumer", e);
             }
         });
+        if (flatStreamConsumerEnabled) {
+            virtualThreadExecutor.submit(() -> {
+                try {
+                    ensureNatsConnectionEstablished();
+                    setupFlatStreamConsumer();
+                } catch (Exception e) {
+                    log.error("Failed to start flat-stream consumer", e);
+                }
+            });
+        }
     }
 
     @PreDestroy
@@ -210,6 +247,17 @@ public class IntegrationNatsConsumer {
             }
             installationConsumer = null;
             stats.setInstallationConsumerActive(false);
+        }
+
+        ScopeConsumer flatStream = flatStreamConsumer;
+        if (flatStream != null) {
+            try {
+                flatStream.stop();
+            } catch (Exception e) {
+                log.debug("Failed to stop flat-stream consumer", e);
+            }
+            flatStreamConsumer = null;
+            stats.setFlatStreamConsumerActive(false);
         }
 
         virtualThreadExecutor.shutdown();
@@ -402,6 +450,38 @@ public class IntegrationNatsConsumer {
         }
     }
 
+    private void setupFlatStreamConsumer() throws IOException {
+        String streamName = ConsumerSubjectMath.streamNameFor(FLAT_STREAM_KIND).orElseThrow(() ->
+            new IllegalStateException("No NATS stream resolved for flat-stream kind=" + FLAT_STREAM_KIND)
+        );
+        String[] subjects = new String[] { ConsumerSubjectMath.flatStreamSubjectFilter(FLAT_STREAM_KIND) };
+        String consumerName = ConsumerSubjectMath.flatStreamConsumerName(durableBaseName(), FLAT_STREAM_KIND);
+
+        try {
+            JetStreamOptions jsOptions = JetStreamOptions.builder()
+                .requestTimeout(connectionProperties.consumer().requestTimeout())
+                .build();
+            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
+            ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
+
+            ScopeConsumer flatStream = new ScopeConsumer(
+                null,
+                consumerName,
+                streamName,
+                consumerContext,
+                streamContext,
+                subjects,
+                this::handleMessage
+            );
+            flatStream.start();
+            flatStreamConsumer = flatStream;
+            stats.setFlatStreamConsumerActive(true);
+            log.info("Started flat-stream consumer: consumerName={}", consumerName);
+        } catch (JetStreamApiException e) {
+            throw new IOException("Failed to set up flat-stream consumer", e);
+        }
+    }
+
     private ConsumerContext createOrUpdateConsumer(StreamContext streamContext, String consumerName, String[] subjects)
         throws IOException, JetStreamApiException {
         boolean durable = !isBlank(connectionProperties.durableConsumerName());
@@ -435,9 +515,29 @@ public class IntegrationNatsConsumer {
             }
         }
 
+        ConsumerConfiguration configuration = newConsumerConfiguration(
+            subjects,
+            consumerProperties,
+            durable ? consumerName : null
+        );
+        log.info(
+            "Creating {} consumer: consumerName={}, subjectCount={}, deliverPolicy={}",
+            durable ? "durable" : "ephemeral",
+            durable ? consumerName : "(ephemeral)",
+            subjects.length,
+            configuration.getDeliverPolicy()
+        );
+        return streamContext.createOrUpdateConsumer(configuration);
+    }
+
+    static ConsumerConfiguration newConsumerConfiguration(
+        String[] subjects,
+        NatsConsumerProperties consumerProperties,
+        String durableName
+    ) {
         ConsumerConfiguration.Builder builder = ConsumerConfiguration.builder()
             .filterSubjects(subjects)
-            .deliverPolicy(DeliverPolicy.ByStartTime)
+            .deliverPolicy(DeliverPolicy.New)
             .ackWait(consumerProperties.ackWait())
             .maxAckPending(consumerProperties.maxAckPending())
             // Server-side cap on redeliveries. Without this, MaxDeliver=∞ would let a
@@ -445,19 +545,11 @@ public class IntegrationNatsConsumer {
             // by IntegrationPoisonHandler counting deliveredCount on our side, which
             // means a JetStream-side observability tool (`nats stream info`) cannot see
             // the policy. Mirrors the value the poison handler uses to ACK-terminate.
-            .maxDeliver(consumerProperties.poison().maxRedeliver())
-            .startTime(ZonedDateTime.now().minusDays(connectionProperties.replayTimeframeDays()));
-        if (durable) {
-            builder.durable(consumerName);
+            .maxDeliver(consumerProperties.poison().maxRedeliver());
+        if (!isBlank(durableName)) {
+            builder.durable(durableName);
         }
-        log.info(
-            "Creating {} consumer: consumerName={}, subjectCount={}, replayDays={}",
-            durable ? "durable" : "ephemeral",
-            durable ? consumerName : "(ephemeral)",
-            subjects.length,
-            connectionProperties.replayTimeframeDays()
-        );
-        return streamContext.createOrUpdateConsumer(builder.build());
+        return builder.build();
     }
 
     private String[] buildScopeSubjects(NatsSubscriptionInfo info) {

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -70,7 +70,7 @@ public class GitLabReviewReconciler {
         User author,
         String discussionGlobalId,
         Instant earliestNoteCreatedAt,
-        GitProvider provider,
+        IdentityProvider provider,
         ProcessingContext ctx
     ) {
         if (pr == null || author == null || author.getNativeId() == null || discussionGlobalId == null) {
@@ -132,7 +132,7 @@ public class GitLabReviewReconciler {
         long reviewNativeId,
         PullRequest pr,
         User author,
-        GitProvider provider,
+        IdentityProvider provider,
         Instant earliestNoteCreatedAt,
         ProcessingContext ctx
     ) {

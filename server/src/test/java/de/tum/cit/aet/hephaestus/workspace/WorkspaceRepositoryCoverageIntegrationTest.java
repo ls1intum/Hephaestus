@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
@@ -42,7 +42,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     private GitHubAppTokenService gitHubAppTokenService;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private ConnectionRepository connectionRepository;
@@ -50,10 +50,12 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
-        // Ensure GitHub GitProvider exists - required by WorkspaceRepositoryMonitorService.ensureRepositoryFromSnapshot
+        // Ensure GitHub IdentityProvider exists - required by WorkspaceRepositoryMonitorService.ensureRepositoryFromSnapshot
         gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
         // Clear any suspended installation state from previous tests
         // This prevents test pollution when async syncs mark installations as suspended
         gitHubAppTokenService.markInstallationActive(INSTALLATION_ID);

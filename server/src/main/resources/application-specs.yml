@@ -26,6 +26,17 @@ spring:
                 dialect: org.hibernate.dialect.H2Dialect
 
 hephaestus:
+    auth:
+        login-providers:
+            github:
+                client-id: ""
+                client-secret: ""
+            gitlab:
+                client-id: ""
+                client-secret: ""
+            slack:
+                client-id: ""
+                client-secret: ""
     # OpenAPI generation boots the full Spring context; HmacOAuthStateService fails fast
     # without a webhook/oauth-state secret. Use a deterministic placeholder for the spec run.
     webhook:
@@ -37,6 +48,9 @@ hephaestus:
             enabled: true
             client-id: "specs-only-placeholder-client-id"
             client-secret: "specs-only-placeholder-client-secret"
+    runtime:
+        webhook:
+            enabled: false
     workspace:
         init-default: false
     mail:

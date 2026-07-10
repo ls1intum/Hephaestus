@@ -1,8 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.exception;
 
 import java.io.Serial;
+import org.springframework.modulith.NamedInterface;
 
-/** Raised when an SSE send fails because the client socket is gone. Control-flow only. */
+/**
+ * Raised when a channel send fails because the peer is gone (SSE socket closed, or a Slack stream write is
+ * rejected because the user deleted the message). Control-flow only. Part of the {@code mentor-chat} named
+ * interface so non-{@code agent} channel adapters (e.g. the Slack streaming adapter) can signal a disconnect.
+ */
+@NamedInterface(name = "mentor-chat")
 public final class ClientDisconnectedException extends RuntimeException {
 
     @Serial

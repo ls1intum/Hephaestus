@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -88,7 +89,7 @@ public class WorkerSessionRegistry implements SmartLifecycle {
 
     /** Snapshot of currently registered sessions; safe to iterate without external locking. */
     public Collection<WorkerSession> sessions() {
-        return java.util.Collections.unmodifiableCollection(byWorkerId.values());
+        return Collections.unmodifiableCollection(byWorkerId.values());
     }
 
     public int activeCount() {

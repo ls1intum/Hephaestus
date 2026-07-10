@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	initiateMutation,
-	sendTestMessageMutation,
+	sendSlackTestMessageMutation,
 	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
+import type { SlackChannelCandidate } from "@/api/types.gen";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -25,7 +26,6 @@ import { Input } from "@/components/ui/input";
 export interface AdminSlackNotificationSettingsProps {
 	workspaceSlug: string;
 	hasSlackConnection: boolean;
-	/** Active Slack connection id; enables the Disconnect affordance when present. */
 	slackConnectionId?: number;
 	channelId?: string;
 	onSaved: () => void;
@@ -66,7 +66,7 @@ export function AdminSlackNotificationSettings({
 	}, [onSaved]);
 
 	const test = useMutation({
-		...sendTestMessageMutation(),
+		...sendSlackTestMessageMutation(),
 		onSuccess: (data) => {
 			if (data.ok) {
 				toast.success("Test message posted to Slack", {

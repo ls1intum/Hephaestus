@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import java.util.List;
@@ -63,7 +64,7 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
             .stream()
             .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration.scm.github."))
             .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
-            .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
+            .filter(c -> !c.getModifiers().contains(JavaModifier.ABSTRACT))
             .filter(c -> !whitelist.contains(c.getFullName()))
             .filter(c -> !bindsToUnifiedSpi(c))
             .map(JavaClass::getFullName)
@@ -75,7 +76,7 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
                 .stream()
                 .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.integration.scm.gitlab."))
                 .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
-                .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
+                .filter(c -> !c.getModifiers().contains(JavaModifier.ABSTRACT))
                 .filter(c -> !whitelist.contains(c.getFullName()))
                 .filter(c -> !bindsToUnifiedSpi(c))
                 .map(JavaClass::getFullName)
@@ -110,7 +111,7 @@ class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
             .stream()
             .filter(c -> c.getPackageName().startsWith(packagePrefix))
             .filter(c -> c.getSimpleName().endsWith("MessageHandler"))
-            .filter(c -> !c.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.ABSTRACT))
+            .filter(c -> !c.getModifiers().contains(JavaModifier.ABSTRACT))
             .filter(IntegrationMessageHandlerArchTest::bindsToUnifiedSpi)
             .count();
     }

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 
@@ -15,7 +15,7 @@ public final class TestUserFactory {
         return repository.findByLogin(login).orElseGet(() -> repository.save(createUser(fallbackId, login)));
     }
 
-    public static User ensureUser(UserRepository repository, String login, long fallbackId, GitProvider provider) {
+    public static User ensureUser(UserRepository repository, String login, long fallbackId, IdentityProvider provider) {
         return repository
             .findByLoginAndProviderId(login, provider.getId())
             .orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
@@ -35,7 +35,7 @@ public final class TestUserFactory {
         return user;
     }
 
-    public static User createUser(long id, String login, GitProvider provider) {
+    public static User createUser(long id, String login, IdentityProvider provider) {
         User user = createUser(id, login);
         user.setProvider(provider);
         return user;

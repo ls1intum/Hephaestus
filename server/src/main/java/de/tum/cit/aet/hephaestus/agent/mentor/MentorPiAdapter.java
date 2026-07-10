@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.mentor;
 
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory.PiPlan;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
@@ -26,9 +27,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MentorPiAdapter {
 
-    public static final String SYSTEM_PROMPT_PATH = WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH;
-    public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_PREFIX;
-    public static final String SESSIONS_DIR_PREFIX = WorkspaceAbi.SESSIONS_DIR_PREFIX;
+    public static final String SYSTEM_PROMPT_PATH = SandboxLayout.MENTOR_SYSTEM_PROMPT_PATH;
+    public static final String CONTEXT_INPUT_PREFIX = SandboxLayout.CONTEXT_PREFIX;
+    public static final String SESSIONS_DIR_PREFIX = SandboxLayout.SESSIONS_DIR_PREFIX;
 
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();
 
@@ -46,15 +47,15 @@ public class MentorPiAdapter {
     public InteractiveSandboxSpec buildSandboxSpec(
         MentorAgentRequest request,
         MentorLlmConfig llmConfig,
-        Map<String, byte[]> aspectInputs,
+        Map<String, byte[]> contextInputs,
         @Nullable SessionRestore sessionRestore
     ) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(llmConfig, "llmConfig");
-        Objects.requireNonNull(aspectInputs, "aspectInputs");
-        validateAspectInputs(aspectInputs);
+        Objects.requireNonNull(contextInputs, "contextInputs");
+        validateContextInputs(contextInputs);
 
-        Map<String, byte[]> extraInputs = new LinkedHashMap<>(aspectInputs);
+        Map<String, byte[]> extraInputs = new LinkedHashMap<>(contextInputs);
         extraInputs.put(SYSTEM_PROMPT_PATH, PiRuntimeFactory.loadClasspathResource("mentor/system.md"));
         if (sessionRestore != null) {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
@@ -106,18 +107,21 @@ public class MentorPiAdapter {
         );
     }
 
-    private static void validateAspectInputs(Map<String, byte[]> aspectInputs) {
-        for (Map.Entry<String, byte[]> entry : aspectInputs.entrySet()) {
+    private static void validateContextInputs(Map<String, byte[]> contextInputs) {
+        for (Map.Entry<String, byte[]> entry : contextInputs.entrySet()) {
             String key = entry.getKey();
-            if (key == null || !key.startsWith(ASPECT_INPUT_PREFIX)) {
+            if (key == null || !key.startsWith(CONTEXT_INPUT_PREFIX)) {
                 throw new IllegalArgumentException(
-                    "aspectInputs key must begin with '" + ASPECT_INPUT_PREFIX + "', got: " + key
+                    "contextInputs key must begin with '" + CONTEXT_INPUT_PREFIX + "', got: " + key
                 );
+            }
+            if (!MentorContextKeys.ALLOWED_OUTPUT_KEYS.contains(key)) {
+                throw new IllegalArgumentException("unsupported mentor context input key: " + key);
             }
             // Reject null bytes here so the failure names the offending key, rather than surfacing as an
             // opaque NPE deep inside PiPlanSpec's Map.copyOf(extraInputs), which rejects null values.
             if (entry.getValue() == null) {
-                throw new IllegalArgumentException("aspectInputs value for '" + key + "' must not be null");
+                throw new IllegalArgumentException("contextInputs value for '" + key + "' must not be null");
             }
         }
     }

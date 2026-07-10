@@ -34,13 +34,18 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     private static final String AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
 
-    // Locked OAuth scope set; rotating apps rejected at finalize until token-rotation refresher ships.
+    // Exact Slack bot scopes used by current code and subscribed events. Channel reading still requires
+    // workspace-admin channel activation and the per-member opt-out firewall.
     static final Set<String> DEFAULT_SCOPES = Set.of(
         "chat:write",
-        "chat:write.public",
-        "team:read",
-        "users:read",
-        "users:read.email"
+        "assistant:write",
+        "im:history",
+        "channels:history",
+        "groups:history",
+        "channels:read",
+        "channels:join",
+        "groups:read",
+        "users:read"
     );
 
     private final OAuthStateService oauthStateService;
@@ -72,6 +77,9 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ConnectInitiation initiate(InitiateRequest request) {
+        if (redirectUri == null || redirectUri.isBlank()) {
+            throw new IllegalStateException("Slack redirect URI must be configured");
+        }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.SLACK, request.actorRef());
         StringBuilder url = new StringBuilder(AUTHORIZE_URL)
             .append('?')
@@ -81,9 +89,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             .append(enc(scopes))
             .append("&state=")
             .append(enc(state));
-        if (redirectUri != null && !redirectUri.isBlank()) {
-            url.append("&redirect_uri=").append(enc(redirectUri));
-        }
+        url.append("&redirect_uri=").append(enc(redirectUri));
         return new ConnectInitiation.RedirectToVendor(URI.create(url.toString()), state);
     }
 
@@ -92,6 +98,9 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         String code = callbackParams == null ? null : callbackParams.get("code");
         if (code == null || code.isBlank()) {
             return new ConnectFinalization.Failed("missing code");
+        }
+        if (redirectUri == null || redirectUri.isBlank()) {
+            return new ConnectFinalization.Failed("Slack redirect URI must be configured");
         }
         OAuthV2Access r;
         try {
@@ -114,6 +123,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
             r.team().name(),
             /* notificationChannelId */ null,
             /* teamLabel */ null,
+            /* retentionDays */ null,
             Set.of()
         );
         return new ConnectFinalization.Completed(
@@ -126,12 +136,6 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public void revoke(IntegrationRef ref) {
-        // Best-effort: invalidate the bot token on Slack's side so a disconnect doesn't
-        // leave a dangling credential. Failure here MUST NOT block the local UNINSTALLED
-        // transition — the caller has already cleared credentials_encrypted, so the
-        // local state is consistent regardless of Slack's reachability. Network failures
-        // (502/timeout), 401 (already-revoked), 5xx — all swallowed with a single
-        // warn log so the disconnect flow stays idempotent.
         var bundle = credentialProvider.resolve(ref);
         if (bundle.isEmpty() || !(bundle.get() instanceof BearerToken bt)) {
             log.debug("Slack revoke skipped: no bearer token for workspace={}", ref.workspaceId());

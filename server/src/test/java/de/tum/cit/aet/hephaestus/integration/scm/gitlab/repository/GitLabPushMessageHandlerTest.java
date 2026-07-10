@@ -11,9 +11,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
@@ -64,7 +64,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     private CommitRepository commitRepository;
 
     @Mock
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Mock
     private GitRepositoryManager gitRepositoryManager;
@@ -92,7 +92,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
     private TransactionTemplate transactionTemplate;
     private GitLabPushMessageHandler handler;
-    private GitProvider gitLabProvider;
+    private IdentityProvider gitLabProvider;
 
     @BeforeEach
     void setUp() {
@@ -116,14 +116,14 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             Duration.ofMinutes(5)
         );
 
-        gitLabProvider = new GitProvider();
+        gitLabProvider = new IdentityProvider();
         gitLabProvider.setId(PROVIDER_ID);
-        gitLabProvider.setType(GitProviderType.GITLAB);
+        gitLabProvider.setType(IdentityProviderType.GITLAB);
         gitLabProvider.setServerUrl(DEFAULT_SERVER_URL);
 
         // Default: provider lookup succeeds
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, DEFAULT_SERVER_URL))
+            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, DEFAULT_SERVER_URL))
             .thenReturn(Optional.of(gitLabProvider));
 
         handler = new GitLabPushMessageHandler(

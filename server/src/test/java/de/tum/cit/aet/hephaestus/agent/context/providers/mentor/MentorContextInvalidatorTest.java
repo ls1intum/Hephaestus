@@ -6,7 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -22,6 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -64,11 +67,11 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        when(cacheManager.getCache("mentor_user_aspect")).thenReturn(userCache);
-        when(cacheManager.getCache("mentor_workspace_aspect")).thenReturn(workspaceCache);
-        when(cacheManager.getCache("mentor_findings_aspect")).thenReturn(findingsCache);
-        when(cacheManager.getCache("mentor_practice_standing_aspect")).thenReturn(standingCache);
-        when(cacheManager.getCache("mentor_authored_work_aspect")).thenReturn(authoredWorkCache);
+        when(cacheManager.getCache("mentor_user_context")).thenReturn(userCache);
+        when(cacheManager.getCache("mentor_workspace_context")).thenReturn(workspaceCache);
+        when(cacheManager.getCache("mentor_findings_context")).thenReturn(findingsCache);
+        when(cacheManager.getCache("mentor_practice_standing_context")).thenReturn(standingCache);
+        when(cacheManager.getCache("mentor_authored_work_context")).thenReturn(authoredWorkCache);
     }
 
     @Test
@@ -81,33 +84,24 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         verify(workspaceCache).evict(eq("7:9"));
         verify(findingsCache).evict(eq("7:9"));
         verify(standingCache).evict(eq("7:9"));
-        // The authored-work aspect is in the per-user eviction set.
+        // The authored-work context is in the per-user eviction set.
         verify(authoredWorkCache).evict(eq("7:9"));
     }
 
     @Test
     void practiceDetectionCompletedEvictsFindingsAndStandingForDeveloper() {
-        // A completed detection run wrote new observations → the findings + standing aspects must be
+        // A completed detection run wrote new observations → the findings + standing contexts must be
         // evicted for the evaluated developer. SCM-only caches stay untouched (this is not an SCM event).
         invalidator.onPracticeDetectionCompleted(
-            new de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent(
-                UUID.randomUUID(),
-                7L,
-                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST,
-                42L,
-                9L,
-                3,
-                0,
-                true
-            )
+            new PracticeDetectionCompletedEvent(UUID.randomUUID(), 7L, WorkArtifact.PULL_REQUEST, 42L, 9L, 3, 0, true)
         );
 
         verify(findingsCache).evict(eq("7:9"));
         verify(standingCache).evict(eq("7:9"));
-        // The user / workspace / authored-work aspects are SCM-driven, not detection-driven — untouched here.
-        verify(userCache, never()).evict(org.mockito.ArgumentMatchers.any());
-        verify(workspaceCache, never()).evict(org.mockito.ArgumentMatchers.any());
-        verify(authoredWorkCache, never()).evict(org.mockito.ArgumentMatchers.any());
+        // The user / workspace / authored-work contexts are SCM-driven, not detection-driven — untouched here.
+        verify(userCache, never()).evict(ArgumentMatchers.any());
+        verify(workspaceCache, never()).evict(ArgumentMatchers.any());
+        verify(authoredWorkCache, never()).evict(ArgumentMatchers.any());
     }
 
     @Test
@@ -126,7 +120,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
 
         invalidator.onPullRequestUpdated(buildPrUpdated(42L, 9L, null));
 
-        verify(userCache, never()).evict(org.mockito.ArgumentMatchers.any());
+        verify(userCache, never()).evict(ArgumentMatchers.any());
     }
 
     @Test
@@ -194,7 +188,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
             DataSource.WEBHOOK,
             "synchronize",
             UUID.randomUUID().toString(),
-            GitProviderType.GITHUB
+            IdentityProviderType.GITHUB
         );
     }
 }

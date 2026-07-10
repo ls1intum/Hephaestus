@@ -124,7 +124,7 @@ the receiver still has known failure windows that we are NOT solving here:
   blips. Beyond that the controllers return 503 → provider retries per its own schedule. Push
   events on GitHub/GitLab are NOT in the provider retry set, so a sustained NATS outage drops
   pushes. Mitigation: NATS uptime SLO (operationally tracked, not gated here).
-- **Stream config drift.** `StreamBootstrap` is `addStream`-or-`getStreamInfo` and never calls
+- **Stream config drift.** `WebhookJetStreamBootstrap` is `addStream`-or-`getStreamInfo` and never calls
   `updateStream`. If a future config change widens `duplicate-window` or `maxAge` in the source,
   an operator must apply it manually via `nats stream edit`. WARN-on-drift surfaces the divergence
   in logs; the receiver continues to publish into the pre-existing stream.

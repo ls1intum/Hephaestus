@@ -51,7 +51,7 @@ public class JetStreamPublisher {
     public void publish(PublishRequest request) {
         inFlight.register();
         try {
-            Retry.decorateCallable(retry, () -> publishOnce(request)).call();
+            Retry.decorateCallable(retry, () -> publishOnce(request, properties.publish().timeout())).call();
             successCounter.increment();
         } catch (Exception e) {
             failureCounter.increment();
@@ -64,7 +64,20 @@ public class JetStreamPublisher {
         }
     }
 
-    private PublishAck publishOnce(PublishRequest request)
+    public void publishFast(PublishRequest request, Duration timeout) {
+        inFlight.register();
+        try {
+            publishOnce(request, timeout);
+            successCounter.increment();
+        } catch (Exception e) {
+            failureCounter.increment();
+            throw new PublishFailedException("Failed to publish webhook to NATS: subject=" + request.subject(), e);
+        } finally {
+            inFlight.arriveAndDeregister();
+        }
+    }
+
+    private PublishAck publishOnce(PublishRequest request, Duration timeout)
         throws IOException, JetStreamApiException, InterruptedException, ExecutionException, TimeoutException {
         Headers headers = new Headers();
         for (Map.Entry<String, String> entry : request.headers().entrySet()) {
@@ -74,16 +87,15 @@ public class JetStreamPublisher {
             .messageId(request.dedupId())
             .expectedStream(streamFor(request.subject()))
             .build();
-        long timeoutMs = properties.publish().timeout().toMillis();
         return jetStream
             .publishAsync(request.subject(), headers, request.body(), options)
-            .get(timeoutMs, TimeUnit.MILLISECONDS);
+            .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /**
      * Derives the JetStream stream name from the subject prefix (first dot-segment).
      * Kept kind-agnostic so a new integration adapter only needs to (a) add a stream in
-     * {@link StreamBootstrap#STREAMS} and (b) emit subjects under {@code <name>.…} —
+     * {@link WebhookJetStreamBootstrap#STREAMS} and (b) emit subjects under {@code <name>.…} —
      * no edit to this method.
      */
     private static String streamFor(String subject) {

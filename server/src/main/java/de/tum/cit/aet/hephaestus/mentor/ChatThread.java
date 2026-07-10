@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.jspecify.annotations.NonNull;
 
@@ -42,6 +43,17 @@ public class ChatThread {
     @Column(columnDefinition = "TEXT", length = 256)
     @Size(max = 256)
     private String title;
+
+    /**
+     * The surface this thread is conducted on (changelog {@code 1782980500800-1}). Existing rows backfill to
+     * {@code WEB}; a Slack DM thread is created with {@code SLACK_DM}. Value-constrained by
+     * {@code chk_chat_thread_surface}.
+     */
+    @NonNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "surface", nullable = false, length = 16)
+    @ColumnDefault("'WEB'")
+    private ThreadSurface surface = ThreadSurface.WEB;
 
     /**
      * All messages in this thread. DB-side {@code ON DELETE CASCADE} (migration

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,7 +38,7 @@ public class HubConfiguration {
     private static final Logger log = LoggerFactory.getLogger(HubConfiguration.class);
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(FrameCodec.class)
+    @ConditionalOnMissingBean(FrameCodec.class)
     FrameCodec frameCodec(ObjectMapper objectMapper) {
         return new FrameCodec(objectMapper);
     }

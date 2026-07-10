@@ -59,8 +59,8 @@ public class AccountWebController {
         boolean hasGitLabIdentity,
         // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
         // gate on the *target instance* rather than merely "has any GitLab identity".
-        java.util.List<LinkedProviderDTO> linkedProviders,
-        java.util.List<String> roles,
+        List<LinkedProviderDTO> linkedProviders,
+        List<String> roles,
         // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh before it
         // lapses, rather than waiting for a 401 (BFF pattern; see CurrentAccount.accessTokenExpiresAt).
         @Nullable Long accessTokenExpiresAt
@@ -87,12 +87,12 @@ public class AccountWebController {
         var identities = accountService.activeIdentities(account.getId());
         // Primary identity = most recently used active link (login source for the SPA).
         IdentityLink primary = identities.stream().findFirst().orElse(null);
-        java.util.List<LinkedProviderDTO> linkedProviders = identities
+        List<LinkedProviderDTO> linkedProviders = identities
             .stream()
             .map(il ->
                 new LinkedProviderDTO(
-                    gitProviderRegistry.providerTypeName(il.getGitProviderId()),
-                    gitProviderRegistry.providerServerUrl(il.getGitProviderId())
+                    gitProviderRegistry.providerTypeName(il.getProviderId()),
+                    gitProviderRegistry.providerServerUrl(il.getProviderId())
                 )
             )
             .distinct()
@@ -110,7 +110,7 @@ public class AccountWebController {
                 primary != null ? primary.getUsernameAtSignup() : account.getDisplayName(),
                 primary != null ? primary.getAvatarUrl() : null,
                 primary != null ? primary.getProfileUrl() : null,
-                primary != null ? gitProviderRegistry.providerTypeName(primary.getGitProviderId()) : null,
+                primary != null ? gitProviderRegistry.providerTypeName(primary.getProviderId()) : null,
                 primary != null ? primary.getSubject() : null,
                 hasGitLab,
                 linkedProviders,
@@ -165,7 +165,7 @@ public class AccountWebController {
     }
 
     private IdentityViewDTO toView(IdentityLink il) {
-        String providerType = gitProviderRegistry.providerTypeName(il.getGitProviderId());
+        String providerType = gitProviderRegistry.providerTypeName(il.getProviderId());
         return new IdentityViewDTO(
             il.getId(),
             providerType,

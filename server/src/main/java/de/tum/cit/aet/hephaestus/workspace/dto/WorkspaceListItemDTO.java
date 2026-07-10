@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -20,7 +20,7 @@ public record WorkspaceListItemDTO(
     String status,
     @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
     @Schema(description = "High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound")
-    GitProviderType providerType,
+    IdentityProviderType providerType,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
     @NonNull @Schema(description = "Whether the Pi mentor chat feature is enabled") Boolean mentorEnabled,
@@ -30,9 +30,9 @@ public record WorkspaceListItemDTO(
     CohortVisibility cohortVisibility
 ) {
     public static WorkspaceListItemDTO from(Workspace workspace, ConnectionService connectionService) {
-        GitProviderType providerType = connectionService
+        IdentityProviderType providerType = connectionService
             .findActiveProviderKind(workspace.getId())
-            .map(GitProviderType::from)
+            .map(IdentityProviderType::from)
             .orElse(null);
         return new WorkspaceListItemDTO(
             workspace.getId(),

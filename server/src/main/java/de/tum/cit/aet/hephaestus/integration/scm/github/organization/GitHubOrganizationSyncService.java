@@ -9,8 +9,8 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -73,7 +73,7 @@ public class GitHubOrganizationSyncService {
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubOrganizationSyncService(
@@ -84,7 +84,7 @@ public class GitHubOrganizationSyncService {
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
         GitHubGraphQlSyncCoordinator graphQlSyncHelper,
-        GitProviderRepository gitProviderRepository
+        IdentityProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.organizationProcessor = organizationProcessor;
@@ -191,8 +191,8 @@ public class GitHubOrganizationSyncService {
 
             // Resolve GitHub provider ID
             Long providerId = gitProviderRepository
-                .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
-                .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
                 .getId();
 
             // Convert GraphQL response to DTO and process

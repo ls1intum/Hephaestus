@@ -35,8 +35,8 @@ import org.jspecify.annotations.Nullable;
  * One <em>active</em> identity per (account, provider, team) — enforced by the partial-unique
  * {@code uq_identity_link_active_per_provider} which only counts rows with {@code disabled_at IS NULL}.
  * Multiple identities of the same provider type for the same account are supported (e.g.
- * personal GitLab + work GitLab) but each must carry a distinct {@link #gitProviderId} (the
- * scalar FK to the integration-owned {@code git_provider} row — see that field's doc for why it
+ * personal GitLab + work GitLab) but each must carry a distinct {@link #providerId} (the
+ * scalar FK to the integration-owned {@code identity_provider} row — see that field's doc for why it
  * is not a JPA {@code @ManyToOne} association).
  */
 @Entity
@@ -55,16 +55,16 @@ public class IdentityLink {
     private Account account;
 
     /**
-     * FK (by id) to the {@code git_provider} row owned by the {@code integration} module.
-     * Stored as a plain scalar rather than a JPA {@code @ManyToOne GitProvider} association so
+     * FK (by id) to the {@code identity_provider} row owned by the {@code integration} module.
+     * Stored as a plain scalar rather than a JPA {@code @ManyToOne IdentityProvider} association so
      * that {@code core.auth} does not import the integration entity — that import would invert
      * the bounded-context dependency direction ({@code integration → core}). Resolution of a
      * {@code registrationId} to this id happens through the
      * {@code de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry} SPI, implemented in
-     * {@code integration}. The DB column and FK constraint are unchanged.
+     * {@code integration}.
      */
-    @Column(name = "git_provider_id", nullable = false)
-    private Long gitProviderId;
+    @Column(name = "provider_id", nullable = false)
+    private Long providerId;
 
     /** IdP-stable user id (GitHub numeric id, GitLab numeric id, Slack {@code U...}). */
     @Column(name = "subject", nullable = false, length = 255)

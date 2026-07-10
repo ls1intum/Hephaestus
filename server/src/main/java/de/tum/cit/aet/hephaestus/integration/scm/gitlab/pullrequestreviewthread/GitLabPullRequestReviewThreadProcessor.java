@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -139,7 +139,7 @@ public class GitLabPullRequestReviewThreadProcessor {
     public PullRequestReviewThread findOrCreateThread(
         ThreadData data,
         PullRequest pr,
-        GitProvider provider,
+        IdentityProvider provider,
         Long scopeId
     ) {
         Long providerId = provider.getId();
@@ -166,7 +166,7 @@ public class GitLabPullRequestReviewThreadProcessor {
     public PullRequestReviewThread findOrCreateWebhookThread(
         WebhookThreadData data,
         PullRequest pr,
-        GitProvider provider
+        IdentityProvider provider
     ) {
         Long providerId = provider.getId();
 
@@ -260,7 +260,12 @@ public class GitLabPullRequestReviewThreadProcessor {
         return existing;
     }
 
-    private PullRequestReviewThread createThread(ThreadData data, PullRequest pr, GitProvider provider, Long scopeId) {
+    private PullRequestReviewThread createThread(
+        ThreadData data,
+        PullRequest pr,
+        IdentityProvider provider,
+        Long scopeId
+    ) {
         long nativeId = deterministicNativeId(data.discussionGlobalId());
 
         PullRequestReviewThread thread = new PullRequestReviewThread();
@@ -304,7 +309,7 @@ public class GitLabPullRequestReviewThreadProcessor {
     private void publishThreadStateEvent(PullRequestReviewThread thread, PullRequest pr, Long scopeId) {
         ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData -> {
             RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
-            EventContext ctx = EventContext.forSync(scopeId, repoRef, GitProviderType.GITLAB);
+            EventContext ctx = EventContext.forSync(scopeId, repoRef, IdentityProviderType.GITLAB);
 
             if (thread.getState() == PullRequestReviewThread.State.RESOLVED) {
                 eventPublisher.publishEvent(new ScmDomainEvent.ReviewThreadResolved(threadData, ctx));

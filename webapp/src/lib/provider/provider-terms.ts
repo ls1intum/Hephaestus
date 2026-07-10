@@ -48,3 +48,12 @@ export function getProviderTerms(provider: ProviderType): ProviderTerminology {
 export function getProviderSlug(provider: ProviderType): ProviderSlug {
 	return provider.toLowerCase() as ProviderSlug;
 }
+
+/**
+ * Narrows a workspace's provider (which may be a non-SCM identity provider such as SLACK) to an SCM
+ * {@link ProviderType} for SCM-only UI (repo terminology, PR/MR state icons, provider palette).
+ * Non-SCM providers fall back to GITHUB so these surfaces render gracefully instead of crashing.
+ */
+export function toScmProviderType(provider: string | null | undefined): ProviderType {
+	return provider === "GITLAB" ? "GITLAB" : "GITHUB";
+}

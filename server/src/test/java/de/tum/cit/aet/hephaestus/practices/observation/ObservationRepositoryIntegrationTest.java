@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
@@ -40,6 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.ObjectMapper;
 
 class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
@@ -68,7 +69,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     private WorkspaceMembershipRepository workspaceMembershipRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private ObservationService observationService;
@@ -101,9 +102,11 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
         aboutUser = TestUserFactory.createUser(100L, "test-about-user", provider);
         aboutUser = userRepository.save(aboutUser);
         WorkspaceMembership membership = new WorkspaceMembership();
@@ -672,8 +675,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void aboutUserIsolation() {
-            GitProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseThrow();
             User otherAboutUser = TestUserFactory.createUser(200L, "other-about-user", provider);
             otherAboutUser = userRepository.save(otherAboutUser);
@@ -852,7 +855,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 workspace.getId(),
                 Instant.parse("2026-01-01T00:00:00Z"),
-                org.springframework.data.domain.PageRequest.of(0, 50)
+                PageRequest.of(0, 50)
             );
 
             // The NA row is filtered out of the drill-down list; only the actionable BAD finding remains.

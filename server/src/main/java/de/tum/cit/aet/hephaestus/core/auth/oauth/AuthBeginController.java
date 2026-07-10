@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +16,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,8 +44,8 @@ public class AuthBeginController {
 
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final AuthIntentCookie authIntentCookie;
-    private final de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver bearerTokenResolver;
-    private final org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
+    private final CookieBearerTokenResolver bearerTokenResolver;
+    private final JwtDecoder jwtDecoder;
 
     /** Proxy-stripped API prefix re-added to the init redirect — see {@code AuthProperties#apiBasePath}. */
     private final String apiBasePath;
@@ -47,9 +53,9 @@ public class AuthBeginController {
     public AuthBeginController(
         ClientRegistrationRepository clientRegistrationRepository,
         AuthIntentCookie authIntentCookie,
-        de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver bearerTokenResolver,
-        de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder jwtDecoder,
-        de.tum.cit.aet.hephaestus.core.auth.AuthProperties authProperties
+        CookieBearerTokenResolver bearerTokenResolver,
+        RevocationAwareJwtDecoder jwtDecoder,
+        AuthProperties authProperties
     ) {
         this.clientRegistrationRepository = clientRegistrationRepository;
         this.authIntentCookie = authIntentCookie;
@@ -76,8 +82,12 @@ public class AuthBeginController {
             return new RedirectView("/auth/error?code=unknown_provider", false);
         }
         String safeReturnTo = ReturnToValidator.safeOrFallback(returnTo);
+        boolean linkMode = "link".equalsIgnoreCase(mode);
+        if (!linkMode && isSlackRegistration(registration)) {
+            return new RedirectView("/auth/error?code=link_requires_auth", false);
+        }
         AuthIntentCookie.Intent intent;
-        if ("link".equalsIgnoreCase(mode)) {
+        if (linkMode) {
             // Link mode MUST be initiated by an already-authenticated user (secure account linking:
             // never auto-link to an unauthenticated context — that is the pre-account-takeover bug).
             // The login chain is stateless and permitAll, so no SecurityContext exists here; we validate
@@ -102,6 +112,11 @@ public class AuthBeginController {
         return new RedirectView(apiBasePath + OAUTH_INIT_PATH + urlEncodedRegistration, false);
     }
 
+    private static boolean isSlackRegistration(ClientRegistration registration) {
+        String authorizationUri = registration.getProviderDetails().getAuthorizationUri();
+        return authorizationUri != null && authorizationUri.startsWith("https://slack.com/");
+    }
+
     /**
      * The current account id from the access cookie, validated through the same decoder the
      * resource-server chain uses (signature + exp/iss/aud + revocation). Returns {@code null} when
@@ -114,9 +129,9 @@ public class AuthBeginController {
             return null;
         }
         try {
-            org.springframework.security.oauth2.jwt.Jwt jwt = jwtDecoder.decode(token);
+            Jwt jwt = jwtDecoder.decode(token);
             return Long.parseLong(jwt.getSubject());
-        } catch (org.springframework.security.oauth2.jwt.JwtException | NumberFormatException ex) {
+        } catch (JwtException | NumberFormatException ex) {
             log.warn("auth.begin: link-mode token rejected: {}", ex.getMessage());
             return null;
         }

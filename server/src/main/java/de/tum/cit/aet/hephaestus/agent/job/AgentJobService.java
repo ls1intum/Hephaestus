@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -295,6 +296,10 @@ public class AgentJobService {
             job.setWorkspace(workspace);
             job.setConfig(config);
             job.setJobType(jobType);
+            // Stamp the polymorphic subject discriminator from the job type so downstream dispatch (e.g.
+            // DiffNotePoster short-circuits when subjectClass != PULL_REQUEST) is driven off an explicit
+            // value rather than the legacy PULL_REQUEST backfill. Wires SLACK_MESSAGE_THREAD.
+            job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
             job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
@@ -517,6 +522,18 @@ public class AgentJobService {
      * Input: {@code "pr_review:owner/repo:42:authoring:abc123"} → Output: {@code "pr_review:owner/repo:42:authoring:"}
      * This allows LIKE-matching against any freshness for the same (PR, phase).
      */
+    /**
+     * The persisted {@link SubjectClass} discriminator for a job type. Exhaustive over
+     * {@link AgentJobType} so a new job type must declare its subject class here (compile gate).
+     */
+    private static SubjectClass subjectClassFor(AgentJobType jobType) {
+        return switch (jobType) {
+            case PULL_REQUEST_REVIEW -> SubjectClass.PULL_REQUEST;
+            case ISSUE_REVIEW -> SubjectClass.ISSUE;
+            case CONVERSATION_REVIEW -> SubjectClass.SLACK_MESSAGE_THREAD;
+        };
+    }
+
     static String extractCooldownKeyPrefix(String idempotencyKey) {
         // The key format is "<type>:{nameWithOwner}:{number}:{phase}:{freshness}" — only the trailing
         // freshness segment is stripped, so the (number, phase) scope is preserved.

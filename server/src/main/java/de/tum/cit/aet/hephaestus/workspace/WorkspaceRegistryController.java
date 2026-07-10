@@ -13,10 +13,12 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
@@ -50,7 +53,7 @@ public class WorkspaceRegistryController {
         summary = "List available workspace creation providers",
         description = "Returns available workspace providers with their configuration. Public endpoint — no authentication required."
     )
-    @io.swagger.v3.oas.annotations.security.SecurityRequirements
+    @SecurityRequirements
     @PreAuthorize("permitAll()")
     public ResponseEntity<WorkspaceProvidersDTO> getProviders() {
         return ResponseEntity.ok(workspaceQueryService.getAvailableProviders());
@@ -73,8 +76,8 @@ public class WorkspaceRegistryController {
             workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY &&
             !SecurityUtils.isSuperAdmin()
         ) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN,
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
                 "Workspace creation is restricted to instance admins on this deployment"
             );
         }
@@ -83,10 +86,7 @@ public class WorkspaceRegistryController {
             createWorkspaceRequest.kind() == IntegrationKind.GITLAB &&
             !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
         ) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.FORBIDDEN,
-                "GitLab workspace creation is not enabled"
-            );
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GitLab workspace creation is not enabled");
         }
 
         // For GitLab PAT workspaces, ensure the user has a linked GitLab identity. This provisions

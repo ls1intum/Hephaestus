@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -30,28 +30,17 @@ public final class TranslatorState {
     @Nullable
     private String activeTextId;
 
-    @Nullable
-    private String activeReasoningId;
-
     /** Buffer of text so far for the open text block — used to materialise the final {@code text} part. */
     private final StringBuilder textBuffer = new StringBuilder();
 
-    /** Buffer of reasoning so far — finalised when reasoning closes. */
-    private final StringBuilder reasoningBuffer = new StringBuilder();
-
-    /** Tool-call id → tool name, populated on {@code tool_execution_start} for later error labels. */
-    private final Map<String, String> toolNameByCallId = new LinkedHashMap<>();
-
-    /**
-     * Tool-call id → the mutable {@code ObjectNode} part inside {@link #partsAccumulator}. The AI
-     * SDK reducer mutates a single part across input-available → output-available/error; appending
-     * separate parts breaks {@code getToolInvocation} which finds-by-toolCallId and returns the
-     * first hit, so the user sees input but no output after page refresh.
-     */
-    private final Map<String, ObjectNode> toolPartByCallId = new LinkedHashMap<>();
-
     /** AI SDK UIMessage parts as accumulated. Order matches the stream; written to JSONB at end-of-turn. */
     private final ArrayNode partsAccumulator = nodes.arrayNode();
+
+    /**
+     * Observation ids the mentor linked this turn via {@code link_finding}, in emission order. Read at
+     * end-of-turn by the conversational-delivery reconciler to flip the matching PREPARED unit to DELIVERED.
+     */
+    private final List<UUID> linkedFindingIds = new ArrayList<>();
 
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
@@ -149,93 +138,6 @@ public final class TranslatorState {
         this.textBuffer.setLength(0);
     }
 
-    @Nullable
-    public synchronized String activeReasoningId() {
-        return activeReasoningId;
-    }
-
-    public synchronized void openReasoningBlock(String id) {
-        this.activeReasoningId = id;
-        this.reasoningBuffer.setLength(0);
-    }
-
-    public synchronized void appendReasoning(String delta) {
-        this.reasoningBuffer.append(delta);
-    }
-
-    public synchronized void closeReasoningBlock() {
-        if (activeReasoningId != null && reasoningBuffer.length() > 0) {
-            ObjectNode part = nodes.objectNode();
-            part.put("type", "reasoning");
-            part.put("text", reasoningBuffer.toString());
-            // AI SDK's ReasoningUIPart schema mirrors TextUIPart: {state:"streaming"|"done"} is
-            // optional. We persist the terminal value for the same refresh-vs-live invariant.
-            part.put("state", "done");
-            partsAccumulator.add(part);
-        }
-        this.activeReasoningId = null;
-        this.reasoningBuffer.setLength(0);
-    }
-
-    /**
-     * Track tool name for the given call id so {@link UIMessageChunk.ToolOutputError} can include
-     * it. Creates the part once; subsequent {@link #recordToolCallOutput}/{@link #recordToolCallError}
-     * calls mutate it in place — matching how AI SDK's reducer threads a single part through
-     * input-available → output-available/error.
-     */
-    public synchronized void recordToolCallStart(String toolCallId, String toolName, @Nullable JsonNode input) {
-        if (toolCallId == null) return;
-        if (toolName != null) {
-            toolNameByCallId.put(toolCallId, toolName);
-        }
-        ObjectNode part = nodes.objectNode();
-        part.put("type", "tool-" + (toolName != null ? toolName : "unknown"));
-        part.put("toolCallId", toolCallId);
-        part.put("state", "input-available");
-        // `input` is REQUIRED on every state per AI SDK's zod schema (ai@6.0.3 dist/index.mjs:7682).
-        // Default to an empty object so the schema validates even when Pi emits a parameter-less tool.
-        part.set("input", input != null ? input : nodes.objectNode());
-        partsAccumulator.add(part);
-        toolPartByCallId.put(toolCallId, part);
-    }
-
-    /** Mutate the existing tool-call part to {@code state:"output-available"}. */
-    public synchronized void recordToolCallOutput(String toolCallId, JsonNode output) {
-        if (toolCallId == null) return;
-        ObjectNode part = toolPartByCallId.get(toolCallId);
-        if (part == null) {
-            // Output without a prior start — synthesise a part. Should never happen with Pi's
-            // matched start/end events, but if it ever does we want a coherent terminal state.
-            part = nodes.objectNode();
-            String toolName = toolNameByCallId.getOrDefault(toolCallId, "unknown");
-            part.put("type", "tool-" + toolName);
-            part.put("toolCallId", toolCallId);
-            part.set("input", nodes.objectNode());
-            partsAccumulator.add(part);
-            toolPartByCallId.put(toolCallId, part);
-        }
-        part.put("state", "output-available");
-        part.set("output", output != null ? output : nodes.nullNode());
-    }
-
-    /** Mutate the existing tool-call part to {@code state:"output-error"}. */
-    public synchronized void recordToolCallError(String toolCallId, String errorText) {
-        if (toolCallId == null) return;
-        ObjectNode part = toolPartByCallId.get(toolCallId);
-        if (part == null) {
-            part = nodes.objectNode();
-            String toolName = toolNameByCallId.getOrDefault(toolCallId, "unknown");
-            part.put("type", "tool-" + toolName);
-            part.put("toolCallId", toolCallId);
-            part.set("input", nodes.objectNode());
-            partsAccumulator.add(part);
-            toolPartByCallId.put(toolCallId, part);
-        }
-        part.put("state", "output-error");
-        part.put("errorText", errorText);
-        part.remove("output");
-    }
-
     public synchronized void recordDataFinding(UUID findingId) {
         // Match the AI SDK data-* envelope: {type, id, data:{...}}. The id at the top level
         // lets AI SDK dedupe across re-renders; findingId stays inside data for consumers.
@@ -244,6 +146,15 @@ public final class TranslatorState {
         part.put("id", findingId.toString());
         part.putObject("data").put("findingId", findingId.toString());
         partsAccumulator.add(part);
+        linkedFindingIds.add(findingId);
+    }
+
+    /**
+     * The observation ids the mentor linked this turn via {@code link_finding}, in emission order (duplicates
+     * retained - the reconciler de-duplicates). Snapshot copy for cross-thread safety on the finalise path.
+     */
+    public synchronized List<UUID> linkedFindingIds() {
+        return List.copyOf(linkedFindingIds);
     }
 
     /**

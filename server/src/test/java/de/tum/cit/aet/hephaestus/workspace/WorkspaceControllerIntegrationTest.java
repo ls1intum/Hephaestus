@@ -161,7 +161,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         WorkspaceDTO workspace = Objects.requireNonNull(created, "Workspace creation response was null");
         assertThat(workspace.workspaceSlug()).isEqualTo("controller-space");
         assertThat(workspace.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE.name());
-        assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITHUB);
+        assertThat(workspace.providerType()).isEqualTo(IdentityProviderType.GITHUB);
         assertThat(workspace.serverUrl()).isNull();
 
         Workspace persistedWorkspace = workspaceRepository.findById(workspace.id()).orElseThrow();
@@ -192,7 +192,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .getResponseBody();
         assertThat(workspaces).isNotNull();
         assertThat(workspaces).extracting(WorkspaceListItemDTO::workspaceSlug).contains(workspace.workspaceSlug());
-        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(GitProviderType.GITHUB);
+        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(IdentityProviderType.GITHUB);
 
         var membership = workspaceMembershipRepository
             .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())

@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 /**
  * Unit coverage for the OAuth-registration → discovery mapping in {@link IdentityProviderDiscoveryController}:
- * {@code providerTypeOf} (GITHUB vs GITLAB host classification) and {@code baseUrlOf} (scheme://host[:port]
+ * {@code providerTypeOf} (GITHUB vs GITLAB vs SLACK host classification) and {@code baseUrlOf} (scheme://host[:port]
  * reconstruction incl. the malformed/host-less fallback). These are the genuinely error-prone branches — host
  * (not substring) matching and port reconstruction — that the integration tests never assert.
  */
@@ -48,6 +48,14 @@ class IdentityProviderDiscoveryControllerTest extends BaseUnitTest {
         ClientRegistration reg = registration("https://gitlab.com/oauth/authorize");
         assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg)).isEqualTo("GITLAB");
         assertThat(IdentityProviderDiscoveryController.baseUrlOf(reg)).isEqualTo("https://gitlab.com");
+    }
+
+    @Test
+    @DisplayName("slack.com authorization host classifies as SLACK")
+    void slackHostIsSlack() {
+        ClientRegistration reg = registration("https://slack.com/openid/connect/authorize");
+        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg)).isEqualTo("SLACK");
+        assertThat(IdentityProviderDiscoveryController.baseUrlOf(reg)).isEqualTo("https://slack.com");
     }
 
     @Test

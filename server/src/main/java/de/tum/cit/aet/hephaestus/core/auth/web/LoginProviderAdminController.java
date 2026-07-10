@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -48,10 +49,7 @@ public class LoginProviderAdminController {
     /** Proxy-stripped API prefix re-added to the displayed callback URL — see {@code AuthProperties#apiBasePath}. */
     private final String apiBasePath;
 
-    public LoginProviderAdminController(
-        LoginProviderService loginProviderService,
-        de.tum.cit.aet.hephaestus.core.auth.AuthProperties authProperties
-    ) {
+    public LoginProviderAdminController(LoginProviderService loginProviderService, AuthProperties authProperties) {
         this.loginProviderService = loginProviderService;
         this.apiBasePath = authProperties.apiBasePath();
     }

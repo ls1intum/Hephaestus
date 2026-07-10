@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Locale;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -76,7 +77,7 @@ public record PracticeReportItemDTO(
 
     // Workspace ABI prefixes (ADR 0020), mirrored locally to avoid a practices -> agent module dependency.
     // The repo checkout mounts at REPO_MOUNT_RELATIVE; the agent-internal artifacts live under context/,
-    // practices/, and the input manifest. WorkspaceAbi is the source of truth for these literals.
+    // practices/, and the input manifest. SandboxLayout is the source of truth for these literals.
     private static final String REPO_MOUNT_RELATIVE = "inputs/sources/scm/repo/";
     private static final String CONTEXT_PREFIX = "inputs/context/";
     private static final String PRACTICES_PREFIX = "inputs/practices/";
@@ -96,7 +97,7 @@ public record PracticeReportItemDTO(
         if (path.startsWith(CONTEXT_PREFIX) || path.startsWith(PRACTICES_PREFIX) || path.equals(MANIFEST_PATH)) {
             return true;
         }
-        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        String lower = path.toLowerCase(Locale.ROOT);
         // Known agent-context basenames that can appear without the directory prefix (the agent strips it).
         return (
             lower.equals("manifest.json") ||

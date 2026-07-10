@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -227,7 +228,7 @@ public class GitHubTestFixtureService {
             }
             """;
 
-        Map<String, Object> input = new java.util.HashMap<>();
+        Map<String, Object> input = new HashMap<>();
         input.put("id", labelNodeId);
         if (newColor != null) input.put("color", newColor);
         if (newDescription != null) input.put("description", newDescription);
@@ -350,7 +351,7 @@ public class GitHubTestFixtureService {
             }
             """;
 
-        Map<String, Object> input = new java.util.HashMap<>();
+        Map<String, Object> input = new HashMap<>();
         input.put("repositoryId", repositoryNodeId);
         input.put("title", title);
         if (body != null) input.put("body", body);
@@ -502,7 +503,7 @@ public class GitHubTestFixtureService {
             }
             """;
 
-        Map<String, Object> input = new java.util.HashMap<>();
+        Map<String, Object> input = new HashMap<>();
         input.put("pullRequestId", pullRequestNodeId);
         input.put("body", body);
         input.put("event", event); // APPROVE, REQUEST_CHANGES, COMMENT

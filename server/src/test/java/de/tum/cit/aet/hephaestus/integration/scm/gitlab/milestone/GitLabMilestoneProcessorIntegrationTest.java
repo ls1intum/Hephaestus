@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -64,14 +64,14 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
-    private GitProvider gitlabProvider;
+    private IdentityProvider gitlabProvider;
 
     @BeforeEach
     void setUp() {
@@ -556,7 +556,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
         private Repository createRepository(long nativeId, String name, String fullName) {
             Organization org = organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(FIXTURE_ORG_LOGIN, GitProviderType.GITLAB)
+                .findByLoginIgnoreCaseAndProvider_Type(FIXTURE_ORG_LOGIN, IdentityProviderType.GITLAB)
                 .orElseThrow(() -> new IllegalStateException("Test org not found"));
 
             Repository repo = new Repository();
@@ -627,9 +627,9 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
     private void setupTestData() {
         gitlabProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
             .orElseGet(() ->
-                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de"))
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
             );
 
         Organization org = new Organization();

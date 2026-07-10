@@ -33,7 +33,7 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
         """
         SELECT il
           FROM IdentityLink il
-         WHERE il.gitProviderId = :gitProviderId
+         WHERE il.providerId = :gitProviderId
            AND il.subject = :subject
            AND COALESCE(il.teamId, '') = COALESCE(:teamId, '')
            AND il.disabledAt IS NULL

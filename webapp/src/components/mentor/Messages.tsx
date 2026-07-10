@@ -64,7 +64,6 @@ export function Messages({
 		if (parts.length === 0) return false;
 		for (const p of parts) {
 			if (p.type === "text" && (p.text ?? "").trim().length > 0) return true;
-			if (p.type === "reasoning" && (p.text ?? "").trim().length > 0) return true;
 			if (p.type === "file") return true;
 			if (typeof p.type === "string" && p.type.startsWith("tool-")) {
 				const state = (p as { state?: string }).state;

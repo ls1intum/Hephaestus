@@ -10,6 +10,10 @@ import {
 	type ResearchParticipationSectionProps,
 } from "./ResearchParticipationSection";
 import { SessionsSection } from "./SessionsSection";
+import {
+	SlackPreferencesSection,
+	type SlackPreferencesSectionProps,
+} from "./SlackPreferencesSection";
 
 export interface SettingsPageProps {
 	/**
@@ -32,6 +36,12 @@ export interface SettingsPageProps {
 	 * Props for the LinkedAccountsSection component
 	 */
 	linkedAccountsProps: LinkedAccountsSectionProps;
+	/**
+	 * Props for Slack account and message-use preferences.
+	 */
+	slackPreferencesProps: SlackPreferencesSectionProps;
+	/** Whether to show Slack account and message-use preferences. */
+	showSlackPreferencesSection?: boolean;
 	/**
 	 * Called after the account is deleted (logout + redirect).
 	 */
@@ -60,6 +70,8 @@ export function SettingsPage({
 	researchProps,
 	showResearchSection,
 	linkedAccountsProps,
+	slackPreferencesProps,
+	showSlackPreferencesSection = true,
 	onAccountDeleted,
 	isLoading = false,
 	settingsError = false,
@@ -68,6 +80,7 @@ export function SettingsPage({
 	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: linkedLoading = false, ...linkedRest } = linkedAccountsProps;
+	const { isLoading: slackLoading = false, ...slackRest } = slackPreferencesProps;
 
 	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
@@ -121,6 +134,13 @@ export function SettingsPage({
 
 			<Separator />
 			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+
+			{showSlackPreferencesSection && (
+				<>
+					<Separator />
+					<SlackPreferencesSection {...slackRest} isLoading={isLoading || slackLoading} />
+				</>
+			)}
 
 			<Separator />
 			<SessionsSection />

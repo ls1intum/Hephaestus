@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>{@code agent.runtime} must not depend on agent-domain packages (practice / mentor) —
  *       the kernel stays role-agnostic.</li>
- *   <li>{@code ContentProvider} implementations live under {@code agent.context.providers.*} —
+ *   <li>{@code ContentSource} implementations live under {@code agent.context.providers.*} —
  *       enforced so a misplaced provider fails the build.</li>
  * </ul>
  */
@@ -63,13 +63,13 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    class ContentProviderPlacement {
+    class ContentSourcePlacement {
 
         @Test
         void providersInProviderPackage() {
             ArchRule rule = classes()
                 .that()
-                .implement("de.tum.cit.aet.hephaestus.agent.context.ContentProvider")
+                .implement("de.tum.cit.aet.hephaestus.agent.context.ContentSource")
                 .should()
                 .resideInAPackage(CONTEXT_PROVIDERS)
                 .because("Provider implementations must live next to each other for discovery and arch hygiene");

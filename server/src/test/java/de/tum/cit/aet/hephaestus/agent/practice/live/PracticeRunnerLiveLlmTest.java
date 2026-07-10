@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.fail;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
@@ -284,11 +284,11 @@ class PracticeRunnerLiveLlmTest {
 
         // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses,
         // with PI_CODING_AGENT_DIR pointed inside the workspace.
-        Path piDir = WORKSPACE.resolve(WorkspaceAbi.PI_AGENT_PREFIX);
+        Path piDir = WORKSPACE.resolve(SandboxLayout.PI_AGENT_PREFIX);
         Files.createDirectories(piDir);
         Files.copy(
             Path.of("src", "main", "resources", "agent", "pi-orchestrator.md").toAbsolutePath(),
-            piDir.resolve(WorkspaceAbi.ORCHESTRATOR_FILENAME),
+            piDir.resolve(SandboxLayout.ORCHESTRATOR_FILENAME),
             StandardCopyOption.REPLACE_EXISTING
         );
 
@@ -305,15 +305,15 @@ class PracticeRunnerLiveLlmTest {
 
         // Practice catalog under /workspace/inputs/practices/ — the agent reads index.json (slug list)
         // and all-criteria.md (per-practice rules) per the orchestrator instructions.
-        Path practicesDir = WORKSPACE.resolve(WorkspaceAbi.PRACTICES_PREFIX);
+        Path practicesDir = WORKSPACE.resolve(SandboxLayout.PRACTICES_PREFIX);
         Files.createDirectories(practicesDir);
         copyFixture("practices/index.json", practicesDir.resolve("index.json"));
         copyFixture("practices/all-criteria.md", practicesDir.resolve("all-criteria.md"));
         copyFixture("practices/hardcoded-secrets.md", practicesDir.resolve("hardcoded-secrets.md"));
 
         // Context fixture — diff, metadata, comments, diff_summary. Mirrors what
-        // PullRequestContentProvider materialises in production.
-        Path contextDir = WORKSPACE.resolve(WorkspaceAbi.CONTEXT_PREFIX);
+        // PullRequestContentSource materialises in production.
+        Path contextDir = WORKSPACE.resolve(SandboxLayout.CONTEXT_PREFIX);
         Files.createDirectories(contextDir);
         copyFixture("diff.patch", contextDir.resolve("diff.patch"));
         copyFixture("metadata.json", contextDir.resolve("metadata.json"));
@@ -339,14 +339,14 @@ class PracticeRunnerLiveLlmTest {
                     "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
                     "Apply the hardcoded-secrets practice to inputs/context/diff.patch. Persist each " +
                     "justified observation via report_observation (one tool call per observation). Follow " +
-                    WorkspaceAbi.ORCHESTRATOR_PATH +
+                    SandboxLayout.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
                 1,
                 "test/fixture"
             )
         );
         Files.write(
-            WORKSPACE.resolve(WorkspaceAbi.TASK_ENVELOPE_FILENAME),
+            WORKSPACE.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME),
             MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope)
         );
     }

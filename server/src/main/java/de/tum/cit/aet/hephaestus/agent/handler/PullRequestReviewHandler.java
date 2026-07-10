@@ -5,7 +5,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
+import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
@@ -46,7 +46,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
  * <p>Delegates workspace-context materialisation to {@link WorkspaceContextBuilder} (which
- * orchestrates {@code PullRequestContentProvider} → {@code inputs/context/...} files) and the
+ * orchestrates {@code PullRequestContentSource} → {@code inputs/context/...} files) and the
  * task envelope to {@link TaskEnvelopeWriter}. Retains practice catalog injection ({@code inputs/practices/})
  * and delivery-phase post-processing here — catalog injection is per-job and not provider-shaped.
  *
@@ -85,19 +85,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * such findings render as non-inlinable summary items rather than diff-anchored inline notes.
      */
     private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(
-        ContentProvider.OUTPUT_PREFIX + "metadata.json",
-        ContentProvider.OUTPUT_PREFIX + "diff.patch",
-        ContentProvider.OUTPUT_PREFIX + "diff_summary.md",
-        ContentProvider.OUTPUT_PREFIX + "comments.json",
+        ContentSource.OUTPUT_PREFIX + "metadata.json",
+        ContentSource.OUTPUT_PREFIX + "diff.patch",
+        ContentSource.OUTPUT_PREFIX + "diff_summary.md",
+        ContentSource.OUTPUT_PREFIX + "comments.json",
         // Raw SQL-only integration objects (the agent cannot get these from the mounted worktree): a finding
         // grounded in one of these must survive the diff-scope filter. Only objects absent from the worktree
         // belong here — anything derivable from the checkout is content the agent reads directly.
-        ContentProvider.OUTPUT_PREFIX + "linked_work_items.json",
-        ContentProvider.OUTPUT_PREFIX + "review_threads.json",
+        ContentSource.OUTPUT_PREFIX + "linked_work_items.json",
+        ContentSource.OUTPUT_PREFIX + "review_threads.json",
         // General (conversation-tab) MR review discussion — position-less notes GitLab routes to
-        // IssueComment, surfaced by GeneralReviewCommentContentProvider. The reviewer-craft practices
+        // IssueComment, surfaced by GeneralReviewCommentContentSource. The reviewer-craft practices
         // ground in this alongside comments.json; a finding citing it must survive the diff-scope filter.
-        ContentProvider.OUTPUT_PREFIX + "general_comments.json"
+        ContentSource.OUTPUT_PREFIX + "general_comments.json"
     );
 
     /**
@@ -239,13 +239,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             workspaceContextBuilder.build(new ContextRequest.PracticeReviewRequest(job))
         );
 
-        files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
+        files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
         practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST);
 
         // Pre-create blobs/scm/ so the repo can mount under it (the directory mount needs its parent
         // to exist before docker cp extracts into it).
-        files.put(WorkspaceAbi.SCM_SOURCE_KEEP, new byte[0]);
+        files.put(SandboxLayout.SCM_SOURCE_KEEP, new byte[0]);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -287,7 +287,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         log.info("Mounting real repo: repoId={}, path={}", repositoryId, repoPath);
-        return Map.of(repoPath.toAbsolutePath().toString(), WorkspaceAbi.REPO_MOUNT);
+        return Map.of(repoPath.toAbsolutePath().toString(), SandboxLayout.REPO_MOUNT);
     }
 
     private String buildPrompt(AgentJob job) {
@@ -305,7 +305,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             repoName +
             ". Read the context files, then persist every justified observation via the report_observation tool. " +
             "Follow " +
-            WorkspaceAbi.ORCHESTRATOR_PATH +
+            SandboxLayout.ORCHESTRATOR_PATH +
             " for the schema and rules.";
         log.info("Built orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
@@ -746,8 +746,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 // The agent cites files it read under the repo mount as "inputs/sources/scm/repo/<path>" (ADR 0020),
                 // but diff-stat paths are repo-relative ("<path>"). Strip the mount prefix so a code finding
                 // on a genuinely-changed file is not dropped on a cosmetic path mismatch.
-                String repoRelative = path.startsWith(WorkspaceAbi.REPO_MOUNT_RELATIVE)
-                    ? path.substring(WorkspaceAbi.REPO_MOUNT_RELATIVE.length())
+                String repoRelative = path.startsWith(SandboxLayout.REPO_MOUNT_RELATIVE)
+                    ? path.substring(SandboxLayout.REPO_MOUNT_RELATIVE.length())
                     : path;
                 if (diffFiles.contains(path) || diffFiles.contains(repoRelative) || isInternalContextPath(path)) {
                     hasInScopeLocation = true;

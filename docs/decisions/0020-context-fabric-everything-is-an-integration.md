@@ -3,12 +3,12 @@
 **Status:** Proposed
 **Date:** 2026-06-12
 **Authors:** Hephaestus maintainers
-**Builds on:** [ADR 0015](0015-unified-integration-framework.md) (the integration framework and `Connection` aggregate), [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md) (SQL-layer tenancy), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md) (per-row AAD), [ADR 0007](0007-sandbox-spi-shape.md) (the agent sandbox / `ContentProvider` seam)
+**Builds on:** [ADR 0015](0015-unified-integration-framework.md) (the integration framework and `Connection` aggregate), [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md) (SQL-layer tenancy), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md) (per-row AAD), [ADR 0007](0007-sandbox-spi-shape.md) (the agent sandbox / `ContentSource` seam)
 
 ## Context
 
 The practice-detection agent reviews a change from a materialised context directory
-(`context/target/*`) built by the `ContentProvider` SPI (`agent.context`, ADR 0007).
+(`context/target/*`) built by the `ContentSource` SPI (`agent.context`, ADR 0007).
 A directory that holds only what the diff and the PR row carry (`metadata.json`,
 `diff.patch`, `diff_summary.md`, `comments.json`) makes a large fraction of mentor
 lessons **context-blind** misses rather than detection misses: the signal lives in
@@ -36,7 +36,7 @@ ships on the existing seam.
 ## Considered options
 
 1. Build the full Connector SPI plus CAS plus node/edge graph now. Rejected: pays the whole migration cost before the reframe has delivered one lesson.
-2. Keep adding ad-hoc ContentProviders forever. Rejected: a non-SCM connector would have no seam; naming the Fabric now makes the Connector promotion a forcing function, not a rewrite.
+2. Keep adding ad-hoc ContentSources forever. Rejected: a non-SCM connector would have no seam; naming the Fabric now makes the Connector promotion a forcing function, not a rewrite.
 3. Ship the slice on the existing seam, target staged-additive (chosen). Reframe proven for one PR, zero schema change.
 
 ## Decision register
@@ -56,11 +56,11 @@ The Context Fabric is defined by the following decisions. Most are **target stat
    implies bronze is *raw landed truth*; here SQL is truth and the CAS is a derived
    cache, so importing "bronze" would invert the trust direction. See Evidence §Iceberg/
    Databricks for why the rename is load-bearing, not cosmetic.
-3. **One `Connector` SPI, a superset of `ContentProvider` (target state).** The target SPI is a single
-   `Connector` interface that subsumes today's `ContentProvider`: `supports(request)`,
+3. **One `Connector` SPI, a superset of `ContentSource` (target state).** The target SPI is a single
+   `Connector` interface that subsumes today's `ContentSource`: `supports(request)`,
    `required()`, and a `contribute`/`project` step, plus capability declaration and a
    fetch step against the upstream. SCM becomes a *peer* connector of Slack/Outline, not
-   a privileged root. Today's `ContentProvider` is the narrow, already-shipped face of
+   a privileged root. Today's `ContentSource` is the narrow, already-shipped face of
    that superset.
 4. **Five PROV-O Kinds.** Projected content is typed by a small fixed vocabulary aligned
    to W3C PROV-O: **Entity** (a thing — issue, doc, commit), **Activity** (a process —
@@ -138,10 +138,10 @@ The shape above is not invented; three independent industry families converge on
 
 This PR does **not** build the `Connector` SPI, the CAS, the `entity_node`/`entity_edge`
 graph, RLS, or `workspace_binding`. It ships the **smallest useful slice of the Fabric on
-the seam that already exists** — the `ContentProvider` SPI from ADR 0007 — proving the
+the seam that already exists** — the `ContentSource` SPI from ADR 0007 — proving the
 reframe end-to-end before paying for the migration:
 
-- **Cross-context `ContentProvider`s** under `agent.context.providers`, each best-effort
+- **Cross-context `ContentSource`s** under `agent.context.providers`, each best-effort
   (`required() == false`: a missing repo/branch/issue logs and skips, never aborts the
   job), each telescope-not-cage (capped, excerpted, every item carries a real `url`):
   - `linked_work_items.json` — already shipped; resolves closing/branch/commit issue refs
@@ -190,7 +190,7 @@ future connector slots in with no restructuring:
   sha256}`. Every projected blob is stored in the CAS, so identical context deduplicates across jobs and
   each entry carries a content-addressed provenance hash. (Enforcing it — rejecting an agent citation
   whose sha is absent — is a follow-up; today the sha is recorded, not yet validated.)
-- **Toward the `Connector` superset (§3).** `ContentProvider` gained `connectorId()` (additive
+- **Toward the `Connector` superset (§3).** `ContentSource` gained `connectorId()` (additive
   default `"scm"`) so each file's producing integration is recorded in the manifest. The full
   `Connector` SPI rename + capability registry remain follow-ups.
 - **Cache GC.** `FabricGarbageCollector` (`@Scheduled`, mirrors the existing retention sweepers)
@@ -215,7 +215,7 @@ Positive:
 
 Neutral / negative:
 
-- The `ContentProvider` seam was not designed as the full `Connector` superset; these
+- The `ContentSource` seam was not designed as the full `Connector` superset; these
   providers fit it, but the richer fetch/Kind/edge surface is absent and the providers
   encode their own ad-hoc projection. That debt is intentional and named here.
 - `test_presence.json` and `branch_graph.json` are **heuristics**. `repoHasTestTarget`
@@ -229,7 +229,7 @@ Neutral / negative:
 
 ## Staged follow-ups (the rest of the Fabric)
 
-Additive, in dependency order: (1) `Connector` SPI superset of `ContentProvider` with a
+Additive, in dependency order: (1) `Connector` SPI superset of `ContentSource` with a
 capability registry; (2) CAS for the on-disk cache (generalising the git clone); (3)
 `entity_node`/`entity_edge` with split match/assertion confidence; (4) the five-Kind
 PROV-O vocabulary + lazy non-lossy conformance; (5) audience + `consistencyToken` on every
@@ -240,7 +240,7 @@ ADR delta; none blocks the slice this PR ships.
 ## Revisit trigger
 
 - A second non-SCM connector (Outline doc, Slack thread) needs to project content — the
-  forcing function to promote `ContentProvider` to the `Connector` superset (§3) rather
+  forcing function to promote `ContentSource` to the `Connector` superset (§3) rather
   than adding a fourth ad-hoc provider.
 - A cross-context link needs to be *asserted* (not just hinted) into a finding — the
   forcing function for `entity_node`/`entity_edge` with split confidence (§5).
@@ -258,5 +258,5 @@ Airbyte connector/protocol specification; Anthropic Model Context Protocol speci
 Authorization System (USENIX ATC 2019, the "zookie" snapshot token); Apache Iceberg table
 spec and schema-evolution guidance; Databricks medallion (bronze/silver/gold) architecture
 guidance; W3C PROV-O provenance ontology. Internal: ADR 0015 (integration framework),
-ADR 0004 (SQL-layer tenancy), ADR 0007 (sandbox/ContentProvider seam), ADR 0014 (per-row
+ADR 0004 (SQL-layer tenancy), ADR 0007 (sandbox/ContentSource seam), ADR 0014 (per-row
 AAD), and internal mentor-quality evaluation.

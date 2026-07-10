@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -948,7 +949,7 @@ public class GitRepositoryManager {
         try (var stream = Files.walk(path)) {
             // Sort in reverse order so files are deleted before their parent directories
             stream
-                .sorted(java.util.Comparator.reverseOrder())
+                .sorted(Comparator.reverseOrder())
                 .forEach(p -> {
                     try {
                         Files.delete(p);

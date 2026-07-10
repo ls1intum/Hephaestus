@@ -11,7 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -109,7 +109,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
     private static Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
         Repository repo = TestEntities.repository(id, nameWithOwner, defaultBranch);
-        repo.setProvider(TestEntities.gitProvider(1L, GitProviderType.GITHUB));
+        repo.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITHUB));
         return repo;
     }
 

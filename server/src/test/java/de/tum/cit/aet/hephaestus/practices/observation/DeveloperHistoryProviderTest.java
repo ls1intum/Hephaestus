@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -232,7 +233,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         @Test
         @DisplayName("returns empty when ObjectMapper throws JacksonException")
         void returnsEmptyOnSerializationFailure() throws Exception {
-            ObjectMapper brokenMapper = org.mockito.Mockito.mock(ObjectMapper.class);
+            ObjectMapper brokenMapper = Mockito.mock(ObjectMapper.class);
             when(brokenMapper.createArrayNode()).thenReturn(objectMapper.createArrayNode());
             when(brokenMapper.createObjectNode()).thenReturn(objectMapper.createObjectNode());
             when(brokenMapper.writeValueAsBytes(any())).thenThrow(

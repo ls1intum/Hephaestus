@@ -4,9 +4,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.adaptPageSize;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.extractNumericId;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener.TeamsSyncedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -87,7 +88,7 @@ public class GitLabTeamSyncService {
     private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabTeamProcessor teamProcessor;
     private final GitLabUserService gitLabUserService;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
     private final RepositoryCollaboratorRepository collaboratorRepository;
     private final TransactionTemplate transactionTemplate;
@@ -101,7 +102,7 @@ public class GitLabTeamSyncService {
         GitLabGraphQlResponseHandler responseHandler,
         GitLabTeamProcessor teamProcessor,
         GitLabUserService gitLabUserService,
-        GitProviderRepository gitProviderRepository,
+        IdentityProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
         RepositoryCollaboratorRepository collaboratorRepository,
         TransactionTemplate transactionTemplate,
@@ -137,7 +138,7 @@ public class GitLabTeamSyncService {
             return 0;
         }
 
-        GitProvider provider = resolveProvider();
+        IdentityProvider provider = resolveProvider();
         if (provider == null) {
             log.warn("Skipped team sync: reason=providerNotResolved, scopeId={}", scopeId);
             return 0;
@@ -292,7 +293,7 @@ public class GitLabTeamSyncService {
         HttpGraphQlClient client,
         Long scopeId,
         String groupFullPath,
-        GitProvider provider,
+        IdentityProvider provider,
         Map<Long, Team> syncedTeamsByNativeId,
         Map<Long, String> teamFullPathsByNativeId,
         Set<Long> syncedNativeIds
@@ -347,7 +348,7 @@ public class GitLabTeamSyncService {
         HttpGraphQlClient client,
         Long scopeId,
         String groupFullPath,
-        GitProvider provider,
+        IdentityProvider provider,
         Map<Long, Team> syncedTeamsByNativeId,
         Map<Long, Long> parentNativeIdByChildNativeId,
         Map<Long, String> teamFullPathsByNativeId,
@@ -508,7 +509,7 @@ public class GitLabTeamSyncService {
     int syncTeamMembers(HttpGraphQlClient client, Long scopeId, Long teamId, String groupFullPath, Long providerId) {
         // Phase C.1: Fetch all members via GraphQL OUTSIDE a transaction
         // to avoid holding a DB connection during network I/O and throttle delays.
-        List<GitLabGroupMemberResponse> allMembers = new java.util.ArrayList<>();
+        List<GitLabGroupMemberResponse> allMembers = new ArrayList<>();
         boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
 
         // Phase C.2: Apply membership diff in a short transaction
@@ -849,9 +850,9 @@ public class GitLabTeamSyncService {
 
     // Helpers
 
-    private GitProvider resolveProvider() {
+    private IdentityProvider resolveProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
             .orElse(null);
     }
 

@@ -13,7 +13,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
@@ -414,7 +414,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         ScmDomainEvent.CommitAuthorsReconciled event = captor.getValue();
         assertThat(event.repositoryId()).isEqualTo(REPO_ID);
         assertThat(event.context().scopeId()).isEqualTo(SCOPE_ID);
-        assertThat(event.context().providerType()).isEqualTo(GitProviderType.GITLAB);
+        assertThat(event.context().providerType()).isEqualTo(IdentityProviderType.GITLAB);
         assertThat(event.context().repository()).isNotNull();
         assertThat(event.context().repository().id()).isEqualTo(REPO_ID);
         assertThat(event.context().repository().nameWithOwner()).isEqualTo(PROJECT_PATH);

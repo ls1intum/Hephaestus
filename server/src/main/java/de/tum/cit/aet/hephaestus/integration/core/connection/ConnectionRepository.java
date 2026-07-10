@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,18 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         long workspaceId,
         IntegrationKind kind,
         String instanceKey
+    );
+
+    Optional<Connection> findFirstByKindAndInstanceKeyAndState(
+        IntegrationKind kind,
+        String instanceKey,
+        IntegrationState state
+    );
+
+    List<Connection> findAllByKindAndInstanceKeyInAndState(
+        IntegrationKind kind,
+        Collection<String> instanceKeys,
+        IntegrationState state
     );
 
     /** Lookup for kinds where there is at most one row per (workspace, kind). */

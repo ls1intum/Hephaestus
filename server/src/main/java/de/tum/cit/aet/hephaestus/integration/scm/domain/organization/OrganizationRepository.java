@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.organization;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -31,7 +31,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
      * {@link #findByLoginIgnoreCaseAndProviderId(String, Long)} with a workspace-derived
      * provider id.
      */
-    Optional<Organization> findByLoginIgnoreCaseAndProvider_Type(String login, GitProviderType type);
+    Optional<Organization> findByLoginIgnoreCaseAndProvider_Type(String login, IdentityProviderType type);
 
     /**
      * Upsert an organization using PostgreSQL ON CONFLICT.

@@ -8,7 +8,7 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * dispatches by kind.
  *
  * <p>This is the cross-module enum. Vendor-private code may use further narrowing
- * (e.g. {@code GitProviderType.from(kind)} for SCM-only paths) but the dependency
+ * (e.g. {@code IdentityProviderType.from(kind)} for SCM-only paths) but the dependency
  * direction is one-way: the SPI does not know about vendor-private types.
  */
 public enum IntegrationKind {

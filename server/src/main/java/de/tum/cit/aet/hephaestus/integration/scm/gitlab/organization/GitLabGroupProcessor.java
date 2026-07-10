@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
@@ -34,11 +34,11 @@ public class GitLabGroupProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitLabGroupProcessor.class);
 
     private final OrganizationRepository organizationRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
     public GitLabGroupProcessor(
         OrganizationRepository organizationRepository,
-        GitProviderRepository gitProviderRepository
+        IdentityProviderRepository gitProviderRepository
     ) {
         this.organizationRepository = organizationRepository;
         this.gitProviderRepository = gitProviderRepository;
@@ -53,7 +53,7 @@ public class GitLabGroupProcessor {
      * (provider_id, native_id) unique constraint.
      *
      * @param group      the GitLab group GraphQL response
-     * @param providerId the FK ID of the GitProvider entity
+     * @param providerId the FK ID of the IdentityProvider entity
      * @return the persisted Organization entity, or null if the response is invalid
      */
     @Transactional

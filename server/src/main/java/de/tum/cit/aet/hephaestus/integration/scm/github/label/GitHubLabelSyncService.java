@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncPropert
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlPaginationHelper;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlPaginationHelper.PaginationRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlPaginationHelper.PaginationResult;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabelConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import java.util.HashSet;
@@ -238,9 +239,7 @@ public class GitHubLabelSyncService {
      * Note: GraphQL doesn't expose databaseId for labels, so id will be null.
      * The processor handles this by using name-based lookup as fallback.
      */
-    private GitHubLabelDTO convertToDTO(
-        de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabel graphQlLabel
-    ) {
+    private GitHubLabelDTO convertToDTO(GHLabel graphQlLabel) {
         return GitHubLabelDTO.fromLabel(graphQlLabel);
     }
 }

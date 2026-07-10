@@ -18,6 +18,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -56,7 +57,7 @@ class CurrentAccountUsersTest extends BaseUnitTest {
     }
 
     private static IdentityLinkView link(long providerId, String login, Long externalActorId) {
-        return new IdentityLinkView(1L, providerId, "subject", login, "Display", null, null, externalActorId);
+        return new IdentityLinkView(1L, providerId, "subject", login, "Display", null, null, externalActorId, null);
     }
 
     private static User user(long id, String login) {
@@ -96,10 +97,7 @@ class CurrentAccountUsersTest extends BaseUnitTest {
 
         assertThat(resolved).extracting(User::getId).containsExactly(500L);
         verify(userRepository).findById(500L);
-        verify(userRepository, never()).findByLoginAndProviderId(
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any()
-        );
+        verify(userRepository, never()).findByLoginAndProviderId(ArgumentMatchers.any(), ArgumentMatchers.any());
     }
 
     @Test
@@ -123,6 +121,6 @@ class CurrentAccountUsersTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.of(user(1L, "legacy")));
 
         assertThat(currentAccountUsers.resolve()).extracting(User::getId).containsExactly(1L);
-        verify(accountIdentityQuery, never()).activeLinksForAccount(org.mockito.ArgumentMatchers.anyLong());
+        verify(accountIdentityQuery, never()).activeLinksForAccount(ArgumentMatchers.anyLong());
     }
 }

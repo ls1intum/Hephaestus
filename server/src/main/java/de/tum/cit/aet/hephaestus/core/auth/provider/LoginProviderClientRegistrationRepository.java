@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import java.time.Duration;
+import java.util.Iterator;
 import java.util.List;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -69,7 +70,7 @@ public class LoginProviderClientRegistrationRepository
     }
 
     @Override
-    public java.util.Iterator<ClientRegistration> iterator() {
+    public Iterator<ClientRegistration> iterator() {
         return listRegistrations().iterator();
     }
 
@@ -100,6 +101,18 @@ public class LoginProviderClientRegistrationRepository
                 .authorizationUri("https://github.com/login/oauth/authorize")
                 .tokenUri("https://github.com/login/oauth/access_token")
                 .userInfoUri("https://api.github.com/user");
+        } else if (provider.getType() == LoginProvider.ProviderType.SLACK) {
+            // "Sign in with Slack" is OIDC: the id_token carries the stable subject (sub) and the verified
+            // team_id claim that keys a Slack identity within its workspace. Setting jwkSetUri (+ the openid
+            // scope, enforced in LoginProviderService) makes Spring Security take the OIDC login path and
+            // validate the id_token JWS. userNameAttributeName MUST be "sub" — Slack has no top-level "id".
+            // Endpoints hang off the slack.com base URL (the only Slack instance).
+            builder
+                .authorizationUri(base + "/openid/connect/authorize")
+                .tokenUri(base + "/api/openid.connect.token")
+                .userInfoUri(base + "/api/openid.connect.userInfo")
+                .jwkSetUri(base + "/openid/connect/keys")
+                .userNameAttributeName("sub");
         } else {
             // GitLab (gitlab.com or self-hosted) — all endpoints hang off the instance base URL.
             builder

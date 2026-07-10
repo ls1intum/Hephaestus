@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Cred
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,7 +53,7 @@ public class Connection {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "workspace_id", nullable = false)
-    private de.tum.cit.aet.hephaestus.workspace.Workspace workspace;
+    private Workspace workspace;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 48)
@@ -103,7 +104,7 @@ public class Connection {
     protected Connection() {}
 
     public Connection(
-        de.tum.cit.aet.hephaestus.workspace.Workspace workspace,
+        Workspace workspace,
         IntegrationKind kind,
         @Nullable String instanceKey,
         ConnectionConfig config
@@ -144,7 +145,7 @@ public class Connection {
         return id;
     }
 
-    public de.tum.cit.aet.hephaestus.workspace.Workspace getWorkspace() {
+    public Workspace getWorkspace() {
         return workspace;
     }
 

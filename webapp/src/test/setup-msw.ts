@@ -16,6 +16,21 @@ import { server } from "@/mocks/server";
 // `*/path` wildcards, so this host is matched regardless of its exact value.
 client.setConfig({ baseUrl: "http://localhost:8080" });
 
+// jsdom has no ResizeObserver; cmdk's <Command.List> observes its own size to size the popup.
+// A no-op stub is enough for tests — no assertions depend on the observed measurements.
+if (typeof globalThis.ResizeObserver === "undefined") {
+	globalThis.ResizeObserver = class ResizeObserver {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	};
+}
+
+// jsdom has no scrollIntoView either; cmdk calls it to keep the highlighted option in view.
+if (typeof Element.prototype.scrollIntoView !== "function") {
+	Element.prototype.scrollIntoView = () => {};
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());

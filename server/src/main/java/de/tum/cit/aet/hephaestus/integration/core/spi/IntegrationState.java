@@ -7,11 +7,9 @@ import java.util.Set;
  * Per-Connection lifecycle state.
  *
  * <p>{@code PENDING} models the OAuth round-trip — we model OUR wait, not vendor's
- * setup work. {@code UNINSTALLED} is terminal: the row stays for audit, no further
- * transitions are legal, and reconnect requires a vendor-issued fresh
- * {@code instance_key} (the same tuple would collide with the {@code uq_connection}
- * unique constraint). Reconnect-with-same-installation-id is a known product gap
- * tracked separately.
+ * setup work. {@code UNINSTALLED} is terminal for generic transitions: credentials were
+ * cleared and the integration is unusable. Kind-specific reconnect flows may opt into a
+ * guarded revival in their application service when that preserves the vendor natural key.
  *
  * <p>Idempotent transitions: hitting {@code SUSPENDED} on an already-{@code SUSPENDED}
  * Connection returns the current state with no audit row — protects against webhook

@@ -11,9 +11,12 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -493,7 +496,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void integrationTestsExtendBaseClasses() {
             // Base classes that are excluded from the check
-            java.util.Set<String> baseClassNames = java.util.Set.of(
+            Set<String> baseClassNames = Set.of(
                 "AbstractWorkspaceIntegrationTest",
                 "AbstractGitHubLiveSyncIntegrationTest",
                 "BaseGitHubLiveIntegrationTest",
@@ -501,7 +504,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             );
 
             // Recognized base classes that integration tests should extend
-            java.util.Set<String> validBaseClasses = java.util.Set.of(
+            Set<String> validBaseClasses = Set.of(
                 "de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest",
                 "de.tum.cit.aet.hephaestus.integration.scm.github.AbstractGitHubLiveSyncIntegrationTest",
                 "de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest"
@@ -512,9 +515,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
-                    boolean hasSpringBootTest = javaClass.isAnnotatedWith(
-                        org.springframework.boot.test.context.SpringBootTest.class
-                    );
+                    boolean hasSpringBootTest = javaClass.isAnnotatedWith(SpringBootTest.class);
 
                     boolean extendsValidBase = javaClass
                         .getAllRawSuperclasses()
@@ -562,7 +563,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 .and()
                 .doNotHaveSimpleName("package-info")
                 .and()
-                .areNotAnnotatedWith(org.springframework.context.annotation.Configuration.class)
+                .areNotAnnotatedWith(Configuration.class)
                 .and()
                 .haveSimpleNameNotStartingWith("Abstract")
                 .and()

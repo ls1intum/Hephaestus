@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +47,7 @@ public class PracticePiAdapter {
             plan.command(),
             plan.environment(),
             plan.inputFiles(),
-            WorkspaceAbi.OUTPUT_PATH,
+            SandboxLayout.OUTPUT_PATH,
             null,
             plan.networkPolicy(),
             null
@@ -61,16 +61,16 @@ public class PracticePiAdapter {
 
     /**
      * Run precompute scripts via Bun before the agent. Failure is non-fatal. Paths reference the
-     * workspace ABI ({@link WorkspaceAbi#CONTEXT_PREFIX}).
+     * workspace ABI ({@link SandboxLayout#CONTEXT_PREFIX}).
      *
      * <p><b>Trust boundary:</b> the returned string is interpolated verbatim into the container's
      * {@code sh -c} command line. Do not derive any part of this output from untrusted input.
      */
     static String buildPrecomputeStep() {
-        String root = WorkspaceAbi.WORKSPACE_ROOT;
-        String contextTarget = root + "/" + WorkspaceAbi.CONTEXT_PREFIX;
-        String precomputeIn = root + "/" + WorkspaceAbi.PRECOMPUTE_PREFIX + "practices";
-        String precomputeOut = root + "/" + WorkspaceAbi.PRECOMPUTE_OUT_PREFIX.replaceFirst("/$", "");
+        String root = SandboxLayout.WORKSPACE_ROOT;
+        String contextTarget = root + "/" + SandboxLayout.CONTEXT_PREFIX;
+        String precomputeIn = root + "/" + SandboxLayout.PRECOMPUTE_PREFIX + "practices";
+        String precomputeOut = root + "/" + SandboxLayout.PRECOMPUTE_OUT_PREFIX.replaceFirst("/$", "");
         return (
             "(mkdir -p " +
             precomputeOut +
@@ -92,7 +92,7 @@ public class PracticePiAdapter {
             precomputeOut +
             "/diff_clean.patch 2>/dev/null ; bun run /opt/precompute/runner.ts" +
             " --repo " +
-            WorkspaceAbi.REPO_MOUNT +
+            SandboxLayout.REPO_MOUNT +
             " --diff " +
             precomputeOut +
             "/diff_clean.patch" +

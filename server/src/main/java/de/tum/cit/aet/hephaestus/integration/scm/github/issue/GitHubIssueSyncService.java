@@ -112,7 +112,7 @@ public class GitHubIssueSyncService {
         GitHubIssueProcessor issueProcessor,
         GitHubIssueCommentProcessor commentProcessor,
         GitHubIssueCommentSyncService commentSyncService,
-        de.tum.cit.aet.hephaestus.integration.scm.github.project.GitHubProjectItemSyncService projectItemSyncService,
+        GitHubProjectItemSyncService projectItemSyncService,
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,

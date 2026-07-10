@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -144,8 +145,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         callback.put("id", 9999L);
         callback.put("method", "fetch_context");
         ObjectNode params = callback.putObject("params");
-        params.put("threadId", UUID.randomUUID().toString());
-        params.put("path", "workspace.json");
+        params.put("threadId", threadId.toString());
+        params.put("path", "inputs/context/workspace.json");
 
         sandbox.pushFrame(callback);
 
@@ -153,7 +154,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
         JsonNode response = sandbox.takeFrame();
         assertThat(response.get("id").asLong()).isEqualTo(9999L);
         assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
-        assertThat(lastFetchContext.get().path()).isEqualTo("workspace.json");
+        assertThat(lastFetchContext.get().path()).isEqualTo("inputs/context/workspace.json");
     }
 
     @Test
@@ -168,8 +169,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         callback.put("id", callbackId);
         callback.put("method", "fetch_context");
         ObjectNode params = callback.putObject("params");
-        params.put("threadId", UUID.randomUUID().toString());
-        params.put("path", "workspace.json");
+        params.put("threadId", threadId.toString());
+        params.put("path", "inputs/context/workspace.json");
 
         sandbox.pushFrame(callback);
 
@@ -177,6 +178,22 @@ class MentorRunnerClientTest extends BaseUnitTest {
         assertThat(response.get("id").isString()).as("id must remain a string").isTrue();
         assertThat(response.get("id").asString()).isEqualTo(callbackId);
         assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
+    }
+
+    @Test
+    void fetchContextForDifferentThread_isIgnored() {
+        ObjectNode callback = mapper.createObjectNode();
+        callback.put("jsonrpc", "2.0");
+        callback.put("id", "fc-" + UUID.randomUUID());
+        callback.put("method", "fetch_context");
+        ObjectNode params = callback.putObject("params");
+        params.put("threadId", UUID.randomUUID().toString());
+        params.put("path", "inputs/context/workspace.json");
+
+        sandbox.pushFrame(callback);
+
+        assertThat(lastFetchContext.get()).isNull();
+        sandbox.assertNoSentFrame();
     }
 
     @Test
@@ -210,8 +227,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
     static final class FakeSandbox implements AttachedSandbox {
 
         private final UUID sessionId = UUID.randomUUID();
-        private final java.util.concurrent.LinkedBlockingDeque<JsonNode> sentFrames =
-            new java.util.concurrent.LinkedBlockingDeque<>();
+        private final LinkedBlockingDeque<JsonNode> sentFrames = new LinkedBlockingDeque<>();
         private final CopyOnWriteArrayList<Consumer<JsonNode>> listeners = new CopyOnWriteArrayList<>();
 
         @Override
@@ -261,6 +277,16 @@ class MentorRunnerClientTest extends BaseUnitTest {
         void pushFrame(JsonNode frame) {
             for (Consumer<JsonNode> listener : listeners) {
                 listener.accept(frame);
+            }
+        }
+
+        void assertNoSentFrame() {
+            try {
+                JsonNode frame = sentFrames.pollFirst(150, TimeUnit.MILLISECONDS);
+                assertThat(frame).as("no frame should be sent").isNull();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while waiting for absence of frame", e);
             }
         }
     }

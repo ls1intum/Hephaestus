@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 class SandboxWorkspaceManagerTest extends BaseUnitTest {
@@ -67,7 +68,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             manager.injectFiles(CONTAINER_ID, files);
 
-            org.mockito.ArgumentCaptor<InputStream> tar = org.mockito.ArgumentCaptor.forClass(InputStream.class);
+            ArgumentCaptor<InputStream> tar = ArgumentCaptor.forClass(InputStream.class);
             verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), tar.capture());
 
             Map<String, Long> dirUid = new HashMap<>();

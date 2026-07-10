@@ -67,6 +67,18 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
             .build();
     }
 
+    private static ClientRegistration slackRegistration() {
+        return ClientRegistration.withRegistrationId("slack")
+            .clientId("client")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("{baseUrl}/login/oauth2/code/slack")
+            .authorizationUri("https://slack.com/openid/connect/authorize")
+            .tokenUri("https://slack.com/api/openid.connect.token")
+            .jwkSetUri("https://slack.com/openid/connect/keys")
+            .issuerUri("https://slack.com")
+            .build();
+    }
+
     private static Jwt jwtForAccount(String sub) {
         return Jwt.withTokenValue("t").header("alg", "ES256").subject(sub).claim("scope", "x").build();
     }
@@ -117,6 +129,18 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
 
         assertThat(view.getUrl()).isEqualTo("/auth/error?code=link_requires_auth");
         assertThat(res.getCookie(AuthIntentCookie.COOKIE_NAME)).isNull();
+    }
+
+    @Test
+    void slackLoginMode_rejectedBecauseSlackIsLinkOnly() {
+        when(registrations.findByRegistrationId("slack")).thenReturn(slackRegistration());
+        MockHttpServletResponse res = new MockHttpServletResponse();
+
+        RedirectView view = controller.begin("slack", null, "/settings", "login", new MockHttpServletRequest(), res);
+
+        assertThat(view.getUrl()).isEqualTo("/auth/error?code=link_requires_auth");
+        assertThat(res.getCookie(AuthIntentCookie.COOKIE_NAME)).isNull();
+        verifyNoInteractions(jwtDecoder);
     }
 
     @Test

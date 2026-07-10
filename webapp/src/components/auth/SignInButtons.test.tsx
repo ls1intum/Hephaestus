@@ -52,4 +52,17 @@ describe("SignInButtons", () => {
 		expect(await screen.findByText(/Couldn't load sign-in options/i)).toBeTruthy();
 		expect(screen.queryByRole("button", { name: /continue with/i })).toBeNull();
 	});
+
+	it("does not offer Slack as a public sign-in option", async () => {
+		const providers: IdentityProviderView[] = [
+			{ registrationId: "github", displayName: "GitHub", providerType: "GITHUB" },
+			{ registrationId: "slack", displayName: "Slack", providerType: "SLACK" },
+		];
+		server.use(http.get("*/identity-providers", () => HttpResponse.json(providers)));
+
+		renderWithClient(<SignInButtons onSignIn={vi.fn()} />);
+
+		expect(await screen.findByRole("button", { name: /continue with github/i })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /continue with slack/i })).toBeNull();
+	});
 });

@@ -20,4 +20,6 @@ public enum WorkArtifact {
     PULL_REQUEST,
     /** An issue — title, body, labels, assignees, comment thread, state-transition timeline (no diff). */
     ISSUE,
+    /** A chat conversation thread — the human turns of a settled discussion (no diff, no code). */
+    CONVERSATION_THREAD,
 }

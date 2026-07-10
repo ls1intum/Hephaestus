@@ -40,6 +40,12 @@ const meta = {
 		reviewCycleTime: "09:00",
 		hasSlackConnection: false,
 		onWorkspaceRefetch: fn(),
+		slackChannels: [],
+		slackChannelCandidates: [],
+		isLoadingSlackChannels: false,
+		onRegisterSlackChannel: fn(),
+		onUpdateSlackChannelConsent: fn(),
+		onRemoveSlackChannel: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 

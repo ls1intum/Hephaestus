@@ -7,6 +7,7 @@ import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Wires the ShedLock {@link LockProvider} (PostgreSQL-backed via the existing app
@@ -36,7 +37,7 @@ public class ShedLockConfig {
     public LockProvider lockProvider(DataSource dataSource) {
         return new JdbcTemplateLockProvider(
             JdbcTemplateLockProvider.Configuration.builder()
-                .withJdbcTemplate(new org.springframework.jdbc.core.JdbcTemplate(dataSource))
+                .withJdbcTemplate(new JdbcTemplate(dataSource))
                 .usingDbTime()
                 .build()
         );

@@ -13,10 +13,12 @@ import io.github.bucket4j.BucketConfiguration;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -79,7 +81,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "ES256")
             .subject(subject)
-            .claim("roles", java.util.List.of("app_admin"))
+            .claim("roles", List.of("app_admin"))
             .build();
         AbstractAuthenticationToken auth = new JwtAuthenticationToken(jwt);
         auth.setAuthenticated(true);
@@ -243,7 +245,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         FilterChain blockedChain = mock(FilterChain.class);
         f.doFilter(new MockHttpServletRequest("DELETE", "/user"), blocked, blockedChain);
 
-        verify(blockedChain, never()).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(blockedChain, never()).doFilter(ArgumentMatchers.any(), ArgumentMatchers.any());
         assertThat(blocked.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
         assertThat(store).containsOnlyKeys("delete-user:acct:7");
         assertThat(capturedConfigs.get("delete-user:acct:7").getBandwidths()[0].getCapacity()).isEqualTo(3);

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
@@ -75,7 +76,7 @@ class ReactionServiceTest extends BaseUnitTest {
             .id(FEEDBACK_ID)
             .recipientUserId(recipientUserId)
             .workspaceId(WORKSPACE_ID)
-            .deliveryState(de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED)
+            .deliveryState(FeedbackDeliveryState.DELIVERED)
             .build();
     }
 
@@ -125,7 +126,7 @@ class ReactionServiceTest extends BaseUnitTest {
                 .id(FEEDBACK_ID)
                 .recipientUserId(CONTRIBUTOR_ID)
                 .workspaceId(WORKSPACE_ID)
-                .deliveryState(de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.SUPPRESSED)
+                .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                 .build();
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)

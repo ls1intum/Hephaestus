@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -692,7 +692,7 @@ public class GitLabCommitMergeRequestLinker {
             eventPublisher.publishEvent(
                 new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
-                    EventContext.forSync(scopeId, RepositoryRef.from(repository), GitProviderType.GITLAB)
+                    EventContext.forSync(scopeId, RepositoryRef.from(repository), IdentityProviderType.GITLAB)
                 )
             );
         }

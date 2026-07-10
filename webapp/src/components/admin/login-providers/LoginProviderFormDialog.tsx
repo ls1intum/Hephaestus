@@ -23,7 +23,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-type ProviderType = "GITHUB" | "GITLAB";
+type ProviderType = "GITHUB" | "GITLAB" | "SLACK";
 
 interface LoginProviderFormDialogProps {
 	open: boolean;
@@ -71,6 +71,7 @@ export function LoginProviderFormDialog({
 	}, [open, editing]);
 
 	const isGitlab = type === "GITLAB";
+	const isSlack = type === "SLACK";
 
 	// Mirror the server-side constraints so the operator sees the problem inline before a round-trip:
 	// the registration id is the immutable callback-path segment, and a GitLab base URL must be HTTPS.
@@ -127,8 +128,8 @@ export function LoginProviderFormDialog({
 					<DialogHeader>
 						<DialogTitle>{isEdit ? "Edit login provider" : "Add login provider"}</DialogTitle>
 						<DialogDescription>
-							A sign-in option offered on the login page. One provider per SCM instance — register
-							the OAuth app on the instance and paste its client credentials here.
+							Configure sign-in and account-link providers. Slack is link-only: it appears in
+							Settings for account linking, not on the public sign-in page.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -165,8 +166,15 @@ export function LoginProviderFormDialog({
 							<SelectContent>
 								<SelectItem value="GITHUB">GitHub</SelectItem>
 								<SelectItem value="GITLAB">GitLab / self-hosted GitLab</SelectItem>
+								<SelectItem value="SLACK">Slack / Sign in with Slack</SelectItem>
 							</SelectContent>
 						</Select>
+						{isSlack && (
+							<FieldDescription>
+								Use the same Slack app client ID and secret. Add this provider's redirect URI to the
+								Slack app redirect URLs.
+							</FieldDescription>
+						)}
 					</Field>
 
 					<Field>
@@ -234,7 +242,7 @@ export function LoginProviderFormDialog({
 							id="lp-scopes"
 							value={scopes}
 							onChange={(e) => setScopes(e.target.value)}
-							placeholder="Defaulted by provider type if blank"
+							placeholder={isSlack ? "openid profile email" : "Defaulted by provider type if blank"}
 						/>
 					</Field>
 

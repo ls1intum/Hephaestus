@@ -12,9 +12,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProject
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     private GitLabProjectProcessor projectProcessor;
 
     @Mock
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     private final GitLabProperties gitLabProperties = new GitLabProperties(
         "https://gitlab.com",
@@ -72,9 +73,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        GitProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, GitProviderType.GITLAB);
+        IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com"))
+            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
             .thenReturn(Optional.of(gitLabProvider));
 
         // Default: responseHandler.handle() returns CONTINUE (valid response)
@@ -353,7 +354,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
 
             // Simulate GitLab returning [proj1, null, null] — 2 null nodes due to access restrictions
-            List<GitLabProjectResponse> nodesWithNulls = new java.util.ArrayList<>();
+            List<GitLabProjectResponse> nodesWithNulls = new ArrayList<>();
             nodesWithNulls.add(proj1);
             nodesWithNulls.add(null);
             nodesWithNulls.add(null);

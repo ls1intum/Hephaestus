@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -107,6 +108,9 @@ public class OAuthCallbackService {
         ConnectFinalization.Completed completed,
         @Nullable String actorRef
     ) {
+        Connection original = connection;
+        connection = resolveSlackCompletionTarget(connection, completed);
+        deleteSupersededPending(original, connection);
         applyVendorMetadata(connection, completed);
         connection.setCredentials(completed.credentials(), credentialBundleConverter);
         connection = connectionRepository.save(connection);
@@ -135,6 +139,51 @@ public class OAuthCallbackService {
         return connection;
     }
 
+    private Connection resolveSlackCompletionTarget(Connection connection, ConnectFinalization.Completed completed) {
+        if (connection.getKind() != IntegrationKind.SLACK) {
+            return connection;
+        }
+        String instanceKey = completed.instanceKey();
+        if (instanceKey == null || instanceKey.isBlank()) {
+            return connection;
+        }
+        Optional<Connection> active = connectionRepository.findFirstByKindAndInstanceKeyAndState(
+            IntegrationKind.SLACK,
+            instanceKey,
+            IntegrationState.ACTIVE
+        );
+        if (active.isEmpty() || Objects.equals(active.get().getId(), connection.getId())) {
+            return connectionRepository
+                .findByWorkspaceIdAndKindAndInstanceKey(
+                    connection.getWorkspace().getId(),
+                    IntegrationKind.SLACK,
+                    instanceKey
+                )
+                .filter(existing -> !Objects.equals(existing.getId(), connection.getId()))
+                .orElse(connection);
+        }
+        Connection existing = active.get();
+        if (Objects.equals(existing.getWorkspace().getId(), connection.getWorkspace().getId())) {
+            return existing;
+        }
+        throw new IllegalStateException(
+            "Slack team is already connected to workspace " +
+                existing.getWorkspace().getId() +
+                "; disconnect it before connecting it to workspace " +
+                connection.getWorkspace().getId()
+        );
+    }
+
+    private void deleteSupersededPending(Connection original, Connection target) {
+        if (Objects.equals(original.getId(), target.getId())) {
+            return;
+        }
+        if (original.getState() != IntegrationState.PENDING || original.getInstanceKey() != null) {
+            return;
+        }
+        connectionRepository.delete(original);
+    }
+
     /**
      * Per-kind empty config seed for newly-created PENDING rows. The strategy's
      * {@code finalizeConnect} may upgrade the config later — we just need a non-null
@@ -150,7 +199,7 @@ public class OAuthCallbackService {
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                 new HashSet<>()
             );
-            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, new HashSet<>());
+            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, new HashSet<>());
         };
     }
 

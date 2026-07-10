@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +22,7 @@ import lombok.ToString;
  * <ul>
  *   <li>{@link #id} — Synthetic auto-generated primary key</li>
  *   <li>{@link #nativeId} — The provider's original numeric ID (always positive)</li>
- *   <li>{@link #provider} — FK to {@link GitProvider} identifying the provider instance</li>
+ *   <li>{@link #provider} — FK to {@link IdentityProvider} identifying the provider instance</li>
  *   <li>{@link #createdAt} / {@link #updatedAt} — Audit timestamps from the provider</li>
  * </ul>
  * <p>
@@ -56,7 +56,7 @@ public abstract class BaseGitServiceEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "provider_id", nullable = false)
     @ToString.Exclude
-    protected GitProvider provider;
+    protected IdentityProvider provider;
 
     @Override
     public boolean equals(Object o) {

@@ -45,6 +45,29 @@ else
   copy_first_hit ".claude/settings.local.json" ".claude/settings.local.json"
 fi
 
+if [ -f "server/.env" ] && grep -Eq '^GITLAB_PAT=.' "server/.env" && grep -Eq '^GITLAB_GROUP_PATH=.' "server/.env"; then
+  set_env_default() {
+    local key="$1"
+    local value="$2"
+    if grep -Eq "^${key}=" "server/.env"; then
+      sed -i -E "s|^${key}=.*|${key}=${value}|" "server/.env"
+    else
+      printf '%s=%s\n' "$key" "$value" >> "server/.env"
+    fi
+  }
+  set_env_if_missing() {
+    local key="$1"
+    local value="$2"
+    if ! grep -Eq "^${key}=" "server/.env"; then
+      printf '%s=%s\n' "$key" "$value" >> "server/.env"
+    fi
+  }
+  set_env_default "GITLAB_WORKSPACE_INIT_DEFAULT" "true"
+  set_env_default "GITLAB_ENABLED" "true"
+  set_env_if_missing "GITLAB_SERVER_URL" "https://gitlab.lrz.de"
+  echo "  enabled GitLab default workspace bootstrap from local server/.env"
+fi
+
 echo "Installing npm dependencies..."
 pnpm install --frozen-lockfile
 

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -16,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/workers")
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @Hidden
-@de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic("Fleet-wide worker registration; not workspace-scoped")
+@WorkspaceAgnostic("Fleet-wide worker registration; not workspace-scoped")
 public class WorkerTokenExchangeController {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerTokenExchangeController.class);
@@ -57,7 +59,7 @@ public class WorkerTokenExchangeController {
     }
 
     @PostMapping("/exchange")
-    @org.springframework.security.access.prepost.PreAuthorize("permitAll()")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<?> exchange(@RequestBody ExchangeRequest request, HttpServletRequest http) {
         if (!properties.isExchangeEnabled()) {
             log.warn("worker token exchange attempted but no registration token is configured");

@@ -53,9 +53,29 @@ const defaultLinkedAccountsProps = {
 	providers: [
 		{ registrationId: "github", displayName: "GitHub", providerType: "GITHUB" },
 		{ registrationId: "gitlab", displayName: "GitLab", providerType: "GITLAB" },
+		{ registrationId: "slack", displayName: "Slack", providerType: "SLACK" },
 	],
 	onLink: fn(),
 	onUnlink: fn(),
+};
+
+const defaultSlackPreferencesProps = {
+	workspaces: [
+		{
+			workspaceSlug: "hephaestustest",
+			workspaceName: "Hephaestus Test",
+			slackTeamId: "T1",
+			slackTeamName: "hephaestus-test",
+			slackUserId: "U1",
+			slackDisplayName: "Felix",
+			channelMessagesAllowed: true,
+			activeMonitoredChannelCount: 2,
+		},
+	],
+	isSlackLinked: true,
+	canConnectSlack: true,
+	onConnectSlack: fn(),
+	onToggleChannelMessages: fn(),
 };
 
 /**
@@ -74,6 +94,7 @@ export const Default: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
+		slackPreferencesProps: defaultSlackPreferencesProps,
 		onAccountDeleted: fn(),
 		isLoading: false,
 	},
@@ -95,6 +116,7 @@ export const AllTogglesDisabled: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
+		slackPreferencesProps: defaultSlackPreferencesProps,
 		onAccountDeleted: fn(),
 		isLoading: false,
 	},
@@ -116,6 +138,7 @@ export const Loading: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
+		slackPreferencesProps: defaultSlackPreferencesProps,
 		onAccountDeleted: fn(),
 		isLoading: true,
 	},
@@ -137,6 +160,7 @@ export const AiReviewHidden: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
+		slackPreferencesProps: defaultSlackPreferencesProps,
 		onAccountDeleted: fn(),
 		isLoading: false,
 	},
@@ -158,6 +182,7 @@ export const ResearchHidden: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
+		slackPreferencesProps: defaultSlackPreferencesProps,
 		onAccountDeleted: fn(),
 		isLoading: false,
 	},

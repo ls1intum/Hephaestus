@@ -29,7 +29,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     /**
      * All review DECISIONS for a pull request, with the review author eagerly fetched.
      *
-     * <p>Used by the cross-context {@code ReviewThreadContentProvider} to surface review-decision
+     * <p>Used by the cross-context {@code ReviewThreadContentSource} to surface review-decision
      * state (CHANGES_REQUESTED / APPROVED) — the signal a "merged past unresolved request-changes"
      * lesson is grounded in, which neither inline comments nor the diff carry. Read-only context
      * materialisation; the caller establishes workspace scope.

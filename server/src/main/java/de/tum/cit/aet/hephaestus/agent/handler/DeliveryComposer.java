@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PI_AGENT_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.REPO_MOUNT_RELATIVE;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.ANALYSIS_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.CONTEXT_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PI_AGENT_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRACTICES_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_OUT_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.PRECOMPUTE_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout.REPO_MOUNT_RELATIVE;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
@@ -975,7 +975,7 @@ class DeliveryComposer {
     /**
      * Sentinel marker tracked in {@code emittedWhy} once a non-blocking (advisory) principle line has been
      * surfaced this delivery, so only the lead advisory critique carries one. Not a valid practice slug
-     * (slugs match {@code WorkspaceAbi.PRACTICE_SLUG}), so it can never collide with a real entry.
+     * (slugs match {@code SandboxLayout.PRACTICE_SLUG}), so it can never collide with a real entry.
      */
     private static final String ADVISORY_PRINCIPLE_SHOWN = " advisory-principle-shown";
 

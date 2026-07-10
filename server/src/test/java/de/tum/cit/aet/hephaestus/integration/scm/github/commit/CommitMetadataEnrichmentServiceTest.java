@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClie
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
@@ -182,16 +184,16 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
             );
 
             // Mock GraphQL client and response
-            ClientResponseField field = org.mockito.Mockito.mock(ClientResponseField.class);
+            ClientResponseField field = Mockito.mock(ClientResponseField.class);
             when(field.getValue()).thenReturn(commitData);
             when(field.toEntity(any(ParameterizedTypeReference.class))).thenReturn(commitData);
 
-            ClientGraphQlResponse graphQlResponse = org.mockito.Mockito.mock(ClientGraphQlResponse.class);
+            ClientGraphQlResponse graphQlResponse = Mockito.mock(ClientGraphQlResponse.class);
             when(graphQlResponse.isValid()).thenReturn(true);
             when(graphQlResponse.field("repository.commit0")).thenReturn(field);
 
-            HttpGraphQlClient client = org.mockito.Mockito.mock(HttpGraphQlClient.class);
-            GraphQlClient.RequestSpec requestSpec = org.mockito.Mockito.mock(GraphQlClient.RequestSpec.class);
+            HttpGraphQlClient client = Mockito.mock(HttpGraphQlClient.class);
+            GraphQlClient.RequestSpec requestSpec = Mockito.mock(GraphQlClient.RequestSpec.class);
             when(client.document(anyString())).thenReturn(requestSpec);
             when(requestSpec.execute()).thenReturn(Mono.just(graphQlResponse));
 
@@ -251,7 +253,7 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.findByShaAndRepositoryId(sha, repoId)).thenReturn(Optional.of(commit));
 
             // Response with null signature (unsigned commit)
-            Map<String, Object> commitData = new java.util.HashMap<>();
+            Map<String, Object> commitData = new HashMap<>();
             commitData.put("oid", sha);
             commitData.put("additions", 0);
             commitData.put("deletions", 0);
@@ -273,16 +275,16 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
             commitData.put("associatedPullRequests", Map.of("nodes", List.of()));
 
             // Mock GraphQL client and response
-            ClientResponseField field = org.mockito.Mockito.mock(ClientResponseField.class);
+            ClientResponseField field = Mockito.mock(ClientResponseField.class);
             when(field.getValue()).thenReturn(commitData);
             when(field.toEntity(any(ParameterizedTypeReference.class))).thenReturn(commitData);
 
-            ClientGraphQlResponse graphQlResponse = org.mockito.Mockito.mock(ClientGraphQlResponse.class);
+            ClientGraphQlResponse graphQlResponse = Mockito.mock(ClientGraphQlResponse.class);
             when(graphQlResponse.isValid()).thenReturn(true);
             when(graphQlResponse.field("repository.commit0")).thenReturn(field);
 
-            HttpGraphQlClient client = org.mockito.Mockito.mock(HttpGraphQlClient.class);
-            GraphQlClient.RequestSpec requestSpec = org.mockito.Mockito.mock(GraphQlClient.RequestSpec.class);
+            HttpGraphQlClient client = Mockito.mock(HttpGraphQlClient.class);
+            GraphQlClient.RequestSpec requestSpec = Mockito.mock(GraphQlClient.RequestSpec.class);
             when(client.document(anyString())).thenReturn(requestSpec);
             when(requestSpec.execute()).thenReturn(Mono.just(graphQlResponse));
 

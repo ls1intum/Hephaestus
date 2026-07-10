@@ -22,13 +22,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
@@ -330,7 +333,7 @@ public class WorkerControlClient {
         URI exchangeUri = URI.create(httpBaseFrom(endpoint) + "/api/workers/exchange");
         String workerId = properties.resolvedWorkerId();
         String body = objectMapper.writeValueAsString(
-            java.util.Map.of("workerId", workerId, "registrationToken", properties.control().registrationToken())
+            Map.of("workerId", workerId, "registrationToken", properties.control().registrationToken())
         );
         HttpRequest request = HttpRequest.newBuilder()
             .uri(exchangeUri)
@@ -369,9 +372,9 @@ public class WorkerControlClient {
                 new WorkerHello(workerId, List.of(FrameEnvelope.CURRENT_VERSION), null)
             );
             ws.sendText(codec.encode(hello), true).toCompletableFuture().get(5, TimeUnit.SECONDS);
-        } catch (java.util.concurrent.ExecutionException e) {
+        } catch (ExecutionException e) {
             throw new IOException("WSS open failed: " + e.getCause().getMessage(), e.getCause());
-        } catch (java.util.concurrent.TimeoutException e) {
+        } catch (TimeoutException e) {
             throw new IOException("WSS open timed out");
         }
     }

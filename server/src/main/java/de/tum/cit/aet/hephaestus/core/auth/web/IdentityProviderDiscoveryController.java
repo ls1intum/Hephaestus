@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /auth/login?provider={registrationId}}.
  *
  * <p>Lists every enabled instance-scoped {@code login_provider} (GitHub, GitLab.com, self-hosted
- * GitLab) — one shared registration per provider, reused across all workspaces.
+ * GitLab, and link-only Slack) — one shared registration per provider, reused across all workspaces.
  */
 @ConditionalOnServerRole
 @RestController
@@ -84,14 +84,19 @@ public class IdentityProviderDiscoveryController {
     }
 
     /**
-     * The provider type drives the SPA's icon choice. Derived from the authorization endpoint host
-     * (the only GitHub login target is github.com; everything else is a GitLab instance), so it works
-     * for any admin-registered self-hosted GitLab without relying on the registration-id naming.
+     * The provider type drives the SPA's icon choice and link-only filtering.
      */
     static String providerTypeOf(ClientRegistration reg) {
         // Match on the parsed HOST, not a substring of the whole URI — "github.com" appearing in a
         // path/query of a GitLab instance (or a look-alike host) must not be misclassified as GitHub.
-        return "github.com".equals(hostOf(reg)) ? "GITHUB" : "GITLAB";
+        String host = hostOf(reg);
+        if ("github.com".equals(host)) {
+            return "GITHUB";
+        }
+        if ("slack.com".equals(host)) {
+            return "SLACK";
+        }
+        return "GITLAB";
     }
 
     /** Host of the authorization endpoint, or {@code null} if absent/malformed. */

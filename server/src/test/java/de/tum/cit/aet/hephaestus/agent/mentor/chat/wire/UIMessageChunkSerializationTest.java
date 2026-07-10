@@ -99,10 +99,10 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                 new UIMessageChunk.ToolInputAvailable(
                     "call-1",
                     "fetch_context",
-                    NODES.objectNode().put("path", "workspace.json")
+                    NODES.objectNode().put("path", "inputs/context/workspace.json")
                 ),
                 "{\"type\":\"tool-input-available\",\"toolCallId\":\"call-1\"," +
-                "\"toolName\":\"fetch_context\",\"input\":{\"path\":\"workspace.json\"}}",
+                "\"toolName\":\"fetch_context\",\"input\":{\"path\":\"inputs/context/workspace.json\"}}",
             },
             // Error tool output — errorText only, no output field on wire.
             new Object[] {

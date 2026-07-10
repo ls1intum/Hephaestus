@@ -44,6 +44,7 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
     Optional<Workspace> findByOrganization_Login(String login);
     Optional<Workspace> findByAccountLoginIgnoreCase(String login);
+    List<Workspace> findAllByAccountLoginIgnoreCase(String login);
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
     boolean existsByWorkspaceSlug(String workspaceSlug);
     boolean existsByOrganizationId(Long organizationId);

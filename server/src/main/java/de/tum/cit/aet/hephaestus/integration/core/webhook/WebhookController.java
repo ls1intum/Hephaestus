@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.Map;
@@ -15,13 +16,15 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Unified webhook ingest controller.
  *
- * <p>{@code POST /webhooks/{kind}} is the sole webhook entry point. Per-kind
+ * <p>{@code POST /webhooks/{kind}} is the unified vendor event entry point. Per-kind
  * routing resolves the {@link IntegrationKindRouting kind} from the path and
  * delegates to {@link WebhookIngestPipeline}, which dispatches signature
  * verification, subject derivation and JetStream publication through the per-kind
  * {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
  * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
- * GitHub, GitLab and Slack all share this endpoint.
+ * GitHub, GitLab and Slack Events API all share this endpoint. Slack interactivity
+ * stays on {@code /webhooks/slack/interactivity} because Slack configures it as a
+ * separate Request URL and it needs a fast ACK before postback work runs.
  *
  * <p>Active only on the webhook runtime role.
  */
@@ -48,10 +51,7 @@ public class WebhookController {
             );
     }
 
-    private ResponseEntity<?> doHandle(
-        de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind k,
-        HttpServletRequest req
-    ) {
+    private ResponseEntity<?> doHandle(IntegrationKind k, HttpServletRequest req) {
         try {
             return pipeline.handle(k, req);
         } catch (IOException e) {

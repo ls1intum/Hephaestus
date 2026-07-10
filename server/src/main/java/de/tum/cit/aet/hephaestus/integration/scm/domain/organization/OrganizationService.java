@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.organization;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,9 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrganizationService {
 
     private final OrganizationRepository organizations;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
-    public OrganizationService(OrganizationRepository organizations, GitProviderRepository gitProviderRepository) {
+    public OrganizationService(OrganizationRepository organizations, IdentityProviderRepository gitProviderRepository) {
         this.organizations = organizations;
         this.gitProviderRepository = gitProviderRepository;
     }
@@ -22,7 +22,7 @@ public class OrganizationService {
      *
      * @param nativeId   the provider's native numeric ID for the organization
      * @param login      the organization login name
-     * @param providerId the FK ID of the GitProvider entity
+     * @param providerId the FK ID of the IdentityProvider entity
      */
     @Transactional
     public Organization upsertIdentity(long nativeId, String login, Long providerId) {
@@ -30,7 +30,7 @@ public class OrganizationService {
             throw new IllegalArgumentException("login required");
         }
 
-        GitProvider provider = gitProviderRepository.getReferenceById(providerId);
+        IdentityProvider provider = gitProviderRepository.getReferenceById(providerId);
 
         Organization organization = organizations
             .findByNativeIdAndProviderId(nativeId, providerId)

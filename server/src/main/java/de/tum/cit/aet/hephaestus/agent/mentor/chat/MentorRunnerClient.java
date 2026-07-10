@@ -270,6 +270,9 @@ public final class MentorRunnerClient implements AutoCloseable {
             sendCallbackError(idNode, -32600, "invalid threadId");
             return;
         }
+        if (!boundThreadId.equals(threadId)) {
+            return;
+        }
         try {
             JsonNode result = fetchContextHandler.apply(new FetchContextRequest(threadId, path));
             ObjectNode response = objectMapper.createObjectNode();

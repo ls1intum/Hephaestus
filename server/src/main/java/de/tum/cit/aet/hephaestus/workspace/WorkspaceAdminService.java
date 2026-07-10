@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.dto.AdminWorkspaceViewDTO;
 import java.util.List;
@@ -39,9 +39,9 @@ public class WorkspaceAdminService {
     }
 
     private AdminWorkspaceViewDTO toView(Workspace ws) {
-        GitProviderType providerType = connectionService
+        IdentityProviderType providerType = connectionService
             .findActiveProviderKind(ws.getId())
-            .map(GitProviderType::from)
+            .map(IdentityProviderType::from)
             .orElse(null);
         String ownerLogin = membershipRepository
             .findUserLoginsByWorkspaceIdAndRole(ws.getId(), WorkspaceRole.OWNER)

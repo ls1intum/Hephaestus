@@ -95,7 +95,7 @@ class AccountFeatureRepositoryIntegrationTest {
     private IdentityLink link(Account account, long gitProviderId, String subject) {
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(gitProviderId);
+        link.setProviderId(gitProviderId);
         link.setSubject(subject);
         link.setUsernameAtSignup("octocat"); // identical login on both providers — must not be the key
         return identityLinkRepository.save(link);

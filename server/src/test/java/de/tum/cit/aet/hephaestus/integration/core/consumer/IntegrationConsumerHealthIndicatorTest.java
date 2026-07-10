@@ -23,11 +23,18 @@ import org.springframework.boot.health.contributor.Status;
 class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
 
     private static IntegrationConsumerHealthIndicator indicator(IntegrationConsumerStats stats) {
+        return indicator(stats, false);
+    }
+
+    private static IntegrationConsumerHealthIndicator indicator(
+        IntegrationConsumerStats stats,
+        boolean flatStreamConsumerEnabled
+    ) {
         IntegrationMessageHandlerRegistry registry = mock(IntegrationMessageHandlerRegistry.class);
         when(registry.handlerCount()).thenReturn(32);
         IntegrationMessageDispatcher dispatcher = mock(IntegrationMessageDispatcher.class);
         when(dispatcher.parserCount()).thenReturn(4);
-        return new IntegrationConsumerHealthIndicator(stats, registry, dispatcher);
+        return new IntegrationConsumerHealthIndicator(stats, registry, dispatcher, flatStreamConsumerEnabled);
     }
 
     @Nested
@@ -59,6 +66,7 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
             when(stats.natsConnectionStatus()).thenReturn(Optional.of("CONNECTED"));
             when(stats.activeScopeConsumerCount()).thenReturn(7);
             when(stats.installationConsumerActive()).thenReturn(true);
+            when(stats.flatStreamConsumerActive()).thenReturn(true);
             Instant dispatchTs = Instant.parse("2026-01-01T00:00:00Z");
             when(stats.lastDispatchAt()).thenReturn(Optional.of(dispatchTs));
             when(stats.lastNakAt()).thenReturn(Optional.empty());
@@ -70,8 +78,26 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
                 .containsEntry("natsConnectionStatus", "CONNECTED")
                 .containsEntry("activeScopeConsumers", 7)
                 .containsEntry("installationConsumerActive", true)
+                .containsEntry("flatStreamConsumerActive", true)
+                .containsEntry("flatStreamConsumerRequired", false)
                 .containsEntry("lastDispatchAt", dispatchTs.toString())
                 .doesNotContainKey("lastNakAt");
+        }
+
+        @Test
+        void connectedWithRequiredFlatStreamActive_reportsUp() {
+            IntegrationConsumerStats stats = mock(IntegrationConsumerStats.class);
+            when(stats.natsConnectionStatus()).thenReturn(Optional.of("CONNECTED"));
+            when(stats.activeScopeConsumerCount()).thenReturn(0);
+            when(stats.installationConsumerActive()).thenReturn(true);
+            when(stats.flatStreamConsumerActive()).thenReturn(true);
+            when(stats.lastDispatchAt()).thenReturn(Optional.empty());
+            when(stats.lastNakAt()).thenReturn(Optional.empty());
+
+            Health health = indicator(stats, true).health();
+
+            assertThat(health.getStatus()).isEqualTo(Status.UP);
+            assertThat(health.getDetails()).containsEntry("flatStreamConsumerRequired", true);
         }
 
         @Test
@@ -80,6 +106,7 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
             when(stats.natsConnectionStatus()).thenReturn(Optional.of("connected"));
             when(stats.activeScopeConsumerCount()).thenReturn(0);
             when(stats.installationConsumerActive()).thenReturn(false);
+            when(stats.flatStreamConsumerActive()).thenReturn(false);
             when(stats.lastDispatchAt()).thenReturn(Optional.empty());
             when(stats.lastNakAt()).thenReturn(Optional.empty());
 
@@ -95,6 +122,7 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
             when(stats.natsConnectionStatus()).thenReturn(Optional.of("DISABLED"));
             when(stats.activeScopeConsumerCount()).thenReturn(0);
             when(stats.installationConsumerActive()).thenReturn(false);
+            when(stats.flatStreamConsumerActive()).thenReturn(false);
             when(stats.lastDispatchAt()).thenReturn(Optional.empty());
             when(stats.lastNakAt()).thenReturn(Optional.empty());
 
@@ -115,6 +143,7 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
             when(stats.natsConnectionStatus()).thenReturn(Optional.of("DISCONNECTED"));
             when(stats.activeScopeConsumerCount()).thenReturn(0);
             when(stats.installationConsumerActive()).thenReturn(false);
+            when(stats.flatStreamConsumerActive()).thenReturn(false);
             when(stats.lastDispatchAt()).thenReturn(Optional.empty());
             when(stats.lastNakAt()).thenReturn(Optional.of(Instant.parse("2026-01-01T00:00:00Z")));
 
@@ -124,6 +153,25 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
             assertThat(health.getDetails())
                 .containsEntry("natsConnectionStatus", "DISCONNECTED")
                 .containsKey("lastNakAt");
+        }
+
+        @Test
+        void connectedButRequiredFlatStreamInactive_reportsDown() {
+            IntegrationConsumerStats stats = mock(IntegrationConsumerStats.class);
+            when(stats.natsConnectionStatus()).thenReturn(Optional.of("CONNECTED"));
+            when(stats.activeScopeConsumerCount()).thenReturn(0);
+            when(stats.installationConsumerActive()).thenReturn(true);
+            when(stats.flatStreamConsumerActive()).thenReturn(false);
+            when(stats.lastDispatchAt()).thenReturn(Optional.empty());
+            when(stats.lastNakAt()).thenReturn(Optional.empty());
+
+            Health health = indicator(stats, true).health();
+
+            assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+            assertThat(health.getDetails())
+                .containsEntry("natsConnectionStatus", "CONNECTED")
+                .containsEntry("flatStreamConsumerRequired", true)
+                .containsEntry("flatStreamConsumerActive", false);
         }
     }
 }

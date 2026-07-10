@@ -1,0 +1,68 @@
+display_information:
+  name: Hephaestus
+
+features:
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  agent_view:
+    agent_description: Hephaestus mentors software project practices in private Slack DMs.
+    suggested_prompts:
+      - title: What needs attention?
+        message: What software project practice should I focus on next?
+      - title: Review my recent work
+        message: Review my recent pull requests, reviews, and issues.
+      - title: Check my reviews
+        message: How are my code reviews and review comments trending?
+      - title: Follow up
+        message: What feedback or project-practice issue should I revisit?
+  bot_user:
+    display_name: Hephaestus
+    always_online: false
+
+oauth_config:
+  redirect_urls:
+    - <api-public-base-url>/oauth/callback/slack
+    - <api-public-base-url>/login/oauth2/code/slack
+  scopes:
+    bot:
+      - assistant:write
+      - chat:write
+      - im:history
+      - channels:history
+      - groups:history
+      - channels:read
+      - channels:join
+      - groups:read
+      - users:read
+    user:
+      - openid
+      - profile
+      - email
+
+settings:
+  event_subscriptions:
+    request_url: https://<webhook-host>/webhooks/slack
+    bot_events:
+      - message.im
+      - message.channels
+      - message.groups
+      - member_joined_channel
+      - channel_archive
+      - channel_deleted
+      - channel_left
+      - channel_rename
+      - group_archive
+      - group_left
+      - group_rename
+      - app_home_opened
+      - app_context_changed
+      - app_uninstalled
+      - tokens_revoked
+  interactivity:
+    is_enabled: true
+    request_url: https://<webhook-host>/webhooks/slack/interactivity
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

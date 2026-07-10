@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -68,21 +69,19 @@ public record PiPlanSpec(
                 ? extraInputs
                       .entrySet()
                       .stream()
-                      .collect(
-                          java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().clone())
-                      )
+                      .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().clone()))
                 : Map.of();
         for (String path : extraInputs.keySet()) {
             boolean ok =
-                WorkspaceAbi.allowedExtraInputPaths().contains(path) ||
-                WorkspaceAbi.allowedExtraInputPrefixes().stream().anyMatch(path::startsWith);
+                SandboxLayout.allowedExtraInputPaths().contains(path) ||
+                SandboxLayout.allowedExtraInputPrefixes().stream().anyMatch(path::startsWith);
             if (!ok) {
                 throw new IllegalArgumentException(
                     "extraInputs path '" +
                         path +
                         "' is not a recognised workspace path: must appear in " +
-                        "WorkspaceAbi.allowedExtraInputPaths() or be prefixed by one of " +
-                        WorkspaceAbi.allowedExtraInputPrefixes()
+                        "SandboxLayout.allowedExtraInputPaths() or be prefixed by one of " +
+                        SandboxLayout.allowedExtraInputPrefixes()
                 );
             }
         }

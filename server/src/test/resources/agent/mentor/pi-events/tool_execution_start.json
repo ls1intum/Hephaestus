@@ -2,5 +2,5 @@
   "type": "tool_execution_start",
   "toolCallId": "call-real-1",
   "toolName": "fetch_context",
-  "args": {"path": "workspace.json"}
+  "args": {"path": "inputs/context/workspace.json"}
 }

@@ -2,15 +2,16 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
 import static org.assertj.core.api.Assertions.*;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -74,7 +75,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -97,7 +98,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     private Repository testRepository;
     private Workspace testWorkspace;
     private Organization testOrganization;
-    private GitProvider githubProvider;
+    private IdentityProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -109,8 +110,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
 
         // Create organization matching fixture data
         testOrganization = new Organization();
@@ -1208,8 +1211,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             existing = issueRepository.save(existing);
 
             // Create a label and associate it with the issue
-            de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label label =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label();
+            Label label = new Label();
             label.setNativeId(100001L);
             label.setProvider(githubProvider);
             label.setName("bug");

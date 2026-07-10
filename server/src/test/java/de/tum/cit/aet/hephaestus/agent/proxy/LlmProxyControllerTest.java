@@ -13,6 +13,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -428,7 +429,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
             assertThat(timer).isNotNull();
             assertThat(timer.count()).isEqualTo(1);
-            assertThat(timer.totalTime(java.util.concurrent.TimeUnit.NANOSECONDS)).isGreaterThan(0);
+            assertThat(timer.totalTime(TimeUnit.NANOSECONDS)).isGreaterThan(0);
         }
 
         @Test

@@ -26,11 +26,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
@@ -68,9 +70,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
         AuthEventLogger logger = new AuthEventLogger(authEventWriter);
         Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
         AuthProperties properties = mock(AuthProperties.class);
-        org.mockito.Mockito.lenient()
-            .when(properties.impersonationMaxLifetime())
-            .thenReturn(java.time.Duration.ofHours(1));
+        Mockito.lenient().when(properties.impersonationMaxLifetime()).thenReturn(java.time.Duration.ofHours(1));
         service = new ImpersonationService(
             accountRepository,
             jwtIssuer,
@@ -97,9 +97,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
         Account target = account(2L, Account.AppRole.USER);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(operator));
         when(accountRepository.findById(2L)).thenReturn(Optional.of(target));
-        when(principalFactory.forAccount(target)).thenReturn(
-            new JwtPrincipal(2L, "target", "Target", java.util.Set.of())
-        );
+        when(principalFactory.forAccount(target)).thenReturn(new JwtPrincipal(2L, "target", "Target", Set.of()));
         when(jwtIssuer.issue(any(), eq(1L), any(), any())).thenReturn(
             new HephaestusJwtIssuer.Token("tok", UUID.randomUUID(), Instant.parse("2026-01-01T00:15:00Z"))
         );
@@ -176,9 +174,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
         Account target = account(2L, Account.AppRole.USER);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(operator));
         when(accountRepository.findById(2L)).thenReturn(Optional.of(target));
-        when(principalFactory.forAccount(target)).thenReturn(
-            new JwtPrincipal(2L, "target", "Target", java.util.Set.of())
-        );
+        when(principalFactory.forAccount(target)).thenReturn(new JwtPrincipal(2L, "target", "Target", Set.of()));
         // act-claim contract: the issuer is invoked with the OPERATOR id as the impersonatorId arg.
         when(jwtIssuer.issue(any(), eq(1L), any(), any())).thenReturn(
             new HephaestusJwtIssuer.Token("tok", UUID.randomUUID(), Instant.parse("2026-01-01T00:15:00Z"))
@@ -205,7 +201,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
     void exit_revokesImpersonationJtiAndMintsOperatorToken() {
         UUID impersonationJti = UUID.randomUUID();
         when(principalFactory.forAccountId(1L)).thenReturn(
-            new JwtPrincipal(1L, "operator", "Operator", java.util.Set.of("admin"))
+            new JwtPrincipal(1L, "operator", "Operator", Set.of("admin"))
         );
         when(jwtIssuer.issue(any(), eq(null), any())).thenReturn(
             new HephaestusJwtIssuer.Token("op-tok", UUID.randomUUID(), Instant.parse("2026-01-01T00:15:00Z"))

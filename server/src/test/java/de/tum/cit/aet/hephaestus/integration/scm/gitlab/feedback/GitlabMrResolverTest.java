@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -91,7 +92,7 @@ class GitlabMrResolverTest extends BaseUnitTest {
     void resolve_missingGlobalIdThrowsWithErrors() {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         stubField(response, "project.mergeRequest.id", null);
-        when(response.getErrors()).thenReturn(List.of(mock(org.springframework.graphql.ResponseError.class)));
+        when(response.getErrors()).thenReturn(List.of(mock(ResponseError.class)));
         stubExecute(Mono.just(response));
 
         assertThatThrownBy(() -> resolver().resolve(1L, "group/project", 42))

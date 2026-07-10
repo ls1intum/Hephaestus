@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
@@ -462,7 +462,7 @@ public class GithubDataSyncScheduler {
 
             // Ensure the organization exists locally before syncing projects
             Organization organization = organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), GitProviderType.GITHUB)
+                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), IdentityProviderType.GITHUB)
                 .orElse(null);
             if (organization == null) {
                 log.info(

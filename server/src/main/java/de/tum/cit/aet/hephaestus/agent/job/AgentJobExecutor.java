@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
@@ -122,8 +122,8 @@ public class AgentJobExecutor {
      * workers' jobs. Populated on claim, removed in the {@code executeJob} finally block.
      */
     private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
-    private final java.util.Optional<WorkerCapacityState> capacityState;
-    private final java.util.Optional<WorkerProperties> workerProperties;
+    private final Optional<WorkerCapacityState> capacityState;
+    private final Optional<WorkerProperties> workerProperties;
     /** This worker's identity (null only when the worker role is off); stamped on claimed jobs to fence terminal writes. */
     private final String workerId;
 
@@ -139,8 +139,8 @@ public class AgentJobExecutor {
         TransactionTemplate transactionTemplate,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry,
-        java.util.Optional<WorkerCapacityState> capacityState,
-        java.util.Optional<WorkerProperties> workerProperties
+        Optional<WorkerCapacityState> capacityState,
+        Optional<WorkerProperties> workerProperties
     ) {
         this.natsConnection = natsConnection;
         this.natsProperties = natsProperties;
@@ -757,11 +757,11 @@ public class AgentJobExecutor {
         // Distinguish envelope drift (exit 42) from generic failure — the runner emits this when
         // the task.json schemaVersion / kind doesn't match this image. Operators need to see
         // this distinctly from agent crashes; the secondary metric also alerts on image drift.
-        if (sandboxResult.exitCode() == WorkspaceAbi.EXIT_ENVELOPE_MISMATCH) {
+        if (sandboxResult.exitCode() == SandboxLayout.EXIT_ENVELOPE_MISMATCH) {
             log.error(
                 "Pi runner rejected task envelope (exit {}) — server/image schemaVersion or kind drift. " +
                     "Rebuild the agent-pi image or roll back the server.",
-                WorkspaceAbi.EXIT_ENVELOPE_MISMATCH
+                SandboxLayout.EXIT_ENVELOPE_MISMATCH
             );
             meterRegistry.counter("agent.pi.envelope.mismatch").increment();
             return AgentJobStatus.FAILED;

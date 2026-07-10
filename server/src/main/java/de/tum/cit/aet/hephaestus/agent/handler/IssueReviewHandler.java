@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Handler for {@link AgentJobType#ISSUE_REVIEW} jobs — the issue counterpart of
  * {@link PullRequestReviewHandler}. Issues have NO diff: the case context is the issue body, the
- * comment thread, and the lifecycle metadata, materialised by {@code IssueContentProvider} under
+ * comment thread, and the lifecycle metadata, materialised by {@code IssueContentSource} under
  * {@code inputs/context/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
  *
  * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE),
@@ -120,7 +120,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         Map<String, byte[]> files = new LinkedHashMap<>(
             workspaceContextBuilder.build(new ContextRequest.IssueReviewRequest(job))
         );
-        files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
+        files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE);
         log.info(
             "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
@@ -155,7 +155,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             "evaluate each practice in inputs/practices/ against the issue and persist every justified observation via the " +
             "report_observation tool. Evidence locations should reference the issue thread/metadata, not source files. " +
             "Follow " +
-            WorkspaceAbi.ORCHESTRATOR_PATH +
+            SandboxLayout.ORCHESTRATOR_PATH +
             " for the observation schema and rules.";
         log.info("Built issue orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;

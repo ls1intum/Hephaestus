@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.mockito.Mock;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -82,7 +84,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
 
             // TransactionTemplate.executeWithoutResult -> just run the consumer
             doAnswer(invocation -> {
-                java.util.function.Consumer<Object> consumer = invocation.getArgument(0);
+                Consumer<Object> consumer = invocation.getArgument(0);
                 consumer.accept(null);
                 return null;
             })
@@ -93,7 +95,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
                 var callback = invocation.getArgument(0);
                 @SuppressWarnings("unchecked")
-                var typedCallback = (org.springframework.transaction.support.TransactionCallback<Object>) callback;
+                var typedCallback = (TransactionCallback<Object>) callback;
                 return typedCallback.doInTransaction(null);
             });
 
@@ -114,7 +116,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
         @Test
         void handlesEmptyHistory() {
             doAnswer(invocation -> {
-                java.util.function.Consumer<Object> consumer = invocation.getArgument(0);
+                Consumer<Object> consumer = invocation.getArgument(0);
                 consumer.accept(null);
                 return null;
             })
@@ -124,7 +126,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
                 var callback = invocation.getArgument(0);
                 @SuppressWarnings("unchecked")
-                var typedCallback = (org.springframework.transaction.support.TransactionCallback<Object>) callback;
+                var typedCallback = (TransactionCallback<Object>) callback;
                 return typedCallback.doInTransaction(null);
             });
 

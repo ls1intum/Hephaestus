@@ -7,7 +7,7 @@
  *   <li>{@code agent.handler} — job-type dispatch + the practice detection → feedback delivery pipeline</li>
  *   <li>{@code agent.practice} — Pi runtime adapter for the practice-review agent (symmetric with {@code agent.mentor})</li>
  *   <li>{@code agent.mentor} — Pi runtime + interactive SSE chat backing the mentor flow</li>
- *   <li>{@code agent.context} — context provider SPI (practices catalog, mentor aspects)</li>
+ *   <li>{@code agent.context} — content source SPI (practices catalog, mentor content sources)</li>
  *   <li>{@code agent.sandbox} — Docker sandbox runtime + interactive variant for mentor</li>
  *   <li>{@code agent.runtime} — shared Pi-runtime kernel (workspace ABI, plan/result, image, proxy auth)</li>
  *   <li>{@code agent.proxy} — worker-side LLM proxy (credential-scoped per-job)</li>

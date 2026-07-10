@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.Base64;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,7 +53,7 @@ class EncryptedStringConverterTest extends BaseUnitTest {
         // An ENC: blob whose decoded body is shorter than the 12-byte GCM IV must fail closed
         // (EncryptionException), not leak a NegativeArraySizeException from `new byte[len - 12]`.
         EncryptedStringConverter c = converter();
-        String truncated = "ENC:" + java.util.Base64.getEncoder().encodeToString(new byte[5]);
+        String truncated = "ENC:" + Base64.getEncoder().encodeToString(new byte[5]);
         assertThatThrownBy(() -> c.convertToEntityAttribute(truncated)).isInstanceOf(EncryptionException.class);
     }
 

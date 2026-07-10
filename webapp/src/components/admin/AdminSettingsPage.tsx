@@ -1,3 +1,4 @@
+import type { SlackMonitoredChannel } from "@/api/types.gen";
 import {
 	AdminFeaturesSettings,
 	type CohortVisibility,
@@ -6,6 +7,11 @@ import {
 } from "./AdminFeaturesSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminReviewCycleSettings } from "./AdminReviewCycleSettings";
+import {
+	AdminSlackChannelsSettings,
+	type SlackChannelCandidate,
+	type SlackConsentState,
+} from "./AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
 type RepositoryItem = {
@@ -39,6 +45,25 @@ export interface AdminSettingsPageProps {
 	slackChannelId?: string;
 	/** Refetch the workspace snapshot after any settings card saves (Slack, review cycle, …). */
 	onWorkspaceRefetch: () => void;
+	// Slack channel-monitoring section (rendered directly below the Slack card).
+	slackChannels: SlackMonitoredChannel[];
+	slackChannelCandidates: SlackChannelCandidate[];
+	isLoadingSlackChannels: boolean;
+	isSlackChannelsError?: boolean;
+	onRetrySlackChannels?: () => void;
+	onRegisterSlackChannel: (input: {
+		slackChannelId: string;
+		channelName?: string;
+	}) => Promise<void> | void;
+	onUpdateSlackChannelConsent: (input: {
+		slackChannelId: string;
+		consentState: SlackConsentState;
+		reason?: string;
+	}) => Promise<void> | void;
+	onRemoveSlackChannel: (input: {
+		slackChannelId: string;
+		reason?: string;
+	}) => Promise<void> | void;
 }
 
 export function AdminSettingsPage({
@@ -63,6 +88,14 @@ export function AdminSettingsPage({
 	slackConnectionId,
 	slackChannelId,
 	onWorkspaceRefetch,
+	slackChannels,
+	slackChannelCandidates,
+	isLoadingSlackChannels,
+	isSlackChannelsError = false,
+	onRetrySlackChannels,
+	onRegisterSlackChannel,
+	onUpdateSlackChannelConsent,
+	onRemoveSlackChannel,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -110,6 +143,21 @@ export function AdminSettingsPage({
 						slackConnectionId={slackConnectionId}
 						channelId={slackChannelId}
 						onSaved={onWorkspaceRefetch}
+					/>
+				)}
+
+				{workspaceSlug != null && hasSlackConnection && (
+					<AdminSlackChannelsSettings
+						workspaceSlug={workspaceSlug}
+						hasSlackConnection={hasSlackConnection}
+						channels={slackChannels}
+						channelCandidates={slackChannelCandidates}
+						isLoading={isLoadingSlackChannels}
+						isError={isSlackChannelsError}
+						onRetry={onRetrySlackChannels}
+						onRegisterChannel={onRegisterSlackChannel}
+						onUpdateConsent={onUpdateSlackChannelConsent}
+						onRemoveChannel={onRemoveSlackChannel}
 					/>
 				)}
 			</div>

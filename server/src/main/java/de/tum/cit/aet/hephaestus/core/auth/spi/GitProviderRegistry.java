@@ -3,13 +3,13 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
 /**
  * Narrow SPI that resolves an OAuth client {@code registrationId} to the persistent
  * {@code git_provider} row id, creating the row on first sight. Implemented in
- * {@code integration} (which owns the {@code GitProvider} aggregate); consumed by
+ * {@code integration} (which owns the {@code IdentityProvider} aggregate); consumed by
  * {@code core.auth} during JIT account provisioning so the {@code IdentityLink} can be
  * keyed by {@code (git_provider_id, subject)} without {@code core.auth} importing the
  * integration entity (which would invert the bounded-context dependency direction).
  *
  * <p>{@code core.auth} owns the {@code login_provider} store and resolves a registration id to its
- * {@code (type, baseUrl)}; integration owns the {@code GitProvider} row and canonicalizes the base
+ * {@code (type, baseUrl)}; integration owns the {@code IdentityProvider} row and canonicalizes the base
  * URL to a server-url origin on upsert. Passing the pair (rather than the registration id) keeps
  * integration from reaching into {@code core.auth}'s store.
  */
@@ -28,7 +28,7 @@ public interface GitProviderRegistry {
      * Resolve the provider <em>type</em> name (e.g. {@code GITHUB}, {@code GITLAB}) for a
      * {@code git_provider} row id. Used by read-side auth surfaces (profile, GDPR export)
      * to label an {@link de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink} without
-     * navigating the integration-owned {@code GitProvider} entity.
+     * navigating the integration-owned {@code IdentityProvider} entity.
      *
      * @param gitProviderId the {@code git_provider} row id, or {@code null}
      * @return the provider type name, or {@code "UNKNOWN"} when the id is {@code null} or no row exists

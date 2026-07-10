@@ -4,7 +4,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -35,23 +39,29 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * Forbid legacy per-vendor webhook ingress routes.
+     * Forbid retired per-vendor webhook ingress routes.
      *
-     * <p>Only {@code WebhookController @PostMapping("/webhooks/{kind}")} should match webhook
-     * payloads. The rule fires when a @{@link PostMapping} value is <em>exactly</em>
-     * {@code /github}, {@code /gitlab}, {@code /slack}, or {@code /outline} — the legacy
+     * <p>Vendor event payloads use {@code WebhookController @PostMapping("/webhooks/{kind}")};
+     * Slack interactivity is the only separate webhook URL. The rule fires when a @{@link PostMapping} value is <em>exactly</em>
+     * {@code /github}, {@code /gitlab}, {@code /slack}, or {@code /outline} — the retired
      * top-level ingress paths the unified webhook framework replaced. Nested paths under a different
      * class-level {@code @RequestMapping} (e.g. {@code WorkspaceRegistryController}'s
      * {@code POST /workspaces/gitlab/preflight}) are admin-API surfaces, not webhook
      * ingress, and remain permitted.
      */
     @Test
-    @DisplayName("no legacy per-vendor webhook PostMapping route")
-    void noLegacyVendorWebhookRoutes() {
-        Set<String> legacyVendorRouteNames = Set.of("/github", "/gitlab", "/slack", "/outline");
+    @DisplayName("no retired per-vendor webhook PostMapping route")
+    void noRetiredVendorWebhookRoutes() {
+        Set<String> retiredVendorRouteNames = Set.of(
+            "/github",
+            "/gitlab",
+            "/slack",
+            "/outline",
+            "/slack/interactivity"
+        );
 
-        ArchCondition<JavaMethod> notDeclareLegacyVendorRoute = new ArchCondition<>(
-            "not declare a legacy /github, /gitlab, /slack, or /outline @PostMapping route"
+        ArchCondition<JavaMethod> notDeclareRetiredVendorRoute = new ArchCondition<>(
+            "not declare a retired vendor webhook @PostMapping route"
         ) {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
@@ -65,12 +75,12 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
                     if (trimmed.isEmpty()) {
                         continue;
                     }
-                    if (legacyVendorRouteNames.contains(trimmed)) {
+                    if (retiredVendorRouteNames.contains(trimmed)) {
                         events.add(
                             SimpleConditionEvent.violated(
                                 method,
                                 String.format(
-                                    "%s declares legacy per-vendor webhook route '%s' — only " +
+                                    "%s declares retired per-vendor webhook route '%s' — only " +
                                         "WebhookController.@PostMapping(\"/webhooks/{kind}\") is permitted",
                                     method.getFullName(),
                                     trimmed
@@ -85,10 +95,10 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
         ArchRule rule = methods()
             .that()
             .areAnnotatedWith(PostMapping.class)
-            .should(notDeclareLegacyVendorRoute)
+            .should(notDeclareRetiredVendorRoute)
             .because(
                 "all vendor webhook receivers live behind /webhooks/{kind}; re-adding /github, " +
-                    "/gitlab, /slack, or /outline would bypass the unified verification framework"
+                    "/gitlab, /slack, or /outline would bypass the unified webhook namespace"
             );
         rule.check(classes);
     }
@@ -116,11 +126,11 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
             "serverUrl"
         );
 
-        ArchCondition<com.tngtech.archunit.core.domain.JavaField> notCarryLegacyName = new ArchCondition<>(
+        ArchCondition<JavaField> notCarryLegacyName = new ArchCondition<>(
             "not carry the name of a legacy Connection-owned column"
         ) {
             @Override
-            public void check(com.tngtech.archunit.core.domain.JavaField field, ConditionEvents events) {
+            public void check(JavaField field, ConditionEvents events) {
                 if (forbiddenFieldNames.contains(field.getName())) {
                     events.add(
                         SimpleConditionEvent.violated(
@@ -139,12 +149,9 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
         // Compose entity-AND-workspace-package via DescribedPredicate#and — chaining two
         // `.areDeclaredInClassesThat()` fluents on the ArchRule builder ORs them and would
         // sweep DTOs/context records that legitimately keep these field names on the wire.
-        com.tngtech.archunit.base.DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> entityInWorkspace =
-            com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage("..workspace..").and(
-                com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.annotatedWith(
-                    jakarta.persistence.Entity.class
-                )
-            );
+        DescribedPredicate<JavaClass> entityInWorkspace = JavaClass.Predicates.resideInAPackage("..workspace..").and(
+            CanBeAnnotated.Predicates.annotatedWith(jakarta.persistence.Entity.class)
+        );
         ArchRule rule = fields()
             .that()
             .areDeclaredInClassesThat(entityInWorkspace)

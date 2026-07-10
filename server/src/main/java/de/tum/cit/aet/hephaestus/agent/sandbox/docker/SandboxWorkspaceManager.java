@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -13,6 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -408,15 +411,15 @@ public class SandboxWorkspaceManager {
     }
 
     /**
-     * Every ancestor directory under the writable {@link WorkspaceAbi#WORK_PREFIX work/} region across
+     * Every ancestor directory under the writable {@link SandboxLayout#WORK_PREFIX work/} region across
      * all input keys, ordered parents-before-children (a {@link java.util.TreeSet} sorts a parent path
      * ahead of its children because the parent is a string prefix). The read-only {@code inputs/} subtree
      * is deliberately excluded — Docker auto-creates those as root, which is exactly the RO guarantee.
      */
-    private static java.util.SortedSet<String> writableAncestorDirs(java.util.Set<String> keys) {
-        java.util.SortedSet<String> dirs = new java.util.TreeSet<>();
+    private static SortedSet<String> writableAncestorDirs(Set<String> keys) {
+        SortedSet<String> dirs = new TreeSet<>();
         for (String key : keys) {
-            if (!key.startsWith(WorkspaceAbi.WORK_PREFIX)) {
+            if (!key.startsWith(SandboxLayout.WORK_PREFIX)) {
                 continue;
             }
             for (int slash = key.indexOf('/'); slash >= 0; slash = key.indexOf('/', slash + 1)) {

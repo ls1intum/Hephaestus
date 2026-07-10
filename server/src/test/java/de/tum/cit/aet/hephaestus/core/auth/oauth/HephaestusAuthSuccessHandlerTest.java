@@ -26,6 +26,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,11 +34,14 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The ADR-0017 account-status gate in {@link HephaestusAuthSuccessHandler}: a SUSPENDED / DELETING /
@@ -79,6 +83,18 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
             Clock.fixed(NOW, ZoneOffset.UTC),
             /* webappBaseUrl */ ""
         );
+    }
+
+    @Test
+    void successHandlerDoesNotOwnTransactionSoHandledProvisioningErrorsCanRedirect() throws Exception {
+        var method = HephaestusAuthSuccessHandler.class.getMethod(
+            "onAuthenticationSuccess",
+            jakarta.servlet.http.HttpServletRequest.class,
+            jakarta.servlet.http.HttpServletResponse.class,
+            Authentication.class
+        );
+
+        Assertions.assertNull(method.getAnnotation(Transactional.class));
     }
 
     @ParameterizedTest
@@ -147,9 +163,39 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     }
 
     @Test
+    void identityAlreadyLinkedElsewhereRedirectsToAuthErrorWithoutCookie() throws Exception {
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenThrow(
+            new AccountLinkConflictException("github", "5898705", 5L)
+        );
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("5898705"));
+
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
+        assertThat(response.getCookie(COOKIE_NAME)).isNull();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/auth/error?code=identity_already_linked");
+        verify(authEventWriter, never()).write(any());
+    }
+
+    @Test
+    void linkOnlyProviderLoginRedirectsToAuthErrorWithoutCookie() throws Exception {
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenThrow(
+            new LinkOnlyProviderLoginException("slack")
+        );
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("U123"));
+
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
+        assertThat(response.getCookie(COOKIE_NAME)).isNull();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/auth/error?code=link_requires_auth");
+        verify(authEventWriter, never()).write(any());
+    }
+
+    @Test
     void nonOAuth2AuthenticationIsRejectedWithNoProvisioningAndNoCookie() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
-        var nonOauth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+        var nonOauth = new UsernamePasswordAuthenticationToken(
             new User("u", "p", List.of(new SimpleGrantedAuthority("ROLE_USER"))),
             "p",
             List.of(new SimpleGrantedAuthority("ROLE_USER"))

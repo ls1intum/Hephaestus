@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -89,5 +92,79 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         UUID getObservationId();
         String getBody();
         Instant getFeedbackCreatedAt();
+    }
+
+    // --- conversational feedback delivery loop ---
+
+    /**
+     * The id(s) of the PREPARED CONVERSATION feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
+     * given observation. Maps a mentor {@code link_finding} observation id back to the unit to flip to DELIVERED.
+     * Ordered newest-first so a caller can take the first; the reconciler's CAS makes any duplicate flip a no-op.
+     */
+    @Query(
+        """
+        SELECT fo.feedback.id
+        FROM FeedbackObservation fo
+        WHERE fo.observation.id = :observationId
+          AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
+          AND fo.feedback.workspaceId = :workspaceId
+          AND fo.feedback.recipientUserId = :recipientUserId
+          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        ORDER BY fo.feedback.createdAt DESC
+        """
+    )
+    List<UUID> findPreparedConversationFeedbackIdsByObservation(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("observationId") UUID observationId
+    );
+
+    /**
+     * Facts + practice (NO body) for the newest PREPARED CONVERSATION units of a recipient - the payload the
+     * {@code PreparedConversationFeedbackContentSource} ships to the mentor. Body is deliberately absent (the mentor
+     * composes the words at delivery). Ordered newest-first, bounded by the caller's {@code Pageable}.
+     */
+    @Query(
+        """
+        SELECT fo.feedback.id AS feedbackId,
+               o.id AS observationId,
+               p.slug AS practiceSlug,
+               p.name AS practiceName,
+               o.title AS title,
+               o.reasoning AS reasoning,
+               o.severity AS severity,
+               fo.feedback.artifactType AS artifactType,
+               fo.feedback.artifactId AS artifactId,
+               fo.feedback.createdAt AS preparedAt
+        FROM FeedbackObservation fo
+        JOIN fo.observation o
+        JOIN o.practice p
+        WHERE fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
+          AND fo.feedback.workspaceId = :workspaceId
+          AND fo.feedback.recipientUserId = :recipientUserId
+          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        ORDER BY fo.feedback.createdAt DESC
+        """
+    )
+    List<PreparedConversationFact> findPreparedConversationFactsForRecipient(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        Pageable pageable
+    );
+
+    /** Projection: facts + practice for one PREPARED conversational unit (no body - composed at delivery). */
+    interface PreparedConversationFact {
+        UUID getFeedbackId();
+        UUID getObservationId();
+        String getPracticeSlug();
+        String getPracticeName();
+        String getTitle();
+        String getReasoning();
+        Severity getSeverity();
+        WorkArtifact getArtifactType();
+        Long getArtifactId();
+        Instant getPreparedAt();
     }
 }

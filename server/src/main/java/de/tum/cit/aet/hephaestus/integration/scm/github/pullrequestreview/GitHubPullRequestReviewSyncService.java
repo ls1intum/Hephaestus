@@ -47,6 +47,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
@@ -433,7 +434,7 @@ public class GitHubPullRequestReviewSyncService {
             } catch (Exception e) {
                 boolean retryable;
                 String errorDetail;
-                if (e instanceof org.springframework.transaction.UnexpectedRollbackException) {
+                if (e instanceof UnexpectedRollbackException) {
                     retryable = true;
                     errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
                 } else {

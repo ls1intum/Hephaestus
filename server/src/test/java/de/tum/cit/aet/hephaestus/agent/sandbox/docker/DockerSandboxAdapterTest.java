@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -615,12 +616,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(result.exitCode()).isZero();
 
             // Verify SecurityProfile.DEFAULT was used
-            ArgumentCaptor<de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile> secCaptor =
-                ArgumentCaptor.forClass(de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile.class);
+            ArgumentCaptor<SecurityProfile> secCaptor = ArgumentCaptor.forClass(SecurityProfile.class);
             verify(securityPolicy).buildHostConfig(secCaptor.capture(), any(), any());
-            assertThat(secCaptor.getValue()).isEqualTo(
-                de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile.DEFAULT
-            );
+            assertThat(secCaptor.getValue()).isEqualTo(SecurityProfile.DEFAULT);
         }
     }
 
@@ -645,7 +643,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         void shouldStopRunningContainer() throws Exception {
             CountDownLatch containerStarted = new CountDownLatch(1);
             CountDownLatch cancelDone = new CountDownLatch(1);
-            var thrownException = new java.util.concurrent.atomic.AtomicReference<Exception>();
+            var thrownException = new AtomicReference<Exception>();
 
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);

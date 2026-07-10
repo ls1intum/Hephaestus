@@ -1,9 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -11,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -28,6 +30,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,7 +122,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             }
         }
 
-        GitProvider provider = context.provider();
+        IdentityProvider provider = context.provider();
 
         // Extract position data from the webhook payload
         @SuppressWarnings("unchecked")
@@ -255,7 +258,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
     ) {
         try {
             return createMinimalPullRequest(dto, context);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent MR creation, looking up: iid={}", dto.iid());
             return pullRequestRepository
                 .findByRepositoryIdAndNumber(context.repository().getId(), dto.iid())
@@ -268,10 +271,10 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         GitLabNoteEventDTO.EmbeddedMergeRequest dto,
         ProcessingContext context
     ) {
-        de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository repository = context.repository();
+        Repository repository = context.repository();
         if (repository == null || dto.id() == null) return null;
 
-        de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State mappedState = convertMrState(dto.state());
+        Issue.State mappedState = convertMrState(dto.state());
 
         PullRequest pr = new PullRequest();
         pr.setNativeId(dto.id());
@@ -282,7 +285,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         pr.setState(mappedState);
         pr.setHtmlUrl(dto.url());
         pr.setDraft(dto.draft());
-        pr.setMerged(mappedState == de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.MERGED);
+        pr.setMerged(mappedState == Issue.State.MERGED);
         pr.setAdditions(0);
         pr.setDeletions(0);
         pr.setChangedFiles(0);
@@ -304,15 +307,13 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         return saved;
     }
 
-    private static de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State convertMrState(
-        @Nullable String state
-    ) {
-        if (state == null) return de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
+    private static Issue.State convertMrState(@Nullable String state) {
+        if (state == null) return Issue.State.OPEN;
         return switch (state.toLowerCase()) {
-            case "opened" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
-            case "closed" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.CLOSED;
-            case "merged" -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.MERGED;
-            default -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN;
+            case "opened" -> Issue.State.OPEN;
+            case "closed" -> Issue.State.CLOSED;
+            case "merged" -> Issue.State.MERGED;
+            default -> Issue.State.OPEN;
         };
     }
 }

@@ -6,8 +6,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -44,7 +44,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabPullRequestReviewCommentProcessor processor;
-    private GitProvider provider;
+    private IdentityProvider provider;
     private PullRequest pr;
     private PullRequestReviewThread thread;
 
@@ -52,9 +52,9 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
     void setUp() {
         processor = new GitLabPullRequestReviewCommentProcessor(commentRepository, eventPublisher);
 
-        provider = new GitProvider();
+        provider = new IdentityProvider();
         provider.setId(PROVIDER_ID);
-        provider.setType(GitProviderType.GITLAB);
+        provider.setType(IdentityProviderType.GITLAB);
 
         pr = new PullRequest();
         pr.setId(PR_ID);

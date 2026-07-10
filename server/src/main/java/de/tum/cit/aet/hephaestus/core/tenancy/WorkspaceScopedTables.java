@@ -49,7 +49,7 @@ public class WorkspaceScopedTables {
         "user_achievement",
         // Synced upstream identity (workspace linked separately via FK)
         "organization",
-        "git_provider",
+        "identity_provider",
         "issue_type",
         // Vendor pricing (#1071: model pricing is global, not tenant-scoped)
         "model_pricing",

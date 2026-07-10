@@ -24,9 +24,6 @@ public class SlackManifest implements IntegrationManifest {
 
     @Override
     public Set<Capability> declaredCapabilities() {
-        // Slack ships outbound-only today (OAuth connect + test message); it
-        // declares no capabilities. Inbound webhook ingest re-adds WEBHOOK_INGEST (and its
-        // handshake/replay siblings) once an actual Slack event handler lands.
-        return Set.of();
+        return Set.of(Capability.WEBHOOK_INGEST);
     }
 }

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -95,9 +96,9 @@ class GithubPrNodeIdResolverTest extends BaseUnitTest {
         // A response whose id field is null means the PR was not found; the thrown message must surface both the
         // reference and the GraphQL errors so the failure is diagnosable.
         ClientGraphQlResponse response = mockGraphQlResponse("repository.pullRequest.id", null);
-        org.springframework.graphql.ResponseError err = mock(org.springframework.graphql.ResponseError.class);
+        ResponseError err = mock(ResponseError.class);
         when(err.toString()).thenReturn("NOT_FOUND");
-        when(response.getErrors()).thenReturn(List.<org.springframework.graphql.ResponseError>of(err));
+        when(response.getErrors()).thenReturn(List.<ResponseError>of(err));
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> resolver.resolve(1L, "owner", "repo", 42))

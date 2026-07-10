@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
@@ -493,7 +493,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             .orElseGet(() -> {
                 var orgOpt = organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
                     orgLogin,
-                    GitProviderType.GITHUB
+                    IdentityProviderType.GITHUB
                 );
                 if (orgOpt.isEmpty()) {
                     log.warn(

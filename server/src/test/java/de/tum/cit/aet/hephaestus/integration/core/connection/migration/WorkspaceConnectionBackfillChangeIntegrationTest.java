@@ -13,7 +13,9 @@ import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -322,7 +324,7 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         }
     }
 
-    private java.util.List<ConnectionRow> listConnectionRows() throws Exception {
+    private List<ConnectionRow> listConnectionRows() throws Exception {
         try (
             Connection conn = dataSource.getConnection();
             var stmt = conn.prepareStatement(
@@ -330,7 +332,7 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
             );
             var rs = stmt.executeQuery()
         ) {
-            var result = new java.util.ArrayList<ConnectionRow>();
+            var result = new ArrayList<ConnectionRow>();
             while (rs.next()) {
                 result.add(
                     new ConnectionRow(

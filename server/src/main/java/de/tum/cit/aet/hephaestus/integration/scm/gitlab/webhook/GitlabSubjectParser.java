@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
+import java.util.Arrays;
 import org.springframework.stereotype.Component;
 
 /**
@@ -47,7 +48,7 @@ public class GitlabSubjectParser implements SubjectParser {
         if (parts.length == 4) {
             event = parts[3];
         } else {
-            event = String.join(".", java.util.Arrays.copyOfRange(parts, 3, parts.length));
+            event = String.join(".", Arrays.copyOfRange(parts, 3, parts.length));
         }
         if (event.isBlank()) {
             throw new IllegalArgumentException("GitLab subject event component is blank: " + fullSubject);

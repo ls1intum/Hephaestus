@@ -29,7 +29,7 @@ interface LinkedWorkItem {
 	number?: number | string;
 	iid?: number | string;
 	title?: string;
-	// The SCM connector (LinkedWorkItemContentProvider) emits the issue body under `bodyExcerpt`; keep
+	// The SCM connector (LinkedWorkItemContentSource) emits the issue body under `bodyExcerpt`; keep
 	// `body`/`description` as host-general fallbacks for other connectors.
 	bodyExcerpt?: string;
 	body?: string;

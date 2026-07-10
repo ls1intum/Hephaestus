@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.pricing.ModelPricingService;
@@ -37,12 +38,16 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
     @Mock
     ModelPricingService pricingService;
 
+    @Mock
+    ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+
     private MentorTurnPersistence persistence() {
         return new MentorTurnPersistence(
             chatThreadRepository,
             chatMessageRepository,
             workspaceRepository,
-            pricingService
+            pricingService,
+            conversationalDeliveryReconciler
         );
     }
 

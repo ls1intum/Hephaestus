@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.team;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
@@ -47,7 +47,7 @@ public class GitLabTeamProcessor {
      */
     @Transactional
     @Nullable
-    public Team process(GitLabDescendantGroupResponse group, String rootFullPath, GitProvider provider) {
+    public Team process(GitLabDescendantGroupResponse group, String rootFullPath, IdentityProvider provider) {
         if (group == null || group.id() == null || group.fullPath() == null) {
             log.warn("Skipped team processing: reason=nullOrMissingId");
             return null;
@@ -106,7 +106,7 @@ public class GitLabTeamProcessor {
     /**
      * Processes the root group as a Team entity (upsert).
      * <p>
-     * Mirrors {@link #process(GitLabDescendantGroupResponse, String, GitProvider)} but
+     * Mirrors {@link #process(GitLabDescendantGroupResponse, String, IdentityProvider)} but
      * sources data from {@link GitLabGroupResponse} (which is what the {@code GetGroup}
      * query returns for a single group by fullPath). The root team anchors the
      * parent chain for descendants and carries the staff-wide direct members
@@ -120,7 +120,7 @@ public class GitLabTeamProcessor {
      */
     @Transactional
     @Nullable
-    public Team processRoot(GitLabGroupResponse group, String rootFullPath, GitProvider provider) {
+    public Team processRoot(GitLabGroupResponse group, String rootFullPath, IdentityProvider provider) {
         if (group == null || group.id() == null || group.fullPath() == null) {
             log.warn("Skipped root team processing: reason=nullOrMissingId");
             return null;

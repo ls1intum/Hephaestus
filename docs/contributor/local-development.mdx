@@ -289,6 +289,10 @@ echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
 The value must match the secret configured on your GitHub and GitLab webhooks (validated via
 `X-Hub-Signature-256` for GitHub, `X-Gitlab-Token` for GitLab).
 
+For Slack app setup, use the scope/event checklist in
+[`docs/admin/production-setup.mdx`](../admin/production-setup#slack-app-configuration) and the manifest template in
+[`docs/admin/slack-app-manifest-template.yml`](../admin/slack-app-manifest-template.yml).
+
 ## Web client (`webapp`)
 
 1. Install dependencies:
@@ -336,4 +340,3 @@ pnpm --filter webapp run openapi-ts
 - Generated types drop the `Dto` suffix and mirror the Spring Boot API responses.
 - Pair every new endpoint with a typed TanStack Query hook for caching and invalidation.
 - Never hand-roll fetch calls – shared interceptors handle auth tokens and error telemetry.
-

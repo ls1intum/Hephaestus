@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -113,7 +113,7 @@ public class GitLabPullRequestReviewCommentProcessor {
         PullRequestReviewThread thread,
         PullRequest pr,
         @Nullable User author,
-        GitProvider provider,
+        IdentityProvider provider,
         @Nullable PullRequestReviewComment inReplyTo,
         @Nullable PullRequestReview review,
         Long scopeId
@@ -263,7 +263,7 @@ public class GitLabPullRequestReviewCommentProcessor {
 
     private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
         RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
-        return EventContext.forSync(scopeId, repoRef, GitProviderType.GITLAB);
+        return EventContext.forSync(scopeId, repoRef, IdentityProviderType.GITLAB);
     }
 
     /**

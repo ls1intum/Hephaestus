@@ -7,9 +7,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -64,7 +66,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private ReactionRepository reactionRepository;
 
     @Autowired
-    private de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackObservationRepository feedbackObservationRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -138,7 +140,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         feedbackObservationRepository.insertIfAbsent(
             feedbackUnit.getId(),
             finding.getId(),
-            de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY.name(),
+            EvidenceRole.PRIMARY.name(),
             0
         );
     }

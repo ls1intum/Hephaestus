@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -59,10 +60,10 @@ public class WorkspaceRepositoryMonitorService {
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
-    private final GitProviderRepository gitProviderRepository;
+    private final IdentityProviderRepository gitProviderRepository;
 
     // Services — natsConsumerService absent under webhook profile.
-    private final org.springframework.beans.factory.ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitRepositoryManager gitRepositoryManager;
 
@@ -85,8 +86,8 @@ public class WorkspaceRepositoryMonitorService {
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
-        GitProviderRepository gitProviderRepository,
-        org.springframework.beans.factory.ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+        IdentityProviderRepository gitProviderRepository,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitRepositoryManager gitRepositoryManager,
         ConnectionService connectionService,
@@ -394,10 +395,10 @@ public class WorkspaceRepositoryMonitorService {
 
         Workspace workspace = workspaceOpt.get();
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseThrow(() ->
-                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=https://github.com")
+                new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=https://github.com")
             );
 
         // Create or update the Repository entity with organization linking
@@ -500,10 +501,10 @@ public class WorkspaceRepositoryMonitorService {
                 .forEach(desiredRepositories::add);
         }
 
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+        IdentityProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
             .orElseThrow(() ->
-                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=https://github.com")
+                new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=https://github.com")
             );
 
         allowedSnapshots.forEach(snapshot -> {
@@ -718,7 +719,7 @@ public class WorkspaceRepositoryMonitorService {
      * {@code isPrivate} and {@code nameWithOwner} respectively.
      *
      * @param workspace     the workspace (used to get the organization)
-     * @param provider      the resolved GitProvider instance
+     * @param provider      the resolved IdentityProvider instance
      * @param nativeId      the provider's original numeric ID for the repository
      * @param nameWithOwner the full name (e.g., "owner/repo")
      * @param name          the short repository name
@@ -726,7 +727,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     private void ensureRepositoryFromSnapshot(
         Workspace workspace,
-        GitProvider provider,
+        IdentityProvider provider,
         long nativeId,
         String nameWithOwner,
         String name,

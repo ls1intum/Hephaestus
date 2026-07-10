@@ -11,7 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -159,7 +160,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     private Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
         Repository repo = TestEntities.repository(id, nameWithOwner, defaultBranch);
         repo.setOrganization(null);
-        repo.setProvider(TestEntities.gitProvider(1L, GitProviderType.GITHUB));
+        repo.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITHUB));
         return repo;
     }
 
@@ -915,9 +916,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         @Test
         void actionTypeShouldReturnPushed() {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
-            assertThat(event.actionType()).isEqualTo(
-                de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction.Push.PUSHED
-            );
+            assertThat(event.actionType()).isEqualTo(GitHubEventAction.Push.PUSHED);
         }
     }
 

@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
@@ -62,7 +62,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     private OrganizationRepository organizationRepository;
 
     @Autowired
-    private GitProviderRepository gitProviderRepository;
+    private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -73,7 +73,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     @Autowired
     private RecordingScmEventListener eventListener;
 
-    private GitProvider testGitProvider;
+    private IdentityProvider testGitProvider;
     private Organization testOrganization;
     private Project testProject;
 
@@ -85,10 +85,12 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     private void setupTestData() {
-        // Create GitProvider for GitHub
+        // Create IdentityProvider for GitHub
         testGitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+            .orElseGet(() ->
+                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
+            );
 
         // Create organization matching the fixture data
         testOrganization = new Organization();

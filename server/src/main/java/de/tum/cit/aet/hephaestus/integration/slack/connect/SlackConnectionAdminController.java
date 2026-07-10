@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @WorkspaceScopedController
 @RequestMapping("/connections/slack")
 @RequireAtLeastWorkspaceAdmin
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 @Tag(name = "Connections", description = "Workspace integration connection management")
 public class SlackConnectionAdminController {
@@ -47,6 +50,7 @@ public class SlackConnectionAdminController {
      * @param body optional channel override; when blank, the persisted notification channel is used.
      */
     @PostMapping("/test-message")
+    @Operation(operationId = "sendSlackTestMessage", summary = "Post a test message to verify the Slack connection")
     public SlackTestMessageResponseDTO sendTestMessage(
         WorkspaceContext workspace,
         @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body

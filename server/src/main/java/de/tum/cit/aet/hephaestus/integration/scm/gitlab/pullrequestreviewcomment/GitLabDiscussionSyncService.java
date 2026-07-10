@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcommen
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -100,7 +100,7 @@ public class GitLabDiscussionSyncService {
     public int syncDiscussionsForMergeRequest(Long scopeId, Repository repository, int mrIid, PullRequest pr) {
         String projectPath = repository.getNameWithOwner();
         String safeContext = sanitizeForLog(projectPath) + "!" + mrIid;
-        GitProvider provider = repository.getProvider();
+        IdentityProvider provider = repository.getProvider();
         Long providerId = provider.getId();
 
         if (providerId == null) {
@@ -239,7 +239,7 @@ public class GitLabDiscussionSyncService {
         Map<String, Object> discussionNode,
         PullRequest pr,
         Repository repository,
-        GitProvider provider,
+        IdentityProvider provider,
         Long providerId,
         Long scopeId
     ) {
@@ -302,7 +302,7 @@ public class GitLabDiscussionSyncService {
         List<Map<String, Object>> noteNodes,
         PullRequest pr,
         Repository repository,
-        GitProvider provider,
+        IdentityProvider provider,
         Long providerId,
         Long scopeId
     ) {
@@ -498,7 +498,7 @@ public class GitLabDiscussionSyncService {
         String discussionGlobalId,
         PullRequest pr,
         Repository repository,
-        GitProvider provider,
+        IdentityProvider provider,
         Long providerId,
         Long scopeId
     ) {

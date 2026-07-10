@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
@@ -230,7 +230,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             EventContext eventCtx = EventContext.forSync(
                 scopeId,
                 RepositoryRef.from(parent.getRepository()),
-                GitProviderType.GITLAB
+                IdentityProviderType.GITLAB
             );
             eventPublisher.publishEvent(
                 new ScmDomainEvent.CommentCreated(ScmEventPayload.CommentData.from(saved), issueId, eventCtx)
@@ -240,7 +240,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             EventContext eventCtx = EventContext.forSync(
                 scopeId,
                 RepositoryRef.from(parent.getRepository()),
-                GitProviderType.GITLAB
+                IdentityProviderType.GITLAB
             );
             eventPublisher.publishEvent(
                 new ScmDomainEvent.CommentUpdated(

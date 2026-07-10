@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.authorization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
@@ -354,7 +355,7 @@ class WorkspaceAccessServiceTest {
     void hasRole_WithSuperAdminButNoWorkspaceMembership_DeniesAccess() {
         // Given: Global admin user with no workspace membership
         SecurityContextHolder.setContext(
-            de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+            MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "app_admin" },
@@ -388,7 +389,7 @@ class WorkspaceAccessServiceTest {
     void hasRole_WithSuperAdminAndMemberRole_AllowsAdminAccess() {
         // Given: Global admin user who is also a MEMBER of the workspace
         SecurityContextHolder.setContext(
-            de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+            MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "app_admin" },
@@ -419,7 +420,7 @@ class WorkspaceAccessServiceTest {
     void hasRole_WithSuperAdminAndOwnerRole_KeepsOwnerPermissions() {
         // Given: Global admin user who is also OWNER of the workspace
         SecurityContextHolder.setContext(
-            de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+            MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "app_admin" },
@@ -450,7 +451,7 @@ class WorkspaceAccessServiceTest {
     void canManageRole_WithSuperAdminAndMembership_CanManageAdminAndMember() {
         // Given: Global admin user with MEMBER workspace role
         SecurityContextHolder.setContext(
-            de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+            MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "app_admin" },
@@ -481,7 +482,7 @@ class WorkspaceAccessServiceTest {
     void hasRole_WithNonAdminUser_DoesNotGetElevation() {
         // Given: Regular user without admin realm role
         SecurityContextHolder.setContext(
-            de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+            MockSecurityContextUtils.createSecurityContext(
                 "regular-user",
                 "user-123",
                 new String[] { "user" }, // Not "admin"

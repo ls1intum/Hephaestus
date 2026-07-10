@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
+import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
@@ -9,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservation;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
@@ -38,6 +41,7 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Records the delivered-feedback LEDGER (ADR 0021 C6): after the hardened delivery path posts the MR/issue
  * summary + inline notes, this persists ONE {@link Feedback} unit (surface IN_CONTEXT) describing what was
- * actually delivered, the {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservation}s it fused,
+ * actually delivered, the {@link FeedbackObservation}s it fused,
  * and a {@link FeedbackPlacement} per posted comment (SUMMARY + one per inline note).
  *
  * <p><b>Non-regressing by construction.</b> This is a pure write-through side-effect invoked AFTER the
@@ -69,24 +73,35 @@ public class FeedbackLedgerRecorder {
     /** Policy-floor SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
     private static final int POLICY_FLOOR_UNIT_ORDINAL_BASE = 2000;
 
+    /**
+     * PREPARED conversational units start here so their {@code (agent_job_id, position)} never collides with
+     * the live IN_CONTEXT unit (0), the B2 base (1000), or the policy-floor base (2000). Public so the
+     * {@link ConversationalFeedbackPreparer} derives its
+     * positions from the one shared constant rather than a second literal.
+     */
+    public static final int CONVERSATION_UNIT_ORDINAL_BASE = 3000;
+
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final PracticeReviewProperties reviewProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     FeedbackLedgerRecorder(
         ObservationRepository observationRepository,
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
-        PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.reviewProperties = reviewProperties;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -125,6 +140,10 @@ public class FeedbackLedgerRecorder {
         List<DeliveredSignal> inlineSignals,
         boolean summaryDelivered
     ) {
+        // Signal the conversational-delivery loop for EVERY cycle that reaches the ledger - before any early
+        // return below - so comms-only cycles (zero IN_CONTEXT posts) and transient no-ops are not skipped. The
+        // listener re-reads the observations and no-ops if nothing is admitted, so an unconditional signal is safe.
+        publishConversationDeliveryTrigger(job);
         if (delivery == null) {
             return;
         }
@@ -294,6 +313,19 @@ public class FeedbackLedgerRecorder {
             artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
             feedbackThreadKey
         );
+    }
+
+    /**
+     * Fire {@link PracticeDetectionDeliveredEvent} so the conversational-delivery listener can route this cycle's
+     * observations and prepare CONVERSATION units. Best-effort - a publish failure must never poison the ledger
+     * write or the delivery already received.
+     */
+    private void publishConversationDeliveryTrigger(AgentJob job) {
+        try {
+            eventPublisher.publishEvent(new PracticeDetectionDeliveredEvent(job.getId(), job.getWorkspace().getId()));
+        } catch (RuntimeException e) {
+            log.warn("Conversational-delivery trigger publish failed (delivery unaffected): jobId={}", job.getId(), e);
+        }
     }
 
     /**

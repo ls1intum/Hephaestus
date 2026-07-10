@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -86,7 +87,7 @@ class DefaultPracticeCatalogSeeder {
         Workspace workspace = workspaceRepository
             .findAll()
             .stream()
-            .min(java.util.Comparator.comparing(Workspace::getId, java.util.Comparator.nullsLast(Long::compareTo)))
+            .min(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
             .orElse(null);
         if (workspace == null) {
             log.warn("Default practice catalog enabled but no workspace exists yet; skipping.");

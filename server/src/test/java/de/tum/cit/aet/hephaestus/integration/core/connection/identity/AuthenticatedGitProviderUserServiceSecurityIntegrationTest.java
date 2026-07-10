@@ -47,7 +47,7 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
         Account account = accountRepository.save(new Account("Victim"));
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(GITLAB_PROVIDER_ID);
+        link.setProviderId(GITLAB_PROVIDER_ID);
         link.setSubject("18024");
         link.setUsernameAtSignup("victim");
         link.setExternalActorId(1000L);
@@ -77,7 +77,7 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
         Account account = accountRepository.save(new Account("Newcomer"));
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProviderId(GITLAB_PROVIDER_ID);
+        link.setProviderId(GITLAB_PROVIDER_ID);
         link.setSubject("18025");
         link.setUsernameAtSignup("newcomer");
         link = identityLinkRepository.saveAndFlush(link); // flush so the JPQL UPDATE sees the row

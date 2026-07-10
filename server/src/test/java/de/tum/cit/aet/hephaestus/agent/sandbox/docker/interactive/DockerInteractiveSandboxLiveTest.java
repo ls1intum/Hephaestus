@@ -10,6 +10,7 @@ import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
@@ -41,9 +42,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -358,13 +362,10 @@ class DockerInteractiveSandboxLiveTest {
             // Both callers race past the fast-path findLive and both spawn containers; the registry
             // resolves the race via tryRegister. Pre-fix the loser leaked its container + network.
             int containersBefore = managedInteractiveCount();
-            java.util.concurrent.CyclicBarrier gate = new java.util.concurrent.CyclicBarrier(2);
-            java.util.concurrent.atomic.AtomicReference<AttachedSandbox> r1 =
-                new java.util.concurrent.atomic.AtomicReference<>();
-            java.util.concurrent.atomic.AtomicReference<AttachedSandbox> r2 =
-                new java.util.concurrent.atomic.AtomicReference<>();
-            java.util.concurrent.atomic.AtomicReference<Throwable> err =
-                new java.util.concurrent.atomic.AtomicReference<>();
+            CyclicBarrier gate = new CyclicBarrier(2);
+            AtomicReference<AttachedSandbox> r1 = new AtomicReference<>();
+            AtomicReference<AttachedSandbox> r2 = new AtomicReference<>();
+            AtomicReference<Throwable> err = new AtomicReference<>();
             Thread t1 = Thread.ofVirtual().start(() -> {
                 try {
                     gate.await();
@@ -516,7 +517,7 @@ class DockerInteractiveSandboxLiveTest {
                 base.inputFiles(),
                 base.volumeMounts()
             );
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.attach(brokenSpec)).isInstanceOf(
+            Assertions.assertThatThrownBy(() -> adapter.attach(brokenSpec)).isInstanceOf(
                 InteractiveSandboxException.class
             );
             // Must distinguish runner-crash from flow-control timeout for dashboards.
@@ -546,7 +547,7 @@ class DockerInteractiveSandboxLiveTest {
             null,
             true,
             120,
-            new de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile(),
+            new MentorRunnerProfile(),
             Map.of(),
             ""
         );
@@ -774,9 +775,7 @@ class DockerInteractiveSandboxLiveTest {
         void sendAfterClose() {
             AttachedSandbox sb = adapter.attach(buildSpec("u9", "w9"));
             sb.close(Duration.ofSeconds(2));
-            org.assertj.core.api.Assertions.assertThatThrownBy(() -> sb.send(ping())).isInstanceOf(
-                InteractiveSandboxException.class
-            );
+            Assertions.assertThatThrownBy(() -> sb.send(ping())).isInstanceOf(InteractiveSandboxException.class);
         }
     }
 }

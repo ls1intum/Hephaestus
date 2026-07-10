@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.Comparator;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +65,7 @@ class DefaultAgentConfigSeeder {
         Workspace workspace = workspaceRepository
             .findAll()
             .stream()
-            .min(java.util.Comparator.comparing(Workspace::getId))
+            .min(Comparator.comparing(Workspace::getId))
             .orElse(null);
         if (workspace == null) {
             log.warn("Default agent config enabled but no workspace exists yet; skipping.");
@@ -87,6 +88,7 @@ class DefaultAgentConfigSeeder {
             .llmProvider(properties.provider())
             .modelName(properties.modelName())
             .llmApiKey(properties.apiKey())
+            .llmBaseUrl(properties.baseUrl())
             .enabled(true)
             .credentialMode(CredentialMode.PROXY)
             .build();

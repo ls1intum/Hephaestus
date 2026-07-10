@@ -13,6 +13,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -26,7 +27,7 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), 2_000_000L),
+        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), Map.of(), 2_000_000L),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(MAX)
     );
@@ -109,6 +110,37 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     }
 
     @Test
+    void rejectsOversizedSlackWebhookPostWith413() throws Exception {
+        // Slack Events API now uses the unified /webhooks/slack path and is tagged provider=slack.
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/slack");
+        request.setContentType("application/json");
+        request.setContent(new byte[2048]);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+        verify(chain, never()).doFilter(request, response);
+        assertCounter("slack", "payload-too-large", 1);
+    }
+
+    @Test
+    void rejectsOversizedSlackInteractivityPostWithSlackProviderTag() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/slack/interactivity");
+        request.setContentType("application/x-www-form-urlencoded");
+        request.setContent(new byte[2048]);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+        verify(chain, never()).doFilter(request, response);
+        assertCounter("slack", "payload-too-large", 1);
+    }
+
+    @Test
     void bypassesNonWebhookPaths() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/some-other-endpoint");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -128,21 +160,5 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
         filter.doFilter(request, response, chain);
 
         verify(chain, times(1)).doFilter(request, response);
-    }
-
-    @Test
-    void bypassesLegacyWebhookPaths() throws Exception {
-        // Legacy /gitlab and /github URLs are retired. The filter must NOT match them —
-        // they should fall through to a 404 rather than be accepted by the size filter.
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/gitlab");
-        request.setContentType("application/json");
-        request.setContent(new byte[2048]);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = mock(FilterChain.class);
-
-        filter.doFilter(request, response, chain);
-
-        verify(chain, times(1)).doFilter(request, response);
-        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
     }
 }

@@ -7,6 +7,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -146,7 +147,7 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
     }
 
     private static Map<String, String> lowercaseKeys(Map<String, String> raw) {
-        java.util.Map<String, String> out = new java.util.LinkedHashMap<>(raw.size());
+        Map<String, String> out = new LinkedHashMap<>(raw.size());
         for (Map.Entry<String, String> e : raw.entrySet()) {
             if (e.getKey() != null) {
                 out.put(e.getKey().toLowerCase(Locale.ROOT), e.getValue());
