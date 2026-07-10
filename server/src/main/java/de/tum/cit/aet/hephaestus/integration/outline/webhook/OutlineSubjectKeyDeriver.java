@@ -21,10 +21,13 @@ import tools.jackson.databind.ObjectMapper;
  * ({@code documents.update}, …) is lowercased via {@link Locale#ROOT} with dots replaced by
  * {@code ~} so it never collides with the NATS token boundary ({@code documents~update}).
  *
- * <p>Dedup key: {@code "outline-" + sha256(subscriptionId|event|payload.id)} when the payload id is
- * present (Outline retries carry the same document id + event), else a SHA-256 of the raw body
- * truncated to 32 hex chars. The {@code "outline-"} vendor prefix guarantees cross-vendor
- * uniqueness on the shared JetStream dedup window.
+ * <p>Dedup key: {@code "outline-" + <delivery id>} — the top-level {@code id} of the delivery
+ * envelope, a UUID unique per event that Outline reuses across retries of the same delivery.
+ * (Never key on {@code payload.id}: two consecutive edits of one document are distinct events
+ * with the same document id, and a document-keyed hash would silently swallow the second one
+ * inside the JetStream dedup window.) Fallback when the body is unparsable or carries no id:
+ * SHA-256 of the raw body (distinct events differ at least in {@code createdAt}). The
+ * {@code "outline-"} vendor prefix guarantees cross-vendor uniqueness on the shared window.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -61,14 +64,9 @@ public class OutlineSubjectKeyDeriver implements SubjectKeyDeriver {
     public String deriveDedupKey(byte[] body, Map<String, String> headers) {
         JsonNode payload = tryParse(body);
         if (payload != null) {
-            String subscriptionId = textOrEmpty(payload, "webhookSubscriptionId");
-            String event = textOrEmpty(payload, "event");
-            String documentId = textOrEmpty(payload.path("payload"), "id");
-            if (!subscriptionId.isBlank() && !event.isBlank() && !documentId.isBlank()) {
-                byte[] digest = sha256(
-                    (subscriptionId + "|" + event + "|" + documentId).getBytes(StandardCharsets.UTF_8)
-                );
-                return "outline-" + HexFormat.of().formatHex(digest);
+            String deliveryId = textOrEmpty(payload, "id");
+            if (!deliveryId.isBlank()) {
+                return "outline-" + deliveryId;
             }
         }
         String hex = HexFormat.of().formatHex(sha256(body == null ? new byte[0] : body));

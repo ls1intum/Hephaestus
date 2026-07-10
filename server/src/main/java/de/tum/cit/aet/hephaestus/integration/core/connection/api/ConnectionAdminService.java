@@ -128,8 +128,17 @@ public class ConnectionAdminService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
 
         ConnectionConfig config = buildConfigForInlineKind(kind, userInput, instanceKey);
-        Connection connection = new Connection(workspace, kind, instanceKey, config);
-        connection = connectionRepository.save(connection);
+        // Reconnect-friendly upsert: (workspace, kind, instance_key) is unique, so a previous
+        // UNINSTALLED install of the same vendor instance is revived with fresh config +
+        // credentials instead of colliding — the guarded INITIATE reconnect in
+        // ConnectionService.transition allows the UNINSTALLED → ACTIVE revival.
+        Connection connection = connectionRepository
+            .findByWorkspaceIdAndKindAndInstanceKey(workspaceId, kind, instanceKey)
+            .map(existing -> {
+                existing.setConfig(config);
+                return existing;
+            })
+            .orElseGet(() -> connectionRepository.save(new Connection(workspace, kind, instanceKey, config)));
 
         persistCredentials(connection, credentials);
 

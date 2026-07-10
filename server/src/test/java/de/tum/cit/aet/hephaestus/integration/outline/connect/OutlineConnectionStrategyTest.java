@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -30,8 +31,16 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
     @Mock
     private OutlineDocumentRepository outlineDocumentRepository;
 
+    @Mock
+    private OutlineCollectionRepository outlineCollectionRepository;
+
     private OutlineConnectionStrategy strategy() {
-        return new OutlineConnectionStrategy(outlineApiClient, webhookRegistrar, outlineDocumentRepository);
+        return new OutlineConnectionStrategy(
+            outlineApiClient,
+            webhookRegistrar,
+            outlineDocumentRepository,
+            outlineCollectionRepository
+        );
     }
 
     private InitiateRequest request(Map<String, String> userInput) {

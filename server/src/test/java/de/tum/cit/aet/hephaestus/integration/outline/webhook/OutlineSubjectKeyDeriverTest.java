@@ -41,18 +41,34 @@ class OutlineSubjectKeyDeriverTest extends BaseUnitTest {
     }
 
     @Test
-    void deriveDedupKey_isStableForTheSameDocumentEvent() {
+    void deriveDedupKey_isTheDeliveryId_stableAcrossRetries() {
+        // Outline retries a failed delivery with the SAME envelope id — that id is the dedup key.
         byte[] body =
-            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\",\"payload\":{\"id\":\"doc-9\"}}".getBytes(
+            "{\"id\":\"delivery-1\",\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\",\"payload\":{\"id\":\"doc-9\"}}".getBytes(
                 StandardCharsets.UTF_8
             );
         String first = deriver.deriveDedupKey(body, Map.of());
         String second = deriver.deriveDedupKey(body, Map.of());
-        assertThat(first).isEqualTo(second).startsWith("outline-");
+        assertThat(first).isEqualTo(second).isEqualTo("outline-delivery-1");
     }
 
     @Test
-    void deriveDedupKey_differsAcrossDocumentsAndEvents() {
+    void deriveDedupKey_differsForConsecutiveEditsOfTheSameDocument() {
+        // Two edits of one document are DISTINCT deliveries; a document-keyed dedup would swallow
+        // the second edit inside the JetStream dedup window.
+        byte[] first =
+            "{\"id\":\"delivery-1\",\"webhookSubscriptionId\":\"s\",\"event\":\"documents.update\",\"payload\":{\"id\":\"a\"}}".getBytes(
+                StandardCharsets.UTF_8
+            );
+        byte[] second =
+            "{\"id\":\"delivery-2\",\"webhookSubscriptionId\":\"s\",\"event\":\"documents.update\",\"payload\":{\"id\":\"a\"}}".getBytes(
+                StandardCharsets.UTF_8
+            );
+        assertThat(deriver.deriveDedupKey(first, Map.of())).isNotEqualTo(deriver.deriveDedupKey(second, Map.of()));
+    }
+
+    @Test
+    void deriveDedupKey_withoutDeliveryId_differsAcrossDistinctBodies() {
         byte[] update =
             "{\"webhookSubscriptionId\":\"s\",\"event\":\"documents.update\",\"payload\":{\"id\":\"a\"}}".getBytes(
                 StandardCharsets.UTF_8
@@ -61,16 +77,11 @@ class OutlineSubjectKeyDeriverTest extends BaseUnitTest {
             "{\"webhookSubscriptionId\":\"s\",\"event\":\"documents.delete\",\"payload\":{\"id\":\"a\"}}".getBytes(
                 StandardCharsets.UTF_8
             );
-        byte[] otherDoc =
-            "{\"webhookSubscriptionId\":\"s\",\"event\":\"documents.update\",\"payload\":{\"id\":\"b\"}}".getBytes(
-                StandardCharsets.UTF_8
-            );
         assertThat(deriver.deriveDedupKey(update, Map.of())).isNotEqualTo(deriver.deriveDedupKey(delete, Map.of()));
-        assertThat(deriver.deriveDedupKey(update, Map.of())).isNotEqualTo(deriver.deriveDedupKey(otherDoc, Map.of()));
     }
 
     @Test
-    void deriveDedupKey_fallsBackToBodyHashWhenTripleIncomplete() {
+    void deriveDedupKey_fallsBackToBodyHashWithoutDeliveryId() {
         byte[] body = "{\"webhookSubscriptionId\":\"s\",\"event\":\"documents.update\"}".getBytes(
             StandardCharsets.UTF_8
         );

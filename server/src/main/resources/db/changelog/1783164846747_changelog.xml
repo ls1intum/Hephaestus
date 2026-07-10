@@ -169,4 +169,25 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-outline" id="1783164846747-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection.kind CHECK already admits OUTLINE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_connection_kind'
+                AND pg_get_constraintdef(oid) LIKE '%OUTLINE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Allow OUTLINE Connection rows (the enum-backed kind column carries a CHECK the JPA tests never see).</comment>
+        <sql>
+            ALTER TABLE connection DROP CONSTRAINT IF EXISTS ck_connection_kind;
+            ALTER TABLE connection
+            ADD CONSTRAINT ck_connection_kind CHECK (kind IN ('GITHUB', 'GITLAB', 'SLACK', 'OUTLINE'));
+        </sql>
+        <rollback>
+            ALTER TABLE connection DROP CONSTRAINT IF EXISTS ck_connection_kind;
+            ALTER TABLE connection
+            ADD CONSTRAINT ck_connection_kind CHECK (kind IN ('GITHUB', 'GITLAB', 'SLACK'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

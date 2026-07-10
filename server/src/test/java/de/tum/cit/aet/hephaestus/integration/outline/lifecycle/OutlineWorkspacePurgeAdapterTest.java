@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.function.Consumer;
@@ -20,6 +21,9 @@ class OutlineWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @Mock
     private OutlineDocumentRepository outlineDocumentRepository;
+
+    @Mock
+    private OutlineCollectionRepository outlineCollectionRepository;
 
     /** A provider whose {@code ifAvailable} runs its consumer against {@code registrar}, or is a no-op when null. */
     @SuppressWarnings("unchecked")
@@ -37,7 +41,11 @@ class OutlineWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     private OutlineWorkspacePurgeAdapter adapter(OutlineWebhookRegistrar registrar) {
-        return new OutlineWorkspacePurgeAdapter(outlineDocumentRepository, providerOf(registrar));
+        return new OutlineWorkspacePurgeAdapter(
+            outlineDocumentRepository,
+            outlineCollectionRepository,
+            providerOf(registrar)
+        );
     }
 
     @Test

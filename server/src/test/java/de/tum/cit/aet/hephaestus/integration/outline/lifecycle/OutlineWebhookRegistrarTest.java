@@ -208,22 +208,16 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     }
 
     @Test
-    void deregister_deletesSubscriptionAndClearsFields() {
+    void deregister_deletesUpstreamWithoutTouchingConfig() {
+        // A config rewrite here would bump the row's version underneath the disconnect request's
+        // stale entity and its transition would die on optimistic locking (proven live in E2E).
         stubActiveConnection(config("sub-99", "sec"));
         stubToken();
 
         registrar(EXTERNAL_URL).deregister(WORKSPACE_ID);
 
         verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-99");
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<UnaryOperator<ConnectionConfig>> mutator = ArgumentCaptor.forClass(UnaryOperator.class);
-        verify(connectionService).updateConfig(eq(WORKSPACE_ID), eq(IntegrationKind.OUTLINE), mutator.capture());
-        ConnectionConfig.OutlineConfig cleared = (ConnectionConfig.OutlineConfig) mutator
-            .getValue()
-            .apply(config("sub-99", "sec"));
-        assertThat(cleared.webhookSubscriptionId()).isNull();
-        assertThat(cleared.webhookSecret()).isNull();
+        verify(connectionService, never()).updateConfig(eq(WORKSPACE_ID), eq(IntegrationKind.OUTLINE), any());
     }
 
     @Test

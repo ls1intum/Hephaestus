@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.util.Map;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Outline connection lifecycle strategy.
@@ -49,15 +51,18 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     private final OutlineApiClient outlineApiClient;
     private final OutlineWebhookRegistrar webhookRegistrar;
     private final OutlineDocumentRepository outlineDocumentRepository;
+    private final OutlineCollectionRepository outlineCollectionRepository;
 
     public OutlineConnectionStrategy(
         OutlineApiClient outlineApiClient,
         OutlineWebhookRegistrar webhookRegistrar,
-        OutlineDocumentRepository outlineDocumentRepository
+        OutlineDocumentRepository outlineDocumentRepository,
+        OutlineCollectionRepository outlineCollectionRepository
     ) {
         this.outlineApiClient = outlineApiClient;
         this.webhookRegistrar = webhookRegistrar;
         this.outlineDocumentRepository = outlineDocumentRepository;
+        this.outlineCollectionRepository = outlineCollectionRepository;
     }
 
     @Override
@@ -96,6 +101,7 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     }
 
     @Override
+    @Transactional
     public void revoke(IntegrationRef ref) {
         log.info(
             "Outline revoke called for workspace={} instanceKey={} (tokens are revoked in Outline; state change handled by caller)",
@@ -109,8 +115,14 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
             // connection. Workspace-scoped delete (carries the workspace_id predicate the tenancy
             // inspector requires); the workspace-purge adapter erases the same rows for full teardown.
             long erased = outlineDocumentRepository.deleteByWorkspaceId(ref.workspaceId());
-            if (erased > 0) {
-                log.info("Outline revoke: erased {} mirrored document(s) for workspace={}", erased, ref.workspaceId());
+            long collections = outlineCollectionRepository.deleteByWorkspaceId(ref.workspaceId());
+            if (erased > 0 || collections > 0) {
+                log.info(
+                    "Outline revoke: erased {} mirrored document(s) and {} collection registration(s) for workspace={}",
+                    erased,
+                    collections,
+                    ref.workspaceId()
+                );
             }
         }
     }

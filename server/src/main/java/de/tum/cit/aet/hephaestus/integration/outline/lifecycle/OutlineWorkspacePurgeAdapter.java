@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.lifecycle;
 
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class OutlineWorkspacePurgeAdapter implements WorkspacePurgeContributor {
     static final int PURGE_ORDER = -200;
 
     private final OutlineDocumentRepository outlineDocumentRepository;
+    private final OutlineCollectionRepository outlineCollectionRepository;
 
     /**
      * Absent when {@code hephaestus.integration.outline.enabled=false}: the registrar is conditional, but this
@@ -58,6 +60,7 @@ public class OutlineWorkspacePurgeAdapter implements WorkspacePurgeContributor {
             );
         }
         outlineDocumentRepository.deleteByWorkspaceId(workspaceId);
+        outlineCollectionRepository.deleteByWorkspaceId(workspaceId);
     }
 
     @Override

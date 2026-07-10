@@ -376,7 +376,7 @@ public class ConnectionService {
             log.debug("Connection {} already in state {}, no-op", connection.getId(), req.next());
             return connection;
         }
-        if (!current.canTransitionTo(req.next()) && !isSlackOAuthReconnect(connection, current, req)) {
+        if (!current.canTransitionTo(req.next()) && !isGuardedReconnect(connection, current, req)) {
             throw new IllegalStateException(
                 "Illegal transition for connection " + connection.getId() + ": " + current + " → " + req.next()
             );
@@ -432,17 +432,25 @@ public class ConnectionService {
         }
     }
 
-    private static boolean isSlackOAuthReconnect(
+    /**
+     * Guarded revival of a terminal UNINSTALLED row — the kind-specific reconnect flows the
+     * {@link IntegrationState} javadoc reserves. Two doors only: a completed Slack OAuth round-trip,
+     * and an admin-driven inline re-connect ({@code INITIATE}) whose strategy just re-validated
+     * fresh credentials against the vendor. Both preserve the vendor natural key
+     * {@code (workspace, kind, instance_key)} instead of colliding with the unique constraint.
+     */
+    private static boolean isGuardedReconnect(
         Connection connection,
         IntegrationState current,
         TransitionRequest request
     ) {
-        return (
-            connection.getKind() == IntegrationKind.SLACK &&
-            current == IntegrationState.UNINSTALLED &&
-            request.next() == IntegrationState.ACTIVE &&
-            "OAUTH_COMPLETE".equals(request.eventType())
-        );
+        if (current != IntegrationState.UNINSTALLED || request.next() != IntegrationState.ACTIVE) {
+            return false;
+        }
+        if (connection.getKind() == IntegrationKind.SLACK && "OAUTH_COMPLETE".equals(request.eventType())) {
+            return true;
+        }
+        return "INITIATE".equals(request.eventType());
     }
 
     /** Parameter object for {@link #transition} — collapses 6 params to one record. */

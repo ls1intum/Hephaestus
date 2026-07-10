@@ -174,9 +174,15 @@ public class OutlineWebhookRegistrar {
     }
 
     /**
-     * Best-effort delete of the workspace's change-notification subscription and clearing of the stored id and
-     * secret, resolved through the ACTIVE connection. Never throws — a left-over subscription simply
-     * auto-disables upstream after repeated delivery failures once the workspace is gone.
+     * Best-effort upstream delete of the workspace's change-notification subscription, resolved through
+     * the ACTIVE connection. Never throws — a left-over subscription simply auto-disables upstream after
+     * repeated delivery failures once the workspace is gone.
+     *
+     * <p>Deliberately does NOT clear the stored id/secret: both callers (connect-strategy revoke inside
+     * the disconnect request, and the workspace purge) run while another transaction holds the same
+     * Connection entity — a config rewrite here bumps the row's version and the caller's subsequent
+     * save throws {@code ObjectOptimisticLockingFailureException}. The stored fields are inert on a
+     * torn-down row, and reactivation's {@link #ensureSubscription} self-heal replaces a stale id.
      */
     public void deregister(long workspaceId) {
         Optional<Connection> active = connectionService.findActive(workspaceId, IntegrationKind.OUTLINE);
@@ -196,7 +202,6 @@ public class OutlineWebhookRegistrar {
                 log.warn("outline.webhook: deregistration failed for workspaceId={}: {}", workspaceId, e.toString());
             }
         }
-        clearStoredSubscription(workspaceId);
     }
 
     /**
