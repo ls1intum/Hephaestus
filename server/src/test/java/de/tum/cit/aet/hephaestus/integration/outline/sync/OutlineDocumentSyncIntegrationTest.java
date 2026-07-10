@@ -57,6 +57,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     private static final String COLLECTION_ID = "col-1";
     private static final String DOC_ONE = "doc-1";
     private static final String DOC_TWO = "doc-2";
+    private static final Instant T0 = Instant.parse("2025-12-01T00:00:00Z");
     private static final Instant T1 = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant T2 = Instant.parse("2026-02-01T00:00:00Z");
     private static final OutlineDocumentListResponse.OutlineUser AUTHOR = new OutlineDocumentListResponse.OutlineUser(
@@ -142,12 +143,14 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
                 new OutlineDocumentListResponse.Meta(
                     id,
                     id,
+                    T0,
                     id.equals(DOC_ONE) ? docOneUpdatedAt : docTwoUpdatedAt,
                     id,
                     null,
                     COLLECTION_ID,
                     AUTHOR,
-                    AUTHOR
+                    AUTHOR,
+                    List.of("user-1", "user-2")
                 )
             )
             .toList();
@@ -169,6 +172,10 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
             assertThat(r.getCollectionId()).isEqualTo(COLLECTION_ID);
             assertThat(r.getCreatedBySubject()).isEqualTo("user-1");
             assertThat(r.getCreatedByName()).isEqualTo("Ada Lovelace");
+            // Research-fitness columns land through the whole wire→JPA→Postgres path (jsonb included).
+            assertThat(r.getOutlineCreatedAt()).isEqualTo(T0);
+            assertThat(r.getCollaboratorSubjects()).containsExactly("user-1", "user-2");
+            assertThat(r.getBodyEvictedAt()).isNull();
         });
         verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_ONE));
         verify(outlineApiClient, times(1)).exportDocument(anyString(), anyString(), eq(DOC_TWO));
@@ -180,6 +187,9 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         assertThat(collection.getLastSyncError()).isNull();
         assertThat(collection.getName()).isEqualTo("Design");
         assertThat(collection.getUrlId()).isEqualTo("col1");
+        // Coverage counters: everything upstream mirrored, nothing skipped.
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(2);
+        assertThat(collection.getExportsSkippedForBudget()).isZero();
     }
 
     @Test
@@ -214,13 +224,48 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         assertThat(docTwo.isDeleted()).isTrue();
         assertThat(docTwo.getDeletedAt()).isNotNull();
         assertThat(docTwo.getBodyMarkdown()).isNull();
+        assertThat(docTwo.getContentHash()).isNull();
         assertThat(docTwo.getCreatedBySubject()).isNull();
         assertThat(docTwo.getCreatedByName()).isNull();
         assertThat(docTwo.getUpdatedBySubject()).isNull();
+        // The tombstone CHECK (ck_outline_document_tombstone) demands the collaborator list goes too.
+        assertThat(docTwo.getCollaboratorSubjects()).isNull();
 
         OutlineDocument docOne = documentById(DOC_ONE);
         assertThat(docOne.isDeleted()).isFalse();
         assertThat(docOne.getBodyMarkdown()).isNotBlank();
+    }
+
+    @Test
+    void eviction_keepsTheHashAndStampsBodyEvictedAt_reExportClearsIt() {
+        stubCollection(List.of(DOC_ONE), T1, T1);
+        scheduler.syncAllNow();
+        OutlineDocument mirrored = documentById(DOC_ONE);
+        String hashBeforeEviction = mirrored.getContentHash();
+
+        // The cap eviction is a native bulk UPDATE — exercise the real SQL against real Postgres.
+        int evicted = documentRepository.evictBodies(workspaceId, List.of(mirrored.getId()));
+
+        assertThat(evicted).isEqualTo(1);
+        OutlineDocument afterEviction = documentById(DOC_ONE);
+        assertThat(afterEviction.getBodyMarkdown()).isNull();
+        assertThat(afterEviction.getContentHash()).isEqualTo(hashBeforeEviction); // kept — no re-export thrash
+        assertThat(afterEviction.getBodyEvictedAt()).isNotNull();
+
+        // Same updatedAt upstream → the retained hash keeps the unchanged fast path: no export happens.
+        clearInvocations(outlineApiClient);
+        scheduler.syncAllNow();
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), eq(DOC_ONE));
+        assertThat(documentById(DOC_ONE).getBodyEvictedAt()).isNotNull();
+
+        // Upstream change → re-export brings the body back and clears the eviction marker.
+        stubCollection(List.of(DOC_ONE), T2, T2);
+        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha v2");
+        scheduler.syncAllNow();
+
+        OutlineDocument reExported = documentById(DOC_ONE);
+        assertThat(reExported.getBodyMarkdown()).isEqualTo("# Alpha v2");
+        assertThat(reExported.getBodyEvictedAt()).isNull();
     }
 
     @Test

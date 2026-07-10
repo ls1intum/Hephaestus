@@ -78,7 +78,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("mentor_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
         when(membershipQuery.membershipsForLogins(any())).thenReturn(
-            List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER"))
+            List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", 314L))
         );
         when(preferencesQuery.preferencesForLogin("ada")).thenReturn(
             Optional.of(new AccountPreferencesQuery.PreferencesView(true, false))

@@ -190,4 +190,137 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-outline" id="1783164846747-6">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document research columns already present">
+            <not>
+                <columnExists tableName="outline_document" columnName="outline_created_at"/>
+            </not>
+        </preConditions>
+        <comment>
+            Research-fitness columns on the document mirror: outline_created_at (upstream createdAt —
+            up-to-dateness signal), collaborator_subjects (JSONB array of Outline user UUIDs from
+            Document.collaboratorIds — middle editors beyond creator/last-editor), body_evicted_at
+            (stamped when the size cap evicts a body, cleared on re-export; the hash is KEPT so an
+            evicted-but-unmodified document is never re-exported just to be evicted again).
+        </comment>
+        <addColumn tableName="outline_document">
+            <column name="outline_created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="collaborator_subjects" type="JSONB"/>
+            <column name="body_evicted_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="outline_document" columnName="outline_created_at"/>
+            <dropColumn tableName="outline_document" columnName="collaborator_subjects"/>
+            <dropColumn tableName="outline_document" columnName="body_evicted_at"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-7">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_collection coverage counters already present">
+            <not>
+                <columnExists tableName="outline_collection" columnName="documents_upstream"/>
+            </not>
+        </preConditions>
+        <comment>
+            Per-collection coverage counters (RQ1): documents_upstream = |documents.list ∪ tree| seen at the
+            last enumeration (clean or not), exports_skipped_for_budget = exports the last pass skipped when
+            the shared budget ran out (0 on a clean pass). Mirrored-live stays derivable as a row count.
+        </comment>
+        <addColumn tableName="outline_collection">
+            <column name="documents_upstream" type="INTEGER"/>
+            <column name="exports_skipped_for_budget" type="INTEGER"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="outline_collection" columnName="documents_upstream"/>
+            <dropColumn tableName="outline_collection" columnName="exports_skipped_for_budget"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document_event already present">
+            <not>
+                <tableExists tableName="outline_document_event"/>
+            </not>
+        </preConditions>
+        <comment>
+            Append-only per-document event log written from the webhook consumer (longitudinal editing-habit
+            signal + middle editors). occurred_at is the envelope's createdAt (upstream clock), actor_subject
+            the envelope's actorId. Webhook-forward only: no events.list backfill, no revisions.list bodies.
+            Erased with the workspace/connection (actor subjects are personal data); document tombstones do
+            NOT touch it — it is the audit trail of the mirror.
+        </comment>
+        <createTable tableName="outline_document_event">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="outline_document_event_pkey"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="connection_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="document_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_name" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_subject" type="VARCHAR(64)"/>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createIndex tableName="outline_document_event" indexName="ix_outline_document_event_document">
+            <column name="workspace_id"/>
+            <column name="document_id"/>
+            <column name="occurred_at"/>
+        </createIndex>
+        <rollback>
+            <dropTable tableName="outline_document_event"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-9">
+        <preConditions onFail="MARK_RAN" onFailMessage="sfk_outline_document_workspace already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_outline_document_workspace"/></not>
+        </preConditions>
+        <comment>Tenancy FKs for the Outline tables (sfk_* = scalar FK, per ADR 0017: DB-level constraint with no JPA association, excluded from the Hibernate drift diff). No DB cascade — the workspace purge contributor and the revoke erase paths remove rows explicitly; the FK guarantees no orphaned Outline content can outlive its workspace or connection.</comment>
+        <addForeignKeyConstraint baseTableName="outline_document" baseColumnNames="workspace_id" constraintName="sfk_outline_document_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="outline_document" baseColumnNames="connection_id" constraintName="sfk_outline_document_connection" referencedTableName="connection" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="outline_collection" baseColumnNames="workspace_id" constraintName="sfk_outline_collection_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="outline_collection" baseColumnNames="connection_id" constraintName="sfk_outline_collection_connection" referencedTableName="connection" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="outline_document_event" baseColumnNames="workspace_id" constraintName="sfk_outline_document_event_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="outline_document_event" baseColumnNames="connection_id" constraintName="sfk_outline_document_event_connection" referencedTableName="connection" referencedColumnNames="id" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="outline_document_event" constraintName="sfk_outline_document_event_connection"/>
+            <dropForeignKeyConstraint baseTableName="outline_document_event" constraintName="sfk_outline_document_event_workspace"/>
+            <dropForeignKeyConstraint baseTableName="outline_collection" constraintName="sfk_outline_collection_connection"/>
+            <dropForeignKeyConstraint baseTableName="outline_collection" constraintName="sfk_outline_collection_workspace"/>
+            <dropForeignKeyConstraint baseTableName="outline_document" constraintName="sfk_outline_document_connection"/>
+            <dropForeignKeyConstraint baseTableName="outline_document" constraintName="sfk_outline_document_workspace"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-10">
+        <preConditions onFail="MARK_RAN" onFailMessage="ck_outline_document_tombstone already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint WHERE conname = 'ck_outline_document_tombstone'
+            </sqlCheck>
+        </preConditions>
+        <comment>Tombstone invariant: a document deleted upstream keeps only its structural marker — no body, no hash, no person-bearing subject may survive on a tombstoned row.</comment>
+        <sql>
+            ALTER TABLE outline_document ADD CONSTRAINT ck_outline_document_tombstone CHECK (
+                deleted_at IS NULL OR (
+                    body_markdown IS NULL AND content_hash IS NULL
+                    AND created_by_subject IS NULL AND updated_by_subject IS NULL
+                    AND collaborator_subjects IS NULL
+                )
+            );
+        </sql>
+        <rollback>
+            ALTER TABLE outline_document DROP CONSTRAINT IF EXISTS ck_outline_document_tombstone;
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

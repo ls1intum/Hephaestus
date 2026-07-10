@@ -1,18 +1,19 @@
 package de.tum.cit.aet.hephaestus.agent.documentation;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Agent-owned SPI: projects a workspace's mirrored Outline documents into the flat, agent-facing view the
- * documentation content source materialises into the sandbox context. Implemented by
- * {@code integration.outline} (the owner of the {@code outline_document} table); the agent content source
- * consumes it and never touches the Outline schema.
+ * Agent-owned SPI: projects a workspace's mirrored documentation into the flat, agent-facing view the
+ * documentation content source materialises into the sandbox context. Implemented by the integration module
+ * that owns the mirrored-document schema; the agent content source consumes it and never touches that schema.
  *
  * <p>The implementation is the sole agent-facing reader of the mirror: it maps rows to {@link ProjectedDocument}
  * and represents a tombstoned (removed upstream) or size-cap-evicted document as a {@code deleted} / null-body
- * marker rather than dropping it, so a link to a vanished document still resolves to a placeholder. Both methods
+ * marker rather than dropping it, so a link to a vanished document still resolves to a placeholder. All methods
  * are pure reads (extract/load only); no practice, verdict, or threshold logic lives on this seam.
  */
 public interface DocumentProjection {
@@ -26,24 +27,40 @@ public interface DocumentProjection {
 
     /**
      * The workspace's mirrored documents matching a set of references — the linked-document lookup for the review
-     * path. Each reference may be an Outline document id or a document URL; a tombstoned/evicted match is still
-     * returned (as a {@code deleted} / null-body marker) so a stale link resolves rather than silently vanishing.
+     * path. Each reference may be a document id or a document URL; a tombstoned/evicted match is still returned
+     * (as a {@code deleted} / null-body marker) so a stale link resolves rather than silently vanishing.
      *
-     * @param workspaceId          the workspace to scope the read to
-     * @param outlineDocIdsOrUrls   the Outline document ids or URLs referenced from the artifact under review
+     * @param workspaceId  the workspace to scope the read to
+     * @param documentRefs the document ids or URLs referenced from the artifact under review
      */
-    List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> outlineDocIdsOrUrls);
+    List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs);
 
     /**
-     * The agent-facing view of one mirrored Outline document. {@code bodyMarkdown} is {@code null} when the
+     * Pulls documentation references — ids, slugs, links — out of free text (an artifact body). What counts
+     * as a reference (link grammar, token derivation) is the implementation's vendor knowledge; the consumer
+     * stays vendor-blind and feeds the result straight into {@link #documentsByReference}. Bounded and
+     * insertion-ordered; a {@code null}/blank input yields an empty set.
+     *
+     * @param text the free text to scan; may be {@code null}
+     */
+    Set<String> extractReferences(@Nullable String text);
+
+    /**
+     * The agent-facing view of one mirrored document. {@code bodyMarkdown} is {@code null} when the
      * document was removed upstream ({@code deleted}) or its body was evicted under the size cap.
+     *
+     * <p><strong>Timestamps.</strong> {@code createdAt}/{@code updatedAt} are the upstream document clocks
+     * — the up-to-dateness signal a reader needs to weigh a doc's authority; {@code null} when the mirror
+     * has not captured them.
      *
      * <p><strong>Authorship.</strong> {@code createdBy*}/{@code updatedBy*} carry the upstream author
      * substrate: the display name (untrusted third-party text — it must ride inside quarantined content,
-     * never as trusted metadata) and the provider-native subject (Outline user UUID). The
-     * {@code *MemberId} fields are the workspace member the subject resolves to through the linked-account
-     * chain — resolved lazily at projection time, {@code null} when the author has not linked an Outline
-     * identity (graceful floor: the display name still renders).
+     * never as trusted metadata) and the provider-native subject. The {@code *MemberId} fields are the
+     * workspace member the subject resolves to through the linked-account chain — resolved lazily at
+     * projection time, {@code null} when the author has not linked an identity (graceful floor: the display
+     * name still renders). {@code collaborators} lists everyone who edited the document (the middle editors
+     * the creator/last-editor pair misses); a collaborator's name is only known when they are also the
+     * creator or last editor, so entries may carry subject + member id only.
      */
     record ProjectedDocument(
         String collectionSlug,
@@ -51,14 +68,23 @@ public interface DocumentProjection {
         String title,
         @Nullable String bodyMarkdown,
         boolean deleted,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
         @Nullable String createdByName,
         @Nullable String createdBySubject,
         @Nullable Long createdByMemberId,
         @Nullable String updatedByName,
         @Nullable String updatedBySubject,
-        @Nullable Long updatedByMemberId
+        @Nullable Long updatedByMemberId,
+        List<Collaborator> collaborators
     ) {
-        /** An author-less projection (no substrate captured / tombstoned) — every author field {@code null}. */
+        /** One document editor: provider-native subject, display name if known, resolved member id if linked. */
+        public record Collaborator(String subject, @Nullable String name, @Nullable Long memberId) {}
+
+        /**
+         * An author-less projection (no substrate captured / tombstoned) — every author field {@code null},
+         * no collaborators, no timestamps.
+         */
         public static ProjectedDocument withoutAuthors(
             String collectionSlug,
             String slug,
@@ -77,7 +103,10 @@ public interface DocumentProjection {
                 null,
                 null,
                 null,
-                null
+                null,
+                null,
+                null,
+                List.of()
             );
         }
     }

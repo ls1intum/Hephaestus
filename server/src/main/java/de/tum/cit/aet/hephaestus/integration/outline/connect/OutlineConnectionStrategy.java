@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.util.Map;
@@ -52,17 +53,20 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
     private final OutlineWebhookRegistrar webhookRegistrar;
     private final OutlineDocumentRepository outlineDocumentRepository;
     private final OutlineCollectionRepository outlineCollectionRepository;
+    private final OutlineDocumentEventRepository outlineDocumentEventRepository;
 
     public OutlineConnectionStrategy(
         OutlineApiClient outlineApiClient,
         OutlineWebhookRegistrar webhookRegistrar,
         OutlineDocumentRepository outlineDocumentRepository,
-        OutlineCollectionRepository outlineCollectionRepository
+        OutlineCollectionRepository outlineCollectionRepository,
+        OutlineDocumentEventRepository outlineDocumentEventRepository
     ) {
         this.outlineApiClient = outlineApiClient;
         this.webhookRegistrar = webhookRegistrar;
         this.outlineDocumentRepository = outlineDocumentRepository;
         this.outlineCollectionRepository = outlineCollectionRepository;
+        this.outlineDocumentEventRepository = outlineDocumentEventRepository;
     }
 
     @Override
@@ -116,11 +120,15 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
             // inspector requires); the workspace-purge adapter erases the same rows for full teardown.
             long erased = outlineDocumentRepository.deleteByWorkspaceId(ref.workspaceId());
             long collections = outlineCollectionRepository.deleteByWorkspaceId(ref.workspaceId());
-            if (erased > 0 || collections > 0) {
+            // The per-document event log carries actor subjects (personal data) — it erases with the
+            // connection, exactly like the mirrored bodies.
+            long events = outlineDocumentEventRepository.deleteByWorkspaceId(ref.workspaceId());
+            if (erased > 0 || collections > 0 || events > 0) {
                 log.info(
-                    "Outline revoke: erased {} mirrored document(s) and {} collection registration(s) for workspace={}",
+                    "Outline revoke: erased {} mirrored document(s), {} collection registration(s) and {} document event(s) for workspace={}",
                     erased,
                     collections,
+                    events,
                     ref.workspaceId()
                 );
             }

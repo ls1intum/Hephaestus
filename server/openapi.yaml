@@ -5705,6 +5705,16 @@ components:
           type: integer
           format: int64
           description: Live (non-tombstoned) mirrored document count
+        documentsUpstream:
+          type: integer
+          format: int32
+          description: Documents upstream reported for this collection at the last
+            enumeration (coverage denominator)
+        exportsSkippedForBudget:
+          type: integer
+          format: int32
+          description: Exports the last pass skipped because the shared budget ran
+            out (0 on a clean pass)
         icon:
           type: string
           description: Collection icon as configured in Outline

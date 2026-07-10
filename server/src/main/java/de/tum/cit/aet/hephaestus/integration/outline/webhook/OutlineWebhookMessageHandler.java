@@ -1,14 +1,20 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
 import io.nats.client.Message;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,6 +34,11 @@ import tools.jackson.databind.ObjectMapper;
  *       (catalog fields; {@code collections.delete} tombstones the mirrored documents).</li>
  *   <li>Anything else is logged at debug and acked.</li>
  * </ul>
+ *
+ * <p>Every {@code documents.*} delivery (including deletes) additionally appends one
+ * {@link OutlineDocumentEvent} row from the envelope ({@code actorId} + {@code createdAt}) BEFORE
+ * routing — the longitudinal editing-habit log. Best-effort by contract: an event-log failure must
+ * never block the mirror refresh, so the append is isolated in its own try/catch.
  *
  * <p>All Outline events collapse onto a single logical event key ({@link #EVENT_TYPE}) —
  * {@link OutlineSubjectParser} maps any {@code outline.<sub>.<event>} subject to it — and the routing
@@ -50,15 +61,18 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
 
     private final ConnectionService connectionService;
     private final OutlineDocumentSyncScheduler syncScheduler;
+    private final OutlineDocumentEventRepository documentEventRepository;
     private final ObjectMapper objectMapper;
 
     public OutlineWebhookMessageHandler(
         ConnectionService connectionService,
         OutlineDocumentSyncScheduler syncScheduler,
+        OutlineDocumentEventRepository documentEventRepository,
         ObjectMapper objectMapper
     ) {
         this.connectionService = connectionService;
         this.syncScheduler = syncScheduler;
+        this.documentEventRepository = documentEventRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -82,6 +96,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         long workspaceId = subscription.get().workspaceId();
         String event = delivery.event();
         if (event.startsWith("documents.")) {
+            appendDocumentEvent(workspaceId, delivery);
             if (delivery.payloadId().isBlank()) {
                 // Cannot target without a document id — fall back to the authoritative reconcile.
                 syncScheduler.syncWorkspaceNow(workspaceId);
@@ -99,22 +114,77 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         }
     }
 
+    /**
+     * Appends the delivery to the per-document event log. Best-effort: the log is telemetry, the
+     * refresh is the product — a failed INSERT (or a missing ACTIVE connection in a teardown race)
+     * must never stop the routing below, so every failure is caught and logged here.
+     */
+    private void appendDocumentEvent(long workspaceId, Delivery delivery) {
+        if (delivery.payloadId().isBlank()) {
+            return; // no document id to attribute the event to
+        }
+        try {
+            Optional<Long> connectionId = connectionService
+                .findActive(workspaceId, IntegrationKind.OUTLINE)
+                .map(Connection::getId);
+            if (connectionId.isEmpty()) {
+                return;
+            }
+            documentEventRepository.save(
+                new OutlineDocumentEvent(
+                    workspaceId,
+                    connectionId.get(),
+                    delivery.payloadId(),
+                    delivery.event(),
+                    delivery.actorId().isBlank() ? null : delivery.actorId(),
+                    delivery.occurredAt()
+                )
+            );
+        } catch (RuntimeException e) {
+            log.warn(
+                "outline.consumer: failed to append document event '{}' for workspaceId={}: {}",
+                delivery.event(),
+                workspaceId,
+                e.toString()
+            );
+        }
+    }
+
     private Delivery parse(byte[] body) {
         if (body == null || body.length == 0) {
-            return new Delivery("", "", "");
+            return new Delivery("", "", "", "", null);
         }
         try {
             JsonNode root = objectMapper.readTree(body);
             return new Delivery(
                 root.path("webhookSubscriptionId").asString(""),
                 root.path("event").asString(""),
-                root.path("payload").path("id").asString("")
+                root.path("payload").path("id").asString(""),
+                root.path("actorId").asString(""),
+                parseInstant(root.path("createdAt").asString(""))
             );
         } catch (RuntimeException e) {
-            return new Delivery("", "", "");
+            return new Delivery("", "", "", "", null);
         }
     }
 
-    /** The routing-relevant fields of one delivery; blanks when absent/unparsable. */
-    private record Delivery(String subscriptionId, String event, String payloadId) {}
+    private static @Nullable Instant parseInstant(String value) {
+        if (value.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /** The routing- and audit-relevant fields of one delivery; blanks/null when absent/unparsable. */
+    private record Delivery(
+        String subscriptionId,
+        String event,
+        String payloadId,
+        String actorId,
+        @Nullable Instant occurredAt
+    ) {}
 }

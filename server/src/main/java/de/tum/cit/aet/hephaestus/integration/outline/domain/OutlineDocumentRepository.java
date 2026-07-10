@@ -128,14 +128,16 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     List<Object[]> findEvictionCandidates(@Param("workspaceId") long workspaceId);
 
     /**
-     * Frees mirrored bodies for the size cap: null {@code body_markdown} (and its hash, so the body
-     * re-exports on next access) for the given rows. Native bulk UPDATE carrying the {@code workspace_id}
-     * predicate. Returns rows affected.
+     * Frees mirrored bodies for the size cap: null {@code body_markdown} and stamp
+     * {@code body_evicted_at} for the given rows. {@code content_hash} is deliberately KEPT so the
+     * unchanged-check still holds — an evicted-but-unmodified document is not re-exported (and
+     * re-evicted) on every pass; the body comes back only when upstream changes or a targeted refresh
+     * asks for it. Native bulk UPDATE carrying the {@code workspace_id} predicate. Returns rows affected.
      */
     @Modifying
     @Transactional
     @Query(
-        value = "UPDATE outline_document SET body_markdown = NULL, content_hash = NULL " +
+        value = "UPDATE outline_document SET body_markdown = NULL, body_evicted_at = now() " +
             "WHERE workspace_id = :workspaceId AND id IN (:ids)",
         nativeQuery = true
     )

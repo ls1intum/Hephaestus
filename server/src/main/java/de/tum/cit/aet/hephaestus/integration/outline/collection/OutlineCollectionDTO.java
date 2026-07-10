@@ -28,6 +28,12 @@ public record OutlineCollectionDTO(
     @Schema(description = "Whether a clean full pass has completed since registration or the last resume")
     SyncStatus syncStatus,
     @NonNull @Schema(description = "Live (non-tombstoned) mirrored document count") Long documentCount,
+    @Schema(
+        description = "Documents upstream reported for this collection at the last enumeration (coverage denominator)"
+    )
+    Integer documentsUpstream,
+    @Schema(description = "Exports the last pass skipped because the shared budget ran out (0 on a clean pass)")
+    Integer exportsSkippedForBudget,
     @Schema(description = "When the last clean sync pass finished, if any") Instant lastSyncedAt,
     @Schema(description = "Last sync failure for this collection, cleared on the next clean pass") String lastSyncError,
     @NonNull @Schema(description = "When the collection was registered for mirroring") Instant createdAt
@@ -44,6 +50,8 @@ public record OutlineCollectionDTO(
             collection.getState(),
             collection.getSyncStatus(),
             documentCount,
+            collection.getDocumentsUpstream(),
+            collection.getExportsSkippedForBudget(),
             collection.getDocumentsSyncedAt(),
             collection.getLastSyncError(),
             collection.getCreatedAt()

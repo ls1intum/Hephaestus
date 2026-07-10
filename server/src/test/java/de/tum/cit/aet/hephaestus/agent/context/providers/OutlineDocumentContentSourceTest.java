@@ -20,8 +20,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,6 +102,9 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         return ProjectedDocument.withoutAuthors(collection, slug, title, null, true);
     }
 
+    private static final Instant CREATED = Instant.parse("2025-11-01T08:00:00Z");
+    private static final Instant UPDATED = Instant.parse("2026-02-03T09:30:00Z");
+
     private static ProjectedDocument authoredDoc(
         String collection,
         String slug,
@@ -108,19 +113,39 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         String authorName,
         Long authorMemberId
     ) {
+        return authoredDoc(collection, slug, title, body, authorName, authorMemberId, List.of());
+    }
+
+    private static ProjectedDocument authoredDoc(
+        String collection,
+        String slug,
+        String title,
+        String body,
+        String authorName,
+        Long authorMemberId,
+        List<ProjectedDocument.Collaborator> collaborators
+    ) {
         return new ProjectedDocument(
             collection,
             slug,
             title,
             body,
             false,
+            CREATED,
+            UPDATED,
             authorName,
             "0aa1bb2c-user",
             authorMemberId,
             authorName,
             "0aa1bb2c-user",
-            authorMemberId
+            authorMemberId,
+            collaborators
         );
+    }
+
+    /** Stubs the projection's reference extraction the way the real projector would resolve {@code body}. */
+    private void extractsReferences(String body, String... refs) {
+        when(projection.extractReferences(body)).thenReturn(new LinkedHashSet<>(List.of(refs)));
     }
 
     // --- originId + supports ---
@@ -149,6 +174,11 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     void reviewPathMaterializesByteStableMarkdownTree() {
         String body =
             "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3 and https://wiki.example.com/doc/old-doc-z9";
+        extractsReferences(
+            body,
+            "https://wiki.example.com/doc/onboarding-guide-a1b2c3",
+            "https://wiki.example.com/doc/old-doc-z9"
+        );
         when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
             List.of(
                 doc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome to the team."),
@@ -244,8 +274,54 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
+    void mentorPathEmitsTimestampsAndCollaborators() throws Exception {
+        when(projection.documentsForWorkspace(WORKSPACE_ID)).thenReturn(
+            List.of(
+                authoredDoc(
+                    "Engineering",
+                    "onboarding-guide",
+                    "Onboarding Guide",
+                    "Welcome.",
+                    "Ada Lovelace",
+                    555L,
+                    List.of(
+                        new ProjectedDocument.Collaborator("0aa1bb2c-user", "Ada Lovelace", 555L),
+                        new ProjectedDocument.Collaborator("7cc9dd0e-user", null, null)
+                    )
+                ),
+                doc("Product", "roadmap", "Roadmap", "Q3 plans.") // no substrate captured
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(mentorRequest(), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/outline_docs.json"));
+        JsonNode rich = root.get(0);
+        // ISO-8601 upstream clocks, present only when captured.
+        assertThat(rich.get("created").asString()).isEqualTo("2025-11-01T08:00:00Z");
+        assertThat(rich.get("last_updated").asString()).isEqualTo("2026-02-03T09:30:00Z");
+        // Collaborators are machine-facing here: subjects always, name/member id only where known.
+        JsonNode collaborators = rich.get("collaborators");
+        assertThat(collaborators.isArray()).isTrue();
+        assertThat(collaborators).hasSize(2);
+        assertThat(collaborators.get(0).get("subject").asString()).isEqualTo("0aa1bb2c-user");
+        assertThat(collaborators.get(0).get("name").asString()).isEqualTo("Ada Lovelace");
+        assertThat(collaborators.get(0).get("member_id").asLong()).isEqualTo(555L);
+        assertThat(collaborators.get(1).get("subject").asString()).isEqualTo("7cc9dd0e-user");
+        assertThat(collaborators.get(1).has("name")).isFalse();
+        assertThat(collaborators.get(1).has("member_id")).isFalse();
+
+        JsonNode bare = root.get(1);
+        assertThat(bare.has("created")).isFalse();
+        assertThat(bare.has("last_updated")).isFalse();
+        assertThat(bare.has("collaborators")).isFalse();
+    }
+
+    @Test
     void reviewPathRendersBylineInsideTheQuarantinedDocument() {
         String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
         when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
             List.of(
                 authoredDoc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome.", "Ada Lovelace", 555L)
@@ -266,6 +342,74 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         assertThat(rendered).contains("_Author: Ada Lovelace (workspace member 555)_");
         // Creator == last editor → no redundant "Last edited by" line.
         assertThat(rendered).doesNotContain("Last edited by");
+        // Upstream freshness renders as a date inside the quarantined content.
+        assertThat(rendered).contains("_Last updated: 2026-02-03_");
+        assertThat(rendered.indexOf("_Last updated: 2026-02-03_")).isGreaterThan(bannerEnd);
+    }
+
+    @Test
+    void reviewPathBylineListsContributorsWithoutLeakingRawSubjects() {
+        String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(
+                authoredDoc(
+                    "Engineering",
+                    "onboarding-guide",
+                    "Onboarding Guide",
+                    "Welcome.",
+                    "Ada Lovelace",
+                    555L,
+                    List.of(
+                        new ProjectedDocument.Collaborator("0aa1bb2c-user", "Ada Lovelace", 555L),
+                        new ProjectedDocument.Collaborator("7cc9dd0e-user", null, null),
+                        new ProjectedDocument.Collaborator("8dd0ee1f-user", null, 777L)
+                    )
+                )
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/onboarding-guide.md"),
+            StandardCharsets.UTF_8
+        );
+        // Named contributors render; the unnamed rest collapses into "+N more" — no raw UUIDs in prose.
+        assertThat(rendered).contains("_Contributors: Ada Lovelace, +2 more_");
+        assertThat(rendered).doesNotContain("7cc9dd0e-user");
+        assertThat(rendered).doesNotContain("8dd0ee1f-user");
+    }
+
+    @Test
+    void reviewPathBylineSkipsContributorsWhenNoneHaveDisplayInfo() {
+        String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(
+                authoredDoc(
+                    "Engineering",
+                    "onboarding-guide",
+                    "Onboarding Guide",
+                    "Welcome.",
+                    null,
+                    null,
+                    List.of(new ProjectedDocument.Collaborator("7cc9dd0e-user", null, null))
+                )
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/onboarding-guide.md"),
+            StandardCharsets.UTF_8
+        );
+        // Nothing rather than raw UUIDs.
+        assertThat(rendered).doesNotContain("Contributors");
+        assertThat(rendered).doesNotContain("7cc9dd0e-user");
     }
 
     // --- (c) review path materializes only the LINKED docs ---
@@ -273,6 +417,7 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     @Test
     void reviewPathResolvesOnlyReferencedDocuments() {
         String body = "Follow https://wiki.example.com/doc/onboarding-guide-a1b2c3 before you start.";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
         when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
             List.of(doc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome."))
         );
@@ -293,6 +438,7 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     @Test
     void issueReviewPathMaterializesLinkedDocs() {
         String body = "See https://wiki.example.com/doc/spec-x for the spec.";
+        extractsReferences(body, "https://wiki.example.com/doc/spec-x");
         when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
             List.of(doc("Product", "spec", "Spec", "Details."))
         );

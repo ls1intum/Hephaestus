@@ -2,14 +2,14 @@
  * Outline vendor adapter — mirrors allow-listed Outline collections into local documents and
  * projects them into the agent's context so design docs and decision records reach practice detection.
  *
- * <p>OPEN (matching {@code scm.github} / {@code scm.gitlab} / {@code slack}): the outbound boundary is
- * pinned through {@code allowedDependencies} as cross-module edges are introduced, so this adapter
- * cannot silently grow new imports. Documents are a content source, not a detection surface — Outline
- * never emits observations or findings of its own.
+ * <p>A closed module (the Modulith default): nothing outside consumes Outline types — the agent reads
+ * through its own {@code agent::documentation-source} SPI, which this module merely implements — so no
+ * package is exposed. The outbound boundary is pinned through {@code allowedDependencies} as
+ * cross-module edges are introduced, so this adapter cannot silently grow new imports. Documents are a
+ * content source, not a detection surface — Outline never emits observations or findings of its own.
  */
 @org.springframework.modulith.ApplicationModule(
     displayName = "Integration · Outline",
-    type = org.springframework.modulith.ApplicationModule.Type.OPEN,
     allowedDependencies = {
         // Connection registry + SPI ports: the credential provider, manifest, lifecycle listener,
         // and connect strategy plug into integration.core the same way every vendor adapter does.
@@ -40,11 +40,9 @@
         "workspace::context",
         // OutlineIdentityResolver resolves a document author (server, team, Outline user UUID) to the
         // workspace developer through the auth SPI ports only (GitProviderRegistry + AccountIdentityQuery +
-        // AccountWorkspaceMembershipQuery) — never core.auth domain types. Mirrors the Slack mentor resolver.
+        // AccountWorkspaceMembershipQuery, whose membership view carries the member's SCM User id) — never
+        // core.auth or SCM domain types. Mirrors the Slack mentor resolver.
         "core::auth-spi",
-        // The resolver maps the linked SCM login to its actor-mirror User row (integration.scm.domain.user),
-        // the same read edge SlackMentorIdentityResolver uses.
-        "integration.scm",
         // integration.outline.documentation implements the agent-owned documentation-source SPI
         // (DocumentProjection): Outline owns the outline_document table and PROJECTS it to the agent through
         // this port, so the agent's mentor/review read path carries no raw SQL against the Outline schema. This

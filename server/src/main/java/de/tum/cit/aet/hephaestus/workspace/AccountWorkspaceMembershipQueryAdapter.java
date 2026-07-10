@@ -61,7 +61,8 @@ public class AccountWorkspaceMembershipQueryAdapter implements AccountWorkspaceM
                         workspace.getId(),
                         workspace.getWorkspaceSlug(),
                         workspace.getDisplayName(),
-                        membership.getRole() != null ? membership.getRole().name() : null
+                        membership.getRole() != null ? membership.getRole().name() : null,
+                        membership.getUser() != null ? membership.getUser().getId() : null
                     )
                 );
             }

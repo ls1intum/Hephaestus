@@ -10,8 +10,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -24,7 +22,8 @@ import org.mockito.Mock;
 /**
  * Pins the provider-scoped, membership-gated resolution chain for Outline document authors: an author
  * only ever resolves to the workspace member their linked account belongs to IN THAT WORKSPACE — never
- * login-only, never across workspaces. Mirrors the Slack mentor resolver contract.
+ * login-only, never across workspaces. Mirrors the Slack mentor resolver contract. The member id comes
+ * off the membership view itself (SPI-only chain — no SCM repository read).
  */
 class OutlineIdentityResolverTest extends BaseUnitTest {
 
@@ -44,19 +43,11 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     @Mock
     private AccountWorkspaceMembershipQuery workspaceMembershipQuery;
 
-    @Mock
-    private UserRepository userRepository;
-
     private OutlineIdentityResolver resolver;
 
     @BeforeEach
     void setUp() {
-        resolver = new OutlineIdentityResolver(
-            gitProviderRegistry,
-            accountIdentityQuery,
-            workspaceMembershipQuery,
-            userRepository
-        );
+        resolver = new OutlineIdentityResolver(gitProviderRegistry, accountIdentityQuery, workspaceMembershipQuery);
         lenient().when(gitProviderRegistry.resolveProviderId("OUTLINE", SERVER_URL)).thenReturn(PROVIDER_ID);
     }
 
@@ -64,21 +55,24 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         return new AccountIdentityQuery.IdentityLinkView(1L, 2L, subject, login, null, null, null, null, null);
     }
 
-    private static AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership(long workspaceId) {
-        return new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(workspaceId, "ws", "Workspace", "MEMBER");
+    private static AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership(long workspaceId, Long memberId) {
+        return new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
+            workspaceId,
+            "ws",
+            "Workspace",
+            "MEMBER",
+            memberId
+        );
     }
 
     @Test
-    @DisplayName("a linked author with membership in the workspace resolves to their member id")
+    @DisplayName("a linked author with membership in the workspace resolves to the view's member id")
     void happyPath_resolvesMemberId() {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));
         when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID))
+            List.of(membership(WORKSPACE_ID, 555L))
         );
-        User user = new User();
-        user.setId(555L);
-        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(user));
 
         Optional<Long> memberId = resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT);
 
@@ -93,7 +87,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.empty());
 
         assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).isEmpty();
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(workspaceMembershipQuery);
     }
 
     @Test
@@ -102,11 +96,10 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));
         when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID + 1))
+            List.of(membership(WORKSPACE_ID + 1, 555L))
         );
 
         assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).isEmpty();
-        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -118,10 +111,22 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         );
         when(workspaceMembershipQuery.membershipsForLogins(Set.of("Ada Lovelace"))).thenReturn(List.of());
         when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID))
+            List.of(membership(WORKSPACE_ID, 555L))
         );
 
         assertThat(resolver.resolveDeveloperLogin(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).contains("octocat");
+    }
+
+    @Test
+    @DisplayName("a membership view without a member id resolves to empty rather than a bogus attribution")
+    void membershipWithoutMemberId_resolvesEmpty() {
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
+        when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));
+        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
+            List.of(membership(WORKSPACE_ID, null))
+        );
+
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).isEmpty();
     }
 
     @Test

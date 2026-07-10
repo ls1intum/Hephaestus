@@ -225,12 +225,14 @@ public class OutlineApiClient {
             new OutlineDocumentListResponse.Meta(
                 data.id(),
                 data.title(),
+                data.createdAt(),
                 data.updatedAt(),
                 data.urlId(),
                 data.parentDocumentId(),
                 data.collectionId(),
                 data.createdBy(),
-                data.updatedBy()
+                data.updatedBy(),
+                data.collaboratorIds()
             )
         );
     }

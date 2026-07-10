@@ -25,7 +25,16 @@ public interface AccountWorkspaceMembershipQuery {
 
     /**
      * A single workspace membership, flattened for export. Contains no SCM-user PII beyond what
-     * the principal already owns (the workspace they belong to + their role).
+     * the principal already owns (the workspace they belong to + their role + the id of their own
+     * member row). {@code memberId} is the SCM {@code User} id the membership hangs off — the handle
+     * integration resolvers need to attribute provider-native activity to a workspace member without
+     * reaching into the SCM schema themselves.
      */
-    record WorkspaceMembershipView(Long workspaceId, String workspaceSlug, String workspaceName, String role) {}
+    record WorkspaceMembershipView(
+        Long workspaceId,
+        String workspaceSlug,
+        String workspaceName,
+        String role,
+        Long memberId
+    ) {}
 }

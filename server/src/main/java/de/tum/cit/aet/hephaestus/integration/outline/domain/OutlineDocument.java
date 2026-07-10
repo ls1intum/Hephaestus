@@ -8,11 +8,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,9 +28,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code bodyMarkdown} carries the rendered Markdown body. It is {@code null} in two states that
  * both render as a placeholder rather than a missing file: {@code deletedAt} set (the document was
- * removed upstream) and a size-cap eviction (the row survives as a directory marker pointing at the
- * document URL). {@code contentHash} + {@code outlineUpdatedAt} drive incremental sync so an
- * unchanged document is never re-exported.
+ * removed upstream) and a size-cap eviction ({@code bodyEvictedAt} set; the row survives as a
+ * directory marker pointing at the document URL). {@code contentHash} + {@code outlineUpdatedAt}
+ * drive incremental sync so an unchanged document is never re-exported — an evicted row KEEPS its
+ * hash, so the body comes back only when upstream actually changes or a targeted refresh asks for it,
+ * never in a cap-evict-re-export thrash loop.
  */
 @Entity
 @Table(
@@ -86,6 +91,19 @@ public class OutlineDocument {
     @Column(name = "outline_updated_at")
     private @Nullable Instant outlineUpdatedAt;
 
+    /** Upstream {@code createdAt} — the document-age half of the up-to-dateness signal. */
+    @Column(name = "outline_created_at")
+    private @Nullable Instant outlineCreatedAt;
+
+    /**
+     * Outline user ids (UUIDs) of everyone who edited the document ({@code Document.collaboratorIds})
+     * — the middle editors the creator/last-editor pair misses. Same lazy-join, PII posture as
+     * {@link #createdBySubject}; {@code null} (never an empty array) when upstream reports none.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "collaborator_subjects", columnDefinition = "jsonb")
+    private @Nullable List<String> collaboratorSubjects;
+
     /**
      * Outline user id (UUID) of the document's creator — authorship substrate. Subjects join
      * {@code identity_link} lazily at projection time; no member id is stamped here.
@@ -112,6 +130,13 @@ public class OutlineDocument {
     /** When the document body was last exported from Outline into the mirror; drives least-recently-exported eviction. */
     @Column(name = "last_materialized_at")
     private @Nullable Instant lastMaterializedAt;
+
+    /**
+     * Set when the size cap evicted the body ({@code bodyMarkdown} nulled, {@code contentHash} kept),
+     * cleared when a sync re-exports the body. Distinguishes "evicted" from "tombstoned" explicitly.
+     */
+    @Column(name = "body_evicted_at")
+    private @Nullable Instant bodyEvictedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

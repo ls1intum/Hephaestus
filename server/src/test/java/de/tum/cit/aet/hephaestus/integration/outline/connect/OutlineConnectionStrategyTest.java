@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -34,12 +35,16 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
     @Mock
     private OutlineCollectionRepository outlineCollectionRepository;
 
+    @Mock
+    private OutlineDocumentEventRepository outlineDocumentEventRepository;
+
     private OutlineConnectionStrategy strategy() {
         return new OutlineConnectionStrategy(
             outlineApiClient,
             webhookRegistrar,
             outlineDocumentRepository,
-            outlineCollectionRepository
+            outlineCollectionRepository,
+            outlineDocumentEventRepository
         );
     }
 
@@ -85,5 +90,7 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
 
         verify(webhookRegistrar).deregister(5L);
         verify(outlineDocumentRepository).deleteByWorkspaceId(5L);
+        // GDPR erase on disconnect covers the event log too — actor subjects are personal data.
+        verify(outlineDocumentEventRepository).deleteByWorkspaceId(5L);
     }
 }

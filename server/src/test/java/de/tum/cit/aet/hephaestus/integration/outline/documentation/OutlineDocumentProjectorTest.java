@@ -75,6 +75,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         );
     }
 
+    private static final Instant CREATED = Instant.parse("2025-11-01T00:00:00Z");
+    private static final Instant UPDATED = Instant.parse("2026-02-01T00:00:00Z");
+
     private static OutlineDocument liveDocument() {
         OutlineDocument doc = new OutlineDocument();
         doc.setWorkspaceId(WORKSPACE_ID);
@@ -85,6 +88,8 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         doc.setSlug("design-doc");
         doc.setTitle("Design Doc");
         doc.setBodyMarkdown("# Design\n\nContent.");
+        doc.setOutlineCreatedAt(CREATED);
+        doc.setOutlineUpdatedAt(UPDATED);
         return doc;
     }
 
@@ -130,6 +135,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 assertThat(projected.title()).isEqualTo("Design Doc");
                 assertThat(projected.bodyMarkdown()).isEqualTo("# Design\n\nContent.");
                 assertThat(projected.deleted()).isFalse();
+                // Vendor-neutral names on the SPI; the vendor prefix stays on the entity columns.
+                assertThat(projected.createdAt()).isEqualTo(CREATED);
+                assertThat(projected.updatedAt()).isEqualTo(UPDATED);
             });
     }
 
@@ -226,6 +234,82 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 assertThat(projected.createdByMemberId()).isNull();
             });
         verify(identityResolver, never()).resolveMemberId(anyLong(), anyString(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("collaborator subjects project with memoised member resolution; names only for creator/last editor")
+    void collaborators_projectWithResolvedMemberIds() {
+        OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
+        doc.setCollaboratorSubjects(List.of("0aa1bb2c-user", "9dd8ee7f-user", "0aa1bb2c-user"));
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(List.of(doc));
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user")).thenReturn(
+            Optional.of(555L)
+        );
+        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "9dd8ee7f-user")).thenReturn(
+            Optional.empty()
+        );
+
+        List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
+
+        assertThat(result)
+            .singleElement()
+            .satisfies(projected -> {
+                // Duplicate subjects collapse; insertion order holds.
+                assertThat(projected.collaborators()).hasSize(2);
+                assertThat(projected.collaborators().get(0).subject()).isEqualTo("0aa1bb2c-user");
+                // Creator/last-editor collaborator carries the known display name + resolved member.
+                assertThat(projected.collaborators().get(0).name()).isEqualTo("Ada Lovelace");
+                assertThat(projected.collaborators().get(0).memberId()).isEqualTo(555L);
+                // A middle editor has no name in the list payload — subject (+ member id if linked) only.
+                assertThat(projected.collaborators().get(1).subject()).isEqualTo("9dd8ee7f-user");
+                assertThat(projected.collaborators().get(1).name()).isNull();
+                assertThat(projected.collaborators().get(1).memberId()).isNull();
+            });
+        // The memo covers collaborators too: the shared subject resolves once for author + collaborator slots.
+        verify(identityResolver, times(1)).resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user");
+    }
+
+    @Test
+    @DisplayName("a row without collaborator subjects projects an empty collaborator list")
+    void noCollaborators_projectsEmptyList() {
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
+            List.of(liveDocument())
+        );
+
+        assertThat(projector.documentsForWorkspace(WORKSPACE_ID))
+            .singleElement()
+            .satisfies(projected -> assertThat(projected.collaborators()).isEmpty());
+    }
+
+    // --- extractReferences (the vendor link grammar behind the vendor-neutral SPI) ---
+
+    @Test
+    @DisplayName("extractReferences pulls doc and share links out of free text, capped and insertion-ordered")
+    void extractReferences_findsOutlineLinks() {
+        String text =
+            "See https://wiki.example.com/doc/onboarding-guide-a1b2c3 and the share " +
+            "https://wiki.example.com/s/shareId9 (twice: https://wiki.example.com/doc/onboarding-guide-a1b2c3). " +
+            "Not a doc link: https://example.com/blog/post-1.";
+
+        Set<String> refs = projector.extractReferences(text);
+
+        assertThat(refs).containsExactly(
+            "https://wiki.example.com/doc/onboarding-guide-a1b2c3",
+            "https://wiki.example.com/s/shareId9"
+        );
+    }
+
+    @Test
+    @DisplayName("extractReferences tolerates null/blank input and caps the fan-out")
+    void extractReferences_nullBlankAndCap() {
+        assertThat(projector.extractReferences(null)).isEmpty();
+        assertThat(projector.extractReferences("   ")).isEmpty();
+
+        StringBuilder many = new StringBuilder();
+        for (int i = 0; i < OutlineDocumentProjector.MAX_REFERENCES + 5; i++) {
+            many.append("https://wiki.example.com/doc/doc-").append(i).append(" ");
+        }
+        assertThat(projector.extractReferences(many.toString())).hasSize(OutlineDocumentProjector.MAX_REFERENCES);
     }
 
     @Test

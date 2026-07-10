@@ -73,9 +73,13 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     private OutlineCollection collection;
 
     private OutlineDocumentSyncService service(int exportBudget) {
+        return service(exportBudget, 200);
+    }
+
+    private OutlineDocumentSyncService service(int exportBudget, int cacheMaxSizeMb) {
         OutlineProperties properties = new OutlineProperties(
             new OutlineProperties.Sync("0 0 */6 * * *", exportBudget, Duration.ofMinutes(5)),
-            new OutlineProperties.Cache(200),
+            new OutlineProperties.Cache(cacheMaxSizeMb),
             Duration.ofDays(30)
         );
         return new OutlineDocumentSyncService(
@@ -134,7 +138,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     }
 
     private static OutlineDocumentListResponse.Meta meta(String id, Instant updatedAt) {
-        return new OutlineDocumentListResponse.Meta(id, id, updatedAt, id, null, COLLECTION_ID, null, null);
+        return new OutlineDocumentListResponse.Meta(id, id, T1, updatedAt, id, null, COLLECTION_ID, null, null, null);
     }
 
     private OutlineDocument mirrored(String documentId) {
@@ -163,6 +167,10 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(collection.getDocumentsSyncedThrough()).isNull();
         assertThat(collection.getDocumentsSyncedAt()).isNull();
         assertThat(staleRow.isDeleted()).isFalse();
+        // Coverage counters are written even on a budget-exhausted pass — the enumeration completed
+        // (upstream = doc-1 + doc-2; the local-only stale row is not upstream).
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(2);
+        assertThat(collection.getExportsSkippedForBudget()).isEqualTo(1);
         // Newest-first ordering means the single budget unit went to doc-1.
         verify(outlineApiClient).exportDocument(SERVER_URL, "token", "doc-1");
         verify(outlineApiClient, never()).exportDocument(SERVER_URL, "token", "doc-2");
@@ -182,6 +190,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
         assertThat(collection.getDocumentsSyncedThrough()).isEqualTo(T2);
         assertThat(collection.getDocumentsSyncedAt()).isNotNull();
+        // Clean-pass counters: full coverage, nothing skipped.
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
+        assertThat(collection.getExportsSkippedForBudget()).isZero();
         assertThat(staleRow.isDeleted()).isTrue();
         assertThat(staleRow.getBodyMarkdown()).isNull();
         assertThat(staleRow.getCreatedBySubject()).isNull();
@@ -221,7 +232,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-x")
         ).thenReturn(Optional.empty());
         when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-x")).thenReturn(
-            Optional.of(new OutlineDocumentListResponse.Meta("doc-x", "X", T1, "doc-x", null, "other-col", null, null))
+            Optional.of(
+                new OutlineDocumentListResponse.Meta("doc-x", "X", T1, T1, "doc-x", null, "other-col", null, null, null)
+            )
         );
         when(
             collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, "other-col")
@@ -283,6 +296,98 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         assertThat(row.isDeleted()).isTrue();
         assertThat(collection.getLastSyncError()).contains("deleted in Outline");
+    }
+
+    @Test
+    void export_capturesTimestampsAndCollaborators_andClearsTheEvictionMarker() {
+        OutlineDocument evicted = mirrored("doc-1");
+        evicted.setContentHash("stale-hash"); // an evicted row keeps its hash…
+        evicted.setOutlineUpdatedAt(T1);
+        evicted.setBodyEvictedAt(T1); // …and carries the eviction marker
+        when(documentRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION)).thenReturn(List.of(evicted));
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(
+                new OutlineDocumentListResponse.Meta(
+                    "doc-1",
+                    "Doc 1",
+                    T1,
+                    T2, // upstream changed → re-export
+                    "doc-1",
+                    null,
+                    COLLECTION_ID,
+                    new OutlineDocumentListResponse.OutlineUser("user-1", "Ada"),
+                    new OutlineDocumentListResponse.OutlineUser("user-2", "Grace"),
+                    List.of("user-1", "user-2", "user-3")
+                )
+            )
+        );
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        assertThat(evicted.getBodyMarkdown()).isEqualTo("# fresh");
+        assertThat(evicted.getBodyEvictedAt()).isNull(); // the body is back — the marker must go
+        assertThat(evicted.getOutlineCreatedAt()).isEqualTo(T1);
+        assertThat(evicted.getOutlineUpdatedAt()).isEqualTo(T2);
+        assertThat(evicted.getCollaboratorSubjects()).containsExactly("user-1", "user-2", "user-3");
+    }
+
+    @Test
+    void evictedButUnmodifiedDocument_isNotReExported_theRetainedHashHoldsTheCap() {
+        OutlineDocument evicted = mirrored("doc-1");
+        evicted.setContentHash("kept-hash");
+        evicted.setOutlineUpdatedAt(T1);
+        evicted.setBodyEvictedAt(T1);
+        when(documentRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION)).thenReturn(List.of(evicted));
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T1)) // upstream unchanged
+        );
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        // No thrash loop: the unchanged fast path holds because eviction kept the hash.
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
+        assertThat(evicted.getBodyEvictedAt()).isEqualTo(T1);
+    }
+
+    @Test
+    void tombstone_clearsCollaboratorSubjectsAlongsideAuthors() {
+        OutlineDocument row = mirrored("doc-1");
+        row.setBodyMarkdown("# body");
+        row.setContentHash("hash");
+        row.setCollaboratorSubjects(List.of("user-1", "user-3"));
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.of(row));
+
+        service(10).refreshDocument(WORKSPACE, "documents.delete", "doc-1");
+
+        assertThat(row.isDeleted()).isTrue();
+        assertThat(row.getBodyMarkdown()).isNull();
+        assertThat(row.getContentHash()).isNull();
+        assertThat(row.getCollaboratorSubjects()).isNull();
+    }
+
+    @Test
+    void syncPendingCollections_enforcesTheSizeCapAfterThePass() {
+        when(
+            collectionRepository.findByWorkspaceIdAndStateAndSyncStatus(
+                WORKSPACE,
+                MirrorState.ENABLED,
+                SyncStatus.PENDING
+            )
+        ).thenReturn(List.of(collection));
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T2)));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# body");
+        // Cap of 0 MB with a non-empty mirror → the eviction path must run.
+        when(documentRepository.sumBodySizeByWorkspaceId(WORKSPACE)).thenReturn(1_000L);
+        when(documentRepository.findEvictionCandidates(WORKSPACE)).thenReturn(
+            List.of(new Object[][] { { 11L, 1_000L } })
+        );
+
+        service(10, 0).syncPendingCollections(WORKSPACE);
+
+        verify(documentRepository).evictBodies(WORKSPACE, List.of(11L));
     }
 
     @Test

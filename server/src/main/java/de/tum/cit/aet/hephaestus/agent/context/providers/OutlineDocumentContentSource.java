@@ -11,14 +11,13 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -82,19 +81,6 @@ public class OutlineDocumentContentSource implements ContentSource {
 
     /** Per-document body excerpt fed to the mentor; keeps the single JSON file bounded. */
     static final int MENTOR_BODY_CHARS = 4_000;
-
-    /** Cap on Outline references resolved from one artifact body — bounds the review-path fan-out. */
-    static final int MAX_REVIEW_REFERENCES = 20;
-
-    /**
-     * Outline document / share link, e.g. {@code https://wiki.example.com/doc/onboarding-guide-a1b2c3} or
-     * {@code https://wiki.example.com/s/shareId}. The full match is handed to
-     * {@link DocumentProjection#documentsByReference} verbatim (it derives the id/slug token from the last path
-     * segment); a non-Outline URL that happens to match resolves to no row, so no foreign document is materialised.
-     */
-    private static final Pattern OUTLINE_LINK = Pattern.compile(
-        "https?://[\\w.-]+(?::\\d+)?/(?:doc|s)/[A-Za-z0-9._~-]+"
-    );
 
     /** Inline quarantine banner prepended to every review {@code .md} — the body below is untrusted data. */
     private static final String QUARANTINE_BANNER =
@@ -173,6 +159,13 @@ public class OutlineDocumentContentSource implements ContentSource {
             node.put("slug", doc.slug());
             node.put("title", doc.title());
             node.put("body", excerptBody(doc));
+            // Upstream document clocks (when the mirror captured them) — the up-to-dateness signal.
+            if (doc.createdAt() != null) {
+                node.put("created", doc.createdAt().toString());
+            }
+            if (doc.updatedAt() != null) {
+                node.put("last_updated", doc.updatedAt().toString());
+            }
             // Authorship (when the mirror captured it): display name is untrusted third-party text riding
             // inside this quarantined JSON; the member id is only present for a linked account.
             if (doc.createdByName() != null) {
@@ -186,6 +179,21 @@ public class OutlineDocumentContentSource implements ContentSource {
             }
             if (doc.updatedByMemberId() != null) {
                 node.put("last_edited_by_member_id", doc.updatedByMemberId());
+            }
+            if (!doc.collaborators().isEmpty()) {
+                // Everyone who edited the document, subjects included (machine-facing; the human byline
+                // never shows raw UUIDs). Name/member id only where known.
+                ArrayNode collaborators = node.putArray("collaborators");
+                for (ProjectedDocument.Collaborator collaborator : doc.collaborators()) {
+                    ObjectNode entry = collaborators.addObject();
+                    entry.put("subject", collaborator.subject());
+                    if (collaborator.name() != null) {
+                        entry.put("name", collaborator.name());
+                    }
+                    if (collaborator.memberId() != null) {
+                        entry.put("member_id", collaborator.memberId());
+                    }
+                }
             }
             emitted++;
         }
@@ -241,7 +249,9 @@ public class OutlineDocumentContentSource implements ContentSource {
                   .findById(artifactId)
                   .map(issue -> issue.getBody())
                   .orElse(null);
-        Set<String> references = extractReferences(body);
+        // The link grammar (what a documentation reference looks like) is the projection impl's vendor
+        // knowledge — this source stays vendor-blind.
+        Set<String> references = projection.extractReferences(body);
         if (references.isEmpty()) {
             return;
         }
@@ -299,9 +309,12 @@ public class OutlineDocumentContentSource implements ContentSource {
     }
 
     /**
-     * The document byline, or {@code null} when the mirror captured no authorship. A resolved member id
-     * (linked account) is appended so the reviewer can attribute the doc to a workspace developer; the
-     * last-editor line only appears when it differs from the creator.
+     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. A resolved
+     * member id (linked account) is appended so the reviewer can attribute the doc to a workspace
+     * developer; the last-editor line only appears when it differs from the creator; contributors show
+     * resolved display info only ("+N more" for the rest) — raw subject UUIDs are machine noise and
+     * never render in the human-facing byline. "Last updated" carries the upstream clock so the
+     * reviewer can weigh the doc's freshness.
      */
     private static String renderByline(ProjectedDocument doc) {
         StringBuilder byline = new StringBuilder();
@@ -323,19 +336,46 @@ public class OutlineDocumentContentSource implements ContentSource {
             }
             byline.append("_");
         }
+        String contributors = renderContributors(doc);
+        if (contributors != null) {
+            if (byline.length() > 0) {
+                byline.append("\n");
+            }
+            byline.append(contributors);
+        }
+        if (doc.updatedAt() != null) {
+            if (byline.length() > 0) {
+                byline.append("\n");
+            }
+            byline.append("_Last updated: ").append(LocalDate.ofInstant(doc.updatedAt(), ZoneOffset.UTC)).append("_");
+        }
         return byline.length() == 0 ? null : byline.toString();
     }
 
-    private static Set<String> extractReferences(String body) {
-        Set<String> references = new LinkedHashSet<>();
-        if (body == null || body.isBlank()) {
-            return references;
+    /**
+     * The contributors line, or {@code null} when no collaborator has resolvable display info. Named
+     * collaborators render by name; the unnamed remainder collapses into "+N more" rather than leaking
+     * raw subject UUIDs into human-facing text.
+     */
+    private static String renderContributors(ProjectedDocument doc) {
+        List<ProjectedDocument.Collaborator> collaborators = doc.collaborators();
+        if (collaborators.isEmpty()) {
+            return null;
         }
-        Matcher matcher = OUTLINE_LINK.matcher(body);
-        while (matcher.find() && references.size() < MAX_REVIEW_REFERENCES) {
-            references.add(matcher.group());
+        List<String> named = collaborators
+            .stream()
+            .map(ProjectedDocument.Collaborator::name)
+            .filter(name -> name != null && !name.isBlank())
+            .toList();
+        if (named.isEmpty()) {
+            return null;
         }
-        return references;
+        StringBuilder line = new StringBuilder("_Contributors: ").append(String.join(", ", named));
+        int unnamed = collaborators.size() - named.size();
+        if (unnamed > 0) {
+            line.append(", +").append(unnamed).append(" more");
+        }
+        return line.append("_").toString();
     }
 
     /** Sanitises a collection/document slug into a safe, deterministic path segment; falls back when empty. */

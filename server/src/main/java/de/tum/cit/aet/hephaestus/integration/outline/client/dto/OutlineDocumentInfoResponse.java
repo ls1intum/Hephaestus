@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -17,11 +18,13 @@ public record OutlineDocumentInfoResponse(@Nullable Data data) {
     public record Data(
         @Nullable String id,
         @Nullable String title,
+        @Nullable Instant createdAt,
         @Nullable Instant updatedAt,
         @Nullable String urlId,
         @Nullable String parentDocumentId,
         @Nullable String collectionId,
         OutlineDocumentListResponse.@Nullable OutlineUser createdBy,
-        OutlineDocumentListResponse.@Nullable OutlineUser updatedBy
+        OutlineDocumentListResponse.@Nullable OutlineUser updatedBy,
+        @Nullable List<String> collaboratorIds
     ) {}
 }

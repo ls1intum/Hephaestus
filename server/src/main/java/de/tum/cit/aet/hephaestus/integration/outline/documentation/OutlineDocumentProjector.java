@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.identity.OutlineIdentityResolver;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -15,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +51,21 @@ public class OutlineDocumentProjector implements DocumentProjection {
     /** Cap on documents surfaced to the mentor per turn — the corpus-breadth envelope. */
     static final int MAX_DOCUMENTS = 200;
 
+    /** Cap on references extracted from one artifact body — bounds the review-path fan-out. */
+    static final int MAX_REFERENCES = 20;
+
+    /**
+     * Outline document / share link, e.g. {@code https://wiki.example.com/doc/onboarding-guide-a1b2c3} or
+     * {@code https://wiki.example.com/s/shareId} — the vendor link grammar that
+     * {@link #extractReferences} hides behind the vendor-neutral SPI. The full match feeds
+     * {@link #documentsByReference} verbatim (which derives the id/slug token from the last path
+     * segment); a non-Outline URL that happens to match resolves to no row, so no foreign document is
+     * materialised.
+     */
+    private static final Pattern OUTLINE_LINK = Pattern.compile(
+        "https?://[\\w.-]+(?::\\d+)?/(?:doc|s)/[A-Za-z0-9._~-]+"
+    );
+
     private final OutlineDocumentRepository documentRepository;
     private final ConnectionService connectionService;
     private final OutlineIdentityResolver identityResolver;
@@ -73,14 +91,14 @@ public class OutlineDocumentProjector implements DocumentProjection {
     }
 
     @Override
-    public List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> outlineDocIdsOrUrls) {
-        if (outlineDocIdsOrUrls == null || outlineDocIdsOrUrls.isEmpty()) {
+    public List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs) {
+        if (documentRefs == null || documentRefs.isEmpty()) {
             return List.of();
         }
         // A reference is either a raw Outline document id or a document URL; match on the id and slug columns,
         // adding the last URL path segment as a candidate token so a link resolves to the mirrored row.
         Set<String> tokens = new LinkedHashSet<>();
-        for (String ref : outlineDocIdsOrUrls) {
+        for (String ref : documentRefs) {
             if (ref == null || ref.isBlank()) {
                 continue;
             }
@@ -102,6 +120,19 @@ public class OutlineDocumentProjector implements DocumentProjection {
             .toList();
     }
 
+    @Override
+    public Set<String> extractReferences(@Nullable String text) {
+        Set<String> references = new LinkedHashSet<>();
+        if (text == null || text.isBlank()) {
+            return references;
+        }
+        Matcher matcher = OUTLINE_LINK.matcher(text);
+        while (matcher.find() && references.size() < MAX_REFERENCES) {
+            references.add(matcher.group());
+        }
+        return references;
+    }
+
     /** Maps a mirrored row to the agent view; a tombstoned/evicted document serves a null body. */
     private static ProjectedDocument project(OutlineDocument doc, AuthorContext authors) {
         boolean deleted = doc.isDeleted();
@@ -112,13 +143,43 @@ public class OutlineDocumentProjector implements DocumentProjection {
             orEmpty(doc.getTitle()),
             body,
             deleted,
+            doc.getOutlineCreatedAt(),
+            doc.getOutlineUpdatedAt(),
             doc.getCreatedByName(),
             doc.getCreatedBySubject(),
             authors.memberIdFor(doc.getCreatedBySubject()),
             doc.getUpdatedByName(),
             doc.getUpdatedBySubject(),
-            authors.memberIdFor(doc.getUpdatedBySubject())
+            authors.memberIdFor(doc.getUpdatedBySubject()),
+            collaborators(doc, authors)
         );
+    }
+
+    /**
+     * The document's collaborator list, each distinct subject resolved through the shared per-batch memo.
+     * A display name is only known when the collaborator is also the creator or last editor — the
+     * {@code documents.list} payload carries no names for middle editors.
+     */
+    private static List<ProjectedDocument.Collaborator> collaborators(OutlineDocument doc, AuthorContext authors) {
+        List<String> subjects = doc.getCollaboratorSubjects();
+        if (subjects == null || subjects.isEmpty()) {
+            return List.of();
+        }
+        Set<String> distinct = new LinkedHashSet<>(subjects);
+        List<ProjectedDocument.Collaborator> result = new ArrayList<>(distinct.size());
+        for (String subject : distinct) {
+            if (subject == null || subject.isBlank()) {
+                continue;
+            }
+            String name = null;
+            if (subject.equals(doc.getCreatedBySubject())) {
+                name = doc.getCreatedByName();
+            } else if (subject.equals(doc.getUpdatedBySubject())) {
+                name = doc.getUpdatedByName();
+            }
+            result.add(new ProjectedDocument.Collaborator(subject, name, authors.memberIdFor(subject)));
+        }
+        return List.copyOf(result);
     }
 
     /**

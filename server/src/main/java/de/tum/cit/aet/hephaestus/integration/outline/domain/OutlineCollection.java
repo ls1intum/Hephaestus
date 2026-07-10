@@ -25,9 +25,9 @@ import org.jspecify.annotations.Nullable;
  * <p>Carries the human-facing catalog fields (name, urlId, color, icon) captured server-side
  * at registration so the admin table renders real names, the mirror lifecycle
  * ({@link MirrorState}), and the per-collection sync bookkeeping: {@link SyncStatus#PENDING}
- * until one clean full pass finishes, {@code documentsSyncedThrough} as the upstream-clock
- * watermark (max {@code updatedAt} seen in a clean pass — immune to local clock skew), and
- * {@code documentsSyncedAt} for stalest-first scheduling. Watermarks advance only on a clean
+ * until one clean full pass finishes, {@code documentsSyncedThrough} as upstream-clock freshness
+ * telemetry (max {@code updatedAt} seen in a clean pass — immune to local clock skew; not a sync
+ * cursor), and {@code documentsSyncedAt} for stalest-first scheduling. Both advance only on a clean
  * pass; a budget-exhausted or failed pass leaves them untouched so nothing is skipped.
  */
 @Entity
@@ -92,8 +92,10 @@ public class OutlineCollection {
     private SyncStatus syncStatus = SyncStatus.PENDING;
 
     /**
-     * Upstream-clock watermark: the max document {@code updatedAt} observed in the last clean
-     * full pass over this collection. Advances only on a clean pass.
+     * Admin telemetry, NOT a sync cursor: the max document {@code updatedAt} observed in the last
+     * clean full pass — the "mirrored through" freshness figure the admin surface displays. Advances
+     * only on a clean pass; no sync decision reads it (the incremental diff runs per document
+     * against {@code outline_document.outline_updated_at}).
      */
     @Column(name = "documents_synced_through")
     private @Nullable Instant documentsSyncedThrough;
@@ -105,6 +107,18 @@ public class OutlineCollection {
     /** Last sync failure for this collection (admin-visible); cleared on the next clean pass. */
     @Column(name = "last_sync_error", length = 2048)
     private @Nullable String lastSyncError;
+
+    /**
+     * Coverage counter: how many documents upstream reported for this collection
+     * ({@code documents.list} ∪ document tree) at the last enumeration — clean or budget-exhausted.
+     * Together with the mirrored-live row count this answers "how much of the wiki do we hold?".
+     */
+    @Column(name = "documents_upstream")
+    private @Nullable Integer documentsUpstream;
+
+    /** Exports the last pass skipped because the shared budget ran out; 0 on a clean pass. */
+    @Column(name = "exports_skipped_for_budget")
+    private @Nullable Integer exportsSkippedForBudget;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

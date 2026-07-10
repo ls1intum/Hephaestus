@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.lifecycle;
 
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import lombok.RequiredArgsConstructor;
@@ -10,8 +11,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
- * Erases the workspace's Outline footprint when the workspace is purged: the mirrored document rows and the
- * upstream change-notification subscription.
+ * Erases the workspace's Outline footprint when the workspace is purged: the mirrored document rows, the
+ * collection registry, the per-document event log (actor subjects are personal data), and the upstream
+ * change-notification subscription.
  *
  * <p>{@code WorkspaceStatus.PURGED} is a soft delete, so an {@code ON DELETE CASCADE} on
  * {@code workspace_id} would not fire — each module drops its own rows explicitly. Document bodies can carry
@@ -39,6 +41,7 @@ public class OutlineWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 
     private final OutlineDocumentRepository outlineDocumentRepository;
     private final OutlineCollectionRepository outlineCollectionRepository;
+    private final OutlineDocumentEventRepository outlineDocumentEventRepository;
 
     /**
      * Absent when {@code hephaestus.integration.outline.enabled=false}: the registrar is conditional, but this
@@ -61,6 +64,8 @@ public class OutlineWorkspacePurgeAdapter implements WorkspacePurgeContributor {
         }
         outlineDocumentRepository.deleteByWorkspaceId(workspaceId);
         outlineCollectionRepository.deleteByWorkspaceId(workspaceId);
+        // The event log carries actor subjects (personal data) — it erases with its workspace.
+        outlineDocumentEventRepository.deleteByWorkspaceId(workspaceId);
     }
 
     @Override

@@ -1,20 +1,28 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import tools.jackson.databind.json.JsonMapper;
@@ -24,9 +32,12 @@ import tools.jackson.databind.json.JsonMapper;
  * body's event name: {@code documents.*} with a payload id → targeted document refresh, without one →
  * whole-workspace reconcile fallback; {@code collections.*} → catalog refresh; anything else is
  * acknowledged without work. A delivery whose subscription no longer resolves (disconnected between
- * publish and consume) is a no-op rather than a NAK loop.
+ * publish and consume) is a no-op rather than a NAK loop. Every {@code documents.*} delivery also
+ * appends one row to the per-document event log — best-effort, so a log failure never blocks routing.
  */
 class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
+
+    private static final long CONNECTION_ID = 7L;
 
     @Mock
     private ConnectionService connectionService;
@@ -34,24 +45,47 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     @Mock
     private OutlineDocumentSyncScheduler syncScheduler;
 
+    @Mock
+    private OutlineDocumentEventRepository documentEventRepository;
+
+    @Mock
+    private Connection connection;
+
     private OutlineWebhookMessageHandler handler() {
-        return new OutlineWebhookMessageHandler(connectionService, syncScheduler, JsonMapper.builder().build());
+        return new OutlineWebhookMessageHandler(
+            connectionService,
+            syncScheduler,
+            documentEventRepository,
+            JsonMapper.builder().build()
+        );
     }
 
     private static Message message(String subscriptionId, String event, String payloadId) {
+        return message(subscriptionId, event, payloadId, null, null);
+    }
+
+    private static Message message(
+        String subscriptionId,
+        String event,
+        String payloadId,
+        String actorId,
+        String createdAt
+    ) {
         Message msg = Mockito.mock(Message.class);
         String payload = payloadId == null ? "{}" : "{\"id\":\"" + payloadId + "\"}";
-        when(msg.getData()).thenReturn(
-            (
-                "{\"webhookSubscriptionId\":\"" +
-                subscriptionId +
-                "\",\"event\":\"" +
-                event +
-                "\",\"payload\":" +
-                payload +
-                "}"
-            ).getBytes(StandardCharsets.UTF_8)
-        );
+        StringBuilder body = new StringBuilder("{\"webhookSubscriptionId\":\"")
+            .append(subscriptionId)
+            .append("\",\"event\":\"")
+            .append(event)
+            .append("\"");
+        if (actorId != null) {
+            body.append(",\"actorId\":\"").append(actorId).append("\"");
+        }
+        if (createdAt != null) {
+            body.append(",\"createdAt\":\"").append(createdAt).append("\"");
+        }
+        body.append(",\"payload\":").append(payload).append("}");
+        when(msg.getData()).thenReturn(body.toString().getBytes(StandardCharsets.UTF_8));
         return msg;
     }
 
@@ -59,6 +93,10 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         when(connectionService.findOutlineSubscription(subscriptionId)).thenReturn(
             Optional.of(new OutlineSubscription(workspaceId, "secret"))
         );
+        lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
+        lenient()
+            .when(connectionService.findActive(workspaceId, IntegrationKind.OUTLINE))
+            .thenReturn(Optional.of(connection));
     }
 
     @Test
@@ -94,6 +132,8 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
         verify(syncScheduler).syncWorkspaceNow(42L);
         verify(syncScheduler, never()).refreshDocumentNow(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString());
+        // No document id → nothing to attribute an event row to.
+        verifyNoInteractions(documentEventRepository);
     }
 
     @Test
@@ -103,6 +143,8 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         handler().onMessage(message("sub-1", "collections.delete", "col-3"));
 
         verify(syncScheduler).refreshCollectionCatalogNow(42L, "collections.delete", "col-3");
+        // The event log is a documents.* trail only.
+        verifyNoInteractions(documentEventRepository);
     }
 
     @Test
@@ -121,6 +163,7 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         handler().onMessage(message("sub-1", "webhookSubscriptions.update", "x"));
 
         verifyNoInteractions(syncScheduler);
+        verifyNoInteractions(documentEventRepository);
     }
 
     @Test
@@ -130,5 +173,71 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         handler().onMessage(message("gone", "documents.update", "doc-9"));
 
         verifyNoInteractions(syncScheduler);
+        verifyNoInteractions(documentEventRepository);
+    }
+
+    // --- the append-only document event log ---
+
+    @Test
+    void documentEvent_appendsOneEventRowWithActorAndUpstreamClock() {
+        resolves("sub-1", 42L);
+
+        handler().onMessage(message("sub-1", "documents.update", "doc-9", "actor-uuid", "2026-07-10T12:34:56.000Z"));
+
+        ArgumentCaptor<OutlineDocumentEvent> event = ArgumentCaptor.forClass(OutlineDocumentEvent.class);
+        verify(documentEventRepository).save(event.capture());
+        assertThat(event.getValue().getWorkspaceId()).isEqualTo(42L);
+        assertThat(event.getValue().getConnectionId()).isEqualTo(CONNECTION_ID);
+        assertThat(event.getValue().getDocumentId()).isEqualTo("doc-9");
+        assertThat(event.getValue().getEventName()).isEqualTo("documents.update");
+        assertThat(event.getValue().getActorSubject()).isEqualTo("actor-uuid");
+        assertThat(event.getValue().getOccurredAt()).isEqualTo(Instant.parse("2026-07-10T12:34:56Z"));
+    }
+
+    @Test
+    void documentDeleteEvent_isLoggedToo() {
+        resolves("sub-1", 42L);
+
+        handler().onMessage(message("sub-1", "documents.delete", "doc-9", "actor-uuid", null));
+
+        ArgumentCaptor<OutlineDocumentEvent> event = ArgumentCaptor.forClass(OutlineDocumentEvent.class);
+        verify(documentEventRepository).save(event.capture());
+        assertThat(event.getValue().getEventName()).isEqualTo("documents.delete");
+        assertThat(event.getValue().getOccurredAt()).isNull();
+    }
+
+    @Test
+    void documentEventWithoutActorOrClock_persistsWithNulls() {
+        resolves("sub-1", 42L);
+
+        handler().onMessage(message("sub-1", "documents.publish", "doc-9"));
+
+        ArgumentCaptor<OutlineDocumentEvent> event = ArgumentCaptor.forClass(OutlineDocumentEvent.class);
+        verify(documentEventRepository).save(event.capture());
+        assertThat(event.getValue().getActorSubject()).isNull();
+        assertThat(event.getValue().getOccurredAt()).isNull();
+    }
+
+    @Test
+    void eventLogFailure_neverBlocksTheRefresh() {
+        resolves("sub-1", 42L);
+        doThrow(new RuntimeException("insert failed")).when(documentEventRepository).save(any());
+
+        handler().onMessage(message("sub-1", "documents.update", "doc-9"));
+
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9");
+    }
+
+    @Test
+    void missingActiveConnection_skipsTheEventRowButStillRoutes() {
+        when(connectionService.findOutlineSubscription("sub-1")).thenReturn(
+            Optional.of(new OutlineSubscription(42L, "secret"))
+        );
+        when(connectionService.findActive(42L, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
+
+        handler().onMessage(message("sub-1", "documents.update", "doc-9"));
+
+        verifyNoInteractions(documentEventRepository);
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9");
     }
 }

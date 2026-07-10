@@ -185,6 +185,9 @@ public class OutlineDocumentSyncService {
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }
+        // The catch-up tick exports bodies too — without this only the 6h reconcile would ever
+        // shrink an over-cap mirror grown by catch-up passes.
+        enforceSizeCap(workspaceId);
     }
 
     /** Targeted sync of one registered collection (the admin-registration kick). No-op unless ENABLED. */
@@ -390,7 +393,7 @@ public class OutlineDocumentSyncService {
         }
 
         Set<String> seen = new HashSet<>();
-        boolean budgetSkipped = false;
+        int skippedForBudget = 0;
         Instant maxUpdatedAt = null;
         for (OutlineDocumentListResponse.Meta meta : metas) {
             if (meta.id() == null) {
@@ -400,9 +403,12 @@ public class OutlineDocumentSyncService {
             if (meta.updatedAt() != null && (maxUpdatedAt == null || meta.updatedAt().isAfter(maxUpdatedAt))) {
                 maxUpdatedAt = meta.updatedAt();
             }
-            budgetSkipped |=
+            if (
                 upsert(ctx, collection, nodeById.get(meta.id()), meta, existing, budget, now) ==
-                UpsertOutcome.SKIPPED_FOR_BUDGET;
+                UpsertOutcome.SKIPPED_FOR_BUDGET
+            ) {
+                skippedForBudget++;
+            }
         }
         // Tree-only nodes (present in the structure but absent from documents.list) still count as seen
         // so a clean pass does not tombstone them.
@@ -410,11 +416,16 @@ public class OutlineDocumentSyncService {
             if (!seen.add(node.id())) {
                 continue;
             }
-            budgetSkipped |=
-                upsert(ctx, collection, node, null, existing, budget, now) == UpsertOutcome.SKIPPED_FOR_BUDGET;
+            if (upsert(ctx, collection, node, null, existing, budget, now) == UpsertOutcome.SKIPPED_FOR_BUDGET) {
+                skippedForBudget++;
+            }
         }
 
-        if (budgetSkipped) {
+        // Coverage counters are written on EVERY full enumeration (clean or budget-exhausted): the seen
+        // set is complete either way — only exports were skipped, never the enumeration itself.
+        collection.setDocumentsUpstream(seen.size());
+        collection.setExportsSkippedForBudget(skippedForBudget);
+        if (skippedForBudget > 0) {
             collection.setSyncStatus(SyncStatus.PENDING);
             collectionRepository.save(collection);
             return;
@@ -493,12 +504,19 @@ public class OutlineDocumentSyncService {
         String body = outlineApiClient.exportDocument(ctx.serverUrl(), ctx.token(), documentId);
         doc.setBodyMarkdown(body);
         doc.setContentHash(body == null ? null : sha256Hex(body));
+        doc.setBodyEvictedAt(null); // the body is back in the mirror — the eviction marker must not linger
         doc.setOutlineUpdatedAt(upstreamUpdatedAt);
         if (meta != null) {
+            doc.setOutlineCreatedAt(meta.createdAt());
             doc.setCreatedBySubject(meta.createdBy() == null ? null : meta.createdBy().id());
             doc.setCreatedByName(meta.createdBy() == null ? null : meta.createdBy().name());
             doc.setUpdatedBySubject(meta.updatedBy() == null ? null : meta.updatedBy().id());
             doc.setUpdatedByName(meta.updatedBy() == null ? null : meta.updatedBy().name());
+            doc.setCollaboratorSubjects(
+                meta.collaboratorIds() == null || meta.collaboratorIds().isEmpty()
+                    ? null
+                    : List.copyOf(meta.collaboratorIds())
+            );
         }
         doc.setDeletedAt(null); // revive a previously tombstoned document that reappeared upstream
         doc.setLastMaterializedAt(now);
@@ -526,17 +544,20 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Drop everything person- or content-bearing: the body, its hash, and the author fields share the
-     * same PII posture — a document that no longer exists upstream keeps only its structural marker.
+     * Drop everything person- or content-bearing: the body, its hash, and the author/collaborator
+     * fields share the same PII posture — a document that no longer exists upstream keeps only its
+     * structural marker. The event log ({@code outline_document_event}) is deliberately untouched:
+     * it is the audit trail and erases with the workspace/connection, not with a document.
      */
     private void tombstone(OutlineDocument doc, Instant now) {
         doc.setDeletedAt(now);
         doc.setBodyMarkdown(null);
-        doc.setContentHash(null);
+        doc.setContentHash(null); // unlike an eviction, a tombstone drops the hash too (enforced by ck_outline_document_tombstone)
         doc.setCreatedBySubject(null);
         doc.setCreatedByName(null);
         doc.setUpdatedBySubject(null);
         doc.setUpdatedByName(null);
+        doc.setCollaboratorSubjects(null);
         documentRepository.save(doc);
     }
 

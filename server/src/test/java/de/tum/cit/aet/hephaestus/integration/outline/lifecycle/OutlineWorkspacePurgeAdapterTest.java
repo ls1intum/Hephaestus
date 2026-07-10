@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.function.Consumer;
@@ -24,6 +25,9 @@ class OutlineWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @Mock
     private OutlineCollectionRepository outlineCollectionRepository;
+
+    @Mock
+    private OutlineDocumentEventRepository outlineDocumentEventRepository;
 
     /** A provider whose {@code ifAvailable} runs its consumer against {@code registrar}, or is a no-op when null. */
     @SuppressWarnings("unchecked")
@@ -44,6 +48,7 @@ class OutlineWorkspacePurgeAdapterTest extends BaseUnitTest {
         return new OutlineWorkspacePurgeAdapter(
             outlineDocumentRepository,
             outlineCollectionRepository,
+            outlineDocumentEventRepository,
             providerOf(registrar)
         );
     }
@@ -56,6 +61,8 @@ class OutlineWorkspacePurgeAdapterTest extends BaseUnitTest {
 
         verify(registrar).deregister(789L);
         verify(outlineDocumentRepository).deleteByWorkspaceId(789L);
+        // The append-only event log erases with its workspace (actor subjects are personal data).
+        verify(outlineDocumentEventRepository).deleteByWorkspaceId(789L);
     }
 
     @Test
