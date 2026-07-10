@@ -18,15 +18,26 @@
         // OutlineWebhookMessageHandler implements the unified IntegrationMessageHandler so Outline
         // change notifications ride the JetStream consumer lane (ADR 0023 §3), same as every SCM handler.
         "integration.core::handler",
+        // OutlineConnectionStateListener consumes the ConnectionLifecycleEvent seam published from
+        // ConnectionService.transition() (register webhook on activate, deregister on deactivate).
+        "integration.core::events",
         // OutlineApiClient uses the shared SSRF-guarded WebClient connector (core) + ServerUrlValidator
         // (core::security) because the Outline server URL is admin-supplied.
         "core",
         "core::security",
         // Runtime-role gate (@ConditionalOnServerRole) on the connect strategy.
         "core::runtime",
+        // The admin services throw the shared EntityNotFoundException so a workspace without an
+        // ACTIVE Outline connection (or an unregistered collection) maps to 404 via the global advice.
+        "core::exception",
         // OutlineWorkspacePurgeAdapter implements the WorkspacePurgeContributor SPI so a workspace
         // PURGE cascades into a bulk delete of the mirrored outline_document rows.
         "workspace::spi",
+        // The admin controllers (connect + collection control plane) sit behind the workspace admin
+        // guard (authorization) and resolve the workspace via @WorkspaceScopedController /
+        // WorkspaceContext (context) — the same edges the Slack admin surface uses.
+        "workspace::authorization",
+        "workspace::context",
         // integration.outline.documentation implements the agent-owned documentation-source SPI
         // (DocumentProjection): Outline owns the outline_document table and PROJECTS it to the agent through
         // this port, so the agent's mentor/review read path carries no raw SQL against the Outline schema. This

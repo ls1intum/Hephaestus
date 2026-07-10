@@ -24,6 +24,35 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
 
     long countByWorkspaceId(Long workspaceId);
 
+    /** Live (non-tombstoned) mirrored documents in the workspace — the admin status figure. */
+    long countByWorkspaceIdAndDeletedAtIsNull(Long workspaceId);
+
+    /** One collection's live (non-tombstoned) document count — the single-row admin DTO figure. */
+    long countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
+        Long workspaceId,
+        Long connectionId,
+        String collectionId
+    );
+
+    /**
+     * Live (non-tombstoned) document counts grouped by collection — one query for the whole admin
+     * collection list instead of a count per row. Each element is {@code [collectionId, count]}.
+     */
+    @Query(
+        "SELECT d.collectionId, COUNT(d) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId " +
+            "AND d.connectionId = :connectionId AND d.deletedAt IS NULL GROUP BY d.collectionId"
+    )
+    List<Object[]> countLiveByCollection(
+        @Param("workspaceId") long workspaceId,
+        @Param("connectionId") long connectionId
+    );
+
+    /**
+     * Hard-deletes one collection's mirrored rows — the erase behind removing a collection from the
+     * mirror. Erase is the point: the mirrored bodies leave the database, they are not tombstoned.
+     */
+    long deleteByWorkspaceIdAndConnectionIdAndCollectionId(Long workspaceId, Long connectionId, String collectionId);
+
     /** The workspace's mirrored documents for one Outline install; the reconcile diffs against this set. */
     List<OutlineDocument> findByWorkspaceIdAndConnectionId(Long workspaceId, Long connectionId);
 
