@@ -857,7 +857,7 @@ erDiagram
         VARCHAR(32) slack_channel_id "NOT NULL"
         VARCHAR(16) from_state
         VARCHAR(16) to_state "NOT NULL"
-        BIGINT actor_user_id
+        BIGINT actor_user_id FK
         TEXT reason
         TIMESTAMPTZ created_at "NOT NULL"
     }
@@ -874,7 +874,7 @@ erDiagram
         TIMESTAMPTZ edited_at
         TIMESTAMPTZ deleted_at
         TIMESTAMPTZ ingested_at "NOT NULL"
-        BIGINT author_member_id
+        BIGINT author_member_id FK
     }
 
     SlackMonitoredChannel {
@@ -1176,6 +1176,8 @@ erDiagram
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
     Workspace ||--o{ SlackChannelConsentEvent : has
+    User ||--o{ SlackChannelConsentEvent : has
+    User ||--o{ SlackMessage : authored_by
     AgentConfig ||--o{ Workspace : practice_config_id
     AgentConfig ||--o{ Workspace : mentor_config_id
     Workspace ||--o{ WorkspaceSlugHistory : has
