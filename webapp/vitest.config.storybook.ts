@@ -32,6 +32,10 @@ export default defineConfig({
 	},
 	test: {
 		name: "storybook",
+		// Parallel suite scheduling in browser mode deadlocks this run (~10 files in flight stall
+		// after ~520 tests, locally and in CI — "Vitest failed to find the runner" / silent hang).
+		// Serial file execution trades a few minutes of wall clock for a run that always finishes.
+		fileParallelism: false,
 		browser: {
 			enabled: true,
 			headless: true,
