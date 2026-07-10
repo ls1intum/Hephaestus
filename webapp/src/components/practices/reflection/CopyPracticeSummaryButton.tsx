@@ -80,6 +80,9 @@ export function CopyPracticeSummaryButton({ practices }: CopyPracticeSummaryButt
 			return;
 		}
 		setCopied(true);
+		// The toast doubles as the screen-reader announcement — the button's visual flip to
+		// "Copied" is a plain DOM change, not an ARIA live region.
+		toast.success("Copied to clipboard");
 		if (timerRef.current !== null) clearTimeout(timerRef.current);
 		timerRef.current = setTimeout(() => {
 			setCopied(false);

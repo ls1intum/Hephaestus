@@ -55,34 +55,6 @@
         </rollback>
     </changeSet>
 
-    <!-- 4. Drop the leaderboard Slack-notification channel id (the Slack target now lives on the Slack
-         Connection's SlackConfig, never on the workspace row). Rollback recreates the column shape only. -->
-    <changeSet author="hephaestus-leaderboard-redesign" id="1783676505143-4">
-        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_channel_id already dropped">
-            <columnExists tableName="workspace" columnName="leaderboard_notification_channel_id"/>
-        </preConditions>
-        <comment>Drop workspace.leaderboard_notification_channel_id (weekly Slack digest removed). Data is NOT recoverable; rollback recreates the column shape only.</comment>
-        <dropColumn tableName="workspace" columnName="leaderboard_notification_channel_id"/>
-        <rollback>
-            <addColumn tableName="workspace">
-                <column name="leaderboard_notification_channel_id" type="VARCHAR(100)"/>
-            </addColumn>
-        </rollback>
-    </changeSet>
-
-    <!-- 5. Drop the leaderboard Slack-notification team filter. Rollback recreates the column shape only. -->
-    <changeSet author="hephaestus-leaderboard-redesign" id="1783676505143-5">
-        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_team already dropped">
-            <columnExists tableName="workspace" columnName="leaderboard_notification_team"/>
-        </preConditions>
-        <comment>Drop workspace.leaderboard_notification_team (weekly Slack digest removed). Data is NOT recoverable; rollback recreates the column shape only.</comment>
-        <dropColumn tableName="workspace" columnName="leaderboard_notification_team"/>
-        <rollback>
-            <addColumn tableName="workspace">
-                <column name="leaderboard_notification_team" type="VARCHAR(100)"/>
-            </addColumn>
-        </rollback>
-    </changeSet>
 
     <!-- 6. Drop the per-workspace league-cycle idempotency marker (league-points update removed). -->
     <changeSet author="hephaestus-leaderboard-redesign" id="1783676505143-6">
