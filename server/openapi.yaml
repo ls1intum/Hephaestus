@@ -45,6 +45,8 @@ tags:
   name: Admin
 - description: Current user's Slack privacy preferences
   name: Slack User Preferences
+- description: Per-workspace Outline collection mirroring control plane
+  name: Outline collections
 - description: Team management within workspace
   name: Teams
 - description: User profile and activity data
@@ -1352,6 +1354,49 @@ paths:
           description: OK
       tags:
       - Connections
+  /workspaces/{workspaceSlug}/connections/outline/status:
+    get:
+      operationId: getOutlineConnectionStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineConnectionStatus"
+          description: OK
+      summary: "Health of the workspace's active Outline connection (webhook, last\
+        \ sync, document count)"
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/outline/sync:
+    post:
+      description: |-
+        Kicks the authoritative full reconcile for this workspace and returns immediately — the sync
+         runs off the request thread, so a large corpus never stalls (or times out) the admin request.
+      operationId: syncOutlineConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          description: OK
+      summary: "Trigger the full Outline reconcile for this workspace (fire-and-forget,\
+        \ 202)"
+      tags:
+      - Connections
   /workspaces/{workspaceSlug}/connections/slack/test-message:
     post:
       description: |-
@@ -2033,6 +2078,135 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/outline/collections:
+    get:
+      operationId: listOutlineCollections
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutlineCollection"
+          description: OK
+      summary: List the workspace's mirrored Outline collections with their sync state
+      tags:
+      - Outline collections
+    post:
+      operationId: registerOutlineCollection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterOutlineCollectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: OK
+      summary: Register an Outline collection for mirroring (lands ENABLED + PENDING;
+        idempotent on the id)
+      tags:
+      - Outline collections
+  /workspaces/{workspaceSlug}/outline/collections/candidates:
+    get:
+      operationId: listOutlineCollectionCandidates
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutlineCollectionCandidate"
+          description: OK
+      summary: List the Outline collections available to mirror (live proxy; doubles
+        as connectivity probe)
+      tags:
+      - Outline collections
+  /workspaces/{workspaceSlug}/outline/collections/{collectionId}:
+    delete:
+      operationId: deleteOutlineCollection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: collectionId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Remove a collection from the mirror and erase its mirrored documents
+        (terminal)
+      tags:
+      - Outline collections
+    patch:
+      operationId: updateOutlineCollectionState
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: collectionId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOutlineCollectionStateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: OK
+      summary: Transition a mirrored collection to a target mirror state (pause /
+        resume)
+      tags:
+      - Outline collections
   /workspaces/{workspaceSlug}/practice-areas:
     get:
       description: Returns the workspace's practice areas
@@ -3963,6 +4137,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         status:
           type: string
         workspaceSlug:
@@ -4639,6 +4814,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
       required:
       - clientId
       - clientSecret
@@ -5510,6 +5686,112 @@ components:
       - practiceSlug
       - presence
       - title
+    OutlineCollection:
+      type: object
+      description: A mirrored Outline collection with its sync state and live document
+        count
+      properties:
+        collectionId:
+          type: string
+          description: Outline collection id (UUID; the natural key)
+        color:
+          type: string
+          description: Collection color as configured in Outline
+        createdAt:
+          type: string
+          format: date-time
+          description: When the collection was registered for mirroring
+        documentCount:
+          type: integer
+          format: int64
+          description: Live (non-tombstoned) mirrored document count
+        icon:
+          type: string
+          description: Collection icon as configured in Outline
+        id:
+          type: integer
+          format: int64
+          description: Internal registry row id
+        lastSyncError:
+          type: string
+          description: "Last sync failure for this collection, cleared on the next\
+            \ clean pass"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: "When the last clean sync pass finished, if any"
+        name:
+          type: string
+          description: "Collection name as shown in Outline, if known"
+        state:
+          type: string
+          description: Mirror lifecycle state (PAUSED freezes sync but keeps documents)
+          enum:
+          - ENABLED
+          - PAUSED
+        syncStatus:
+          type: string
+          description: Whether a clean full pass has completed since registration
+            or the last resume
+          enum:
+          - PENDING
+          - COMPLETE
+        urlId:
+          type: string
+          description: Outline url id (the short slug in collection URLs)
+      required:
+      - collectionId
+      - createdAt
+      - documentCount
+      - id
+      - state
+      - syncStatus
+    OutlineCollectionCandidate:
+      type: object
+      description: "An Outline collection the token can see, offered in the add-collection\
+        \ picker"
+      properties:
+        alreadyMirrored:
+          type: boolean
+          description: Whether this collection is already registered for mirroring
+        collectionId:
+          type: string
+          description: Outline collection id (UUID)
+        color:
+          type: string
+          description: Collection color as configured in Outline
+        icon:
+          type: string
+          description: Collection icon as configured in Outline
+        name:
+          type: string
+          description: Collection name as shown in Outline
+        urlId:
+          type: string
+          description: Outline url id (the short slug in collection URLs)
+      required:
+      - alreadyMirrored
+      - collectionId
+    OutlineConnectionStatus:
+      type: object
+      description: Health of the workspace's active Outline connection
+      properties:
+        documentCount:
+          type: integer
+          format: int64
+          description: Live (non-tombstoned) mirrored document count across all collections
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: "When a mirrored collection last finished a clean sync pass,\
+            \ if any"
+        webhookRegistered:
+          type: boolean
+          description: Whether the Outline change-notification webhook subscription
+            is registered
+      required:
+      - documentCount
+      - webhookRegistered
     PageAgentJob:
       type: object
       properties:
@@ -6246,6 +6528,17 @@ components:
       - standing
       - strengths
       - toWorkOn
+    RegisterOutlineCollectionRequest:
+      type: object
+      description: Register an Outline collection for mirroring (lands ENABLED + PENDING)
+      properties:
+        collectionId:
+          type: string
+          description: Outline collection id (UUID)
+          maxLength: 64
+          minLength: 0
+      required:
+      - collectionId
     RegisterSlackChannelRequest:
       type: object
       description: Allow-list a Slack channel (lands in PENDING)
@@ -6795,6 +7088,19 @@ components:
           type: boolean
         scopes:
           type: string
+    UpdateOutlineCollectionStateRequest:
+      type: object
+      description: Transition a mirrored Outline collection to a target mirror state
+        (pause / resume)
+      properties:
+        state:
+          type: string
+          description: Target mirror state
+          enum:
+          - ENABLED
+          - PAUSED
+      required:
+      - state
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state
@@ -7235,6 +7541,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         serverUrl:
           type: string
           description: Custom server URL for self-hosted instances (null for cloud
@@ -7320,6 +7627,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\

@@ -1,5 +1,15 @@
-import { BookTextIcon, CheckIcon, ExternalLinkIcon } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import {
+	BookTextIcon,
+	CheckIcon,
+	ExternalLinkIcon,
+	FileTextIcon,
+	RefreshCwIcon,
+	WebhookIcon,
+	ZapOffIcon,
+} from "lucide-react";
 import { useState } from "react";
+import type { OutlineConnectionStatus } from "@/api/types.gen";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,25 +24,31 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
 	token: string;
-	/** Raw allow-list text (comma- or newline-separated) exactly as typed; the container normalizes it. */
-	collectionAllowList: string;
 }
 
-export interface OutlineIntegrationCardProps {
+export interface OutlineConnectCardProps {
 	connected: boolean;
 	/** Label for the connected instance (team name or id), shown next to the connected state. */
 	connectionLabel?: string;
+	/** Connection health (webhook, document count, last sync), shown while connected. */
+	status?: OutlineConnectionStatus;
+	/** The status query is still resolving — show a placeholder line instead of stale zeros. */
+	isStatusLoading?: boolean;
 	isConnecting?: boolean;
 	isDisconnecting?: boolean;
+	/** The fire-and-forget full reconcile has been requested and not yet acknowledged. */
+	isSyncing?: boolean;
 	/** Connect error surfaced inline under the form. */
 	errorMessage?: string;
 	onConnect: (input: OutlineConnectInput) => void;
 	onDisconnect: () => void;
+	/** Trigger the full reconcile (202 fire-and-forget). */
+	onSyncNow: () => void;
 }
 
 // Client-side format hint only — the server re-validates the URL through the SSRF guard on connect.
@@ -41,23 +57,28 @@ const DEFAULT_SERVER_URL = "https://app.getoutline.com";
 
 /**
  * Workspace-admin card for the Outline documentation integration. When disconnected it captures the
- * Outline server URL, an API token, and a collection allow-list, then hands them to the generic connection
- * initiate flow. When connected it shows the linked instance and a guarded disconnect action.
+ * Outline server URL and an API token, then hands them to the generic connection initiate flow.
+ * When connected it shows the linked instance, a health line (webhook vs polling, document count,
+ * last sync), a Sync-now action, and a guarded disconnect. Which collections are mirrored is managed
+ * post-connect in {@link OutlineCollectionsSection}.
  *
  * <p>Pure presentation: all data fetching and mutations live in the container that renders this card.
  */
-export function OutlineIntegrationCard({
+export function OutlineConnectCard({
 	connected,
 	connectionLabel,
+	status,
+	isStatusLoading = false,
 	isConnecting = false,
 	isDisconnecting = false,
+	isSyncing = false,
 	errorMessage,
 	onConnect,
 	onDisconnect,
-}: OutlineIntegrationCardProps) {
+	onSyncNow,
+}: OutlineConnectCardProps) {
 	const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
 	const [token, setToken] = useState("");
-	const [collections, setCollections] = useState("");
 	const [disconnectOpen, setDisconnectOpen] = useState(false);
 
 	const serverUrlInvalid = serverUrl.length > 0 && !HTTPS_URL.test(serverUrl.trim());
@@ -73,9 +94,9 @@ export function OutlineIntegrationCard({
 				<Card>
 					<CardContent className="space-y-4">
 						<p className="text-sm text-muted-foreground">
-							Mirror allow-listed Outline collections so their design docs and decision records
-							reach practice detection as context. Use a dedicated bot-user API token; only the
-							collections you list are read.
+							Mirror Outline collections so their design docs and decision records reach practice
+							detection as context. Use a dedicated bot-user API token; after connecting you choose
+							exactly which collections are mirrored.
 						</p>
 
 						{!connected ? (
@@ -114,32 +135,10 @@ export function OutlineIntegrationCard({
 									</FieldDescription>
 								</Field>
 
-								<Field>
-									<FieldLabel htmlFor="outline-collections">Collection allow-list</FieldLabel>
-									<Textarea
-										id="outline-collections"
-										value={collections}
-										disabled={isConnecting}
-										onChange={(e) => setCollections(e.target.value)}
-										placeholder={"Engineering\nArchitecture Decisions"}
-										rows={3}
-									/>
-									<FieldDescription>
-										One collection name, URL id, or id per line (or comma-separated). Only these
-										collections are mirrored. Leave blank to mirror none until you scope it.
-									</FieldDescription>
-								</Field>
-
 								{errorMessage && <FieldError>{errorMessage}</FieldError>}
 
 								<Button
-									onClick={() =>
-										onConnect({
-											serverUrl: serverUrl.trim(),
-											token: token.trim(),
-											collectionAllowList: collections,
-										})
-									}
+									onClick={() => onConnect({ serverUrl: serverUrl.trim(), token: token.trim() })}
 									disabled={!canConnect}
 									className="w-full"
 								>
@@ -158,7 +157,44 @@ export function OutlineIntegrationCard({
 									</span>
 								</div>
 
-								<div className="flex justify-end border-t pt-4">
+								{isStatusLoading ? (
+									<Skeleton className="h-5 w-full max-w-md" />
+								) : (
+									status && (
+										<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+											{status.webhookRegistered ? (
+												<span className="flex items-center gap-1.5">
+													<WebhookIcon
+														className="size-4 text-green-600 dark:text-green-400"
+														aria-hidden
+													/>
+													Live updates via webhook
+												</span>
+											) : (
+												<span className="flex items-center gap-1.5">
+													<ZapOffIcon className="size-4" aria-hidden />
+													Polling only — webhook not registered
+												</span>
+											)}
+											<span className="flex items-center gap-1.5">
+												<FileTextIcon className="size-4" aria-hidden />
+												{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
+												mirrored
+											</span>
+											<span>
+												{status.lastSyncedAt
+													? `Last synced ${formatDistanceToNow(new Date(status.lastSyncedAt), { addSuffix: true })}`
+													: "Not synced yet"}
+											</span>
+										</div>
+									)
+								)}
+
+								<div className="flex items-center justify-between gap-2 border-t pt-4">
+									<Button variant="outline" size="sm" onClick={onSyncNow} disabled={isSyncing}>
+										<RefreshCwIcon className="size-4" />
+										{isSyncing ? "Starting sync…" : "Sync now"}
+									</Button>
 									<Button
 										variant="outline"
 										className="text-destructive"
@@ -180,7 +216,8 @@ export function OutlineIntegrationCard({
 						<AlertDialogTitle>Disconnect Outline?</AlertDialogTitle>
 						<AlertDialogDescription>
 							The document mirror stops syncing and every mirrored document for this workspace is
-							erased. You can reconnect later with a token.
+							erased. Documents in Outline itself are not affected. You can reconnect later with a
+							token.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

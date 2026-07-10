@@ -163,7 +163,7 @@ export type WorkspaceListItem = {
     /**
      * High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound
      */
-    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -277,7 +277,7 @@ export type Workspace = {
     /**
      * High-level git provider type for the workspace's SCM connection (null if none bound)
      */
-    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
@@ -634,6 +634,16 @@ export type UpdatePracticeActiveRequest = {
     active: boolean;
 };
 
+/**
+ * Transition a mirrored Outline collection to a target mirror state (pause / resume)
+ */
+export type UpdateOutlineCollectionStateRequest = {
+    /**
+     * Target mirror state
+     */
+    state: 'ENABLED' | 'PAUSED';
+};
+
 export type UpdateLoginProviderRequest = {
     baseUrl?: string;
     clientId?: string;
@@ -866,7 +876,7 @@ export type SortObject = {
     unsorted?: boolean;
 };
 
-export type SlackUserWorkspacePreferences = {
+export type SlackWorkspacePreferences = {
     activeMonitoredChannelCount?: number;
     channelMessagesAllowed?: boolean;
     slackDisplayName?: string;
@@ -878,7 +888,7 @@ export type SlackUserWorkspacePreferences = {
 };
 
 export type SlackUserPreferences = {
-    workspaces: Array<SlackUserWorkspacePreferences>;
+    workspaces: Array<SlackWorkspacePreferences>;
 };
 
 /**
@@ -1060,6 +1070,16 @@ export type RegisterSlackChannelRequest = {
      * Slack public/private channel id (stable C… or G… id)
      */
     slackChannelId: string;
+};
+
+/**
+ * Register an Outline collection for mirroring (lands ENABLED + PENDING)
+ */
+export type RegisterOutlineCollectionRequest = {
+    /**
+     * Outline collection id (UUID)
+     */
+    collectionId: string;
 };
 
 /**
@@ -1820,6 +1840,108 @@ export type AgentJob = {
 };
 
 /**
+ * Health of the workspace's active Outline connection
+ */
+export type OutlineConnectionStatus = {
+    /**
+     * Live (non-tombstoned) mirrored document count across all collections
+     */
+    documentCount: number;
+    /**
+     * When a mirrored collection last finished a clean sync pass, if any
+     */
+    lastSyncedAt?: Date;
+    /**
+     * Whether the Outline change-notification webhook subscription is registered
+     */
+    webhookRegistered: boolean;
+};
+
+/**
+ * An Outline collection the token can see, offered in the add-collection picker
+ */
+export type OutlineCollectionCandidate = {
+    /**
+     * Whether this collection is already registered for mirroring
+     */
+    alreadyMirrored: boolean;
+    /**
+     * Outline collection id (UUID)
+     */
+    collectionId: string;
+    /**
+     * Collection color as configured in Outline
+     */
+    color?: string;
+    /**
+     * Collection icon as configured in Outline
+     */
+    icon?: string;
+    /**
+     * Collection name as shown in Outline
+     */
+    name?: string;
+    /**
+     * Outline url id (the short slug in collection URLs)
+     */
+    urlId?: string;
+};
+
+/**
+ * A mirrored Outline collection with its sync state and live document count
+ */
+export type OutlineCollection = {
+    /**
+     * Outline collection id (UUID; the natural key)
+     */
+    collectionId: string;
+    /**
+     * Collection color as configured in Outline
+     */
+    color?: string;
+    /**
+     * When the collection was registered for mirroring
+     */
+    createdAt: Date;
+    /**
+     * Live (non-tombstoned) mirrored document count
+     */
+    documentCount: number;
+    /**
+     * Collection icon as configured in Outline
+     */
+    icon?: string;
+    /**
+     * Internal registry row id
+     */
+    id: number;
+    /**
+     * Last sync failure for this collection, cleared on the next clean pass
+     */
+    lastSyncError?: string;
+    /**
+     * When the last clean sync pass finished, if any
+     */
+    lastSyncedAt?: Date;
+    /**
+     * Collection name as shown in Outline, if known
+     */
+    name?: string;
+    /**
+     * Mirror lifecycle state (PAUSED freezes sync but keeps documents)
+     */
+    state: 'ENABLED' | 'PAUSED';
+    /**
+     * Whether a clean full pass has completed since registration or the last resume
+     */
+    syncStatus: 'PENDING' | 'COMPLETE';
+    /**
+     * Outline url id (the short slug in collection URLs)
+     */
+    urlId?: string;
+};
+
+/**
  * Full practice observation detail including guidance and evidence
  */
 export type ObservationDetail = {
@@ -2415,7 +2537,7 @@ export type CreateLoginProviderRequest = {
      * Space-separated scopes; defaulted by provider type if omitted
      */
     scopes?: string;
-    type: 'GITHUB' | 'GITLAB' | 'SLACK';
+    type: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
 /**
@@ -2766,7 +2888,7 @@ export type AdminWorkspaceView = {
     id: number;
     memberCount: number;
     ownerLogin?: string;
-    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     status: string;
     workspaceSlug: string;
 };
@@ -3388,21 +3510,21 @@ export type UpdateUserSettingsResponses = {
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
 
-export type GetSlackUserPreferencesData = {
+export type ListSlackUserPreferencesData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/user/slack/preferences';
 };
 
-export type GetSlackUserPreferencesResponses = {
+export type ListSlackUserPreferencesResponses = {
     /**
      * OK
      */
     200: SlackUserPreferences;
 };
 
-export type GetSlackUserPreferencesResponse = GetSlackUserPreferencesResponses[keyof GetSlackUserPreferencesResponses];
+export type ListSlackUserPreferencesResponse = ListSlackUserPreferencesResponses[keyof ListSlackUserPreferencesResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -3933,7 +4055,47 @@ export type InitiateResponses = {
 
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
 
-export type SendSlackTestMessageData = {
+export type GetOutlineConnectionStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/outline/status';
+};
+
+export type GetOutlineConnectionStatusResponses = {
+    /**
+     * OK
+     */
+    200: OutlineConnectionStatus;
+};
+
+export type GetOutlineConnectionStatusResponse = GetOutlineConnectionStatusResponses[keyof GetOutlineConnectionStatusResponses];
+
+export type SyncOutlineConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/outline/sync';
+};
+
+export type SyncOutlineConnectionResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type SendTestMessageData = {
     /**
      * optional channel override; when blank, the persisted notification channel is used.
      */
@@ -3948,14 +4110,14 @@ export type SendSlackTestMessageData = {
     url: '/workspaces/{workspaceSlug}/connections/slack/test-message';
 };
 
-export type SendSlackTestMessageResponses = {
+export type SendTestMessageResponses = {
     /**
      * OK
      */
     200: SlackTestMessageResponse;
 };
 
-export type SendSlackTestMessageResponse = SendSlackTestMessageResponses[keyof SendSlackTestMessageResponses];
+export type SendTestMessageResponse = SendTestMessageResponses[keyof SendTestMessageResponses];
 
 export type ReadData = {
     body?: never;
@@ -4472,6 +4634,111 @@ export type UpdateNotificationsResponses = {
 };
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
+
+export type ListOutlineCollectionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections';
+};
+
+export type ListOutlineCollectionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<OutlineCollection>;
+};
+
+export type ListOutlineCollectionsResponse = ListOutlineCollectionsResponses[keyof ListOutlineCollectionsResponses];
+
+export type RegisterOutlineCollectionData = {
+    body: RegisterOutlineCollectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections';
+};
+
+export type RegisterOutlineCollectionResponses = {
+    /**
+     * OK
+     */
+    200: OutlineCollection;
+};
+
+export type RegisterOutlineCollectionResponse = RegisterOutlineCollectionResponses[keyof RegisterOutlineCollectionResponses];
+
+export type ListOutlineCollectionCandidatesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/candidates';
+};
+
+export type ListOutlineCollectionCandidatesResponses = {
+    /**
+     * OK
+     */
+    200: Array<OutlineCollectionCandidate>;
+};
+
+export type ListOutlineCollectionCandidatesResponse = ListOutlineCollectionCandidatesResponses[keyof ListOutlineCollectionCandidatesResponses];
+
+export type DeleteOutlineCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        collectionId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
+};
+
+export type DeleteOutlineCollectionResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type UpdateOutlineCollectionStateData = {
+    body: UpdateOutlineCollectionStateRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        collectionId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
+};
+
+export type UpdateOutlineCollectionStateResponses = {
+    /**
+     * OK
+     */
+    200: OutlineCollection;
+};
+
+export type UpdateOutlineCollectionStateResponse = UpdateOutlineCollectionStateResponses[keyof UpdateOutlineCollectionStateResponses];
 
 export type ListAreasData = {
     body?: never;
@@ -5330,6 +5597,26 @@ export type ListSlackChannelCandidatesResponses = {
 
 export type ListSlackChannelCandidatesResponse = ListSlackChannelCandidatesResponses[keyof ListSlackChannelCandidatesResponses];
 
+export type DeleteSlackChannelData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slackChannelId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/slack/channels/{slackChannelId}';
+};
+
+export type DeleteSlackChannelResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type UpdateSlackChannelConsentData = {
     body: UpdateSlackChannelConsentRequest;
     path: {
@@ -5390,7 +5677,7 @@ export type UpdateSlackUserPreferencesResponses = {
     /**
      * OK
      */
-    200: SlackUserWorkspacePreferences;
+    200: SlackWorkspacePreferences;
 };
 
 export type UpdateSlackUserPreferencesResponse = UpdateSlackUserPreferencesResponses[keyof UpdateSlackUserPreferencesResponses];
