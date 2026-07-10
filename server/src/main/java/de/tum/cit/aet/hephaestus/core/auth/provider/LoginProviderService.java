@@ -50,6 +50,11 @@ public class LoginProviderService {
     // verified team_id claim. "openid" is REQUIRED here (it makes Spring take the OIDC path); the GitLab
     // "must not contain openid" guard in sanitizeScopesOrThrow is scoped to GITLAB, so it never fires for SLACK.
     static final String SLACK_SCOPES = "openid profile email";
+    // Outline is a plain OAuth2 provider (NOT OIDC) — like GitLab the scope must NOT contain "openid"
+    // (enforced in sanitizeScopesOrThrow; Spring's OIDC path would 500 the callback with no jwkSetUri).
+    // "read" is Outline's read-everything scope and is sufficient for the POST /api/auth.info identity
+    // probe. The scope grammar is pinned against the self-hosted Outline E2E instance (v0.87).
+    static final String OUTLINE_SCOPES = "read";
     private static final String GITHUB_COM = "https://github.com";
     // The single Slack instance. Canonical origin the seeded identity_provider + SlackMentorIdentityResolver key on.
     private static final String SLACK_COM = "https://slack.com";
@@ -80,6 +85,16 @@ public class LoginProviderService {
     @Transactional(readOnly = true)
     public List<LoginProvider> listAll() {
         return repository.findAll(Sort.by("displayName").ascending());
+    }
+
+    /**
+     * The enabled provider behind a registration id, or empty when unknown/disabled — the login-begin
+     * lookup ({@code AuthBeginController}): an unknown or disabled provider must not start an OAuth
+     * flow, and the row's type drives the link-only gate.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<LoginProvider> findEnabled(String registrationId) {
+        return repository.findByRegistrationId(registrationId).filter(LoginProvider::isEnabled);
     }
 
     @Transactional(readOnly = true)
@@ -247,7 +262,8 @@ public class LoginProviderService {
 
     /**
      * GitHub login is github.com only (GHE login is out of scope; the registration builder hardcodes
-     * github.com endpoints). For GitLab, validate the supplied base URL (HTTPS + SSRF guard).
+     * github.com endpoints). For GitLab and Outline (self-hosted instances), validate the supplied
+     * base URL (HTTPS + SSRF guard).
      */
     private static String resolveBaseUrl(LoginProvider.ProviderType type, @Nullable String baseUrl) {
         if (type == LoginProvider.ProviderType.GITHUB) {
@@ -274,22 +290,29 @@ public class LoginProviderService {
             case GITHUB -> GITHUB_SCOPES;
             case GITLAB -> GITLAB_SCOPES;
             case SLACK -> SLACK_SCOPES;
+            case OUTLINE -> OUTLINE_SCOPES;
         };
     }
 
     /**
-     * GitLab login uses the OAuth2 flow (userInfo = /api/v4/user); an {@code openid} scope flips Spring
-     * to the OIDC path and 500s the callback (no jwkSetUri is configured). Reject it with an actionable
-     * 422 so an admin editing the provider can't silently brick sign-in. See GITLAB_SCOPES + ADR 0017.
+     * GitLab and Outline use the plain OAuth2 flow (userInfo = /api/v4/user resp. /api/auth.info); an
+     * {@code openid} scope flips Spring to the OIDC path and 500s the callback (no jwkSetUri is
+     * configured — Outline is not an OIDC provider at all). Reject it with an actionable 422 so an
+     * admin editing the provider can't silently brick sign-in. See GITLAB_SCOPES / OUTLINE_SCOPES +
+     * ADR 0017.
      */
     private static String sanitizeScopesOrThrow(LoginProvider.ProviderType type, String scopes) {
         String trimmed = scopes.trim();
-        if (type == LoginProvider.ProviderType.GITLAB) {
+        if (type == LoginProvider.ProviderType.GITLAB || type == LoginProvider.ProviderType.OUTLINE) {
+            String replacement = type == LoginProvider.ProviderType.GITLAB ? "'read_user'" : "'read'";
             for (String scope : trimmed.split("\\s+")) {
                 if (scope.equalsIgnoreCase("openid")) {
                     throw new ResponseStatusException(
                         HttpStatus.UNPROCESSABLE_ENTITY,
-                        "GitLab login uses the OAuth2 flow — the scope must not contain 'openid' (use 'read_user')"
+                        type +
+                            " login uses the plain OAuth2 flow — the scope must not contain 'openid' (use " +
+                            replacement +
+                            ")"
                     );
                 }
             }

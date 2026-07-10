@@ -38,6 +38,13 @@
         // WorkspaceContext (context) — the same edges the Slack admin surface uses.
         "workspace::authorization",
         "workspace::context",
+        // OutlineIdentityResolver resolves a document author (server, team, Outline user UUID) to the
+        // workspace developer through the auth SPI ports only (GitProviderRegistry + AccountIdentityQuery +
+        // AccountWorkspaceMembershipQuery) — never core.auth domain types. Mirrors the Slack mentor resolver.
+        "core::auth-spi",
+        // The resolver maps the linked SCM login to its actor-mirror User row (integration.scm.domain.user),
+        // the same read edge SlackMentorIdentityResolver uses.
+        "integration.scm",
         // integration.outline.documentation implements the agent-owned documentation-source SPI
         // (DocumentProjection): Outline owns the outline_document table and PROJECTS it to the agent through
         // this port, so the agent's mentor/review read path carries no raw SQL against the Outline schema. This

@@ -93,11 +93,34 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     }
 
     private static ProjectedDocument doc(String collection, String slug, String title, String body) {
-        return new ProjectedDocument(collection, slug, title, body, false);
+        return ProjectedDocument.withoutAuthors(collection, slug, title, body, false);
     }
 
     private static ProjectedDocument tombstone(String collection, String slug, String title) {
-        return new ProjectedDocument(collection, slug, title, null, true);
+        return ProjectedDocument.withoutAuthors(collection, slug, title, null, true);
+    }
+
+    private static ProjectedDocument authoredDoc(
+        String collection,
+        String slug,
+        String title,
+        String body,
+        String authorName,
+        Long authorMemberId
+    ) {
+        return new ProjectedDocument(
+            collection,
+            slug,
+            title,
+            body,
+            false,
+            authorName,
+            "0aa1bb2c-user",
+            authorMemberId,
+            authorName,
+            "0aa1bb2c-user",
+            authorMemberId
+        );
     }
 
     // --- originId + supports ---
@@ -192,6 +215,57 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         assertThat(entry.has("body")).isTrue();
         assertThat(entry.has("verdict")).isFalse();
         assertThat(entry.has("severity")).isFalse();
+    }
+
+    // --- (b') authorship exposure ---
+
+    @Test
+    void mentorPathEmitsAuthorNameAndResolvedMemberId() throws Exception {
+        when(projection.documentsForWorkspace(WORKSPACE_ID)).thenReturn(
+            List.of(
+                authoredDoc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome.", "Ada Lovelace", 555L),
+                authoredDoc("Product", "roadmap", "Roadmap", "Q3 plans.", "Grace Hopper", null) // unlinked
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(mentorRequest(), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/outline_docs.json"));
+        JsonNode linked = root.get(0);
+        assertThat(linked.get("author").asString()).isEqualTo("Ada Lovelace");
+        assertThat(linked.get("author_member_id").asLong()).isEqualTo(555L);
+        assertThat(linked.get("last_edited_by").asString()).isEqualTo("Ada Lovelace");
+        assertThat(linked.get("last_edited_by_member_id").asLong()).isEqualTo(555L);
+        // Unlinked author degrades to name-only: the member-id key is simply absent, never null.
+        JsonNode unlinked = root.get(1);
+        assertThat(unlinked.get("author").asString()).isEqualTo("Grace Hopper");
+        assertThat(unlinked.has("author_member_id")).isFalse();
+    }
+
+    @Test
+    void reviewPathRendersBylineInsideTheQuarantinedDocument() {
+        String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(
+                authoredDoc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome.", "Ada Lovelace", 555L)
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/onboarding-guide.md"),
+            StandardCharsets.UTF_8
+        );
+        // The byline (untrusted third-party name) rides BELOW the quarantine banner, inside the
+        // quarantined document — never as trusted metadata above it.
+        int bannerEnd = rendered.indexOf("-->");
+        assertThat(rendered.indexOf("Ada Lovelace")).isGreaterThan(bannerEnd);
+        assertThat(rendered).contains("_Author: Ada Lovelace (workspace member 555)_");
+        // Creator == last editor → no redundant "Last edited by" line.
+        assertThat(rendered).doesNotContain("Last edited by");
     }
 
     // --- (c) review path materializes only the LINKED docs ---

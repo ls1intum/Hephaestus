@@ -37,12 +37,48 @@ public interface DocumentProjection {
     /**
      * The agent-facing view of one mirrored Outline document. {@code bodyMarkdown} is {@code null} when the
      * document was removed upstream ({@code deleted}) or its body was evicted under the size cap.
+     *
+     * <p><strong>Authorship.</strong> {@code createdBy*}/{@code updatedBy*} carry the upstream author
+     * substrate: the display name (untrusted third-party text — it must ride inside quarantined content,
+     * never as trusted metadata) and the provider-native subject (Outline user UUID). The
+     * {@code *MemberId} fields are the workspace member the subject resolves to through the linked-account
+     * chain — resolved lazily at projection time, {@code null} when the author has not linked an Outline
+     * identity (graceful floor: the display name still renders).
      */
     record ProjectedDocument(
         String collectionSlug,
         String slug,
         String title,
         @Nullable String bodyMarkdown,
-        boolean deleted
-    ) {}
+        boolean deleted,
+        @Nullable String createdByName,
+        @Nullable String createdBySubject,
+        @Nullable Long createdByMemberId,
+        @Nullable String updatedByName,
+        @Nullable String updatedBySubject,
+        @Nullable Long updatedByMemberId
+    ) {
+        /** An author-less projection (no substrate captured / tombstoned) — every author field {@code null}. */
+        public static ProjectedDocument withoutAuthors(
+            String collectionSlug,
+            String slug,
+            String title,
+            @Nullable String bodyMarkdown,
+            boolean deleted
+        ) {
+            return new ProjectedDocument(
+                collectionSlug,
+                slug,
+                title,
+                bodyMarkdown,
+                deleted,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+        }
+    }
 }

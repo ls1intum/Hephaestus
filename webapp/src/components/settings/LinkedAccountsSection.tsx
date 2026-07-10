@@ -1,4 +1,4 @@
-import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
+import { BookOpen, LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
 import { GithubIcon, GitlabIcon, SlackIcon } from "@/components/icons/brand";
@@ -21,12 +21,14 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,
 	SLACK: SlackIcon,
+	OUTLINE: BookOpen,
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
 	GITHUB: "GitHub",
 	GITLAB: "GitLab",
 	SLACK: "Slack",
+	OUTLINE: "Outline",
 };
 
 /**

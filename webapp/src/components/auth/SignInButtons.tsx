@@ -12,7 +12,7 @@ type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
 
 /** Synthetic provider type the server emits for the optional passwordless dev sign-in. */
 const DEV_PROVIDER_TYPE = "DEV";
-const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK"]);
+const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
 
 interface SignInButtonsProps {
 	onSignIn: (idpHint: string) => void;

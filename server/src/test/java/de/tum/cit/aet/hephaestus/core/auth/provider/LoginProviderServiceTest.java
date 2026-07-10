@@ -75,6 +75,18 @@ class LoginProviderServiceTest extends BaseUnitTest {
         );
     }
 
+    private static LoginProviderService.Draft outlineDraft(String registrationId, String baseUrl, String scopes) {
+        return new LoginProviderService.Draft(
+            registrationId,
+            LoginProvider.ProviderType.OUTLINE,
+            "Team Wiki",
+            baseUrl,
+            "client-id",
+            "client-secret",
+            scopes
+        );
+    }
+
     @Test
     void seedsConfiguredGithubWhenAbsent() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
@@ -227,6 +239,54 @@ class LoginProviderServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void createOutlineDefaultsToReadScopeAndValidatesBaseUrl() {
+        // OUTLINE mirrors the GITLAB self-hosted shape: per-instance base URL (validated), plain OAuth2
+        // with a pinned minimal "read" scope — see LoginProviderService.OUTLINE_SCOPES.
+        when(repository.existsByRegistrationId("outline-acme")).thenReturn(false);
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        LoginProvider created = adminService().create(outlineDraft("outline-acme", "https://wiki.acme.test/", null));
+
+        assertThat(created.getType()).isEqualTo(LoginProvider.ProviderType.OUTLINE);
+        assertThat(created.getBaseUrl()).isEqualTo("https://wiki.acme.test"); // trailing slash stripped
+        assertThat(created.getScopes()).isEqualTo("read"); // defaulted by type (plain OAuth2, no openid)
+        verify(registrationCache).evict("outline-acme");
+    }
+
+    @Test
+    void createRejectsOutlineOpenidScope() {
+        // Outline is NOT an OIDC provider: openid flips Spring to the OIDC path and 500s the callback
+        // (no id_token, no jwkSetUri) — same failure mode the GitLab guard closes.
+        assertThatThrownBy(() ->
+            adminService().create(outlineDraft("outline-x", "https://wiki.acme.test", "openid read"))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void updateRejectsOutlineOpenidScope() {
+        LoginProvider existing = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("outline")).thenReturn(java.util.Optional.of(existing));
+
+        assertThatThrownBy(() ->
+            adminService().update(
+                "outline",
+                new LoginProviderService.Patch(null, null, null, null, "openid read", null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsNonHttpsOutlineBaseUrl() {
+        // SSRF / HTTPS guard: the Outline base URL takes the same ServerUrlValidator posture as GitLab.
+        assertThatThrownBy(() ->
+            adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void createRejectsMalformedRegistrationId() {
         assertThatThrownBy(() ->
             adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null))
@@ -289,6 +349,19 @@ class LoginProviderServiceTest extends BaseUnitTest {
 
         adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "new-secret", null, null));
         assertThat(existing.getClientSecret()).isEqualTo("new-secret");
+    }
+
+    private static LoginProvider outlineProvider(String registrationId, String clientSecret) {
+        LoginProvider provider = new LoginProvider();
+        provider.setRegistrationId(registrationId);
+        provider.setType(LoginProvider.ProviderType.OUTLINE);
+        provider.setDisplayName("Team Wiki");
+        provider.setBaseUrl("https://wiki.example.com");
+        provider.setClientId("client-id");
+        provider.setClientSecret(clientSecret);
+        provider.setScopes("read");
+        provider.setEnabled(true);
+        return provider;
     }
 
     private static LoginProvider gitlabProvider(String registrationId, String clientSecret) {

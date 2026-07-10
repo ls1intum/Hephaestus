@@ -43,9 +43,13 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><strong>Two shapes, one per audience.</strong>
  * <ul>
  *   <li><b>Mentor chat</b> ({@link MentorChatRequest}) emits a single {@code inputs/context/outline_docs.json} — a
- *       JSON array of {@code {collection,slug,title,body}}. The mentor runner JSON-parses every context key by
- *       exact basename ({@code MentorChatService#handleFetchContext}), so a {@code .md} tree would break it; the
- *       corpus is telescoped (bounded doc count + per-body excerpt) rather than dumping a whole wiki.</li>
+ *       JSON array of {@code {collection,slug,title,body}} plus, when the mirror captured authorship,
+ *       {@code author}/{@code last_edited_by} display names and the resolved workspace {@code *_member_id}s
+ *       (linked accounts only — an unlinked author degrades to name-only). The mentor runner JSON-parses every
+ *       context key by exact basename ({@code MentorChatService#handleFetchContext}), so a {@code .md} tree would
+ *       break it; the corpus is telescoped (bounded doc count + per-body excerpt) rather than dumping a whole
+ *       wiki. Author names are third-party text and ride inside this already-quarantined JSON, never as trusted
+ *       metadata.</li>
  *   <li><b>PR / issue review</b> ({@link PracticeReviewRequest}, {@link IssueReviewRequest}) materialises a
  *       {@code .md} tree under {@code inputs/context/outline/<collection-slug>/<doc-slug>.md}, scoped to the
  *       documents actually linked from the artifact under review (Outline URLs resolved from the artifact body),
@@ -169,6 +173,20 @@ public class OutlineDocumentContentSource implements ContentSource {
             node.put("slug", doc.slug());
             node.put("title", doc.title());
             node.put("body", excerptBody(doc));
+            // Authorship (when the mirror captured it): display name is untrusted third-party text riding
+            // inside this quarantined JSON; the member id is only present for a linked account.
+            if (doc.createdByName() != null) {
+                node.put("author", doc.createdByName());
+            }
+            if (doc.createdByMemberId() != null) {
+                node.put("author_member_id", doc.createdByMemberId());
+            }
+            if (doc.updatedByName() != null) {
+                node.put("last_edited_by", doc.updatedByName());
+            }
+            if (doc.updatedByMemberId() != null) {
+                node.put("last_edited_by_member_id", doc.updatedByMemberId());
+            }
             emitted++;
         }
         try {
@@ -260,6 +278,12 @@ public class OutlineDocumentContentSource implements ContentSource {
         md.append(QUARANTINE_BANNER);
         String title = doc.title() == null || doc.title().isBlank() ? "(untitled document)" : doc.title();
         md.append("# ").append(title).append("\n\n");
+        // Byline BELOW the quarantine banner: the author name is untrusted third-party text and must read
+        // as data inside the quarantined document, never as trusted metadata outside it.
+        String byline = renderByline(doc);
+        if (byline != null) {
+            md.append(byline).append("\n\n");
+        }
         if (doc.deleted() || doc.bodyMarkdown() == null) {
             md.append(
                 "_This linked Outline document is no longer available (removed upstream or evicted from the local " +
@@ -272,6 +296,34 @@ public class OutlineDocumentContentSource implements ContentSource {
             }
         }
         return md.toString();
+    }
+
+    /**
+     * The document byline, or {@code null} when the mirror captured no authorship. A resolved member id
+     * (linked account) is appended so the reviewer can attribute the doc to a workspace developer; the
+     * last-editor line only appears when it differs from the creator.
+     */
+    private static String renderByline(ProjectedDocument doc) {
+        StringBuilder byline = new StringBuilder();
+        if (doc.createdByName() != null && !doc.createdByName().isBlank()) {
+            byline.append("_Author: ").append(doc.createdByName());
+            if (doc.createdByMemberId() != null) {
+                byline.append(" (workspace member ").append(doc.createdByMemberId()).append(")");
+            }
+            byline.append("_");
+        }
+        boolean sameAsCreator = doc.updatedBySubject() != null && doc.updatedBySubject().equals(doc.createdBySubject());
+        if (doc.updatedByName() != null && !doc.updatedByName().isBlank() && !sameAsCreator) {
+            if (byline.length() > 0) {
+                byline.append("\n");
+            }
+            byline.append("_Last edited by: ").append(doc.updatedByName());
+            if (doc.updatedByMemberId() != null) {
+                byline.append(" (workspace member ").append(doc.updatedByMemberId()).append(")");
+            }
+            byline.append("_");
+        }
+        return byline.length() == 0 ? null : byline.toString();
     }
 
     private static Set<String> extractReferences(String body) {

@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -64,6 +66,20 @@ class IdentityProviderDiscoveryControllerTest extends BaseUnitTest {
         ClientRegistration reg = registration("https://gitlab.internal/github.com/oauth/authorize");
         assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg)).isEqualTo("GITLAB");
         assertThat(IdentityProviderDiscoveryController.baseUrlOf(reg)).isEqualTo("https://gitlab.internal");
+    }
+
+    @Test
+    @DisplayName("the login_provider row's type is authoritative — an OUTLINE registration never host-sniffs to GITLAB")
+    void rowTypeWinsOverHostSniff() {
+        // A self-hosted Outline's /oauth/authorize is URL-shaped exactly like a GitLab's; only the row
+        // type can classify it. Misclassifying as GITLAB would render a public login button for a
+        // link-only provider (the SPA filters on providerType).
+        ClientRegistration reg = registration("https://wiki.example.com/oauth/authorize");
+        Map<String, LoginProvider.ProviderType> rows = Map.of("p", LoginProvider.ProviderType.OUTLINE);
+
+        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg, rows::get)).isEqualTo("OUTLINE");
+        // Sniff-only fallback (no row) keeps the legacy GITLAB classification.
+        assertThat(IdentityProviderDiscoveryController.providerTypeOf(reg, id -> null)).isEqualTo("GITLAB");
     }
 
     @Test
