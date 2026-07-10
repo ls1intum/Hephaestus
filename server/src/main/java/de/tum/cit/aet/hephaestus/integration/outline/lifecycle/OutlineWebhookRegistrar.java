@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
@@ -14,6 +15,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -32,6 +34,15 @@ import org.springframework.stereotype.Component;
  * <p>Everything here is best-effort and never throws: without a configured external URL, token, or on
  * any Outline-side failure the periodic reconcile remains the source of truth, so a missing
  * subscription only costs freshness.
+ *
+ * <p>This is also the single seam through which a workspace's outline subscription id changes — fresh
+ * registration, self-heal re-registration (a new id replaces the old one), and both deregister paths all
+ * run through this class. The workspace-side {@code NatsSubscriptionProvider} derives the {@code outline}
+ * stream subject from that stored id, so every id change must be followed by a scope-consumer reconcile or
+ * the running consumer keeps filtering on a stale (or absent) subject — proven live: a workspace that
+ * connects Outline while the server is already up never receives its webhook deliveries until the next
+ * restart. {@link #reconcileScopeConsumer} is called from every branch that actually changes what the
+ * subscription provider would report, never from the early no-op returns.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -48,16 +59,39 @@ public class OutlineWebhookRegistrar {
     private final EncryptedStringConverter secretCipher;
     private final String externalUrl;
 
+    /**
+     * Absent when {@code hephaestus.sync.nats.enabled=false} (the consumer bean is conditional on it);
+     * the registrar itself carries no such requirement, so every use goes through {@link
+     * ObjectProvider#ifAvailable}.
+     */
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumer;
+
     public OutlineWebhookRegistrar(
         ConnectionService connectionService,
         OutlineApiClient outlineApiClient,
         EncryptedStringConverter secretCipher,
-        @Value("${hephaestus.webhook.external-url:}") String externalUrl
+        @Value("${hephaestus.webhook.external-url:}") String externalUrl,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumer
     ) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
         this.secretCipher = secretCipher;
         this.externalUrl = externalUrl;
+        this.natsConsumer = natsConsumer;
+    }
+
+    /**
+     * Brings the workspace's scope consumer in line with the subscription id this class just stored or
+     * invalidated. {@code startConsumingScope} no-ops once the scope already has consumers (the common
+     * case: an SCM stream is already running) and {@code updateScopeConsumer} no-ops when the scope has
+     * none yet (the rare case: Outline is the workspace's first-ever integration) — calling both in
+     * sequence therefore reconciles every state without duplicating work in either.
+     */
+    private void reconcileScopeConsumer(long workspaceId) {
+        natsConsumer.ifAvailable(consumer -> {
+            consumer.startConsumingScope(workspaceId);
+            consumer.updateScopeConsumer(workspaceId);
+        });
     }
 
     /**
@@ -150,6 +184,9 @@ public class OutlineWebhookRegistrar {
                 return outlineCfg.withWebhookSubscription(subscriptionId, encryptedSecret);
             });
             log.info("outline.webhook: registered subscription {} for workspaceId={}", subscriptionId, workspaceId);
+            // The subject the scope consumer filters on is derived from this id — reconcile now instead of
+            // waiting for a restart (fresh register) or the next 6h reconcile (self-heal re-register).
+            reconcileScopeConsumer(workspaceId);
         } catch (RuntimeException e) {
             // Best-effort: the periodic reconcile still keeps the mirror fresh without a subscription.
             log.warn("outline.webhook: registration failed for workspaceId={}: {}", workspaceId, e.toString());
@@ -202,6 +239,11 @@ public class OutlineWebhookRegistrar {
                 log.warn("outline.webhook: deregistration failed for workspaceId={}: {}", workspaceId, e.toString());
             }
         }
+        // Harmless here (the connection is still ACTIVE, so the subscription provider's view is
+        // unchanged) but required symmetry: this method runs before the caller's own state transition
+        // takes the connection off ACTIVE, and the {@code deregister(workspaceId, connectionId)}
+        // variant — called after that transition commits — does the reconcile that actually matters.
+        reconcileScopeConsumer(workspaceId);
     }
 
     /**
@@ -229,6 +271,10 @@ public class OutlineWebhookRegistrar {
                 subscriptionId,
                 connectionId
             );
+            // The connection already left ACTIVE (that's why this by-id variant is resolving it), so the
+            // subscription provider has already stopped reporting the outline stream for this workspace —
+            // reconcile the scope consumer down to match even though the upstream delete itself is a no-op.
+            reconcileScopeConsumer(workspaceId);
             return;
         }
         try {
@@ -241,6 +287,7 @@ public class OutlineWebhookRegistrar {
         } catch (RuntimeException e) {
             log.warn("outline.webhook: deregistration failed for connectionId={}: {}", connectionId, e.toString());
         }
+        reconcileScopeConsumer(workspaceId);
     }
 
     /** A 256-bit hex signing secret (64 chars), comfortably above the NIST-recommended HMAC key length. */

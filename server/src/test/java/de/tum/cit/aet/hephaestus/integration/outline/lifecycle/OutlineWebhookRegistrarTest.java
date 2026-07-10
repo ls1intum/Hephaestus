@@ -6,15 +6,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
@@ -24,10 +27,14 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * Correctness of the change-notification subscription lifecycle: without a stored id a subscription is
@@ -52,12 +59,39 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
+    @Mock
+    private IntegrationNatsConsumer natsConsumer;
+
+    /**
+     * A provider whose {@code ifAvailable} runs its consumer against {@code bean}, or is a no-op when
+     * null. {@code lenient()} because most no-op tests never reach the reconcile call at all.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> providerOf(T bean) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        if (bean != null) {
+            Mockito.lenient()
+                .doAnswer(inv -> {
+                    inv.<Consumer<T>>getArgument(0).accept(bean);
+                    return null;
+                })
+                .when(provider)
+                .ifAvailable(any());
+        }
+        return provider;
+    }
+
     private OutlineWebhookRegistrar registrar(String externalUrl) {
+        return registrar(externalUrl, natsConsumer);
+    }
+
+    private OutlineWebhookRegistrar registrar(String externalUrl, IntegrationNatsConsumer consumer) {
         return new OutlineWebhookRegistrar(
             connectionService,
             outlineApiClient,
             new EncryptedStringConverter(),
-            externalUrl
+            externalUrl,
+            providerOf(consumer)
         );
     }
 
@@ -99,6 +133,16 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         );
     }
 
+    /**
+     * The subscription id changed (fresh register, self-heal re-register, or either deregister path) —
+     * both {@code startConsumingScope} and {@code updateScopeConsumer} are called so the reconcile lands
+     * regardless of whether the scope consumer was already running.
+     */
+    private void verifyScopeConsumerReconciled() {
+        verify(natsConsumer).startConsumingScope(WORKSPACE_ID);
+        verify(natsConsumer).updateScopeConsumer(WORKSPACE_ID);
+    }
+
     @Test
     void ensureSubscription_registersAndStoresSubscriptionWhenNoneStored() {
         stubActiveConnection(config(null, null));
@@ -129,6 +173,21 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
             .apply(config(null, null));
         assertThat(updated.webhookSubscriptionId()).isEqualTo("sub-99");
         assertThat(updated.webhookSecret()).isEqualTo(secret.getValue());
+        // The bug this closes: without this reconcile the scope consumer (created at boot with only the
+        // SCM stream) never picks up the new outline.<subId>.> filter until a restart.
+        verifyScopeConsumerReconciled();
+    }
+
+    @Test
+    @DisplayName("still stores the subscription and never NPEs when the NATS consumer bean is absent")
+    void ensureSubscription_registersFineWithNoNatsConsumerBean() {
+        stubActiveConnection(config(null, null));
+        stubToken();
+        stubCreateReturning("sub-99");
+
+        assertThatCode(() -> registrar(EXTERNAL_URL, null).ensureSubscription(WORKSPACE_ID)).doesNotThrowAnyException();
+
+        verify(connectionService).updateConfig(eq(WORKSPACE_ID), eq(IntegrationKind.OUTLINE), any());
     }
 
     @Test
@@ -136,6 +195,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         registrar("").ensureSubscription(WORKSPACE_ID);
 
         verify(connectionService, never()).findActive(anyLongMatcher(), any());
+        verifyNoInteractions(natsConsumer);
     }
 
     @Test
@@ -148,6 +208,8 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
 
         verify(outlineApiClient, never()).createWebhookSubscription(any(), any(), any(), any(), any(), any());
         verify(connectionService, never()).updateConfig(anyLongMatcher(), any(), any());
+        // Nothing changed upstream — the scope consumer must not be poked.
+        verifyNoInteractions(natsConsumer);
     }
 
     @Test
@@ -181,6 +243,24 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
             .get(1)
             .apply(config(null, null));
         assertThat(stored.webhookSubscriptionId()).isEqualTo("sub-2");
+        // Self-heal mints a NEW subscription id = a new subject filter — the scope consumer must be
+        // reconciled just like a fresh register, or the workspace stays deaf until a restart.
+        verifyScopeConsumerReconciled();
+    }
+
+    @Test
+    @DisplayName("still self-heals and never NPEs when the NATS consumer bean is absent")
+    void ensureSubscription_reRegistersFineWithNoNatsConsumerBean() {
+        stubActiveConnection(config("sub-1", "sec"));
+        stubToken();
+        when(outlineApiClient.listWebhookSubscriptions(SERVER_URL, "tok")).thenReturn(
+            List.of(upstream("sub-1", false))
+        );
+        stubCreateReturning("sub-2");
+
+        assertThatCode(() -> registrar(EXTERNAL_URL, null).ensureSubscription(WORKSPACE_ID)).doesNotThrowAnyException();
+
+        verify(outlineApiClient).createWebhookSubscription(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -193,6 +273,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         registrar(EXTERNAL_URL).ensureSubscription(WORKSPACE_ID);
 
         verify(outlineApiClient).createWebhookSubscription(any(), any(), any(), any(), any(), any());
+        verifyScopeConsumerReconciled();
     }
 
     @Test
@@ -205,6 +286,8 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
 
         verify(outlineApiClient, never()).createWebhookSubscription(any(), any(), any(), any(), any(), any());
         verify(connectionService, never()).updateConfig(anyLongMatcher(), any(), any());
+        // An unverifiable upstream changes nothing — don't churn the scope consumer either.
+        verifyNoInteractions(natsConsumer);
     }
 
     @Test
@@ -218,6 +301,18 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
 
         verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-99");
         verify(connectionService, never()).updateConfig(eq(WORKSPACE_ID), eq(IntegrationKind.OUTLINE), any());
+        verifyScopeConsumerReconciled();
+    }
+
+    @Test
+    @DisplayName("still deletes upstream and never NPEs when the NATS consumer bean is absent")
+    void deregister_deletesFineWithNoNatsConsumerBean() {
+        stubActiveConnection(config("sub-99", "sec"));
+        stubToken();
+
+        assertThatCode(() -> registrar(EXTERNAL_URL, null).deregister(WORKSPACE_ID)).doesNotThrowAnyException();
+
+        verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-99");
     }
 
     @Test
@@ -227,6 +322,8 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         registrar(EXTERNAL_URL).deregister(WORKSPACE_ID);
 
         verify(outlineApiClient, never()).deleteWebhookSubscription(any(), any(), any());
+        // Nothing was stored to invalidate — the scope consumer must not be poked.
+        verifyNoInteractions(natsConsumer);
     }
 
     @Test
@@ -239,6 +336,23 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         );
 
         registrar(EXTERNAL_URL).deregister(WORKSPACE_ID, CONNECTION_ID);
+
+        verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-77");
+        verifyScopeConsumerReconciled();
+    }
+
+    @Test
+    @DisplayName("still deletes upstream (by connection id) and never NPEs when the NATS consumer bean is absent")
+    void deregisterByConnectionId_deletesFineWithNoNatsConsumerBean() {
+        when(connection.getConfig()).thenReturn(config("sub-77", "sec"));
+        when(connectionService.findInWorkspace(WORKSPACE_ID, CONNECTION_ID)).thenReturn(Optional.of(connection));
+        when(connectionService.findBearerToken(WORKSPACE_ID, CONNECTION_ID)).thenReturn(
+            Optional.of(new BearerToken("tok", null))
+        );
+
+        assertThatCode(() ->
+            registrar(EXTERNAL_URL, null).deregister(WORKSPACE_ID, CONNECTION_ID)
+        ).doesNotThrowAnyException();
 
         verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-77");
     }
@@ -255,6 +369,20 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         ).doesNotThrowAnyException();
 
         verify(outlineApiClient, never()).deleteWebhookSubscription(any(), any(), any());
+        // The connection already left ACTIVE — the scope consumer must still be reconciled down even
+        // though no upstream delete was possible.
+        verifyScopeConsumerReconciled();
+    }
+
+    @Test
+    void deregisterByConnectionId_skipsWhenNoSubscriptionStored() {
+        when(connection.getConfig()).thenReturn(config(null, null));
+        when(connectionService.findInWorkspace(WORKSPACE_ID, CONNECTION_ID)).thenReturn(Optional.of(connection));
+
+        registrar(EXTERNAL_URL).deregister(WORKSPACE_ID, CONNECTION_ID);
+
+        verify(outlineApiClient, never()).deleteWebhookSubscription(any(), any(), any());
+        verifyNoInteractions(natsConsumer);
     }
 
     private static long anyLongMatcher() {

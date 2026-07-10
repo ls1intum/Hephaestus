@@ -18,6 +18,10 @@
         // OutlineWebhookMessageHandler implements the unified IntegrationMessageHandler so Outline
         // change notifications ride the JetStream consumer lane (ADR 0023 §3), same as every SCM handler.
         "integration.core::handler",
+        // OutlineWebhookRegistrar reconciles the workspace's scope consumer (IntegrationNatsConsumer)
+        // whenever the subscription id it stores changes — register, self-heal re-register, deregister —
+        // mirroring WorkspaceRepositoryMonitorService's use of the same seam for SCM repository changes.
+        "integration.core::consumer",
         // OutlineConnectionStateListener consumes the ConnectionLifecycleEvent seam published from
         // ConnectionService.transition() (register webhook on activate, deregister on deactivate).
         "integration.core::events",
