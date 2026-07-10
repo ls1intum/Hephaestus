@@ -60,7 +60,7 @@ public class SlackChannelConsentEvent {
 
     /**
      * The workspace {@code User} (admin) who made the change; null if driven by a system path rather than an admin.
-     * FK'd to {@code "user"(id)} ON DELETE SET NULL ({@code fk_slack_channel_consent_event_actor}) — no JPA
+     * FK'd to {@code "user"(id)} ON DELETE SET NULL ({@code sfk_slack_channel_consent_event_actor}) — no JPA
      * association, matching {@code SlackMessage#getAuthorMemberId()}'s DB-only-FK convention.
      */
     @Column(name = "actor_user_id")

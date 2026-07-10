@@ -69,7 +69,7 @@ public class SlackMessage {
      * {@code MentorChatRequest#developerId}), or {@code null} when the Slack sender is not a linked, workspace-member
      * developer. This is the firewall stamp the conversation projector unions into {@code slack_thread}'s
      * {@code participant_member_ids}. Written via the native ingest insert. FK'd to {@code "user"(id)} ON DELETE SET
-     * NULL ({@code fk_slack_message_author_member}) — no JPA association (scalar reference only, matching
+     * NULL ({@code sfk_slack_message_author_member}) — no JPA association (scalar reference only, matching
      * {@code mentor_slack_thread.chat_thread_id}'s DB-only-FK convention for cross-module references).
      */
     @Column(name = "author_member_id")

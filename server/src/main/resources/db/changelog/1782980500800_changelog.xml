@@ -421,7 +421,7 @@
         <preConditions onFail="MARK_RAN" onFailMessage="slack_participant_consent already present">
             <not><tableExists tableName="slack_participant_consent"/></not>
         </preConditions>
-        <comment>Person-level Slack ingestion/research consent, keyed by (workspace_id, slack_user_id).</comment>
+        <comment>Person-level Slack consent. PK column order (slack_user_id, workspace_id) is Hibernate's canonical alphabetical order for the @IdClass composite — the drift gate diffs against it, so it must not be "fixed" to workspace-first.</comment>
         <sql>
             CREATE TABLE slack_participant_consent (
                 workspace_id BIGINT NOT NULL,
@@ -543,47 +543,23 @@
     </changeSet>
 
     <changeSet author="hephaestus-slack" id="1782980500800-26">
-        <preConditions onFail="MARK_RAN" onFailMessage="fk_slack_message_workspace already present">
-            <not><foreignKeyConstraintExists foreignKeyName="fk_slack_message_workspace"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="sfk_slack_message_workspace already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_slack_message_workspace"/></not>
         </preConditions>
-        <comment>Tenancy FKs for the Slack tables (mirrors fk_practice_workspace). No DB cascade — the workspace purge contributor and the Slack erasure paths remove rows explicitly; the FK guarantees no orphaned Slack PII can outlive its workspace.</comment>
-        <addForeignKeyConstraint baseTableName="slack_message" baseColumnNames="workspace_id" constraintName="fk_slack_message_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="slack_thread" baseColumnNames="workspace_id" constraintName="fk_slack_thread_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="mentor_slack_thread" baseColumnNames="workspace_id" constraintName="fk_mentor_slack_thread_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="slack_monitored_channel" baseColumnNames="workspace_id" constraintName="fk_slack_monitored_channel_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="slack_participant_consent" baseColumnNames="workspace_id" constraintName="fk_slack_participant_consent_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="slack_channel_consent_event" baseColumnNames="workspace_id" constraintName="fk_slack_channel_consent_event_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <comment>Tenancy FKs for the Slack tables (sfk_* = scalar FK, per ADR 0017: DB-level constraint with no JPA association, excluded from the Hibernate drift diff). No DB cascade — the workspace purge contributor and the Slack erasure paths remove rows explicitly; the FK guarantees no orphaned Slack PII can outlive its workspace.</comment>
+        <addForeignKeyConstraint baseTableName="slack_message" baseColumnNames="workspace_id" constraintName="sfk_slack_message_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="slack_thread" baseColumnNames="workspace_id" constraintName="sfk_slack_thread_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="mentor_slack_thread" baseColumnNames="workspace_id" constraintName="sfk_mentor_slack_thread_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="slack_monitored_channel" baseColumnNames="workspace_id" constraintName="sfk_slack_monitored_channel_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="slack_participant_consent" baseColumnNames="workspace_id" constraintName="sfk_slack_participant_consent_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="slack_channel_consent_event" baseColumnNames="workspace_id" constraintName="sfk_slack_channel_consent_event_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
         <rollback>
-            <dropForeignKeyConstraint baseTableName="slack_channel_consent_event" constraintName="fk_slack_channel_consent_event_workspace"/>
-            <dropForeignKeyConstraint baseTableName="slack_participant_consent" constraintName="fk_slack_participant_consent_workspace"/>
-            <dropForeignKeyConstraint baseTableName="slack_monitored_channel" constraintName="fk_slack_monitored_channel_workspace"/>
-            <dropForeignKeyConstraint baseTableName="mentor_slack_thread" constraintName="fk_mentor_slack_thread_workspace"/>
-            <dropForeignKeyConstraint baseTableName="slack_thread" constraintName="fk_slack_thread_workspace"/>
-            <dropForeignKeyConstraint baseTableName="slack_message" constraintName="fk_slack_message_workspace"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-slack" id="1782980500800-27">
-        <preConditions onFail="MARK_RAN" onFailMessage="pk_slack_participant_consent is already workspace-first">
-            <sqlCheck expectedResult="1">
-                SELECT count(*) FROM information_schema.key_column_usage
-                 WHERE constraint_name = 'pk_slack_participant_consent'
-                   AND column_name = 'slack_user_id'
-                   AND ordinal_position = 1
-            </sqlCheck>
-        </preConditions>
-        <comment>Reorder the participant-consent primary key workspace-first, matching every other Slack unique key. The leading workspace_id also serves the hot countByWorkspaceIdAndIngestionOptedOutTrue scan, which a slack_user_id-leading index cannot.</comment>
-        <sql>
-            ALTER TABLE slack_participant_consent DROP CONSTRAINT pk_slack_participant_consent;
-            ALTER TABLE slack_participant_consent
-              ADD CONSTRAINT pk_slack_participant_consent PRIMARY KEY (workspace_id, slack_user_id);
-        </sql>
-        <rollback>
-            <sql>
-                ALTER TABLE slack_participant_consent DROP CONSTRAINT pk_slack_participant_consent;
-                ALTER TABLE slack_participant_consent
-                  ADD CONSTRAINT pk_slack_participant_consent PRIMARY KEY (slack_user_id, workspace_id);
-            </sql>
+            <dropForeignKeyConstraint baseTableName="slack_channel_consent_event" constraintName="sfk_slack_channel_consent_event_workspace"/>
+            <dropForeignKeyConstraint baseTableName="slack_participant_consent" constraintName="sfk_slack_participant_consent_workspace"/>
+            <dropForeignKeyConstraint baseTableName="slack_monitored_channel" constraintName="sfk_slack_monitored_channel_workspace"/>
+            <dropForeignKeyConstraint baseTableName="mentor_slack_thread" constraintName="sfk_mentor_slack_thread_workspace"/>
+            <dropForeignKeyConstraint baseTableName="slack_thread" constraintName="sfk_slack_thread_workspace"/>
+            <dropForeignKeyConstraint baseTableName="slack_message" constraintName="sfk_slack_message_workspace"/>
         </rollback>
     </changeSet>
 
@@ -651,7 +627,7 @@
         <addForeignKeyConstraint
             baseTableName="slack_message"
             baseColumnNames="author_member_id"
-            constraintName="fk_slack_message_author_member"
+            constraintName="sfk_slack_message_author_member"
             referencedTableName="user"
             referencedColumnNames="id"
             onDelete="SET NULL"
@@ -659,14 +635,14 @@
         <addForeignKeyConstraint
             baseTableName="slack_channel_consent_event"
             baseColumnNames="actor_user_id"
-            constraintName="fk_slack_channel_consent_event_actor"
+            constraintName="sfk_slack_channel_consent_event_actor"
             referencedTableName="user"
             referencedColumnNames="id"
             onDelete="SET NULL"
             validate="true"/>
         <rollback>
-            <dropForeignKeyConstraint baseTableName="slack_channel_consent_event" constraintName="fk_slack_channel_consent_event_actor"/>
-            <dropForeignKeyConstraint baseTableName="slack_message" constraintName="fk_slack_message_author_member"/>
+            <dropForeignKeyConstraint baseTableName="slack_channel_consent_event" constraintName="sfk_slack_channel_consent_event_actor"/>
+            <dropForeignKeyConstraint baseTableName="slack_message" constraintName="sfk_slack_message_author_member"/>
             <sql>
                 ALTER TABLE slack_channel_consent_event DROP CONSTRAINT IF EXISTS chk_slack_channel_consent_event_to_state;
                 ALTER TABLE slack_channel_consent_event DROP CONSTRAINT IF EXISTS chk_slack_channel_consent_event_from_state;
