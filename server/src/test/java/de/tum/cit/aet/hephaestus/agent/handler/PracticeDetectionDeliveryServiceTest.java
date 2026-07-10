@@ -66,6 +66,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository userRepository;
+
+    @Mock
     private ReviewerResolver reviewerResolver;
 
     @Mock
@@ -89,6 +92,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             observationRepository,
             pullRequestRepository,
             issueRepository,
+            userRepository,
             reviewerResolver,
             eventPublisher,
             objectMapper

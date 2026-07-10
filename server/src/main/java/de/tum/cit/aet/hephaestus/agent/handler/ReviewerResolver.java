@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.GeneralReviewCommentContentProvider;
+import de.tum.cit.aet.hephaestus.agent.context.providers.GeneralReviewCommentContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -92,7 +92,7 @@ public class ReviewerResolver {
                 continue;
             }
             String body = note.getBody();
-            if (body != null && body.contains(GeneralReviewCommentContentProvider.HEPHAESTUS_MARKER)) {
+            if (body != null && body.contains(GeneralReviewCommentContentSource.HEPHAESTUS_MARKER)) {
                 String normalized = normalizeLogin(note.getAuthor().getLogin());
                 if (normalized != null) {
                     hephaestusLogins.add(normalized);

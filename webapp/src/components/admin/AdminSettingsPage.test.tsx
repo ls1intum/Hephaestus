@@ -17,9 +17,6 @@ const features: FeatureValues = {
 	practicesEnabled: false,
 	mentorEnabled: false,
 	achievementsEnabled: false,
-	leaderboardEnabled: false,
-	progressionEnabled: false,
-	leaguesEnabled: false,
 	practiceReviewAutoTriggerEnabled: true,
 	practiceReviewManualTriggerEnabled: true,
 };
@@ -42,17 +39,16 @@ function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 		addRepositoryError: null,
 		isAddingRepository: false,
 		isRemovingRepository: false,
-		isResettingLeagues: false,
 		onAddRepository: vi.fn(),
 		onRemoveRepository: vi.fn(),
-		onResetLeagues: vi.fn(),
 		features,
+		cohortVisibility: "MENTORS_ONLY",
 		isSavingFeatures: false,
 		onToggleFeature: vi.fn(),
+		onCohortVisibilityChange: vi.fn(),
 		workspaceSlug: "demo",
 		hasSlackConnection: false,
-		slackNotificationsEnabled: false,
-		onSlackSaved: vi.fn(),
+		onWorkspaceRefetch: vi.fn(),
 		slackChannels: [],
 		slackChannelCandidates: [],
 		isLoadingSlackChannels: false,
@@ -69,7 +65,7 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 	it("hides channel monitoring when Slack is disconnected, even if stale channels are present", () => {
 		setup({ hasSlackConnection: false, slackChannels: [staleChannel] });
 
-		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: /slack connection/i })).toBeTruthy();
 		expect(screen.queryByText(/slack channel monitoring/i)).toBeNull();
 		expect(screen.queryByText(/old-channel/i)).toBeNull();
 		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
@@ -78,8 +74,7 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 	it("shows connected Slack management under one integration section", () => {
 		setup({ hasSlackConnection: true, slackChannels: [staleChannel] });
 
-		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: /weekly digest/i })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: /slack connection/i })).toBeTruthy();
 		expect(screen.getByRole("heading", { name: /slack channel monitoring/i })).toBeTruthy();
 		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});

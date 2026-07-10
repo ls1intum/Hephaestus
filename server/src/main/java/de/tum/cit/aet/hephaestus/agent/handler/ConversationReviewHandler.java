@@ -165,11 +165,14 @@ public class ConversationReviewHandler implements JobTypeHandler {
     public void deliver(AgentJob job) {
         var parsed = resultParser.parse(job.getOutput());
         if (!parsed.discarded().isEmpty()) {
-            log.info("Discarded {} findings during parsing: jobId={}", parsed.discarded().size(), job.getId());
+            log.info("Discarded {} observations during parsing: jobId={}", parsed.discarded().size(), job.getId());
         }
-        if (parsed.validFindings().isEmpty()) {
+        if (parsed.validObservations().isEmpty()) {
             throw new JobDeliveryException(
-                "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
+                "No valid observations in agent output: jobId=" +
+                    job.getId() +
+                    ", discarded=" +
+                    parsed.discarded().size()
             );
         }
         // Coherence coercion mirrors the issue path: defect-detector GOOD → NOT_APPLICABLE + severity sentinel.
@@ -180,11 +183,11 @@ public class ConversationReviewHandler implements JobTypeHandler {
                       job.getWorkspace().getId(),
                       WorkArtifact.CONVERSATION_THREAD
                   );
-        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
-            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
+        List<PracticeDetectionResultParser.ValidatedObservation> coercedObservations =
+            PracticeDetectionResultParser.coerceCoherence(parsed.validObservations(), defectDetectorSlugs);
 
         // Persist observations (aboutUserId resolved from metadata about_user_id) in its own transaction.
-        PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
+        PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedObservations);
         log.info(
             "Conversation delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
             result.inserted(),

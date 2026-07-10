@@ -527,10 +527,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             // so the author's later job must NOT evict the reviewer's observations from that PR. Pre-fix (grain
             // was per artifact only) the author's later run would be selected as THE latest run for the PR and
             // the reviewer's row would be excluded → the reviewer would silently vanish from every aggregate.
-            GitProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseGet(() ->
-                    gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+                    gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
                 );
             User reviewer = userRepository.save(TestUserFactory.createUser(200L, "reviewer-user", provider));
 

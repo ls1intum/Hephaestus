@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -49,6 +50,7 @@ public class PracticeDetectionDeliveryService {
     private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
+    private final UserRepository userRepository;
     private final ReviewerResolver reviewerResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
@@ -59,6 +61,7 @@ public class PracticeDetectionDeliveryService {
         ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
+        UserRepository userRepository,
         ReviewerResolver reviewerResolver,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper
@@ -68,6 +71,7 @@ public class PracticeDetectionDeliveryService {
         this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
+        this.userRepository = userRepository;
         this.reviewerResolver = reviewerResolver;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
@@ -323,7 +327,17 @@ public class PracticeDetectionDeliveryService {
             if (aboutUserNode == null || aboutUserNode.isNull() || !aboutUserNode.isNumber()) {
                 throw new JobDeliveryException("Missing about_user_id in job metadata: jobId=" + job.getId());
             }
-            return new Target(WorkArtifact.CONVERSATION_THREAD, threadIdNode.asLong(), aboutUserNode.asLong());
+            User aboutUser = userRepository
+                .findById(aboutUserNode.asLong())
+                .orElseThrow(() ->
+                    new JobDeliveryException(
+                        "Conversation subject user not found: userId=" +
+                            aboutUserNode.asLong() +
+                            ", jobId=" +
+                            job.getId()
+                    )
+                );
+            return new Target(WorkArtifact.CONVERSATION_THREAD, threadIdNode.asLong(), aboutUser);
         }
         if (WorkArtifact.ISSUE.name().equals(artifactType)) {
             JsonNode issueIdNode = metadata.get("issue_id");

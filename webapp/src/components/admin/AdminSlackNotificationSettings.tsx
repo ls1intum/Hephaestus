@@ -7,7 +7,6 @@ import {
 	sendSlackTestMessageMutation,
 	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { SlackChannelCandidate } from "@/api/types.gen";
 import {
 	AlertDialog,
 	AlertDialogAction,

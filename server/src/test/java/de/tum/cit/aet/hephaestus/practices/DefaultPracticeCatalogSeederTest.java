@@ -207,9 +207,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
         // A runtime-created workspace gets the full catalog (mirrors the boot path), dispatched via the executor.
-        verify(areaService, times(11)).createArea(any(), any(), any());
-        verify(practiceService, times(32)).createPractice(any(), any());
-        verify(areaService, times(32)).bindPractice(any(), any(), any());
+        verify(areaService, times(12)).createArea(any(), any(), any());
+        verify(practiceService, times(35)).createPractice(any(), any());
+        verify(areaService, times(35)).bindPractice(any(), any(), any());
     }
 
     @Test
