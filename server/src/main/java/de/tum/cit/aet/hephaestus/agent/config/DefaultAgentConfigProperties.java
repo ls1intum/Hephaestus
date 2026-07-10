@@ -17,5 +17,7 @@ public record DefaultAgentConfigProperties(
     @DefaultValue("Default model") String name,
     @DefaultValue("ANTHROPIC") LlmProvider provider,
     @Nullable String modelName,
-    @Nullable String apiKey
+    @Nullable String apiKey,
+    /** Optional OpenAI-compatible endpoint (self-hosted / proxy models); null uses the provider's default. */
+    @Nullable String baseUrl
 ) {}

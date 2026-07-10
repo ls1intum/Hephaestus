@@ -30,7 +30,14 @@ class DefaultAgentConfigSeederTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     private DefaultAgentConfigSeeder seeder(boolean enabled, String apiKey) {
-        var props = new DefaultAgentConfigProperties(enabled, "Default model", LlmProvider.ANTHROPIC, null, apiKey);
+        var props = new DefaultAgentConfigProperties(
+            enabled,
+            "Default model",
+            LlmProvider.ANTHROPIC,
+            null,
+            apiKey,
+            null
+        );
         return new DefaultAgentConfigSeeder(props, agentConfigService, agentConfigRepository, workspaceRepository);
     }
 

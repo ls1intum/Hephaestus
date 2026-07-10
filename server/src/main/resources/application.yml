@@ -468,6 +468,7 @@ hephaestus:
             provider: ${AGENT_DEFAULT_CONFIG_PROVIDER:ANTHROPIC}
             model-name: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:}
             api-key: ${AGENT_DEFAULT_CONFIG_API_KEY:}
+            base-url: ${AGENT_DEFAULT_CONFIG_BASE_URL:}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION

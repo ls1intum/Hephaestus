@@ -88,6 +88,7 @@ class DefaultAgentConfigSeeder {
             .llmProvider(properties.provider())
             .modelName(properties.modelName())
             .llmApiKey(properties.apiKey())
+            .llmBaseUrl(properties.baseUrl())
             .enabled(true)
             .credentialMode(CredentialMode.PROXY)
             .build();
