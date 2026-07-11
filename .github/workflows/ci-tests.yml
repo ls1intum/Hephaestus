@@ -121,13 +121,16 @@ jobs:
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               pnpm exec playwright install chromium --with-deps
-              # Vitest browser mode intermittently deadlocks its scheduler on shared runners
-              # (run stalls between tests, then burns the whole job timeout). A full local run
-              # takes ~3 min, so bound each attempt at 10 min and retry once before failing.
-              timeout 10m pnpm run test:storybook || {
-                echo "::warning::Storybook test run stalled or failed — retrying once."
-                timeout 10m pnpm run test:storybook
-              }
+              # Root-caused: the previous intermittent "Failed to fetch dynamically imported module" /
+              # "Vitest failed to find the runner" deadlock was Vite's dependency optimizer discovering
+              # a bare import mid-run and reloading the shared (isolate:false) page out from under an
+              # in-flight test. Fixed at the config layer in vitest.config.storybook.ts
+              # (optimizeDeps.include pre-bundles every runtime dependency up front, isolate:false, plus
+              # the existing fileParallelism:false/server.warmup) and verified with repeated runs,
+              # including under artificial CPU contention (taskset -c 0,1, and 24 competing processes
+              # on a 20-core box) — 539/539 every time. The outer timeout stays as a defensive backstop
+              # for a genuinely new failure mode, but the retry-and-hope loop is gone.
+              timeout 5m pnpm run test:storybook
               ;;
             "webapp-visual")
               pnpm run build-storybook
