@@ -127,6 +127,15 @@ public class OutlineDocument {
     @Column(name = "deleted_at")
     private @Nullable Instant deletedAt;
 
+    /**
+     * Set when the document is archived in Outline — soft and recoverable, unlike {@link #deletedAt}: the
+     * body, hash, and author/collaborator fields are all KEPT. Cleared the moment the document is seen live
+     * again (a normal {@code documents.list}/{@code collections.documents} enumeration, both of which exclude
+     * archived documents by default, or an {@code documents.unarchive} refresh).
+     */
+    @Column(name = "archived_at")
+    private @Nullable Instant archivedAt;
+
     /** When the document body was last exported from Outline into the mirror; drives least-recently-exported eviction. */
     @Column(name = "last_materialized_at")
     private @Nullable Instant lastMaterializedAt;
@@ -149,5 +158,10 @@ public class OutlineDocument {
     /** Whether the document has been tombstoned (removed upstream). */
     public boolean isDeleted() {
         return deletedAt != null;
+    }
+
+    /** Whether the document is archived in Outline (soft, recoverable — content is still present). */
+    public boolean isArchived() {
+        return archivedAt != null;
     }
 }

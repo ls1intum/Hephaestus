@@ -323,4 +323,39 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-outline" id="1783164846747-11">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_document.archived_at already present">
+            <not>
+                <columnExists tableName="outline_document" columnName="archived_at"/>
+            </not>
+        </preConditions>
+        <comment>
+            Outline archive is soft/recoverable — distinct from deleted_at (hard tombstone, body wiped).
+            archived_at marks a document archived in the wiki while KEEPING body/hash/authors, so a still-linked
+            reference to an archived-but-recoverable document resolves to its real content, not an empty
+            tombstone placeholder.
+        </comment>
+        <addColumn tableName="outline_document">
+            <column name="archived_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="outline_document" columnName="archived_at"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="outline_collection.description already present">
+            <not>
+                <columnExists tableName="outline_collection" columnName="description"/>
+            </not>
+        </preConditions>
+        <comment>Collection description as shown in Outline, captured server-side from collections.list (truncated to fit on write).</comment>
+        <addColumn tableName="outline_collection">
+            <column name="description" type="VARCHAR(2048)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="outline_collection" columnName="description"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

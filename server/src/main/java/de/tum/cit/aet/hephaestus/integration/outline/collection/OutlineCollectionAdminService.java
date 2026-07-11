@@ -59,6 +59,9 @@ public class OutlineCollectionAdminService {
      */
     private static final int CANDIDATES_MAX_PAGES = 5;
 
+    /** Matches {@code outline_collection.description}'s column width. */
+    private static final int MAX_DESCRIPTION_LENGTH = 2048;
+
     private final ConnectionService connectionService;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineDocumentRepository documentRepository;
@@ -127,6 +130,7 @@ public class OutlineCollectionAdminService {
                     c.urlId(),
                     c.color(),
                     c.icon(),
+                    c.description(),
                     mirrored.contains(c.id())
                 )
             )
@@ -172,6 +176,7 @@ public class OutlineCollectionAdminService {
         row.setUrlId(live.urlId());
         row.setColor(live.color());
         row.setIcon(live.icon());
+        row.setDescription(truncateDescription(live.description()));
         row.setState(MirrorState.ENABLED);
         row.setSyncStatus(SyncStatus.PENDING);
         OutlineCollection saved = collectionRepository.save(row);
@@ -306,5 +311,15 @@ public class OutlineCollectionAdminService {
             .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
             .map(BearerToken::token)
             .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
+    }
+
+    /** Truncates a collection description to fit {@code outline_collection.description}'s column width. */
+    private static String truncateDescription(String description) {
+        if (description == null) {
+            return null;
+        }
+        return description.length() <= MAX_DESCRIPTION_LENGTH
+            ? description
+            : description.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 }

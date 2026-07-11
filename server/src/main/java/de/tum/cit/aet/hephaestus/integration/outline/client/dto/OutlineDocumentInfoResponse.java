@@ -26,6 +26,8 @@ public record OutlineDocumentInfoResponse(@Nullable Data data) {
         @Nullable String collectionId,
         OutlineDocumentListResponse.@Nullable OutlineUser createdBy,
         OutlineDocumentListResponse.@Nullable OutlineUser updatedBy,
-        @Nullable List<String> collaboratorIds
+        @Nullable List<String> collaboratorIds,
+        /** When the document was archived upstream, or {@code null} when live. */
+        @Nullable Instant archivedAt
     ) {}
 }

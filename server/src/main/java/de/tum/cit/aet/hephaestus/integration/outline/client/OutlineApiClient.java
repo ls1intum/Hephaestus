@@ -254,9 +254,57 @@ public class OutlineApiClient {
                 data.collectionId(),
                 data.createdBy(),
                 data.updatedBy(),
-                data.collaboratorIds()
+                data.collaboratorIds(),
+                data.archivedAt()
             )
         );
+    }
+
+    /**
+     * Lists a collection's ARCHIVED documents ({@code documents.list} with {@code statusFilter: ["archived"]}).
+     * Outline's default {@code documents.list} (and {@code collections.documents}) excludes archived documents
+     * entirely — archive is soft and recoverable, not a delete — so without this second call the live-enumeration
+     * tombstone-by-absence sweep would wipe an archived document as if it had been permanently deleted. Same
+     * offset/limit paging as {@link #listDocuments}.
+     */
+    public List<OutlineDocumentListResponse.Meta> listArchivedDocuments(
+        String serverUrl,
+        String token,
+        String collectionId
+    ) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        List<OutlineDocumentListResponse.Meta> all = new ArrayList<>();
+        for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
+            OutlineDocumentListResponse body = post(
+                resolvedUrl,
+                token,
+                "/api/documents.list",
+                Map.of(
+                    "collectionId",
+                    collectionId,
+                    "offset",
+                    offset,
+                    "limit",
+                    PAGE_LIMIT,
+                    "sort",
+                    "updatedAt",
+                    "direction",
+                    "DESC",
+                    "statusFilter",
+                    List.of("archived")
+                ),
+                OutlineDocumentListResponse.class
+            );
+            List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
+            if (pageData == null || pageData.isEmpty()) {
+                break;
+            }
+            all.addAll(pageData);
+            if (pageData.size() < PAGE_LIMIT) {
+                break;
+            }
+        }
+        return all;
     }
 
     /**

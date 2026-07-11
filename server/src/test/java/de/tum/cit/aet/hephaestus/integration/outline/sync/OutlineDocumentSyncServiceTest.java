@@ -130,10 +130,13 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         lenient()
             .when(outlineApiClient.listCollections(SERVER_URL, "token"))
             .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
+                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
             );
         lenient()
             .when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID))
+            .thenReturn(List.of());
+        lenient()
+            .when(outlineApiClient.listArchivedDocuments(SERVER_URL, "token", COLLECTION_ID))
             .thenReturn(List.of());
     }
 
@@ -147,6 +150,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             id,
             null,
             COLLECTION_ID,
+            null,
             null,
             null,
             null
@@ -165,7 +169,25 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             COLLECTION_ID,
             null,
             null,
+            null,
             null
+        );
+    }
+
+    private static OutlineDocumentListResponse.Meta archivedMeta(String id, Instant updatedAt, Instant archivedAt) {
+        return new OutlineDocumentListResponse.Meta(
+            id,
+            "/doc/" + id,
+            id,
+            T1,
+            updatedAt,
+            id,
+            null,
+            COLLECTION_ID,
+            null,
+            null,
+            null,
+            archivedAt
         );
     }
 
@@ -254,6 +276,194 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
     }
 
+    // --- archive is not delete: soft, recoverable, content kept ---
+
+    @Test
+    void refreshDocument_archiveEvent_keepsContentAndStampsArchivedAt_noApiCall() {
+        OutlineDocument row = mirrored("doc-1");
+        row.setBodyMarkdown("# body");
+        row.setContentHash("hash");
+        row.setCreatedBySubject("user-1");
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.of(row));
+
+        service(10).refreshDocument(WORKSPACE, "documents.archive", "doc-1");
+
+        assertThat(row.isDeleted()).isFalse();
+        assertThat(row.getArchivedAt()).isNotNull();
+        // Unlike a tombstone, archiving KEEPS the body, hash, and authors.
+        assertThat(row.getBodyMarkdown()).isEqualTo("# body");
+        assertThat(row.getContentHash()).isEqualTo("hash");
+        assertThat(row.getCreatedBySubject()).isEqualTo("user-1");
+        verify(outlineApiClient, never()).getDocumentInfo(anyString(), anyString(), anyString());
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void refreshDocument_archiveEvent_noMirroredRow_isNoOp() {
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.empty());
+
+        service(10).refreshDocument(WORKSPACE, "documents.archive", "doc-1");
+
+        verify(documentRepository, never()).save(any());
+    }
+
+    @Test
+    void refreshDocument_unarchiveEvent_refreshesLiveAndClearsArchivedAt() {
+        OutlineDocument row = mirrored("doc-1");
+        row.setArchivedAt(Instant.parse("2026-01-15T00:00:00Z"));
+        row.setBodyMarkdown("# stale");
+        row.setContentHash("stale-hash");
+        row.setOutlineUpdatedAt(T1);
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.of(row));
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).refreshDocument(WORKSPACE, "documents.unarchive", "doc-1");
+
+        assertThat(row.getArchivedAt()).isNull();
+        assertThat(row.getBodyMarkdown()).isEqualTo("# fresh");
+    }
+
+    // --- payload.model (webhook trust): skip documents.info when usable, fall back otherwise ---
+
+    @Test
+    void refreshDocument_withUsablePrefetchedMeta_skipsDocumentsInfo() {
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.empty());
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1", meta("doc-1", T2));
+
+        verify(outlineApiClient, never()).getDocumentInfo(anyString(), anyString(), anyString());
+        verify(outlineApiClient).exportDocument(SERVER_URL, "token", "doc-1");
+        verify(documentRepository).save(
+            org.mockito.ArgumentMatchers.argThat(
+                d -> "doc-1".equals(d.getDocumentId()) && "# fresh".equals(d.getBodyMarkdown())
+            )
+        );
+    }
+
+    @Test
+    void refreshDocument_prefetchedMetaMissingCollectionId_fallsBackToDocumentsInfo() {
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.empty());
+        OutlineDocumentListResponse.Meta incomplete = new OutlineDocumentListResponse.Meta(
+            "doc-1",
+            null,
+            "Doc 1",
+            T1,
+            T2,
+            "doc-1",
+            null,
+            null, // no collectionId — unusable
+            null,
+            null,
+            null,
+            null
+        );
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1", incomplete);
+
+        verify(outlineApiClient).getDocumentInfo(SERVER_URL, "token", "doc-1");
+    }
+
+    @Test
+    void refreshDocument_nullPrefetchedMeta_fallsBackToDocumentsInfo() {
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.empty());
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1", null);
+
+        verify(outlineApiClient).getDocumentInfo(SERVER_URL, "token", "doc-1");
+    }
+
+    // --- archived documents: enumerated separately, never tombstoned by absence ---
+
+    @Test
+    void syncWorkspace_archivedDocument_isSeenNotTombstoned_andNotReExportedWhenBodyPresent() {
+        OutlineDocument existingArchived = mirrored("doc-archived");
+        existingArchived.setBodyMarkdown("# already have it");
+        existingArchived.setContentHash("hash");
+        when(documentRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION)).thenReturn(
+            List.of(existingArchived)
+        );
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of());
+        when(outlineApiClient.listArchivedDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(archivedMeta("doc-archived", T1, T2))
+        );
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        assertThat(existingArchived.isDeleted()).isFalse();
+        assertThat(existingArchived.getArchivedAt()).isEqualTo(T2);
+        assertThat(existingArchived.getBodyMarkdown()).isEqualTo("# already have it");
+        // A body is already present — never re-export just because it is archived.
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), eq("doc-archived"));
+        // The clean pass still completes: the archived doc counted into the seen set.
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
+    }
+
+    @Test
+    void syncWorkspace_archivedDocumentWithNoBody_exportsOnceToBackfillIt() {
+        when(documentRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION)).thenReturn(List.of());
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of());
+        when(outlineApiClient.listArchivedDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(archivedMeta("doc-archived", T1, T2))
+        );
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-archived")).thenReturn("# backfilled");
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        verify(outlineApiClient).exportDocument(SERVER_URL, "token", "doc-archived");
+        verify(documentRepository).save(
+            org.mockito.ArgumentMatchers.argThat(
+                d -> "doc-archived".equals(d.getDocumentId()) && "# backfilled".equals(d.getBodyMarkdown())
+            )
+        );
+    }
+
+    @Test
+    void syncWorkspace_archivedDocumentUpsert_neverAdvancesTheLiveWatermark() {
+        // Only the archived doc is seen (no live docs); the watermark stays untouched — archived content
+        // is deliberately excluded from the freshness signal (see the sync service's javadoc).
+        when(documentRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION)).thenReturn(List.of());
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of());
+        when(outlineApiClient.listArchivedDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(archivedMeta("doc-archived", T1, T2))
+        );
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-archived")).thenReturn("# backfilled");
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        assertThat(collection.getDocumentsSyncedThrough()).isNull();
+    }
+
     @Test
     void refreshDocument_updateOutsideMirroredCollections_isIgnored() {
         when(
@@ -270,6 +480,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
                     "doc-x",
                     null,
                     "other-col",
+                    null,
                     null,
                     null,
                     null
@@ -401,7 +612,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
                     COLLECTION_ID,
                     new OutlineDocumentListResponse.OutlineUser("user-1", "Ada"),
                     new OutlineDocumentListResponse.OutlineUser("user-2", "Grace"),
-                    List.of("user-1", "user-2", "user-3")
+                    List.of("user-1", "user-2", "user-3"),
+                    null
                 )
             )
         );

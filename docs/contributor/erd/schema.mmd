@@ -610,6 +610,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         INTEGER documents_upstream
         INTEGER exports_skipped_for_budget
+        VARCHAR(2048) description
     }
 
     OutlineDocument {
@@ -636,6 +637,7 @@ erDiagram
         TIMESTAMPTZ outline_created_at
         JSONB collaborator_subjects
         TIMESTAMPTZ body_evicted_at
+        TIMESTAMPTZ archived_at
     }
 
     OutlineDocumentEvent {

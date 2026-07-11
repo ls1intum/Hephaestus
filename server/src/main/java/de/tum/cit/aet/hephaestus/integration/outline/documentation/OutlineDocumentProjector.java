@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.identity.OutlineIdentityResolver;
@@ -67,15 +69,18 @@ public class OutlineDocumentProjector implements DocumentProjection {
     );
 
     private final OutlineDocumentRepository documentRepository;
+    private final OutlineCollectionRepository collectionRepository;
     private final ConnectionService connectionService;
     private final OutlineIdentityResolver identityResolver;
 
     public OutlineDocumentProjector(
         OutlineDocumentRepository documentRepository,
+        OutlineCollectionRepository collectionRepository,
         ConnectionService connectionService,
         OutlineIdentityResolver identityResolver
     ) {
         this.documentRepository = documentRepository;
+        this.collectionRepository = collectionRepository;
         this.connectionService = connectionService;
         this.identityResolver = identityResolver;
     }
@@ -83,10 +88,11 @@ public class OutlineDocumentProjector implements DocumentProjection {
     @Override
     public List<ProjectedDocument> documentsForWorkspace(long workspaceId) {
         AuthorContext authors = authorContext(workspaceId);
+        Map<String, String> collectionNames = collectionNames(workspaceId);
         return documentRepository
             .findForProjection(workspaceId, PageRequest.of(0, MAX_DOCUMENTS))
             .stream()
-            .map(doc -> project(doc, authors))
+            .map(doc -> project(doc, authors, collectionNames))
             .toList();
     }
 
@@ -126,10 +132,11 @@ public class OutlineDocumentProjector implements DocumentProjection {
             return List.of();
         }
         AuthorContext authors = authorContext(workspaceId);
+        Map<String, String> collectionNames = collectionNames(workspaceId);
         return documentRepository
             .findByWorkspaceIdAndReferenceIn(workspaceId, tokens)
             .stream()
-            .map(doc -> project(doc, authors))
+            .map(doc -> project(doc, authors, collectionNames))
             .toList();
     }
 
@@ -147,7 +154,11 @@ public class OutlineDocumentProjector implements DocumentProjection {
     }
 
     /** Maps a mirrored row to the agent view; a tombstoned/evicted document serves a null body. */
-    private static ProjectedDocument project(OutlineDocument doc, AuthorContext authors) {
+    private static ProjectedDocument project(
+        OutlineDocument doc,
+        AuthorContext authors,
+        Map<String, String> collectionNames
+    ) {
         boolean deleted = doc.isDeleted();
         String body = deleted ? null : doc.getBodyMarkdown();
         return new ProjectedDocument(
@@ -164,8 +175,26 @@ public class OutlineDocumentProjector implements DocumentProjection {
             doc.getUpdatedByName(),
             doc.getUpdatedBySubject(),
             authors.memberIdFor(doc.getUpdatedBySubject()),
-            collaborators(doc, authors)
+            collaborators(doc, authors),
+            doc.isArchived(),
+            collectionNames.get(doc.getCollectionId())
         );
+    }
+
+    /**
+     * The workspace's collection id → display name map, loaded once per projection call (mirrors
+     * {@link #authorContext}'s per-batch resolution). A collection with no captured name is simply
+     * absent, so {@code Map#get} degrades to {@code null} — the graceful floor for {@link
+     * DocumentProjection.ProjectedDocument#collectionName}.
+     */
+    private Map<String, String> collectionNames(long workspaceId) {
+        Map<String, String> names = new HashMap<>();
+        for (OutlineCollection collection : collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId)) {
+            if (collection.getName() != null) {
+                names.put(collection.getCollectionId(), collection.getName());
+            }
+        }
+        return names;
     }
 
     /**

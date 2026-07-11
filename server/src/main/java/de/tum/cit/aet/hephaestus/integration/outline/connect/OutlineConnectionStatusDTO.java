@@ -16,7 +16,8 @@ public record OutlineConnectionStatusDTO(
     @NonNull
     @Schema(description = "Whether the Outline change-notification webhook subscription is registered")
     Boolean webhookRegistered,
-    @Schema(description = "When a mirrored collection last finished a clean sync pass, if any") Instant lastSyncedAt,
+    @Schema(description = "When a mirrored collection last completed a full reconcile pass, if any")
+    Instant lastSyncedAt,
     @NonNull
     @Schema(description = "Live (non-tombstoned) mirrored document count across all collections")
     Long documentCount,

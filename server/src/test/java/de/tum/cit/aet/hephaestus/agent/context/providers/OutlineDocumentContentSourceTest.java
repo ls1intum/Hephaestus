@@ -139,7 +139,59 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
             authorName,
             "0aa1bb2c-user",
             authorMemberId,
-            collaborators
+            collaborators,
+            false,
+            null
+        );
+    }
+
+    /** An archived (soft, recoverable) document: not deleted, body intact, {@code archived=true}. */
+    private static ProjectedDocument archivedDoc(String collection, String slug, String title, String body) {
+        return new ProjectedDocument(
+            collection,
+            slug,
+            title,
+            body,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            true,
+            null
+        );
+    }
+
+    /** A document carrying a human-facing collection display name distinct from its path slug. */
+    private static ProjectedDocument docWithCollectionName(
+        String collectionSlug,
+        String collectionName,
+        String slug,
+        String title,
+        String body
+    ) {
+        return new ProjectedDocument(
+            collectionSlug,
+            slug,
+            title,
+            body,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            false,
+            collectionName
         );
     }
 
@@ -212,6 +264,49 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         assertThat(first.get(tombstonePath)).isEqualTo(second.get(tombstonePath));
     }
 
+    // --- title de-duplication: documents.export bodies always open with "# {title}" ---
+
+    @Test
+    void reviewPathDoesNotDuplicateTheHeadingWhenTheBodyAlreadyOpensWithIt() {
+        String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
+        // The exported body already carries its own "# Onboarding Guide" H1 — exactly what
+        // documents.export always emits.
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(doc("Engineering", "onboarding-guide", "Onboarding Guide", "# Onboarding Guide\n\nWelcome."))
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/onboarding-guide.md"),
+            StandardCharsets.UTF_8
+        );
+        // The heading appears exactly once, carried over from the body — never duplicated.
+        assertThat(rendered.split("# Onboarding Guide", -1)).hasSize(2);
+        assertThat(rendered).contains("# Onboarding Guide\n\nWelcome.");
+    }
+
+    @Test
+    void reviewPathPrependsTheHeadingWhenTheBodyDoesNotAlreadyCarryIt() {
+        String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(doc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome — no leading heading here."))
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/onboarding-guide.md"),
+            StandardCharsets.UTF_8
+        );
+        assertThat(rendered).contains("# Onboarding Guide\n\nWelcome — no leading heading here.");
+        assertThat(rendered.split("# Onboarding Guide", -1)).hasSize(2);
+    }
+
     // --- (b) mentor path: single JSON array ---
 
     @Test
@@ -245,6 +340,31 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         assertThat(entry.has("body")).isTrue();
         assertThat(entry.has("verdict")).isFalse();
         assertThat(entry.has("severity")).isFalse();
+    }
+
+    @Test
+    void mentorPathEmitsCollectionNameOnlyWhenCaptured() throws Exception {
+        when(projection.documentsForWorkspace(WORKSPACE_ID)).thenReturn(
+            List.of(
+                docWithCollectionName(
+                    "engineering",
+                    "Engineering Docs",
+                    "onboarding-guide",
+                    "Onboarding Guide",
+                    "Welcome."
+                ),
+                doc("product", "roadmap", "Roadmap", "Q3 plans.") // no captured collection name
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(mentorRequest(), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/outline_docs.json"));
+        // "collection" stays the path/slug identity; "collection_name" is the additive human label.
+        assertThat(root.get(0).get("collection").asString()).isEqualTo("engineering");
+        assertThat(root.get(0).get("collection_name").asString()).isEqualTo("Engineering Docs");
+        assertThat(root.get(1).has("collection_name")).isFalse();
     }
 
     // --- (b') authorship exposure ---
@@ -345,6 +465,55 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         // Upstream freshness renders as a date inside the quarantined content.
         assertThat(rendered).contains("_Last updated: 2026-02-03_");
         assertThat(rendered.indexOf("_Last updated: 2026-02-03_")).isGreaterThan(bannerEnd);
+    }
+
+    @Test
+    void reviewPathBylineShowsTheCollectionDisplayNameAheadOfAuthor() {
+        String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(
+                docWithCollectionName(
+                    "engineering",
+                    "Engineering Docs",
+                    "onboarding-guide",
+                    "Onboarding Guide",
+                    "Welcome."
+                )
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/onboarding-guide.md"),
+            StandardCharsets.UTF_8
+        );
+        assertThat(rendered).contains("_Collection: Engineering Docs_");
+        // The path segment stays the slug, not the display name.
+        assertThat(files.keySet()).containsExactly("inputs/context/outline/engineering/onboarding-guide.md");
+    }
+
+    @Test
+    void reviewPathRendersArchivedDocumentWithContentIntactPlusStatusMarker() {
+        String body = "See https://wiki.example.com/doc/legacy-adr-a1b2c3";
+        extractsReferences(body, "https://wiki.example.com/doc/legacy-adr-a1b2c3");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(archivedDoc("Engineering", "legacy-adr", "Legacy ADR", "This decision was superseded."))
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        String rendered = new String(
+            files.get("inputs/context/outline/engineering/legacy-adr.md"),
+            StandardCharsets.UTF_8
+        );
+        // Archived is NOT the tombstone placeholder — the real content still renders.
+        assertThat(rendered).contains("This decision was superseded.");
+        assertThat(rendered).doesNotContain("no longer available");
+        assertThat(rendered).contains("_Status: archived in the wiki (may be superseded)_");
     }
 
     @Test

@@ -21,6 +21,7 @@ public record OutlineCollectionDTO(
     @Schema(description = "Outline url id (the short slug in collection URLs)") String urlId,
     @Schema(description = "Collection color as configured in Outline") String color,
     @Schema(description = "Collection icon as configured in Outline") String icon,
+    @Schema(description = "Collection description as shown in Outline") String description,
     @NonNull
     @Schema(description = "Mirror lifecycle state (PAUSED freezes sync but keeps documents)")
     MirrorState state,
@@ -34,7 +35,7 @@ public record OutlineCollectionDTO(
     Integer documentsUpstream,
     @Schema(description = "Exports the last pass skipped because the shared budget ran out (0 on a clean pass)")
     Integer exportsSkippedForBudget,
-    @Schema(description = "When the last clean sync pass finished, if any") Instant lastSyncedAt,
+    @Schema(description = "When this collection last completed a full reconcile pass, if any") Instant lastSyncedAt,
     @Schema(description = "Last sync failure for this collection, cleared on the next clean pass") String lastSyncError,
     @NonNull @Schema(description = "When the collection was registered for mirroring") Instant createdAt
 ) {
@@ -47,6 +48,7 @@ public record OutlineCollectionDTO(
             collection.getUrlId(),
             collection.getColor(),
             collection.getIcon(),
+            collection.getDescription(),
             collection.getState(),
             collection.getSyncStatus(),
             documentCount,

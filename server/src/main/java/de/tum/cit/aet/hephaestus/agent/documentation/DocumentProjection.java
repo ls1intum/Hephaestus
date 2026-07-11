@@ -61,6 +61,13 @@ public interface DocumentProjection {
      * name still renders). {@code collaborators} lists everyone who edited the document (the middle editors
      * the creator/last-editor pair misses); a collaborator's name is only known when they are also the
      * creator or last editor, so entries may carry subject + member id only.
+     *
+     * <p>{@code archived} is Outline's soft, recoverable "archived in the wiki" state — distinct from
+     * {@code deleted}: an archived document keeps its {@code bodyMarkdown} (unlike a tombstone, which nulls
+     * it), so a renderer should surface both facts distinctly rather than treating archived as another
+     * flavor of gone. {@code collectionName} is the collection's human-facing display name — as opposed to
+     * {@link #collectionSlug}, which stays the stable path/directory identity — {@code null} when the
+     * mirror has not captured a name for the collection.
      */
     record ProjectedDocument(
         String collectionSlug,
@@ -76,14 +83,16 @@ public interface DocumentProjection {
         @Nullable String updatedByName,
         @Nullable String updatedBySubject,
         @Nullable Long updatedByMemberId,
-        List<Collaborator> collaborators
+        List<Collaborator> collaborators,
+        boolean archived,
+        @Nullable String collectionName
     ) {
         /** One document editor: provider-native subject, display name if known, resolved member id if linked. */
         public record Collaborator(String subject, @Nullable String name, @Nullable Long memberId) {}
 
         /**
          * An author-less projection (no substrate captured / tombstoned) — every author field {@code null},
-         * no collaborators, no timestamps.
+         * no collaborators, no timestamps, not archived, no collection name.
          */
         public static ProjectedDocument withoutAuthors(
             String collectionSlug,
@@ -106,7 +115,9 @@ public interface DocumentProjection {
                 null,
                 null,
                 null,
-                List.of()
+                List.of(),
+                false,
+                null
             );
         }
     }

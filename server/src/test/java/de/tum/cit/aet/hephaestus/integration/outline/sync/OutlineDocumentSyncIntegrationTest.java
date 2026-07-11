@@ -117,7 +117,16 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
             .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
+                List.of(
+                    new OutlineCollectionListResponse.Collection(
+                        COLLECTION_ID,
+                        "Design",
+                        "col1",
+                        null,
+                        null,
+                        "Design docs"
+                    )
+                )
             );
         lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha");
         lenient().when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_TWO))).thenReturn("# Beta");
@@ -151,7 +160,8 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
                     COLLECTION_ID,
                     AUTHOR,
                     AUTHOR,
-                    List.of("user-1", "user-2")
+                    List.of("user-1", "user-2"),
+                    null
                 )
             )
             .toList();
@@ -188,6 +198,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         assertThat(collection.getLastSyncError()).isNull();
         assertThat(collection.getName()).isEqualTo("Design");
         assertThat(collection.getUrlId()).isEqualTo("col1");
+        assertThat(collection.getDescription()).isEqualTo("Design docs");
         // Coverage counters: everything upstream mirrored, nothing skipped.
         assertThat(collection.getDocumentsUpstream()).isEqualTo(2);
         assertThat(collection.getExportsSkippedForBudget()).isZero();
@@ -235,6 +246,52 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         OutlineDocument docOne = documentById(DOC_ONE);
         assertThat(docOne.isDeleted()).isFalse();
         assertThat(docOne.getBodyMarkdown()).isNotBlank();
+    }
+
+    @Test
+    void archivedDocument_isNotTombstonedByAbsence_realPostgresRoundTrip() {
+        stubCollection(List.of(DOC_ONE, DOC_TWO), T1, T1);
+        scheduler.syncAllNow();
+        clearInvocations(outlineApiClient);
+
+        // doc-2 is archived upstream (soft, recoverable): it vanishes from documents.list/collections.documents
+        // (Outline's default listing excludes archived docs) but is enumerated separately via
+        // listArchivedDocuments — the second call the reconcile now makes per collection.
+        stubCollection(List.of(DOC_ONE), T1, T1);
+        Instant archivedAt = Instant.parse("2026-03-01T00:00:00Z");
+        when(outlineApiClient.listArchivedDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(
+            List.of(
+                new OutlineDocumentListResponse.Meta(
+                    DOC_TWO,
+                    "/doc/" + DOC_TWO,
+                    DOC_TWO.toUpperCase(java.util.Locale.ROOT),
+                    T0,
+                    T1,
+                    DOC_TWO,
+                    null,
+                    COLLECTION_ID,
+                    AUTHOR,
+                    AUTHOR,
+                    List.of("user-1"),
+                    archivedAt
+                )
+            )
+        );
+
+        scheduler.syncAllNow();
+
+        OutlineDocument docTwo = documentById(DOC_TWO);
+        // Archived is NOT tombstoned: the row survives, with its real content intact — the tombstone CHECK
+        // (ck_outline_document_tombstone) is unaffected since deleted_at stays null.
+        assertThat(docTwo.isDeleted()).isFalse();
+        assertThat(docTwo.getArchivedAt()).isEqualTo(archivedAt);
+        assertThat(docTwo.getBodyMarkdown()).isNotBlank();
+        // A body was already present from the first sync — the archived-enumeration pass must not re-export it.
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), eq(DOC_TWO));
+
+        OutlineCollection collection = onlyCollection();
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getLastSyncError()).isNull();
     }
 
     @Test

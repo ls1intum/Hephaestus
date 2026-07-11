@@ -29,7 +29,13 @@ public record OutlineDocumentListResponse(@Nullable List<Meta> data, @Nullable O
         @Nullable String collectionId,
         @Nullable OutlineUser createdBy,
         @Nullable OutlineUser updatedBy,
-        @Nullable List<String> collaboratorIds
+        @Nullable List<String> collaboratorIds,
+        /**
+         * When the document was archived upstream, or {@code null} when live — Outline's default
+         * {@code documents.list}/{@code collections.documents} exclude archived documents entirely, so a
+         * {@code null} here from those endpoints means "not archived", never "unknown".
+         */
+        @Nullable Instant archivedAt
     ) {}
 
     /** Document author reference — id and display name only; email is deliberately never captured. */

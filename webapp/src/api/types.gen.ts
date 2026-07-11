@@ -1852,7 +1852,7 @@ export type OutlineConnectionStatus = {
      */
     erroredCollections: number;
     /**
-     * When a mirrored collection last finished a clean sync pass, if any
+     * When a mirrored collection last completed a full reconcile pass, if any
      */
     lastSyncedAt?: Date;
     /**
@@ -1886,6 +1886,10 @@ export type OutlineCollectionCandidate = {
      */
     color?: string;
     /**
+     * Collection description as shown in Outline
+     */
+    description?: string;
+    /**
      * Collection icon as configured in Outline
      */
     icon?: string;
@@ -1916,6 +1920,10 @@ export type OutlineCollection = {
      */
     createdAt: Date;
     /**
+     * Collection description as shown in Outline
+     */
+    description?: string;
+    /**
      * Live (non-tombstoned) mirrored document count
      */
     documentCount: number;
@@ -1940,7 +1948,7 @@ export type OutlineCollection = {
      */
     lastSyncError?: string;
     /**
-     * When the last clean sync pass finished, if any
+     * When this collection last completed a full reconcile pass, if any
      */
     lastSyncedAt?: Date;
     /**

@@ -64,6 +64,12 @@ import org.springframework.transaction.annotation.Transactional;
  * skipped for budget. Visibility loss (collection absent from {@code collections.list}) records an error
  * and skips the collection but never tombstones its documents: forbidden/gone is not "documents removed".
  * An HTTP 429 aborts the pass — progress so far commits and the remainder resumes next tick.
+ *
+ * <p>Archive is soft/recoverable, NOT delete: {@code documents.archive} only stamps {@code archivedAt}
+ * (body/hash/authors kept), and both {@code documents.list} and {@code collections.documents} exclude
+ * archived documents by default, so {@link #syncOneCollection} runs one extra enumeration
+ * ({@link #syncArchivedDocuments}) to keep them in the {@code seen} set — otherwise the tombstone-by-absence
+ * sweep above would wipe an archived-but-recoverable document as if it had been permanently deleted.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -72,13 +78,20 @@ public class OutlineDocumentSyncService {
     private static final Logger log = LoggerFactory.getLogger(OutlineDocumentSyncService.class);
 
     /** Document events whose meaning is "the mirrored body must go away" — no API round-trip needed. */
-    private static final Set<String> TOMBSTONE_EVENTS = Set.of(
-        "documents.delete",
-        "documents.permanent_delete",
-        "documents.archive"
-    );
+    private static final Set<String> TOMBSTONE_EVENTS = Set.of("documents.delete", "documents.permanent_delete");
+
+    /**
+     * The archive event is soft/recoverable — NOT a delete. Outline keeps an archived document's content
+     * intact and lets it be restored, so unlike {@link #TOMBSTONE_EVENTS} this never wipes the body/hash/
+     * authors; it only stamps {@code archivedAt} on the mirrored row. No API round-trip needed either: the
+     * event itself is the only fact that changed.
+     */
+    private static final String ARCHIVE_EVENT = "documents.archive";
 
     private static final int MAX_ERROR_LENGTH = 2048;
+
+    /** Matches {@code outline_collection.description}'s column width. */
+    private static final int MAX_DESCRIPTION_LENGTH = 2048;
 
     private final ConnectionService connectionService;
     private final OutlineApiClient outlineApiClient;
@@ -219,12 +232,36 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Webhook targeted refresh of one document (≤2 API calls). Delete-shaped events tombstone the
-     * mirrored row without any call; everything else resolves {@code documents.info} — a vanished
-     * document tombstones, a live one is exported iff its collection is a mirrored ENABLED collection.
+     * Webhook targeted refresh of one document (≤2 API calls) — no pre-fetched metadata available.
+     * Equivalent to {@link #refreshDocument(long, String, String, OutlineDocumentListResponse.Meta)}
+     * with a {@code null} {@code prefetchedMeta}.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void refreshDocument(long workspaceId, String eventName, String documentId) {
+        refreshDocument(workspaceId, eventName, documentId, null);
+    }
+
+    /**
+     * Webhook targeted refresh of one document. Delete-shaped events tombstone the mirrored row without
+     * any call; {@link #ARCHIVE_EVENT} stamps {@code archivedAt} in place, also without a call — the
+     * body/hash/authors are untouched, since archiving is soft and recoverable. Everything else resolves
+     * metadata and exports iff its collection is a mirrored ENABLED collection: a vanished document
+     * tombstones, a live one upserts (which clears any stale {@code archivedAt} once the document is seen
+     * live again, e.g. via {@code documents.unarchive}).
+     *
+     * <p>{@code prefetchedMeta} is the webhook payload's own {@code model} — authenticated by the whole
+     * envelope's HMAC, so a usable one (carrying at least an id and a collection id) is trusted as metadata
+     * and the {@code documents.info} round-trip is skipped entirely; only the body export still calls out,
+     * since the payload never carries content. A {@code null}/incomplete {@code prefetchedMeta} falls back
+     * to fetching {@code documents.info} as before.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void refreshDocument(
+        long workspaceId,
+        String eventName,
+        String documentId,
+        OutlineDocumentListResponse.@Nullable Meta prefetchedMeta
+    ) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null || documentId == null || documentId.isBlank()) {
             return;
@@ -238,17 +275,31 @@ public class OutlineDocumentSyncService {
             mirrored.filter(d -> !d.isDeleted()).ifPresent(d -> tombstone(d, Instant.now()));
             return;
         }
+        if (ARCHIVE_EVENT.equals(eventName)) {
+            mirrored
+                .filter(d -> !d.isDeleted())
+                .ifPresent(d -> {
+                    d.setArchivedAt(Instant.now());
+                    documentRepository.save(d);
+                });
+            return;
+        }
         try {
-            Optional<OutlineDocumentListResponse.Meta> info = outlineApiClient.getDocumentInfo(
-                ctx.serverUrl(),
-                ctx.token(),
-                documentId
-            );
-            if (info.isEmpty()) {
-                mirrored.filter(d -> !d.isDeleted()).ifPresent(d -> tombstone(d, Instant.now()));
-                return;
+            OutlineDocumentListResponse.Meta meta;
+            if (prefetchedMeta != null && prefetchedMeta.id() != null && prefetchedMeta.collectionId() != null) {
+                meta = prefetchedMeta;
+            } else {
+                Optional<OutlineDocumentListResponse.Meta> info = outlineApiClient.getDocumentInfo(
+                    ctx.serverUrl(),
+                    ctx.token(),
+                    documentId
+                );
+                if (info.isEmpty()) {
+                    mirrored.filter(d -> !d.isDeleted()).ifPresent(d -> tombstone(d, Instant.now()));
+                    return;
+                }
+                meta = info.get();
             }
-            OutlineDocumentListResponse.Meta meta = info.get();
             if (meta.collectionId() == null) {
                 return;
             }
@@ -335,6 +386,7 @@ public class OutlineDocumentSyncService {
             row.setUrlId(upstream.urlId());
             row.setColor(upstream.color());
             row.setIcon(upstream.icon());
+            row.setDescription(truncate(upstream.description(), MAX_DESCRIPTION_LENGTH));
             collectionRepository.save(row);
         }
         return live;
@@ -359,7 +411,8 @@ public class OutlineDocumentSyncService {
         } catch (OutlineRateLimitedException e) {
             throw e;
         } catch (OutlineApiException e) {
-            collection.setLastSyncError(truncateError(e.getMessage()));
+            String message = e.getMessage() == null ? "Outline API call failed" : e.getMessage();
+            collection.setLastSyncError(truncate(message, MAX_ERROR_LENGTH));
             collectionRepository.save(collection);
             return false;
         }
@@ -420,6 +473,11 @@ public class OutlineDocumentSyncService {
                 skippedForBudget++;
             }
         }
+
+        // Archived documents are excluded from documents.list/collections.documents above by default —
+        // without this second enumeration, the tombstone-by-absence sweep below would wipe a merely
+        // archived (soft, recoverable) document as if it had been permanently deleted.
+        skippedForBudget += syncArchivedDocuments(ctx, collection, existing, seen, budget, now);
 
         // Coverage counters are written on EVERY full enumeration (clean or budget-exhausted): the seen
         // set is complete either way — only exports were skipped, never the enumeration itself.
@@ -494,6 +552,13 @@ public class OutlineDocumentSyncService {
         );
         doc.setTitle(node != null && node.title() != null ? node.title() : (meta == null ? null : meta.title()));
         doc.setSlug(resolveSlug(node, meta));
+        // documents.list/collections.documents (meta from either) exclude archived documents by default, so
+        // any document reaching this normal upsert path is unambiguously live — clear a stale archivedAt the
+        // moment it is seen this way again (e.g. after documents.unarchive). A null meta (a tree-only node
+        // with no matching documents.list entry) leaves it untouched rather than guessing.
+        if (meta != null) {
+            doc.setArchivedAt(meta.archivedAt());
+        }
         if (unchanged) {
             // Metadata may have shifted (renamed/moved) but the body is current — do not re-export.
             documentRepository.save(doc);
@@ -523,6 +588,104 @@ public class OutlineDocumentSyncService {
         documentRepository.save(doc);
         existing.put(documentId, doc);
         return UpsertOutcome.EXPORTED;
+    }
+
+    /**
+     * Enumerates a collection's ARCHIVED documents (a second, separate {@code documents.list} call —
+     * Outline's default listing excludes them) and upserts each into the mirror via {@link
+     * #upsertArchived}, adding every one to {@code seen} so the caller's tombstone-by-absence sweep never
+     * touches them: an archived document is soft/recoverable, not deleted.
+     *
+     * <p><strong>Deliberately excluded from the watermark.</strong> {@code documentsSyncedThrough} is a
+     * freshness signal over the actively-edited corpus; archived documents are, by definition, not being
+     * edited, so their {@code updatedAt} never feeds {@code maxUpdatedAt} in the caller. Counting them
+     * separately in a dedicated coverage figure would be over-engineering for what the admin surface needs
+     * today — they still land in {@code documentsUpstream} (the shared {@code seen} set), so "how much of
+     * the wiki do we hold" stays accurate; only the freshness watermark stays scoped to live content.
+     *
+     * @return exports skipped for budget among the archived documents enumerated this pass
+     */
+    private int syncArchivedDocuments(
+        SyncContext ctx,
+        OutlineCollection collection,
+        Map<String, OutlineDocument> existing,
+        Set<String> seen,
+        ExportBudget budget,
+        Instant now
+    ) {
+        int skipped = 0;
+        for (OutlineDocumentListResponse.Meta meta : outlineApiClient.listArchivedDocuments(
+            ctx.serverUrl(),
+            ctx.token(),
+            collection.getCollectionId()
+        )) {
+            if (meta.id() == null) {
+                continue;
+            }
+            seen.add(meta.id());
+            if (!upsertArchived(ctx, collection, meta, existing, budget, now)) {
+                skipped++;
+            }
+        }
+        return skipped;
+    }
+
+    /**
+     * Upsert one archived document. Never re-exports a body just because {@code updatedAt} moved — an
+     * archived document is not being edited, so that would waste the shared budget for no behavioral gain
+     * — the ONE exception being a row that carries no body at all (never captured, or evicted), which
+     * exports once to backfill it.
+     *
+     * @return {@code false} when an export was needed but the budget denied it (the row is left untouched)
+     */
+    private boolean upsertArchived(
+        SyncContext ctx,
+        OutlineCollection collection,
+        OutlineDocumentListResponse.Meta meta,
+        Map<String, OutlineDocument> existing,
+        ExportBudget budget,
+        Instant now
+    ) {
+        String documentId = meta.id();
+        OutlineDocument doc = existing.get(documentId);
+        boolean needsExport = doc == null || doc.isDeleted() || doc.getBodyMarkdown() == null;
+        if (needsExport && !budget.tryConsume()) {
+            return false;
+        }
+        if (doc == null) {
+            doc = new OutlineDocument();
+            doc.setWorkspaceId(ctx.workspaceId());
+            doc.setConnectionId(ctx.connectionId());
+            doc.setDocumentId(documentId);
+        }
+        doc.setCollectionId(collection.getCollectionId());
+        doc.setCollectionSlug(collectionSlug(collection));
+        doc.setParentDocumentId(meta.parentDocumentId());
+        doc.setTitle(meta.title());
+        doc.setSlug(resolveSlug(null, meta));
+        doc.setArchivedAt(meta.archivedAt() != null ? meta.archivedAt() : now);
+        doc.setDeletedAt(null); // archived is not a tombstone — clear any stale marker
+        if (needsExport) {
+            String body = outlineApiClient.exportDocument(ctx.serverUrl(), ctx.token(), documentId);
+            doc.setBodyMarkdown(body);
+            doc.setContentHash(body == null ? null : sha256Hex(body));
+            doc.setBodyEvictedAt(null);
+            doc.setOutlineUpdatedAt(meta.updatedAt());
+            doc.setOutlineCreatedAt(meta.createdAt());
+            doc.setCreatedBySubject(meta.createdBy() == null ? null : meta.createdBy().id());
+            doc.setCreatedByName(meta.createdBy() == null ? null : meta.createdBy().name());
+            doc.setUpdatedBySubject(meta.updatedBy() == null ? null : meta.updatedBy().id());
+            doc.setUpdatedByName(meta.updatedBy() == null ? null : meta.updatedBy().name());
+            doc.setCollaboratorSubjects(
+                meta.collaboratorIds() == null || meta.collaboratorIds().isEmpty()
+                    ? null
+                    : List.copyOf(meta.collaboratorIds())
+            );
+            doc.setLastMaterializedAt(now);
+        }
+        documentRepository.save(doc);
+        existing.put(documentId, doc);
+        return true;
     }
 
     /** Tombstone this collection's mirrored rows that were not seen in a clean pass. */
@@ -653,11 +816,12 @@ public class OutlineDocumentSyncService {
         );
     }
 
-    private static @Nullable String truncateError(@Nullable String message) {
-        if (message == null) {
-            return "Outline API call failed";
+    /** Truncates a value to at most {@code maxLen} characters; {@code null} passes through unchanged. */
+    private static @Nullable String truncate(@Nullable String value, int maxLen) {
+        if (value == null) {
+            return null;
         }
-        return message.length() <= MAX_ERROR_LENGTH ? message : message.substring(0, MAX_ERROR_LENGTH);
+        return value.length() <= maxLen ? value : value.substring(0, maxLen);
     }
 
     /** Depth-first flatten of the document tree, carrying each node's parent id down the recursion. */

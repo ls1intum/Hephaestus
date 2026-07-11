@@ -83,6 +83,10 @@ public class OutlineCollection {
     @Column(name = "icon", length = 64)
     private @Nullable String icon;
 
+    /** Collection description as shown in Outline, refreshed on every catalog touch (truncated on write). */
+    @Column(name = "description", length = 2048)
+    private @Nullable String description;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "state", nullable = false, length = 16)
     private MirrorState state = MirrorState.ENABLED;

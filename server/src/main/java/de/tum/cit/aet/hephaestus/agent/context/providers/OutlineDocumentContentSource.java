@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -179,6 +180,10 @@ public class OutlineDocumentContentSource implements ContentSource {
             node.put("slug", doc.slug());
             node.put("title", doc.title());
             node.put("body", excerptBody(doc));
+            // Human-facing collection label; "collection" above stays the path/slug identity.
+            if (doc.collectionName() != null) {
+                node.put("collection_name", doc.collectionName());
+            }
             // Upstream document clocks (when the mirror captured them) — the up-to-dateness signal.
             if (doc.createdAt() != null) {
                 node.put("created", doc.createdAt().toString());
@@ -370,7 +375,11 @@ public class OutlineDocumentContentSource implements ContentSource {
         StringBuilder md = new StringBuilder(512);
         md.append(QUARANTINE_BANNER);
         String title = doc.title() == null || doc.title().isBlank() ? "(untitled document)" : doc.title();
-        md.append("# ").append(title).append("\n\n");
+        // documents.export bodies always open with "# {title}" — prepending another H1 here would duplicate
+        // it verbatim. Only add the heading when the body does not already carry an equivalent one.
+        if (!bodyStartsWithHeading(doc.bodyMarkdown(), title)) {
+            md.append("# ").append(title).append("\n\n");
+        }
         // Byline BELOW the quarantine banner: the author name is untrusted third-party text and must read
         // as data inside the quarantined document, never as trusted metadata outside it.
         String byline = renderByline(doc);
@@ -392,16 +401,39 @@ public class OutlineDocumentContentSource implements ContentSource {
     }
 
     /**
-     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. A resolved
-     * member id (linked account) is appended so the reviewer can attribute the doc to a workspace
-     * developer; the last-editor line only appears when it differs from the creator; contributors show
-     * resolved display info only ("+N more" for the rest) — raw subject UUIDs are machine noise and
-     * never render in the human-facing byline. "Last updated" carries the upstream clock so the
-     * reviewer can weigh the doc's freshness.
+     * Whether {@code body}'s first line is already the H1 heading this renderer would otherwise prepend
+     * (Outline's {@code documents.export} Markdown always opens with {@code # <title>}). Trimmed,
+     * case-sensitive comparison of the first line only — a body without a matching opening heading (or no
+     * body at all) never counts as a match, so the heading still gets added.
+     */
+    private static boolean bodyStartsWithHeading(@Nullable String body, String title) {
+        if (body == null) {
+            return false;
+        }
+        int newline = body.indexOf('\n');
+        String firstLine = (newline >= 0 ? body.substring(0, newline) : body).trim();
+        return firstLine.equals("# " + title);
+    }
+
+    /**
+     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. Opens with the
+     * collection's human-facing name (when captured — the model needs a way to label the doc group, not
+     * just see an opaque directory slug); a resolved member id (linked account) is appended so the
+     * reviewer can attribute the doc to a workspace developer; the last-editor line only appears when it
+     * differs from the creator; contributors show resolved display info only ("+N more" for the rest) —
+     * raw subject UUIDs are machine noise and never render in the human-facing byline. "Last updated"
+     * carries the upstream clock so the reviewer can weigh the doc's freshness; a trailing archived-status
+     * line marks a document that is still live-linkable but archived (soft, recoverable) in the wiki.
      */
     private static String renderByline(ProjectedDocument doc) {
         StringBuilder byline = new StringBuilder();
+        if (doc.collectionName() != null && !doc.collectionName().isBlank()) {
+            byline.append("_Collection: ").append(doc.collectionName()).append("_");
+        }
         if (doc.createdByName() != null && !doc.createdByName().isBlank()) {
+            if (byline.length() > 0) {
+                byline.append("\n");
+            }
             byline.append("_Author: ").append(doc.createdByName());
             if (doc.createdByMemberId() != null) {
                 byline.append(" (workspace member ").append(doc.createdByMemberId()).append(")");
@@ -431,6 +463,12 @@ public class OutlineDocumentContentSource implements ContentSource {
                 byline.append("\n");
             }
             byline.append("_Last updated: ").append(LocalDate.ofInstant(doc.updatedAt(), ZoneOffset.UTC)).append("_");
+        }
+        if (doc.archived()) {
+            if (byline.length() > 0) {
+                byline.append("\n");
+            }
+            byline.append("_Status: archived in the wiki (may be superseded)_");
         }
         return byline.length() == 0 ? null : byline.toString();
     }

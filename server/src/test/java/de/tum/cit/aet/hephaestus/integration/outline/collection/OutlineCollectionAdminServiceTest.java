@@ -113,7 +113,14 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
             collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
         ).thenReturn(Optional.empty());
         stubLiveCollections(
-            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", "#F00", "ruler")
+            new OutlineCollectionListResponse.Collection(
+                COLLECTION_ID,
+                "Design",
+                "col1",
+                "#F00",
+                "ruler",
+                "Design team docs"
+            )
         );
 
         OutlineCollectionAdminService.RegistrationOutcome outcome = service.register(WS, COLLECTION_ID);
@@ -125,6 +132,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         assertThat(outcome.collection().state()).isEqualTo(MirrorState.ENABLED);
         assertThat(outcome.collection().syncStatus()).isEqualTo(SyncStatus.PENDING);
         assertThat(outcome.collection().documentCount()).isZero();
+        assertThat(outcome.collection().description()).isEqualTo("Design team docs");
 
         ArgumentCaptor<OutlineCollection> saved = ArgumentCaptor.forClass(OutlineCollection.class);
         verify(collectionRepository).save(saved.capture());
@@ -132,6 +140,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         assertThat(saved.getValue().getConnectionId()).isEqualTo(CONNECTION_ID);
         assertThat(saved.getValue().getColor()).isEqualTo("#F00");
         assertThat(saved.getValue().getIcon()).isEqualTo("ruler");
+        assertThat(saved.getValue().getDescription()).isEqualTo("Design team docs");
 
         verify(syncScheduler).syncCollectionNow(WS, COLLECTION_ID);
     }
@@ -165,7 +174,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         when(
             collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
         ).thenReturn(Optional.empty());
-        stubLiveCollections(new OutlineCollectionListResponse.Collection("other-id", "Other", null, null, null));
+        stubLiveCollections(new OutlineCollectionListResponse.Collection("other-id", "Other", null, null, null, null));
 
         assertThatThrownBy(() -> service.register(WS, COLLECTION_ID)).isInstanceOf(
             UnknownOutlineCollectionException.class
@@ -257,8 +266,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
             List.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE))
         );
         stubCandidateCollections(
-            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null),
-            new OutlineCollectionListResponse.Collection("col-2", "Archive", "col2", null, null)
+            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null),
+            new OutlineCollectionListResponse.Collection("col-2", "Archive", "col2", null, null, null)
         );
 
         List<OutlineCollectionCandidateDTO> candidates = service.listCandidates(WS);
@@ -276,7 +285,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         OutlineCollectionAdminService service = service();
         when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WS)).thenReturn(List.of());
         stubCandidateCollections(
-            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", null, null, null)
+            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", null, null, null, null)
         );
 
         List<OutlineCollectionCandidateDTO> candidates = service.listCandidates(WS);

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.O
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -24,16 +25,25 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Consumes a verified Outline event off the unified JetStream lane and triggers a <em>targeted</em>
- * refresh of the owning workspace's mirror — the payload is trusted only for routing
- * ({@code event} + {@code payload.id}), never as content:
+ * refresh of the owning workspace's mirror:
  * <ul>
  *   <li>{@code documents.*} → {@link OutlineDocumentSyncScheduler#refreshDocumentNow} (tombstone for
- *       delete-shaped events, {@code documents.info} + export otherwise, ≤2 API calls). A delivery
- *       without a payload id falls back to a whole-workspace reconcile.</li>
+ *       delete-shaped events, an in-place {@code archivedAt} stamp for {@code documents.archive},
+ *       {@code documents.info} + export otherwise, ≤2 API calls). A delivery without a payload id falls
+ *       back to a whole-workspace reconcile.</li>
  *   <li>{@code collections.*} → {@link OutlineDocumentSyncScheduler#refreshCollectionCatalogNow}
  *       (catalog fields; {@code collections.delete} tombstones the mirrored documents).</li>
  *   <li>Anything else is logged at debug and acked.</li>
  * </ul>
+ *
+ * <p><strong>Trust model.</strong> The webhook signature (verified upstream, before this handler runs)
+ * covers the raw bytes of the WHOLE envelope — {@code event} + {@code payload.id} are trusted for routing,
+ * and {@code payload.model} (the document's own metadata snapshot at delivery time) is equally
+ * authenticated, so a document event carrying a usable model (id + collection id) is trusted as metadata:
+ * {@link #parseModel} extracts it and the sync path skips its own {@code documents.info} round-trip,
+ * roughly halving the webhook-path API calls. The document BODY never travels in the envelope, so
+ * {@code documents.export} still runs whenever content is needed. A missing/incomplete model falls back to
+ * {@code documents.info} exactly as before.
  *
  * <p>Every {@code documents.*} delivery (including deletes) additionally appends one
  * {@link OutlineDocumentEvent} row from the envelope ({@code actorId} + {@code createdAt}) BEFORE
@@ -101,7 +111,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
                 // Cannot target without a document id — fall back to the authoritative reconcile.
                 syncScheduler.syncWorkspaceNow(workspaceId);
             } else {
-                syncScheduler.refreshDocumentNow(workspaceId, event, delivery.payloadId());
+                syncScheduler.refreshDocumentNow(workspaceId, event, delivery.payloadId(), delivery.model());
             }
         } else if (event.startsWith("collections.")) {
             syncScheduler.refreshCollectionCatalogNow(
@@ -152,19 +162,42 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
 
     private Delivery parse(byte[] body) {
         if (body == null || body.length == 0) {
-            return new Delivery("", "", "", "", null);
+            return new Delivery("", "", "", "", null, null);
         }
         try {
             JsonNode root = objectMapper.readTree(body);
+            String event = root.path("event").asString("");
             return new Delivery(
                 root.path("webhookSubscriptionId").asString(""),
-                root.path("event").asString(""),
+                event,
                 root.path("payload").path("id").asString(""),
                 root.path("actorId").asString(""),
-                parseInstant(root.path("createdAt").asString(""))
+                parseInstant(root.path("createdAt").asString("")),
+                parseModel(event, root.path("payload").path("model"))
             );
         } catch (RuntimeException e) {
-            return new Delivery("", "", "", "", null);
+            return new Delivery("", "", "", "", null, null);
+        }
+    }
+
+    /**
+     * Parses the delivery's {@code payload.model} into document metadata when the event is a document
+     * event carrying a usable model (an id and a collection id). The HMAC covers the whole envelope, so a
+     * model that parses is trusted metadata, letting {@link OutlineDocumentSyncScheduler#refreshDocumentNow}
+     * skip its own {@code documents.info} round-trip. Returns {@code null} on any parse failure or an
+     * incomplete model — the sync path then falls back to {@code documents.info} as before.
+     */
+    private OutlineDocumentListResponse.@Nullable Meta parseModel(String event, JsonNode modelNode) {
+        if (!event.startsWith("documents.") || modelNode == null || modelNode.isMissingNode() || modelNode.isNull()) {
+            return null;
+        }
+        if (modelNode.path("id").asString("").isBlank() || modelNode.path("collectionId").asString("").isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.treeToValue(modelNode, OutlineDocumentListResponse.Meta.class);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
@@ -179,12 +212,17 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         }
     }
 
-    /** The routing- and audit-relevant fields of one delivery; blanks/null when absent/unparsable. */
+    /**
+     * The routing- and audit-relevant fields of one delivery; blanks/null when absent/unparsable.
+     * {@code model} is the pre-parsed {@code payload.model} (document events only, {@code null} when
+     * absent/incomplete) — see {@link #parseModel}.
+     */
     private record Delivery(
         String subscriptionId,
         String event,
         String payloadId,
         String actorId,
-        @Nullable Instant occurredAt
+        @Nullable Instant occurredAt,
+        OutlineDocumentListResponse.@Nullable Meta model
     ) {}
 }

@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.identity.OutlineIdentityResolver;
@@ -43,6 +45,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     private OutlineDocumentRepository documentRepository;
 
     @Mock
+    private OutlineCollectionRepository collectionRepository;
+
+    @Mock
     private ConnectionService connectionService;
 
     @Mock
@@ -55,13 +60,19 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        projector = new OutlineDocumentProjector(documentRepository, connectionService, identityResolver);
+        projector = new OutlineDocumentProjector(
+            documentRepository,
+            collectionRepository,
+            connectionService,
+            identityResolver
+        );
         lenient()
             .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
             .thenReturn(Optional.of(activeConnection()));
         lenient()
             .when(identityResolver.resolveMemberId(anyLong(), anyString(), any(), anyString()))
             .thenReturn(Optional.empty());
+        lenient().when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID)).thenReturn(List.of());
     }
 
     private static Connection activeConnection() {
@@ -118,6 +129,24 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         return doc;
     }
 
+    private static OutlineDocument archivedDocument() {
+        OutlineDocument doc = liveDocument();
+        doc.setDocumentId("doc-uuid-3");
+        doc.setSlug("archived-doc");
+        // Archived, not deleted: body/hash stay — only archivedAt is set.
+        doc.setArchivedAt(Instant.parse("2026-03-01T00:00:00Z"));
+        return doc;
+    }
+
+    private static OutlineCollection registeredCollection(String collectionId, String name) {
+        OutlineCollection collection = new OutlineCollection();
+        collection.setWorkspaceId(WORKSPACE_ID);
+        collection.setConnectionId(7L);
+        collection.setCollectionId(collectionId);
+        collection.setName(name);
+        return collection;
+    }
+
     @Test
     @DisplayName("documentsForWorkspace maps entity fields onto the projected document")
     void documentsForWorkspace_mapsFieldsCorrectly() {
@@ -157,6 +186,76 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 assertThat(projected.bodyMarkdown()).isNull();
                 assertThat(projected.slug()).isEqualTo("removed-doc");
             });
+    }
+
+    // --- archived flag + collection name ---
+
+    @Test
+    @DisplayName("an archived (soft, recoverable) row projects archived=true and KEEPS its body — unlike a tombstone")
+    void documentsForWorkspace_archivedRowProjectsArchivedTrueWithBodyIntact() {
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
+            List.of(archivedDocument())
+        );
+
+        List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
+
+        assertThat(result)
+            .singleElement()
+            .satisfies(projected -> {
+                assertThat(projected.archived()).isTrue();
+                assertThat(projected.deleted()).isFalse();
+                assertThat(projected.bodyMarkdown()).isEqualTo("# Design\n\nContent.");
+            });
+    }
+
+    @Test
+    @DisplayName("a live (never-archived) row projects archived=false")
+    void documentsForWorkspace_liveRowProjectsArchivedFalse() {
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
+            List.of(liveDocument())
+        );
+
+        List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
+
+        assertThat(result)
+            .singleElement()
+            .satisfies(projected -> assertThat(projected.archived()).isFalse());
+    }
+
+    @Test
+    @DisplayName("collectionName resolves from the registered collection's captured name, keyed by collection id")
+    void documentsForWorkspace_resolvesCollectionNameFromTheRegistry() {
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
+            List.of(liveDocument())
+        );
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID)).thenReturn(
+            List.of(registeredCollection("col-uuid-1", "Architecture"))
+        );
+
+        List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
+
+        assertThat(result)
+            .singleElement()
+            .satisfies(projected -> {
+                // collectionSlug (path identity) stays distinct from collectionName (display label).
+                assertThat(projected.collectionSlug()).isEqualTo("architecture");
+                assertThat(projected.collectionName()).isEqualTo("Architecture");
+            });
+    }
+
+    @Test
+    @DisplayName("an unregistered/unnamed collection degrades to a null collectionName")
+    void documentsForWorkspace_unknownCollection_collectionNameIsNull() {
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
+            List.of(liveDocument())
+        );
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID)).thenReturn(List.of());
+
+        List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
+
+        assertThat(result)
+            .singleElement()
+            .satisfies(projected -> assertThat(projected.collectionName()).isNull());
     }
 
     // --- authorship projection ---

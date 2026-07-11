@@ -19,6 +19,7 @@ public record OutlineCollectionListResponse(@Nullable List<Collection> data, @Nu
         @Nullable String name,
         @Nullable String urlId,
         @Nullable String color,
-        @Nullable String icon
+        @Nullable String icon,
+        @Nullable String description
     ) {}
 }

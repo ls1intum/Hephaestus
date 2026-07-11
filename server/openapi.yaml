@@ -5769,6 +5769,9 @@ components:
           type: string
           format: date-time
           description: When the collection was registered for mirroring
+        description:
+          type: string
+          description: Collection description as shown in Outline
         documentCount:
           type: integer
           format: int64
@@ -5797,7 +5800,8 @@ components:
         lastSyncedAt:
           type: string
           format: date-time
-          description: "When the last clean sync pass finished, if any"
+          description: "When this collection last completed a full reconcile pass,\
+            \ if any"
         name:
           type: string
           description: "Collection name as shown in Outline, if known"
@@ -5838,6 +5842,9 @@ components:
         color:
           type: string
           description: Collection color as configured in Outline
+        description:
+          type: string
+          description: Collection description as shown in Outline
         icon:
           type: string
           description: Collection icon as configured in Outline
@@ -5866,8 +5873,8 @@ components:
         lastSyncedAt:
           type: string
           format: date-time
-          description: "When a mirrored collection last finished a clean sync pass,\
-            \ if any"
+          description: "When a mirrored collection last completed a full reconcile\
+            \ pass, if any"
         pendingCollections:
           type: integer
           format: int64

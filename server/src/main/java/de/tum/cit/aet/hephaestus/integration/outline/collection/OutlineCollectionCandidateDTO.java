@@ -10,6 +10,7 @@ public record OutlineCollectionCandidateDTO(
     @Schema(description = "Outline url id (the short slug in collection URLs)") String urlId,
     @Schema(description = "Collection color as configured in Outline") String color,
     @Schema(description = "Collection icon as configured in Outline") String icon,
+    @Schema(description = "Collection description as shown in Outline") String description,
     @NonNull
     @Schema(description = "Whether this collection is already registered for mirroring")
     Boolean alreadyMirrored

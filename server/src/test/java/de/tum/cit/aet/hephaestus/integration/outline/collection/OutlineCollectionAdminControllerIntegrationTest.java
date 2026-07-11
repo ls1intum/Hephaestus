@@ -102,12 +102,12 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
             .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
+                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
             );
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString(), anyInt()))
             .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null))
+                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
             );
         lenient().when(outlineApiClient.listDocuments(anyString(), anyString(), anyString())).thenReturn(List.of());
         lenient()

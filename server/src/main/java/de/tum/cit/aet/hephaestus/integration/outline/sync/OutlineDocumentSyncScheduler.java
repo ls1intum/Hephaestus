@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import java.util.List;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -114,6 +115,20 @@ public class OutlineDocumentSyncScheduler {
     /** Webhook targeted document refresh; tenancy-bypass hop, see {@link #syncWorkspaceNow}. */
     public void refreshDocumentNow(long workspaceId, String eventName, String documentId) {
         syncService.refreshDocument(workspaceId, eventName, documentId);
+    }
+
+    /**
+     * Webhook targeted document refresh carrying the delivery's pre-parsed {@code payload.model} (already
+     * authenticated by the envelope's HMAC), letting the sync service skip its own {@code documents.info}
+     * round-trip when the model is usable. Tenancy-bypass hop, see {@link #syncWorkspaceNow}.
+     */
+    public void refreshDocumentNow(
+        long workspaceId,
+        String eventName,
+        String documentId,
+        OutlineDocumentListResponse.@Nullable Meta prefetchedMeta
+    ) {
+        syncService.refreshDocument(workspaceId, eventName, documentId, prefetchedMeta);
     }
 
     /** Webhook collection-event catalog refresh; tenancy-bypass hop, see {@link #syncWorkspaceNow}. */

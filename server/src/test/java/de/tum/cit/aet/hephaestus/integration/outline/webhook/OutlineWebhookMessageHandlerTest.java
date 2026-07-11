@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -13,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -111,7 +113,7 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
         handler().onMessage(message("sub-1", "documents.update", "doc-9"));
 
-        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9");
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
         verify(syncScheduler, never()).syncWorkspaceNow(Mockito.anyLong());
     }
 
@@ -121,7 +123,7 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
         handler().onMessage(message("sub-1", "documents.delete", "doc-9"));
 
-        verify(syncScheduler).refreshDocumentNow(42L, "documents.delete", "doc-9");
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.delete", "doc-9", null);
     }
 
     @Test
@@ -131,7 +133,12 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         handler().onMessage(message("sub-1", "documents.update", null));
 
         verify(syncScheduler).syncWorkspaceNow(42L);
-        verify(syncScheduler, never()).refreshDocumentNow(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString());
+        verify(syncScheduler, never()).refreshDocumentNow(
+            Mockito.anyLong(),
+            Mockito.anyString(),
+            Mockito.anyString(),
+            org.mockito.ArgumentMatchers.any()
+        );
         // No document id → nothing to attribute an event row to.
         verifyNoInteractions(documentEventRepository);
     }
@@ -225,7 +232,7 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
         handler().onMessage(message("sub-1", "documents.update", "doc-9"));
 
-        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9");
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
     }
 
     @Test
@@ -238,6 +245,44 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         handler().onMessage(message("sub-1", "documents.update", "doc-9"));
 
         verifyNoInteractions(documentEventRepository);
-        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9");
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
+    }
+
+    // --- payload.model trust: parsed when usable, ignored otherwise ---
+
+    @Test
+    void documentEventWithUsableModel_passesItThrough() {
+        resolves("sub-1", 42L);
+        Message msg = Mockito.mock(Message.class);
+        String body =
+            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\"," +
+            "\"payload\":{\"id\":\"doc-9\",\"model\":{\"id\":\"doc-9\",\"collectionId\":\"col-1\"," +
+            "\"title\":\"Doc\",\"url\":\"/doc/doc-9\"}}}";
+        when(msg.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
+
+        handler().onMessage(msg);
+
+        ArgumentCaptor<OutlineDocumentListResponse.Meta> model = ArgumentCaptor.forClass(
+            OutlineDocumentListResponse.Meta.class
+        );
+        verify(syncScheduler).refreshDocumentNow(eq(42L), eq("documents.update"), eq("doc-9"), model.capture());
+        assertThat(model.getValue()).isNotNull();
+        assertThat(model.getValue().id()).isEqualTo("doc-9");
+        assertThat(model.getValue().collectionId()).isEqualTo("col-1");
+        assertThat(model.getValue().title()).isEqualTo("Doc");
+    }
+
+    @Test
+    void documentEventWithModelMissingCollectionId_fallsBackToNull() {
+        resolves("sub-1", 42L);
+        Message msg = Mockito.mock(Message.class);
+        String body =
+            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\"," +
+            "\"payload\":{\"id\":\"doc-9\",\"model\":{\"id\":\"doc-9\",\"title\":\"Doc\"}}}";
+        when(msg.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
+
+        handler().onMessage(msg);
+
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
     }
 }
