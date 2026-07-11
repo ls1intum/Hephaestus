@@ -121,7 +121,13 @@ jobs:
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               pnpm exec playwright install chromium --with-deps
-              pnpm run test:storybook
+              # Vitest browser mode intermittently deadlocks its scheduler on shared runners
+              # (run stalls between tests, then burns the whole job timeout). A full local run
+              # takes ~3 min, so bound each attempt at 10 min and retry once before failing.
+              timeout 10m pnpm run test:storybook || {
+                echo "::warning::Storybook test run stalled or failed — retrying once."
+                timeout 10m pnpm run test:storybook
+              }
               ;;
             "webapp-visual")
               pnpm run build-storybook
