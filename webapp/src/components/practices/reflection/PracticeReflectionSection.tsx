@@ -48,20 +48,22 @@ export function PracticeReflectionSection({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-wrap items-start justify-between gap-3">
-				<div className="flex flex-col gap-1">
-					<h2 className="text-xl font-semibold tracking-tight">My Practices</h2>
-					<p className="text-sm text-muted-foreground">
-						Recent feedback on your work — for your growth, not a score.
-					</p>
-					<p className="text-sm text-muted-foreground">
-						Workspace admins can see practice standing to support mentoring — every detailed view is
-						recorded.
-					</p>
+			<div className="flex flex-col gap-1">
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="flex flex-col gap-1">
+						<h2 className="text-xl font-semibold tracking-tight">My Practices</h2>
+						<p className="text-sm text-muted-foreground">
+							Recent feedback on your work — for your growth, not a score.
+						</p>
+					</div>
+					{!isLoading && !isError && items.length > 0 && (
+						<CopyPracticeSummaryButton practices={items} />
+					)}
 				</div>
-				{!isLoading && !isError && items.length > 0 && (
-					<CopyPracticeSummaryButton practices={items} />
-				)}
+				<p className="text-xs text-muted-foreground">
+					Workspace admins can see practice standing to support mentoring — every detailed view is
+					recorded.
+				</p>
 			</div>
 
 			{isLoading ? (
