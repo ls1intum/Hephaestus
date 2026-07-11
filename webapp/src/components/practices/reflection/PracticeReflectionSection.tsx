@@ -61,8 +61,8 @@ export function PracticeReflectionSection({
 					)}
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Workspace admins can see practice standing to support mentoring, and every detailed view
-					is recorded.
+					Workspace admins can see your practice status to support mentoring, and every detailed
+					view is recorded.
 				</p>
 			</div>
 

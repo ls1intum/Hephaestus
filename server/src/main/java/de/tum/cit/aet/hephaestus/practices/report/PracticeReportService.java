@@ -12,8 +12,9 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatusDeriver;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeTrend;
-import de.tum.cit.aet.hephaestus.practices.report.dto.AreaStandingCellDTO;
-import de.tum.cit.aet.hephaestus.practices.report.dto.CohortAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.AreaHealthDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.AreaStatusCellDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.HealthAvailability;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,27 +38,28 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code since} only (an explicit {@code until} bound of "now" is passed alongside it), so activity after
  * the cycle's nominal close is included.
  *
- * <p><b>Scope (P1 generalisation):</b> the mentor-facing roster and cohort surfaces here now cover EVERY
- * active practice area, at an area-rollup grain (one cell/card per area, summing that area's practices'
+ * <p><b>Scope (P1 generalisation):</b> the mentor-facing roster and workspace health surfaces here now cover
+ * EVERY active practice area, at an area-rollup grain (one cell/card per area, summing that area's practices'
  * good/bad signal). They used to be hardcoded to the single {@link #REVIEWING_PRACTICE_AREA_SLUG} area — a
  * live test proved that scoping left the mentor blind to risk concentrated in other areas (security,
  * testing, error-handling). The developer's own {@code /reports/me} reflection (in {@code
  * ObservationService}) was never area-scoped: it already spans every practice, at PRACTICE grain (not
- * rolled up), which the roster/cohort deliberately do NOT match — a per-practice roster column count would
- * not stay legible as the catalogue grows, hence the area rollup.
+ * rolled up), which the roster/health surfaces deliberately do NOT match — a per-practice roster column
+ * count would not stay legible as the catalogue grows, hence the area rollup.
  */
 @Service
 @RequiredArgsConstructor
 public class PracticeReportService {
 
     /**
-     * Historical scope constant: the mentor roster + cohort used to be hardcoded to this single area (see the
-     * class javadoc). It is no longer a scope gate for {@link #listReports} or {@link #getCohortStatus} — both
-     * now cover every active area. Kept because a few tests still seed a fixture area under this slug.
+     * Historical scope constant: the mentor roster + workspace health used to be hardcoded to this single
+     * area (see the class javadoc). It is no longer a scope gate for {@link #listReports} or
+     * {@link #getWorkspaceHealth} — both now cover every active area. Kept because a few tests still seed a
+     * fixture area under this slug.
      */
     public static final String REVIEWING_PRACTICE_AREA_SLUG = "constructive-code-review";
 
-    /** Minimum active developers before a cohort card exposes counts. */
+    /** Minimum active developers before a workspace health card exposes counts. */
     private static final int K_ANONYMITY_THRESHOLD = 5;
 
     private final ObservationRepository observationRepository;
@@ -71,7 +74,7 @@ public class PracticeReportService {
     }
 
     @Transactional(readOnly = true)
-    public List<CohortAreaStatusDTO> getCohortStatus(Long workspaceId) {
+    public List<AreaHealthDTO> getWorkspaceHealth(Long workspaceId) {
         Optional<Workspace> workspace = findWorkspace(workspaceId);
         if (workspace.isEmpty()) {
             return List.of();
@@ -82,17 +85,17 @@ public class PracticeReportService {
             observationRepository.findAreaRollupStandingBetween(workspaceId, since, Instant.now())
         );
 
-        List<CohortAreaStatusDTO> cards = new ArrayList<>();
+        List<AreaHealthDTO> cards = new ArrayList<>();
         for (PracticeArea area : areas) {
             Map<Long, AreaAccumulation> byDeveloper = byAreaThenDeveloper.getOrDefault(area.getSlug(), Map.of());
             // Zero active developers is NOT a privacy risk (nobody to re-identify) — distinguish it from
             // k-anonymity suppression, which applies only once there IS some (too-small) activity.
             if (byDeveloper.isEmpty()) {
-                cards.add(CohortAreaStatusDTO.noData(area.getSlug(), area.getName()));
+                cards.add(AreaHealthDTO.noData(area.getSlug(), area.getName()));
                 continue;
             }
             if (byDeveloper.size() < K_ANONYMITY_THRESHOLD) {
-                cards.add(CohortAreaStatusDTO.suppressed(area.getSlug(), area.getName()));
+                cards.add(AreaHealthDTO.suppressed(area.getSlug(), area.getName()));
                 continue;
             }
             int strength = 0;
@@ -108,15 +111,14 @@ public class PracticeReportService {
                 }
             }
             if (hasSmallBucket(strength, developing, mixed, noActivity)) {
-                cards.add(CohortAreaStatusDTO.suppressed(area.getSlug(), area.getName()));
+                cards.add(AreaHealthDTO.suppressed(area.getSlug(), area.getName()));
                 continue;
             }
             cards.add(
-                new CohortAreaStatusDTO(
+                new AreaHealthDTO(
                     area.getSlug(),
                     area.getName(),
-                    false,
-                    false,
+                    HealthAvailability.AVAILABLE,
                     strength,
                     developing,
                     mixed,
@@ -136,8 +138,15 @@ public class PracticeReportService {
         return false;
     }
 
+    /**
+     * Paginated exactly like {@link de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipController#listMembers}:
+     * the FULL needs-attention-first roster is built first (bounded by the review-cycle window's one rollup
+     * query, not by page), then paged in memory. This is the simplest-correct approach: the rollup is already
+     * bounded (one review cycle's activity), so there is no risk of an unbounded in-memory scan growing with
+     * page number the way it would for an unbounded table.
+     */
     @Transactional(readOnly = true)
-    public List<PracticeReportSummaryDTO> listReports(Long workspaceId) {
+    public List<PracticeReportSummaryDTO> listReports(Long workspaceId, Pageable pageable) {
         Optional<Workspace> workspace = findWorkspace(workspaceId);
         if (workspace.isEmpty()) {
             return List.of();
@@ -170,7 +179,7 @@ public class PracticeReportService {
             Map<String, AreaAccumulation> priorAreaAcc = priorByDeveloper.getOrDefault(userId, Map.of());
             DeveloperIdentity identity = identities.get(userId);
 
-            List<AreaStandingCellDTO> cells = new ArrayList<>();
+            List<AreaStatusCellDTO> cells = new ArrayList<>();
             int attentionCount = 0;
             List<String> attentionReasons = new ArrayList<>();
             for (PracticeArea area : areas) {
@@ -180,7 +189,7 @@ public class PracticeReportService {
                 PracticeStatus priorStanding = PracticeStatusDeriver.derive(prior.bad() > 0, prior.good() > 0);
                 PracticeTrend trend = PracticeStatusDeriver.trendOf(priorStanding, currentStanding);
 
-                cells.add(new AreaStandingCellDTO(area.getSlug(), area.getName(), currentStanding, trend));
+                cells.add(new AreaStatusCellDTO(area.getSlug(), area.getName(), currentStanding, trend));
                 if (PracticeStatusDeriver.needsAttention(currentStanding)) {
                     attentionCount++;
                     attentionReasons.add(attentionReasonFor(area.getName(), currentStanding));
@@ -204,7 +213,18 @@ public class PracticeReportService {
                 .reversed()
                 .thenComparing(a -> a.entry().userLogin())
         );
-        return accumulators.stream().map(RosterAccumulator::entry).toList();
+        List<PracticeReportSummaryDTO> sorted = accumulators.stream().map(RosterAccumulator::entry).toList();
+        return page(sorted, pageable);
+    }
+
+    /** Pages an already-sorted list in memory (see {@link #listReports} for why paging happens here, not in SQL). */
+    private static <T> List<T> page(List<T> sorted, Pageable pageable) {
+        if (pageable.isUnpaged()) {
+            return sorted;
+        }
+        int fromIndex = Math.min((int) pageable.getOffset(), sorted.size());
+        int toIndex = Math.min(fromIndex + pageable.getPageSize(), sorted.size());
+        return sorted.subList(fromIndex, toIndex);
     }
 
     @Transactional(readOnly = true)

@@ -25,7 +25,7 @@ Nothing on My Practices compares you to anyone else. Cards describe observations
 
 Workspace administrators and owners have a **Practice Overview** page to support mentoring:
 
-- **Cohort health** – for each practice area, how many developers stand at each status. This view is anonymised: buckets with fewer than five developers are suppressed, so it never reveals individuals. An area with no recent activity is shown honestly as having no data yet, which is not the same thing as suppression.
+- **Workspace health** – for each practice area, how many developers stand at each status (Strength, Focus area, or Mixed). This view is anonymised: buckets with fewer than five developers are suppressed, so it never reveals individuals. An area with no recent activity is shown honestly as having no data yet, which is not the same thing as suppression.
 - **Roster** – a named list of developers with activity, sorted so people who may need attention come first (then by login). This is a triage aid, not a ranking – there is no score or ordering by performance.
 - **Drill-down** – a mentor can open an individual developer's practice cards (the same cards that developer sees) to prepare a conversation.
 
@@ -34,6 +34,6 @@ Both the roster and the practice cards also show whether a practice is improving
 ### Access is controlled and audited
 
 - The named roster and the per-developer drill-down are restricted to workspace **administrators and owners**. Every time either is viewed, Hephaestus records an append-only audit entry (who accessed whose report, and when) as a compliance record.
-- The anonymised cohort view is visible to mentors only by default. A workspace administrator can choose to share it with **all members** – even then, it stays aggregated and small groups remain suppressed.
+- The anonymised workspace health view is visible to mentors only by default (the **workspace health visibility** setting). A workspace administrator can choose to share it with **all members** – even then, it stays aggregated and small groups remain suppressed.
 
 Questions about how this data is handled? See the privacy statement linked in the app footer.

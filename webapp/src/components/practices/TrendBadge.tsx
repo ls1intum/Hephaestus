@@ -1,8 +1,8 @@
 import { Dot, type LucideIcon, TrendingDown, TrendingUp } from "lucide-react";
-import type { AreaStandingCell } from "@/api/types.gen";
+import type { AreaStatusCell } from "@/api/types.gen";
 import { cn } from "@/lib/utils";
 
-export type Trend = AreaStandingCell["trend"];
+export type Trend = AreaStatusCell["trend"];
 
 // Direction versus the prior review cycle — criterion-referenced, never a peer comparison. STEADY
 // carries no signal worth surfacing, so it's deliberately absent from this map: both renderers below
@@ -20,7 +20,7 @@ export const TREND_META: Partial<
 	WORSENING: {
 		icon: TrendingDown,
 		ariaLabel: "worsening",
-		sentence: "Slipped since last cycle",
+		sentence: "Declining since last cycle",
 		toneClassName: "text-provider-attention-foreground",
 	},
 	NEW: {

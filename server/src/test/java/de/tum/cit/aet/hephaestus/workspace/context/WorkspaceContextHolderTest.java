@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -33,7 +33,7 @@ class WorkspaceContextHolderTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
 
@@ -59,7 +59,7 @@ class WorkspaceContextHolderTest {
             999L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
 
@@ -80,7 +80,7 @@ class WorkspaceContextHolderTest {
             100L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContextHolder.setContext(context);
@@ -103,7 +103,7 @@ class WorkspaceContextHolderTest {
             null, // No installation ID
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
 
@@ -124,7 +124,7 @@ class WorkspaceContextHolderTest {
             100L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
 
@@ -136,7 +136,7 @@ class WorkspaceContextHolderTest {
             200L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -182,7 +182,7 @@ class WorkspaceContextHolderTest {
             100L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContextHolder.setContext(context);

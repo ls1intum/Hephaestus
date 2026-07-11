@@ -1,24 +1,24 @@
 import { AlertTriangle, Radar, ShieldAlert } from "lucide-react";
 import { useState } from "react";
-import type { CohortAreaStatus, PracticeReportSummary } from "@/api/types.gen";
+import type { AreaHealth, PracticeReportSummary } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CohortHealthCard } from "./CohortHealthCard";
 import { DeveloperDrillDownDialog } from "./DeveloperDrillDownDialog";
 import { RosterTable } from "./RosterTable";
+import { WorkspaceHealthCard } from "./WorkspaceHealthCard";
 
 export interface PracticeOverviewPageProps {
 	workspaceSlug: string;
-	cohort?: CohortAreaStatus[];
+	health?: AreaHealth[];
 	roster?: PracticeReportSummary[];
 	isLoading: boolean;
-	/** True when the server refused access (403) — non-admins must not see cohort/roster data. */
+	/** True when the server refused access (403) — non-admins must not see health/roster data. */
 	isForbidden: boolean;
 	/** True when the queries failed for a non-403 reason (transient/server error). */
 	isError?: boolean;
-	/** Regular members with cohort visibility EVERYONE can see cohort cards, but never the named roster. */
+	/** Regular members with health visibility EVERYONE can see workspace health cards, but never the named roster. */
 	showRoster?: boolean;
 	/** Retry the underlying queries after a non-403 failure. */
 	onRetry?: () => void;
@@ -26,7 +26,7 @@ export interface PracticeOverviewPageProps {
 
 export function PracticeOverviewPage({
 	workspaceSlug,
-	cohort,
+	health,
 	roster,
 	isLoading,
 	isForbidden,
@@ -42,7 +42,7 @@ export function PracticeOverviewPage({
 				<EmptyState
 					icon={ShieldAlert}
 					title="Practice overview isn't available"
-					description="The feature may be disabled for this workspace, or cohort visibility may be limited to admins and owners."
+					description="The feature may be disabled for this workspace, or workspace health visibility may be limited to admins and owners."
 				/>
 			</div>
 		);
@@ -54,7 +54,7 @@ export function PracticeOverviewPage({
 				<EmptyState
 					icon={AlertTriangle}
 					title="Couldn't load the practice overview"
-					description="Something went wrong fetching the cohort. This is usually temporary, so try again."
+					description="Something went wrong fetching workspace health. This is usually temporary, so try again."
 					action={
 						onRetry ? (
 							<Button variant="outline" onClick={onRetry}>
@@ -67,7 +67,7 @@ export function PracticeOverviewPage({
 		);
 	}
 
-	const cohortItems = cohort ?? [];
+	const healthItems = health ?? [];
 	const rosterItems = roster ?? [];
 
 	return (
@@ -75,32 +75,32 @@ export function PracticeOverviewPage({
 			<header className="flex flex-col gap-1">
 				<h1 className="text-2xl font-bold tracking-tight">Practice Overview</h1>
 				<p className="text-sm text-muted-foreground">
-					A mentoring view of how the cohort is doing across practices. Not a ranking.
+					A mentoring view of how the workspace is doing across practices. Not a ranking.
 				</p>
 			</header>
 
-			<Tabs defaultValue="cohort">
+			<Tabs defaultValue="health">
 				<TabsList>
-					<TabsTrigger value="cohort">Cohort health</TabsTrigger>
+					<TabsTrigger value="health">Workspace health</TabsTrigger>
 					{showRoster && <TabsTrigger value="roster">Roster</TabsTrigger>}
 				</TabsList>
 
-				<TabsContent value="cohort" className="pt-4">
+				<TabsContent value="health" className="pt-4">
 					{isLoading ? (
 						<div className="grid gap-4 sm:grid-cols-2">
 							<Skeleton className="h-40 w-full" />
 							<Skeleton className="h-40 w-full" />
 						</div>
-					) : cohortItems.length === 0 ? (
+					) : healthItems.length === 0 ? (
 						<EmptyState
 							icon={Radar}
-							title="No cohort activity yet"
-							description="Cohort health appears once enough developers have recent reviewed work."
+							title="No activity yet"
+							description="Workspace health appears once enough developers have recently reviewed work."
 						/>
 					) : (
 						<div className="grid gap-4 sm:grid-cols-2">
-							{cohortItems.map((health) => (
-								<CohortHealthCard key={health.areaSlug} health={health} />
+							{healthItems.map((area) => (
+								<WorkspaceHealthCard key={area.areaSlug} health={area} />
 							))}
 						</div>
 					)}

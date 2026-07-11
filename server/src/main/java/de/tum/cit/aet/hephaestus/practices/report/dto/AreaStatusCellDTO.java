@@ -10,8 +10,8 @@ import org.jspecify.annotations.NonNull;
  * (rolled up across that area's practices) — a triage label against the area's practices, plus the
  * cycle-over-cycle {@link PracticeTrend} against the prior cycle.
  */
-@Schema(description = "A developer's standing on one practice area")
-public record AreaStandingCellDTO(
+@Schema(description = "A developer's status on one practice area")
+public record AreaStatusCellDTO(
     @NonNull @Schema(description = "Area slug") String areaSlug,
     @NonNull @Schema(description = "Area name") String areaName,
     @NonNull

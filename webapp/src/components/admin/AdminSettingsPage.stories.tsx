@@ -31,10 +31,10 @@ const meta = {
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 		features: allOff,
-		cohortVisibility: "MENTORS_ONLY",
+		healthVisibility: "MENTORS_ONLY",
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
-		onCohortVisibilityChange: fn(),
+		onHealthVisibilityChange: fn(),
 		workspaceSlug: "demo",
 		reviewCycleDay: 1,
 		reviewCycleTime: "09:00",
@@ -87,7 +87,7 @@ export const SlackConfigured: Story = {
 	},
 };
 
-/** Everyone — members can additionally see the anonymised cohort insights. */
+/** Everyone — members can additionally see the anonymised workspace insights. */
 export const EveryoneVisibility: Story = {
-	args: { cohortVisibility: "EVERYONE" },
+	args: { healthVisibility: "EVERYONE" },
 };

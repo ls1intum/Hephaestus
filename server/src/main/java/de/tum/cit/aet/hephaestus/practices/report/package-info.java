@@ -6,8 +6,8 @@
  *       and the mentor drill-down ({@code /practices/reports/{userId}});
  *   <li>a report roster of developers-with-activity carrying a per-practice status + a needs-attention triage
  *       flag (admin/owner-only — it names individuals);
- *   <li>a k-anonymised cohort status aggregate ({@code /practices/cohort}: how many developers stand at each
- *       status per practice, never per-person).
+ *   <li>a k-anonymised workspace health aggregate ({@code /practices/health}: how many developers stand at
+ *       each status per practice, never per-person).
  * </ul>
  *
  * <p><b>This surface never ranks developers.</b> There is no score, XP, ELO, rank, or position column, and

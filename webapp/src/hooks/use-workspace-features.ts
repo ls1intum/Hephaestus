@@ -8,7 +8,7 @@ export interface WorkspaceFeatures {
 	practicesEnabled: boolean;
 	mentorEnabled: boolean;
 	achievementsEnabled: boolean;
-	cohortVisibility: WorkspaceListItem["cohortVisibility"];
+	healthVisibility: WorkspaceListItem["healthVisibility"];
 }
 
 export function useWorkspaceFeatures(workspaceSlug?: string): WorkspaceFeatures & {
@@ -41,6 +41,6 @@ export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFe
 		practicesEnabled: workspace?.practicesEnabled ?? false,
 		mentorEnabled: workspace?.mentorEnabled ?? false,
 		achievementsEnabled: workspace?.achievementsEnabled ?? true,
-		cohortVisibility: workspace?.cohortVisibility ?? "MENTORS_ONLY",
+		healthVisibility: workspace?.healthVisibility ?? "MENTORS_ONLY",
 	};
 }

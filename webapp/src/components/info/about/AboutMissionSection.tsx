@@ -9,7 +9,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Practice Feedback",
 		description: "Turning technical work into personal growth",
 		content:
-			"Transform code reviews into personal, practice-by-practice feedback on each developer's own work, with a mentoring overview across the cohort. It highlights strengths and what to work on — growth signals for everyone, never scores or rankings.",
+			"Transform code reviews into personal, practice-by-practice feedback on each developer's own work, with a mentoring overview across the workspace. It highlights strengths and what to work on — growth signals for everyone, never scores or rankings.",
 	},
 	{
 		icon: Sparkles,
@@ -32,9 +32,9 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We help novice developers onboard and grow in agile software teams by combining
-						practice-focused feedback with process-aware AI mentoring. Our guidance is grounded in
-						your actual repository activity and supports self-regulated learning.
+						We help developers onboard and grow by combining practice-focused feedback with
+						process-aware AI mentoring. Our guidance is grounded in your actual repository activity
+						and supports self-regulated learning.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">

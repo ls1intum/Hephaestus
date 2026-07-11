@@ -41,7 +41,7 @@ The full literature rationale lives in ADR 0021
 
 | Concept | Hephaestus object | What it is |
 | --- | --- | --- |
-| the practice as a shared, tacit standard | the **`Practice` *concept*** | lives in the cohort's shared understanding; NOT a column |
+| the practice as a shared, tacit standard | the **`Practice` *concept*** | lives in the workspace's shared understanding; NOT a column |
 | the written rule representing that standard | **`Practice.criteria`** | a partial, codified representation — never the standard itself |
 | a single observed enactment | **`Observation`** | the situated, observable trace |
 | feedback synthesised for a person | **`Feedback`** | task-framed feed-up / feed-back / feed-forward |
@@ -148,7 +148,7 @@ or the observation schema — practices remain the unit of detection.
 | slug | String(64) | `slug` | no | Stable key, unique per workspace (`uk_practice_area_workspace_slug`). | Survives a `name` rename. |
 | name | String(128) | `name` | no | Admin-renameable display label. | Dashboard label. |
 | description | String (TEXT) | `description` | yes | Optional blurb on the area card. | Context for the bucket. |
-| active | boolean | `is_active` | no (default true) | Cohort-level visibility toggle; independent of `Practice.active`. | Surface/hide on dashboards without touching detection. |
+| active | boolean | `is_active` | no (default true) | Workspace-level visibility toggle; independent of `Practice.active`. | Surface/hide on dashboards without touching detection. |
 | displayOrder | int | `display_order` | no (default 0) | Admin dashboard ordering. | Deterministic UI sequence. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp. | Audit trail. |
 | updatedAt | Instant | `updated_at` | yes | Last-update timestamp. | Audit trail. |
@@ -332,9 +332,9 @@ The schema encodes two orthogonal axes that the display layer must keep separate
   1. A workspace **ADMIN/OWNER** (the mentor role) may read the named roster (`GET /practices/reports`)
      and a per-developer drill-down (`GET /practices/reports/{userId}`). Every serving of either writes an
      append-only `DataAccessEvent` disclosure row (`core.audit`) — the mentor read is *audited*, never silent.
-  2. The **anonymised cohort** rollup (`GET /practices/cohort`, k-anonymised with K = 5 small-cell
-     suppression) is readable by admins/owners always, and by regular members only when the workspace's
-     `cohortVisibility` feature is `EVERYONE` (default: `MENTORS_ONLY`).
+  2. The **anonymised workspace health** rollup (`GET /practices/health`, k-anonymised with K = 5
+     small-cell suppression) is readable by admins/owners always, and by regular members only when the
+     workspace's `healthVisibility` feature is `EVERYONE` (default: `MENTORS_ONLY`).
 
   The researcher analysing **anonymised** study data and the workspace admin editing the catalog
   (criteria, area labels) remain distinct audiences; no audience ever receives an *unaudited,

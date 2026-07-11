@@ -233,12 +233,12 @@ public class ObservationService {
                 continue;
             }
 
-            // Map the standing through the shared deriver so the reflection cards and the mentor roster/cohort
-            // apply the SAME (hasProblems, hasStrengths) -> standing decision. The two inputs are computed
-            // per-surface (here in Java over the quarantine-filtered toWorkOn; the cohort/roster in SQL applying
-            // the same quarantine floor). A card with neither problems nor strengths is skipped above, so
-            // NO_ACTIVITY never reaches here — map it defensively to STRENGTH (the "nothing to act on" reading)
-            // rather than leaking a fourth value into the 3-value card enum.
+            // Map the standing through the shared deriver so the reflection cards and the mentor
+            // roster/workspace-health apply the SAME (hasProblems, hasStrengths) -> standing decision. The two
+            // inputs are computed per-surface (here in Java over the quarantine-filtered toWorkOn; the
+            // health/roster in SQL applying the same quarantine floor). A card with neither problems nor
+            // strengths is skipped above, so NO_ACTIVITY never reaches here — map it defensively to STRENGTH
+            // (the "nothing to act on" reading) rather than leaking a fourth value into the 3-value card enum.
             PracticeStatus standing = toCardStanding(
                 PracticeStatusDeriver.derive(!toWorkOn.isEmpty(), !strengths.isEmpty())
             );
@@ -267,7 +267,7 @@ public class ObservationService {
 
         // Lead with what needs attention (worst severity first), then mixed, then pure strengths.
         cards.sort(
-            Comparator.<PracticeReportCardDTO>comparingInt(c -> standingRank(c.standing())).thenComparingInt(
+            Comparator.<PracticeReportCardDTO>comparingInt(c -> standingRank(c.status())).thenComparingInt(
                 ObservationService::worstSeverityOrdinal
             )
         );
@@ -287,7 +287,7 @@ public class ObservationService {
     /**
      * Maps a prior-window {@link ObservationRepository.PracticeStandingRow} through the shared deriver — the
      * SAME {@code (hasProblems, hasStrengths) -> standing} decision the current-window card and the mentor
-     * roster/cohort use, so a trend diff compares like with like.
+     * roster/workspace-health use, so a trend diff compares like with like.
      */
     private static PracticeStatus standingOf(ObservationRepository.PracticeStandingRow row) {
         boolean hasProblems = row.getBadCount() != null && row.getBadCount() > 0;

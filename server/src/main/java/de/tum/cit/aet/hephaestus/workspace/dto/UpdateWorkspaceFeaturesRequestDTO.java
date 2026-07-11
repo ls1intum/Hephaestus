@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -17,7 +17,7 @@ public record UpdateWorkspaceFeaturesRequestDTO(
     @Schema(description = "Enable manual practice reviews triggered via bot command")
     Boolean practiceReviewManualTriggerEnabled,
     @Schema(
-        description = "Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)"
+        description = "Audience for the k-anonymised workspace health aggregate on the practice overview (MENTORS_ONLY, EVERYONE)"
     )
-    CohortVisibility cohortVisibility
+    HealthVisibility healthVisibility
 ) {}

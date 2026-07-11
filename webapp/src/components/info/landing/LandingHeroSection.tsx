@@ -10,7 +10,7 @@ const SAMPLE_PRACTICE: PracticeReportCard = {
 	name: "Write a clear pull request description",
 	areaName: "Pull requests",
 	slug: "clear-pr-description",
-	standing: "DEVELOPING",
+	status: "DEVELOPING",
 	trend: "STEADY",
 	whyItMatters:
 		"A clear description helps reviewers understand the change quickly and gives future readers the context behind it.",

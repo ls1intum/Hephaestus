@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 /**
  * The single, shared mapping from a developer's problem/strength signals to a per-practice
  * {@link PracticeStatus}. Both the developer's own reflection cards
- * ({@link ObservationService#getPracticeReport}) and the mentor overview (cohort + roster) map through here, so
- * the {@code (hasProblems, hasStrengths) -> standing} decision is defined in exactly one place. The two
- * inputs themselves are computed per-surface (reflection in Java, the cohort/roster in the repository's
- * quarantine-aware SQL) — both apply the same quarantine floor so the surfaces agree.
+ * ({@link ObservationService#getPracticeReport}) and the mentor overview (workspace health + roster) map
+ * through here, so the {@code (hasProblems, hasStrengths) -> status} decision is defined in exactly one
+ * place. The two inputs themselves are computed per-surface (reflection in Java, the health/roster in the
+ * repository's quarantine-aware SQL) — both apply the same quarantine floor so the surfaces agree.
  */
 public final class PracticeStatusDeriver {
 
@@ -49,7 +49,7 @@ public final class PracticeStatusDeriver {
     }
 
     /**
-     * Problem-load rank used ONLY to diff two standings across cycles ({@link #trendOf}) — never exposed on
+     * Problem-load order used ONLY to diff two statuses across cycles ({@link #trendOf}) — never exposed on
      * the wire (that would re-create a leaderboard, ADR 0023). Lower rank = more unresolved problems.
      */
     private static int problemLoadRank(PracticeStatus standing) {

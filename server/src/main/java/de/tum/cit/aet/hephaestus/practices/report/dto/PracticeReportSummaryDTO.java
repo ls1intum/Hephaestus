@@ -15,9 +15,7 @@ public record PracticeReportSummaryDTO(
     @NonNull @Schema(description = "Developer login") String userLogin,
     @Nullable @Schema(description = "Developer display name (may be null; UI falls back to login)") String name,
     @NonNull @Schema(description = "Developer avatar URL") String avatarUrl,
-    @NonNull
-    @Schema(description = "The developer's standing on each practice area")
-    List<AreaStandingCellDTO> standings,
+    @NonNull @Schema(description = "The developer's status on each practice area") List<AreaStatusCellDTO> areas,
     @Schema(description = "Whether the developer has unresolved gaps a mentor should look at (a triage flag)")
     boolean needsAttention,
     @NonNull

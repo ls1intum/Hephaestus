@@ -49,15 +49,15 @@ public class WorkspaceFeatures {
     private Boolean practiceReviewManualTriggerEnabled = true;
 
     /**
-     * Audience for the k-anonymised cohort aggregate on the practice overview (a privacy control, never a
-     * ranking control). Defaults to {@link CohortVisibility#MENTORS_ONLY}. The roster and per-developer
-     * drill-down stay admin/owner-only in both values; see {@link CohortVisibility}.
+     * Audience for the k-anonymised workspace health aggregate on the practice overview (a privacy control,
+     * never a ranking control). Defaults to {@link HealthVisibility#MENTORS_ONLY}. The roster and
+     * per-developer drill-down stay admin/owner-only in both values; see {@link HealthVisibility}.
      */
     @NotNull
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'MENTORS_ONLY'")
-    @Column(name = "cohort_visibility", nullable = false, length = 32)
-    private CohortVisibility cohortVisibility = CohortVisibility.MENTORS_ONLY;
+    @Column(name = "health_visibility", nullable = false, length = 32)
+    private HealthVisibility healthVisibility = HealthVisibility.MENTORS_ONLY;
 
     /** PATCH semantics: null fields are ignored, non-null fields overwrite. */
     public void applyPatch(UpdateWorkspaceFeaturesRequestDTO request) {
@@ -70,8 +70,8 @@ public class WorkspaceFeatures {
         if (request.practiceReviewManualTriggerEnabled() != null) {
             this.practiceReviewManualTriggerEnabled = request.practiceReviewManualTriggerEnabled();
         }
-        if (request.cohortVisibility() != null) {
-            this.cohortVisibility = request.cohortVisibility();
+        if (request.healthVisibility() != null) {
+            this.healthVisibility = request.healthVisibility();
         }
     }
 }

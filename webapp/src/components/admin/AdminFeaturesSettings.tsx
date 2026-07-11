@@ -4,18 +4,18 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 
-// Boolean feature toggles only. `cohortVisibility` is a string enum handled by its own control.
-export type FeatureKey = Exclude<keyof UpdateWorkspaceFeaturesRequest, "cohortVisibility">;
+// Boolean feature toggles only. `healthVisibility` is a string enum handled by its own control.
+export type FeatureKey = Exclude<keyof UpdateWorkspaceFeaturesRequest, "healthVisibility">;
 export type FeatureValues = Record<FeatureKey, boolean>;
 
-export type CohortVisibility = NonNullable<UpdateWorkspaceFeaturesRequest["cohortVisibility"]>;
+export type HealthVisibility = NonNullable<UpdateWorkspaceFeaturesRequest["healthVisibility"]>;
 
 export interface AdminFeaturesSettingsProps {
 	values: FeatureValues;
-	cohortVisibility: CohortVisibility;
+	healthVisibility: HealthVisibility;
 	isSaving: boolean;
 	onToggle: (feature: FeatureKey, enabled: boolean) => void;
-	onCohortVisibilityChange: (visibility: CohortVisibility) => void;
+	onHealthVisibilityChange: (visibility: HealthVisibility) => void;
 }
 
 interface FeatureDefinition {
@@ -58,7 +58,7 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 ];
 
 const VISIBILITY_OPTIONS: ReadonlyArray<{
-	value: CohortVisibility;
+	value: HealthVisibility;
 	label: string;
 	description: string;
 }> = [
@@ -66,22 +66,22 @@ const VISIBILITY_OPTIONS: ReadonlyArray<{
 		value: "MENTORS_ONLY",
 		label: "Admins/owners only",
 		description:
-			"Only workspace admins and owners see the anonymised cohort insights. Developers always see their own feedback.",
+			"Only workspace admins and owners see the anonymised workspace insights. Developers always see their own feedback.",
 	},
 	{
 		value: "EVERYONE",
 		label: "Everyone in the workspace",
 		description:
-			"Every workspace member can also see the anonymised cohort insights (never any per-person data).",
+			"Every workspace member can also see the anonymised workspace insights (never any per-person data).",
 	},
 ];
 
 export function AdminFeaturesSettings({
 	values,
-	cohortVisibility,
+	healthVisibility,
 	isSaving,
 	onToggle,
-	onCohortVisibilityChange,
+	onHealthVisibilityChange,
 }: AdminFeaturesSettingsProps) {
 	return (
 		<div className="space-y-6">
@@ -134,31 +134,31 @@ export function AdminFeaturesSettings({
 			</div>
 
 			<div>
-				<h2 className="text-lg font-semibold mb-4">Cohort visibility</h2>
+				<h2 className="text-lg font-semibold mb-4">Workspace health visibility</h2>
 				<Card>
 					<CardContent>
 						<div className="space-y-4">
 							<p className="text-sm text-muted-foreground">
-								Anonymised cohort insights visible to: admins/owners only, or everyone in the
-								workspace. This is never a score or a ranking. It only controls the cohort view. The
-								roster and per-developer drill-downs stay admin-only, and developers always see
-								their own feedback.
+								Anonymised workspace insights visible to: admins/owners only, or everyone in the
+								workspace. This is never a score or a ranking. It only controls the workspace health
+								view. The roster and per-developer drill-downs stay admin-only, and developers
+								always see their own feedback.
 							</p>
 							<RadioGroup
-								value={cohortVisibility}
+								value={healthVisibility}
 								onValueChange={(value) => {
-									if (value) onCohortVisibilityChange(value as CohortVisibility);
+									if (value) onHealthVisibilityChange(value as HealthVisibility);
 								}}
-								aria-label="Cohort visibility"
+								aria-label="Workspace health visibility"
 							>
 								{VISIBILITY_OPTIONS.map((option) => (
 									<label
 										key={option.value}
-										htmlFor={`cohort-visibility-${option.value}`}
+										htmlFor={`health-visibility-${option.value}`}
 										className="flex cursor-pointer items-start gap-3 rounded-md border p-3 has-data-checked:border-primary"
 									>
 										<RadioGroupItem
-											id={`cohort-visibility-${option.value}`}
+											id={`health-visibility-${option.value}`}
 											value={option.value}
 											disabled={isSaving}
 											className="mt-0.5"

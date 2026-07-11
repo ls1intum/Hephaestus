@@ -125,10 +125,6 @@ export type WorkspaceListItem = {
      */
     achievementsEnabled: boolean;
     /**
-     * Audience for the k-anonymised cohort aggregate on the practice overview
-     */
-    cohortVisibility: 'MENTORS_ONLY' | 'EVERYONE';
-    /**
      * Timestamp when the workspace was created
      */
     createdAt: Date;
@@ -136,6 +132,10 @@ export type WorkspaceListItem = {
      * Human-readable name of the workspace
      */
     displayName: string;
+    /**
+     * Audience for the k-anonymised workspace health aggregate on the practice overview
+     */
+    healthVisibility: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Unique identifier of the workspace
      */
@@ -175,10 +175,6 @@ export type Workspace = {
      */
     achievementsEnabled: boolean;
     /**
-     * Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)
-     */
-    cohortVisibility: 'MENTORS_ONLY' | 'EVERYONE';
-    /**
      * Timestamp when the workspace was created
      */
     createdAt: Date;
@@ -198,6 +194,10 @@ export type Workspace = {
      * Whether Slack token is configured
      */
     hasSlackToken: boolean;
+    /**
+     * Audience for the k-anonymised workspace health aggregate on the practice overview (MENTORS_ONLY, EVERYONE)
+     */
+    healthVisibility: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Unique identifier of the workspace
      */
@@ -399,9 +399,9 @@ export type UpdateWorkspaceFeaturesRequest = {
      */
     achievementsEnabled?: boolean;
     /**
-     * Audience for the k-anonymised cohort aggregate on the practice overview (MENTORS_ONLY, EVERYONE)
+     * Audience for the k-anonymised workspace health aggregate on the practice overview (MENTORS_ONLY, EVERYONE)
      */
-    cohortVisibility?: 'MENTORS_ONLY' | 'EVERYONE';
+    healthVisibility?: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Enable the Pi mentor chat feature
      */
@@ -1311,6 +1311,10 @@ export type ProblemDetail = {
  */
 export type PracticeReportSummary = {
     /**
+     * The developer's status on each practice area
+     */
+    areas: Array<AreaStatusCell>;
+    /**
      * Plain-language reasons behind needsAttention (empty when none)
      */
     attentionReasons: Array<string>;
@@ -1327,10 +1331,6 @@ export type PracticeReportSummary = {
      */
     needsAttention?: boolean;
     /**
-     * The developer's standing on each practice area
-     */
-    standings: Array<AreaStandingCell>;
-    /**
      * Stable SCM user id for drill-down calls
      */
     userId: number;
@@ -1341,9 +1341,9 @@ export type PracticeReportSummary = {
 };
 
 /**
- * A developer's standing on one practice area
+ * A developer's status on one practice area
  */
-export type AreaStandingCell = {
+export type AreaStatusCell = {
     /**
      * Area name
      */
@@ -1419,7 +1419,7 @@ export type PracticeReportCard = {
     /**
      * Where the developer stands on this practice
      */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
+    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
     /**
      * What the developer already does well here
      */
@@ -2419,44 +2419,6 @@ export type ConnectionAuditEntry = {
 };
 
 /**
- * Cohort standing distribution for one practice area (k-anonymised, never per-person)
- */
-export type CohortAreaStatus = {
-    /**
-     * Area name
-     */
-    areaName: string;
-    /**
-     * Area slug
-     */
-    areaSlug: string;
-    /**
-     * Developers standing at DEVELOPING (null when suppressed or no data)
-     */
-    developingCount?: number;
-    /**
-     * Developers standing at MIXED (null when suppressed or no data)
-     */
-    mixedCount?: number;
-    /**
-     * Developers with activity but no problems/strengths this window (null when suppressed or no data)
-     */
-    noActivityCount?: number;
-    /**
-     * True when no developer had activity on this area in the window (not a privacy risk — nobody to re-identify)
-     */
-    noData?: boolean;
-    /**
-     * Developers standing at STRENGTH (null when suppressed or no data)
-     */
-    strengthCount?: number;
-    /**
-     * True when suppressed for k-anonymity (< 5 developers active, or a non-zero bucket has < 5)
-     */
-    suppressed?: boolean;
-};
-
-/**
  * Mentor chat thread summary (no messages).
  */
 export type ChatThreadSummary = {
@@ -2541,6 +2503,40 @@ export type AssignRoleRequest = {
      * User ID of the member to update
      */
     userId: number;
+};
+
+/**
+ * Workspace health distribution for one practice area (k-anonymised, never per-person)
+ */
+export type AreaHealth = {
+    /**
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * Whether counts are available, suppressed for k-anonymity, or there was no data at all
+     */
+    availability: 'AVAILABLE' | 'SUPPRESSED' | 'NO_DATA';
+    /**
+     * Developers standing at DEVELOPING (null unless availability is AVAILABLE)
+     */
+    developingCount?: number;
+    /**
+     * Developers standing at MIXED (null unless availability is AVAILABLE)
+     */
+    mixedCount?: number;
+    /**
+     * Developers with activity but no problems/strengths this window (null unless availability is AVAILABLE)
+     */
+    noActivityCount?: number;
+    /**
+     * Developers standing at STRENGTH (null unless availability is AVAILABLE)
+     */
+    strengthCount?: number;
 };
 
 /**
@@ -4463,36 +4459,6 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
-export type GetCohortPracticeStatusData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/cohort';
-};
-
-export type GetCohortPracticeStatusErrors = {
-    /**
-     * Not permitted for this cohort visibility
-     */
-    403: ProblemDetail;
-};
-
-export type GetCohortPracticeStatusError = GetCohortPracticeStatusErrors[keyof GetCohortPracticeStatusErrors];
-
-export type GetCohortPracticeStatusResponses = {
-    /**
-     * Cohort status cards returned
-     */
-    200: Array<CohortAreaStatus>;
-};
-
-export type GetCohortPracticeStatusResponse = GetCohortPracticeStatusResponses[keyof GetCohortPracticeStatusResponses];
-
 export type GetEngagementData = {
     body?: never;
     path: {
@@ -4583,6 +4549,36 @@ export type SubmitReactionResponses = {
 };
 
 export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
+
+export type ListPracticeHealthData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/health';
+};
+
+export type ListPracticeHealthErrors = {
+    /**
+     * Not permitted for this workspace's health visibility
+     */
+    403: ProblemDetail;
+};
+
+export type ListPracticeHealthError = ListPracticeHealthErrors[keyof ListPracticeHealthErrors];
+
+export type ListPracticeHealthResponses = {
+    /**
+     * Workspace health cards returned
+     */
+    200: Array<AreaHealth>;
+};
+
+export type ListPracticeHealthResponse = ListPracticeHealthResponses[keyof ListPracticeHealthResponses];
 
 export type ListLearnerPracticesData = {
     body?: never;
@@ -4724,7 +4720,10 @@ export type ListPracticeReportsData = {
          */
         workspaceSlug: string;
     };
-    query?: never;
+    query?: {
+        page?: number;
+        size?: number;
+    };
     url: '/workspaces/{workspaceSlug}/practices/reports';
 };
 

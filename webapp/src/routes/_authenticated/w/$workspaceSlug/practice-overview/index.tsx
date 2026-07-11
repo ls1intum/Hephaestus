@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
-	getCohortPracticeStatusOptions,
+	listPracticeHealthOptions,
 	listPracticeReportsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { PracticeOverviewPage } from "@/components/practices/overview/PracticeOverviewPage";
@@ -21,12 +21,12 @@ function PracticeOverviewContainer() {
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !accessLoading && !hasWorkspace;
 
-	const canQueryCohort = hasWorkspace && practicesEnabled;
-	const canQueryRoster = canQueryCohort && isAdmin;
+	const canQueryHealth = hasWorkspace && practicesEnabled;
+	const canQueryRoster = canQueryHealth && isAdmin;
 
-	const cohortQuery = useQuery({
-		...getCohortPracticeStatusOptions({ path: { workspaceSlug: slug } }),
-		enabled: canQueryCohort,
+	const healthQuery = useQuery({
+		...listPracticeHealthOptions({ path: { workspaceSlug: slug } }),
+		enabled: canQueryHealth,
 	});
 	const rosterQuery = useQuery({
 		...listPracticeReportsOptions({ path: { workspaceSlug: slug } }),
@@ -42,25 +42,25 @@ function PracticeOverviewContainer() {
 	}
 
 	const serverRefusedAccess =
-		httpStatusOf(cohortQuery.error) === 403 || (isAdmin && httpStatusOf(rosterQuery.error) === 403);
+		httpStatusOf(healthQuery.error) === 403 || (isAdmin && httpStatusOf(rosterQuery.error) === 403);
 	const isForbidden = !accessLoading && hasWorkspace && (!practicesEnabled || serverRefusedAccess);
-	const isError = !isForbidden && (cohortQuery.isError || rosterQuery.isError);
+	const isError = !isForbidden && (healthQuery.isError || rosterQuery.isError);
 
 	return (
 		<PracticeOverviewPage
 			workspaceSlug={slug}
-			cohort={cohortQuery.data}
+			health={healthQuery.data}
 			roster={rosterQuery.data}
 			isLoading={
 				accessLoading ||
-				(canQueryCohort && cohortQuery.isPending) ||
+				(canQueryHealth && healthQuery.isPending) ||
 				(canQueryRoster && rosterQuery.isPending)
 			}
 			isForbidden={isForbidden}
 			isError={isError}
 			showRoster={isAdmin}
 			onRetry={() => {
-				cohortQuery.refetch();
+				healthQuery.refetch();
 				if (isAdmin) rosterQuery.refetch();
 			}}
 		/>

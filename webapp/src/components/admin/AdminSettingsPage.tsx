@@ -1,9 +1,9 @@
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import {
 	AdminFeaturesSettings,
-	type CohortVisibility,
 	type FeatureKey,
 	type FeatureValues,
+	type HealthVisibility,
 } from "./AdminFeaturesSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminReviewCycleSettings } from "./AdminReviewCycleSettings";
@@ -30,10 +30,10 @@ export interface AdminSettingsPageProps {
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
 	features: FeatureValues;
-	cohortVisibility: CohortVisibility;
+	healthVisibility: HealthVisibility;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	onCohortVisibilityChange: (visibility: CohortVisibility) => void;
+	onHealthVisibilityChange: (visibility: HealthVisibility) => void;
 	// Review cycle (weekly practice-review window)
 	workspaceSlug?: string;
 	reviewCycleDay?: number;
@@ -76,10 +76,10 @@ export function AdminSettingsPage({
 	onAddRepository,
 	onRemoveRepository,
 	features,
-	cohortVisibility,
+	healthVisibility,
 	isSavingFeatures,
 	onToggleFeature,
-	onCohortVisibilityChange,
+	onHealthVisibilityChange,
 	workspaceSlug,
 	reviewCycleDay,
 	reviewCycleTime,
@@ -102,10 +102,10 @@ export function AdminSettingsPage({
 			<div className="space-y-10">
 				<AdminFeaturesSettings
 					values={features}
-					cohortVisibility={cohortVisibility}
+					healthVisibility={healthVisibility}
 					isSaving={isSavingFeatures}
 					onToggle={onToggleFeature}
-					onCohortVisibilityChange={onCohortVisibilityChange}
+					onHealthVisibilityChange={onHealthVisibilityChange}
 				/>
 
 				<AdminRepositoriesSettings

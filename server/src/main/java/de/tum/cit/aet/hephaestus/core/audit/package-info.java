@@ -1,9 +1,9 @@
 /**
  * Data-access audit — a small, generalized, append-only disclosure log.
  *
- * <p>Records one row each time a privileged actor is shown another person's (or a named cohort's) data,
- * tamper-evident at the storage layer. The first writer is the practice-report surface (a mentor opening
- * a developer's report, or the roster that names developers), but the model is deliberately resource-typed
+ * <p>Records one row each time a privileged actor is shown another person's (or several people's, in one bulk
+ * view) data, tamper-evident at the storage layer. The first writer is the practice-report surface (a mentor
+ * opening a developer's report, or the roster that names developers), but the model is deliberately resource-typed
  * ({@link DataAccessResourceType}) so any future disclosure surface can reuse it without a new bespoke table.
  *
  * <p>The application only WRITES this log: the append-only insert path ({@link DataAccessAuditWriter}),

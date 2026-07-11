@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReacti
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.time.Instant;
 import java.util.List;
@@ -66,7 +66,7 @@ class ReactionServiceTest extends BaseUnitTest {
             null,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
     }

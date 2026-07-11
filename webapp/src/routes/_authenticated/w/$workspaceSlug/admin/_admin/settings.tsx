@@ -13,7 +13,7 @@ import {
 	updateFeaturesMutation,
 	updateSlackChannelConsentMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { CohortVisibility, FeatureKey } from "@/components/admin/AdminFeaturesSettings";
+import type { FeatureKey, HealthVisibility } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import type { SlackConsentState } from "@/components/admin/AdminSlackChannelsSettings";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
@@ -224,14 +224,14 @@ function AdminSettings() {
 		});
 	};
 
-	// Handle cohort-visibility change
-	const handleCohortVisibilityChange = (cohortVisibility: CohortVisibility) => {
+	// Handle workspace-health-visibility change
+	const handleHealthVisibilityChange = (healthVisibility: HealthVisibility) => {
 		if (!workspaceSlug) {
 			return;
 		}
 		updateFeatures.mutate({
 			path: { workspaceSlug },
-			body: { cohortVisibility },
+			body: { healthVisibility },
 		});
 	};
 
@@ -315,10 +315,10 @@ function AdminSettings() {
 				practiceReviewManualTriggerEnabled:
 					workspaceData?.practiceReviewManualTriggerEnabled ?? true,
 			}}
-			cohortVisibility={workspaceData?.cohortVisibility ?? "MENTORS_ONLY"}
+			healthVisibility={workspaceData?.healthVisibility ?? "MENTORS_ONLY"}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
-			onCohortVisibilityChange={handleCohortVisibilityChange}
+			onHealthVisibilityChange={handleHealthVisibilityChange}
 			workspaceSlug={workspaceSlug ?? undefined}
 			reviewCycleDay={workspaceData?.reviewCycleDay ?? undefined}
 			reviewCycleTime={workspaceData?.reviewCycleTime ?? undefined}

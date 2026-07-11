@@ -7,7 +7,7 @@ const basePractice: PracticeReportCard = {
 	name: "Write a clear pull request description",
 	areaName: "Pull requests",
 	slug: "clear-pr-description",
-	standing: "MIXED",
+	status: "MIXED",
 	trend: "STEADY",
 	whyItMatters:
 		"A clear description helps reviewers understand the change quickly and gives future readers the context behind it.",
@@ -43,7 +43,7 @@ const basePractice: PracticeReportCard = {
 	],
 };
 
-/** One practice's readable feedback for a developer: a criterion-referenced standing chip, strengths, and what to work on. */
+/** One practice's readable feedback for a developer: a criterion-referenced status chip, strengths, and what to work on. */
 const meta = {
 	component: PracticeReflectionCard,
 	parameters: { layout: "padded" },
@@ -75,12 +75,12 @@ export const Strength: Story = {
 	args: {
 		practice: {
 			...basePractice,
-			standing: "STRENGTH",
+			status: "STRENGTH",
 			toWorkOn: [],
 		},
 	},
 	play: async ({ canvasElement }) => {
-		// The standing enum maps to a human chip label.
+		// The status enum maps to a human chip label.
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("Strength")).toBeVisible();
 	},
@@ -90,7 +90,7 @@ export const Developing: Story = {
 	args: {
 		practice: {
 			...basePractice,
-			standing: "DEVELOPING",
+			status: "DEVELOPING",
 			strengths: [],
 		},
 	},
@@ -127,7 +127,7 @@ export const TrendWorsening: Story = {
 	args: { practice: { ...basePractice, trend: "WORSENING" } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Slipped since last cycle")).toBeVisible();
+		await expect(canvas.getByText("Declining since last cycle")).toBeVisible();
 	},
 };
 
@@ -145,7 +145,7 @@ export const TrendSteady: Story = {
 		// STEADY is deliberately silent — no badge, no noise.
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByText("Improving since last cycle")).toBeNull();
-		await expect(canvas.queryByText("Slipped since last cycle")).toBeNull();
+		await expect(canvas.queryByText("Declining since last cycle")).toBeNull();
 		await expect(canvas.queryByText("New this cycle")).toBeNull();
 	},
 };

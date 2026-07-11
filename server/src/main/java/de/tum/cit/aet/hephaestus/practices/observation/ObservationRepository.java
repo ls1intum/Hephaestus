@@ -275,8 +275,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p>Each row is one (practice slug, presence, assessment) combination with the total count and the
      * most recent detection timestamp. Callers group results by slug to build a per-practice
-     * history summary. The {@code idx_observation_subject} index on {@code (about_user_id)} narrows the
-     * initial scan by about-user.
+     * history summary. The {@code idx_observation_subject} index on {@code (about_user_id, observed_at DESC)}
+     * narrows the initial scan by about-user.
      *
      * <p>Re-review deduped to each target's latest run (same grain as the sibling histogram queries), so a
      * twice-reviewed target contributes only its current state rather than inflating the good/bad counts that
@@ -597,7 +597,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     /**
      * Per-(developer, area, practice) good/bad activity for the mentor overview, across ALL practice areas
-     * (P1 generalisation — the mentor roster/cohort used to be hardcoded to one area). Keeps parity with the
+     * (P1 generalisation — the mentor roster/workspace health used to be hardcoded to one area). Keeps parity with the
      * reflection surface by deduping re-reviews to the target's latest run WITHIN the window (bounded by
      * {@code until} on both the outer predicate and the correlated latest-run subquery, so a prior-window call
      * never picks up a "latest run" that actually happened after that window closed) and excluding

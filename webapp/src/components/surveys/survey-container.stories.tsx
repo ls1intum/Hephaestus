@@ -88,7 +88,7 @@ const hephaestusFeedbackSurvey: PostHogSurvey = {
 			id: "e72a329b-e4c2-4fc0-bf22-9d7f651d8d4a",
 			type: "open",
 			question:
-				"What specific changes to the practice overview (e.g., cohort visibility, mentoring signals, or reflection cards) would make the feedback more useful without feeling competitive?",
+				"What specific changes to the practice overview (e.g., workspace health visibility, mentoring signals, or reflection cards) would make the feedback more useful without feeling competitive?",
 			buttonText: "Submit",
 			description: "",
 			descriptionContentType: "text",

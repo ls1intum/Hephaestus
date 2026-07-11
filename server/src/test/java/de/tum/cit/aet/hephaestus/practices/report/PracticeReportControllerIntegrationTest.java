@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -34,14 +34,14 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Controller-level integration tests for the mentor overview. Exercises access control (roster/drill-down are
- * admin/owner-only; cohort follows the visibility tier), the recency window, and the disclosure audit rows
- * written on drill-down/roster views.
+ * admin/owner-only; workspace health follows the visibility tier), the recency window, and the disclosure
+ * audit rows written on drill-down/roster views.
  */
 class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String REPORTS_URI = "/workspaces/{workspaceSlug}/practices/reports";
-    private static final String COHORT_URI = "/workspaces/{workspaceSlug}/practices/cohort";
+    private static final String HEALTH_URI = "/workspaces/{workspaceSlug}/practices/health";
     private static final String REVIEW_AREA = "constructive-code-review";
 
     @Autowired
@@ -105,8 +105,8 @@ class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrati
         return practiceRepository.save(practice);
     }
 
-    private void setVisibility(CohortVisibility tier) {
-        workspace.getFeatures().setCohortVisibility(tier);
+    private void setVisibility(HealthVisibility tier) {
+        workspace.getFeatures().setHealthVisibility(tier);
         workspace = workspaceRepository.save(workspace);
     }
 
@@ -186,18 +186,18 @@ class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrati
             .isForbidden();
     }
 
-    // ---- /cohort visibility tier ----
+    // ---- /health visibility tier ----
 
     @Test
     @WithUser
-    @DisplayName("member gets 403 on cohort when tier is MENTORS_ONLY")
-    void memberForbiddenOnCohortMentorOnly() {
+    @DisplayName("member gets 403 on workspace health when tier is MENTORS_ONLY")
+    void memberForbiddenOnHealthMentorOnly() {
         getMemberUser();
-        setVisibility(CohortVisibility.MENTORS_ONLY);
+        setVisibility(HealthVisibility.MENTORS_ONLY);
 
         webTestClient
             .get()
-            .uri(COHORT_URI, workspace.getWorkspaceSlug())
+            .uri(HEALTH_URI, workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -206,29 +206,27 @@ class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithUser
-    @DisplayName("member sees cohort when tier is EVERYONE")
-    void memberSeesCohortWorkspaceVisible() {
+    @DisplayName("member sees workspace health when tier is EVERYONE")
+    void memberSeesHealthWorkspaceVisible() {
         getMemberUser();
-        setVisibility(CohortVisibility.EVERYONE);
+        setVisibility(HealthVisibility.EVERYONE);
 
         webTestClient
             .get()
-            .uri(COHORT_URI, workspace.getWorkspaceSlug())
+            .uri(HEALTH_URI, workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isOk()
             .expectBody()
-            // One area, zero active developers this window -> no-data card (not a k-anonymity suppression:
+            // One area, zero active developers this window -> NO_DATA card (not a k-anonymity suppression:
             // there is nobody to re-identify), counts null.
             .jsonPath("$.length()")
             .isEqualTo(1)
             .jsonPath("$[0].areaSlug")
             .isEqualTo(REVIEW_AREA)
-            .jsonPath("$[0].noData")
-            .isEqualTo(true)
-            .jsonPath("$[0].suppressed")
-            .isEqualTo(false)
+            .jsonPath("$[0].availability")
+            .isEqualTo("NO_DATA")
             .jsonPath("$[0].strengthCount")
             .doesNotExist();
     }

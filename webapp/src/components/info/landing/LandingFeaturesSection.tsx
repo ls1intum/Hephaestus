@@ -12,7 +12,7 @@ export function LandingFeaturesSection() {
 						Key Features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Tools for Team Growth
+						Tools for developer growth
 					</h2>
 					<p className="text-muted-foreground text-lg">
 						Features designed to elevate your engineering team's collaboration and learning
@@ -38,7 +38,7 @@ export function LandingFeaturesSection() {
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>A mentoring overview across the whole cohort</span>
+									<span>A mentoring overview across the whole workspace</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />

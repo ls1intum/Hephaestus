@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Set;
@@ -62,7 +62,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -81,7 +81,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -93,7 +93,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
 
@@ -127,7 +127,7 @@ class WorkspaceContextTest {
             null,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             roles
         );
 
@@ -148,7 +148,7 @@ class WorkspaceContextTest {
             100L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             roles
         );
 

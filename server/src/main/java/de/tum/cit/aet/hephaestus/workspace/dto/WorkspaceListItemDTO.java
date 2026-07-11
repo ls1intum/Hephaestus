@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -26,8 +26,8 @@ public record WorkspaceListItemDTO(
     @NonNull @Schema(description = "Whether the Pi mentor chat feature is enabled") Boolean mentorEnabled,
     @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
     @NonNull
-    @Schema(description = "Audience for the k-anonymised cohort aggregate on the practice overview")
-    CohortVisibility cohortVisibility
+    @Schema(description = "Audience for the k-anonymised workspace health aggregate on the practice overview")
+    HealthVisibility healthVisibility
 ) {
     public static WorkspaceListItemDTO from(Workspace workspace, ConnectionService connectionService) {
         IdentityProviderType providerType = connectionService
@@ -45,7 +45,7 @@ public record WorkspaceListItemDTO(
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getMentorEnabled(),
             workspace.getFeatures().getAchievementsEnabled(),
-            workspace.getFeatures().getCohortVisibility()
+            workspace.getFeatures().getHealthVisibility()
         );
     }
 }

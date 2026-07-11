@@ -15,7 +15,7 @@ const mockWorkspace = {
 	practicesEnabled: true,
 	mentorEnabled: true,
 	achievementsEnabled: true,
-	cohortVisibility: "MENTORS_ONLY",
+	healthVisibility: "MENTORS_ONLY",
 } as const;
 
 /**

@@ -1,6 +1,6 @@
 import { CircleAlert, CircleCheck, CircleDot } from "lucide-react";
 import type { PracticeReportCard, PracticeReportItem } from "@/api/types.gen";
-import { StandingChip } from "@/components/practices/StandingChip";
+import { StatusChip } from "@/components/practices/StatusChip";
 import { TrendNote } from "@/components/practices/TrendBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -55,11 +55,11 @@ export interface PracticeReflectionCardProps {
 
 /**
  * A single practice's readable feedback for one developer. Non-competitive by construction: it shows
- * a criterion-referenced standing chip (no number, no rank), what the developer does well, and what
+ * a criterion-referenced status chip (no number, no rank), what the developer does well, and what
  * to work on. Reused by the developer self-view and the mentor drill-down.
  */
 export function PracticeReflectionCard({ practice }: PracticeReflectionCardProps) {
-	const { name, areaName, standing, trend, whyItMatters, strengths, toWorkOn } = practice;
+	const { name, areaName, status, trend, whyItMatters, strengths, toWorkOn } = practice;
 	const hasStrengths = strengths.length > 0;
 	const hasToWorkOn = toWorkOn.length > 0;
 
@@ -75,7 +75,7 @@ export function PracticeReflectionCard({ practice }: PracticeReflectionCardProps
 						)}
 						<h3 className="text-base font-semibold text-foreground">{name}</h3>
 					</div>
-					<StandingChip standing={standing} />
+					<StatusChip status={status} />
 				</div>
 				<TrendNote trend={trend} />
 				{whyItMatters && (

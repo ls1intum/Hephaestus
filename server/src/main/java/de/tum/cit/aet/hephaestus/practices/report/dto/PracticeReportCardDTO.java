@@ -32,7 +32,7 @@ public record PracticeReportCardDTO(
         description = "Where the developer stands on this practice",
         allowableValues = { "DEVELOPING", "STRENGTH", "MIXED" }
     )
-    PracticeStatus standing,
+    PracticeStatus status,
     @NonNull
     @Schema(
         description = "Direction versus the prior review cycle (criterion-referenced, never a peer comparison)",

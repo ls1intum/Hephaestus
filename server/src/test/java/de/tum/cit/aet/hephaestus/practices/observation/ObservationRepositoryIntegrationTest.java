@@ -998,7 +998,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Quarantine parity: the cohort SQL {@code findAreaRollupStandingBetween} and the
+     * Quarantine parity: the workspace-health SQL {@code findAreaRollupStandingBetween} and the
      * developer's own reflection ({@link ObservationService#getPracticeReport}) must reach the SAME verdict on the
      * SAME single-target BAD. Both apply the identical floor — a single-target BAD with confidence &lt; 0.5 is
      * quarantined (excluded), a confident one is not.
@@ -1006,7 +1006,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
      * <p><b>How parity is pinned.</b> Both surfaces are driven from ONE inserted observation per test (same
      * about-user, same reviewing practice, same artifact, same confidence). The recency bound is the SAME
      * value on both paths: {@code getPracticeReport} computes {@code since} internally from
-     * {@link ReviewCycleWindowResolver#previousCycleWindow}, and the cohort assertion passes exactly that same
+     * {@link ReviewCycleWindowResolver#previousCycleWindow}, and the workspace-health assertion passes exactly that same
      * {@code previousCycleWindow(workspace).after()} (truncated to the minute, so both reads see it identically
      * within a test run). So any divergence between the two is a floor-application difference, not an input or
      * window difference.
@@ -1062,7 +1062,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         /** The area-rollup query's EFFECTIVE bad count for our (developer, reviewing practice) pair (0 if no row). */
-        private long cohortBadCount() {
+        private long healthBadCount() {
             return observationRepository
                 .findAreaRollupStandingBetween(workspace.getId(), since, Instant.now().plusSeconds(60))
                 .stream()
@@ -1084,13 +1084,13 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("a single-target low-confidence BAD is quarantined identically on cohort and reflection")
-        void quarantinedBadIsNeitherACohortProblemNorAReflectionToWorkOnItem() {
+        @DisplayName("a single-target low-confidence BAD is quarantined identically on workspace health and reflection")
+        void quarantinedBadIsNeitherAWorkspaceHealthProblemNorAReflectionToWorkOnItem() {
             seedReviewingArea();
             insertBad("parity-quarantined", 7L, 0.4f); // single target + confidence < 0.5 → quarantined on BOTH
 
-            // (i) cohort: the BAD is excluded from badCount, so the developer is NOT DEVELOPING on this practice.
-            long badCount = cohortBadCount();
+            // (i) workspace health: the BAD is excluded from badCount, so the developer is NOT DEVELOPING on this practice.
+            long badCount = healthBadCount();
             assertThat(badCount).isZero();
             assertThat(PracticeStatusDeriver.derive(badCount > 0, false)).isNotEqualTo(PracticeStatus.DEVELOPING);
 
@@ -1099,13 +1099,13 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("a high-confidence BAD is flagged identically on cohort and reflection")
+        @DisplayName("a high-confidence BAD is flagged identically on workspace health and reflection")
         void confidentBadIsFlaggedOnBothSurfaces() {
             seedReviewingArea();
             insertBad("parity-confident", 7L, 0.8f); // single target but confidence ≥ 0.5 → NOT quarantined
 
-            // (i) cohort: the confident BAD counts → the developer is DEVELOPING on this practice.
-            long badCount = cohortBadCount();
+            // (i) workspace health: the confident BAD counts → the developer is DEVELOPING on this practice.
+            long badCount = healthBadCount();
             assertThat(badCount).isEqualTo(1L);
             assertThat(PracticeStatusDeriver.derive(badCount > 0, false)).isEqualTo(PracticeStatus.DEVELOPING);
 
@@ -1114,8 +1114,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("hidden workspace members are excluded from the practice overview cohort query")
-        void hiddenMembersAreExcludedFromCohortStanding() {
+        @DisplayName("hidden workspace members are excluded from the practice overview workspace-health query")
+        void hiddenMembersAreExcludedFromWorkspaceHealthStanding() {
             seedReviewingArea();
             insertBad("hidden-member", 7L, 0.8f);
             WorkspaceMembership membership = workspaceMembershipRepository
@@ -1134,7 +1134,9 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("observations from a repository hidden from contributions are excluded on cohort AND reflection")
+        @DisplayName(
+            "observations from a repository hidden from contributions are excluded on workspace health AND reflection"
+        )
         void hiddenRepositoryObservationsAreExcludedOnBothSurfaces() {
             seedReviewingArea();
             PullRequest visiblePr = persistPullRequest("visible-org/visible-repo", 201L, false);
@@ -1153,8 +1155,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 .extracting(o -> o.getArtifactId())
                 .containsExactly(visiblePr.getId());
 
-            // (ii) cohort: same verdict — the hidden-repo BAD never counts.
-            long badCount = cohortBadCount();
+            // (ii) workspace health: same verdict — the hidden-repo BAD never counts.
+            long badCount = healthBadCount();
             assertThat(badCount).isEqualTo(1L);
         }
 

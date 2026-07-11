@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Set;
@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * Immutable request-scoped context containing workspace metadata and user roles.
  * Used for isolation, authorization, and observability (MDC enrichment).
  *
- * <p>{@code mentorEnabled} and {@code cohortVisibility} are captured here so per-request practice/mentor
+ * <p>{@code mentorEnabled} and {@code healthVisibility} are captured here so per-request practice/mentor
  * controllers can short-circuit their access checks without re-loading the {@link Workspace} entity — the
  * filter already has the row in hand.
  *
@@ -24,7 +24,8 @@ import org.jspecify.annotations.Nullable;
  *                       carries the column directly)
  * @param publiclyViewable Whether the workspace allows public read access
  * @param mentorEnabled Whether the Pi mentor chat feature is enabled for this workspace
- * @param cohortVisibility Audience for the k-anonymised cohort aggregate on the practice overview (privacy control)
+ * @param healthVisibility Audience for the k-anonymised workspace health aggregate on the practice overview
+ *                         (privacy control)
  * @param roles Set of workspace roles for the current user
  */
 public record WorkspaceContext(
@@ -35,7 +36,7 @@ public record WorkspaceContext(
     Long installationId,
     boolean publiclyViewable,
     boolean mentorEnabled,
-    CohortVisibility cohortVisibility,
+    HealthVisibility healthVisibility,
     Set<WorkspaceRole> roles
 ) {
     /**
@@ -57,7 +58,7 @@ public record WorkspaceContext(
             installationId,
             Boolean.TRUE.equals(workspace.getIsPubliclyViewable()),
             Boolean.TRUE.equals(workspace.getFeatures().getMentorEnabled()),
-            workspace.getFeatures().getCohortVisibility(),
+            workspace.getFeatures().getHealthVisibility(),
             roles != null ? roles : Set.of()
         );
     }

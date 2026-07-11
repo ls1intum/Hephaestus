@@ -13,15 +13,15 @@ export function NavDashboards({
 	achievementsEnabled = true,
 	practicesEnabled = true,
 	isAdmin = false,
-	cohortVisibility = "MENTORS_ONLY",
+	healthVisibility = "MENTORS_ONLY",
 }: {
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	practicesEnabled?: boolean;
 	isAdmin?: boolean;
-	cohortVisibility?: "MENTORS_ONLY" | "EVERYONE";
+	healthVisibility?: "MENTORS_ONLY" | "EVERYONE";
 }) {
-	const canSeePracticeOverview = isAdmin || cohortVisibility === "EVERYONE";
+	const canSeePracticeOverview = isAdmin || healthVisibility === "EVERYONE";
 
 	return (
 		<SidebarGroup>

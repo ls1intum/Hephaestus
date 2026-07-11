@@ -115,7 +115,7 @@ export function AppSidebar({
 					workspaceSlug={activeWorkspace.workspaceSlug}
 					achievementsEnabled={activeWorkspace.achievementsEnabled}
 					practicesEnabled={activeWorkspace.practicesEnabled}
-					cohortVisibility={activeWorkspace.cohortVisibility}
+					healthVisibility={activeWorkspace.healthVisibility}
 					isAdmin={isAdmin}
 				/>
 				{/* Mentor link requires BOTH the user-scoped account_feature flag and the per-workspace toggle. */}

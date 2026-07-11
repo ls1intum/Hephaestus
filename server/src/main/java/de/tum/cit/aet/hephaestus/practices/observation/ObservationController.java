@@ -39,8 +39,8 @@ import tools.jackson.databind.json.JsonMapper;
  * The pull-request endpoint returns every developer's observations on that PR, so it rejects non-members
  * itself (see {@link #getObservationsForPullRequest}).
  *
- * <p>The synthesised per-developer report cards and the anonymised cohort rollup live on the sibling
- * {@code /practices/reports} + {@code /practices/cohort} resources (see
+ * <p>The synthesised per-developer report cards and the anonymised workspace health rollup live on the sibling
+ * {@code /practices/reports} + {@code /practices/health} resources (see
  * {@link de.tum.cit.aet.hephaestus.practices.report.PracticeReportController}).
  */
 @WorkspaceScopedController

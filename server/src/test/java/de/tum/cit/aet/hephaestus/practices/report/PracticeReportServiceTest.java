@@ -16,8 +16,9 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaRollupRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus;
-import de.tum.cit.aet.hephaestus.practices.report.dto.AreaStandingCellDTO;
-import de.tum.cit.aet.hephaestus.practices.report.dto.CohortAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.AreaHealthDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.AreaStatusCellDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.HealthAvailability;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleProperties;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.data.domain.Pageable;
 
 class PracticeReportServiceTest extends BaseUnitTest {
 
@@ -143,8 +145,8 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("cohort: fewer than 5 active developers -> suppressed with null counts")
-    void cohortSuppressedBelowThreshold() {
+    @DisplayName("workspace health: fewer than 5 active developers -> suppressed with null counts")
+    void healthSuppressedBelowThreshold() {
         PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
         when(
             practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
@@ -156,12 +158,11 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        CohortAreaStatusDTO card = cards.get(0);
-        assertThat(card.suppressed()).isTrue();
-        assertThat(card.noData()).isFalse();
+        AreaHealthDTO card = cards.get(0);
+        assertThat(card.availability()).isEqualTo(HealthAvailability.SUPPRESSED);
         assertThat(card.strengthCount()).isNull();
         assertThat(card.developingCount()).isNull();
         assertThat(card.mixedCount()).isNull();
@@ -169,26 +170,25 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("cohort: zero active developers -> no-data, NOT suppressed (nobody to re-identify)")
-    void cohortNoDataForZeroActiveDevelopers() {
+    @DisplayName("workspace health: zero active developers -> no-data, NOT suppressed (nobody to re-identify)")
+    void healthNoDataForZeroActiveDevelopers() {
         PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
         when(
             practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
         ).thenReturn(List.of(a));
         when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(List.of());
 
-        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        CohortAreaStatusDTO card = cards.get(0);
-        assertThat(card.noData()).isTrue();
-        assertThat(card.suppressed()).isFalse();
+        AreaHealthDTO card = cards.get(0);
+        assertThat(card.availability()).isEqualTo(HealthAvailability.NO_DATA);
         assertThat(card.strengthCount()).isNull();
     }
 
     @Test
-    @DisplayName("cohort: only groups at/above 5 active developers expose counts")
-    void cohortCountsAtThreshold() {
+    @DisplayName("workspace health: only groups at/above 5 active developers expose counts")
+    void healthCountsAtThreshold() {
         PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
         when(
             practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
@@ -219,12 +219,11 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        CohortAreaStatusDTO card = cards.get(0);
-        assertThat(card.suppressed()).isFalse();
-        assertThat(card.noData()).isFalse();
+        AreaHealthDTO card = cards.get(0);
+        assertThat(card.availability()).isEqualTo(HealthAvailability.AVAILABLE);
         assertThat(card.strengthCount()).isEqualTo(5);
         assertThat(card.developingCount()).isEqualTo(5);
         assertThat(card.mixedCount()).isEqualTo(5);
@@ -232,8 +231,8 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("cohort: a non-zero bucket below 5 suppresses the whole card")
-    void cohortSuppressesSmallBuckets() {
+    @DisplayName("workspace health: a non-zero bucket below 5 suppresses the whole card")
+    void healthSuppressesSmallBuckets() {
         PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
         when(
             practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
@@ -249,12 +248,12 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
 
         assertThat(cards)
             .singleElement()
             .satisfies(card -> {
-                assertThat(card.suppressed()).isTrue();
+                assertThat(card.availability()).isEqualTo(HealthAvailability.SUPPRESSED);
                 assertThat(card.strengthCount()).isNull();
             });
     }
@@ -279,7 +278,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<PracticeReportSummaryDTO> roster = service.listReports(WORKSPACE_ID);
+        List<PracticeReportSummaryDTO> roster = service.listReports(WORKSPACE_ID, Pageable.unpaged());
 
         assertThat(roster).extracting(PracticeReportSummaryDTO::userId).containsExactly(2L, 1L, 3L);
         assertThat(roster).extracting(PracticeReportSummaryDTO::userLogin).containsExactly("alice", "zed", "bob");
@@ -290,6 +289,35 @@ class PracticeReportServiceTest extends BaseUnitTest {
         PracticeReportSummaryDTO bob = roster.get(2);
         assertThat(bob.needsAttention()).isFalse();
         assertThat(bob.attentionReasons()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("roster: pagination pages the already-sorted needs-attention-first list, not the raw rollup")
+    void rosterPaginationPagesSortedList() {
+        PracticeArea areaA = area("area-a", "Area A", 0);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(areaA));
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
+            List.of(
+                row(1, "zed", areaA.getSlug(), areaA.getName(), 0, "practice-1", 0, 1),
+                row(2, "alice", areaA.getSlug(), areaA.getName(), 0, "practice-1", 0, 1),
+                row(3, "bob", areaA.getSlug(), areaA.getName(), 0, "practice-1", 3, 0)
+            )
+        );
+
+        // Same sort as the unpaged test: needs-attention-first (alice, zed), then login (bob) -> [alice, zed, bob].
+        List<PracticeReportSummaryDTO> firstPage = service.listReports(
+            WORKSPACE_ID,
+            org.springframework.data.domain.PageRequest.of(0, 2)
+        );
+        List<PracticeReportSummaryDTO> secondPage = service.listReports(
+            WORKSPACE_ID,
+            org.springframework.data.domain.PageRequest.of(1, 2)
+        );
+
+        assertThat(firstPage).extracting(PracticeReportSummaryDTO::userLogin).containsExactly("alice", "zed");
+        assertThat(secondPage).extracting(PracticeReportSummaryDTO::userLogin).containsExactly("bob");
     }
 
     @Test
@@ -304,10 +332,10 @@ class PracticeReportServiceTest extends BaseUnitTest {
             List.of(row(1, "alice", areaA.getSlug(), areaA.getName(), 0, "practice-1", 1, 0))
         );
 
-        List<PracticeReportSummaryDTO> roster = service.listReports(WORKSPACE_ID);
+        List<PracticeReportSummaryDTO> roster = service.listReports(WORKSPACE_ID, Pageable.unpaged());
 
         assertThat(roster).hasSize(1);
-        List<AreaStandingCellDTO> cells = roster.get(0).standings();
+        List<AreaStatusCellDTO> cells = roster.get(0).areas();
         assertThat(cells).hasSize(2);
         assertThat(cells.get(0).status()).isEqualTo(PracticeStatus.STRENGTH);
         assertThat(cells.get(1).status()).isEqualTo(PracticeStatus.NO_ACTIVITY);
@@ -341,10 +369,10 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("missing workspace yields empty cohort/roster rather than throwing")
+    @DisplayName("missing workspace yields empty health/roster rather than throwing")
     void missingWorkspaceEmpty() {
         when(workspaceRepository.findById(anyLong())).thenReturn(Optional.empty());
-        assertThat(service.getCohortStatus(999L)).isEmpty();
-        assertThat(service.listReports(999L)).isEmpty();
+        assertThat(service.getWorkspaceHealth(999L)).isEmpty();
+        assertThat(service.listReports(999L, Pageable.unpaged())).isEmpty();
     }
 }

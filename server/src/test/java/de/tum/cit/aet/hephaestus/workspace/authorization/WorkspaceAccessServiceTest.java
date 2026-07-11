@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -49,7 +49,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of()
         );
         WorkspaceContextHolder.setContext(context);
@@ -69,7 +69,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -91,7 +91,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -113,7 +113,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -134,7 +134,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -153,7 +153,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -172,7 +172,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -192,7 +192,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -212,7 +212,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
 
@@ -229,7 +229,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(adminContext);
@@ -244,7 +244,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(ownerContext);
@@ -262,7 +262,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -284,7 +284,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -306,7 +306,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -334,7 +334,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.ADMIN)
         );
         WorkspaceContextHolder.setContext(context);
@@ -371,7 +371,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of() // No workspace roles - not a member
         );
         WorkspaceContextHolder.setContext(context);
@@ -405,7 +405,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER) // Only MEMBER role in workspace
         );
         WorkspaceContextHolder.setContext(context);
@@ -436,7 +436,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.OWNER)
         );
         WorkspaceContextHolder.setContext(context);
@@ -467,7 +467,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER) // Has workspace membership
         );
         WorkspaceContextHolder.setContext(context);
@@ -498,7 +498,7 @@ class WorkspaceAccessServiceTest {
             123L,
             false,
             false,
-            CohortVisibility.MENTORS_ONLY,
+            HealthVisibility.MENTORS_ONLY,
             Set.of(WorkspaceRole.MEMBER)
         );
         WorkspaceContextHolder.setContext(context);

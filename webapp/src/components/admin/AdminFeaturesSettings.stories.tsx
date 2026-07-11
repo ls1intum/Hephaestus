@@ -16,10 +16,10 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		values: allOff,
-		cohortVisibility: "MENTORS_ONLY",
+		healthVisibility: "MENTORS_ONLY",
 		isSaving: false,
 		onToggle: fn(),
-		onCohortVisibilityChange: fn(),
+		onHealthVisibilityChange: fn(),
 	},
 } satisfies Meta<typeof AdminFeaturesSettings>;
 
@@ -61,11 +61,11 @@ export const PracticesBothTriggersOff: Story = {
 };
 
 export const MentorsOnlyVisibility: Story = {
-	args: { cohortVisibility: "MENTORS_ONLY" },
+	args: { healthVisibility: "MENTORS_ONLY" },
 };
 
 export const EveryoneVisibility: Story = {
-	args: { cohortVisibility: "EVERYONE" },
+	args: { healthVisibility: "EVERYONE" },
 };
 
 export const Saving: Story = {

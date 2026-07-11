@@ -25,8 +25,8 @@ neither carrying a score or rank:
    (`GET /practices/reports/me`), server-gated to the caller.
 2. **Practice Overview** — a mentor/admin surface (workspace ADMIN/OWNER only): a roster of
    per-developer summaries sorted needs-attention-first then login (`GET /practices/reports`), a
-   per-developer drill-down (`GET /practices/reports/{userId}`), and an anonymised cohort rollup
-   (`GET /practices/cohort`). The roster and cohort cover **every** practice area at an area-rollup
+   per-developer drill-down (`GET /practices/reports/{userId}`), and an anonymised workspace health
+   rollup (`GET /practices/health`). The roster and workspace health rollup cover **every** practice area at an area-rollup
    grain (one cell/card per area); the drill-down keeps per-practice detail. Each area cell and each
    reflection card carries a **cycle-over-cycle trend** (IMPROVING / WORSENING / STEADY / NEW) — the
    trajectory a mentor and developer act on — so the surface answers "is this getting better?", not
@@ -36,10 +36,10 @@ neither carrying a score or rank:
 
 Guardrails shipped with the surfaces:
 
-- **`cohortVisibility` workspace feature** — `MENTORS_ONLY` (default) or `EVERYONE` — controls whether
-  regular members may read the cohort aggregate.
-- **K = 5 small-cell suppression** on the cohort rollup, so no member can de-anonymise a colleague from
-  a small bucket.
+- **`healthVisibility` workspace feature** — `MENTORS_ONLY` (default) or `EVERYONE` — controls whether
+  regular members may read the workspace health aggregate.
+- **K = 5 small-cell suppression** on the workspace health rollup, so no member can de-anonymise a
+  colleague from a small bucket.
 - **Read audit** — every serving of the named roster or a drill-down writes an append-only
   `DataAccessEvent` row (`core.audit`: actor, subject, resource type, timestamp).
 
@@ -56,9 +56,9 @@ personal milestones without ranking members against each other, and the activity
   are named and individual (not k-anonymised) because coaching a person requires seeing that person's
   work — formative-feedback and scaffolding theory (Hattie & Timperley; Vygotsky's ZPD; deliberate
   practice) all require diagnosing *this* learner, which an aggregate cannot do. K-anonymity applies
-  only to the cohort rollup, whose threat model is a *member* re-identifying a colleague from a small
-  bucket — a threat that does not exist for a mentor who already knows their mentees by name. The
-  read-audit and the developer's in-product notice (that admins can see their standing) are what keep
+  only to the workspace health rollup, whose threat model is a *member* re-identifying a colleague from
+  a small bucket — a threat that does not exist for a mentor who already knows their mentees by name.
+  The read-audit and the developer's in-product notice (that admins can see their status) are what keep
   the individual surface formative-and-accountable rather than surveillance.
 - The Slack digest path from ADR 0015 is gone; the Slack module's surviving jobs are mentor DMs and
   consent-gated channel monitoring (#1341).

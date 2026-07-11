@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import type { PracticeReportSummary } from "@/api/types.gen";
 import { RosterTable } from "./RosterTable";
 
-/** Mentor roster: criterion-referenced standing chips per developer in server order — no score, rank, or position column. */
+/** Mentor roster: criterion-referenced status chips per developer in server order — no score, rank, or position column. */
 const meta = {
 	component: RosterTable,
 	parameters: { layout: "fullscreen" },
@@ -22,7 +22,7 @@ const entries: PracticeReportSummary[] = [
 		avatarUrl: "",
 		needsAttention: true,
 		attentionReasons: ["Clear PR description: gaps to work on this cycle"],
-		standings: [
+		areas: [
 			{
 				areaName: "Clear PR description",
 				areaSlug: "clear-pr",
@@ -39,7 +39,7 @@ const entries: PracticeReportSummary[] = [
 		avatarUrl: "",
 		needsAttention: false,
 		attentionReasons: [],
-		standings: [
+		areas: [
 			{
 				areaName: "Clear PR description",
 				areaSlug: "clear-pr",
@@ -71,7 +71,7 @@ export const NeedsAttention: Story = {
 			...entry,
 			needsAttention: true,
 			attentionReasons: ["Clear PR description: gaps to work on this cycle"],
-			standings: entry.standings.map((cell) => ({ ...cell, status: "DEVELOPING" as const })),
+			areas: entry.areas.map((cell) => ({ ...cell, status: "DEVELOPING" as const })),
 		})),
 	},
 	play: async ({ canvasElement }) => {
@@ -111,7 +111,7 @@ export const ManyAreasWithTrends: Story = {
 				avatarUrl: "",
 				needsAttention: true,
 				attentionReasons: ["Test coverage: gaps to work on this cycle"],
-				standings: [
+				areas: [
 					{
 						areaName: "Clear PR description",
 						areaSlug: "clear-pr",

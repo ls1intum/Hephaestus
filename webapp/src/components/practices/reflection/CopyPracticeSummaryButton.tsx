@@ -2,7 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PracticeReportCard, PracticeReportItem } from "@/api/types.gen";
-import { STANDING_META } from "@/components/practices/StandingChip";
+import { STATUS_META } from "@/components/practices/StatusChip";
 import { Button } from "@/components/ui/button";
 import { copyHtmlAndText } from "@/lib/clipboard";
 
@@ -16,7 +16,7 @@ function itemLine(item: PracticeReportItem): string {
 function buildMarkdown(practices: PracticeReportCard[]): string {
 	const lines: string[] = ["# My practice summary", ""];
 	for (const practice of practices) {
-		lines.push(`## ${practice.name} — ${STANDING_META[practice.standing].label}`);
+		lines.push(`## ${practice.name} — ${STATUS_META[practice.status].label}`);
 		if (practice.strengths.length > 0) {
 			lines.push("", "**What I'm doing well**");
 			for (const item of practice.strengths) lines.push(`- ${itemLine(item)}`);
@@ -48,7 +48,7 @@ function buildHtml(practices: PracticeReportCard[]): string {
 						.map((item) => `<li>${escapeHtml(itemLine(item))}</li>`)
 						.join("")}</ul>`
 				: "";
-		return `<h3>${escapeHtml(practice.name)} — ${STANDING_META[practice.standing].label}</h3>${strengths}${toWorkOn}`;
+		return `<h3>${escapeHtml(practice.name)} — ${STATUS_META[practice.status].label}</h3>${strengths}${toWorkOn}`;
 	});
 	return `<h2>My practice summary</h2>${sections.join("")}`;
 }
@@ -71,7 +71,7 @@ export function CopyPracticeSummaryButton({ practices }: CopyPracticeSummaryButt
 		const succeeded = await copyHtmlAndText(buildHtml(practices), buildMarkdown(practices));
 		if (!succeeded) {
 			// Don't claim "Copied" when the browser rejected the write (e.g. permission denied).
-			toast.error("Couldn't copy to the clipboard");
+			toast.error("Couldn't copy. Try again.");
 			return;
 		}
 		setCopied(true);

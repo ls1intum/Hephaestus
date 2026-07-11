@@ -1,5 +1,5 @@
-import type { AreaStandingCell, PracticeReportSummary } from "@/api/types.gen";
-import { StandingChip } from "@/components/practices/StandingChip";
+import type { AreaStatusCell, PracticeReportSummary } from "@/api/types.gen";
+import { StatusChip } from "@/components/practices/StatusChip";
 import { TrendGlyph } from "@/components/practices/TrendBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,34 +13,34 @@ import {
 } from "@/components/ui/table";
 import { getInitials } from "@/lib/avatar";
 
-type Standing = AreaStandingCell["status"];
+type Status = AreaStatusCell["status"];
 
 // Presentation-only ordering within one developer's row of area chips — never a reorder of
 // developers. Areas that need a mentor's attention float to the front; a clean STRENGTH area and an
 // area with no activity yet carry the least urgency, so they settle to the end.
-const AREA_ATTENTION_PRIORITY: Record<Standing, number> = {
+const AREA_ATTENTION_PRIORITY: Record<Status, number> = {
 	DEVELOPING: 0,
 	MIXED: 1,
 	STRENGTH: 2,
 	NO_ACTIVITY: 3,
 };
 
-function sortForAttention(standings: AreaStandingCell[]): AreaStandingCell[] {
-	return [...standings].sort(
+function sortForAttention(areas: AreaStatusCell[]): AreaStatusCell[] {
+	return [...areas].sort(
 		(a, b) => AREA_ATTENTION_PRIORITY[a.status] - AREA_ATTENTION_PRIORITY[b.status],
 	);
 }
 
-function StandingCell({ standing }: { standing: Standing }) {
-	// NO_ACTIVITY renders as a muted em dash; the three active standings share the one StandingChip.
-	if (standing === "NO_ACTIVITY") {
+function StatusCell({ status }: { status: Status }) {
+	// NO_ACTIVITY renders as a muted em dash; the three active areas share the one StatusChip.
+	if (status === "NO_ACTIVITY") {
 		return (
 			<span className="text-muted-foreground" role="img" aria-label="No activity">
 				—
 			</span>
 		);
 	}
-	return <StandingChip standing={standing} />;
+	return <StatusChip status={status} />;
 }
 
 export interface RosterTableProps {
@@ -51,11 +51,11 @@ export interface RosterTableProps {
 /**
  * The mentor roster. Rows are rendered in SERVER ORDER (needs-attention-then-alphabetical) and are
  * never re-sorted client-side. There is deliberately NO score, rank, position, or numeric column —
- * only criterion-referenced standing chips and an attention triage flag.
+ * only criterion-referenced status chips and an attention triage flag.
  *
  * There are ~12 practice areas per developer, so a 12-column matrix (one column per area) would force
  * either horizontal scrolling or illegibly narrow columns. Instead each developer gets ONE wrapping
- * row of compact "area name + standing chip" pairs — legible at any width, and it reads well on small
+ * row of compact "area name + status chip" pairs — legible at any width, and it reads well on small
  * screens without a scrollbar. Areas that need attention are ordered first within the row (see
  * `sortForAttention`); this never reorders developers, only the chips inside a single row.
  */
@@ -72,7 +72,7 @@ export function RosterTable({ entries, onSelectDeveloper }: RosterTableProps) {
 				</TableHeader>
 				<TableBody>
 					{entries.map((entry) => {
-						const orderedStandings = sortForAttention(entry.standings);
+						const orderedAreas = sortForAttention(entry.areas);
 						return (
 							<TableRow
 								key={entry.userLogin}
@@ -105,10 +105,10 @@ export function RosterTable({ entries, onSelectDeveloper }: RosterTableProps) {
 								</TableCell>
 								<TableCell>
 									<div className="flex flex-wrap gap-x-4 gap-y-2">
-										{orderedStandings.map((cell) => (
+										{orderedAreas.map((cell) => (
 											<div key={cell.areaSlug} className="flex items-center gap-1.5 text-xs">
 												<span className="text-muted-foreground">{cell.areaName}</span>
-												<StandingCell standing={cell.status} />
+												<StatusCell status={cell.status} />
 												<TrendGlyph trend={cell.trend} />
 											</div>
 										))}

@@ -17,7 +17,7 @@ const developer: PracticeReportSummary = {
 	avatarUrl: "",
 	needsAttention: true,
 	attentionReasons: ["Clear PR description: gaps to work on this cycle"],
-	standings: [
+	areas: [
 		{
 			areaName: "Clear PR description",
 			areaSlug: "clear-pr",
@@ -31,7 +31,7 @@ const cards: PracticeReportCard[] = [
 	{
 		name: "Clear PR description",
 		slug: "clear-pr",
-		standing: "DEVELOPING",
+		status: "DEVELOPING",
 		trend: "IMPROVING",
 		whyItMatters: "Reviewers need the intent, not just the diff.",
 		strengths: [],

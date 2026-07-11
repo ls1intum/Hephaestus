@@ -8,7 +8,7 @@ const practices: PracticeReportCard[] = [
 		name: "Write a clear pull request description",
 		areaName: "Pull requests",
 		slug: "clear-pr-description",
-		standing: "MIXED",
+		status: "MIXED",
 		trend: "STEADY",
 		whyItMatters: "A clear description helps reviewers understand the change quickly.",
 		strengths: [
@@ -38,7 +38,7 @@ const practices: PracticeReportCard[] = [
 		name: "Keep pull requests small",
 		areaName: "Pull requests",
 		slug: "small-prs",
-		standing: "STRENGTH",
+		status: "STRENGTH",
 		trend: "IMPROVING",
 		whyItMatters: "Smaller changes are easier to review and safer to ship.",
 		strengths: [

@@ -49,8 +49,8 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     /**
      * Active practices under an area (by area slug), in catalogue order — the reviewing-practice set the
-     * mentor overview (cohort cards + roster columns) iterates. Ordered by the practice display order so the
-     * overview presents practices in their configured order, never by any activity count.
+     * mentor overview (workspace health cards + roster columns) iterates. Ordered by the practice display
+     * order so the overview presents practices in their configured order, never by any activity count.
      */
     @Query(
         """
