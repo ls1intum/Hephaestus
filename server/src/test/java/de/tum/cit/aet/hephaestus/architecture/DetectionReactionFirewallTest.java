@@ -6,12 +6,12 @@ import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the #895 research-integrity firewall: the detection-context assembly must be REACTION-BLIND.
+ * Pins the #895 measurement-integrity firewall: the detection-context assembly must be REACTION-BLIND.
  *
  * <p><b>Why this matters (ADR 0021, F-9).</b> {@code Reaction} records whether a contributor
  * previously {@code ADDRESSED}/{@code DISPUTED}/{@code NOT_APPLICABLE}'d a finding. If any of that
  * reaches the sandbox the detector reads, the AI could learn to agree with whatever the contributor
- * accepted and contaminate the accuracy measurement the thesis depends on — so a finding must be
+ * accepted and contaminate the accuracy of the detector itself — so a finding must be
  * emitted blind to how earlier findings were received. Today the firewall holds only by omission (no
  * context provider happens to query reactions); a future refactor could silently breach it. This test
  * makes the firewall load-bearing: the {@code ContentSource}s that materialise the detection

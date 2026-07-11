@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  * critically — the observation <em>title</em>. The title makes identity inert: the LLM re-words the same underlying concern every
  * run ("DoD ticks 'All tests pass' with zero tests" vs "'All tests pass' ticked but no tests
  * exist"), so a title-anchored key does not correlate across re-detections. Identity is therefore at the <em>(practice, artifact, subject, file)</em> locus grain —
- * the right grain for the research question "did the practice-concern at this locus persist or resolve?",
+ * the right grain for answering "did the practice-concern at this locus persist or resolve?",
  * not "did this exact prose recur". Two distinct observations of one practice in one file collapse to one
  * locus; that is intentional (they are the same practice concern there). Only the evidence <em>path</em>
  * participates — callers MUST pass the path of the first location and MUST NOT fold in a line.

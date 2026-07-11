@@ -8,7 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The research question ("do developers' practices change over time?") is unanswerable unless the SAME
+ * Whether developers' practices change over time is unmeasurable unless the SAME
  * underlying finding gets the SAME identity across separate detection runs. A title-anchored key never
  * correlates because the LLM re-words every run, so identity is the {@code (practice, artifact, subject,
  * file)} LOCUS, not the prose. These cases lock that grain and what must NEVER perturb it.

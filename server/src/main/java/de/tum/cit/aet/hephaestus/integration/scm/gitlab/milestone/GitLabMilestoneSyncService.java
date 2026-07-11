@@ -227,7 +227,7 @@ public class GitLabMilestoneSyncService {
      * Pagination continues until {@code hasNextPage=false} or the response list is empty.
      *
      * @param scopeId              workspace/scope ID for authentication
-     * @param groupFullPath        the top-level group path (e.g. {@code "ase/ipraktikum/ios2526"})
+     * @param groupFullPath        the top-level group path (e.g. {@code "ase/course-org/cohort2026"})
      * @param repositoriesInGroup  repositories that should receive the milestone fan-out
      * @return sync result with total number of milestone rows written (milestones * repos)
      */

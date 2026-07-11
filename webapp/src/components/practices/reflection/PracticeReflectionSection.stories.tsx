@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { expect, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import type { PracticeReportCard } from "@/api/types.gen";
 import { PracticeReflectionSection } from "./PracticeReflectionSection";
 
@@ -59,11 +58,9 @@ const meta = {
 	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
-			<QueryClientProvider client={new QueryClient()}>
-				<div className="mx-auto max-w-3xl">
-					<Story />
-				</div>
-			</QueryClientProvider>
+			<div className="mx-auto max-w-3xl">
+				<Story />
+			</div>
 		),
 	],
 	args: {
@@ -92,4 +89,16 @@ export const Loading: Story = {
 
 export const Empty: Story = {
 	args: { practices: [] },
+};
+
+export const ErrorState: Story = {
+	args: { isError: true, onRetry: fn() },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Couldn't load your practice feedback")).toBeVisible();
+
+		const retry = canvas.getByRole("button", { name: /retry/i });
+		await userEvent.click(retry);
+		await expect(args.onRetry).toHaveBeenCalledOnce();
+	},
 };

@@ -12,16 +12,16 @@
 ## 1. Orientation
 
 This schema records, for every contribution a developer makes, **what software-engineering
-practices an AI agent observed** and **what feedback a student actually saw**. It answers a
-research question of the shape *"do good engineering practices appear, change over time, and
-respond to targeted feedback?"* To answer that honestly the schema separates three things that
+practices an AI agent observed** and **what feedback a student actually saw**. This schema exists to
+answer: *do good engineering practices appear, change over time, and respond to targeted feedback?*
+To answer that honestly the schema separates three things that
 naive review tools fuse: the **raw observation** (an `Observation`, audience-neutral, append-only,
 deduplicated by a stable cross-run recurrence key), the **synthesised delivery** of one or more of those
 observations to one person (a `Feedback` unit, with its own provenance and delivery lifecycle), and
 the **rule metadata** that gives an observation meaning (a `Practice`, carrying its criteria and
 trigger events, optionally rolled up into a `PracticeArea` learning bucket). Everything is
 append-only so the temporal record of *what a student was shown, and how they reacted* survives
-re-runs and supersession — the substrate the longitudinal research question depends on.
+re-runs and supersession — the substrate that answering "do practices change over time?" depends on.
 
 The vocabulary is deliberately aligned with finding-interchange standards (SARIF, SonarQube,
 GitHub code-scanning) where one exists, and with learning-analytics standards (xAPI, Caliper) for the
@@ -202,7 +202,7 @@ detection accuracy. The latest row per `(feedback, developer)` is the current st
 | feedbackId | UUID | `feedback_id` | no (read-only mirror) | Scalar access without lazy-loading the proxy. | Avoids a proxy hit in hot reads. |
 | recurrenceKey | String(64) | `recurrence_key` | yes | Denormalised copy of the feedback's underlying locus recurrence key at reaction-write time. | `thread_key` exists only on *delivered* units, so a withheld-but-recurring locus has no other cross-run key; this lets B2 suppression find a prior DISPUTED / NOT_APPLICABLE reaction. Index `idx_reaction_recurrence`. |
 | reactorUserId | Long | `reactor_user_id` | no | Reacting developer; FK `RESTRICT`. | Reactions outlive users; the single identity on a reaction. |
-| action | ReactionAction | `action` | no | `ADDRESSED` / `DISPUTED` (RESPONSE axis) / `NOT_APPLICABLE` (VALIDITY axis). | Research signal (RQ1/RQ2/RQ4), not workflow. The value set is a *recipience act* (see note below). |
+| action | ReactionAction | `action` | no | `ADDRESSED` / `DISPUTED` (RESPONSE axis) / `NOT_APPLICABLE` (VALIDITY axis). | Measurement signal (which feedback was acted on vs disputed), not workflow state. The value set is a *recipience act* (see note below). |
 | explanation | String (TEXT) | `explanation` | yes | Free-text rationale (required for `DISPUTED`; the required explanation *is* the evaluative judgement). | Qualitative dispute signal. |
 | createdAt | Instant | `created_at` | no (immutable) | When the reaction was submitted. | Temporal "changed my mind" record. |
 
@@ -308,7 +308,7 @@ revision in force when it was detected, making *which criteria version fired thi
 | **Presence** | `PRESENT` (the signal is there), `ABSENT` (expected but missing), `NOT_APPLICABLE` (practice irrelevant to the work). | Measurement axis; ≈ SARIF `result.kind` with the direction factored out. `NOT_APPLICABLE` is a verbatim SARIF match. `PRESENT`/`ABSENT` replace the signed `OBSERVED`/`NOT_OBSERVED`. |
 | **Assessment** | `GOOD` (a strength), `BAD` (a problem); NULL iff `presence = NOT_APPLICABLE`. | Valence axis, resolved per observation by the detector. Replaces the rule-level `Practice.kind`; "is this a problem?" = `assessment = BAD`. |
 | **Severity** | `CRITICAL`, `MAJOR`, `MINOR`, `INFO` — impact, set only when `assessment = BAD`. | SARIF `result.level` / SonarQube blocker..info. NULL on GOOD or NOT_APPLICABLE. |
-| **ReactionAction** | **RESPONSE axis:** `ADDRESSED` ("acted to close the gap"; outcome unverified — RQ2), `DISPUTED` ("AI is wrong", reasoned rejection, requires explanation — RQ1/RQ4). **VALIDITY axis:** `NOT_APPLICABLE` ("valid but irrelevant" — RQ4; excluded from uptake ratios). | Recipience act (Winstone 2017 "enacting"); not workflow. `ADDRESSED` renamed from `APPLIED` (claimed action ≠ verified closure). No `DISMISSED`/`ACKNOWLEDGED` — non-action = absence of a row; affective dismissal deferred behind a UI affordance (§6). |
+| **ReactionAction** | **RESPONSE axis:** `ADDRESSED` ("acted to close the gap"; outcome unverified), `DISPUTED` ("AI is wrong", reasoned rejection, requires explanation). **VALIDITY axis:** `NOT_APPLICABLE` ("valid but irrelevant"; excluded from uptake ratios). | Recipience act (Winstone 2017 "enacting"); not workflow. `ADDRESSED` renamed from `APPLIED` (claimed action ≠ verified closure). No `DISMISSED`/`ACKNOWLEDGED` — non-action = absence of a row; affective dismissal deferred behind a UI affordance (§6). |
 | **EvidenceRole** | `PRIMARY` (anchors the headline), `SUPPORTING` (corroborates). | Synthesis-time weighting; replaces `display_role`. |
 | **FeedbackChannel** | `IN_CONTEXT` (on the PR/issue), `CONVERSATION` (mentor turn), `PROFILE` (recipient's private dashboard). | Decouples message from channel. Every channel is developer-facing. `PROFILE` replaces legacy `REFLECTION_DASHBOARD`. |
 | **FeedbackDeliveryState** | `PREPARED`, `DELIVERED`, `SUPERSEDED` (replaced via `replaces_id`), `SUPPRESSED` (withheld; see reason), `FAILED`. | Delivery state machine + review-tool edit-in-place (SUPERSEDED) + SARIF `suppressions` (SUPPRESSED). |

@@ -24,6 +24,6 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default features section with two main feature cards:
- * Code Review Gamification and AI-Powered Mentorship.
+ * Practice Feedback and AI-Powered Mentorship.
  */
 export const Default: Story = {};

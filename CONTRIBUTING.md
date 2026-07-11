@@ -90,8 +90,7 @@ We use **Semantic Release** to automatically version and release our application
 **Service scopes** (where the code lives):
 
 - `webapp`: React frontend
-- `server`: Java application server (includes the in-process Pi mentor agent)
-- `webhooks`: Webhook ingestion service
+- `server`: Java application server (includes the in-process Pi mentor agent and webhook receiver)
 - `docs`: Documentation
 
 **Infrastructure scopes that WILL trigger releases** (affect runtime):
@@ -99,13 +98,13 @@ We use **Semantic Release** to automatically version and release our application
 - `deps`: Production dependencies (security patches, bug fixes)
 - `security`: Security fixes are critical
 - `db`: Database migrations affect runtime
+- `docker`: Dockerfiles and production compose affect deployed containers
 
 **Infrastructure scopes that will NOT trigger releases**:
 
 - `ci`: CI/CD workflows
 - `config`: Tooling configuration (renovate, eslint, tsconfig, etc.)
 - `deps-dev`: Dev dependencies only
-- `docker`: Container dev configuration
 - `scripts`: Helper scripts
 - `no-release`: Explicit release prevention
 

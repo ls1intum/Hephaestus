@@ -8,7 +8,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Renders the cross-run progress-delta footer (ADR 0021, B1/B3) — the ONLY surface that makes behavior
- * change visible to its subject (the research question's dependent variable). Appended, collapsed, at the
+ * change visible to its subject. Appended, collapsed, at the
  * bottom of the persistent summary so it never competes with the lead blocking-issue count.
  *
  * <p>Renders nothing unless the run actually moved (something resolved, appeared, or slipped back): a

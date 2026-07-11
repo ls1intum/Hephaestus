@@ -21,7 +21,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default feature card showcasing code review gamification.
+ * Default feature card showcasing practice feedback.
  */
 export const Default: Story = {
 	args: {

@@ -110,3 +110,9 @@ export const sessionsError = http.get(
 
 /** `GET /user/sessions` -> empty list. */
 export const noSessions = http.get("*/user/sessions", () => HttpResponse.json([]));
+
+/** `GET /workspaces/:slug/practices/reports/:userId` -> 500, for the drill-down error state. */
+export const developerPracticeReportError = http.get(
+	"*/practices/reports/*",
+	() => new HttpResponse(null, { status: 500 }),
+);

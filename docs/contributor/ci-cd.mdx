@@ -160,7 +160,7 @@ CI only runs jobs for components that actually changed:
 
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
-| Webapp               | `webapp/**`, `package.json`, `package-lock.json`              |
+| Webapp               | `webapp/**`, `package.json`, `pnpm-lock.yaml`                 |
 | Application Server   | `server/**`, `scripts/db-utils.sh` (includes webhook receiver — ADR 0008) |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
@@ -298,7 +298,7 @@ filters: |
   new-service:
     - 'server/new-service/**'
     - 'package.json'
-    - 'package-lock.json'
+    - 'pnpm-lock.yaml'
 ```
 
 Update the `any-code` aggregate output to include the new service.

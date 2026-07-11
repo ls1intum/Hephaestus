@@ -59,7 +59,7 @@ The login flow uses GitHub (and optionally gitlab.lrz.de) OAuth directly. On suc
 
 ### New review activity
 
-![New review activity workflow](./img/system-design/new_review_activity.svg)
+{/* new_review_activity.svg removed: depicted the deleted leaderboard flow; regenerate from hephaestus-system-model.mdj when the model is updated */}
 
 Webhook events arrive at the `webhook-server` container (the application-server image running under `SPRING_PROFILES_ACTIVE=prod,webhook`), which verifies the signature/token and publishes to NATS JetStream. The application-server's sync consumer reads the stream, enriches the SCM data, and records ActivityEvents and practice observations. The two containers are restart-independent — see ADR 0008.
 

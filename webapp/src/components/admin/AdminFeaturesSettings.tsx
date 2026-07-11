@@ -29,7 +29,8 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 	{
 		key: "practicesEnabled",
 		label: "Practice Review",
-		description: "Enable agent-based practice review for contributors.",
+		description:
+			"Enable agent-based practice review for contributors; admins and owners get an audited practice overview of contributors.",
 		children: [
 			{
 				key: "practiceReviewAutoTriggerEnabled",

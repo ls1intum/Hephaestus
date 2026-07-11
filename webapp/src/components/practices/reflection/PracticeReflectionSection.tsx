@@ -54,6 +54,10 @@ export function PracticeReflectionSection({
 					<p className="text-sm text-muted-foreground">
 						Recent feedback on your work — for your growth, not a score.
 					</p>
+					<p className="text-sm text-muted-foreground">
+						Workspace admins can see practice standing to support mentoring — every detailed view is
+						recorded.
+					</p>
 				</div>
 				{!isLoading && !isError && items.length > 0 && (
 					<CopyPracticeSummaryButton practices={items} />

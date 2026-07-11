@@ -53,3 +53,5 @@ personal milestones without ranking members against each other, and the activity
   default mitigates by keeping the aggregate away from members unless an admin opts in.
 - `league_points` and related columns were dropped; ADR 0019's SCM-attribution examples now read
   `hidden` + practice/activity attribution (see its amendment note).
+- Account-erasure of practice observations follows the account/actor split (ADR 0019) and is tracked
+  as a follow-up: practice data is keyed on the SCM actor, so `AccountPurger` does not yet remove it.

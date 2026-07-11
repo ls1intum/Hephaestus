@@ -67,7 +67,7 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">Improve code quality</p>
 									<p className="text-sm text-muted-foreground">
-										Motivate better code reviews through friendly competition
+										Motivate better code reviews through personal, practice-based feedback
 									</p>
 								</div>
 							</li>

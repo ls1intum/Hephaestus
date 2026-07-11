@@ -3,15 +3,16 @@ TITLE FORMAT (required):
   <type>(<scope>): <description>
 
   Types: feat | fix | docs | refactor | test | ci | perf | revert
-  Scopes (Service): webapp | server | ai | docs
-  Scopes (Infra - NO RELEASE): ci | config | deps | deps-dev | docker | scripts | security | db | no-release
-  Scopes (Feature): integration | scm | leaderboard | mentor | notifications | profile | teams | workspace
+  Scopes (Service): webapp | server | docs
+  Scopes (Release-triggering infra): deps | security | db | docker
+  Scopes (Infra - NO RELEASE): ci | config | deps-dev | scripts | no-release
+  Scopes (Feature): integration | scm | activity | practices | mentor | notifications | profile | teams | workspace
 
   Breaking: Add ! before colon (feat!: or feat(scope)!:)
 
-  ✓ Good: feat(leaderboard): add weekly ranking filter
+  ✓ Good: feat(practices): add reflection card filter
   ✓ Good (No Release): fix(ci): update workflow configuration
-  ✗ Bad:  Added weekly ranking filter to leaderboard
+  ✗ Bad:  Added filter to practice reflection cards
 
 BEFORE PUSHING:
   pnpm run format && pnpm run check     # Format + lint + typecheck all services

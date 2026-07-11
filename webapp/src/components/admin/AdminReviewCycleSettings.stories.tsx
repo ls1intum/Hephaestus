@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import { AdminReviewCycleSettings } from "./AdminReviewCycleSettings";
 
 const meta = {
@@ -25,4 +25,11 @@ export const Default: Story = {};
 
 export const Prefilled: Story = { args: { day: 5, time: "17:30" } };
 
-export const InvalidTime: Story = { args: { time: "25:00" } };
+export const InvalidTime: Story = {
+	args: { time: "25:00" },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Time must be in HH:mm format.")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /save/i })).toBeDisabled();
+	},
+};

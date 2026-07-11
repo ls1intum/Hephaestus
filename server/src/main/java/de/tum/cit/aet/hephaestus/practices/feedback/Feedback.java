@@ -28,7 +28,7 @@ import org.hibernate.annotations.Immutable;
  * provenance, and its delivery {@link FeedbackDeliveryState}. Findings are linked through the {@code FeedbackObservation}
  * join and physically placed through {@code FeedbackPlacement} rows — see ADR 0021 (findings↔feedback synthesis seam).
  *
- * <p>Append-only for research-data integrity: a re-run that re-synthesises the same delivery unit inserts a new
+ * <p>Append-only for record integrity: a re-run that re-synthesises the same delivery unit inserts a new
  * row (deduplicated by the {@code (agent_job_id, position)} unit grain, {@code uk_feedback_unit}) and points
  * {@link #replacesId} at the prior row rather than mutating it, so the temporal record of what a student actually
  * saw is preserved. {@code baseline_state} is intentionally <em>not</em> a column — it is derived on read from the

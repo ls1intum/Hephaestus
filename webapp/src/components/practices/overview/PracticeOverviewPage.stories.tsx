@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { expect, fn, userEvent, within } from "storybook/test";
 import type { CohortPracticeStatus, PracticeReportSummary } from "@/api/types.gen";
 import { PracticeOverviewPage } from "./PracticeOverviewPage";
 
@@ -89,4 +90,24 @@ export const Loading: Story = {
 
 export const Forbidden: Story = {
 	args: { isForbidden: true, cohort: undefined, roster: undefined },
+};
+
+export const ErrorState: Story = {
+	args: { isError: true, onRetry: fn(), cohort: undefined, roster: undefined },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Couldn't load the practice overview")).toBeVisible();
+
+		const retry = canvas.getByRole("button", { name: /retry/i });
+		await userEvent.click(retry);
+		await expect(args.onRetry).toHaveBeenCalledOnce();
+	},
+};
+
+export const MemberView: Story = {
+	args: { showRoster: false },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByRole("tab", { name: /roster/i })).not.toBeInTheDocument();
+	},
 };

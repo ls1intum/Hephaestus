@@ -18,7 +18,7 @@
 
 ## Context
 
-The umbrella research question is: **how can AI provide effective mentoring support for developers — where *effective* means developers act on the feedback and their practices change.** Delivery and reception are therefore first-class.
+The system exists to produce feedback developers actually act on — delivery and the developer's response are therefore first-class, not afterthoughts.
 
 Today three concerns are conflated. `PracticeFinding` (`@Immutable`, idempotent) is genuine atomic evidence — but it carries `reasoning`/`guidance` TEXT (proto-feedback baked into the measurement). `DeliveryComposer` is a ~991-line pure Java step that renders the *in-memory* parser output (not the persisted rows) into one MR/PR comment **every review**, surfacing essentially every finding. There is **no `Feedback` entity**: the delivered artifact is unpersisted, the posted id lives on `AgentJob.deliveryCommentId` (one scalar id), and `PracticeDetectionCompletedEvent` is published-into-the-void (no consumer). The result: "one finding → one comment" bot-noise (Wessel et al.), no record of *what was actually delivered*, no reception signal, and no seam for the dashboard or mentor channels.
 
@@ -52,7 +52,7 @@ A finding is the evidence record (database + the reflective dashboard). What rea
 | **F-10** | DECIDED | **`report_finding` returns the finding's stable `idempotency_key`; `report_feedback.findingRefs` carry it** — never `(slug, title)`. |
 | **F-11** | DECIDED | **Audit on `Feedback`:** `origin {AGENT,POLICY_FLOOR,FALLBACK}` (the policy-vs-LLM boundary is `GROUP BY origin`), `model_id`, `composer_version`. (`policy_floor_delta` jsonb is **dropped** — `origin` restates it.) |
 | **F-12** | DECIDED | **Reviewer-side guards exist now, latent:** `PracticeFinding.subject_user_id` (null ⇒ contributor) + `Practice.audience_role {AUTHOR,REVIEWER}` (default `AUTHOR`; a `REVIEWER` finding is persisted, `state=SUPPRESSED`, never posted in-context to the author). No `REVIEWER` writer this PR. |
-| **F-13** | DECIDED | **Reactions move to feedback.** `FindingReaction` → **`FeedbackReaction`** wholesale: `feedback_id NOT NULL` (the developer reacts to the unit they saw), `finding_id NULLABLE` (granular per-evidence dispute, and the finding-less OVERVIEW unit). RQ2 attributes APPLIED/DISPUTED to the *delivered unit*. |
+| **F-13** | DECIDED | **Reactions move to feedback.** `FindingReaction` → **`FeedbackReaction`** wholesale: `feedback_id NOT NULL` (the developer reacts to the unit they saw), `finding_id NULLABLE` (granular per-evidence dispute, and the finding-less OVERVIEW unit). Attributes APPLIED/DISPUTED to the *delivered unit*, so uptake is measurable per unit shown. |
 | **F-14** | DECIDED | **Delete `FeedbackPost` outright** (verified 0 production writers; live edit-in-place is the marker-sweep, not this ledger). Keep `SubjectClass.SLACK_MESSAGE_THREAD` for the SPI. The posted id lives on `FeedbackPlacement.external_ref` (1:N — a summary id, inline ids, GitHub place-then-fallback), so the `AgentJob.deliveryCommentId` scalar mistake is not repeated. |
 | **F-15** | DECIDED | **Mentor surface is migration-free:** `Feedback.rendered_body` is **nullable**, with `body_storage {SNAPSHOT,REFERENCE}` (`SNAPSHOT` default for IN_CONTEXT; the CONVERSATION writer later sets `REFERENCE` + a placement pointer to the transcript turn, zero ALTER). |
 | **F-16** | DECIDED | **Supersession by `continuity_key`** (a cross-job natural key), not the job-scoped `idempotency_key` — re-review is a *new* `agent_job`; `supersedes_id` resolves via `continuity_key`. |
@@ -62,7 +62,7 @@ A finding is the evidence record (database + the reflective dashboard). What rea
 | **F-20** | DECIDED | **`Feedback.suppression_reason`** (= SARIF `suppression.justification`; set only when `SUPPRESSED`) closes the "why didn't the developer see this finding" audit gap. **`Feedback.synthesis_prompt_version`** (= PROV-O `prov:used` of the prompt) — `composer_version` versions the renderer, not the prompt that shaped the AI's words; required to reproduce a feedback diff. |
 | **F-21** | DECIDED | **Harden the inline anchor** (keep it *logical*, F-7): add `anchor_old_path` (GitLab rename-mandatory — **verified live bug** at `GitlabInlineFindingChannel:207`, oldPath=new path → silent fallback), `anchor_kind {LINE,RANGE,FILE,IMAGE}` (file-level/non-line stop faking line 1; `IMAGE` reserves the seam with **no** coordinate columns), `anchor_quote` (content re-anchor fallback = WADM `TextQuoteSelector`, survives a moved line — the stale-diff-note bug class), `anchor_start_side` (cross-side ranges). Rename `anchor_commit_sha → pinned_commit_sha` (a **staleness witness**, never the wire SHA — the adapter recomputes the position from live `diff_refs`). `posted_state` gains `OUTDATED/ORPHANED/GONE` (separate staleness/deletion from API error). Thread `old_path` through the `FindingAnchor.DiffAnchor` SPI. |
 | **F-22** | DECIDED | **`placement` gains `CONVERSATION_TURN`** so a mentor chat turn has a real selector instead of being shoehorned into `SUMMARY`. |
-| **F-23** | DECIDED | **Capture native resolution on the placement** (not on `Feedback` — resolution is about the posted artifact, reaction is about the lesson): `thread_external_ref` (edit-in-place + reply across re-reviews) + `resolved/resolved_at/resolved_external_ref`. GitLab "resolve thread" / Gerrit `unresolved` is a workflow-native "acted-on" signal at **zero UI cost** — the single biggest free RQ2 win. |
+| **F-23** | DECIDED | **Capture native resolution on the placement** (not on `Feedback` — resolution is about the posted artifact, reaction is about the lesson): `thread_external_ref` (edit-in-place + reply across re-reviews) + `resolved/resolved_at/resolved_external_ref`. GitLab "resolve thread" / Gerrit `unresolved` is a workflow-native "acted-on" signal at **zero UI cost** — the single biggest free uptake-measurement win. |
 | **F-24** | DECIDED | **Reshape `FeedbackReaction` into an event log:** replace the closed `action` enum with an **open `verb`** discriminator + `occurred_at` + `supersedes_id` (= xAPI `actor-verb-object` / AS2). Reaction verbs (`APPLIED/DISPUTED/NOT_APPLICABLE`) now; passive verbs (`VIEWED/EXPANDED/DWELLED`) become additive enum values in the **same** table — so the deferred passive-engagement log is **never** a second table. Reject the xAPI URI-verbs / JSON-LD wire format — steal the shape, not the serialization. |
 | **F-25** | DECIDED | **`Feedback.body_storage` CUT as theatre** — a `NULL rendered_body` already expresses "this is a reference"; the enum was a 0-writer column (the very trap F-17/F-25 forbid). |
 
@@ -86,7 +86,7 @@ PracticeFinding  (@Immutable — KEEP; +correlation_key, +subject_user_id; verdi
   evidence jsonb                                     # region-shaped: locations[{path,startLine,startCol,endLine,endCol,snippet}], references[]
   reasoning text · guidance text · detected_at
   # baseline_state {NEW,UNCHANGED,UPDATED,ABSENT} is DERIVED ON READ over a correlation_key chain (not stored —
-  #   would break @Immutable; = SARIF baselineState, emitted per-run). ABSENT/UPDATED-to-clean = "they fixed it" = RQ2 signal.
+  #   would break @Immutable; = SARIF baselineState, emitted per-run). ABSENT/UPDATED-to-clean = "they fixed it" = an uptake signal.
 
 Practice  (mutable — +2)                              # = SARIF reportingDescriptor; practice_goal/category = taxa
   polarity {DESIRABLE,UNDESIRABLE,MIXED} NOT NULL     # F-6
@@ -125,7 +125,7 @@ FeedbackPlacement  (@Immutable — NEW — where shown + LOGICAL anchor + per-pl
   pinned_commit_sha varchar NULL                     # F-21 RENAMED — a STALENESS WITNESS only; the channel recomputes the wire position from live diff_refs
   external_ref varchar NULL                          # the posted NOTE id (1:N — F-14)
   thread_external_ref varchar NULL                   # F-23 — the discussion/thread id (edit-in-place + reply across re-reviews)
-  resolved boolean NOT NULL DEFAULT false · resolved_at timestamptz NULL · resolved_external_ref varchar NULL  # F-23 — workflow-native "acted-on" (GitLab resolve-thread / Gerrit unresolved); the cheapest RQ2 signal
+  resolved boolean NOT NULL DEFAULT false · resolved_at timestamptz NULL · resolved_external_ref varchar NULL  # F-23 — workflow-native "acted-on" (GitLab resolve-thread / Gerrit unresolved); the cheapest uptake signal
   posted_state {PENDING,POSTED,SNAPPED,FELL_BACK,OUTDATED,ORPHANED,GONE,FAILED} NOT NULL DEFAULT 'PENDING'  # F-21 (separate staleness/deletion from API error)
   created_at
 
@@ -212,13 +212,13 @@ Every planned surface maps to a column/table/enum present now: (1) reflection da
 
 - **`correlation_key` derivation tuple** (F-18) — confirm `hash(practice_id, target_type, target_id, COALESCE(subject_user_id,contributor_id), content-anchor)`. For location-less practices (`mr-description-quality`, `commit-discipline`) the content-anchor is absent → fall back to `(practice + target + subject)` and accept the coarser bucket rather than over-engineer. *Recommendation: accept.*
 - **`recipient_user_id` rename** (from `contributor_id` on `Feedback`) — a real DTO/OpenAPI/Spring-Data migration for *zero* current behaviour (no facilitator writer this PR). *Recommendation: keep the recipient/subject two-column **semantics** but **defer the rename** until the facilitator surface writes a row.*
-- **`Feedback.motivation` {ASSESSING,COMMENTING,EDITING,QUESTIONING}** (W3C Web Annotation speech-act axis) — thesis-strengthening, not load-bearing. *Recommendation: defer-with-trigger (add when the dashboard distinguishes "assessing" cards from "editing" inline suggestions). Your call to add now for analysis richness.*
+- **`Feedback.motivation` {ASSESSING,COMMENTING,EDITING,QUESTIONING}** (W3C Web Annotation speech-act axis) — useful for future analysis, not load-bearing. *Recommendation: defer-with-trigger (add when the dashboard distinguishes "assessing" cards from "editing" inline suggestions). Your call to add now for analysis richness.*
 - **`prior_finding_id` self-FK on `PracticeFinding`** — `correlation_key` alone unblocks the RQ; this only sharpens UPDATED-vs-UNCHANGED for multi-occurrence practices. *Recommendation: add if cheap in the same changelog, else defer.*
 - **Hattie `level` derived, not stored** — dropped per the praxis decision; persist only if the RQ analysis needs it frozen at delivery time.
 
 ## Consequences
 
-The in-context comment becomes an agent-synthesised, grouped, lifted, **granular** artifact instead of a per-finding render; everything delivered is persisted, placement-tracked, and reaction-linkable (RQ2). The schema is final for every planned surface (proof above). Costs: two feedback content sources (agent + the deterministic blocking-only fallback) feed one renderer; a cross-language `report_feedback` contract (mitigated by a `.mjs`↔Java round-trip test + a blocking-mark E2E test); under GPU saturation the synthesis turn truncates first, degrading to today's quality, never below.
+The in-context comment becomes an agent-synthesised, grouped, lifted, **granular** artifact instead of a per-finding render; everything delivered is persisted, placement-tracked, and reaction-linkable. The schema is final for every planned surface (proof above). Costs: two feedback content sources (agent + the deterministic blocking-only fallback) feed one renderer; a cross-language `report_feedback` contract (mitigated by a `.mjs`↔Java round-trip test + a blocking-mark E2E test); under GPU saturation the synthesis turn truncates first, degrading to today's quality, never below.
 
 ## Sources
 

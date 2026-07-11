@@ -78,6 +78,10 @@ public class PracticeReportController {
      * what good looks like, where they stand, the specific feedback to act on, and what they already do well.
      * The third feedback channel alongside in-context SCM notes and the conversational mentor; the same
      * findings reorganised by practice for self-paced reflection.
+     *
+     * <p>Deliberately requires no workspace membership: the subject is always the CALLER, so on a
+     * publicly viewable workspace a past contributor who never joined can still read their own
+     * reflection — self-view-only exposure, never anyone else's data.
      */
     @GetMapping("/reports/me")
     @Operation(

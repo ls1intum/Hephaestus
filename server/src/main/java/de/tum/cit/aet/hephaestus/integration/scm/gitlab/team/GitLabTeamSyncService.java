@@ -768,7 +768,7 @@ public class GitLabTeamSyncService {
     /**
      * Adds project-level collaborators (WRITE/TRIAGE) as members of their parent subgroup team.
      * <p>
-     * In GitLab iPraktikum, each tutor subgroup contains student repos. Students are direct
+     * In a typical GitLab course-org layout, each tutor subgroup contains student repos. Students are direct
      * project members but not group members. This phase bridges the gap so they appear in the
      * team on the practice overview and profile views.
      */

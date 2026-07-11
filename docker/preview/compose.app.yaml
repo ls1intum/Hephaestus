@@ -230,8 +230,6 @@ services:
       MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-false}
       MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 2 * * *}
       MONITORING_BACKFILL_ENABLED: "false"
-      # Notifications disabled for previews
-      LEADERBOARD_NOTIFICATION_ENABLED: "false"
       # Observability (optional)
       SENTRY_DSN: ${SENTRY_DSN:-}
       # Webhook auto-registration. Override (not the APPLICATION_HOST_URL default) because previews

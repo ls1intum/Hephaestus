@@ -11,7 +11,7 @@ class GitLabTeamProcessorTest {
 
     @Test
     void rootSlug_usesLastSegment() {
-        assertThat(GitLabTeamProcessor.rootSlug("ase/ipraktikum/IOS26/Introcourse")).isEqualTo("Introcourse");
+        assertThat(GitLabTeamProcessor.rootSlug("ase/course-org/IOS26/Introcourse")).isEqualTo("Introcourse");
         assertThat(GitLabTeamProcessor.rootSlug("introcourse")).isEqualTo("introcourse");
     }
 

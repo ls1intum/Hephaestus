@@ -10,8 +10,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The cross-run change at a review target (ADR 0021, A1) — for each stable {@code recurrence_key} locus,
- * how it moved between the prior review run and the current one. This is the measurement primitive the
- * research question ("do practices change over time?") reads, and the substrate the delivery layer renders
+ * how it moved between the prior review run and the current one. This is the measurement primitive that
+ * answers "did this practice concern get better or worse over time?", and the substrate the delivery layer renders
  * as a progress-delta footer (B3) and "Resolved since last review" lines (B1), and that the re-review
  * notification (A4) consults to decide whether anything actually changed.
  *
