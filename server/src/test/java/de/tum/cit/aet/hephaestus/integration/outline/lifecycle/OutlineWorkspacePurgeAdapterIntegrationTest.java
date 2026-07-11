@@ -12,7 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Erasure integration tests (Testcontainers) for the Outline workspace-purge arm: purging one workspace drops
- * every mirrored document for it and leaves another workspace's documents untouched — completeness AND no
+ * every mirrored document for it and leaves another workspace's documents untouched — completeness and no
  * over-reach. Distinct workspace ids per test give isolation without a clean-between step.
  */
 class OutlineWorkspacePurgeAdapterIntegrationTest extends BaseIntegrationTest {

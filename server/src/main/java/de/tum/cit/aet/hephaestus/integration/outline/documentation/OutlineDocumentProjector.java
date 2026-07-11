@@ -183,8 +183,8 @@ public class OutlineDocumentProjector implements DocumentProjection {
 
     /**
      * The workspace's collection id → display name map, loaded once per projection call (mirrors
-     * {@link #authorContext}'s per-batch resolution). A collection with no captured name is simply
-     * absent, so {@code Map#get} degrades to {@code null} — the graceful floor for {@link
+     * {@link #authorContext}'s per-batch resolution). A collection with no captured name is absent from
+     * the map, so {@code Map#get} degrades to {@code null} — the graceful floor for {@link
      * DocumentProjection.ProjectedDocument#collectionName}.
      */
     private Map<String, String> collectionNames(long workspaceId) {

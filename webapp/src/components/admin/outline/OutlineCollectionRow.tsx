@@ -126,8 +126,7 @@ export function OutlineCollectionRow({
 					{!!collection.exportsSkippedForBudget && (
 						<Tooltip>
 							{/* Amber, not destructive — this is expected budget throttling, not an error; the
-							next reconcile catches these up. Default TooltipTrigger renders a real <button> so
-							it's reachable by keyboard and screen-reader users. */}
+							next reconcile catches these up. */}
 							<TooltipTrigger
 								className="text-amber-600 dark:text-amber-400"
 								aria-label={`${collection.exportsSkippedForBudget} exports skipped for budget for ${label}`}

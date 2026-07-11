@@ -137,7 +137,7 @@ public class OutlineDocument {
     @Column(name = "created_by_subject", length = 64)
     private @Nullable String createdBySubject;
 
-    /** Creator display name (graceful floor when the subject has no linked account). */
+    /** Creator display name (fallback when the subject has no linked account). */
     @Column(name = "created_by_name", length = 255)
     private @Nullable String createdByName;
 

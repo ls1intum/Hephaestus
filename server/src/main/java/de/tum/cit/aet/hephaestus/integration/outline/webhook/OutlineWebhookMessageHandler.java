@@ -43,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  * {@link #parseModel} extracts it and the sync path skips its own {@code documents.info} round-trip,
  * roughly halving the webhook-path API calls. The document BODY never travels in the envelope, so
  * {@code documents.export} still runs whenever content is needed. A missing/incomplete model falls back to
- * {@code documents.info} exactly as before.
+ * a {@code documents.info} call instead.
  *
  * <p>Every {@code documents.*} delivery (including deletes) additionally appends one
  * {@link OutlineDocumentEvent} row from the envelope ({@code actorId} + {@code createdAt}) BEFORE
@@ -185,7 +185,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
      * event carrying a usable model (an id and a collection id). The HMAC covers the whole envelope, so a
      * model that parses is trusted metadata, letting {@link OutlineDocumentSyncScheduler#refreshDocumentNow}
      * skip its own {@code documents.info} round-trip. Returns {@code null} on any parse failure or an
-     * incomplete model — the sync path then falls back to {@code documents.info} as before.
+     * incomplete model, so the sync path falls back to a {@code documents.info} call.
      */
     private OutlineDocumentListResponse.@Nullable Meta parseModel(String event, JsonNode modelNode) {
         if (!event.startsWith("documents.") || modelNode == null || modelNode.isMissingNode() || modelNode.isNull()) {

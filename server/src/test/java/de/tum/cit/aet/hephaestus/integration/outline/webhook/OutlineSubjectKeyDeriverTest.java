@@ -42,7 +42,7 @@ class OutlineSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void deriveDedupKey_isTheDeliveryId_stableAcrossRetries() {
-        // Outline retries a failed delivery with the SAME envelope id — that id is the dedup key.
+        // Outline retries a failed delivery with the same envelope id — that id is the dedup key.
         byte[] body =
             "{\"id\":\"delivery-1\",\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\",\"payload\":{\"id\":\"doc-9\"}}".getBytes(
                 StandardCharsets.UTF_8
@@ -54,7 +54,7 @@ class OutlineSubjectKeyDeriverTest extends BaseUnitTest {
 
     @Test
     void deriveDedupKey_differsForConsecutiveEditsOfTheSameDocument() {
-        // Two edits of one document are DISTINCT deliveries; a document-keyed dedup would swallow
+        // Two edits of one document are distinct deliveries; a document-keyed dedup would swallow
         // the second edit inside the JetStream dedup window.
         byte[] first =
             "{\"id\":\"delivery-1\",\"webhookSubscriptionId\":\"s\",\"event\":\"documents.update\",\"payload\":{\"id\":\"a\"}}".getBytes(

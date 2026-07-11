@@ -53,7 +53,7 @@ export function AddCollectionDialog({
 		refetch,
 	} = useQuery({
 		...listOutlineCollectionCandidatesOptions({ path: { workspaceSlug } }),
-		// Lazy + live: only probe Outline while the dialog is open, and re-probe on every open.
+		// Re-probe on every open (staleTime 0); no retry so a connectivity failure surfaces immediately.
 		enabled: open,
 		staleTime: 0,
 		retry: false,

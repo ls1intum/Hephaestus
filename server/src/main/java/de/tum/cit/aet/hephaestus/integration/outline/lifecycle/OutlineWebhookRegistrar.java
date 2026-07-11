@@ -39,10 +39,10 @@ import org.springframework.stereotype.Component;
  * registration, self-heal re-registration (a new id replaces the old one), and both deregister paths all
  * run through this class. The workspace-side {@code NatsSubscriptionProvider} derives the {@code outline}
  * stream subject from that stored id, so every id change must be followed by a scope-consumer reconcile or
- * the running consumer keeps filtering on a stale (or absent) subject — proven live: a workspace that
- * connects Outline while the server is already up never receives its webhook deliveries until the next
- * restart. {@link #reconcileScopeConsumer} is called from every branch that actually changes what the
- * subscription provider would report, never from the early no-op returns.
+ * the running consumer keeps filtering on a stale (or absent) subject: without it, a workspace that
+ * connects Outline while the server is already running would never receive its webhook deliveries until
+ * the next restart. {@link #reconcileScopeConsumer} is called from every branch that actually changes what
+ * the subscription provider would report, never from the early no-op returns.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -212,7 +212,7 @@ public class OutlineWebhookRegistrar {
 
     /**
      * Best-effort upstream delete of the workspace's change-notification subscription, resolved through
-     * the ACTIVE connection. Never throws — a left-over subscription simply auto-disables upstream after
+     * the ACTIVE connection. Never throws — a left-over subscription auto-disables upstream after
      * repeated delivery failures once the workspace is gone.
      *
      * <p>Deliberately does NOT clear the stored id/secret: both callers (connect-strategy revoke inside

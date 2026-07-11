@@ -6,8 +6,7 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 
 /**
-* This function is used to resolve the absolute path of a package.
-* It is needed in projects that use Yarn PnP or are set up within a monorepo.
+* Resolves a package's absolute path — needed for Yarn PnP and monorepo setups.
 */
 function getAbsolutePath(value: string): string {
   return dirname(require.resolve(join(value, 'package.json')))
@@ -19,7 +18,7 @@ const config: StorybookConfig = {
     "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"
   ],
   addons: [
-    // Note: addon-essentials functionality moved to core in Storybook 9+
+    // addon-essentials functionality is built into Storybook 9+ core; no separate addon needed.
     getAbsolutePath('@storybook/addon-docs'),
     getAbsolutePath('@storybook/addon-onboarding'),
     getAbsolutePath('@chromatic-com/storybook'),

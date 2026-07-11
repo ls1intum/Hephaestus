@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
  * ({@link WebhookSecretSource.Scope#SUBSCRIPTION}). The subscription id is carried in the event
  * <em>body</em> (not a header) as an untrusted routing key, so this source parses it out of
  * {@link SecretLookup#body()} and resolves the stored secret of the ACTIVE Outline Connection that
- * registered it. A forged id simply matches no connection, so the downstream HMAC check fails.
+ * registered it. A forged id matches no connection, so the downstream HMAC check fails.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

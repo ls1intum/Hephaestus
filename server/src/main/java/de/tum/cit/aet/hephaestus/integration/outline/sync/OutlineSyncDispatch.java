@@ -9,11 +9,10 @@ import org.springframework.core.task.AsyncTaskExecutor;
  * request already answered (202 / the mutating call already succeeded), and the periodic reconcile is
  * the retry safety net either way. Both {@code OutlineConnectionAdminService.syncNow} (full workspace
  * reconcile) and {@code OutlineCollectionAdminService.kickCollectionSync} (targeted single-collection
- * sync) dispatch through this so the failure-handling shape can't drift between them the way it already
- * had (one carried an in-flight dedup guard, the other didn't — that asymmetry is intentional and stays
- * layered on top by the caller, not folded in here: only the manual "sync now" endpoint is
- * double-click-able by a human; the targeted kick is an internal side effect of an already-idempotent
- * registration/resume call).
+ * sync) dispatch through this so the failure-handling shape can't drift between them: one carries an
+ * in-flight dedup guard, the other doesn't — intentionally, and layered on top by the caller rather than
+ * folded in here, since only the manual "sync now" endpoint is double-click-able by a human; the targeted
+ * kick is an internal side effect of an already-idempotent registration/resume call.
  */
 public final class OutlineSyncDispatch {
 

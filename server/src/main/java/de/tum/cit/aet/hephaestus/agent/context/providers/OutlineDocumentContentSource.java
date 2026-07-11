@@ -68,7 +68,7 @@ import tools.jackson.databind.node.ObjectNode;
  * body reads as data, never as instructions.
  *
  * <p>Gated on {@code hephaestus.integration.outline.enabled} — mirrors the projector so neither bean exists when the
- * integration is off and the context file is simply never produced.
+ * integration is off and the context file is never produced.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -349,11 +349,11 @@ public class OutlineDocumentContentSource implements ContentSource {
 
     /**
      * Renders the pipeline note for {@link #UNRESOLVED_REFERENCES_KEY} — plain infrastructure text, not a
-     * quarantined vendor document (see the field javadoc for why no banner). The instruction line exists
-     * because of a live-observed failure mode: a reviewing model, seeing no materialised wiki document, wrote
-     * that the artifact "does not reference any documentation" for a PR whose body DID link a real doc that
-     * simply failed to resolve — read by a human as the author having skipped documentation entirely. This
-     * note heads that off at the source instead of leaving the gap silent.
+     * quarantined vendor document (see the field javadoc for why no banner). The instruction line guards
+     * against a reviewing model misreading a resolution failure as neglect: seeing no materialised wiki
+     * document, it could otherwise claim the artifact "does not reference any documentation" even when the
+     * PR body links a real doc that failed to resolve. This note heads that off at the source instead of
+     * leaving the gap silent.
      */
     private static String renderUnresolvedNote(Set<String> unresolved) {
         StringBuilder md = new StringBuilder(256);

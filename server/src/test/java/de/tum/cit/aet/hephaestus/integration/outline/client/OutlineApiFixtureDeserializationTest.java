@@ -20,19 +20,15 @@ import org.springframework.test.context.ContextConfiguration;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Pins the tolerant-reader contract for the Outline REST DTOs ({@code OutlineApiClient}'s response
- * types) against REAL response bodies captured live from a self-hosted Outline instance
- * (outline-test.felixdietrich.com) — {@code documents.list}, {@code documents.info} (a root document
- * and a nested child with {@code parentDocumentId} set), {@code collections.list},
- * {@code collections.documents} (a real nested tree), and {@code webhookSubscriptions.list} (signing
- * {@code secret} redacted; every other field is the live wire shape).
+ * Pins the tolerant-reader contract for the Outline REST DTOs against response bodies captured from a
+ * real self-hosted Outline instance: {@code documents.list}, {@code documents.info} (a root document and
+ * a nested child with {@code parentDocumentId} set), {@code collections.list}, {@code collections.documents}
+ * (a real nested tree), and {@code webhookSubscriptions.list} (signing {@code secret} redacted).
  *
- * <p>Real Outline responses carry many more fields than our narrow tolerant DTOs declare (e.g.
- * {@code documents.list}'s {@code text}, {@code tasks}, {@code revision}, {@code publishedAt}, …) — this
- * is exactly the shape drift a hand-authored fixture would not exercise. Booting the real
- * Spring-Boot-autoconfigured Jackson&nbsp;3 mapper (rather than a hand-built one), the same way
- * {@code MultiVersionFixtureTest} does for the SCM DTOs, is the point: unknown-field tolerance is mapper
- * <em>configuration</em>, not an annotation effect.
+ * <p>Real Outline responses carry many more fields than our narrow DTOs declare (e.g. {@code
+ * documents.list}'s {@code text}, {@code tasks}, {@code revision}, {@code publishedAt}, …). Booting the
+ * real Spring-Boot-autoconfigured Jackson&nbsp;3 mapper, rather than a hand-built one, exercises that
+ * unknown-field tolerance is mapper configuration, not an annotation effect.
  */
 @Tag("unit")
 @SpringBootTest(classes = JacksonAutoConfiguration.class)

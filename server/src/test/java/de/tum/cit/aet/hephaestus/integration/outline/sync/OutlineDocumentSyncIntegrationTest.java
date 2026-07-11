@@ -283,7 +283,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         scheduler.syncAllNow();
 
         OutlineDocument docTwo = documentById(DOC_TWO);
-        // Archived is NOT tombstoned: the row survives, with its real content intact — the tombstone CHECK
+        // Archived is not tombstoned: the row survives, with its real content intact — the tombstone CHECK
         // (ck_outline_document_tombstone) is unaffected since deleted_at stays null.
         assertThat(docTwo.isDeleted()).isFalse();
         assertThat(docTwo.getArchivedAt()).isEqualTo(archivedAt);
@@ -348,11 +348,11 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     void versionColumn_engagesOptimisticLockingAgainstRealPostgres_andIncrementsOnEveryWrite() {
         // The lost-update the @Version column guards against is a webhook refreshDocument and a mid-flight
         // reconcile upsert (each its own REQUIRES_NEW transaction, unserialized per workspace) both doing a
-        // full-column save of the SAME row. The service's retry-once RECOVERY from that conflict is pinned
-        // deterministically by OutlineDocumentSyncServiceTest (mock save throws once then succeeds). What
-        // only real Postgres can prove — and what this test pins — is that the column is actually wired:
-        // the NOT NULL DEFAULT 0 lands, the version increments on every write, and a stale-snapshot save
-        // genuinely raises ObjectOptimisticLockingFailureException rather than silently clobbering.
+        // full-column save of the same row. The service's retry-once recovery from that conflict is pinned
+        // deterministically by OutlineDocumentSyncServiceTest (mock save throws once then succeeds). Only
+        // real Postgres can prove the column is actually wired: the NOT NULL DEFAULT 0 lands, the version
+        // increments on every write, and a stale-snapshot save genuinely raises
+        // ObjectOptimisticLockingFailureException rather than silently clobbering.
         stubCollection(List.of(DOC_ONE), T1, T1);
         scheduler.syncAllNow();
 

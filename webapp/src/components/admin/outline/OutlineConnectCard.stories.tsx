@@ -37,7 +37,7 @@ export const Disconnected: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /connect outline/i })).toBeDisabled();
-		// The collection allow-list moved to the post-connect collections plane.
+		// Collection selection lives in the post-connect collections plane, not here.
 		await expect(canvas.queryByLabelText(/allow-list/i)).not.toBeInTheDocument();
 	},
 };

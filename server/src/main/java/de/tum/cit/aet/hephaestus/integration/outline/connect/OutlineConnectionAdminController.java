@@ -51,12 +51,6 @@ public class OutlineConnectionAdminController {
         return ResponseEntity.ok(adminService.status(workspace.id()));
     }
 
-    /**
-     * Kicks the authoritative full reconcile for this workspace and returns immediately — the sync
-     * runs off the request thread, so a large corpus never stalls (or times out) the admin request.
-     * Always 202 with the status resource in {@code Location}; a duplicate submit while a reconcile
-     * is still running dispatches nothing and answers the same 202 pointing at the same monitor.
-     */
     @PostMapping("/sync")
     @Operation(
         operationId = "syncOutlineConnection",

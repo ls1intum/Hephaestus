@@ -21,9 +21,9 @@ import org.mockito.Mock;
 
 /**
  * Pins the provider-scoped, membership-gated resolution chain for Outline document authors: an author
- * only ever resolves to the workspace member their linked account belongs to IN THAT WORKSPACE — never
- * login-only, never across workspaces. Mirrors the Slack mentor resolver contract. The member id comes
- * off the membership view itself (SPI-only chain — no SCM repository read).
+ * only ever resolves to the workspace member their linked account belongs to in that same workspace —
+ * never login-only, never across workspaces. The member id comes off the membership view itself
+ * (SPI-only chain — no SCM repository read).
  */
 class OutlineIdentityResolverTest extends BaseUnitTest {
 
@@ -91,7 +91,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("membership in a DIFFERENT workspace is filtered out — never a cross-workspace attribution")
+    @DisplayName("membership in a different workspace is filtered out — never a cross-workspace attribution")
     void crossWorkspaceMembership_isFiltered() {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));

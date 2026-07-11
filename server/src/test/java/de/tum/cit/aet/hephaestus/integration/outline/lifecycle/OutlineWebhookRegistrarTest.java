@@ -175,8 +175,8 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
             .apply(config(null, null));
         assertThat(updated.webhookSubscriptionId()).isEqualTo("sub-99");
         assertThat(updated.webhookSecret()).isEqualTo(secret.getValue());
-        // The bug this closes: without this reconcile the scope consumer (created at boot with only the
-        // SCM stream) never picks up the new outline.<subId>.> filter until a restart.
+        // Without this reconcile, the scope consumer (created at boot with only the SCM stream) never
+        // picks up the new outline.<subId>.> filter until a restart.
         verifyScopeConsumerReconciled();
     }
 
@@ -233,7 +233,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
             .get(1)
             .apply(config(null, null));
         assertThat(stored.webhookSubscriptionId()).isEqualTo("sub-2");
-        // Self-heal mints a NEW subscription id = a new subject filter — the scope consumer must be
+        // Self-heal mints a new subscription id, i.e. a new subject filter — the scope consumer must be
         // reconciled just like a fresh register, or the workspace stays deaf until a restart.
         verifyScopeConsumerReconciled();
     }
@@ -268,7 +268,7 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     @Test
     void deregister_deletesUpstreamWithoutTouchingConfig() {
         // A config rewrite here would bump the row's version underneath the disconnect request's
-        // stale entity and its transition would die on optimistic locking (proven live in E2E).
+        // stale entity and its transition would die on optimistic locking.
         stubActiveConnection(config("sub-99", "sec"));
         stubToken();
 

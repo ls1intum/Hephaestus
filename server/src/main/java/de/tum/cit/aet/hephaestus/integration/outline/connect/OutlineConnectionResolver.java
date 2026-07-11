@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 
 /**
  * Resolves a workspace's ACTIVE Outline connection — the one 404 gate shared by every Outline admin
- * surface ({@link OutlineConnectionAdminService} and the collection registry's admin service). Both
- * previously carried their own copy of this check and had silently diverged: only one of them treated
- * a blank {@code serverUrl} as "not connected".
+ * surface ({@link OutlineConnectionAdminService} and the collection registry's admin service), so both
+ * agree on whether a blank {@code serverUrl} counts as "not connected" instead of each keeping its own
+ * copy of the check.
  *
  * <p>A blank {@code serverUrl} is a real reachable state, not just theoretical: the inline-connect
  * config builder defaults an omitted {@code server_url} to {@code null} and the Connection still

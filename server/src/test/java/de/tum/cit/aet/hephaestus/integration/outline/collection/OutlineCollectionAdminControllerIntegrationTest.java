@@ -44,18 +44,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * End-to-end tests for {@link OutlineCollectionAdminController} and
- * {@link de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionAdminController} —
- * the Outline admin surface. The whole Outline integration is enabled so the guarded controllers +
- * services run against a real Postgres via {@link WebTestClient}; {@link OutlineApiClient} is mocked
- * so live verification, candidates, and the registration sync kick are observable without an Outline
- * server.
- *
- * <p>Each test asserts a behavior that would fail if the guard or contract were removed: a non-admin
- * is 403; a workspace without an ACTIVE Outline connection is 404; register verifies against the live
- * list (unknown → 422, known → 201, repeat → 200) and round-trips through the list; PATCH resumes
- * reset the sync status to PENDING; DELETE erases the mirrored documents; an Outline API failure on
- * the candidates probe is a 502 ProblemDetail; and the connection status endpoint reports webhook /
- * count / last-sync truthfully.
+ * {@link de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionAdminController} — the
+ * Outline admin surface. The guarded controllers and services run against a real Postgres via
+ * {@link WebTestClient}; {@link OutlineApiClient} is mocked so live verification, candidates, and the
+ * registration sync kick are observable without an Outline server.
  */
 @TestPropertySource(properties = "hephaestus.integration.outline.enabled=true")
 class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {

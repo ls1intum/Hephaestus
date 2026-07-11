@@ -40,14 +40,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Feeds the REAL {@code documents.list} + {@code collections.documents} fixtures (captured live off
- * outline-test.felixdietrich.com — see {@code OutlineApiFixtureDeserializationTest}) through
- * {@link OutlineDocumentSyncService#syncWorkspace} and pins the full upsert mapping against real wire
- * data: slug derived from the real {@code url}, real timestamps, real author/collaborator ids and
- * names, and a real parent/child relationship carried by an actual nested collection tree — the class
- * of mapping bug ({@code @JsonProperty} typo, wrong nesting precedence, a slug regression) that
- * {@link OutlineDocumentSyncServiceTest}'s hand-built {@code Meta} records cannot catch because they
- * are shaped to already match the code, not to match what Outline actually sends.
+ * Feeds the same real {@code documents.list} + {@code collections.documents} fixtures used by {@code
+ * OutlineApiFixtureDeserializationTest} through {@link OutlineDocumentSyncService#syncWorkspace} and
+ * pins the full upsert mapping against real wire data: slug derived from the real {@code url}, real
+ * timestamps, real author/collaborator ids and names, and a parent/child relationship carried by an
+ * actual nested collection tree. This catches mapping bugs ({@code @JsonProperty} typos, wrong nesting
+ * precedence, slug derivation errors) that {@link OutlineDocumentSyncServiceTest}'s hand-built {@code
+ * Meta} records cannot, since those are shaped to already match the code rather than the real payload.
  */
 class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
@@ -140,7 +139,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             .when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE))
             .thenReturn(List.of(collection));
 
-        // --- wire the mocked client's return values off REAL captured fixtures ---
+        // --- wire the mocked client's return values off the real captured fixtures ---
 
         OutlineCollectionListResponse collectionsList = readFixture(
             "/outline-api/collections.list.json",
@@ -212,8 +211,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
         OutlineDocument child = savedDocument(CHILD_DOC_ID);
         assertThat(child.getTitle()).isEqualTo("Fixture Capture Child 2");
         assertThat(child.getSlug()).isEqualTo("fixture-capture-child-2-OHQpaAib7z");
-        // The parent id comes from the REAL collections.documents nesting (the child sits under the
-        // parent's node in the live tree), matching the REAL documents.list metadata's parentDocumentId.
+        // The parent id comes from the collections.documents nesting (the child sits under the parent's
+        // node in the live tree), matching documents.list metadata's parentDocumentId.
         assertThat(child.getParentDocumentId()).isEqualTo(PARENT_DOC_ID);
         assertThat(child.getCollectionId()).isEqualTo(COLLECTION_ID);
         assertThat(child.getBodyMarkdown()).isEqualTo("# Fixture Capture Child 2\n\nSecond child doc body.");

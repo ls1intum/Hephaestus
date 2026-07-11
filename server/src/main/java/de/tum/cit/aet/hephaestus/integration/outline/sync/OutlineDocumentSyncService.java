@@ -257,7 +257,7 @@ public class OutlineDocumentSyncService {
      * envelope's HMAC, so a usable one (carrying at least an id and a collection id) is trusted as metadata
      * and the {@code documents.info} round-trip is skipped entirely; only the body export still calls out,
      * since the payload never carries content. A {@code null}/incomplete {@code prefetchedMeta} falls back
-     * to fetching {@code documents.info} as before.
+     * to fetching {@code documents.info} directly.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void refreshDocument(
@@ -821,7 +821,7 @@ public class OutlineDocumentSyncService {
 
     private static void logRateLimited(long workspaceId, OutlineRateLimitedException e) {
         // Pause, don't abort: progress committed so far is kept and the remainder resumes next tick. The
-        // tombstone pass is intentionally skipped so a document we simply did not reach is never dropped.
+        // tombstone pass is intentionally skipped so a document we did not reach is never dropped.
         log.warn(
             "outline.sync: rate-limited for workspaceId={} — pausing this pass (retryAfter={})",
             workspaceId,

@@ -48,29 +48,19 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Drives {@link OutlineWebhookSignatureVerifier}, {@link OutlineSubjectKeyDeriver},
- * {@link OutlineSubjectParser}, and {@link OutlineWebhookMessageHandler} end-to-end off every REAL
- * Outline webhook delivery body committed under {@code src/test/resources/outline} — captured live
- * from a self-hosted Outline instance's {@code webhook_deliveries} table rather than hand-authored, the
- * way {@code SubjectGrammarRoundTripTest} does for GitHub/GitLab fixtures.
+ * {@link OutlineSubjectParser}, and {@link OutlineWebhookMessageHandler} end-to-end against every
+ * committed Outline webhook delivery body under {@code src/test/resources/outline}, captured live from
+ * a self-hosted Outline instance's {@code webhook_deliveries} table rather than hand-authored.
  *
  * <p>For each fixture: (1) the raw bytes verify under a signature computed over them with a test
  * secret — proving the verifier's HMAC-over-exact-bytes contract survives real Outline JSON
  * formatting/whitespace; (2) the publisher-side subject the deriver builds falls under the
  * consumer-side subscription filter and the parser collapses it onto the handler's single logical key;
  * (3) the handler routes on the fixture's real {@code event} + {@code payload.id} — every committed
- * fixture happens to carry a payload id, so a {@code documents.*} delivery refreshes that exact document
- * and appends the exact actor/clock to the event log (the no-id workspace-reconcile fallback is covered
- * by the hand-built {@code OutlineWebhookMessageHandlerTest}), while a {@code collections.*} delivery
+ * fixture carries a payload id, so a {@code documents.*} delivery refreshes that exact document and
+ * appends the exact actor/clock to the event log (the no-id workspace-reconcile fallback is covered by
+ * the hand-built {@code OutlineWebhookMessageHandlerTest}), while a {@code collections.*} delivery
  * refreshes the catalog instead.
- *
- * <p>This is Outline's analogue of {@code SubjectGrammarRoundTripTest}'s "for every committed fixture"
- * producer↔consumer guard — not a literal extension of it. That test's fixture discovery is
- * repository-shaped (it reads {@code path_with_namespace}/owner+repo off the payload), which does not
- * apply to Outline's subscription-scoped {@code outline.<sub>.<event>} grammar; Slack's equally
- * non-repository-shaped events get the same treatment via its own {@code SlackSubjectRoundTripTest}
- * rather than being folded into the SCM-specific test. Outline's version goes one step further than
- * Slack's (which uses hand-authored literals): it is driven entirely by the committed REAL delivery
- * fixtures below, closing the fixture-discipline gap the other two integrations already had.
  */
 class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
 
@@ -125,7 +115,7 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         String subject = verifySubjectRoundTrip(payload, subscriptionId, event);
         verifyHandlerRouting(body, subscriptionId, event, payloadId, actorId, createdAtRaw);
 
-        // Belt-and-braces: the subject the deriver actually emitted for THIS fixture round-trips too.
+        // Belt-and-braces: the subject the deriver actually emitted for this fixture round-trips too.
         assertThat(PARSER.parse(subject).kind()).isEqualTo(IntegrationKind.OUTLINE);
     }
 
@@ -179,7 +169,7 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
             MAPPER
         );
 
-        // Route the REAL fixture bytes exactly as they arrive off the wire — the handler only trusts
+        // Route the fixture bytes exactly as they arrive off the wire — the handler only trusts
         // event/payload.id/actorId/createdAt for routing (never the document body), but feeding the
         // full real envelope (rather than a hand-built minimal one) exercises the actual JSON shape.
         Message message = Mockito.mock(Message.class);

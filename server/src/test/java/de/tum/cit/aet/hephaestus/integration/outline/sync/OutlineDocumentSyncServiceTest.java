@@ -316,7 +316,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         assertThat(row.isDeleted()).isFalse();
         assertThat(row.getArchivedAt()).isNotNull();
-        // Unlike a tombstone, archiving KEEPS the body, hash, and authors.
+        // Unlike a tombstone, archiving keeps the body, hash, and authors.
         assertThat(row.getBodyMarkdown()).isEqualTo("# body");
         assertThat(row.getContentHash()).isEqualTo("hash");
         assertThat(row.getCreatedBySubject()).isEqualTo("user-1");
@@ -543,9 +543,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
     @Test
     void refreshDocument_storesTheFullUrlSlug_matchingTheFullReconcilePath() {
-        // Regression: the webhook targeted-refresh path used to store only the bare urlId as the slug
-        // while the full-reconcile path stores the full "<title-slug>-<urlId>" trailing URL segment — a
-        // document linked from a PR/issue right after creation never resolved until the next full sync.
+        // The webhook targeted-refresh path must store the same slug format as full reconcile — the
+        // full "<title-slug>-<urlId>" trailing URL segment, not the bare urlId — or a document linked
+        // from a PR/issue right after creation won't resolve until the next full sync.
         when(
             documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
         ).thenReturn(Optional.empty());
@@ -804,7 +804,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(collection.getDocumentsSyncedAt()).isNull();
     }
 
-    // --- optimistic-lock retry: a webhook refresh and a mid-flight reconcile racing the SAME row ---
+    // --- optimistic-lock retry: a webhook refresh and a mid-flight reconcile racing the same row ---
 
     @Test
     void refreshDocument_optimisticLockConflict_retriesOnceThenSucceeds() {
@@ -835,7 +835,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         verify(documentRepository, times(2)).saveAndFlush(any());
         verify(entityManager).detach(row);
         assertThat(row.getVersion()).isEqualTo(5L); // adopted the current version before the retry
-        assertThat(row.getBodyMarkdown()).isEqualTo("# fresh"); // this pass's write was NOT lost
+        assertThat(row.getBodyMarkdown()).isEqualTo("# fresh"); // this pass's write was not lost
     }
 
     @Test

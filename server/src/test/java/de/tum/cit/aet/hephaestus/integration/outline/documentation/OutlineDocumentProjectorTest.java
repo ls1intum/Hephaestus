@@ -191,7 +191,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     // --- archived flag + collection name ---
 
     @Test
-    @DisplayName("an archived (soft, recoverable) row projects archived=true and KEEPS its body — unlike a tombstone")
+    @DisplayName("an archived (soft, recoverable) row projects archived=true and keeps its body, unlike a tombstone")
     void documentsForWorkspace_archivedRowProjectsArchivedTrueWithBodyIntact() {
         when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class))).thenReturn(
             List.of(archivedDocument())
@@ -283,9 +283,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the resolver is consulted once per DISTINCT subject, not once per field or per document")
+    @DisplayName("the resolver is consulted once per distinct subject, not once per field or per document")
     void resolverConsultedOncePerDistinctSubject() {
-        // Two documents by the same author (creator == last editor on both) → four subject slots, ONE lookup.
+        // Two documents by the same author (creator == last editor on both) → four subject slots, one lookup.
         OutlineDocument first = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
         OutlineDocument second = authoredDocument("doc-uuid-2", "0aa1bb2c-user", "Ada Lovelace");
         second.setSlug("second-doc");
@@ -439,14 +439,14 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
     @Test
     @DisplayName(
-        "documentsByReference resolves a full-URL reference even when a legacy webhook-synced row " +
-            "stored only the short Outline urlId as its slug (regression: PR/issue linked right after " +
-            "creation used to never resolve until the next full reconcile)"
+        "documentsByReference resolves a full-URL reference even when a webhook-synced row stored " +
+            "only the short Outline urlId as its slug, not the full title-slug"
     )
     void documentsByReference_legacyShortSlugRow_stillResolvesAgainstFullUrlReference() {
         OutlineDocument legacyRow = liveDocument();
-        // Pre-fix webhook targeted-refresh rows stored the bare urlId, not the full "<title>-<urlId>" slug
-        // the full-reconcile path derives from the document tree.
+        // A webhook targeted-refresh row's slug may be the bare urlId instead of the full
+        // "<title>-<urlId>" segment full reconcile derives from the document tree; reference
+        // matching must handle both forms.
         legacyRow.setSlug("psUl8qCles");
         when(documentRepository.findByWorkspaceIdAndReferenceIn(eq(WORKSPACE_ID), refsCaptor.capture())).thenReturn(
             List.of(legacyRow)
