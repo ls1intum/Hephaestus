@@ -11,12 +11,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionResolver;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
+import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineSyncDispatch;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -270,38 +272,33 @@ public class OutlineCollectionAdminService {
     }
 
     /**
-     * Fires the targeted single-collection sync off the request thread. Routed through the
-     * {@link OutlineDocumentSyncScheduler} pass-through so the executor thread (which carries no
-     * request tenancy scope) crosses the {@code @WorkspaceAgnostic} bypass hop.
+     * Fires the targeted single-collection sync off the request thread through the shared
+     * {@link OutlineSyncDispatch}. Routed through the {@link OutlineDocumentSyncScheduler} pass-through
+     * so the executor thread (which carries no request tenancy scope) crosses the
+     * {@code @WorkspaceAgnostic} bypass hop. Deliberately unguarded, unlike
+     * {@code OutlineConnectionAdminService.syncNow}: both call sites (a fresh registration, a
+     * PAUSED→ENABLED resume) are themselves idempotent/state-gated, so there is no human-repeatable
+     * double-click path that would pile up concurrent kicks for the same collection.
      */
     private void kickCollectionSync(long workspaceId, String collectionId) {
-        taskExecutor.execute(() -> {
-            try {
-                syncScheduler.syncCollectionNow(workspaceId, collectionId);
-            } catch (RuntimeException e) {
+        OutlineSyncDispatch.fireAndForget(
+            taskExecutor,
+            () -> syncScheduler.syncCollectionNow(workspaceId, collectionId),
+            e ->
                 // The registration/resume already succeeded; the catch-up tick retries a failed kick.
                 log.warn(
                     "outline.admin: targeted sync kick failed for workspaceId={}, collectionId={}: {}",
                     workspaceId,
                     collectionId,
                     e.toString()
-                );
-            }
-        });
+                )
+        );
     }
 
-    /** The workspace's ACTIVE Outline install, or {@link EntityNotFoundException} (404) when not connected. */
+    /** The workspace's ACTIVE Outline install, or a 404 when not connected — see {@link OutlineConnectionResolver}. */
     private OutlineInstall requireInstall(long workspaceId) {
-        Connection connection = connectionService
-            .findActive(workspaceId, IntegrationKind.OUTLINE)
-            .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
-        if (
-            !(connection.getConfig() instanceof ConnectionConfig.OutlineConfig config) ||
-            config.serverUrl() == null ||
-            config.serverUrl().isBlank()
-        ) {
-            throw new EntityNotFoundException("Outline connection", Long.toString(workspaceId));
-        }
+        Connection connection = OutlineConnectionResolver.requireActiveConnection(connectionService, workspaceId);
+        ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();
         return new OutlineInstall(workspaceId, connection.getId(), config.serverUrl());
     }
 

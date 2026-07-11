@@ -184,6 +184,34 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void register_descriptionOverColumnWidth_isTruncatedAtTheBoundary() {
+        // outline_collection.description is 2048 chars wide; a live description past that must be
+        // clamped, not rejected or silently widened.
+        OutlineCollectionAdminService service = service();
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
+        ).thenReturn(Optional.empty());
+        String overLongDescription = "d".repeat(2100);
+        stubLiveCollections(
+            new OutlineCollectionListResponse.Collection(
+                COLLECTION_ID,
+                "Design",
+                "col1",
+                null,
+                null,
+                overLongDescription
+            )
+        );
+
+        service.register(WS, COLLECTION_ID);
+
+        ArgumentCaptor<OutlineCollection> saved = ArgumentCaptor.forClass(OutlineCollection.class);
+        verify(collectionRepository).save(saved.capture());
+        assertThat(saved.getValue().getDescription()).hasSize(2048);
+        assertThat(saved.getValue().getDescription()).isEqualTo(overLongDescription.substring(0, 2048));
+    }
+
+    @Test
     void register_withoutActiveConnection_isNotFound() {
         OutlineCollectionAdminService service = service();
         when(connectionService.findActive(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());

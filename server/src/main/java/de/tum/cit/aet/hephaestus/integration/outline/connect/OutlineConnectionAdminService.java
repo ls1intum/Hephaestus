@@ -1,17 +1,16 @@
 package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
+import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineSyncDispatch;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -114,10 +113,11 @@ public class OutlineConnectionAdminService {
 
     /**
      * Fires the full workspace reconcile off the request thread (the endpoint answers 202
-     * immediately). Guarded per workspace: while a manually triggered reconcile is still running, a
-     * duplicate submit dispatches nothing — the caller gets the same 202 pointing at the same status
-     * monitor. Routed through the {@link OutlineDocumentSyncScheduler} pass-through so the executor
-     * thread (which carries no request tenancy scope) crosses the {@code @WorkspaceAgnostic} bypass hop.
+     * immediately) through the shared {@link OutlineSyncDispatch}. Guarded per workspace: while a
+     * manually triggered reconcile is still running, a duplicate submit dispatches nothing — the
+     * caller gets the same 202 pointing at the same status monitor. Routed through the
+     * {@link OutlineDocumentSyncScheduler} pass-through so the executor thread (which carries no
+     * request tenancy scope) crosses the {@code @WorkspaceAgnostic} bypass hop.
      */
     public void syncNow(long workspaceId) {
         requireActiveConnection(workspaceId);
@@ -129,20 +129,19 @@ public class OutlineConnectionAdminService {
             return;
         }
         try {
-            taskExecutor.execute(() -> {
-                try {
-                    syncScheduler.syncWorkspaceNow(workspaceId);
-                } catch (RuntimeException e) {
+            OutlineSyncDispatch.fireAndForget(
+                taskExecutor,
+                () -> {
+                    try {
+                        syncScheduler.syncWorkspaceNow(workspaceId);
+                    } finally {
+                        syncsInFlight.remove(workspaceId);
+                    }
+                },
+                e ->
                     // Fire-and-forget: the 202 already went out; the 6h reconcile is the safety net.
-                    log.warn(
-                        "outline.admin: manual reconcile failed for workspaceId={}: {}",
-                        workspaceId,
-                        e.toString()
-                    );
-                } finally {
-                    syncsInFlight.remove(workspaceId);
-                }
-            });
+                    log.warn("outline.admin: manual reconcile failed for workspaceId={}: {}", workspaceId, e.toString())
+            );
         } catch (RuntimeException e) {
             // The executor rejected the task — clear the guard so the next submit can dispatch again.
             syncsInFlight.remove(workspaceId);
@@ -150,14 +149,8 @@ public class OutlineConnectionAdminService {
         }
     }
 
-    /** The workspace's ACTIVE Outline connection, or {@link EntityNotFoundException} (404) when not connected. */
+    /** The workspace's ACTIVE Outline connection, or a 404 when not connected — see {@link OutlineConnectionResolver}. */
     private Connection requireActiveConnection(long workspaceId) {
-        Connection connection = connectionService
-            .findActive(workspaceId, IntegrationKind.OUTLINE)
-            .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
-        if (!(connection.getConfig() instanceof ConnectionConfig.OutlineConfig)) {
-            throw new EntityNotFoundException("Outline connection", Long.toString(workspaceId));
-        }
-        return connection;
+        return OutlineConnectionResolver.requireActiveConnection(connectionService, workspaceId);
     }
 }

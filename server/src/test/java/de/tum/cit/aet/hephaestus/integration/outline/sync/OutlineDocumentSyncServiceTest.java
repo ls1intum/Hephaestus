@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
@@ -258,6 +259,21 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
         assertThat(collection.getDocumentsSyncedAt()).isNull();
+    }
+
+    @Test
+    void syncOneCollection_apiFailureMessageOverColumnWidth_truncatesLastSyncErrorAtTheBoundary() {
+        // outline_collection.last_sync_error is 2048 chars wide; an oversized exception message must be
+        // clamped, not rejected or silently widened.
+        String overLongMessage = "x".repeat(2100);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenThrow(
+            new OutlineApiException(overLongMessage)
+        );
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        assertThat(collection.getLastSyncError()).hasSize(2048);
+        assertThat(collection.getLastSyncError()).isEqualTo(overLongMessage.substring(0, 2048));
     }
 
     @Test

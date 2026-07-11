@@ -248,6 +248,57 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
     }
 
+    // --- tolerant parsing: malformed input is acked, never crashes the consumer ---
+
+    @Test
+    void garbageBytes_isAcknowledgedWithoutCrashOrDispatch() {
+        Message msg = Mockito.mock(Message.class);
+        when(msg.getData()).thenReturn("not json at all {{{".getBytes(StandardCharsets.UTF_8));
+
+        handler().onMessage(msg);
+
+        verifyNoInteractions(syncScheduler);
+        verifyNoInteractions(documentEventRepository);
+    }
+
+    @Test
+    void emptyBody_isAcknowledgedWithoutCrashOrDispatch() {
+        Message msg = Mockito.mock(Message.class);
+        when(msg.getData()).thenReturn(new byte[0]);
+
+        handler().onMessage(msg);
+
+        verifyNoInteractions(syncScheduler);
+        verifyNoInteractions(documentEventRepository);
+    }
+
+    @Test
+    void nullBody_isAcknowledgedWithoutCrashOrDispatch() {
+        Message msg = Mockito.mock(Message.class);
+        when(msg.getData()).thenReturn(null);
+
+        handler().onMessage(msg);
+
+        verifyNoInteractions(syncScheduler);
+        verifyNoInteractions(documentEventRepository);
+    }
+
+    @Test
+    void documentEventWithNonObjectModel_fallsBackToNullWithoutCrashing() {
+        // payload.model is a JSON string, not the expected object — parseModel's field lookups on a
+        // scalar node must degrade to "no usable model", not throw.
+        resolves("sub-1", 42L);
+        Message msg = Mockito.mock(Message.class);
+        String body =
+            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\"," +
+            "\"payload\":{\"id\":\"doc-9\",\"model\":\"not-an-object\"}}";
+        when(msg.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
+
+        handler().onMessage(msg);
+
+        verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
+    }
+
     // --- payload.model trust: parsed when usable, ignored otherwise ---
 
     @Test

@@ -1,6 +1,6 @@
 # ADR 0023: Outline documentation integration — a content source, not a detection surface
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-04
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0015](0015-unified-integration-framework.md) (integration framework), [ADR 0020](0020-context-fabric-everything-is-an-integration.md) (context fabric), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md) (credential encryption), [ADR 0007](0007-sandbox-spi-shape.md) (sandbox SPI shape)
@@ -136,6 +136,27 @@ age clock only forces a re-sync. Retention is therefore driven by reconciling to
 on delete) and a per-workspace least-recently-materialized size cap, with a hard staleness ceiling on
 tombstoned rows as defense-in-depth. This is a deliberate divergence from the wall-clock retention the
 messaging integration runs.
+
+## Implementation notes (2026-07-10)
+
+This ADR was drafted before the collections admin plane and archive handling were designed; both
+shipped in the same branch. Recorded here rather than rewritten into the decisions above, since
+neither changes the decision, only the mechanism:
+
+- **The collection allow-list is a live admin registry, not a static list.** "Allow-listed set of
+  Outline collections" (Context, Decision 6) is implemented as the `outline_collection` table: an
+  admin registers/pauses/resumes/removes individual collections through a dedicated control plane
+  (`OutlineCollectionAdminService` + its REST surface), each row tracking its own sync status and
+  watermark. The registry table — not a JSONB config field — is the single source of truth for which
+  collections are mirrored; a paused collection stops syncing without losing its registration, and
+  removal hard-deletes both the row and its mirrored documents.
+- **Archive is tracked as a distinct, soft/recoverable state.** Decision 6 and 7's "tombstones
+  documents that vanished upstream" describes the delete case only. In practice `OutlineDocument`
+  carries an `archivedAt` column separate from `deletedAt`: an Outline `documents.archive` event (or a
+  sync pass) stamps `archivedAt` in place — the content stays mirrored and un-tombstoned — while
+  `documents.unarchive` (or the document reappearing live) clears it. The sync service enumerates
+  archived documents on a second pass so the tombstone-by-absence sweep never mistakes "archived" for
+  "permanently deleted".
 
 ## Consequences
 

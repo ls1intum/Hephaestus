@@ -31,6 +31,8 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -179,18 +181,6 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("still stores the subscription and never NPEs when the NATS consumer bean is absent")
-    void ensureSubscription_registersFineWithNoNatsConsumerBean() {
-        stubActiveConnection(config(null, null));
-        stubToken();
-        stubCreateReturning("sub-99");
-
-        assertThatCode(() -> registrar(EXTERNAL_URL, null).ensureSubscription(WORKSPACE_ID)).doesNotThrowAnyException();
-
-        verify(connectionService).updateConfig(eq(WORKSPACE_ID), eq(IntegrationKind.OUTLINE), any());
-    }
-
-    @Test
     void ensureSubscription_skipsWhenExternalUrlMissing() {
         registrar("").ensureSubscription(WORKSPACE_ID);
 
@@ -249,21 +239,6 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("still self-heals and never NPEs when the NATS consumer bean is absent")
-    void ensureSubscription_reRegistersFineWithNoNatsConsumerBean() {
-        stubActiveConnection(config("sub-1", "sec"));
-        stubToken();
-        when(outlineApiClient.listWebhookSubscriptions(SERVER_URL, "tok")).thenReturn(
-            List.of(upstream("sub-1", false))
-        );
-        stubCreateReturning("sub-2");
-
-        assertThatCode(() -> registrar(EXTERNAL_URL, null).ensureSubscription(WORKSPACE_ID)).doesNotThrowAnyException();
-
-        verify(outlineApiClient).createWebhookSubscription(any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
     void ensureSubscription_reRegistersWhenTheStoredSubscriptionVanishedUpstream() {
         stubActiveConnection(config("sub-1", "sec"));
         stubToken();
@@ -305,17 +280,6 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("still deletes upstream and never NPEs when the NATS consumer bean is absent")
-    void deregister_deletesFineWithNoNatsConsumerBean() {
-        stubActiveConnection(config("sub-99", "sec"));
-        stubToken();
-
-        assertThatCode(() -> registrar(EXTERNAL_URL, null).deregister(WORKSPACE_ID)).doesNotThrowAnyException();
-
-        verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-99");
-    }
-
-    @Test
     void deregister_skipsWhenNoSubscriptionStored() {
         stubActiveConnection(config(null, null));
 
@@ -339,22 +303,6 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
 
         verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-77");
         verifyScopeConsumerReconciled();
-    }
-
-    @Test
-    @DisplayName("still deletes upstream (by connection id) and never NPEs when the NATS consumer bean is absent")
-    void deregisterByConnectionId_deletesFineWithNoNatsConsumerBean() {
-        when(connection.getConfig()).thenReturn(config("sub-77", "sec"));
-        when(connectionService.findInWorkspace(WORKSPACE_ID, CONNECTION_ID)).thenReturn(Optional.of(connection));
-        when(connectionService.findBearerToken(WORKSPACE_ID, CONNECTION_ID)).thenReturn(
-            Optional.of(new BearerToken("tok", null))
-        );
-
-        assertThatCode(() ->
-            registrar(EXTERNAL_URL, null).deregister(WORKSPACE_ID, CONNECTION_ID)
-        ).doesNotThrowAnyException();
-
-        verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-77");
     }
 
     @Test
@@ -383,6 +331,72 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
 
         verify(outlineApiClient, never()).deleteWebhookSubscription(any(), any(), any());
         verifyNoInteractions(natsConsumer);
+    }
+
+    // --- absent NATS-consumer ObjectProvider bean: every reconcile-triggering call site must not NPE ---
+
+    /** The four call sites whose scope-consumer reconcile must tolerate a missing {@code IntegrationNatsConsumer} bean. */
+    private enum NoNatsConsumerBeanCase {
+        ENSURE_SUBSCRIPTION_REGISTERS,
+        ENSURE_SUBSCRIPTION_RE_REGISTERS,
+        DEREGISTER,
+        DEREGISTER_BY_CONNECTION_ID,
+    }
+
+    @ParameterizedTest
+    @EnumSource(NoNatsConsumerBeanCase.class)
+    @DisplayName("never NPEs when the NATS consumer ObjectProvider bean is absent")
+    void neverNPEsWithNoNatsConsumerBean(NoNatsConsumerBeanCase testCase) {
+        switch (testCase) {
+            case ENSURE_SUBSCRIPTION_REGISTERS -> {
+                stubActiveConnection(config(null, null));
+                stubToken();
+                stubCreateReturning("sub-99");
+
+                assertThatCode(() ->
+                    registrar(EXTERNAL_URL, null).ensureSubscription(WORKSPACE_ID)
+                ).doesNotThrowAnyException();
+
+                verify(connectionService).updateConfig(eq(WORKSPACE_ID), eq(IntegrationKind.OUTLINE), any());
+            }
+            case ENSURE_SUBSCRIPTION_RE_REGISTERS -> {
+                stubActiveConnection(config("sub-1", "sec"));
+                stubToken();
+                when(outlineApiClient.listWebhookSubscriptions(SERVER_URL, "tok")).thenReturn(
+                    List.of(upstream("sub-1", false))
+                );
+                stubCreateReturning("sub-2");
+
+                assertThatCode(() ->
+                    registrar(EXTERNAL_URL, null).ensureSubscription(WORKSPACE_ID)
+                ).doesNotThrowAnyException();
+
+                verify(outlineApiClient).createWebhookSubscription(any(), any(), any(), any(), any(), any());
+            }
+            case DEREGISTER -> {
+                stubActiveConnection(config("sub-99", "sec"));
+                stubToken();
+
+                assertThatCode(() -> registrar(EXTERNAL_URL, null).deregister(WORKSPACE_ID)).doesNotThrowAnyException();
+
+                verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-99");
+            }
+            case DEREGISTER_BY_CONNECTION_ID -> {
+                when(connection.getConfig()).thenReturn(config("sub-77", "sec"));
+                when(connectionService.findInWorkspace(WORKSPACE_ID, CONNECTION_ID)).thenReturn(
+                    Optional.of(connection)
+                );
+                when(connectionService.findBearerToken(WORKSPACE_ID, CONNECTION_ID)).thenReturn(
+                    Optional.of(new BearerToken("tok", null))
+                );
+
+                assertThatCode(() ->
+                    registrar(EXTERNAL_URL, null).deregister(WORKSPACE_ID, CONNECTION_ID)
+                ).doesNotThrowAnyException();
+
+                verify(outlineApiClient).deleteWebhookSubscription(SERVER_URL, "tok", "sub-77");
+            }
+        }
     }
 
     private static long anyLongMatcher() {

@@ -27,7 +27,6 @@ public class OutlineApiException extends RuntimeException {
         this.retryable = retryable;
     }
 
-    /** Whether the failure is worth retrying (transient) rather than permanent. */
     public boolean isRetryable() {
         return retryable;
     }
