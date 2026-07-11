@@ -326,19 +326,20 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Recent findings the mentor can refer to by title in conversation.
+     * A developer's recent observations, latest-run-deduped. Feeds two consumers: the mentor's
+     * conversation context (referred to by title) and the developer's own reflection report cards
+     * ({@code ObservationService#getPracticeReport}), which group and re-order these into per-practice cards.
      *
      * <p>Re-review deduped (same grain as {@link #findDeveloperPracticeSummary}): keeps only each
-     * target's LATEST detection run, so a re-pushed PR's findings don't repeat across the list and the
-     * mentor doesn't see (and re-litigate) the same finding four times. Native because the latest-run
+     * target's LATEST detection run, so a re-pushed PR's observations don't repeat across the list and a
+     * consumer doesn't see (and re-litigate) the same observation four times. Native because the latest-run
      * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
-     * per finding (bounded by the page size) rather than JOIN-fetched.
+     * per observation (bounded by the page size) rather than JOIN-fetched.
      *
      * <p>{@code NOT_APPLICABLE} is excluded: it dominates the list (the bulk are "no change needed /
-     * awaiting review" rows) the mentor cannot coach from, and would bury the actionable {@code BAD} problems
+     * awaiting review" rows) neither consumer can act on, and would bury the actionable {@code BAD} problems
      * and {@code GOOD} strengths within the page budget. The NA total still reaches the mentor via the
-     * presence-count summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by
-     * severity) to preserve its "what happened lately" purpose.
+     * presence-count summary. Rows come back recency-ordered; each consumer applies its own final ordering.
      */
     @Query(
         value = """

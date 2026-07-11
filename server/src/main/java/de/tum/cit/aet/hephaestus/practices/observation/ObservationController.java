@@ -32,9 +32,12 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Read-only REST API for practice observations — the raw observation ledger.
  *
- * <p>All endpoints require workspace membership (enforced by {@link WorkspaceScopedController}).
- * List, summary, and detail endpoints are scoped to the authenticated developer's own
- * observations. The pull-request endpoint returns observations for all developers on that PR.
+ * <p>{@link WorkspaceScopedController} resolves workspace existence and the caller's role but does not by
+ * itself require membership: on a publicly-viewable workspace a GET from a non-member still resolves a
+ * context with {@code hasMembership() == false}. The list, summary, and detail endpoints are scoped to the
+ * authenticated developer's own observations, so a non-member reaches them but only ever sees their own data.
+ * The pull-request endpoint returns every developer's observations on that PR, so it rejects non-members
+ * itself (see {@link #getObservationsForPullRequest}).
  *
  * <p>The synthesised per-developer report cards and the anonymised cohort rollup live on the sibling
  * {@code /practices/reports} + {@code /practices/cohort} resources (see

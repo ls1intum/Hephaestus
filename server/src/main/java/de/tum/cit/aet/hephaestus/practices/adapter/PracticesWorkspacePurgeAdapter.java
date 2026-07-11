@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
  *   <li>Observations (via native query through practice.workspace_id)</li>
  *   <li>Practice definitions for the workspace</li>
  *   <li>Practice areas (unreferenced once practices are gone)</li>
+ *   <li>The append-only practice-report data-access audit rows for the workspace</li>
  * </ul>
  */
 @Component

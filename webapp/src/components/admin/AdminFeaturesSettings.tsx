@@ -140,9 +140,9 @@ export function AdminFeaturesSettings({
 						<div className="space-y-4">
 							<p className="text-sm text-muted-foreground">
 								Anonymised cohort insights visible to: admins/owners only, or everyone in the
-								workspace. This is never a score or a ranking, and it only controls the cohort view
-								— the roster and per-developer drill-downs stay admin-only, and developers always
-								see their own feedback.
+								workspace. This is never a score or a ranking. It only controls the cohort view. The
+								roster and per-developer drill-downs stay admin-only, and developers always see
+								their own feedback.
 							</p>
 							<RadioGroup
 								value={cohortVisibility}

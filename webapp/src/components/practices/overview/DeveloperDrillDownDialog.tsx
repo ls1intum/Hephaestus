@@ -67,7 +67,7 @@ export function DeveloperDrillDownDialog({
 		>
 			<DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
 				<DialogHeader>
-					<DialogTitle>Mentoring view — {displayName}</DialogTitle>
+					<DialogTitle>Mentoring view for {displayName}</DialogTitle>
 					<DialogDescription>
 						A read-only look at {displayName}&apos;s practice feedback to help you mentor.
 					</DialogDescription>
@@ -82,7 +82,7 @@ export function DeveloperDrillDownDialog({
 					<EmptyState
 						icon={AlertTriangle}
 						title="Couldn't load this developer's feedback"
-						description="Something went wrong loading the reflection. This is usually temporary — try again."
+						description="Something went wrong loading the reflection. This is usually temporary, so try again."
 						action={
 							<Button variant="outline" onClick={handleRetry}>
 								Retry

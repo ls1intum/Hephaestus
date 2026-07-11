@@ -99,7 +99,7 @@ export function PracticeReflectionCard({ practice }: PracticeReflectionCardProps
 						</ul>
 					) : (
 						<p className="text-sm text-muted-foreground">
-							Nothing flagged as a strength here yet — keep going.
+							Nothing flagged as a strength here yet. Keep going.
 						</p>
 					)}
 				</section>

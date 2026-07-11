@@ -106,7 +106,13 @@ export function RosterTable({ entries, onSelectDeveloper }: RosterTableProps) {
 											))}
 										</div>
 									) : (
-										<span className="text-muted-foreground">—</span>
+										<span
+											className="text-muted-foreground"
+											role="img"
+											aria-label="No attention needed"
+										>
+											—
+										</span>
 									)}
 								</TableCell>
 							</TableRow>

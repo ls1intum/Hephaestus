@@ -54,7 +54,7 @@ export function PracticeOverviewPage({
 				<EmptyState
 					icon={AlertTriangle}
 					title="Couldn't load the practice overview"
-					description="Something went wrong fetching the cohort. This is usually temporary — try again."
+					description="Something went wrong fetching the cohort. This is usually temporary, so try again."
 					action={
 						onRetry ? (
 							<Button variant="outline" onClick={onRetry}>

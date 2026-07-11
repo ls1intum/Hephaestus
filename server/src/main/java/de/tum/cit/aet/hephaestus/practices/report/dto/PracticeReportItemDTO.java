@@ -24,8 +24,10 @@ public record PracticeReportItemDTO(
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
     @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
-    @NonNull @Schema(description = "The kind of work this is about (PR / issue)") WorkArtifact artifactType,
-    @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
+    @NonNull
+    @Schema(description = "The kind of work this is about (PR / issue / Slack conversation thread)")
+    WorkArtifact artifactType,
+    @NonNull @Schema(description = "Id of the PR / issue / conversation thread this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
 ) {
     public static PracticeReportItemDTO from(Observation observation, @Nullable String deliveredGuidance) {

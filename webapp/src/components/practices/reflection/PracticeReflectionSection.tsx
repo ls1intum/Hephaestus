@@ -53,7 +53,7 @@ export function PracticeReflectionSection({
 					<div className="flex flex-col gap-1">
 						<h2 className="text-xl font-semibold tracking-tight">My Practices</h2>
 						<p className="text-sm text-muted-foreground">
-							Recent feedback on your work — for your growth, not a score.
+							Recent feedback on your work, for your growth, not a score.
 						</p>
 					</div>
 					{!isLoading && !isError && items.length > 0 && (
@@ -75,7 +75,7 @@ export function PracticeReflectionSection({
 				<EmptyState
 					icon={AlertTriangle}
 					title="Couldn't load your practice feedback"
-					description="Something went wrong loading your reflection. This is usually temporary — try again."
+					description="Something went wrong loading your reflection. This is usually temporary, so try again."
 					action={
 						onRetry ? (
 							<Button variant="outline" onClick={onRetry}>
