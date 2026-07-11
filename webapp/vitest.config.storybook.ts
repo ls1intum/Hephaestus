@@ -30,6 +30,14 @@ export default defineConfig({
 			"@": path.resolve(dirname, "./src")
 		}
 	},
+	// Pre-transform the shared setup module: on cold CI runners the first suite's dynamic import of
+	// vitest.setup.ts intermittently races the vite server ("Failed to fetch dynamically imported
+	// module") and fails one random suite; warming it up removes the race.
+	server: {
+		warmup: {
+			clientFiles: ["./.storybook/vitest.setup.ts"]
+		}
+	},
 	test: {
 		name: "storybook",
 		// Parallel suite scheduling in browser mode deadlocks this run (~10 files in flight stall
