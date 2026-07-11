@@ -32,11 +32,19 @@ import org.springframework.transaction.annotation.Transactional;
  * Read-model service for practice reports. The reporting window opens at the previous review-cycle
  * boundary ({@code previousCycleWindow().after()}) and is open-ended to now — queries filter on
  * {@code since} only, so activity after the cycle's nominal close is included.
+ *
+ * <p><b>Scope (deliberate, P1):</b> the mentor-facing roster and cohort surfaces here are scoped to the
+ * single {@link #REVIEWING_PRACTICE_AREA_SLUG} area — the reviewer-craft practices, whose signal is the
+ * least individually sensitive to aggregate. The developer's own {@code /reports/me} reflection (in
+ * {@code ObservationService}) is NOT area-scoped: it already spans every practice. Broadening the mentor
+ * surface to the remaining areas (at an area-rollup grain, to keep the roster legible) is the tracked
+ * next step; the single-area coupling lives only in this constant and the two queries it feeds.
  */
 @Service
 @RequiredArgsConstructor
 public class PracticeReportService {
 
+    /** The one practice area the mentor roster + cohort cover today (see the class javadoc for why). */
     public static final String REVIEWING_PRACTICE_AREA_SLUG = "constructive-code-review";
 
     /** Minimum active developers before a cohort card exposes counts. */

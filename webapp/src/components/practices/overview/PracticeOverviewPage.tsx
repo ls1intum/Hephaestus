@@ -75,7 +75,7 @@ export function PracticeOverviewPage({
 			<header className="flex flex-col gap-1">
 				<h1 className="text-2xl font-bold tracking-tight">Practice Overview</h1>
 				<p className="text-sm text-muted-foreground">
-					A mentoring view of how the cohort is doing across practices. Not a ranking.
+					A mentoring view of how the cohort is doing on code-review practices. Not a ranking.
 				</p>
 			</header>
 
@@ -95,7 +95,7 @@ export function PracticeOverviewPage({
 						<EmptyState
 							icon={Radar}
 							title="No cohort activity yet"
-							description="Cohort health appears once developers have recent reviewed work."
+							description="Cohort health appears once enough developers have recent reviewed work."
 						/>
 					) : (
 						<div className="grid gap-4 sm:grid-cols-2">
