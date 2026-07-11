@@ -22,7 +22,10 @@ import org.jspecify.annotations.Nullable;
 @Table(
     name = "data_access_event",
     indexes = {
-        @Index(name = "idx_data_access_event_subject", columnList = "workspace_id, subject_user_id, resource_type"),
+        // Subject leads: "every disclosure about this person" (GDPR subject-access / erasure) is the query shape.
+        @Index(name = "idx_data_access_event_subject", columnList = "subject_user_id, workspace_id, resource_type"),
+        // Mirror GDPR query: "everything this actor disclosed" (account-erasure redaction UPDATE).
+        @Index(name = "idx_data_access_event_actor", columnList = "actor_user_id"),
     }
 )
 @Getter

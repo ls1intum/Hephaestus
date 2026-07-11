@@ -135,11 +135,13 @@
          roster) has no single subject; resource_type is CHECK-constrained to the two values the application
          writes today (mirrors the house convention: login_provider.type, observation.presence).
 
-         Indexes: idx_data_access_event_subject is a PARTIAL index on (subject_user_id, workspace_id,
-         resource_type) WHERE subject_user_id IS NOT NULL — subject_user_id leads because "every disclosure
-         about this person" (GDPR subject-access / erasure) is the query shape, and the WHERE clause excludes
-         the bulk-view rows (NULL subject) that can never be looked up this way. idx_data_access_event_actor on
-         actor_user_id serves the mirror GDPR query ("everything this actor disclosed").
+         Indexes: idx_data_access_event_subject on (subject_user_id, workspace_id, resource_type) —
+         subject_user_id leads because "every disclosure about this person" (GDPR subject-access / erasure)
+         is the query shape. A partial WHERE subject_user_id IS NOT NULL clause would be marginally smaller,
+         but JPA @Index cannot express it and the schema-drift gate diffs DDL against the entity annotations,
+         so the plain form is used (the table is low-write; the difference is negligible).
+         idx_data_access_event_actor on actor_user_id serves the mirror GDPR query ("everything this actor
+         disclosed").
 
          SECURITY — storage-layer append-only. A BEFORE UPDATE OR DELETE trigger RAISEs so the app cannot
          silently alter or erase a disclosure record. UPDATE is allowed only for the account-erasure redaction
@@ -180,11 +182,11 @@
             </column>
         </createTable>
         <sql>ALTER TABLE data_access_event ADD CONSTRAINT chk_data_access_event_resource_type CHECK (resource_type IN ('PRACTICE_REPORT', 'PRACTICE_ROSTER'))</sql>
-        <sql splitStatements="false"><![CDATA[
-            CREATE INDEX idx_data_access_event_subject
-                ON data_access_event (subject_user_id, workspace_id, resource_type)
-                WHERE subject_user_id IS NOT NULL;
-        ]]></sql>
+        <createIndex tableName="data_access_event" indexName="idx_data_access_event_subject">
+            <column name="subject_user_id"/>
+            <column name="workspace_id"/>
+            <column name="resource_type"/>
+        </createIndex>
         <createIndex tableName="data_access_event" indexName="idx_data_access_event_actor">
             <column name="actor_user_id"/>
         </createIndex>
