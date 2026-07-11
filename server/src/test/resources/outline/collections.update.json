@@ -1,0 +1,45 @@
+{
+  "id": "e38445d7-c9d8-4129-af0e-0127d9c1fc7b",
+  "event": "collections.update",
+  "actorId": "99bdd8e2-176a-42fa-ba0c-4f9c4ce6caa9",
+  "payload": {
+    "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
+    "model": {
+      "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
+      "url": "/collection/engineering-docs-j4Gxqv1NCn",
+      "data": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "text": "ADRs and design docs (fixture capture pass)",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      "icon": null,
+      "name": "Engineering Docs",
+      "sort": {
+        "field": "index",
+        "direction": "asc"
+      },
+      "color": "#4E5C6E",
+      "index": "8",
+      "urlId": "j4Gxqv1NCn",
+      "sharing": true,
+      "createdAt": "2026-07-10T10:01:13.654Z",
+      "deletedAt": null,
+      "updatedAt": "2026-07-11T05:23:26.641Z",
+      "archivedAt": null,
+      "commenting": null,
+      "permission": null,
+      "templateManagement": "admin"
+    }
+  },
+  "createdAt": "2026-07-11T05:23:26.677Z",
+  "webhookSubscriptionId": "451e2dc4-010e-44e7-8052-8537a3927ba8"
+}
