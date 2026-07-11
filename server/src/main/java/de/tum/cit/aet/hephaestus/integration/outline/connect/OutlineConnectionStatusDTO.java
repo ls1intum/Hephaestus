@@ -14,7 +14,12 @@ import org.jspecify.annotations.NonNull;
 @Schema(description = "Health of the workspace's active Outline connection")
 public record OutlineConnectionStatusDTO(
     @NonNull
-    @Schema(description = "Whether the Outline change-notification webhook subscription is registered")
+    @Schema(
+        description = "Whether a webhook subscription id is currently stored for this connection. This is " +
+            "existence only, not a liveness check: Outline auto-disables a subscription after repeated " +
+            "delivery failures, and a stale id here self-heals on the next reconcile rather than being " +
+            "verified live by this endpoint."
+    )
     Boolean webhookRegistered,
     @Schema(description = "When a mirrored collection last completed a full reconcile pass, if any")
     Instant lastSyncedAt,

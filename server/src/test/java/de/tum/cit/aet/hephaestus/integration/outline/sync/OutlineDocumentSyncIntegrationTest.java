@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
@@ -37,6 +38,7 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -340,6 +342,46 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(workspaceId, connectionId);
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> assertThat(r.isDeleted()).isFalse());
+    }
+
+    @Test
+    void versionColumn_engagesOptimisticLockingAgainstRealPostgres_andIncrementsOnEveryWrite() {
+        // The lost-update the @Version column guards against is a webhook refreshDocument and a mid-flight
+        // reconcile upsert (each its own REQUIRES_NEW transaction, unserialized per workspace) both doing a
+        // full-column save of the SAME row. The service's retry-once RECOVERY from that conflict is pinned
+        // deterministically by OutlineDocumentSyncServiceTest (mock save throws once then succeeds). What
+        // only real Postgres can prove — and what this test pins — is that the column is actually wired:
+        // the NOT NULL DEFAULT 0 lands, the version increments on every write, and a stale-snapshot save
+        // genuinely raises ObjectOptimisticLockingFailureException rather than silently clobbering.
+        stubCollection(List.of(DOC_ONE), T1, T1);
+        scheduler.syncAllNow();
+
+        OutlineDocument afterFirstSync = documentById(DOC_ONE);
+        assertThat(afterFirstSync.getVersion()).isZero(); // NOT NULL DEFAULT 0 on the fresh insert
+
+        // A real re-export (upstream updatedAt moves) is a full-column save — the version must advance.
+        stubCollection(List.of(DOC_ONE), T2, T2);
+        when(outlineApiClient.exportDocument(anyString(), anyString(), eq(DOC_ONE))).thenReturn("# Alpha v2");
+        scheduler.syncAllNow();
+        assertThat(documentById(DOC_ONE).getVersion()).isGreaterThan(0L);
+
+        // Two independent detached snapshots at the same version model the two concurrent writers. The
+        // first save wins and bumps the version; the second, now stale, must be rejected by the optimistic
+        // lock — the exact StaleObjectState the service's saveDocument catches and retries.
+        OutlineDocument staleSnapshot = documentById(DOC_ONE);
+        OutlineDocument winner = documentById(DOC_ONE);
+        assertThat(staleSnapshot.getVersion()).isEqualTo(winner.getVersion());
+
+        winner.setBodyMarkdown("# concurrent winner");
+        documentRepository.saveAndFlush(winner);
+
+        staleSnapshot.setTitle("stale writer's title");
+        assertThatThrownBy(() -> documentRepository.saveAndFlush(staleSnapshot)).isInstanceOf(
+            ObjectOptimisticLockingFailureException.class
+        );
+
+        // The winner's write survived; the stale write was rejected, not silently merged.
+        assertThat(documentById(DOC_ONE).getBodyMarkdown()).isEqualTo("# concurrent winner");
     }
 
     private OutlineCollection onlyCollection() {

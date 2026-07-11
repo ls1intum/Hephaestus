@@ -7,11 +7,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -50,6 +52,19 @@ public class OutlineDocument {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /**
+     * Optimistic-lock guard. A webhook-triggered {@code refreshDocument} and a mid-flight full reconcile's
+     * per-document upsert both run in their own {@code REQUIRES_NEW} transaction with nothing serializing
+     * them per-workspace, so they CAN race the SAME row (e.g. a document edited right as the 6h reconcile
+     * reaches its collection). Without a version column, both writers do a full-column save and the loser's
+     * commit silently clobbers the winner's — a lost update. {@code OutlineDocumentSyncService} retries a
+     * losing write once against the row's current version before giving up to the next reconcile.
+     */
+    @Version
+    @ColumnDefault("0")
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;
@@ -107,6 +122,17 @@ public class OutlineDocument {
     /**
      * Outline user id (UUID) of the document's creator — authorship substrate. Subjects join
      * {@code identity_link} lazily at projection time; no member id is stamped here.
+     *
+     * <p><strong>Account-erasure posture.</strong> The author subject/name columns are integration-mirror
+     * data, NOT Hephaestus account PII: they are captured from Outline's own {@code Document.createdBy}
+     * and are on the same GDPR Art. 17(3) footing as the SCM activity mirror ({@code
+     * integration.scm.domain.user.User}) that {@code AccountHardDeleteSweeper} documents. An account
+     * hard-delete severs the personal ↔ mirror association by deleting {@code identity_link} (so the
+     * Outline subject can no longer be joined back to the erased account) rather than scrubbing every
+     * workspace's mirror — the same posture Slack's ingested content follows (its person-erasure fires on
+     * Slack-side consent revocation / opt-out, not on account hard-delete). Full erasure of these columns
+     * happens with the workspace/connection purge and on tombstone. Adding an Outline-only account-erasure
+     * hook would diverge from that established repo-wide posture, so it is deliberately not done here.
      */
     @Column(name = "created_by_subject", length = 64)
     private @Nullable String createdBySubject;

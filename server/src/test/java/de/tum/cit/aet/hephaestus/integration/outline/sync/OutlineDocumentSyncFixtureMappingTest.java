@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import jakarta.persistence.EntityManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -81,6 +82,9 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
+    @Mock
+    private EntityManager entityManager;
+
     private OutlineCollection collection;
 
     private OutlineDocumentSyncService service() {
@@ -95,7 +99,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             documentRepository,
             collectionRepository,
             webhookRegistrar,
-            properties
+            properties,
+            entityManager
         );
     }
 
@@ -116,10 +121,10 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             .thenReturn(List.of());
         lenient().when(documentRepository.sumBodySizeByWorkspaceId(WORKSPACE)).thenReturn(0L);
         lenient()
-            .when(documentRepository.save(any()))
+            .when(documentRepository.saveAndFlush(any()))
             .thenAnswer(inv -> inv.getArgument(0));
         lenient()
-            .when(collectionRepository.save(any()))
+            .when(collectionRepository.saveAndFlush(any()))
             .thenAnswer(inv -> inv.getArgument(0));
 
         collection = new OutlineCollection();
@@ -224,7 +229,9 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
     private OutlineDocument savedDocument(String documentId) {
         ArgumentCaptor<OutlineDocument> captor = ArgumentCaptor.forClass(OutlineDocument.class);
-        org.mockito.Mockito.verify(documentRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        org.mockito.Mockito.verify(documentRepository, org.mockito.Mockito.atLeastOnce()).saveAndFlush(
+            captor.capture()
+        );
         return captor
             .getAllValues()
             .stream()

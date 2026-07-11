@@ -9,10 +9,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.jspecify.annotations.Nullable;
@@ -58,6 +60,20 @@ public class OutlineCollection {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /**
+     * Optimistic-lock guard. This row has two concurrent writers: the admin PATCH (state ENABLED/PAUSED)
+     * and the sync passes (catalog refresh, per-collection bookkeeping — {@code lastSyncError},
+     * {@code documentsSyncedThrough}/{@code documentsSyncedAt}, coverage counters). A registration or a
+     * PAUSED→ENABLED resume kicks a sync off the request thread, so the admin write and the kicked sync's
+     * write can land close enough in time to race the SAME row; a full-column save from the loser would
+     * otherwise silently clobber the winner's field. {@code OutlineDocumentSyncService} logs and skips a
+     * lost race on the sync side — the next pass reconciles the row regardless.
+     */
+    @Version
+    @ColumnDefault("0")
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;

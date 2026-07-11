@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRep
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
+import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -99,6 +100,7 @@ public class OutlineDocumentSyncService {
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineWebhookRegistrar webhookRegistrar;
     private final OutlineProperties properties;
+    private final EntityManager entityManager;
 
     public OutlineDocumentSyncService(
         ConnectionService connectionService,
@@ -106,7 +108,8 @@ public class OutlineDocumentSyncService {
         OutlineDocumentRepository documentRepository,
         OutlineCollectionRepository collectionRepository,
         OutlineWebhookRegistrar webhookRegistrar,
-        OutlineProperties properties
+        OutlineProperties properties,
+        EntityManager entityManager
     ) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
@@ -114,6 +117,7 @@ public class OutlineDocumentSyncService {
         this.collectionRepository = collectionRepository;
         this.webhookRegistrar = webhookRegistrar;
         this.properties = properties;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -141,7 +145,7 @@ public class OutlineDocumentSyncService {
                 if (!live.containsKey(collection.getCollectionId())) {
                     // Visibility loss ≠ deletion: never tombstone documents we merely cannot see.
                     collection.setLastSyncError("Collection is no longer visible to the integration token");
-                    collectionRepository.save(collection);
+                    OutlineOptimisticSave.saveCollection(collectionRepository, entityManager, collection);
                     continue;
                 }
                 if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
@@ -280,7 +284,7 @@ public class OutlineDocumentSyncService {
                 .filter(d -> !d.isDeleted())
                 .ifPresent(d -> {
                     d.setArchivedAt(Instant.now());
-                    documentRepository.save(d);
+                    OutlineOptimisticSave.saveDocument(documentRepository, entityManager, d);
                 });
             return;
         }
@@ -349,7 +353,7 @@ public class OutlineDocumentSyncService {
                         }
                     }
                     collection.setLastSyncError("Collection was deleted in Outline");
-                    collectionRepository.save(collection);
+                    OutlineOptimisticSave.saveCollection(collectionRepository, entityManager, collection);
                 });
             return;
         }
@@ -387,7 +391,7 @@ public class OutlineDocumentSyncService {
             row.setColor(upstream.color());
             row.setIcon(upstream.icon());
             row.setDescription(truncate(upstream.description(), MAX_DESCRIPTION_LENGTH));
-            collectionRepository.save(row);
+            OutlineOptimisticSave.saveCollection(collectionRepository, entityManager, row);
         }
         return live;
     }
@@ -412,8 +416,17 @@ public class OutlineDocumentSyncService {
             throw e;
         } catch (OutlineApiException e) {
             String message = e.getMessage() == null ? "Outline API call failed" : e.getMessage();
+            // Unlike the catalog-refresh failure above (cosmetic, so only logged), a per-collection sync
+            // failure is a real gap in the mirror — log it so ops has a trace without having to inspect
+            // the DB, in addition to the lastSyncError the admin surface already reads.
+            log.warn(
+                "outline.sync: collection sync failed for workspaceId={}, collectionId={}: {}",
+                ctx.workspaceId(),
+                collection.getCollectionId(),
+                message
+            );
             collection.setLastSyncError(truncate(message, MAX_ERROR_LENGTH));
-            collectionRepository.save(collection);
+            OutlineOptimisticSave.saveCollection(collectionRepository, entityManager, collection);
             return false;
         }
     }
@@ -485,7 +498,7 @@ public class OutlineDocumentSyncService {
         collection.setExportsSkippedForBudget(skippedForBudget);
         if (skippedForBudget > 0) {
             collection.setSyncStatus(SyncStatus.PENDING);
-            collectionRepository.save(collection);
+            OutlineOptimisticSave.saveCollection(collectionRepository, entityManager, collection);
             return;
         }
         int tombstoned = tombstoneVanished(existing, collectionId, seen, now);
@@ -503,7 +516,7 @@ public class OutlineDocumentSyncService {
         collection.setDocumentsSyncedAt(now);
         collection.setSyncStatus(SyncStatus.COMPLETE);
         collection.setLastSyncError(null);
-        collectionRepository.save(collection);
+        OutlineOptimisticSave.saveCollection(collectionRepository, entityManager, collection);
     }
 
     /**
@@ -561,7 +574,7 @@ public class OutlineDocumentSyncService {
         }
         if (unchanged) {
             // Metadata may have shifted (renamed/moved) but the body is current — do not re-export.
-            documentRepository.save(doc);
+            OutlineOptimisticSave.saveDocument(documentRepository, entityManager, doc);
             existing.put(documentId, doc);
             return UpsertOutcome.UNCHANGED;
         }
@@ -585,7 +598,7 @@ public class OutlineDocumentSyncService {
         }
         doc.setDeletedAt(null); // revive a previously tombstoned document that reappeared upstream
         doc.setLastMaterializedAt(now);
-        documentRepository.save(doc);
+        OutlineOptimisticSave.saveDocument(documentRepository, entityManager, doc);
         existing.put(documentId, doc);
         return UpsertOutcome.EXPORTED;
     }
@@ -683,7 +696,7 @@ public class OutlineDocumentSyncService {
             );
             doc.setLastMaterializedAt(now);
         }
-        documentRepository.save(doc);
+        OutlineOptimisticSave.saveDocument(documentRepository, entityManager, doc);
         existing.put(documentId, doc);
         return true;
     }
@@ -721,7 +734,7 @@ public class OutlineDocumentSyncService {
         doc.setUpdatedBySubject(null);
         doc.setUpdatedByName(null);
         doc.setCollaboratorSubjects(null);
-        documentRepository.save(doc);
+        OutlineOptimisticSave.saveDocument(documentRepository, entityManager, doc);
     }
 
     /**

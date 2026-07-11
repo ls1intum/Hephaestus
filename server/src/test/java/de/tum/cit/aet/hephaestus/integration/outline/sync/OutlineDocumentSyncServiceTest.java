@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import jakarta.persistence.EntityManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -37,6 +39,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Unit coverage for the sync paths the real-Postgres integration test cannot cheaply pin: the export
@@ -50,6 +53,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     private static final long CONNECTION = 7L;
     private static final String SERVER_URL = "https://outline.example.test";
     private static final String COLLECTION_ID = "col-1";
+    private static final String COLLECTION_ID_B = "col-2";
     private static final Instant T1 = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant T2 = Instant.parse("2026-02-01T00:00:00Z");
 
@@ -71,6 +75,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
+    @Mock
+    private EntityManager entityManager;
+
     private OutlineCollection collection;
 
     private OutlineDocumentSyncService service(int exportBudget) {
@@ -89,7 +96,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             documentRepository,
             collectionRepository,
             webhookRegistrar,
-            properties
+            properties,
+            entityManager
         );
     }
 
@@ -110,10 +118,10 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenReturn(List.of());
         lenient().when(documentRepository.sumBodySizeByWorkspaceId(WORKSPACE)).thenReturn(0L);
         lenient()
-            .when(documentRepository.save(any()))
+            .when(documentRepository.saveAndFlush(any()))
             .thenAnswer(inv -> inv.getArgument(0));
         lenient()
-            .when(collectionRepository.save(any()))
+            .when(collectionRepository.saveAndFlush(any()))
             .thenAnswer(inv -> inv.getArgument(0));
 
         collection = new OutlineCollection();
@@ -324,7 +332,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         service(10).refreshDocument(WORKSPACE, "documents.archive", "doc-1");
 
-        verify(documentRepository, never()).save(any());
+        verify(documentRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -365,7 +373,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         verify(outlineApiClient, never()).getDocumentInfo(anyString(), anyString(), anyString());
         verify(outlineApiClient).exportDocument(SERVER_URL, "token", "doc-1");
-        verify(documentRepository).save(
+        verify(documentRepository).saveAndFlush(
             org.mockito.ArgumentMatchers.argThat(
                 d -> "doc-1".equals(d.getDocumentId()) && "# fresh".equals(d.getBodyMarkdown())
             )
@@ -457,7 +465,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).syncWorkspace(WORKSPACE);
 
         verify(outlineApiClient).exportDocument(SERVER_URL, "token", "doc-archived");
-        verify(documentRepository).save(
+        verify(documentRepository).saveAndFlush(
             org.mockito.ArgumentMatchers.argThat(
                 d -> "doc-archived".equals(d.getDocumentId()) && "# backfilled".equals(d.getBodyMarkdown())
             )
@@ -510,7 +518,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).refreshDocument(WORKSPACE, "documents.update", "doc-x");
 
         verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
-        verify(documentRepository, never()).save(any());
+        verify(documentRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -526,7 +534,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
 
-        verify(documentRepository).save(
+        verify(documentRepository).saveAndFlush(
             org.mockito.ArgumentMatchers.argThat(
                 d -> "doc-1".equals(d.getDocumentId()) && "# fresh".equals(d.getBodyMarkdown())
             )
@@ -551,7 +559,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
 
-        verify(documentRepository).save(
+        verify(documentRepository).saveAndFlush(
             org.mockito.ArgumentMatchers.argThat(d -> "setup-guide-psUl8qCles".equals(d.getSlug()))
         );
     }
@@ -573,7 +581,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
 
-        verify(documentRepository).save(org.mockito.ArgumentMatchers.argThat(d -> "doc-1".equals(d.getSlug())));
+        verify(documentRepository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(d -> "doc-1".equals(d.getSlug())));
     }
 
     @Test
@@ -716,5 +724,193 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         verify(outlineApiClient, never()).listCollections(anyString(), anyString());
         verify(outlineApiClient, never()).listDocuments(anyString(), anyString(), anyString());
+    }
+
+    // --- failure-path coverage: multi-collection partial failure, rate limits beyond syncWorkspace ---
+
+    @Test
+    void syncWorkspace_multiCollectionPartialFailure_collectionBStillSyncsWhileACarriesTheError() {
+        OutlineCollection collectionB = new OutlineCollection();
+        collectionB.setWorkspaceId(WORKSPACE);
+        collectionB.setConnectionId(CONNECTION);
+        collectionB.setCollectionId(COLLECTION_ID_B);
+        collectionB.setState(MirrorState.ENABLED);
+        collectionB.setSyncStatus(SyncStatus.PENDING);
+
+        when(collectionRepository.findForSync(WORKSPACE, CONNECTION, MirrorState.ENABLED)).thenReturn(
+            List.of(collection, collectionB)
+        );
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE)).thenReturn(
+            List.of(collection, collectionB)
+        );
+        when(outlineApiClient.listCollections(SERVER_URL, "token")).thenReturn(
+            List.of(
+                new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null),
+                new OutlineCollectionListResponse.Collection(COLLECTION_ID_B, "Eng", "col2", null, null, null)
+            )
+        );
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenThrow(
+            new OutlineApiException("collection A is unreachable")
+        );
+        when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID_B)).thenReturn(List.of());
+        when(outlineApiClient.listArchivedDocuments(SERVER_URL, "token", COLLECTION_ID_B)).thenReturn(List.of());
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID_B)).thenReturn(
+            List.of(meta("doc-b", T1))
+        );
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-b")).thenReturn("# b body");
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        // The service's own documented resilience claim: one collection's API failure never blocks the rest.
+        assertThat(collection.getLastSyncError()).isEqualTo("collection A is unreachable");
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING); // never reached a clean pass
+        assertThat(collectionB.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collectionB.getLastSyncError()).isNull();
+    }
+
+    @Test
+    void syncPendingCollections_rateLimit_abortsThePassWithoutMarkingComplete() {
+        when(
+            collectionRepository.findByWorkspaceIdAndStateAndSyncStatus(
+                WORKSPACE,
+                MirrorState.ENABLED,
+                SyncStatus.PENDING
+            )
+        ).thenReturn(List.of(collection));
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenThrow(
+            new OutlineRateLimitedException(Duration.ofSeconds(30), null)
+        );
+
+        service(10).syncPendingCollections(WORKSPACE);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        assertThat(collection.getDocumentsSyncedAt()).isNull();
+        // The rate limit aborts before the size-cap enforcement runs too.
+        verify(documentRepository, never()).findEvictionCandidates(anyLong());
+    }
+
+    @Test
+    void syncCollection_rateLimit_abortsWithoutMarkingComplete() {
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenThrow(
+            new OutlineRateLimitedException(Duration.ofSeconds(30), null)
+        );
+
+        service(10).syncCollection(WORKSPACE, COLLECTION_ID);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        assertThat(collection.getDocumentsSyncedAt()).isNull();
+    }
+
+    // --- optimistic-lock retry: a webhook refresh and a mid-flight reconcile racing the SAME row ---
+
+    @Test
+    void refreshDocument_optimisticLockConflict_retriesOnceThenSucceeds() {
+        OutlineDocument row = mirrored("doc-1");
+        row.setId(99L);
+        row.setVersion(0L);
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.of(row));
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        // The row a concurrent writer (a full reconcile or another webhook delivery) committed in between
+        // our read and our write.
+        OutlineDocument currentInDb = mirrored("doc-1");
+        currentInDb.setId(99L);
+        currentInDb.setVersion(5L);
+        when(documentRepository.findById(99L)).thenReturn(Optional.of(currentInDb));
+        when(documentRepository.saveAndFlush(any()))
+            .thenThrow(new ObjectOptimisticLockingFailureException(OutlineDocument.class, 99L))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
+
+        verify(documentRepository, times(2)).saveAndFlush(any());
+        verify(entityManager).detach(row);
+        assertThat(row.getVersion()).isEqualTo(5L); // adopted the current version before the retry
+        assertThat(row.getBodyMarkdown()).isEqualTo("# fresh"); // this pass's write was NOT lost
+    }
+
+    @Test
+    void refreshDocument_optimisticLockConflict_bothAttemptsFail_logsAndSkipsWithoutThrowing() {
+        OutlineDocument row = mirrored("doc-1");
+        row.setId(99L);
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.of(row));
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+
+        OutlineDocument currentInDb = mirrored("doc-1");
+        currentInDb.setId(99L);
+        currentInDb.setVersion(5L);
+        when(documentRepository.findById(99L)).thenReturn(Optional.of(currentInDb));
+        when(documentRepository.saveAndFlush(any())).thenThrow(
+            new ObjectOptimisticLockingFailureException(OutlineDocument.class, 99L)
+        );
+
+        // The second conflict must be swallowed (logged + skipped) — never escape and abort the caller.
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+            service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1")
+        );
+
+        verify(documentRepository, times(2)).saveAndFlush(any());
+    }
+
+    @Test
+    void refreshDocument_optimisticLockConflict_rowVanishedDuringRetry_skipsWithoutThrowing() {
+        OutlineDocument row = mirrored("doc-1");
+        row.setId(99L);
+        when(
+            documentRepository.findByWorkspaceIdAndConnectionIdAndDocumentId(WORKSPACE, CONNECTION, "doc-1")
+        ).thenReturn(Optional.of(row));
+        when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
+        when(
+            collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WORKSPACE, CONNECTION, COLLECTION_ID)
+        ).thenReturn(Optional.of(collection));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
+        // The row was hard-deleted (e.g. collection removed from the mirror) between our conflict and our retry.
+        when(documentRepository.findById(99L)).thenReturn(Optional.empty());
+        when(documentRepository.saveAndFlush(any())).thenThrow(
+            new ObjectOptimisticLockingFailureException(OutlineDocument.class, 99L)
+        );
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+            service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1")
+        );
+
+        verify(documentRepository, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    void syncWorkspace_collectionOptimisticLockConflict_retriesOnceThenSucceeds() {
+        collection.setId(55L);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of());
+
+        OutlineCollection currentInDb = new OutlineCollection();
+        currentInDb.setWorkspaceId(WORKSPACE);
+        currentInDb.setConnectionId(CONNECTION);
+        currentInDb.setCollectionId(COLLECTION_ID);
+        currentInDb.setId(55L);
+        currentInDb.setVersion(3L);
+        when(collectionRepository.findById(55L)).thenReturn(Optional.of(currentInDb));
+        when(collectionRepository.saveAndFlush(any()))
+            .thenThrow(new ObjectOptimisticLockingFailureException(OutlineCollection.class, 55L))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getVersion()).isEqualTo(3L);
     }
 }
