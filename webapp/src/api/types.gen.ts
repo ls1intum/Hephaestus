@@ -1363,11 +1363,11 @@ export type PracticeReportSummary = {
  */
 export type PracticeReportItem = {
     /**
-     * Id of the PR / issue this is about
+     * Id of the PR / issue / conversation thread this is about
      */
     artifactId: number;
     /**
-     * The kind of work this is about (PR / issue)
+     * The kind of work this is about (PR / issue / Slack conversation thread)
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
     /**

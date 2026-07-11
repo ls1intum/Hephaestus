@@ -5589,10 +5589,11 @@ components:
         artifactId:
           type: integer
           format: int64
-          description: Id of the PR / issue this is about
+          description: Id of the PR / issue / conversation thread this is about
         artifactType:
           type: string
-          description: The kind of work this is about (PR / issue)
+          description: The kind of work this is about (PR / issue / Slack conversation
+            thread)
           enum:
           - PULL_REQUEST
           - ISSUE
