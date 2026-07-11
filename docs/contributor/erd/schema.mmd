@@ -611,6 +611,7 @@ erDiagram
         INTEGER documents_upstream
         INTEGER exports_skipped_for_budget
         VARCHAR(2048) description
+        BIGINT version "NOT NULL"
     }
 
     OutlineDocument {
@@ -638,6 +639,7 @@ erDiagram
         JSONB collaborator_subjects
         TIMESTAMPTZ body_evicted_at
         TIMESTAMPTZ archived_at
+        BIGINT version "NOT NULL"
     }
 
     OutlineDocumentEvent {
