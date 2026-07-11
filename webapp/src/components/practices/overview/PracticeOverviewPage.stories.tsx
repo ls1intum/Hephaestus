@@ -1,30 +1,35 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn, userEvent, within } from "storybook/test";
-import type { CohortPracticeStatus, PracticeReportSummary } from "@/api/types.gen";
+import type { CohortAreaStatus, PracticeReportSummary } from "@/api/types.gen";
 import { PracticeOverviewPage } from "./PracticeOverviewPage";
 
-const cohort: CohortPracticeStatus[] = [
+const cohort: CohortAreaStatus[] = [
 	{
-		name: "Clear PR description",
-		slug: "clear-pr",
+		areaName: "Clear PR description",
+		areaSlug: "clear-pr",
 		strengthCount: 6,
 		developingCount: 3,
 		mixedCount: 2,
 		noActivityCount: 4,
 	},
 	{
-		name: "Small PRs",
-		slug: "small-prs",
+		areaName: "Small PRs",
+		areaSlug: "small-prs",
 		strengthCount: 8,
 		developingCount: 1,
 		mixedCount: 0,
 		noActivityCount: 6,
 	},
 	{
-		name: "Reproduce before fixing",
-		slug: "repro-first",
+		areaName: "Reproduce before fixing",
+		areaSlug: "repro-first",
 		suppressed: true,
+	},
+	{
+		areaName: "Security awareness",
+		areaSlug: "security",
+		noData: true,
 	},
 ];
 
@@ -37,8 +42,13 @@ const roster: PracticeReportSummary[] = [
 		needsAttention: true,
 		attentionReasons: ["Clear PR description: gaps to work on this cycle"],
 		standings: [
-			{ name: "Clear PR description", slug: "clear-pr", standing: "DEVELOPING" },
-			{ name: "Small PRs", slug: "small-prs", standing: "NO_ACTIVITY" },
+			{
+				areaName: "Clear PR description",
+				areaSlug: "clear-pr",
+				status: "DEVELOPING",
+				trend: "STEADY",
+			},
+			{ areaName: "Small PRs", areaSlug: "small-prs", status: "NO_ACTIVITY", trend: "STEADY" },
 		],
 	},
 	{
@@ -49,8 +59,13 @@ const roster: PracticeReportSummary[] = [
 		needsAttention: false,
 		attentionReasons: [],
 		standings: [
-			{ name: "Clear PR description", slug: "clear-pr", standing: "STRENGTH" },
-			{ name: "Small PRs", slug: "small-prs", standing: "MIXED" },
+			{
+				areaName: "Clear PR description",
+				areaSlug: "clear-pr",
+				status: "STRENGTH",
+				trend: "IMPROVING",
+			},
+			{ areaName: "Small PRs", areaSlug: "small-prs", status: "MIXED", trend: "STEADY" },
 		],
 	},
 ];
@@ -78,10 +93,23 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const CohortHealth: Story = {};
+export const CohortHealth: Story = {
+	play: async ({ canvasElement }) => {
+		// The suppressed area and the no-data area render distinct, honest messages side by side.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Not enough recent activity to show this safely.")).toBeVisible();
+		await expect(canvas.getByText("No activity in this area yet.")).toBeVisible();
+	},
+};
 
 export const Roster: Story = {
 	args: { cohort: [], roster },
+	play: async ({ canvasElement }) => {
+		// Switch to the Roster tab, then confirm a trend glyph renders for Aaron's improving area.
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("tab", { name: "Roster" }));
+		await expect(canvas.getByRole("img", { name: "improving" })).toBeVisible();
+	},
 };
 
 export const Loading: Story = {

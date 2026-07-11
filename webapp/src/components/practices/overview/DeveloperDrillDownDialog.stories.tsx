@@ -17,7 +17,14 @@ const developer: PracticeReportSummary = {
 	avatarUrl: "",
 	needsAttention: true,
 	attentionReasons: ["Clear PR description: gaps to work on this cycle"],
-	standings: [{ name: "Clear PR description", slug: "clear-pr", standing: "DEVELOPING" }],
+	standings: [
+		{
+			areaName: "Clear PR description",
+			areaSlug: "clear-pr",
+			status: "DEVELOPING",
+			trend: "STEADY",
+		},
+	],
 };
 
 const cards: PracticeReportCard[] = [
@@ -25,6 +32,7 @@ const cards: PracticeReportCard[] = [
 		name: "Clear PR description",
 		slug: "clear-pr",
 		standing: "DEVELOPING",
+		trend: "IMPROVING",
 		whyItMatters: "Reviewers need the intent, not just the diff.",
 		strengths: [],
 		toWorkOn: [
@@ -78,6 +86,8 @@ export const Loaded: Story = {
 	play: async () => {
 		await screen.findByRole("dialog");
 		await expect(screen.getByRole("heading", { name: cards[0].name })).toBeInTheDocument();
+		// The drill-down reuses PracticeReflectionCard, so the trend note renders here too.
+		await expect(screen.getByText("Improving since last cycle")).toBeInTheDocument();
 	},
 };
 

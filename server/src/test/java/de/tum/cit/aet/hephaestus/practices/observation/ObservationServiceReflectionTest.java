@@ -76,6 +76,15 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         when(reviewCycleWindowResolver.previousCycleWindow(any())).thenReturn(
             new ReviewCycleWindowResolver.CycleWindow(Instant.now().minusSeconds(604800), Instant.now())
         );
+        // Trend computation needs a prior-cycle window too; the prior-standing query itself is unstubbed
+        // (Mockito's default answer returns an empty list), so every card in these tests defaults to a NEW
+        // trend — irrelevant here since none of these tests assert on trend.
+        when(reviewCycleWindowResolver.priorCycleWindow(any())).thenReturn(
+            new ReviewCycleWindowResolver.CycleWindow(
+                Instant.now().minusSeconds(1209600),
+                Instant.now().minusSeconds(604800)
+            )
+        );
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {

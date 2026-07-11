@@ -11,6 +11,7 @@ const SAMPLE_PRACTICE: PracticeReportCard = {
 	areaName: "Pull requests",
 	slug: "clear-pr-description",
 	standing: "DEVELOPING",
+	trend: "STEADY",
 	whyItMatters:
 		"A clear description helps reviewers understand the change quickly and gives future readers the context behind it.",
 	strengths: [

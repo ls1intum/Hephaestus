@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.audit.DataAccessAuditWriter;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.ProblemDetailSchema;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
-import de.tum.cit.aet.hephaestus.practices.report.dto.CohortPracticeStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.CohortAreaStatusDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportSummaryDTO;
 import de.tum.cit.aet.hephaestus.workspace.CohortVisibility;
@@ -43,14 +43,16 @@ public class PracticeReportController {
     private final DataAccessAuditWriter dataAccessAuditWriter;
 
     /**
-     * Report roster: one summary per developer-with-activity — their per-practice status and a
-     * needs-attention triage flag. ADMIN or OWNER only (it names individuals); members receive 403.
+     * Report roster: one summary per developer-with-activity — their per-AREA status (rolled up across all
+     * practice areas) and a needs-attention triage flag. ADMIN or OWNER only (it names individuals); members
+     * receive 403.
      */
     @GetMapping("/reports")
     @Operation(
         summary = "List developer practice reports (admin/owner only)",
-        description = "One summary per developer with activity in the window: per-practice status + a " +
-            "needs-attention triage flag. Sorted needs-attention-first then login. Not a scoreboard — no score/rank."
+        description = "One summary per developer with activity in the window: per-area status (rolled up across " +
+            "that area's practices, with a cycle-over-cycle trend) + a needs-attention triage flag. Sorted " +
+            "needs-attention-first then login. Not a scoreboard — no score/rank."
     )
     @ApiResponse(
         responseCode = "200",
@@ -146,20 +148,22 @@ public class PracticeReportController {
     }
 
     /**
-     * Cohort practice status per reviewing practice (k-anonymised, never per-person). Visibility follows the
+     * Cohort practice status per practice AREA (k-anonymised, never per-person). Visibility follows the
      * workspace's {@link CohortVisibility}: admins/owners always; regular members only when it is
      * {@link CohortVisibility#EVERYONE}; otherwise 403.
      */
     @GetMapping("/cohort")
     @Operation(
         summary = "Cohort practice status",
-        description = "Per reviewing practice, how many developers stand at each status (k-anonymised, K=5 with small-bucket suppression). " +
-            "Admins/owners always; members only when the workspace cohort visibility is EVERYONE."
+        description = "Per practice area, how many developers stand at each status (k-anonymised, K=5 with " +
+            "small-bucket suppression). An area with zero active developers is marked no-data rather than " +
+            "suppressed — there is nobody to re-identify. Admins/owners always; members only when the workspace " +
+            "cohort visibility is EVERYONE."
     )
     @ApiResponse(
         responseCode = "200",
         description = "Cohort status cards returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = CohortPracticeStatusDTO.class)))
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = CohortAreaStatusDTO.class)))
     )
     @ApiResponse(
         responseCode = "403",
@@ -167,7 +171,7 @@ public class PracticeReportController {
         content = @Content(schema = @Schema(implementation = ProblemDetailSchema.class))
     )
     @SecurityRequirements
-    public ResponseEntity<List<CohortPracticeStatusDTO>> getCohortPracticeStatus(WorkspaceContext workspaceContext) {
+    public ResponseEntity<List<CohortAreaStatusDTO>> getCohortPracticeStatus(WorkspaceContext workspaceContext) {
         if (!canViewCohort(workspaceContext)) {
             throw new AccessForbiddenException("Not permitted to view the cohort status for this workspace");
         }

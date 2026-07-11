@@ -1,5 +1,6 @@
-import type { PracticeReportSummary, PracticeStatusCell } from "@/api/types.gen";
+import type { AreaStandingCell, PracticeReportSummary } from "@/api/types.gen";
 import { StandingChip } from "@/components/practices/StandingChip";
+import { TrendGlyph } from "@/components/practices/TrendBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,7 +13,23 @@ import {
 } from "@/components/ui/table";
 import { getInitials } from "@/lib/avatar";
 
-type Standing = PracticeStatusCell["standing"];
+type Standing = AreaStandingCell["status"];
+
+// Presentation-only ordering within one developer's row of area chips — never a reorder of
+// developers. Areas that need a mentor's attention float to the front; a clean STRENGTH area and an
+// area with no activity yet carry the least urgency, so they settle to the end.
+const AREA_ATTENTION_PRIORITY: Record<Standing, number> = {
+	DEVELOPING: 0,
+	MIXED: 1,
+	STRENGTH: 2,
+	NO_ACTIVITY: 3,
+};
+
+function sortForAttention(standings: AreaStandingCell[]): AreaStandingCell[] {
+	return [...standings].sort(
+		(a, b) => AREA_ATTENTION_PRIORITY[a.status] - AREA_ATTENTION_PRIORITY[b.status],
+	);
+}
 
 function StandingCell({ standing }: { standing: Standing }) {
 	// NO_ACTIVITY renders as a muted em dash; the three active standings share the one StandingChip.
@@ -35,29 +52,27 @@ export interface RosterTableProps {
  * The mentor roster. Rows are rendered in SERVER ORDER (needs-attention-then-alphabetical) and are
  * never re-sorted client-side. There is deliberately NO score, rank, position, or numeric column —
  * only criterion-referenced standing chips and an attention triage flag.
+ *
+ * There are ~12 practice areas per developer, so a 12-column matrix (one column per area) would force
+ * either horizontal scrolling or illegibly narrow columns. Instead each developer gets ONE wrapping
+ * row of compact "area name + standing chip" pairs — legible at any width, and it reads well on small
+ * screens without a scrollbar. Areas that need attention are ordered first within the row (see
+ * `sortForAttention`); this never reorders developers, only the chips inside a single row.
  */
 export function RosterTable({ entries, onSelectDeveloper }: RosterTableProps) {
-	// Column set = the reviewing practices, taken from the first entry that has them. The server
-	// returns the same practice set (in the same order) for every developer.
-	const practiceColumns = entries.find((entry) => entry.standings.length > 0)?.standings ?? [];
-
 	return (
 		<div className="overflow-x-auto rounded-md border">
 			<Table>
 				<TableHeader>
 					<TableRow>
 						<TableHead className="min-w-48">Developer</TableHead>
-						{practiceColumns.map((practice) => (
-							<TableHead key={practice.slug} className="whitespace-nowrap">
-								{practice.name}
-							</TableHead>
-						))}
+						<TableHead>Practice areas</TableHead>
 						<TableHead>Attention</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{entries.map((entry) => {
-						const standingBySlug = new Map(entry.standings.map((cell) => [cell.slug, cell]));
+						const orderedStandings = sortForAttention(entry.standings);
 						return (
 							<TableRow
 								key={entry.userLogin}
@@ -88,14 +103,17 @@ export function RosterTable({ entries, onSelectDeveloper }: RosterTableProps) {
 										</div>
 									</button>
 								</TableCell>
-								{practiceColumns.map((practice) => {
-									const cell = standingBySlug.get(practice.slug);
-									return (
-										<TableCell key={practice.slug}>
-											<StandingCell standing={cell?.standing ?? "NO_ACTIVITY"} />
-										</TableCell>
-									);
-								})}
+								<TableCell>
+									<div className="flex flex-wrap gap-x-4 gap-y-2">
+										{orderedStandings.map((cell) => (
+											<div key={cell.areaSlug} className="flex items-center gap-1.5 text-xs">
+												<span className="text-muted-foreground">{cell.areaName}</span>
+												<StandingCell standing={cell.status} />
+												<TrendGlyph trend={cell.trend} />
+											</div>
+										))}
+									</div>
+								</TableCell>
 								<TableCell>
 									{entry.needsAttention && entry.attentionReasons.length > 0 ? (
 										<div className="flex flex-wrap gap-1">

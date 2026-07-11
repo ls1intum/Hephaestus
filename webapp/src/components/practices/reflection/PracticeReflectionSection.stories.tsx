@@ -9,6 +9,7 @@ const practices: PracticeReportCard[] = [
 		areaName: "Pull requests",
 		slug: "clear-pr-description",
 		standing: "MIXED",
+		trend: "STEADY",
 		whyItMatters: "A clear description helps reviewers understand the change quickly.",
 		strengths: [
 			{
@@ -38,6 +39,7 @@ const practices: PracticeReportCard[] = [
 		areaName: "Pull requests",
 		slug: "small-prs",
 		standing: "STRENGTH",
+		trend: "IMPROVING",
 		whyItMatters: "Smaller changes are easier to review and safer to ship.",
 		strengths: [
 			{

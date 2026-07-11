@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, within } from "storybook/test";
-import type { CohortPracticeStatus } from "@/api/types.gen";
+import type { CohortAreaStatus } from "@/api/types.gen";
 import { CohortHealthCard } from "./CohortHealthCard";
 
 const meta = {
@@ -12,9 +12,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const health = (over: Partial<CohortPracticeStatus>): CohortPracticeStatus => ({
-	name: "Clear PR description",
-	slug: "clear-pr",
+const health = (over: Partial<CohortAreaStatus>): CohortAreaStatus => ({
+	areaName: "Clear PR description",
+	areaSlug: "clear-pr",
 	strengthCount: 6,
 	developingCount: 5,
 	mixedCount: 5,
@@ -33,26 +33,43 @@ export const Default: Story = {
 };
 
 export const Suppressed: Story = {
-	args: { health: { name: "Reproduce before fixing", slug: "repro-first", suppressed: true } },
+	args: {
+		health: { areaName: "Reproduce before fixing", areaSlug: "repro-first", suppressed: true },
+	},
 	play: async ({ canvasElement }) => {
 		// k-anonymity suppression: the practice still renders, but NO standing labels or counts do.
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("Reproduce before fixing")).toBeVisible();
+		await expect(canvas.getByText("Not enough recent activity to show this safely.")).toBeVisible();
+		await expect(canvas.queryByText("No activity in this area yet.")).toBeNull();
 		await expect(canvas.queryByText("Strength")).toBeNull();
 		await expect(canvas.queryByText("Developing")).toBeNull();
 	},
 };
 
-export const NoActivity: Story = {
+export const NoData: Story = {
 	args: {
-		health: health({ strengthCount: 0, developingCount: 0, mixedCount: 0, noActivityCount: 0 }),
+		health: {
+			areaName: "Reproduce before fixing",
+			areaSlug: "repro-first",
+			noData: true,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		// noData is NOT a privacy suppression — it's an honest "nobody active here yet" and must read
+		// differently from the Suppressed story's "hidden to protect privacy" message.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Reproduce before fixing")).toBeVisible();
+		await expect(canvas.getByText("No activity in this area yet.")).toBeVisible();
+		await expect(canvas.queryByText("Not enough recent activity to show this safely.")).toBeNull();
+		await expect(canvas.queryByText("Strength")).toBeNull();
 	},
 };
 
 export const LongName: Story = {
 	args: {
 		health: health({
-			name: "Write descriptive pull request titles and summaries that explain the change",
+			areaName: "Write descriptive pull request titles and summaries that explain the change",
 		}),
 	},
 };

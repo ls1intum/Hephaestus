@@ -23,8 +23,13 @@ const entries: PracticeReportSummary[] = [
 		needsAttention: true,
 		attentionReasons: ["Clear PR description: gaps to work on this cycle"],
 		standings: [
-			{ name: "Clear PR description", slug: "clear-pr", standing: "DEVELOPING" },
-			{ name: "Small PRs", slug: "small-prs", standing: "NO_ACTIVITY" },
+			{
+				areaName: "Clear PR description",
+				areaSlug: "clear-pr",
+				status: "DEVELOPING",
+				trend: "STEADY",
+			},
+			{ areaName: "Small PRs", areaSlug: "small-prs", status: "NO_ACTIVITY", trend: "STEADY" },
 		],
 	},
 	{
@@ -35,8 +40,13 @@ const entries: PracticeReportSummary[] = [
 		needsAttention: false,
 		attentionReasons: [],
 		standings: [
-			{ name: "Clear PR description", slug: "clear-pr", standing: "STRENGTH" },
-			{ name: "Small PRs", slug: "small-prs", standing: "MIXED" },
+			{
+				areaName: "Clear PR description",
+				areaSlug: "clear-pr",
+				status: "STRENGTH",
+				trend: "IMPROVING",
+			},
+			{ areaName: "Small PRs", areaSlug: "small-prs", status: "MIXED", trend: "STEADY" },
 		],
 	},
 ];
@@ -61,7 +71,7 @@ export const NeedsAttention: Story = {
 			...entry,
 			needsAttention: true,
 			attentionReasons: ["Clear PR description: gaps to work on this cycle"],
-			standings: entry.standings.map((cell) => ({ ...cell, standing: "DEVELOPING" as const })),
+			standings: entry.standings.map((cell) => ({ ...cell, status: "DEVELOPING" as const })),
 		})),
 	},
 	play: async ({ canvasElement }) => {
@@ -83,5 +93,98 @@ export const OpensDrillDown: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getAllByRole("button")[0]);
 		await expect(args.onSelectDeveloper).toHaveBeenCalledWith(entries[0]);
+	},
+};
+
+/**
+ * A realistic ~12-area roster row: many area chips wrap onto multiple lines per developer, with
+ * DEVELOPING/MIXED areas (the ones that need attention) ordered first. Also exercises a mix of
+ * trend glyphs (IMPROVING, WORSENING, NEW, STEADY) so all four render distinctly.
+ */
+export const ManyAreasWithTrends: Story = {
+	args: {
+		entries: [
+			{
+				userId: 44,
+				userLogin: "priya",
+				name: "Priya Chandra",
+				avatarUrl: "",
+				needsAttention: true,
+				attentionReasons: ["Test coverage: gaps to work on this cycle"],
+				standings: [
+					{
+						areaName: "Clear PR description",
+						areaSlug: "clear-pr",
+						status: "STRENGTH",
+						trend: "STEADY",
+					},
+					{ areaName: "Small PRs", areaSlug: "small-prs", status: "STRENGTH", trend: "IMPROVING" },
+					{
+						areaName: "Test coverage",
+						areaSlug: "test-coverage",
+						status: "DEVELOPING",
+						trend: "WORSENING",
+					},
+					{
+						areaName: "Reproduce before fixing",
+						areaSlug: "repro-first",
+						status: "MIXED",
+						trend: "STEADY",
+					},
+					{
+						areaName: "Reviewer craft",
+						areaSlug: "reviewer-craft",
+						status: "STRENGTH",
+						trend: "STEADY",
+					},
+					{
+						areaName: "Commit hygiene",
+						areaSlug: "commit-hygiene",
+						status: "NO_ACTIVITY",
+						trend: "STEADY",
+					},
+					{ areaName: "Issue triage", areaSlug: "issue-triage", status: "STRENGTH", trend: "NEW" },
+					{ areaName: "API design", areaSlug: "api-design", status: "MIXED", trend: "STEADY" },
+					{
+						areaName: "Documentation",
+						areaSlug: "documentation",
+						status: "STRENGTH",
+						trend: "STEADY",
+					},
+					{
+						areaName: "Refactoring discipline",
+						areaSlug: "refactoring",
+						status: "DEVELOPING",
+						trend: "STEADY",
+					},
+					{
+						areaName: "CI hygiene",
+						areaSlug: "ci-hygiene",
+						status: "NO_ACTIVITY",
+						trend: "STEADY",
+					},
+					{
+						areaName: "Security awareness",
+						areaSlug: "security",
+						status: "STRENGTH",
+						trend: "STEADY",
+					},
+				],
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// All 12 area names render, wrapped in one row for the developer.
+		await expect(canvas.getByText("Clear PR description")).toBeVisible();
+		await expect(canvas.getByText("Security awareness")).toBeVisible();
+		// Each trend glyph is present with its own accessible label.
+		await expect(canvas.getByRole("img", { name: "improving" })).toBeVisible();
+		await expect(canvas.getByRole("img", { name: "worsening" })).toBeVisible();
+		await expect(canvas.getByRole("img", { name: "new since last cycle" })).toBeVisible();
+		// STEADY areas render no glyph, so there are exactly three trend glyphs, not twelve.
+		await expect(
+			canvas.getAllByRole("img", { name: /improving|worsening|new since last cycle/ }),
+		).toHaveLength(3);
 	},
 };

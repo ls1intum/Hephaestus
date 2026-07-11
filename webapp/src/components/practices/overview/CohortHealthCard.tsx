@@ -1,4 +1,4 @@
-import type { CohortPracticeStatus } from "@/api/types.gen";
+import type { CohortAreaStatus } from "@/api/types.gen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -14,20 +14,38 @@ const SEGMENTS: ReadonlyArray<{
 ];
 
 export interface CohortHealthCardProps {
-	health: CohortPracticeStatus;
+	health: CohortAreaStatus;
 }
 
 export function CohortHealthCard({ health }: CohortHealthCardProps) {
+	// Privacy suppression takes precedence: even if the window also happened to have no activity,
+	// "hidden to protect privacy" and "no activity yet" are different facts and must never collapse
+	// into the same message.
 	if (health.suppressed) {
 		return (
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">{health.name}</CardTitle>
+					<CardTitle className="text-base">{health.areaName}</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<p className="text-sm text-muted-foreground">
 						Not enough recent activity to show this safely.
 					</p>
+				</CardContent>
+			</Card>
+		);
+	}
+
+	// noData is NOT a privacy suppression — there is simply nobody with activity in this area yet, so
+	// it renders its own honest, distinctly-worded muted state instead of the distribution below.
+	if (health.noData) {
+		return (
+			<Card>
+				<CardHeader>
+					<CardTitle className="text-base">{health.areaName}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<p className="text-sm text-muted-foreground">No activity in this area yet.</p>
 				</CardContent>
 			</Card>
 		);
@@ -42,13 +60,13 @@ export function CohortHealthCard({ health }: CohortHealthCardProps) {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="text-base">{health.name}</CardTitle>
+				<CardTitle className="text-base">{health.areaName}</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
 				<div
 					className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
 					role="img"
-					aria-label={`Cohort standings for ${health.name}: ${counts
+					aria-label={`Cohort standings for ${health.areaName}: ${counts
 						.map((c) => `${c.value} ${c.label}`)
 						.join(", ")}`}
 				>

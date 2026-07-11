@@ -26,7 +26,13 @@ neither carrying a score or rank:
 2. **Practice Overview** — a mentor/admin surface (workspace ADMIN/OWNER only): a roster of
    per-developer summaries sorted needs-attention-first then login (`GET /practices/reports`), a
    per-developer drill-down (`GET /practices/reports/{userId}`), and an anonymised cohort rollup
-   (`GET /practices/cohort`).
+   (`GET /practices/cohort`). The roster and cohort cover **every** practice area at an area-rollup
+   grain (one cell/card per area); the drill-down keeps per-practice detail. Each area cell and each
+   reflection card carries a **cycle-over-cycle trend** (IMPROVING / WORSENING / STEADY / NEW) — the
+   trajectory a mentor and developer act on — so the surface answers "is this getting better?", not
+   just "how does it look right now". (An earlier P1 iteration scoped the mentor surfaces to the single
+   `constructive-code-review` area; a live fill-test showed that left the mentor blind to risk
+   concentrated in other areas, so the generalisation landed in this ADR's scope.)
 
 Guardrails shipped with the surfaces:
 
@@ -46,6 +52,14 @@ personal milestones without ranking members against each other, and the activity
   triage, not ranking.
 - Mentor visibility into named reports is now an audited disclosure rather than a public scoreboard —
   a strictly smaller and accountable exposure of personal data.
+- **Individual vs. aggregate, deliberately split by threat model:** the mentor's roster and drill-down
+  are named and individual (not k-anonymised) because coaching a person requires seeing that person's
+  work — formative-feedback and scaffolding theory (Hattie & Timperley; Vygotsky's ZPD; deliberate
+  practice) all require diagnosing *this* learner, which an aggregate cannot do. K-anonymity applies
+  only to the cohort rollup, whose threat model is a *member* re-identifying a colleague from a small
+  bucket — a threat that does not exist for a mentor who already knows their mentees by name. The
+  read-audit and the developer's in-product notice (that admins can see their standing) are what keep
+  the individual surface formative-and-accountable rather than surveillance.
 - The Slack digest path from ADR 0015 is gone; the Slack module's surviving jobs are mentor DMs and
   consent-gated channel monitoring (#1341).
 - **Residual risk:** k-anonymity does not defend homogeneous cells — if all ≥5 developers in a bucket

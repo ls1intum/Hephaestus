@@ -99,4 +99,30 @@ class ReviewCycleWindowResolverTest extends BaseUnitTest {
         // before is the most recent Monday 09:00 at-or-before now; after is one week earlier.
         assertThat(window.after()).isEqualTo(window.before().minusSeconds(7 * 24 * 3600));
     }
+
+    @Test
+    void priorCycleWindowEndsExactlyWherePreviousCycleWindowBegins() {
+        Workspace w = workspace(1, "09:00");
+        ReviewCycleWindowResolver.CycleWindow previous = resolver.previousCycleWindow(w);
+        ReviewCycleWindowResolver.CycleWindow prior = resolver.priorCycleWindow(w);
+
+        // The two windows tile with no gap or overlap: prior.before() == previous.after().
+        assertThat(prior.before()).isEqualTo(previous.after());
+    }
+
+    @Test
+    void priorCycleWindowIsExactlyOneWeekWide() {
+        Workspace w = workspace(1, "09:00");
+        ReviewCycleWindowResolver.CycleWindow prior = resolver.priorCycleWindow(w);
+        assertThat(prior.after()).isEqualTo(prior.before().minusSeconds(7 * 24 * 3600));
+    }
+
+    @Test
+    void priorCycleWindowIsOneFullWeekBeforePreviousCycleWindow() {
+        Workspace w = workspace(1, "09:00");
+        ReviewCycleWindowResolver.CycleWindow previous = resolver.previousCycleWindow(w);
+        ReviewCycleWindowResolver.CycleWindow prior = resolver.priorCycleWindow(w);
+
+        assertThat(prior.after()).isEqualTo(previous.after().minusSeconds(7 * 24 * 3600));
+    }
 }

@@ -8,6 +8,7 @@ const basePractice: PracticeReportCard = {
 	areaName: "Pull requests",
 	slug: "clear-pr-description",
 	standing: "MIXED",
+	trend: "STEADY",
 	whyItMatters:
 		"A clear description helps reviewers understand the change quickly and gives future readers the context behind it.",
 	strengths: [
@@ -110,5 +111,41 @@ export const NoGuidance: Story = {
 				},
 			],
 		},
+	},
+};
+
+export const TrendImproving: Story = {
+	args: { practice: { ...basePractice, trend: "IMPROVING" } },
+	play: async ({ canvasElement }) => {
+		// A criterion-referenced trajectory note, not a number or a peer comparison.
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Improving since last cycle")).toBeVisible();
+	},
+};
+
+export const TrendWorsening: Story = {
+	args: { practice: { ...basePractice, trend: "WORSENING" } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Slipped since last cycle")).toBeVisible();
+	},
+};
+
+export const TrendNew: Story = {
+	args: { practice: { ...basePractice, trend: "NEW" } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("New this cycle")).toBeVisible();
+	},
+};
+
+export const TrendSteady: Story = {
+	args: { practice: { ...basePractice, trend: "STEADY" } },
+	play: async ({ canvasElement }) => {
+		// STEADY is deliberately silent — no badge, no noise.
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText("Improving since last cycle")).toBeNull();
+		await expect(canvas.queryByText("Slipped since last cycle")).toBeNull();
+		await expect(canvas.queryByText("New this cycle")).toBeNull();
 	},
 };

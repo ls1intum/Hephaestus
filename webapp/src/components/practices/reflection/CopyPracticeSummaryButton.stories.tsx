@@ -18,6 +18,7 @@ const practices: PracticeReportCard[] = [
 		name: "Clear PR description",
 		slug: "clear-pr",
 		standing: "STRENGTH",
+		trend: "STEADY",
 		strengths: [
 			{
 				observationId: "o1",
@@ -33,6 +34,7 @@ const practices: PracticeReportCard[] = [
 		name: "Small PRs",
 		slug: "small-prs",
 		standing: "DEVELOPING",
+		trend: "WORSENING",
 		strengths: [],
 		toWorkOn: [
 			{

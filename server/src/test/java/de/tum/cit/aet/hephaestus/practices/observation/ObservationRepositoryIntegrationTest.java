@@ -25,8 +25,8 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaRollupRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.CohortStandingRow;
 import de.tum.cit.aet.hephaestus.practices.report.PracticeReportService;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -998,7 +998,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Quarantine parity: the cohort SQL {@code findCohortStandingByAreaAndWorkspace} and the
+     * Quarantine parity: the cohort SQL {@code findAreaRollupStandingBetween} and the
      * developer's own reflection ({@link ObservationService#getPracticeReport}) must reach the SAME verdict on the
      * SAME single-target BAD. Both apply the identical floor — a single-target BAD with confidence &lt; 0.5 is
      * quarantined (excluded), a confident one is not.
@@ -1061,21 +1061,17 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
         }
 
-        /** The cohort query's EFFECTIVE bad count for our (developer, reviewing practice) pair (0 if no row). */
+        /** The area-rollup query's EFFECTIVE bad count for our (developer, reviewing practice) pair (0 if no row). */
         private long cohortBadCount() {
             return observationRepository
-                .findCohortStandingByAreaAndWorkspace(
-                    workspace.getId(),
-                    PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG,
-                    since
-                )
+                .findAreaRollupStandingBetween(workspace.getId(), since, Instant.now().plusSeconds(60))
                 .stream()
                 .filter(
                     r ->
                         reviewingPractice.getSlug().equals(r.getPracticeSlug()) &&
                         aboutUser.getId().equals(r.getAboutUserId())
                 )
-                .mapToLong(CohortStandingRow::getBadCount)
+                .mapToLong(AreaRollupRow::getBadCount)
                 .sum();
         }
 
@@ -1129,10 +1125,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             workspaceMembershipRepository.saveAndFlush(membership);
 
             assertThat(
-                observationRepository.findCohortStandingByAreaAndWorkspace(
+                observationRepository.findAreaRollupStandingBetween(
                     workspace.getId(),
-                    PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG,
-                    since
+                    since,
+                    Instant.now().plusSeconds(60)
                 )
             ).isEmpty();
         }

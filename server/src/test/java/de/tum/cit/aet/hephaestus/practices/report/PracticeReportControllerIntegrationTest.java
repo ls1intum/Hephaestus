@@ -219,13 +219,16 @@ class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrati
             .expectStatus()
             .isOk()
             .expectBody()
-            // One reviewing practice, few active developers -> suppressed card (k-anonymity), counts null.
+            // One area, zero active developers this window -> no-data card (not a k-anonymity suppression:
+            // there is nobody to re-identify), counts null.
             .jsonPath("$.length()")
             .isEqualTo(1)
-            .jsonPath("$[0].slug")
-            .isEqualTo(reviewPractice.getSlug())
-            .jsonPath("$[0].suppressed")
+            .jsonPath("$[0].areaSlug")
+            .isEqualTo(REVIEW_AREA)
+            .jsonPath("$[0].noData")
             .isEqualTo(true)
+            .jsonPath("$[0].suppressed")
+            .isEqualTo(false)
             .jsonPath("$[0].strengthCount")
             .doesNotExist();
     }

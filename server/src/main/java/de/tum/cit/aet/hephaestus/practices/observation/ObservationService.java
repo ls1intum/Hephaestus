@@ -151,6 +151,20 @@ public class ObservationService {
             Pageable.unpaged()
         );
 
+        // Cycle-over-cycle trend: ONE extra query for the whole request, bounded to the cycle immediately
+        // before this one — never per-card. A practice absent from this map had no qualifying activity last
+        // cycle, so it defaults to NO_ACTIVITY (-> trend NEW) below.
+        ReviewCycleWindowResolver.CycleWindow priorWindow = reviewCycleWindowResolver.priorCycleWindow(workspace.get());
+        Map<String, PracticeStatus> priorStandingBySlug = new HashMap<>();
+        for (ObservationRepository.PracticeStandingRow row : observationRepository.findPracticeStandingForDeveloperBetween(
+            developerUserId,
+            workspaceId,
+            priorWindow.after(),
+            priorWindow.before()
+        )) {
+            priorStandingBySlug.put(row.getPracticeSlug(), standingOf(row));
+        }
+
         // Advice lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
         // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can
         // show what was actually delivered (null when nothing was). One query, not N+1.
@@ -228,6 +242,11 @@ public class ObservationService {
             PracticeStatus standing = toCardStanding(
                 PracticeStatusDeriver.derive(!toWorkOn.isEmpty(), !strengths.isEmpty())
             );
+            PracticeStatus priorStanding = priorStandingBySlug.getOrDefault(
+                practice.getSlug(),
+                PracticeStatus.NO_ACTIVITY
+            );
+            PracticeTrend trend = PracticeStatusDeriver.trendOf(priorStanding, standing);
 
             PracticeArea area = practice.getArea();
             cards.add(
@@ -239,6 +258,7 @@ public class ObservationService {
                     practice.getWhyItMatters(),
                     practice.getWhatGoodLooksLike(),
                     standing,
+                    trend,
                     toWorkOn,
                     strengths
                 )
@@ -262,6 +282,17 @@ public class ObservationService {
      */
     private static PracticeStatus toCardStanding(PracticeStatus standing) {
         return standing == PracticeStatus.NO_ACTIVITY ? PracticeStatus.STRENGTH : standing;
+    }
+
+    /**
+     * Maps a prior-window {@link ObservationRepository.PracticeStandingRow} through the shared deriver — the
+     * SAME {@code (hasProblems, hasStrengths) -> standing} decision the current-window card and the mentor
+     * roster/cohort use, so a trend diff compares like with like.
+     */
+    private static PracticeStatus standingOf(ObservationRepository.PracticeStandingRow row) {
+        boolean hasProblems = row.getBadCount() != null && row.getBadCount() > 0;
+        boolean hasStrengths = row.getGoodCount() != null && row.getGoodCount() > 0;
+        return PracticeStatusDeriver.derive(hasProblems, hasStrengths);
     }
 
     private static int standingRank(PracticeStatus s) {

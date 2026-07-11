@@ -2095,9 +2095,11 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/cohort:
     get:
-      description: "Per reviewing practice, how many developers stand at each status\
-        \ (k-anonymised, K=5 with small-bucket suppression). Admins/owners always;\
-        \ members only when the workspace cohort visibility is EVERYONE."
+      description: "Per practice area, how many developers stand at each status (k-anonymised,\
+        \ K=5 with small-bucket suppression). An area with zero active developers\
+        \ is marked no-data rather than suppressed — there is nobody to re-identify.\
+        \ Admins/owners always; members only when the workspace cohort visibility\
+        \ is EVERYONE."
       operationId: getCohortPracticeStatus
       parameters:
       - description: Workspace slug
@@ -2114,7 +2116,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CohortPracticeStatus"
+                  $ref: "#/components/schemas/CohortAreaStatus"
           description: Cohort status cards returned
         "403":
           content:
@@ -2401,8 +2403,9 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/reports:
     get:
-      description: "One summary per developer with activity in the window: per-practice\
-        \ status + a needs-attention triage flag. Sorted needs-attention-first then\
+      description: "One summary per developer with activity in the window: per-area\
+        \ status (rolled up across that area's practices, with a cycle-over-cycle\
+        \ trend) + a needs-attention triage flag. Sorted needs-attention-first then\
         \ login. Not a scoreboard — no score/rank."
       operationId: listPracticeReports
       parameters:
@@ -4130,6 +4133,39 @@ components:
       - practicesEnabled
       - runForAllUsers
       - skipDrafts
+    AreaStandingCell:
+      type: object
+      description: A developer's standing on one practice area
+      properties:
+        areaName:
+          type: string
+          description: Area name
+        areaSlug:
+          type: string
+          description: Area slug
+        status:
+          type: string
+          description: "Where the developer stands on this area (criterion-referenced,\
+            \ not a rank)"
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NO_ACTIVITY
+        trend:
+          type: string
+          description: "Direction versus the prior review cycle (criterion-referenced,\
+            \ never a peer comparison)"
+          enum:
+          - IMPROVING
+          - WORSENING
+          - STEADY
+          - NEW
+      required:
+      - areaName
+      - areaSlug
+      - status
+      - trend
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -4279,41 +4315,47 @@ components:
           format: uuid
         title:
           type: string
-    CohortPracticeStatus:
+    CohortAreaStatus:
       type: object
-      description: "Cohort standing distribution for one reviewing practice (k-anonymised,\
+      description: "Cohort standing distribution for one practice area (k-anonymised,\
         \ never per-person)"
       properties:
+        areaName:
+          type: string
+          description: Area name
+        areaSlug:
+          type: string
+          description: Area slug
         developingCount:
           type: integer
           format: int32
-          description: Developers standing at DEVELOPING (null when suppressed)
+          description: Developers standing at DEVELOPING (null when suppressed or
+            no data)
         mixedCount:
           type: integer
           format: int32
-          description: Developers standing at MIXED (null when suppressed)
-        name:
-          type: string
-          description: Practice name
+          description: Developers standing at MIXED (null when suppressed or no data)
         noActivityCount:
           type: integer
           format: int32
           description: Developers with activity but no problems/strengths this window
-            (null when suppressed)
-        slug:
-          type: string
-          description: Practice slug
+            (null when suppressed or no data)
+        noData:
+          type: boolean
+          description: True when no developer had activity on this area in the window
+            (not a privacy risk — nobody to re-identify)
         strengthCount:
           type: integer
           format: int32
-          description: Developers standing at STRENGTH (null when suppressed)
+          description: Developers standing at STRENGTH (null when suppressed or no
+            data)
         suppressed:
           type: boolean
           description: "True when suppressed for k-anonymity (< 5 developers active,\
             \ or a non-zero bucket has < 5)"
       required:
-      - name
-      - slug
+      - areaName
+      - areaSlug
     ConnectionAuditEntry:
       type: object
       description: |-
@@ -5570,6 +5612,15 @@ components:
           description: Specific feedback to act on (highest-impact first)
           items:
             $ref: "#/components/schemas/PracticeReportItem"
+        trend:
+          type: string
+          description: "Direction versus the prior review cycle (criterion-referenced,\
+            \ never a peer comparison)"
+          enum:
+          - IMPROVING
+          - WORSENING
+          - STEADY
+          - NEW
         whatGoodLooksLike:
           type: string
           description: A concrete picture of doing this well
@@ -5582,6 +5633,7 @@ components:
       - standing
       - strengths
       - toWorkOn
+      - trend
     PracticeReportItem:
       type: object
       description: A single piece of practice feedback to read and act on
@@ -5648,9 +5700,9 @@ components:
             at (a triage flag)
         standings:
           type: array
-          description: The developer's standing on each reviewing practice
+          description: The developer's standing on each practice area
           items:
-            $ref: "#/components/schemas/PracticeStatusCell"
+            $ref: "#/components/schemas/AreaStandingCell"
         userId:
           type: integer
           format: int64
@@ -5664,29 +5716,6 @@ components:
       - standings
       - userId
       - userLogin
-    PracticeStatusCell:
-      type: object
-      description: A developer's standing on one reviewing practice
-      properties:
-        name:
-          type: string
-          description: Practice name
-        slug:
-          type: string
-          description: Practice slug
-        standing:
-          type: string
-          description: "Where the developer stands on this practice (criterion-referenced,\
-            \ not a rank)"
-          enum:
-          - DEVELOPING
-          - STRENGTH
-          - MIXED
-          - NO_ACTIVITY
-      required:
-      - name
-      - slug
-      - standing
     ProblemDetail:
       type: object
       description: RFC 7807 / RFC 9457 problem detail response

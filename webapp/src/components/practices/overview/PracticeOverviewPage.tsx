@@ -1,6 +1,6 @@
 import { AlertTriangle, Radar, ShieldAlert } from "lucide-react";
 import { useState } from "react";
-import type { CohortPracticeStatus, PracticeReportSummary } from "@/api/types.gen";
+import type { CohortAreaStatus, PracticeReportSummary } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +11,7 @@ import { RosterTable } from "./RosterTable";
 
 export interface PracticeOverviewPageProps {
 	workspaceSlug: string;
-	cohort?: CohortPracticeStatus[];
+	cohort?: CohortAreaStatus[];
 	roster?: PracticeReportSummary[];
 	isLoading: boolean;
 	/** True when the server refused access (403) — non-admins must not see cohort/roster data. */
@@ -75,7 +75,7 @@ export function PracticeOverviewPage({
 			<header className="flex flex-col gap-1">
 				<h1 className="text-2xl font-bold tracking-tight">Practice Overview</h1>
 				<p className="text-sm text-muted-foreground">
-					A mentoring view of how the cohort is doing on code-review practices. Not a ranking.
+					A mentoring view of how the cohort is doing across practices. Not a ranking.
 				</p>
 			</header>
 
@@ -100,7 +100,7 @@ export function PracticeOverviewPage({
 					) : (
 						<div className="grid gap-4 sm:grid-cols-2">
 							{cohortItems.map((health) => (
-								<CohortHealthCard key={health.slug} health={health} />
+								<CohortHealthCard key={health.areaSlug} health={health} />
 							))}
 						</div>
 					)}

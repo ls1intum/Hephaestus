@@ -10,15 +10,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.CohortStandingRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaRollupRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus;
-import de.tum.cit.aet.hephaestus.practices.report.dto.CohortPracticeStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.AreaStandingCellDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.CohortAreaStatusDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportSummaryDTO;
-import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeStatusCellDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleProperties;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -34,13 +34,12 @@ import org.mockito.Mock;
 class PracticeReportServiceTest extends BaseUnitTest {
 
     private static final Long WORKSPACE_ID = 1L;
-    private static final String AREA = PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG;
 
     @Mock
     private ObservationRepository observationRepository;
 
     @Mock
-    private PracticeRepository practiceRepository;
+    private PracticeAreaRepository practiceAreaRepository;
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -60,7 +59,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
         );
         service = new PracticeReportService(
             observationRepository,
-            practiceRepository,
+            practiceAreaRepository,
             workspaceRepository,
             resolver,
             observationService,
@@ -72,24 +71,25 @@ class PracticeReportServiceTest extends BaseUnitTest {
             .thenReturn(Optional.of(new Workspace()));
     }
 
-    private Practice practice(String slug, String name, int order) {
-        Practice p = new Practice();
-        p.setSlug(slug);
-        p.setName(name);
-        p.setDisplayOrder(order);
-        return p;
+    private PracticeArea area(String slug, String name, int order) {
+        PracticeArea a = new PracticeArea();
+        a.setSlug(slug);
+        a.setName(name);
+        a.setDisplayOrder(order);
+        return a;
     }
 
-    private static CohortStandingRow row(
+    private static AreaRollupRow row(
         long userId,
         String login,
+        String areaSlug,
+        String areaName,
+        int areaOrder,
         String practiceSlug,
-        String practiceName,
-        int order,
         long good,
         long bad
     ) {
-        return new CohortStandingRow() {
+        return new AreaRollupRow() {
             @Override
             public Long getAboutUserId() {
                 return userId;
@@ -111,18 +111,23 @@ class PracticeReportServiceTest extends BaseUnitTest {
             }
 
             @Override
+            public String getAreaSlug() {
+                return areaSlug;
+            }
+
+            @Override
+            public String getAreaName() {
+                return areaName;
+            }
+
+            @Override
+            public Integer getAreaDisplayOrder() {
+                return areaOrder;
+            }
+
+            @Override
             public String getPracticeSlug() {
                 return practiceSlug;
-            }
-
-            @Override
-            public String getPracticeName() {
-                return practiceName;
-            }
-
-            @Override
-            public Integer getPracticeDisplayOrder() {
-                return order;
             }
 
             @Override
@@ -140,22 +145,23 @@ class PracticeReportServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("cohort: fewer than 5 active developers -> suppressed with null counts")
     void cohortSuppressedBelowThreshold() {
-        Practice p = practice("leaves-useful-specific-review-comments", "Useful comments", 0);
-        when(practiceRepository.findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(WORKSPACE_ID, AREA)).thenReturn(
-            List.of(p)
-        );
-        when(observationRepository.findCohortStandingByAreaAndWorkspace(eq(WORKSPACE_ID), eq(AREA), any())).thenReturn(
+        PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(a));
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
             List.of(
-                row(1, "alice", p.getSlug(), p.getName(), 0, 1, 0),
-                row(2, "bob", p.getSlug(), p.getName(), 0, 0, 1)
+                row(1, "alice", a.getSlug(), a.getName(), 0, "leaves-useful-comments", 1, 0),
+                row(2, "bob", a.getSlug(), a.getName(), 0, "leaves-useful-comments", 0, 1)
             )
         );
 
-        List<CohortPracticeStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        CohortPracticeStatusDTO card = cards.get(0);
+        CohortAreaStatusDTO card = cards.get(0);
         assertThat(card.suppressed()).isTrue();
+        assertThat(card.noData()).isFalse();
         assertThat(card.strengthCount()).isNull();
         assertThat(card.developingCount()).isNull();
         assertThat(card.mixedCount()).isNull();
@@ -163,42 +169,62 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("cohort: zero active developers -> no-data, NOT suppressed (nobody to re-identify)")
+    void cohortNoDataForZeroActiveDevelopers() {
+        PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(a));
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(List.of());
+
+        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        CohortAreaStatusDTO card = cards.get(0);
+        assertThat(card.noData()).isTrue();
+        assertThat(card.suppressed()).isFalse();
+        assertThat(card.strengthCount()).isNull();
+    }
+
+    @Test
     @DisplayName("cohort: only groups at/above 5 active developers expose counts")
     void cohortCountsAtThreshold() {
-        Practice p = practice("leaves-useful-specific-review-comments", "Useful comments", 0);
-        when(practiceRepository.findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(WORKSPACE_ID, AREA)).thenReturn(
-            List.of(p)
-        );
-        when(observationRepository.findCohortStandingByAreaAndWorkspace(eq(WORKSPACE_ID), eq(AREA), any())).thenReturn(
+        PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(a));
+        String slug = "leaves-useful-comments";
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
             List.of(
-                row(1, "s1", p.getSlug(), p.getName(), 0, 1, 0),
-                row(2, "s2", p.getSlug(), p.getName(), 0, 1, 0),
-                row(3, "s3", p.getSlug(), p.getName(), 0, 1, 0),
-                row(4, "s4", p.getSlug(), p.getName(), 0, 1, 0),
-                row(5, "s5", p.getSlug(), p.getName(), 0, 1, 0),
-                row(6, "d1", p.getSlug(), p.getName(), 0, 0, 1),
-                row(7, "d2", p.getSlug(), p.getName(), 0, 0, 1),
-                row(8, "d3", p.getSlug(), p.getName(), 0, 0, 1),
-                row(9, "d4", p.getSlug(), p.getName(), 0, 0, 1),
-                row(10, "d5", p.getSlug(), p.getName(), 0, 0, 1),
-                row(11, "m1", p.getSlug(), p.getName(), 0, 1, 1),
-                row(12, "m2", p.getSlug(), p.getName(), 0, 1, 1),
-                row(13, "m3", p.getSlug(), p.getName(), 0, 1, 1),
-                row(14, "m4", p.getSlug(), p.getName(), 0, 1, 1),
-                row(15, "m5", p.getSlug(), p.getName(), 0, 1, 1),
-                row(16, "n1", p.getSlug(), p.getName(), 0, 0, 0),
-                row(17, "n2", p.getSlug(), p.getName(), 0, 0, 0),
-                row(18, "n3", p.getSlug(), p.getName(), 0, 0, 0),
-                row(19, "n4", p.getSlug(), p.getName(), 0, 0, 0),
-                row(20, "n5", p.getSlug(), p.getName(), 0, 0, 0)
+                row(1, "s1", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(2, "s2", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(3, "s3", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(4, "s4", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(5, "s5", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(6, "d1", a.getSlug(), a.getName(), 0, slug, 0, 1),
+                row(7, "d2", a.getSlug(), a.getName(), 0, slug, 0, 1),
+                row(8, "d3", a.getSlug(), a.getName(), 0, slug, 0, 1),
+                row(9, "d4", a.getSlug(), a.getName(), 0, slug, 0, 1),
+                row(10, "d5", a.getSlug(), a.getName(), 0, slug, 0, 1),
+                row(11, "m1", a.getSlug(), a.getName(), 0, slug, 1, 1),
+                row(12, "m2", a.getSlug(), a.getName(), 0, slug, 1, 1),
+                row(13, "m3", a.getSlug(), a.getName(), 0, slug, 1, 1),
+                row(14, "m4", a.getSlug(), a.getName(), 0, slug, 1, 1),
+                row(15, "m5", a.getSlug(), a.getName(), 0, slug, 1, 1),
+                row(16, "n1", a.getSlug(), a.getName(), 0, slug, 0, 0),
+                row(17, "n2", a.getSlug(), a.getName(), 0, slug, 0, 0),
+                row(18, "n3", a.getSlug(), a.getName(), 0, slug, 0, 0),
+                row(19, "n4", a.getSlug(), a.getName(), 0, slug, 0, 0),
+                row(20, "n5", a.getSlug(), a.getName(), 0, slug, 0, 0)
             )
         );
 
-        List<CohortPracticeStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        CohortPracticeStatusDTO card = cards.get(0);
+        CohortAreaStatusDTO card = cards.get(0);
         assertThat(card.suppressed()).isFalse();
+        assertThat(card.noData()).isFalse();
         assertThat(card.strengthCount()).isEqualTo(5);
         assertThat(card.developingCount()).isEqualTo(5);
         assertThat(card.mixedCount()).isEqualTo(5);
@@ -208,21 +234,22 @@ class PracticeReportServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("cohort: a non-zero bucket below 5 suppresses the whole card")
     void cohortSuppressesSmallBuckets() {
-        Practice p = practice("leaves-useful-specific-review-comments", "Useful comments", 0);
-        when(practiceRepository.findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(WORKSPACE_ID, AREA)).thenReturn(
-            List.of(p)
-        );
-        when(observationRepository.findCohortStandingByAreaAndWorkspace(eq(WORKSPACE_ID), eq(AREA), any())).thenReturn(
+        PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(a));
+        String slug = "leaves-useful-comments";
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
             List.of(
-                row(1, "s1", p.getSlug(), p.getName(), 0, 1, 0),
-                row(2, "s2", p.getSlug(), p.getName(), 0, 1, 0),
-                row(3, "s3", p.getSlug(), p.getName(), 0, 1, 0),
-                row(4, "s4", p.getSlug(), p.getName(), 0, 1, 0),
-                row(5, "d1", p.getSlug(), p.getName(), 0, 0, 1)
+                row(1, "s1", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(2, "s2", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(3, "s3", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(4, "s4", a.getSlug(), a.getName(), 0, slug, 1, 0),
+                row(5, "d1", a.getSlug(), a.getName(), 0, slug, 0, 1)
             )
         );
 
-        List<CohortPracticeStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
+        List<CohortAreaStatusDTO> cards = service.getCohortStatus(WORKSPACE_ID);
 
         assertThat(cards)
             .singleElement()
@@ -233,19 +260,22 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("roster: developers with more DEVELOPING/MIXED practices sort first, then login ascending")
+    @DisplayName("roster: developers with more DEVELOPING/MIXED areas sort first, then login ascending")
     void rosterNeedsAttentionSort() {
-        Practice p1 = practice("leaves-useful-specific-review-comments", "Useful comments", 0);
-        Practice p2 = practice("reviews-respectfully-asks-rather-than-demands", "Respectful", 1);
-        when(practiceRepository.findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(WORKSPACE_ID, AREA)).thenReturn(
-            List.of(p1, p2)
-        );
-        when(observationRepository.findCohortStandingByAreaAndWorkspace(eq(WORKSPACE_ID), eq(AREA), any())).thenReturn(
+        PracticeArea areaA = area("area-a", "Area A", 0);
+        PracticeArea areaB = area("area-b", "Area B", 1);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(areaA, areaB));
+        // Same rows feed BOTH the current-window and prior-window rollups (matched by any()/any() Instant
+        // args), so every cell's prior standing equals its current standing -> trend is STEADY everywhere;
+        // this test asserts only on standing/attention, not trend.
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
             List.of(
-                row(1, "zed", p1.getSlug(), p1.getName(), 0, 0, 1),
-                row(2, "alice", p1.getSlug(), p1.getName(), 0, 0, 1),
-                row(2, "alice", p2.getSlug(), p2.getName(), 1, 1, 1),
-                row(3, "bob", p1.getSlug(), p1.getName(), 0, 3, 0)
+                row(1, "zed", areaA.getSlug(), areaA.getName(), 0, "practice-1", 0, 1),
+                row(2, "alice", areaA.getSlug(), areaA.getName(), 0, "practice-1", 0, 1),
+                row(2, "alice", areaB.getSlug(), areaB.getName(), 1, "practice-2", 1, 1),
+                row(3, "bob", areaA.getSlug(), areaA.getName(), 0, "practice-1", 3, 0)
             )
         );
 
@@ -253,7 +283,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
 
         assertThat(roster).extracting(PracticeReportSummaryDTO::userId).containsExactly(2L, 1L, 3L);
         assertThat(roster).extracting(PracticeReportSummaryDTO::userLogin).containsExactly("alice", "zed", "bob");
-        // alice has 2 attention practices, needsAttention true, with reasons
+        // alice has 2 attention areas (DEVELOPING on A, MIXED on B), needsAttention true, with reasons
         PracticeReportSummaryDTO alice = roster.get(0);
         assertThat(alice.needsAttention()).isTrue();
         assertThat(alice.attentionReasons()).hasSize(2);
@@ -263,24 +293,24 @@ class PracticeReportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("roster: a practice with no row for a developer is NO_ACTIVITY, not a gap")
-    void rosterFillsMissingPracticeAsNoActivity() {
-        Practice p1 = practice("leaves-useful-specific-review-comments", "Useful comments", 0);
-        Practice p2 = practice("reviews-substantively-with-understanding", "Substantive", 1);
-        when(practiceRepository.findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(WORKSPACE_ID, AREA)).thenReturn(
-            List.of(p1, p2)
-        );
-        when(observationRepository.findCohortStandingByAreaAndWorkspace(eq(WORKSPACE_ID), eq(AREA), any())).thenReturn(
-            List.of(row(1, "alice", p1.getSlug(), p1.getName(), 0, 1, 0))
+    @DisplayName("roster: an area with no row for a developer is NO_ACTIVITY, not a gap")
+    void rosterFillsMissingAreaAsNoActivity() {
+        PracticeArea areaA = area("area-a", "Area A", 0);
+        PracticeArea areaB = area("area-b", "Area B", 1);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(areaA, areaB));
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
+            List.of(row(1, "alice", areaA.getSlug(), areaA.getName(), 0, "practice-1", 1, 0))
         );
 
         List<PracticeReportSummaryDTO> roster = service.listReports(WORKSPACE_ID);
 
         assertThat(roster).hasSize(1);
-        List<PracticeStatusCellDTO> cells = roster.get(0).standings();
+        List<AreaStandingCellDTO> cells = roster.get(0).standings();
         assertThat(cells).hasSize(2);
-        assertThat(cells.get(0).standing()).isEqualTo(PracticeStatus.STRENGTH);
-        assertThat(cells.get(1).standing()).isEqualTo(PracticeStatus.NO_ACTIVITY);
+        assertThat(cells.get(0).status()).isEqualTo(PracticeStatus.STRENGTH);
+        assertThat(cells.get(1).status()).isEqualTo(PracticeStatus.NO_ACTIVITY);
         assertThat(roster.get(0).needsAttention()).isFalse();
     }
 
@@ -288,36 +318,21 @@ class PracticeReportServiceTest extends BaseUnitTest {
     @DisplayName("developer report: validates subject with focused visibility query")
     void developerReportValidatesSubjectWithFocusedQuery() {
         when(
-            observationRepository.existsVisibleReportSubjectByAreaAndWorkspace(
-                eq(WORKSPACE_ID),
-                eq(AREA),
-                any(),
-                eq(42L)
-            )
+            observationRepository.existsVisibleReportSubjectBetween(eq(WORKSPACE_ID), any(), any(), eq(42L))
         ).thenReturn(true);
         when(observationService.getPracticeReport(WORKSPACE_ID, 42L)).thenReturn(List.of());
 
         assertThat(service.getDeveloperReport(WORKSPACE_ID, 42L)).isEmpty();
 
-        verify(observationRepository).existsVisibleReportSubjectByAreaAndWorkspace(
-            eq(WORKSPACE_ID),
-            eq(AREA),
-            any(),
-            eq(42L)
-        );
-        verify(observationRepository, never()).findCohortStandingByAreaAndWorkspace(anyLong(), any(), any());
+        verify(observationRepository).existsVisibleReportSubjectBetween(eq(WORKSPACE_ID), any(), any(), eq(42L));
+        verify(observationRepository, never()).findAreaRollupStandingBetween(anyLong(), any(), any());
     }
 
     @Test
     @DisplayName("developer report: rejects subjects outside the visible roster")
     void developerReportRejectsSubjectOutsideVisibleRoster() {
         when(
-            observationRepository.existsVisibleReportSubjectByAreaAndWorkspace(
-                eq(WORKSPACE_ID),
-                eq(AREA),
-                any(),
-                eq(99L)
-            )
+            observationRepository.existsVisibleReportSubjectBetween(eq(WORKSPACE_ID), any(), any(), eq(99L))
         ).thenReturn(false);
 
         assertThatThrownBy(() -> service.getDeveloperReport(WORKSPACE_ID, 99L)).hasMessageContaining("99");

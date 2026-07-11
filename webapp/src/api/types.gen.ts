@@ -1307,24 +1307,6 @@ export type ProblemDetail = {
 };
 
 /**
- * A developer's standing on one reviewing practice
- */
-export type PracticeStatusCell = {
-    /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * Practice slug
-     */
-    slug: string;
-    /**
-     * Where the developer stands on this practice (criterion-referenced, not a rank)
-     */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NO_ACTIVITY';
-};
-
-/**
  * A developer on the mentor roster (admin/owner-only; a triage view, never a ranking)
  */
 export type PracticeReportSummary = {
@@ -1345,9 +1327,9 @@ export type PracticeReportSummary = {
      */
     needsAttention?: boolean;
     /**
-     * The developer's standing on each reviewing practice
+     * The developer's standing on each practice area
      */
-    standings: Array<PracticeStatusCell>;
+    standings: Array<AreaStandingCell>;
     /**
      * Stable SCM user id for drill-down calls
      */
@@ -1356,6 +1338,28 @@ export type PracticeReportSummary = {
      * Developer login
      */
     userLogin: string;
+};
+
+/**
+ * A developer's standing on one practice area
+ */
+export type AreaStandingCell = {
+    /**
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * Where the developer stands on this area (criterion-referenced, not a rank)
+     */
+    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NO_ACTIVITY';
+    /**
+     * Direction versus the prior review cycle (criterion-referenced, never a peer comparison)
+     */
+    trend: 'IMPROVING' | 'WORSENING' | 'STEADY' | 'NEW';
 };
 
 /**
@@ -1424,6 +1428,10 @@ export type PracticeReportCard = {
      * Specific feedback to act on (highest-impact first)
      */
     toWorkOn: Array<PracticeReportItem>;
+    /**
+     * Direction versus the prior review cycle (criterion-referenced, never a peer comparison)
+     */
+    trend: 'IMPROVING' | 'WORSENING' | 'STEADY' | 'NEW';
     /**
      * A concrete picture of doing this well
      */
@@ -2411,31 +2419,35 @@ export type ConnectionAuditEntry = {
 };
 
 /**
- * Cohort standing distribution for one reviewing practice (k-anonymised, never per-person)
+ * Cohort standing distribution for one practice area (k-anonymised, never per-person)
  */
-export type CohortPracticeStatus = {
+export type CohortAreaStatus = {
     /**
-     * Developers standing at DEVELOPING (null when suppressed)
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * Developers standing at DEVELOPING (null when suppressed or no data)
      */
     developingCount?: number;
     /**
-     * Developers standing at MIXED (null when suppressed)
+     * Developers standing at MIXED (null when suppressed or no data)
      */
     mixedCount?: number;
     /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * Developers with activity but no problems/strengths this window (null when suppressed)
+     * Developers with activity but no problems/strengths this window (null when suppressed or no data)
      */
     noActivityCount?: number;
     /**
-     * Practice slug
+     * True when no developer had activity on this area in the window (not a privacy risk — nobody to re-identify)
      */
-    slug: string;
+    noData?: boolean;
     /**
-     * Developers standing at STRENGTH (null when suppressed)
+     * Developers standing at STRENGTH (null when suppressed or no data)
      */
     strengthCount?: number;
     /**
@@ -4476,7 +4488,7 @@ export type GetCohortPracticeStatusResponses = {
     /**
      * Cohort status cards returned
      */
-    200: Array<CohortPracticeStatus>;
+    200: Array<CohortAreaStatus>;
 };
 
 export type GetCohortPracticeStatusResponse = GetCohortPracticeStatusResponses[keyof GetCohortPracticeStatusResponses];

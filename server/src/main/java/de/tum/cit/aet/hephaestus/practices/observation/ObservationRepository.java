@@ -596,9 +596,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Per-(developer, practice) good/bad activity for the mentor overview. Keeps parity with the reflection
-     * surface by deduping re-reviews to the target's latest run and excluding low-confidence uncorroborated
-     * BAD observations from {@code badCount}.
+     * Per-(developer, area, practice) good/bad activity for the mentor overview, across ALL practice areas
+     * (P1 generalisation — the mentor roster/cohort used to be hardcoded to one area). Keeps parity with the
+     * reflection surface by deduping re-reviews to the target's latest run WITHIN the window (bounded by
+     * {@code until} on both the outer predicate and the correlated latest-run subquery, so a prior-window call
+     * never picks up a "latest run" that actually happened after that window closed) and excluding
+     * low-confidence uncorroborated BAD observations from {@code badCount}. Rows stay at PRACTICE grain (one
+     * row per developer × practice, carrying its area's slug/name/display-order) — callers roll practice rows
+     * up to a per-area standing; the quarantine CTEs stay keyed on {@code practice_id} exactly as before.
      */
     @Query(
         value = """
@@ -609,8 +614,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    u.avatar_url AS avatar_url,
                    p.id AS practice_id,
                    p.slug AS slug,
-                   p.name AS practice_name,
-                   p.display_order AS display_order,
+                   pa.slug AS area_slug,
+                   pa.name AS area_name,
+                   pa.display_order AS area_display_order,
                    f.assessment AS assessment,
                    f.confidence AS confidence,
                    f.artifact_id AS artifact_id,
@@ -627,7 +633,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               ON f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
              AND target_issue.id = f.artifact_id
             WHERE p.workspace_id = :workspaceId
-              AND pa.slug = :areaSlug
               AND p.is_active = true
               AND u.type = 'USER'
               AND NOT EXISTS (
@@ -638,6 +643,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     AND wtrs.hidden_from_contributions = true
               )
               AND f.observed_at >= :since
+              AND f.observed_at < :until
               AND f.presence <> 'NOT_APPLICABLE'
               AND f.agent_job_id = (
                   SELECT f2.agent_job_id FROM observation f2
@@ -645,6 +651,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   WHERE p2.workspace_id = p.workspace_id
                     AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                     AND f2.about_user_id = f.about_user_id
+                    AND f2.observed_at < :until
                   ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
               )
         ),
@@ -664,9 +671,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                f.login AS "userLogin",
                f.name AS "userName",
                f.avatar_url AS "avatarUrl",
+               f.area_slug AS "areaSlug",
+               f.area_name AS "areaName",
+               f.area_display_order AS "areaDisplayOrder",
                f.slug AS "practiceSlug",
-               f.practice_name AS "practiceName",
-               f.display_order AS "practiceDisplayOrder",
                SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
                SUM(CASE WHEN f.assessment = 'BAD' AND NOT (
                        COALESCE(f.confidence, 0) < 0.5
@@ -679,15 +687,15 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               AND lt.recurrence_key = f.recurrence_key
         LEFT JOIN group_targets gt
                ON gt.about_user_id = f.about_user_id AND gt.practice_id = f.practice_id
-        GROUP BY f.about_user_id, f.login, f.name, f.avatar_url, f.slug, f.practice_name, f.display_order
-        ORDER BY f.login ASC, f.display_order ASC, f.slug ASC
+        GROUP BY f.about_user_id, f.login, f.name, f.avatar_url, f.area_slug, f.area_name, f.area_display_order, f.slug
+        ORDER BY f.login ASC, f.area_display_order ASC, f.slug ASC
         """,
         nativeQuery = true
     )
-    List<CohortStandingRow> findCohortStandingByAreaAndWorkspace(
+    List<AreaRollupRow> findAreaRollupStandingBetween(
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") String areaSlug,
-        @Param("since") Instant since
+        @Param("since") Instant since,
+        @Param("until") Instant until
     );
 
     @Query(
@@ -706,7 +714,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               ON f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
              AND target_issue.id = f.artifact_id
             WHERE p.workspace_id = :workspaceId
-              AND pa.slug = :areaSlug
               AND f.about_user_id = :aboutUserId
               AND p.is_active = true
               AND u.type = 'USER'
@@ -718,6 +725,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     AND wtrs.hidden_from_contributions = true
               )
               AND f.observed_at >= :since
+              AND f.observed_at < :until
               AND f.presence <> 'NOT_APPLICABLE'
               AND f.agent_job_id = (
                   SELECT f2.agent_job_id FROM observation f2
@@ -725,31 +733,118 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                   WHERE p2.workspace_id = p.workspace_id
                     AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
                     AND f2.about_user_id = f.about_user_id
+                    AND f2.observed_at < :until
                   ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
               )
         )
         """,
         nativeQuery = true
     )
-    boolean existsVisibleReportSubjectByAreaAndWorkspace(
+    boolean existsVisibleReportSubjectBetween(
         @Param("workspaceId") Long workspaceId,
-        @Param("areaSlug") String areaSlug,
         @Param("since") Instant since,
+        @Param("until") Instant until,
         @Param("aboutUserId") Long aboutUserId
     );
 
     /**
-     * Projection: one developer's good/bad activity on one practice in the window — the standing input the
-     * mentor overview derives a {@link de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus} from.
+     * Per-practice good/bad activity for ONE developer in a bounded window — the prior-window standing input
+     * for the reflection/drill-down cards' cycle-over-cycle {@code trend}. Same grain and quarantine floor as
+     * {@link #findRecentByDeveloperAndWorkspace} (hidden-repo excluded, {@code NOT_APPLICABLE} excluded,
+     * latest-run-within-window deduped), aggregated to (practice, good/bad counts) instead of individual
+     * observations, and NOT restricted to area-bound practices (a card can exist for an ungrouped practice).
      */
-    interface CohortStandingRow {
+    @Query(
+        value = """
+        WITH filtered AS (
+            SELECT p.id AS practice_id,
+                   p.slug AS slug,
+                   f.assessment AS assessment,
+                   f.confidence AS confidence,
+                   f.artifact_id AS artifact_id,
+                   f.recurrence_key AS recurrence_key
+            FROM observation f
+            JOIN practice p ON p.id = f.practice_id
+            LEFT JOIN issue target_issue
+              ON f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+             AND target_issue.id = f.artifact_id
+            WHERE f.about_user_id = :aboutUserId
+              AND p.workspace_id = :workspaceId
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM workspace_team_repository_settings wtrs
+                  WHERE wtrs.workspace_id = p.workspace_id
+                    AND wtrs.repository_id = target_issue.repository_id
+                    AND wtrs.hidden_from_contributions = true
+              )
+              AND f.observed_at >= :since
+              AND f.observed_at < :until
+              AND f.presence <> 'NOT_APPLICABLE'
+              AND f.agent_job_id = (
+                  SELECT f2.agent_job_id FROM observation f2
+                  JOIN practice p2 ON p2.id = f2.practice_id
+                  WHERE p2.workspace_id = p.workspace_id
+                    AND f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+                    AND f2.about_user_id = f.about_user_id
+                    AND f2.observed_at < :until
+                  ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
+              )
+        ),
+        locus_targets AS (
+            SELECT practice_id, recurrence_key, COUNT(DISTINCT artifact_id) AS n
+            FROM filtered
+            WHERE assessment = 'BAD' AND recurrence_key IS NOT NULL
+            GROUP BY practice_id, recurrence_key
+        ),
+        group_targets AS (
+            SELECT practice_id, COUNT(DISTINCT artifact_id) AS n
+            FROM filtered
+            WHERE assessment = 'BAD'
+            GROUP BY practice_id
+        )
+        SELECT f.slug AS "practiceSlug",
+               SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
+               SUM(CASE WHEN f.assessment = 'BAD' AND NOT (
+                       COALESCE(f.confidence, 0) < 0.5
+                       AND (CASE WHEN f.recurrence_key IS NOT NULL
+                                 THEN COALESCE(lt.n, 0) ELSE COALESCE(gt.n, 0) END) < 2
+                   ) THEN 1 ELSE 0 END) AS "badCount"
+        FROM filtered f
+        LEFT JOIN locus_targets lt
+               ON lt.practice_id = f.practice_id AND lt.recurrence_key = f.recurrence_key
+        LEFT JOIN group_targets gt
+               ON gt.practice_id = f.practice_id
+        GROUP BY f.slug
+        """,
+        nativeQuery = true
+    )
+    List<PracticeStandingRow> findPracticeStandingForDeveloperBetween(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        @Param("until") Instant until
+    );
+
+    /**
+     * Projection: one developer's good/bad activity on one practice, WITH its area — the standing input the
+     * mentor overview rolls up to an area-grain {@link de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus}.
+     */
+    interface AreaRollupRow {
         Long getAboutUserId();
         String getUserLogin();
         String getUserName();
         String getAvatarUrl();
+        String getAreaSlug();
+        String getAreaName();
+        Integer getAreaDisplayOrder();
         String getPracticeSlug();
-        String getPracticeName();
-        Integer getPracticeDisplayOrder();
+        Long getGoodCount();
+        Long getBadCount();
+    }
+
+    /** Projection: one developer's good/bad activity on one practice in a bounded window (trend input). */
+    interface PracticeStandingRow {
+        String getPracticeSlug();
         Long getGoodCount();
         Long getBadCount();
     }

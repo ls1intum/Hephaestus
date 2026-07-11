@@ -6,8 +6,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One developer on the mentor roster: their identity plus a per-reviewing-practice standing and a
- * needs-attention triage flag. Admin/owner-only (it names an individual).
+ * One developer on the mentor roster: their identity plus a per-AREA standing (rolled up across all practice
+ * areas, P1 generalisation) and a needs-attention triage flag. Admin/owner-only (it names an individual).
  */
 @Schema(description = "A developer on the mentor roster (admin/owner-only; a triage view, never a ranking)")
 public record PracticeReportSummaryDTO(
@@ -16,8 +16,8 @@ public record PracticeReportSummaryDTO(
     @Nullable @Schema(description = "Developer display name (may be null; UI falls back to login)") String name,
     @NonNull @Schema(description = "Developer avatar URL") String avatarUrl,
     @NonNull
-    @Schema(description = "The developer's standing on each reviewing practice")
-    List<PracticeStatusCellDTO> standings,
+    @Schema(description = "The developer's standing on each practice area")
+    List<AreaStandingCellDTO> standings,
     @Schema(description = "Whether the developer has unresolved gaps a mentor should look at (a triage flag)")
     boolean needsAttention,
     @NonNull

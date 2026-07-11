@@ -47,4 +47,47 @@ public final class PracticeStatusDeriver {
     public static boolean needsAttention(PracticeStatus standing) {
         return standing == PracticeStatus.DEVELOPING || standing == PracticeStatus.MIXED;
     }
+
+    /**
+     * Problem-load rank used ONLY to diff two standings across cycles ({@link #trendOf}) — never exposed on
+     * the wire (that would re-create a leaderboard, ADR 0023). Lower rank = more unresolved problems.
+     */
+    private static int problemLoadRank(PracticeStatus standing) {
+        return switch (standing) {
+            case DEVELOPING -> 0;
+            case MIXED -> 1;
+            case STRENGTH -> 2;
+            case NO_ACTIVITY -> -1; // neutral; callers guard NO_ACTIVITY before ranking (see trendOf)
+        };
+    }
+
+    /**
+     * Cycle-over-cycle {@link PracticeTrend} comparing a prior-cycle standing to the current one.
+     *
+     * <ul>
+     *   <li>current is {@link PracticeStatus#NO_ACTIVITY} → {@link PracticeTrend#STEADY} (nothing this cycle
+     *       to read a direction from)
+     *   <li>prior is {@link PracticeStatus#NO_ACTIVITY} (and current is not) → {@link PracticeTrend#NEW} (a
+     *       first appearance — no prior cycle to compare against)
+     *   <li>otherwise, compare {@link #problemLoadRank}: current &gt; prior → {@link PracticeTrend#IMPROVING},
+     *       current &lt; prior → {@link PracticeTrend#WORSENING}, equal → {@link PracticeTrend#STEADY}
+     * </ul>
+     */
+    public static PracticeTrend trendOf(PracticeStatus priorStanding, PracticeStatus currentStanding) {
+        if (currentStanding == PracticeStatus.NO_ACTIVITY) {
+            return PracticeTrend.STEADY;
+        }
+        if (priorStanding == PracticeStatus.NO_ACTIVITY) {
+            return PracticeTrend.NEW;
+        }
+        int priorRank = problemLoadRank(priorStanding);
+        int currentRank = problemLoadRank(currentStanding);
+        if (currentRank > priorRank) {
+            return PracticeTrend.IMPROVING;
+        }
+        if (currentRank < priorRank) {
+            return PracticeTrend.WORSENING;
+        }
+        return PracticeTrend.STEADY;
+    }
 }

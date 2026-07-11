@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.report.dto;
 
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeTrend;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -32,6 +33,12 @@ public record PracticeReportCardDTO(
         allowableValues = { "DEVELOPING", "STRENGTH", "MIXED" }
     )
     PracticeStatus standing,
+    @NonNull
+    @Schema(
+        description = "Direction versus the prior review cycle (criterion-referenced, never a peer comparison)",
+        allowableValues = { "IMPROVING", "WORSENING", "STEADY", "NEW" }
+    )
+    PracticeTrend trend,
     @NonNull
     @Schema(description = "Specific feedback to act on (highest-impact first)")
     List<PracticeReportItemDTO> toWorkOn,

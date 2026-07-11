@@ -819,7 +819,7 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Cohort practice status
  *
- * Per reviewing practice, how many developers stand at each status (k-anonymised, K=5 with small-bucket suppression). Admins/owners always; members only when the workspace cohort visibility is EVERYONE.
+ * Per practice area, how many developers stand at each status (k-anonymised, K=5 with small-bucket suppression). An area with zero active developers is marked no-data rather than suppressed — there is nobody to re-identify. Admins/owners always; members only when the workspace cohort visibility is EVERYONE.
  */
 export const getCohortPracticeStatus = <ThrowOnError extends boolean = false>(options: Options<GetCohortPracticeStatusData, ThrowOnError>) => (options.client ?? client).get<GetCohortPracticeStatusResponses, GetCohortPracticeStatusErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/cohort', ...options });
 
@@ -904,7 +904,7 @@ export const reorderPractices = <ThrowOnError extends boolean = false>(options: 
 /**
  * List developer practice reports (admin/owner only)
  *
- * One summary per developer with activity in the window: per-practice status + a needs-attention triage flag. Sorted needs-attention-first then login. Not a scoreboard — no score/rank.
+ * One summary per developer with activity in the window: per-area status (rolled up across that area's practices, with a cycle-over-cycle trend) + a needs-attention triage flag. Sorted needs-attention-first then login. Not a scoreboard — no score/rank.
  */
 export const listPracticeReports = <ThrowOnError extends boolean = false>(options: Options<ListPracticeReportsData, ThrowOnError>) => (options.client ?? client).get<ListPracticeReportsResponses, ListPracticeReportsErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/reports', ...options });
 

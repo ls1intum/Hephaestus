@@ -66,6 +66,18 @@ public class ReviewCycleWindowResolver {
         return new CycleWindow(before.minusWeeks(1).toInstant(), before.toInstant());
     }
 
+    /**
+     * The cycle immediately BEFORE {@link #previousCycleWindow}: {@code [prev.after() - 1 week, prev.after())}.
+     * Feeds the cycle-over-cycle {@code trend} comparisons (a standing computed over this window is the
+     * "prior" side of the diff). Uses the same {@link ZonedDateTime} week arithmetic (in the workspace's
+     * effective zone) as {@link #previousCycleWindow}, so the two windows tile exactly with no gap or overlap.
+     */
+    public CycleWindow priorCycleWindow(Workspace workspace) {
+        CycleWindow previous = previousCycleWindow(workspace);
+        ZonedDateTime previousAfter = ZonedDateTime.ofInstant(previous.after(), clock.getZone());
+        return new CycleWindow(previousAfter.minusWeeks(1).toInstant(), previous.after());
+    }
+
     /** Half-open weekly window {@code [after, before)} for one review cycle. */
     public record CycleWindow(Instant after, Instant before) {}
 }

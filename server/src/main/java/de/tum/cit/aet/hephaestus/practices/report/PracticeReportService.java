@@ -4,18 +4,20 @@ import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.CohortStandingRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaRollupRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationService;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatusDeriver;
-import de.tum.cit.aet.hephaestus.practices.report.dto.CohortPracticeStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeTrend;
+import de.tum.cit.aet.hephaestus.practices.report.dto.AreaStandingCellDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.CohortAreaStatusDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportSummaryDTO;
-import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeStatusCellDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,67 +33,74 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Read-model service for practice reports. The reporting window opens at the previous review-cycle
  * boundary ({@code previousCycleWindow().after()}) and is open-ended to now — queries filter on
- * {@code since} only, so activity after the cycle's nominal close is included.
+ * {@code since} only (an explicit {@code until} bound of "now" is passed alongside it), so activity after
+ * the cycle's nominal close is included.
  *
- * <p><b>Scope (deliberate, P1):</b> the mentor-facing roster and cohort surfaces here are scoped to the
- * single {@link #REVIEWING_PRACTICE_AREA_SLUG} area — the reviewer-craft practices, whose signal is the
- * least individually sensitive to aggregate. The developer's own {@code /reports/me} reflection (in
- * {@code ObservationService}) is NOT area-scoped: it already spans every practice. Broadening the mentor
- * surface to the remaining areas (at an area-rollup grain, to keep the roster legible) is the tracked
- * next step; the single-area coupling lives only in this constant and the two queries it feeds.
+ * <p><b>Scope (P1 generalisation):</b> the mentor-facing roster and cohort surfaces here now cover EVERY
+ * active practice area, at an area-rollup grain (one cell/card per area, summing that area's practices'
+ * good/bad signal). They used to be hardcoded to the single {@link #REVIEWING_PRACTICE_AREA_SLUG} area — a
+ * live test proved that scoping left the mentor blind to risk concentrated in other areas (security,
+ * testing, error-handling). The developer's own {@code /reports/me} reflection (in {@code
+ * ObservationService}) was never area-scoped: it already spans every practice, at PRACTICE grain (not
+ * rolled up), which the roster/cohort deliberately do NOT match — a per-practice roster column count would
+ * not stay legible as the catalogue grows, hence the area rollup.
  */
 @Service
 @RequiredArgsConstructor
 public class PracticeReportService {
 
-    /** The one practice area the mentor roster + cohort cover today (see the class javadoc for why). */
+    /**
+     * Historical scope constant: the mentor roster + cohort used to be hardcoded to this single area (see the
+     * class javadoc). It is no longer a scope gate for {@link #listReports} or {@link #getCohortStatus} — both
+     * now cover every active area. Kept because a few tests still seed a fixture area under this slug.
+     */
     public static final String REVIEWING_PRACTICE_AREA_SLUG = "constructive-code-review";
 
     /** Minimum active developers before a cohort card exposes counts. */
     private static final int K_ANONYMITY_THRESHOLD = 5;
 
     private final ObservationRepository observationRepository;
-    private final PracticeRepository practiceRepository;
+    private final PracticeAreaRepository practiceAreaRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ReviewCycleWindowResolver reviewCycleWindowResolver;
     private final ObservationService observationService;
     private final UserRepository userRepository;
 
-    private Optional<Instant> windowSince(Long workspaceId) {
-        return workspaceRepository
-            .findById(workspaceId)
-            .map(reviewCycleWindowResolver::previousCycleWindow)
-            .map(ReviewCycleWindowResolver.CycleWindow::after);
+    private Optional<Workspace> findWorkspace(Long workspaceId) {
+        return workspaceRepository.findById(workspaceId);
     }
 
     @Transactional(readOnly = true)
-    public List<CohortPracticeStatusDTO> getCohortStatus(Long workspaceId) {
-        Optional<Instant> since = windowSince(workspaceId);
-        if (since.isEmpty()) {
+    public List<CohortAreaStatusDTO> getCohortStatus(Long workspaceId) {
+        Optional<Workspace> workspace = findWorkspace(workspaceId);
+        if (workspace.isEmpty()) {
             return List.of();
         }
-        List<Practice> reviewingPractices = reviewingPractices(workspaceId);
-        Map<String, List<CohortStandingRow>> rowsByPractice = groupRowsByPractice(
-            observationRepository.findCohortStandingByAreaAndWorkspace(
-                workspaceId,
-                REVIEWING_PRACTICE_AREA_SLUG,
-                since.get()
-            )
+        Instant since = reviewCycleWindowResolver.previousCycleWindow(workspace.get()).after();
+        List<PracticeArea> areas = activeAreas(workspaceId);
+        Map<String, Map<Long, AreaAccumulation>> byAreaThenDeveloper = rollUpByAreaThenDeveloper(
+            observationRepository.findAreaRollupStandingBetween(workspaceId, since, Instant.now())
         );
 
-        List<CohortPracticeStatusDTO> cards = new ArrayList<>();
-        for (Practice practice : reviewingPractices) {
-            List<CohortStandingRow> rows = rowsByPractice.getOrDefault(practice.getSlug(), List.of());
-            if (rows.size() < K_ANONYMITY_THRESHOLD) {
-                cards.add(CohortPracticeStatusDTO.suppressed(practice.getSlug(), practice.getName()));
+        List<CohortAreaStatusDTO> cards = new ArrayList<>();
+        for (PracticeArea area : areas) {
+            Map<Long, AreaAccumulation> byDeveloper = byAreaThenDeveloper.getOrDefault(area.getSlug(), Map.of());
+            // Zero active developers is NOT a privacy risk (nobody to re-identify) — distinguish it from
+            // k-anonymity suppression, which applies only once there IS some (too-small) activity.
+            if (byDeveloper.isEmpty()) {
+                cards.add(CohortAreaStatusDTO.noData(area.getSlug(), area.getName()));
+                continue;
+            }
+            if (byDeveloper.size() < K_ANONYMITY_THRESHOLD) {
+                cards.add(CohortAreaStatusDTO.suppressed(area.getSlug(), area.getName()));
                 continue;
             }
             int strength = 0;
             int developing = 0;
             int mixed = 0;
             int noActivity = 0;
-            for (CohortStandingRow row : rows) {
-                switch (standingOf(row)) {
+            for (AreaAccumulation acc : byDeveloper.values()) {
+                switch (PracticeStatusDeriver.derive(acc.bad() > 0, acc.good() > 0)) {
                     case STRENGTH -> strength++;
                     case DEVELOPING -> developing++;
                     case MIXED -> mixed++;
@@ -99,13 +108,14 @@ public class PracticeReportService {
                 }
             }
             if (hasSmallBucket(strength, developing, mixed, noActivity)) {
-                cards.add(CohortPracticeStatusDTO.suppressed(practice.getSlug(), practice.getName()));
+                cards.add(CohortAreaStatusDTO.suppressed(area.getSlug(), area.getName()));
                 continue;
             }
             cards.add(
-                new CohortPracticeStatusDTO(
-                    practice.getSlug(),
-                    practice.getName(),
+                new CohortAreaStatusDTO(
+                    area.getSlug(),
+                    area.getName(),
+                    false,
                     false,
                     strength,
                     developing,
@@ -128,52 +138,65 @@ public class PracticeReportService {
 
     @Transactional(readOnly = true)
     public List<PracticeReportSummaryDTO> listReports(Long workspaceId) {
-        Optional<Instant> since = windowSince(workspaceId);
-        if (since.isEmpty()) {
+        Optional<Workspace> workspace = findWorkspace(workspaceId);
+        if (workspace.isEmpty()) {
             return List.of();
         }
-        List<Practice> reviewingPractices = reviewingPractices(workspaceId);
-        List<CohortStandingRow> rows = observationRepository.findCohortStandingByAreaAndWorkspace(
+        Instant since = reviewCycleWindowResolver.previousCycleWindow(workspace.get()).after();
+        ReviewCycleWindowResolver.CycleWindow priorWindow = reviewCycleWindowResolver.priorCycleWindow(workspace.get());
+
+        List<PracticeArea> areas = activeAreas(workspaceId);
+        List<AreaRollupRow> currentRows = observationRepository.findAreaRollupStandingBetween(
             workspaceId,
-            REVIEWING_PRACTICE_AREA_SLUG,
-            since.get()
+            since,
+            Instant.now()
+        );
+        // ONE extra query for the whole roster request (not per developer/area) to power the trend column.
+        List<AreaRollupRow> priorRows = observationRepository.findAreaRollupStandingBetween(
+            workspaceId,
+            priorWindow.after(),
+            priorWindow.before()
         );
 
-        Map<Long, List<CohortStandingRow>> byDeveloper = new LinkedHashMap<>();
-        for (CohortStandingRow row : rows) {
-            byDeveloper.computeIfAbsent(row.getAboutUserId(), k -> new ArrayList<>()).add(row);
-        }
+        Map<Long, DeveloperIdentity> identities = collectIdentities(currentRows);
+        Map<Long, Map<String, AreaAccumulation>> currentByDeveloper = rollUpByDeveloperThenArea(currentRows);
+        Map<Long, Map<String, AreaAccumulation>> priorByDeveloper = rollUpByDeveloperThenArea(priorRows);
 
         record RosterAccumulator(PracticeReportSummaryDTO entry, int attentionCount) {}
         List<RosterAccumulator> accumulators = new ArrayList<>();
-        for (List<CohortStandingRow> developerRows : byDeveloper.values()) {
-            CohortStandingRow identity = developerRows.get(0);
-            Map<String, PracticeStatus> standingBySlug = new LinkedHashMap<>();
-            for (CohortStandingRow row : developerRows) {
-                standingBySlug.put(row.getPracticeSlug(), standingOf(row));
-            }
-            List<PracticeStatusCellDTO> cells = new ArrayList<>();
+        for (Map.Entry<Long, Map<String, AreaAccumulation>> entry : currentByDeveloper.entrySet()) {
+            Long userId = entry.getKey();
+            Map<String, AreaAccumulation> currentAreaAcc = entry.getValue();
+            Map<String, AreaAccumulation> priorAreaAcc = priorByDeveloper.getOrDefault(userId, Map.of());
+            DeveloperIdentity identity = identities.get(userId);
+
+            List<AreaStandingCellDTO> cells = new ArrayList<>();
             int attentionCount = 0;
             List<String> attentionReasons = new ArrayList<>();
-            for (Practice practice : reviewingPractices) {
-                PracticeStatus standing = standingBySlug.getOrDefault(practice.getSlug(), PracticeStatus.NO_ACTIVITY);
-                cells.add(new PracticeStatusCellDTO(practice.getSlug(), practice.getName(), standing));
-                if (PracticeStatusDeriver.needsAttention(standing)) {
+            for (PracticeArea area : areas) {
+                AreaAccumulation current = currentAreaAcc.getOrDefault(area.getSlug(), AreaAccumulation.EMPTY);
+                PracticeStatus currentStanding = PracticeStatusDeriver.derive(current.bad() > 0, current.good() > 0);
+                AreaAccumulation prior = priorAreaAcc.getOrDefault(area.getSlug(), AreaAccumulation.EMPTY);
+                PracticeStatus priorStanding = PracticeStatusDeriver.derive(prior.bad() > 0, prior.good() > 0);
+                PracticeTrend trend = PracticeStatusDeriver.trendOf(priorStanding, currentStanding);
+
+                cells.add(new AreaStandingCellDTO(area.getSlug(), area.getName(), currentStanding, trend));
+                if (PracticeStatusDeriver.needsAttention(currentStanding)) {
                     attentionCount++;
-                    attentionReasons.add(attentionReasonFor(practice.getName(), standing));
+                    attentionReasons.add(attentionReasonFor(area.getName(), currentStanding));
                 }
             }
             boolean needsAttention = attentionCount > 0;
-            PracticeReportSummaryDTO entry = new PracticeReportSummaryDTO(
-                identity.getAboutUserId(),
-                identity.getUserLogin(),
-                identity.getUserName(),
-                identity.getAvatarUrl(),
+            PracticeReportSummaryDTO summary = new PracticeReportSummaryDTO(
+                userId,
+                identity.login(),
+                identity.name(),
+                identity.avatarUrl(),
                 cells,
                 needsAttention,
                 attentionReasons
             );
-            accumulators.add(new RosterAccumulator(entry, attentionCount));
+            accumulators.add(new RosterAccumulator(summary, attentionCount));
         }
 
         accumulators.sort(
@@ -202,13 +225,13 @@ public class PracticeReportService {
     }
 
     private void validateSubjectInCurrentRoster(Long workspaceId, Long subjectUserId) {
-        Optional<Instant> since = windowSince(workspaceId);
+        Optional<Workspace> workspace = findWorkspace(workspaceId);
         boolean present =
-            since.isPresent() &&
-            observationRepository.existsVisibleReportSubjectByAreaAndWorkspace(
+            workspace.isPresent() &&
+            observationRepository.existsVisibleReportSubjectBetween(
                 workspaceId,
-                REVIEWING_PRACTICE_AREA_SLUG,
-                since.get(),
+                reviewCycleWindowResolver.previousCycleWindow(workspace.get()).after(),
+                Instant.now(),
                 subjectUserId
             );
         if (!present) {
@@ -216,32 +239,64 @@ public class PracticeReportService {
         }
     }
 
-    private List<Practice> reviewingPractices(Long workspaceId) {
-        return practiceRepository.findActiveByWorkspaceIdAndAreaSlugOrderByDisplayOrder(
-            workspaceId,
-            REVIEWING_PRACTICE_AREA_SLUG
-        );
+    private List<PracticeArea> activeAreas(Long workspaceId) {
+        return practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(workspaceId);
     }
 
-    private static Map<String, List<CohortStandingRow>> groupRowsByPractice(List<CohortStandingRow> rows) {
-        Map<String, List<CohortStandingRow>> byPractice = new LinkedHashMap<>();
-        for (CohortStandingRow row : rows) {
-            byPractice.computeIfAbsent(row.getPracticeSlug(), k -> new ArrayList<>()).add(row);
+    private static Map<Long, DeveloperIdentity> collectIdentities(List<AreaRollupRow> rows) {
+        Map<Long, DeveloperIdentity> identities = new LinkedHashMap<>();
+        for (AreaRollupRow row : rows) {
+            identities.putIfAbsent(
+                row.getAboutUserId(),
+                new DeveloperIdentity(row.getUserLogin(), row.getUserName(), row.getAvatarUrl())
+            );
         }
-        return byPractice;
+        return identities;
     }
 
-    private static PracticeStatus standingOf(CohortStandingRow row) {
-        boolean hasProblems = row.getBadCount() != null && row.getBadCount() > 0;
-        boolean hasStrengths = row.getGoodCount() != null && row.getGoodCount() > 0;
-        return PracticeStatusDeriver.derive(hasProblems, hasStrengths);
+    private static Map<Long, Map<String, AreaAccumulation>> rollUpByDeveloperThenArea(List<AreaRollupRow> rows) {
+        Map<Long, Map<String, AreaAccumulation>> result = new LinkedHashMap<>();
+        for (AreaRollupRow row : rows) {
+            result
+                .computeIfAbsent(row.getAboutUserId(), k -> new LinkedHashMap<>())
+                .merge(row.getAreaSlug(), AreaAccumulation.of(row), AreaAccumulation::plus);
+        }
+        return result;
     }
 
-    private static String attentionReasonFor(String practiceName, PracticeStatus standing) {
+    private static Map<String, Map<Long, AreaAccumulation>> rollUpByAreaThenDeveloper(List<AreaRollupRow> rows) {
+        Map<String, Map<Long, AreaAccumulation>> result = new LinkedHashMap<>();
+        for (AreaRollupRow row : rows) {
+            result
+                .computeIfAbsent(row.getAreaSlug(), k -> new LinkedHashMap<>())
+                .merge(row.getAboutUserId(), AreaAccumulation.of(row), AreaAccumulation::plus);
+        }
+        return result;
+    }
+
+    private static String attentionReasonFor(String areaName, PracticeStatus standing) {
         return switch (standing) {
-            case DEVELOPING -> practiceName + ": gaps to work on this cycle";
-            case MIXED -> practiceName + ": some strengths, some gaps to work on";
-            case STRENGTH, NO_ACTIVITY -> practiceName; // not reachable (needsAttention filters these out)
+            case DEVELOPING -> areaName + ": gaps to work on this cycle";
+            case MIXED -> areaName + ": some strengths, some gaps to work on";
+            case STRENGTH, NO_ACTIVITY -> areaName; // not reachable (needsAttention filters these out)
         };
+    }
+
+    /** A developer's identity fields, captured once from their first current-window row. */
+    private record DeveloperIdentity(String login, String name, String avatarUrl) {}
+
+    /** Sum of good/bad signal across a (developer, area)'s practices in a window. */
+    private record AreaAccumulation(long good, long bad) {
+        static final AreaAccumulation EMPTY = new AreaAccumulation(0, 0);
+
+        static AreaAccumulation of(AreaRollupRow row) {
+            long good = row.getGoodCount() == null ? 0 : row.getGoodCount();
+            long bad = row.getBadCount() == null ? 0 : row.getBadCount();
+            return new AreaAccumulation(good, bad);
+        }
+
+        AreaAccumulation plus(AreaAccumulation other) {
+            return new AreaAccumulation(good + other.good, bad + other.bad);
+        }
     }
 }

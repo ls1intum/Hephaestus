@@ -1592,7 +1592,7 @@ export const getCohortPracticeStatusQueryKey = (options: Options<GetCohortPracti
 /**
  * Cohort practice status
  *
- * Per reviewing practice, how many developers stand at each status (k-anonymised, K=5 with small-bucket suppression). Admins/owners always; members only when the workspace cohort visibility is EVERYONE.
+ * Per practice area, how many developers stand at each status (k-anonymised, K=5 with small-bucket suppression). An area with zero active developers is marked no-data rather than suppressed — there is nobody to re-identify. Admins/owners always; members only when the workspace cohort visibility is EVERYONE.
  */
 export const getCohortPracticeStatusOptions = (options: Options<GetCohortPracticeStatusData>) => queryOptions<GetCohortPracticeStatusResponse, GetCohortPracticeStatusError, GetCohortPracticeStatusResponse, ReturnType<typeof getCohortPracticeStatusQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1797,7 +1797,7 @@ export const listPracticeReportsQueryKey = (options: Options<ListPracticeReports
 /**
  * List developer practice reports (admin/owner only)
  *
- * One summary per developer with activity in the window: per-practice status + a needs-attention triage flag. Sorted needs-attention-first then login. Not a scoreboard — no score/rank.
+ * One summary per developer with activity in the window: per-area status (rolled up across that area's practices, with a cycle-over-cycle trend) + a needs-attention triage flag. Sorted needs-attention-first then login. Not a scoreboard — no score/rank.
  */
 export const listPracticeReportsOptions = (options: Options<ListPracticeReportsData>) => queryOptions<ListPracticeReportsResponse, ListPracticeReportsError, ListPracticeReportsResponse, ReturnType<typeof listPracticeReportsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

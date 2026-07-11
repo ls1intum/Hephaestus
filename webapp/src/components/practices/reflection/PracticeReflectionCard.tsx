@@ -1,6 +1,7 @@
 import { CircleAlert, CircleCheck, CircleDot } from "lucide-react";
 import type { PracticeReportCard, PracticeReportItem } from "@/api/types.gen";
 import { StandingChip } from "@/components/practices/StandingChip";
+import { TrendNote } from "@/components/practices/TrendBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -58,7 +59,7 @@ export interface PracticeReflectionCardProps {
  * to work on. Reused by the developer self-view and the mentor drill-down.
  */
 export function PracticeReflectionCard({ practice }: PracticeReflectionCardProps) {
-	const { name, areaName, standing, whyItMatters, strengths, toWorkOn } = practice;
+	const { name, areaName, standing, trend, whyItMatters, strengths, toWorkOn } = practice;
 	const hasStrengths = strengths.length > 0;
 	const hasToWorkOn = toWorkOn.length > 0;
 
@@ -76,6 +77,7 @@ export function PracticeReflectionCard({ practice }: PracticeReflectionCardProps
 					</div>
 					<StandingChip standing={standing} />
 				</div>
+				<TrendNote trend={trend} />
 				{whyItMatters && (
 					<p className="text-sm italic text-muted-foreground">
 						<span className="not-italic font-medium">Why this matters:</span> {whyItMatters}
