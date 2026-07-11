@@ -54,7 +54,7 @@ import lombok.ToString;
  * ConnectionService}. Use {@code ConnectionService.findActiveProviderKind(workspaceId)}
  * to classify a workspace at runtime and the typed accessors
  * ({@code findActiveGitHubAppConfig}, {@code findActiveGitLabConfig},
- * {@code findSlackNotificationConfig}, {@code findActiveBearerToken}) to read
+ * {@code findSlackConfig}, {@code findActiveBearerToken}) to read
  * per-Connection state.
  *
  * <h2>Lifecycle States</h2>

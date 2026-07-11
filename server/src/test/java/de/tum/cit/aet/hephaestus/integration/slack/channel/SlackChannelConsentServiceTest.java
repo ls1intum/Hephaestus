@@ -317,8 +317,8 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     @Test
     void register_new_landsInPending_created() {
         when(monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(WS, CHANNEL)).thenReturn(Optional.empty());
-        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.SlackConfig("T1", null, null, null, null, Set.of()))
+        when(connectionService.findSlackConfig(WS)).thenReturn(
+            Optional.of(new ConnectionConfig.SlackConfig("T1", null, null, null, Set.of()))
         );
         when(monitoredChannelRepository.save(ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -368,7 +368,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         // A purely-admin registration of an unseen channel needs an ACTIVE Slack connection to know the team id; its
         // absence is a 404.
         when(monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(WS, CHANNEL)).thenReturn(Optional.empty());
-        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(Optional.empty());
+        when(connectionService.findSlackConfig(WS)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().register(WS, CHANNEL, "general")).isInstanceOf(
             EntityNotFoundException.class

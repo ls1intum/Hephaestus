@@ -128,10 +128,9 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         ConnectionConfig.SlackConfig original = new ConnectionConfig.SlackConfig(
             "T123",
             "Acme Slack",
-            "C456",
             "Engineering",
             /* retentionDays */ null,
-            Set.of("leaderboard")
+            Set.of("conversations")
         );
         Long id = persistAndClear(IntegrationKind.SLACK, "T123", original);
 
@@ -140,11 +139,44 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         ConnectionConfig.SlackConfig cfg = (ConnectionConfig.SlackConfig) reloaded.getConfig();
         assertThat(cfg.teamId()).isEqualTo("T123");
         assertThat(cfg.teamName()).isEqualTo("Acme Slack");
-        assertThat(cfg.notificationChannelId()).isEqualTo("C456");
         assertThat(cfg.teamLabel()).isEqualTo("Engineering");
-        assertThat(cfg.enabledStreams()).containsExactly("leaderboard");
+        assertThat(cfg.enabledStreams()).containsExactly("conversations");
 
         assertDiscriminator(id, "SLACK");
+    }
+
+    @Test
+    void slackConfig_toleratesRetiredNotificationChannelKeyInStoredJson() {
+        // Rows written before the weekly-digest removal still carry "notificationChannelId" in the
+        // stored config JSON; Hibernate's real deserialization path must ignore the retired key.
+        ConnectionConfig.SlackConfig original = new ConnectionConfig.SlackConfig(
+            "T123",
+            "Acme Slack",
+            "Engineering",
+            30,
+            Set.of("conversations")
+        );
+        Long id = persistAndClear(IntegrationKind.SLACK, "T123", original);
+
+        String legacyJson =
+            "{\"type\":\"SLACK\",\"teamId\":\"T123\",\"teamName\":\"Acme Slack\"," +
+            "\"notificationChannelId\":\"C456\",\"teamLabel\":\"Engineering\"," +
+            "\"retentionDays\":30,\"enabledStreams\":[\"conversations\"]}";
+        entityManager
+            .createNativeQuery(
+                "UPDATE connection SET config = CAST(:json AS jsonb) WHERE id = :id AND workspace_id = :wsId"
+            )
+            .setParameter("json", legacyJson)
+            .setParameter("id", id)
+            .setParameter("wsId", workspace.getId())
+            .executeUpdate();
+        entityManager.clear();
+
+        Connection reloaded = connectionRepository.findById(id).orElseThrow();
+        assertThat(reloaded.getConfig()).isInstanceOf(ConnectionConfig.SlackConfig.class);
+        ConnectionConfig.SlackConfig cfg = (ConnectionConfig.SlackConfig) reloaded.getConfig();
+        assertThat(cfg.teamId()).isEqualTo("T123");
+        assertThat(cfg.teamLabel()).isEqualTo("Engineering");
     }
 
     @Test

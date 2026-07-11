@@ -75,13 +75,10 @@ public sealed interface ConnectionConfig
         }
     }
 
-    /** Slack bot identity, notification channel, enabled streams, and message-retention configuration. */
+    /** Slack bot identity, enabled streams, and message-retention configuration. */
     record SlackConfig(
         @Nullable String teamId,
         @Nullable String teamName,
-        // Retained for stored-config JSON compatibility; nothing writes or reads it since the
-        // weekly-digest removal (ADR 0023).
-        @Nullable String notificationChannelId,
         @Nullable String teamLabel,
         @Nullable Integer retentionDays,
         Set<String> enabledStreams

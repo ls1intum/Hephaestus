@@ -173,10 +173,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     void compose_forIssueArtifact_usesNonBlockingTightenCta() {
         // W3: Hephaestus is non-blocking. The CTA is state-neutral feed-forward ("to tighten"), never the
         // gatekeeping "to fix before merging" — and that holds for issues (which are never merged) too.
-        DeliveryContent result = DeliveryComposer.compose(
-            mixedFindings(),
-            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
-        );
+        DeliveryContent result = DeliveryComposer.compose(mixedFindings(), WorkArtifact.ISSUE);
 
         assertThat(result).isNotNull();
         String mrNote = result.mrNote();

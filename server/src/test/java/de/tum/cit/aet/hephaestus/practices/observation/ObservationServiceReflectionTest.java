@@ -16,7 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
 import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportItemDTO;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver.CycleWindow;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -53,10 +57,10 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository workspaceRepository;
+    private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver reviewCycleWindowResolver;
+    private ReviewCycleWindowResolver reviewCycleWindowResolver;
 
     @InjectMocks
     private ObservationService observationService;
@@ -68,14 +72,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
         // The self-view resolves the workspace then its review-cycle window; the recency `since` is passed as
         // any(Instant) to the finding query, so the concrete instant here is irrelevant.
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(
-            Optional.of(new de.tum.cit.aet.hephaestus.workspace.Workspace())
-        );
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(new Workspace()));
         when(reviewCycleWindowResolver.previousCycleWindow(any())).thenReturn(
-            new de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver.CycleWindow(
-                Instant.now().minusSeconds(604800),
-                Instant.now()
-            )
+            new ReviewCycleWindowResolver.CycleWindow(Instant.now().minusSeconds(604800), Instant.now())
         );
     }
 

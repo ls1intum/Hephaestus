@@ -54,7 +54,7 @@ class SlackMessageServiceLiveTest {
             workspace,
             IntegrationKind.SLACK,
             "T-live-e2e",
-            new ConnectionConfig.SlackConfig("T-live-e2e", "hephaestus-test", channelId, null, null, Set.of())
+            new ConnectionConfig.SlackConfig("T-live-e2e", "hephaestus-test", null, null, Set.of())
         );
         connection.setState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken(botToken, null), converter);

@@ -113,7 +113,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             workspace,
             IntegrationKind.SLACK,
             "T1",
-            new ConnectionConfig.SlackConfig("T1", "Acme", null, null, null, Set.of())
+            new ConnectionConfig.SlackConfig("T1", "Acme", null, null, Set.of())
         );
         connection.setState(IntegrationState.UNINSTALLED);
 

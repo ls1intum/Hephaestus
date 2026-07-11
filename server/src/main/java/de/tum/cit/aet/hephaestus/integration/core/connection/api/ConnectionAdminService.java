@@ -199,7 +199,6 @@ public class ConnectionAdminService {
             case SLACK -> new ConnectionConfig.SlackConfig(
                 instanceKey,
                 /* teamName */ null,
-                /* notificationChannelId */ null,
                 /* teamLabel */ null,
                 /* retentionDays */ null,
                 enabledStreams

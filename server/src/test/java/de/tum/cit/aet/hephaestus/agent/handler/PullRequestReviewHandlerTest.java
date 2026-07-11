@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -187,7 +188,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    WorkArtifact.PULL_REQUEST
                 )
             )
             .thenReturn(samplePractices());
@@ -258,7 +259,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
 
@@ -308,7 +309,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
@@ -323,7 +324,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(List.of());
 
@@ -351,7 +352,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
+                    WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
 

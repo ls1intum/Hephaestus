@@ -199,7 +199,7 @@ public class OAuthCallbackService {
                 ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                 new HashSet<>()
             );
-            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, new HashSet<>());
+            case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, new HashSet<>());
         };
     }
 

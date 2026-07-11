@@ -121,7 +121,6 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         ConnectionConfig.SlackConfig config = new ConnectionConfig.SlackConfig(
             r.team().id(),
             r.team().name(),
-            /* notificationChannelId */ null,
             /* teamLabel */ null,
             /* retentionDays */ null,
             Set.of()

@@ -17,10 +17,14 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -54,7 +58,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository practiceRevisionRepository;
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Mock
     private ObservationRepository observationRepository;
@@ -63,10 +67,10 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private PullRequestRepository pullRequestRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
+    private IssueRepository issueRepository;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository userRepository;
+    private UserRepository userRepository;
 
     @Mock
     private ReviewerResolver reviewerResolver;
@@ -549,7 +553,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void routesToIssueTargetAndAuthorWhenArtifactTypeIsIssue() {
             // Job carries artifact_type=ISSUE + issue_id → resolve the Issue (TYPE-filtered) + its author.
-            var issue = new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
+            var issue = new Issue();
             ReflectionTestUtils.setField(issue, "id", 999L);
             issue.setAuthor(testAuthor);
             when(issueRepository.findByIdWithAuthor(999L)).thenReturn(Optional.of(issue));
