@@ -4,6 +4,14 @@
 **Date:** 2026-05-26
 **Authors:** Felix T.J. Dietrich
 
+> **Note (amended detail):** The Slack weekly-leaderboard digest fan-out
+> (`SlackLeaderboardDigestPublisher`) described below is being retired behind the per-workspace
+> leaderboard feature flag
+> ([ADR 0023](0023-retire-competitive-leaderboard-for-practice-surfaces.md)): it still ships, but only
+> fires for workspaces with `leaderboardEnabled` on, and new workspaces default it off. The unified
+> integration framework and its package layout are unaffected. The rest of this ADR is preserved as
+> originally recorded.
+
 ## Context
 
 Before #1198, each vendor (GitHub, GitLab, Slack-as-notification) had its own
