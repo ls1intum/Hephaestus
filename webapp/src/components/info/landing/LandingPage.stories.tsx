@@ -26,7 +26,7 @@ const meta = {
 		},
 		onGoToDashboard: {
 			description:
-				"Callback function triggered when the 'Go to Dashboard' button is clicked (for signed-in users)",
+				"Callback function triggered when the 'Go to dashboard' button is clicked (for signed-in users)",
 			action: "go to dashboard",
 		},
 		isSignedIn: {
@@ -45,7 +45,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default landing page view for first-time visitors and anonymous users.
- * Features prominent "Get Started" CTAs directing to the sign-in flow.
+ * Features prominent "Sign in" CTAs directing to the sign-in flow.
  */
 export const Default: Story = {
 	args: {
@@ -55,7 +55,7 @@ export const Default: Story = {
 
 /**
  * Landing page view for users who are already authenticated.
- * "Get Started" buttons are replaced with "Go to Dashboard" to provide
+ * "Sign in" buttons are replaced with "Go to dashboard" to provide
  * quick access to the user's workspace.
  */
 export const SignedIn: Story = {

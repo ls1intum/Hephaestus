@@ -38,7 +38,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default testimonial section for first-time visitors.
- * Features "Get Started" CTA and testimonial cards.
+ * Features the testimonial cards.
  */
 export const Default: Story = {
 	args: {
@@ -48,7 +48,7 @@ export const Default: Story = {
 
 /**
  * Testimonial section for authenticated users.
- * "Get Started" button is replaced with "Go to Dashboard".
+ * The section content does not change with authentication state.
  */
 export const SignedIn: Story = {
 	args: {

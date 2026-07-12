@@ -25,7 +25,7 @@ const meta = {
 			action: "signed in",
 		},
 		onGoToDashboard: {
-			description: "Callback function triggered when the 'Go to Dashboard' button is clicked",
+			description: "Callback function triggered when the 'Go to dashboard' button is clicked",
 			action: "go to dashboard",
 		},
 		isSignedIn: {
@@ -59,7 +59,7 @@ export const Default: Story = {
 
 /**
  * Hero section for authenticated users.
- * "Get Started" button is replaced with "Go to Dashboard".
+ * "Sign in" button is replaced with "Go to dashboard".
  */
 export const SignedIn: Story = {
 	args: {

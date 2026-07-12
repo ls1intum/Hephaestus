@@ -21,8 +21,8 @@ const faqItems = [
 	},
 	{
 		key: "faq-item-3",
-		q: "How does Heph, your AI mentor, work?",
-		a: "Heph looks at your pull requests, issues, and reviews and gives you feedback on what was done well, what could be better, and a way to get there. You can also chat with it about your work, in the app or in Slack.",
+		q: "How does Heph work?",
+		a: "Heph reads your pull requests, issues, and reviews, then names your strongest habit and the one change that would help most. You can also chat with it about your work, in the app or in Slack.",
 	},
 	{
 		key: "faq-item-4",

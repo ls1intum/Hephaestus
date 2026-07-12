@@ -40,7 +40,7 @@ export function LandingFeaturesSection() {
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Names what was done well, what could be better, and a way to get there
+										Highlights what you did well alongside what to improve, with a concrete fix
 									</span>
 								</li>
 								<li className="flex gap-2 items-start">

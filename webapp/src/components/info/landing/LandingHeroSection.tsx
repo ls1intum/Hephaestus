@@ -50,16 +50,19 @@ export function LandingHeroSection({
 				</div>
 			</div>
 
-			{/* Mentor feedback preview */}
+			{/* Mentor feedback preview (decorative mock conversation, hidden from assistive tech) */}
 			<div className="mx-auto max-w-2xl px-4 md:px-6">
-				<div className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3 bg-background text-left">
+				<div
+					aria-hidden="true"
+					className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3 bg-background text-left"
+				>
 					<div className="flex items-center gap-2 border-b border-muted px-4 py-3">
 						<MentorIcon size={24} className="text-primary" />
 						<span className="text-sm font-medium">Heph</span>
 						<span className="text-xs text-muted-foreground">on your pull request</span>
 					</div>
 					<div
-						className="space-y-3 px-4 py-4 text-sm"
+						className="space-y-3 px-4 py-4 text-sm pointer-events-none"
 						style={{
 							maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0))",
 						}}

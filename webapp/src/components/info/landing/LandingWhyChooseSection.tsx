@@ -57,7 +57,7 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">You stay in charge</p>
 									<p className="text-sm text-muted-foreground">
-										Act on the feedback, push back with a reason, or let it pass
+										Feedback is advisory. You decide what to take up and what to skip
 									</p>
 								</div>
 							</li>
