@@ -4,6 +4,11 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.core.audit.DataAccessAuditWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -67,6 +72,12 @@ class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private PullRequestRepository pullRequestRepository;
 
     private Workspace workspace;
     private Practice reviewPractice;
@@ -378,6 +389,77 @@ class PracticeReportControllerIntegrationTest extends AbstractWorkspaceIntegrati
             .isEqualTo(1)
             .jsonPath("$[0].toWorkOn[0].title")
             .isEqualTo("Recent gap");
+    }
+
+    @Test
+    @WithUser
+    @DisplayName("self report items are anchored to their PR: title, deep link, repository and state are served")
+    void reflectionItemsCarryArtifactContext() {
+        User dev = getMemberUser();
+        var provider = ensureGitHubProvider();
+        Repository repo = new Repository();
+        repo.setNativeId(9001L);
+        repo.setProvider(provider);
+        repo.setName("payments-api");
+        repo.setNameWithOwner("acme/payments-api");
+        repo.setHtmlUrl("https://github.com/acme/payments-api");
+        repo.setDefaultBranch("main");
+        repo = repositoryRepository.save(repo);
+
+        PullRequest pullRequest = new PullRequest();
+        pullRequest.setNativeId(9002L);
+        pullRequest.setProvider(provider);
+        pullRequest.setNumber(575);
+        pullRequest.setTitle("Add distance warnings to the AR recorder");
+        pullRequest.setHtmlUrl("https://github.com/acme/payments-api/pull/575");
+        pullRequest.setState(Issue.State.MERGED);
+        pullRequest.setRepository(repo);
+        pullRequest.setCreatedAt(Instant.now());
+        pullRequest.setUpdatedAt(Instant.now());
+        pullRequest = pullRequestRepository.save(pullRequest);
+        insertObservation(reviewPractice, dev, "A gap", "ABSENT", "MAJOR", pullRequest.getId(), Instant.now());
+
+        webTestClient
+            .get()
+            .uri(REPORTS_URI + "/me", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$[0].toWorkOn[0].artifactTitle")
+            .isEqualTo("Add distance warnings to the AR recorder")
+            .jsonPath("$[0].toWorkOn[0].artifactUrl")
+            .isEqualTo("https://github.com/acme/payments-api/pull/575")
+            .jsonPath("$[0].toWorkOn[0].artifactNumber")
+            .isEqualTo(575)
+            .jsonPath("$[0].toWorkOn[0].artifactRepository")
+            .isEqualTo("acme/payments-api")
+            .jsonPath("$[0].toWorkOn[0].artifactState")
+            .isEqualTo("MERGED")
+            .jsonPath("$[0].toWorkOn[0].observedAt")
+            .exists();
+    }
+
+    @Test
+    @WithUser
+    @DisplayName("an observation whose artifact no longer resolves is served without a deep link, never failing")
+    void reflectionToleratesUnresolvableArtifact() {
+        User dev = getMemberUser();
+        insertObservation(reviewPractice, dev, "A gap", "ABSENT", "MAJOR", 424242L, Instant.now());
+
+        webTestClient
+            .get()
+            .uri(REPORTS_URI + "/me", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$[0].toWorkOn[0].artifactTitle")
+            .doesNotExist()
+            .jsonPath("$[0].toWorkOn[0].artifactUrl")
+            .doesNotExist();
     }
 
     /** The @WithUser default login is "testuser"; ensure it is a member with a persisted User row. */

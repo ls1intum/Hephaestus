@@ -23,6 +23,8 @@ const meta = {
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
 		leaderboardEnabled: true,
+		practicesEnabled: true,
+		isAdmin: false,
 	},
 	argTypes: {
 		username: {
@@ -40,6 +42,14 @@ const meta = {
 		leaderboardEnabled: {
 			control: "boolean",
 			description: "Whether leaderboard sidebar item is visible",
+		},
+		practicesEnabled: {
+			control: "boolean",
+			description: "Whether the practice sidebar items are visible",
+		},
+		isAdmin: {
+			control: "boolean",
+			description: "Whether the admin-only practice overview entry is visible",
 		},
 	},
 	decorators: [
@@ -76,5 +86,15 @@ export const AllFeaturesDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
+		practicesEnabled: false,
+	},
+};
+
+/**
+ * A workspace admin additionally sees the practice overview entry.
+ */
+export const AdminWithPractices: Story = {
+	args: {
+		isAdmin: true,
 	},
 };

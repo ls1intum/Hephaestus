@@ -33,6 +33,10 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
    - **Automated standups:** Turn weekly insights into a concise standup table to streamline team communication and accountability.
    - **Repo context awareness:** Ground guidance in actual activity (issues, commits, reviews, PRs) to deliver objective, data-informed feedback and next steps.
 
+3. **Practice Surfaces**
+
+   - **My practices:** Each developer gets an opinionated short list of at most three engineering practices to focus on this cycle, with every signal deep-linking the pull request or issue it came from and one concrete next step. **Practice overview** gives workspace admins an anonymised health rollup per practice area plus a scannable developers-by-areas matrix with a per-developer drill-down, ordered as a triage aid. Statuses are criterion-referenced per practice, aggregate counts stay suppressed below five active developers, and every detailed view is recorded in an audit log.
+
 ## Roadmap
 
 - **Short Term:** Develop initial workspace support by moving environment variable configuration into a user-friendly workspace settings UI for setting up API credentials, webhooks, etc.

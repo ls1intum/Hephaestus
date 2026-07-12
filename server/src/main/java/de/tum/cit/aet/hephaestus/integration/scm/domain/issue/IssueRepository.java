@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +46,14 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     /** Fetches an issue with its repository eagerly — used to build an issue-detection job submission. */
     @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepository(@Param("id") long id);
+
+    /**
+     * Batch-fetches issues AND pull requests (no {@code TYPE} restriction — the practice report needs both)
+     * with their repositories eagerly, so a report surface can anchor each observation to the concrete
+     * artifact it came from (title, link, repository) in one query rather than one lazy load per item.
+     */
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE i.id IN :ids")
+    List<Issue> findAllWithRepositoryByIdIn(@Param("ids") Collection<Long> ids);
 
     /**
      * Fetches an issue with its author eagerly — used by the practice-detection delivery path to resolve

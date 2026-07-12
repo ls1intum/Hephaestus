@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Sparkles, Trophy, User, Users } from "lucide-react";
+import { Radar, Sparkles, Sprout, Trophy, User, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -13,11 +13,16 @@ export function NavDashboards({
 	workspaceSlug,
 	achievementsEnabled = true,
 	leaderboardEnabled = true,
+	practicesEnabled = true,
+	isAdmin = false,
 }: {
 	username: string;
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	leaderboardEnabled?: boolean;
+	practicesEnabled?: boolean;
+	/** Gates the mentor-facing practice overview entry (the route and API are admin/owner only). */
+	isAdmin?: boolean;
 }) {
 	return (
 		<SidebarGroup>
@@ -37,6 +42,28 @@ export function NavDashboards({
 						<span>Profile</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
+				{practicesEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="My practices"
+							render={<Link to="/w/$workspaceSlug/practices" params={{ workspaceSlug }} />}
+						>
+							<Sprout />
+							<span>My practices</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{practicesEnabled && isAdmin && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Practice overview"
+							render={<Link to="/w/$workspaceSlug/practice-overview" params={{ workspaceSlug }} />}
+						>
+							<Radar />
+							<span>Practice overview</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 				{achievementsEnabled && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
