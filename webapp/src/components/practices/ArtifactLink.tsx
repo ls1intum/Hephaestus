@@ -25,6 +25,12 @@ export interface ArtifactLinkProps {
  */
 export function ArtifactLink({ item, className }: ArtifactLinkProps) {
 	const repoShortName = item.artifactRepository?.split("/")[1];
+	const reference = [
+		repoShortName,
+		item.artifactNumber != null ? `#${item.artifactNumber}` : undefined,
+	]
+		.filter(Boolean)
+		.join(" ");
 	const fallbackLabel =
 		item.artifactType === "CONVERSATION_THREAD" ? "A team conversation" : "A work item";
 	return (
@@ -45,9 +51,8 @@ export function ArtifactLink({ item, className }: ArtifactLinkProps) {
 				</span>
 			)}
 			<span className="shrink-0 text-xs text-muted-foreground">
-				{repoShortName}
-				{item.artifactNumber != null ? ` #${item.artifactNumber}` : null}
-				{` · ${formatWhen(item.observedAt)}`}
+				{reference ? `${reference} · ` : ""}
+				{formatWhen(item.observedAt)}
 			</span>
 		</span>
 	);

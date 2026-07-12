@@ -108,7 +108,7 @@ export function DrillDownSheet({
 	const groups = groupByArea(cards ?? []);
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
-			<SheetContent side="right" className="w-full overflow-y-auto data-[side=right]:sm:max-w-md">
+			<SheetContent side="right" className="w-full overflow-y-auto data-[side=right]:sm:max-w-lg">
 				{developer && (
 					<>
 						<SheetHeader>

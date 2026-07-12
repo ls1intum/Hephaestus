@@ -22,6 +22,10 @@ import { cn } from "@/lib/utils";
  * The one shared visual vocabulary for status and trend across every practice surface.
  * Status is criterion referenced per practice and carries no number and no rank. Trend copy
  * is blame free by construction ("Declining since last cycle", never "Slipped").
+ *
+ * The dot encodes each status in shape as well as colour so the vocabulary survives colour
+ * blindness: STRENGTH is a solid round dot, DEVELOPING a solid square, NO_ACTIVITY a hollow
+ * ring, and MIXED a round dot at reduced weight.
  */
 export const STATUS_META: Record<
 	PracticeStatus,
@@ -29,22 +33,22 @@ export const STATUS_META: Record<
 > = {
 	STRENGTH: {
 		label: "Strength",
-		dotClassName: "bg-provider-success-foreground",
+		dotClassName: "rounded-full bg-provider-success-foreground",
 		chipClassName: "bg-provider-success/20 text-provider-success-foreground",
 	},
 	MIXED: {
 		label: "Mixed",
-		dotClassName: "bg-provider-done-foreground/70",
+		dotClassName: "rounded-full bg-provider-done-foreground/70",
 		chipClassName: "bg-provider-done/20 text-provider-done-foreground",
 	},
 	DEVELOPING: {
 		label: "Developing",
-		dotClassName: "bg-provider-attention-foreground",
+		dotClassName: "rounded-[3px] bg-provider-attention-foreground",
 		chipClassName: "bg-provider-attention/25 text-provider-attention-foreground",
 	},
 	NO_ACTIVITY: {
 		label: "No activity yet",
-		dotClassName: "border border-muted-foreground/40 bg-transparent",
+		dotClassName: "rounded-full border border-muted-foreground/40 bg-transparent",
 		chipClassName: "bg-muted text-muted-foreground",
 	},
 };
@@ -72,16 +76,20 @@ export const TREND_META: Partial<
 export interface StatusDotProps {
 	status: PracticeStatus;
 	className?: string;
+	/** Hide from assistive tech when a parent already announces the status. */
+	decorative?: boolean;
 }
 
 /** A 2.5px status dot, the smallest unit of the language. NO_ACTIVITY renders hollow. */
-export function StatusDot({ status, className }: StatusDotProps) {
+export function StatusDot({ status, className, decorative = false }: StatusDotProps) {
 	const meta = STATUS_META[status];
+	const accessibility = decorative
+		? ({ "aria-hidden": true } as const)
+		: ({ role: "img", "aria-label": meta.label } as const);
 	return (
 		<span
-			role="img"
-			aria-label={meta.label}
-			className={cn("inline-block size-2.5 shrink-0 rounded-full", meta.dotClassName, className)}
+			{...accessibility}
+			className={cn("inline-block size-2.5 shrink-0", meta.dotClassName, className)}
 		/>
 	);
 }
@@ -110,20 +118,20 @@ export function StatusChip({ status, className }: StatusChipProps) {
 export interface TrendGlyphProps {
 	trend: PracticeTrend;
 	className?: string;
+	/** Hide from assistive tech when a parent already announces the trend. */
+	decorative?: boolean;
 }
 
 /** Directional trend glyph. STEADY carries no signal, so it deliberately renders nothing. */
-export function TrendGlyph({ trend, className }: TrendGlyphProps) {
+export function TrendGlyph({ trend, className, decorative = false }: TrendGlyphProps) {
 	const meta = TREND_META[trend];
 	if (!meta) return null;
 	const Icon = meta.icon;
+	const accessibility = decorative
+		? ({ "aria-hidden": true } as const)
+		: ({ role: "img", "aria-label": meta.label, title: meta.label } as const);
 	return (
-		<span
-			role="img"
-			aria-label={meta.label}
-			title={meta.label}
-			className={cn("inline-flex shrink-0", meta.toneClassName, className)}
-		>
+		<span {...accessibility} className={cn("inline-flex shrink-0", meta.toneClassName, className)}>
 			<Icon className="size-3.5" aria-hidden="true" />
 		</span>
 	);

@@ -5,7 +5,6 @@ import {
 	buildLargeRoster,
 	HEALTH_FILLED,
 	HEALTH_SPARSE,
-	HEALTH_SUPPRESSED,
 	ROSTER,
 	SPARSE_ROSTER,
 } from "@/components/practices/story-data";
@@ -13,9 +12,9 @@ import {
 /**
  * The mentor view's core: a dense developers-by-areas matrix. One status dot per developer per
  * area, icon-only column headers with tooltips, trend arrows only where they carry signal.
- * Clicking an area header filters the roster; clicking a row opens the drill-down. The muted
- * first row is the anonymous workspace health. Triage order comes from the server and is never
- * a ranking.
+ * Clicking an area header filters the roster; clicking a row opens the drill-down. A legend
+ * above the grid spells out the dot vocabulary. Triage order comes from the server and is
+ * never a ranking.
  */
 const meta = {
 	component: AreaMatrix,
@@ -71,11 +70,6 @@ export const ThirtyDevelopers: Story = {
 /** A fresh workspace: two members, first-cycle signals, mostly no-data health. */
 export const SparseNewWorkspace: Story = {
 	args: { roster: SPARSE_ROSTER, health: HEALTH_SPARSE },
-};
-
-/** Workspace health suppressed below the member threshold, rows still visible to the mentor. */
-export const SuppressedHealth: Story = {
-	args: { health: HEALTH_SUPPRESSED },
 };
 
 /** Loading skeleton mirroring the matrix layout. */

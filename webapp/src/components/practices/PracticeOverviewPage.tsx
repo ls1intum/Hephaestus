@@ -18,6 +18,9 @@ export interface PracticeOverviewPageProps {
 	workspaceSlug: string;
 }
 
+/** The roster page size (the server caps at 100). A full page gets a "showing first N" note. */
+const ROSTER_PAGE_SIZE = 100;
+
 /**
  * The mentor view container: anonymous workspace health per area on top, the
  * developers-by-areas matrix below, and a drill-down sheet per developer. Fetches the roster,
@@ -29,7 +32,10 @@ export function PracticeOverviewPage({ workspaceSlug }: PracticeOverviewPageProp
 	const [selectedDeveloper, setSelectedDeveloper] = useState<PracticeReportSummary | null>(null);
 
 	const rosterQuery = useQuery(
-		listPracticeReportsOptions({ path: { workspaceSlug }, query: { page: 0, size: 100 } }),
+		listPracticeReportsOptions({
+			path: { workspaceSlug },
+			query: { page: 0, size: ROSTER_PAGE_SIZE },
+		}),
 	);
 	const healthQuery = useQuery(listPracticeHealthOptions({ path: { workspaceSlug } }));
 	const drillDownQuery = useQuery({
@@ -77,11 +83,18 @@ export function PracticeOverviewPage({ workspaceSlug }: PracticeOverviewPageProp
 			{!isLoading && !isError && (
 				<div className="flex flex-col gap-6">
 					<WorkspaceHealthCards health={healthQuery.data ?? []} />
-					<AreaMatrix
-						roster={rosterQuery.data ?? []}
-						health={healthQuery.data ?? []}
-						onOpenDeveloper={setSelectedDeveloper}
-					/>
+					<div className="flex flex-col gap-1.5">
+						<AreaMatrix
+							roster={rosterQuery.data ?? []}
+							health={healthQuery.data ?? []}
+							onOpenDeveloper={setSelectedDeveloper}
+						/>
+						{(rosterQuery.data?.length ?? 0) >= ROSTER_PAGE_SIZE && (
+							<p className="px-1 text-xs text-muted-foreground">
+								Showing the first {ROSTER_PAGE_SIZE} developers.
+							</p>
+						)}
+					</div>
 				</div>
 			)}
 			<DrillDownSheet

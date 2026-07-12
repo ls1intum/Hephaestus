@@ -32,9 +32,10 @@ const SHOTS = [
 		out: [`${PR_DIR}/health-cards-available.png`],
 	},
 	{
+		// Component state of the member-facing health payload (the admin overview gets full counts).
 		id: "components-practices-workspacehealthcards--suppressed",
 		waitFor: "nobody can be singled out",
-		out: [`${DOCS_DIR}/workspace-health-suppressed.png`, `${PR_DIR}/health-cards-suppressed.png`],
+		out: [`${PR_DIR}/health-cards-suppressed.png`],
 	},
 ];
 
@@ -52,10 +53,6 @@ for (const shot of SHOTS) {
 		await page.waitForTimeout(800);
 		await page.keyboard.press("Escape");
 		await page.waitForTimeout(500);
-	}
-	if (shot.expand) {
-		await page.getByRole("button", { name: new RegExp(shot.expand) }).first().click();
-		await page.waitForTimeout(400);
 	}
 	await page.waitForTimeout(300);
 	for (const out of shot.out) {

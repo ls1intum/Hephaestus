@@ -106,7 +106,7 @@ export function FocusQueue({ cards }: FocusQueueProps) {
 
 	if (cards.length === 0) {
 		return (
-			<Empty className="max-w-xl border border-dashed">
+			<Empty className="border border-dashed">
 				<EmptyHeader>
 					<EmptyMedia variant="icon">
 						<Sprout aria-hidden="true" />
@@ -122,7 +122,7 @@ export function FocusQueue({ cards }: FocusQueueProps) {
 	}
 
 	return (
-		<div className="flex w-full max-w-xl flex-col gap-4">
+		<div className="flex w-full flex-col gap-4">
 			{focus.length > 0 ? (
 				<div className="flex flex-col gap-3">
 					{focus.map((card) => (
@@ -135,24 +135,26 @@ export function FocusQueue({ cards }: FocusQueueProps) {
 				</p>
 			)}
 			{strengths.length > 0 && (
-				<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
-					Going well:
-					{strengths.map((card) => {
-						const area = getAreaIdentity(card.areaSlug ?? "", card.areaName ?? "");
-						const Icon = area.Icon;
-						return (
-							<span
-								key={card.slug}
-								className={cn(
-									"inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground",
-									area.tintClassName,
-								)}
-							>
-								<Icon className={cn("size-3", area.iconClassName)} aria-hidden="true" />
-								{card.name}
-							</span>
-						);
-					})}
+				<div className="flex flex-col gap-1.5">
+					<span className="text-xs text-muted-foreground">Going well</span>
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+						{strengths.map((card) => {
+							const area = getAreaIdentity(card.areaSlug ?? "", card.areaName ?? "");
+							const Icon = area.Icon;
+							return (
+								<span
+									key={card.slug}
+									className={cn(
+										"inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-foreground",
+										area.tintClassName,
+									)}
+								>
+									<Icon className={cn("size-3", area.iconClassName)} aria-hidden="true" />
+									{card.name}
+								</span>
+							);
+						})}
+					</div>
 				</div>
 			)}
 			{everythingElse.length > 0 && (
@@ -194,7 +196,7 @@ export function FocusQueue({ cards }: FocusQueueProps) {
 /** Loading placeholder mirroring the focus-cards layout. */
 export function FocusQueueSkeleton() {
 	return (
-		<div className="flex w-full max-w-xl flex-col gap-4">
+		<div className="flex w-full flex-col gap-4">
 			{[0, 1, 2].map((card) => (
 				<div key={card} className="flex flex-col gap-3 rounded-xl border bg-card p-4">
 					<div className="flex items-center gap-2">

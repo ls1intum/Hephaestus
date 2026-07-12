@@ -3,10 +3,10 @@ import { expect, userEvent, within } from "storybook/test";
 import { PracticeOverviewPage } from "@/components/practices/PracticeOverviewPage";
 import {
 	drillDownHandler,
+	fullFirstPageRosterHandler,
 	healthHandler,
-	rosterErrorHandler,
+	rosterErrorOnceHandler,
 	rosterHandler,
-	suppressedHealthHandler,
 } from "@/components/practices/story-data";
 
 /**
@@ -45,30 +45,30 @@ export const Filled: Story = {
 	},
 };
 
-/** Workspace health suppressed below the member threshold. */
-export const SuppressedHealth: Story = {
+/** A full first roster page shows the "showing the first 100 developers" note. */
+export const FullFirstPage: Story = {
 	parameters: {
-		msw: { handlers: [drillDownHandler, rosterHandler, suppressedHealthHandler] },
+		msw: { handlers: [drillDownHandler, fullFirstPageRosterHandler, healthHandler] },
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const notes = await canvas.findAllByText(
-			"Shown once five or more developers are active here, so nobody can be singled out.",
-		);
-		await expect(notes.length).toBeGreaterThan(0);
+		await expect(await canvas.findByText("Showing the first 100 developers.")).toBeInTheDocument();
 	},
 };
 
-/** The roster request fails and offers a retry. */
+/** The roster request fails once; retrying loads the page. */
 export const ErrorWithRetry: Story = {
 	parameters: {
-		msw: { handlers: [rosterErrorHandler, healthHandler] },
+		msw: { handlers: [rosterErrorOnceHandler, drillDownHandler, rosterHandler, healthHandler] },
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(
 			await canvas.findByText("The practice overview could not be loaded right now."),
 		).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
+		await expect(
+			await canvas.findByText("Priya Raghavan", undefined, { timeout: 5000 }),
+		).toBeInTheDocument();
 	},
 };

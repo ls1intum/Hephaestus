@@ -16,7 +16,7 @@ export function MyPracticesPage({ workspaceSlug }: MyPracticesPageProps) {
 	const reportQuery = useQuery(getMyPracticeReportOptions({ path: { workspaceSlug } }));
 
 	return (
-		<div className="container mx-auto max-w-4xl py-6">
+		<div className="container mx-auto max-w-2xl py-6">
 			<div className="mb-6 flex flex-col gap-1">
 				<h1 className="text-3xl font-bold">My practices</h1>
 				<p className="text-sm text-muted-foreground">
@@ -29,7 +29,7 @@ export function MyPracticesPage({ workspaceSlug }: MyPracticesPageProps) {
 			</div>
 			{reportQuery.isLoading && <FocusQueueSkeleton />}
 			{reportQuery.isError && (
-				<div className="flex max-w-xl flex-col items-start gap-2 rounded-lg border border-dashed px-4 py-6">
+				<div className="flex flex-col items-start gap-2 rounded-lg border border-dashed px-4 py-6">
 					<p className="text-sm text-muted-foreground">
 						Your practice report could not be loaded right now.
 					</p>

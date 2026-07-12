@@ -24,15 +24,19 @@ type Story = StoryObj<typeof meta>;
 /** Counts available on every area. */
 export const Available: Story = {};
 
-/** Every area below the privacy threshold states the rule instead of showing numbers. */
+/**
+ * Every area below the privacy threshold: one banner states the rule once, listing the areas.
+ * This is the shape of the member-facing health payload; the admin-facing overview page always
+ * receives full counts, because admins already see the named roster.
+ */
 export const Suppressed: Story = {
 	args: { health: HEALTH_SUPPRESSED },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const notes = await canvas.findAllByText(
-			"Shown once five or more developers are active here, so nobody can be singled out.",
-		);
-		await expect(notes.length).toBeGreaterThan(0);
+		await expect(
+			await canvas.findByText(/once five or more developers are active there/),
+		).toBeInTheDocument();
+		await expect(canvas.getByText("Testing your changes")).toBeInTheDocument();
 	},
 };
 

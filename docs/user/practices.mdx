@@ -21,8 +21,8 @@ Below the focus cards, practices you are doing well appear as compact chips, and
 
 Status is judged against each practice's own criteria for the current review cycle. Your page is about your own trajectory, and each practice is judged on its own terms.
 
-:::info Who can see this
-Workspace admins can see your practice status to support mentoring, and every detailed view is recorded. The same line appears on the page itself.
+:::info
+**Who can see this.** Workspace admins can see your practice status to support mentoring, and every detailed view is recorded. The same line appears on the page itself.
 :::
 
 ## Practice overview: what mentors see
@@ -37,13 +37,11 @@ Workspace administrators and owners have a **Practice overview** page for mentor
 
 ![The drill-down side panel with evidence expanded](./img/practices/drill-down.png)
 
-## How suppression works
+## How the aggregate counts protect people
 
-The workspace health counts are aggregate by design. When fewer than five developers are active in an area, the counts stay hidden and the card says so: "Shown once five or more developers are active here, so nobody can be singled out." The same rule applies when any single status bucket is small enough to identify someone. An area with zero recent activity shows "No activity in this area yet", which is a different state from suppression.
+The workspace health counts are aggregate by design: people per status, never named. The protection is enforced by the server. When it serves the aggregate to a regular member, an area's counts stay hidden until five or more developers are active there, and the same rule applies when any single status bucket is small enough to identify someone. An area with zero recent activity reads "No activity in this area yet", which is a different state from suppression.
 
-![Workspace health below the suppression threshold](./img/practices/workspace-health-suppressed.png)
-
-Administrators and owners see full counts, because they already see every developer by name on the roster. The **workspace health visibility** setting controls whether members can see the aggregate view too; when shared, it stays aggregated and small groups remain suppressed.
+On the practice overview page, administrators and owners see full counts. That is deliberate: they already see every developer by name on the roster directly below, so hiding their aggregate would protect nobody.
 
 ## Access is controlled and audited
 

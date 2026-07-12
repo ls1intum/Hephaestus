@@ -467,10 +467,6 @@ export const emptyMyReportHandler = http.get("*/workspaces/:slug/practices/repor
 	HttpResponse.json([]),
 );
 
-export const myReportErrorHandler = http.get("*/workspaces/:slug/practices/reports/me", () =>
-	HttpResponse.json({ title: "Internal Server Error", status: 500 }, { status: 500 }),
-);
-
 export const rosterHandler = http.get("*/workspaces/:slug/practices/reports", () =>
 	HttpResponse.json(ROSTER),
 );
@@ -479,12 +475,23 @@ export const healthHandler = http.get("*/workspaces/:slug/practices/health", () 
 	HttpResponse.json(HEALTH_FILLED),
 );
 
-export const suppressedHealthHandler = http.get("*/workspaces/:slug/practices/health", () =>
-	HttpResponse.json(HEALTH_SUPPRESSED),
+/** Fails the first request only, so a retry succeeds against the regular handler behind it. */
+export const myReportErrorOnceHandler = http.get(
+	"*/workspaces/:slug/practices/reports/me",
+	() => HttpResponse.json({ title: "Internal Server Error", status: 500 }, { status: 500 }),
+	{ once: true },
 );
 
-export const rosterErrorHandler = http.get("*/workspaces/:slug/practices/reports", () =>
-	HttpResponse.json({ title: "Internal Server Error", status: 500 }, { status: 500 }),
+/** Fails the first request only, so a retry succeeds against the regular handler behind it. */
+export const rosterErrorOnceHandler = http.get(
+	"*/workspaces/:slug/practices/reports",
+	() => HttpResponse.json({ title: "Internal Server Error", status: 500 }, { status: 500 }),
+	{ once: true },
+);
+
+/** A full first page, to exercise the "showing the first N developers" note. */
+export const fullFirstPageRosterHandler = http.get("*/workspaces/:slug/practices/reports", () =>
+	HttpResponse.json(buildLargeRoster(100)),
 );
 
 export const drillDownHandler = http.get("*/workspaces/:slug/practices/reports/:userId", () =>
