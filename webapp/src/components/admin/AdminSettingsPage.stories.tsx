@@ -70,7 +70,7 @@ export const ResettingLeagues: Story = { args: { isResettingLeagues: true } };
 /** GitHub App Installation workspace — repository management is read-only. */
 export const AppInstallationWorkspace: Story = { args: { isAppInstallationWorkspace: true } };
 
-/** Practice Review on with auto-trigger only — exercises the nested sub-toggle layout. */
+/** Practices on with auto-trigger only — exercises the nested sub-toggle layout. */
 export const PracticeReviewWithSubToggles: Story = {
 	args: {
 		features: {

@@ -31,6 +31,8 @@ import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
 import { Route as AuthenticatedWorkspacesNewGitlabRouteImport } from './routes/_authenticated/workspaces/new/gitlab'
 import { Route as AuthenticatedWorkspacesNewGithubRouteImport } from './routes/_authenticated/workspaces/new/github'
+import { Route as AuthenticatedWWorkspaceSlugPracticesRouteImport } from './routes/_authenticated/w/$workspaceSlug/practices'
+import { Route as AuthenticatedWWorkspaceSlugPracticeOverviewRouteImport } from './routes/_authenticated/w/$workspaceSlug/practice-overview'
 import { Route as AuthenticatedWWorkspaceSlugMentorRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor'
 import { Route as AuthenticatedWWorkspaceSlugAchievementsRouteImport } from './routes/_authenticated/w/$workspaceSlug/achievements'
 import { Route as AuthenticatedWWorkspaceSlugTeamsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/teams/index'
@@ -169,6 +171,18 @@ const AuthenticatedWorkspacesNewGithubRoute =
   AuthenticatedWorkspacesNewGithubRouteImport.update({
     id: '/workspaces/new/github',
     path: '/workspaces/new/github',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugPracticesRoute =
+  AuthenticatedWWorkspaceSlugPracticesRouteImport.update({
+    id: '/w/$workspaceSlug/practices',
+    path: '/w/$workspaceSlug/practices',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWWorkspaceSlugPracticeOverviewRoute =
+  AuthenticatedWWorkspaceSlugPracticeOverviewRouteImport.update({
+    id: '/w/$workspaceSlug/practice-overview',
+    path: '/w/$workspaceSlug/practice-overview',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugMentorRoute =
@@ -324,6 +338,8 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
+  '/w/$workspaceSlug/practice-overview': typeof AuthenticatedWWorkspaceSlugPracticeOverviewRoute
+  '/w/$workspaceSlug/practices': typeof AuthenticatedWWorkspaceSlugPracticesRoute
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
   '/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
@@ -368,6 +384,8 @@ export interface FileRoutesByTo {
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
+  '/w/$workspaceSlug/practice-overview': typeof AuthenticatedWWorkspaceSlugPracticeOverviewRoute
+  '/w/$workspaceSlug/practices': typeof AuthenticatedWWorkspaceSlugPracticesRoute
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
   '/w/$workspaceSlug': typeof AuthenticatedWWorkspaceSlugIndexRoute
@@ -414,6 +432,8 @@ export interface FileRoutesById {
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
   '/_authenticated/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/_authenticated/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
+  '/_authenticated/w/$workspaceSlug/practice-overview': typeof AuthenticatedWWorkspaceSlugPracticeOverviewRoute
+  '/_authenticated/w/$workspaceSlug/practices': typeof AuthenticatedWWorkspaceSlugPracticesRoute
   '/_authenticated/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/_authenticated/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
   '/_authenticated/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
@@ -461,6 +481,8 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/login'
     | '/w/$workspaceSlug/achievements'
     | '/w/$workspaceSlug/mentor'
+    | '/w/$workspaceSlug/practice-overview'
+    | '/w/$workspaceSlug/practices'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
     | '/w/$workspaceSlug/'
@@ -505,6 +527,8 @@ export interface FileRouteTypes {
     | '/mentor'
     | '/w/$workspaceSlug/login'
     | '/w/$workspaceSlug/achievements'
+    | '/w/$workspaceSlug/practice-overview'
+    | '/w/$workspaceSlug/practices'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
     | '/w/$workspaceSlug'
@@ -550,6 +574,8 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/login'
     | '/_authenticated/w/$workspaceSlug/achievements'
     | '/_authenticated/w/$workspaceSlug/mentor'
+    | '/_authenticated/w/$workspaceSlug/practice-overview'
+    | '/_authenticated/w/$workspaceSlug/practices'
     | '/_authenticated/workspaces/new/github'
     | '/_authenticated/workspaces/new/gitlab'
     | '/_authenticated/w/$workspaceSlug/'
@@ -743,6 +769,20 @@ declare module '@tanstack/react-router' {
       path: '/workspaces/new/github'
       fullPath: '/workspaces/new/github'
       preLoaderRoute: typeof AuthenticatedWorkspacesNewGithubRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/w/$workspaceSlug/practices': {
+      id: '/_authenticated/w/$workspaceSlug/practices'
+      path: '/w/$workspaceSlug/practices'
+      fullPath: '/w/$workspaceSlug/practices'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugPracticesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/w/$workspaceSlug/practice-overview': {
+      id: '/_authenticated/w/$workspaceSlug/practice-overview'
+      path: '/w/$workspaceSlug/practice-overview'
+      fullPath: '/w/$workspaceSlug/practice-overview'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugPracticeOverviewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/w/$workspaceSlug/mentor': {
@@ -1007,6 +1047,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
   AuthenticatedWWorkspaceSlugAchievementsRoute: typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   AuthenticatedWWorkspaceSlugMentorRoute: typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
+  AuthenticatedWWorkspaceSlugPracticeOverviewRoute: typeof AuthenticatedWWorkspaceSlugPracticeOverviewRoute
+  AuthenticatedWWorkspaceSlugPracticesRoute: typeof AuthenticatedWWorkspaceSlugPracticesRoute
   AuthenticatedWorkspacesNewGithubRoute: typeof AuthenticatedWorkspacesNewGithubRoute
   AuthenticatedWorkspacesNewGitlabRoute: typeof AuthenticatedWorkspacesNewGitlabRoute
   AuthenticatedWWorkspaceSlugIndexRoute: typeof AuthenticatedWWorkspaceSlugIndexRoute
@@ -1027,6 +1069,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedWWorkspaceSlugAchievementsRoute,
   AuthenticatedWWorkspaceSlugMentorRoute:
     AuthenticatedWWorkspaceSlugMentorRouteWithChildren,
+  AuthenticatedWWorkspaceSlugPracticeOverviewRoute:
+    AuthenticatedWWorkspaceSlugPracticeOverviewRoute,
+  AuthenticatedWWorkspaceSlugPracticesRoute:
+    AuthenticatedWWorkspaceSlugPracticesRoute,
   AuthenticatedWorkspacesNewGithubRoute: AuthenticatedWorkspacesNewGithubRoute,
   AuthenticatedWorkspacesNewGitlabRoute: AuthenticatedWorkspacesNewGitlabRoute,
   AuthenticatedWWorkspaceSlugIndexRoute: AuthenticatedWWorkspaceSlugIndexRoute,

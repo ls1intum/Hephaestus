@@ -45,12 +45,12 @@ export const AllEnabled: Story = {
 	},
 };
 
-/** Mentor chat enabled only — proves the new toggle renders next to Practice Review. */
+/** Mentor chat enabled only — proves the new toggle renders next to Practices. */
 export const MentorEnabled: Story = {
 	args: { values: { ...allOff, mentorEnabled: true } },
 };
 
-/** Practice Review enabled with both sub-triggers on — shows the nested toggle layout. */
+/** Practices enabled with both sub-triggers on — shows the nested toggle layout. */
 export const PracticesWithBothTriggers: Story = {
 	args: {
 		values: {
@@ -62,7 +62,7 @@ export const PracticesWithBothTriggers: Story = {
 	},
 };
 
-/** Practice Review parent on, both children off — reviews can't fire (UI edge case). */
+/** Practices parent on, both children off — reviews can't fire (UI edge case). */
 export const PracticesBothTriggersOff: Story = {
 	args: { values: { ...allOff, practicesEnabled: true } },
 };

@@ -24,8 +24,9 @@ interface FeatureDefinition {
 const FEATURES: ReadonlyArray<FeatureDefinition> = [
 	{
 		key: "practicesEnabled",
-		label: "Practice Review",
-		description: "Enable agent-based practice review for contributors.",
+		label: "Practices",
+		description:
+			"Practice feedback for contributors: agent reviews on their work, the My practices page, and the mentor-facing practice overview.",
 		children: [
 			{
 				key: "practiceReviewAutoTriggerEnabled",
