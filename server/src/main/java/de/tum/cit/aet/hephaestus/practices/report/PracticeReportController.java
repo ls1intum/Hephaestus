@@ -196,7 +196,11 @@ public class PracticeReportController {
         if (!canViewHealth(workspaceContext)) {
             throw new AccessForbiddenException("Not permitted to view the workspace health for this workspace");
         }
-        return ResponseEntity.ok(reportService.getWorkspaceHealth(workspaceContext.id()));
+        // K-anonymity protects a MEMBER from re-identifying a colleague in a small bucket. An admin or
+        // owner already sees every developer by name on the roster and drill-down, so suppressing their
+        // aggregate protects nothing — they get the full counts; members get the suppressed view.
+        boolean suppressSmallGroups = !accessService.isAdmin();
+        return ResponseEntity.ok(reportService.getWorkspaceHealth(workspaceContext.id(), suppressSmallGroups));
     }
 
     /** ADMIN or OWNER (super-admins with membership are elevated to ADMIN by the access service). */

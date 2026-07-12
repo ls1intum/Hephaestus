@@ -158,7 +158,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID, true);
 
         assertThat(cards).hasSize(1);
         AreaHealthDTO card = cards.get(0);
@@ -178,7 +178,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
         ).thenReturn(List.of(a));
         when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(List.of());
 
-        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID, true);
 
         assertThat(cards).hasSize(1);
         AreaHealthDTO card = cards.get(0);
@@ -219,7 +219,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID, true);
 
         assertThat(cards).hasSize(1);
         AreaHealthDTO card = cards.get(0);
@@ -248,7 +248,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
             )
         );
 
-        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID);
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID, true);
 
         assertThat(cards)
             .singleElement()
@@ -256,6 +256,32 @@ class PracticeReportServiceTest extends BaseUnitTest {
                 assertThat(card.availability()).isEqualTo(HealthAvailability.SUPPRESSED);
                 assertThat(card.strengthCount()).isNull();
             });
+    }
+
+    @Test
+    @DisplayName("workspace health: admins are never suppressed — they already see the named roster")
+    void healthExposesCountsToAdminsRegardlessOfGroupSize() {
+        // Same small-team data that suppresses the member view: with suppression off (admin read),
+        // the counts come through, because k-anonymity guards members, not the mentor who can open
+        // the roster and see every developer by name anyway.
+        PracticeArea a = area("constructive-code-review", "Constructive code review", 0);
+        when(
+            practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(WORKSPACE_ID)
+        ).thenReturn(List.of(a));
+        when(observationRepository.findAreaRollupStandingBetween(eq(WORKSPACE_ID), any(), any())).thenReturn(
+            List.of(
+                row(1, "alice", a.getSlug(), a.getName(), 0, "leaves-useful-comments", 1, 0),
+                row(2, "bob", a.getSlug(), a.getName(), 0, "leaves-useful-comments", 0, 1)
+            )
+        );
+
+        List<AreaHealthDTO> cards = service.getWorkspaceHealth(WORKSPACE_ID, false);
+
+        assertThat(cards).hasSize(1);
+        AreaHealthDTO card = cards.get(0);
+        assertThat(card.availability()).isEqualTo(HealthAvailability.AVAILABLE);
+        assertThat(card.strengthCount()).isEqualTo(1);
+        assertThat(card.developingCount()).isEqualTo(1);
     }
 
     @Test
@@ -372,7 +398,7 @@ class PracticeReportServiceTest extends BaseUnitTest {
     @DisplayName("missing workspace yields empty health/roster rather than throwing")
     void missingWorkspaceEmpty() {
         when(workspaceRepository.findById(anyLong())).thenReturn(Optional.empty());
-        assertThat(service.getWorkspaceHealth(999L)).isEmpty();
+        assertThat(service.getWorkspaceHealth(999L, true)).isEmpty();
         assertThat(service.listReports(999L, Pageable.unpaged())).isEmpty();
     }
 }

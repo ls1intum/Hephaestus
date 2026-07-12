@@ -62,8 +62,13 @@ public class PracticeReportService {
         return workspaceRepository.findById(workspaceId);
     }
 
+    /**
+     * @param suppressSmallGroups apply k-anonymity suppression (member-facing reads). The admin/owner
+     *     view passes {@code false}: those roles already see every developer by name on the roster, so
+     *     suppressing their aggregate would protect nobody while blinding the mentor on small teams.
+     */
     @Transactional(readOnly = true)
-    public List<AreaHealthDTO> getWorkspaceHealth(Long workspaceId) {
+    public List<AreaHealthDTO> getWorkspaceHealth(Long workspaceId, boolean suppressSmallGroups) {
         Optional<Workspace> workspace = findWorkspace(workspaceId);
         if (workspace.isEmpty()) {
             return List.of();
@@ -83,7 +88,7 @@ public class PracticeReportService {
                 cards.add(AreaHealthDTO.noData(area.getSlug(), area.getName()));
                 continue;
             }
-            if (byDeveloper.size() < K_ANONYMITY_THRESHOLD) {
+            if (suppressSmallGroups && byDeveloper.size() < K_ANONYMITY_THRESHOLD) {
                 cards.add(AreaHealthDTO.suppressed(area.getSlug(), area.getName()));
                 continue;
             }
@@ -99,7 +104,7 @@ public class PracticeReportService {
                     case NO_ACTIVITY -> noActivity++;
                 }
             }
-            if (hasSmallBucket(strength, developing, mixed, noActivity)) {
+            if (suppressSmallGroups && hasSmallBucket(strength, developing, mixed, noActivity)) {
                 cards.add(AreaHealthDTO.suppressed(area.getSlug(), area.getName()));
                 continue;
             }
