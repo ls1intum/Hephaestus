@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -49,6 +50,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private AccountJitCreator accountJitCreator;
     private AdminBootstrapPolicy adminBootstrapPolicy;
     private LoginProviderRepository loginProviderRepository;
+    private ExternalActorQuery externalActorQuery;
     private AccountProvisioningService service;
 
     @BeforeEach
@@ -61,6 +63,11 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
         adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
         loginProviderRepository = mock(LoginProviderRepository.class);
+        externalActorQuery = mock(ExternalActorQuery.class);
+        // Default: no synced SCM actor exists yet — the link stays unbound (the lazy path fills it later).
+        lenient()
+            .when(externalActorQuery.findExternalActorId(org.mockito.ArgumentMatchers.anyLong(), any(), any()))
+            .thenReturn(Optional.empty());
         var githubProvider = new LoginProvider();
         githubProvider.setRegistrationId("github");
         githubProvider.setType(LoginProvider.ProviderType.GITHUB);
@@ -82,6 +89,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             verifiedEmailResolver,
             accountJitCreator,
             adminBootstrapPolicy,
+            externalActorQuery,
             Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
@@ -150,6 +158,42 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         );
 
         assertThat(result.account().getAppRole()).isEqualTo(Account.AppRole.USER);
+    }
+
+    @Test
+    void jitCreate_whenScmActorResolvable_bindsExternalActorIdOnTheLink() {
+        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any())).thenReturn(
+            Optional.empty()
+        );
+        when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
+            new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
+        );
+        when(externalActorQuery.findExternalActorId(PROVIDER_ID, "sub-1", "octocat")).thenReturn(Optional.of(42L));
+
+        service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.login(null, null));
+
+        ArgumentCaptor<IdentityLink> link = ArgumentCaptor.forClass(IdentityLink.class);
+        verify(accountJitCreator).create(any(), link.capture());
+        assertThat(link.getValue().getExternalActorId()).isEqualTo(42L);
+        // The eager bind never touches linked_via: a JIT link keeps its OAUTH_LOGIN default (CHECK constraint).
+        assertThat(link.getValue().getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.OAUTH_LOGIN);
+    }
+
+    @Test
+    void jitCreate_whenNoScmActorSyncedYet_leavesExternalActorIdNull() {
+        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any())).thenReturn(
+            Optional.empty()
+        );
+        when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
+            new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
+        );
+        // externalActorQuery defaults to Optional.empty() — nothing synced for this identity yet.
+
+        service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.login(null, null));
+
+        ArgumentCaptor<IdentityLink> link = ArgumentCaptor.forClass(IdentityLink.class);
+        verify(accountJitCreator).create(any(), link.capture());
+        assertThat(link.getValue().getExternalActorId()).isNull();
     }
 
     private static OAuth2User principal() {

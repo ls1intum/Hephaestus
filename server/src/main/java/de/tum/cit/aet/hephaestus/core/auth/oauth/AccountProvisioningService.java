@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
@@ -42,6 +43,7 @@ public class AccountProvisioningService {
     private final VerifiedEmailResolver verifiedEmailResolver;
     private final AccountJitCreator accountJitCreator;
     private final AdminBootstrapPolicy adminBootstrapPolicy;
+    private final ExternalActorQuery externalActorQuery;
     private final Clock clock;
 
     public AccountProvisioningService(
@@ -52,6 +54,7 @@ public class AccountProvisioningService {
         VerifiedEmailResolver verifiedEmailResolver,
         AccountJitCreator accountJitCreator,
         AdminBootstrapPolicy adminBootstrapPolicy,
+        ExternalActorQuery externalActorQuery,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
@@ -61,6 +64,7 @@ public class AccountProvisioningService {
         this.verifiedEmailResolver = verifiedEmailResolver;
         this.accountJitCreator = accountJitCreator;
         this.adminBootstrapPolicy = adminBootstrapPolicy;
+        this.externalActorQuery = externalActorQuery;
         this.clock = clock;
     }
 
@@ -263,11 +267,18 @@ public class AccountProvisioningService {
         link.setProviderId(providerId);
         link.setSubject(subject);
         link.setTeamId(teamId);
-        link.setUsernameAtSignup(stringAttr(principal, "login", "preferred_username", "username"));
+        String username = stringAttr(principal, "login", "preferred_username", "username");
+        link.setUsernameAtSignup(username);
         link.setEmailAtSignup(email(principal));
         link.setDisplayName(stringAttr(principal, "name", "display_name"));
         link.setAvatarUrl(stringAttr(principal, "avatar_url", "picture"));
         link.setProfileUrl(stringAttr(principal, "html_url", "web_url", "profile"));
+        // Bind the synced SCM actor eagerly when it already exists (best-effort; the identity chain is
+        // account -> link -> external_actor_id). Without this a JIT-created account cannot be resolved to
+        // its actor until the lazy provisioning path fills the column, so actor-keyed self views (e.g. the
+        // developer's own practice report) come back empty right after first login. linked_via keeps its
+        // OAUTH_LOGIN default here; the LINK-mode caller overrides it to MANUAL_LINK after this returns.
+        externalActorQuery.findExternalActorId(providerId, subject, username).ifPresent(link::setExternalActorId);
         return link;
     }
 

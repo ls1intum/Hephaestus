@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
+import de.tum.cit.aet.hephaestus.core.audit.DataAccessAuditWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
  *   <li>Observations (via native query through practice.workspace_id)</li>
  *   <li>Practice definitions for the workspace</li>
  *   <li>Practice areas (unreferenced once practices are gone)</li>
+ *   <li>The append-only practice-report data-access audit rows for the workspace</li>
  * </ul>
  */
 @Component
@@ -29,17 +31,20 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     private final ObservationRepository observationRepository;
     private final PracticeRepository practiceRepository;
     private final PracticeAreaRepository practiceAreaRepository;
+    private final DataAccessAuditWriter dataAccessAuditWriter;
 
     public PracticesWorkspacePurgeAdapter(
         FeedbackRepository feedbackRepository,
         ObservationRepository observationRepository,
         PracticeRepository practiceRepository,
-        PracticeAreaRepository practiceAreaRepository
+        PracticeAreaRepository practiceAreaRepository,
+        DataAccessAuditWriter dataAccessAuditWriter
     ) {
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
         this.practiceRepository = practiceRepository;
         this.practiceAreaRepository = practiceAreaRepository;
+        this.dataAccessAuditWriter = dataAccessAuditWriter;
     }
 
     @Override
@@ -54,8 +59,15 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         practiceRepository.deleteAllByWorkspaceId(workspaceId);
         // Delete practice areas (unreferenced once practices are gone).
         practiceAreaRepository.deleteAllByWorkspaceId(workspaceId);
+        // Delete the append-only practice-report disclosure audit for this workspace. This is the ONLY
+        // sanctioned deletion path — the append-only trigger blocks every other DELETE; the writer sets the
+        // transaction-local purge marker so this one runs (GDPR erasure).
+        dataAccessAuditWriter.purgeWorkspace(workspaceId);
 
-        log.info("Deleted feedback, observations, practices and areas for workspace: workspaceId={}", workspaceId);
+        log.info(
+            "Deleted feedback, observations, practices, areas and data-access audit for workspace: workspaceId={}",
+            workspaceId
+        );
     }
 
     @Override

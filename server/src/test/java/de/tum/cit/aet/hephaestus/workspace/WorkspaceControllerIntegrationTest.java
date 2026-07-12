@@ -352,6 +352,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         Workspace workspace = createWorkspace("league-space", "League", "league", AccountType.ORG, user);
         ensureAdminMembership(workspace);
+        // The reset endpoint is gated on the leagues feature flag (404 when off, like the read endpoints).
+        workspace.getFeatures().setLeaguesEnabled(true);
+        workspace = workspaceRepository.save(workspace);
 
         ProblemDetail missingWorkspace = webTestClient
             .put()
@@ -925,6 +928,46 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(dto.progressionEnabled()).isFalse();
         assertThat(dto.practiceReviewAutoTriggerEnabled()).isTrue();
         assertThat(dto.practiceReviewManualTriggerEnabled()).isTrue();
+        assertThat(dto.healthVisibility()).isEqualTo(HealthVisibility.MENTORS_ONLY);
+    }
+
+    @Test
+    @WithAdminUser
+    void updateFeaturesPatchesHealthVisibilityAndLeavesBooleansUntouched() {
+        User owner = persistUser("health-visibility-owner");
+        Workspace workspace = createWorkspace("health-visibility", "Health", "health-org", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        WorkspaceDTO patched = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(
+                new UpdateWorkspaceFeaturesRequestDTO(
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    HealthVisibility.EVERYONE
+                )
+            )
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(patched).isNotNull();
+        assertThat(patched.healthVisibility()).isEqualTo(HealthVisibility.EVERYONE);
+        // PATCH semantics: untouched flags keep their values.
+        assertThat(patched.practicesEnabled()).isFalse();
+        assertThat(patched.leaderboardEnabled()).isFalse();
     }
 
     @Test
@@ -940,7 +983,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -986,7 +1029,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, true, null, null, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, true, null, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -1006,7 +1049,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null, null, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -1034,7 +1077,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null, null))
             .exchange()
             .expectStatus()
             .isOk();
@@ -1045,7 +1088,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, false, null, null, null, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, false, null, null, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -1079,7 +1122,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, false, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, false, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -1097,7 +1140,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, true, false))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, null, true, false, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -1141,7 +1184,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, true, true, true, true, null, null, null))
             .exchange()
             .expectStatus()
             .isForbidden();
@@ -1160,7 +1203,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, false, true, false, false, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, false, true, false, false, null, null, null))
             .exchange()
             .expectStatus()
             .isOk();

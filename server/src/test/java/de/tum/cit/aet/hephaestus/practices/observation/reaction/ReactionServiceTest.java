@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReacti
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.time.Instant;
 import java.util.List;
@@ -57,7 +58,17 @@ class ReactionServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new ReactionService(reactionRepository, feedbackRepository, userRepository);
-        workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, false, Set.of());
+        workspaceContext = new WorkspaceContext(
+            WORKSPACE_ID,
+            "test-ws",
+            "Test WS",
+            null,
+            null,
+            false,
+            false,
+            HealthVisibility.MENTORS_ONLY,
+            Set.of()
+        );
     }
 
     private Feedback createFeedback(Long recipientUserId) {

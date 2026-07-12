@@ -1,5 +1,7 @@
-package de.tum.cit.aet.hephaestus.practices.observation.dto;
+package de.tum.cit.aet.hephaestus.practices.report.dto;
 
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeStatus;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeTrend;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -11,14 +13,14 @@ import org.jspecify.annotations.Nullable;
  * about a practice: why it matters, what good looks like, where they stand, what to act on, and what they
  * already do well.
  *
- * <p>It is the conversational/in-context substance reorganised by practice — NOT a scoreboard. Counts and
+ * <p>It is the conversational/in-context substance reorganised by practice. Counts and
  * observation enums are deliberately absent; so is {@code criteria} (the {@code whyItMatters} /
  * {@code whatGoodLooksLike} learner framing is carried instead, preserving the "criteria never reaches a
  * learner" invariant). Items are the actual findings, deduped to each target's latest review and with the
  * "not applicable / no change needed" noise removed.
  */
 @Schema(description = "A developer's readable feedback for one practice")
-public record ReflectionPracticeDTO(
+public record PracticeReportCardDTO(
     @NonNull @Schema(description = "Practice slug") String slug,
     @NonNull @Schema(description = "Practice name") String name,
     @Nullable @Schema(description = "Area slug this practice belongs to, if any") String areaSlug,
@@ -30,19 +32,15 @@ public record ReflectionPracticeDTO(
         description = "Where the developer stands on this practice",
         allowableValues = { "DEVELOPING", "STRENGTH", "MIXED" }
     )
-    Standing standing,
+    PracticeStatus status,
+    @NonNull
+    @Schema(
+        description = "Direction versus the prior review cycle (criterion-referenced, never a peer comparison)",
+        allowableValues = { "IMPROVING", "WORSENING", "STEADY", "NEW" }
+    )
+    PracticeTrend trend,
     @NonNull
     @Schema(description = "Specific feedback to act on (highest-impact first)")
-    List<ReflectionItemDTO> toWorkOn,
-    @NonNull @Schema(description = "What the developer already does well here") List<ReflectionItemDTO> strengths
-) {
-    /** Coarse, human standing derived from the developer's latest-run feedback on this practice. */
-    public enum Standing {
-        /** Only problems (no strengths surfaced) — the focus of attention. */
-        DEVELOPING,
-        /** Only strengths — a confirmed good habit. */
-        STRENGTH,
-        /** Both problems and strengths across the developer's work. */
-        MIXED,
-    }
-}
+    List<PracticeReportItemDTO> toWorkOn,
+    @NonNull @Schema(description = "What the developer already does well here") List<PracticeReportItemDTO> strengths
+) {}

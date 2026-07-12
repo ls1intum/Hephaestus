@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.workspace.HealthVisibility;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -56,7 +57,12 @@ public record WorkspaceDTO(
     Boolean practiceReviewAutoTriggerEnabled,
     @NonNull
     @Schema(description = "Whether manual practice reviews triggered via bot command are enabled")
-    Boolean practiceReviewManualTriggerEnabled
+    Boolean practiceReviewManualTriggerEnabled,
+    @NonNull
+    @Schema(
+        description = "Audience for the k-anonymised workspace health aggregate on the practice report surface (MENTORS_ONLY, EVERYONE)"
+    )
+    HealthVisibility healthVisibility
 ) {
     /** Builds a DTO pulling integration metadata from the Connection registry. */
     public static WorkspaceDTO from(Workspace workspace, ConnectionService connectionService) {
@@ -137,7 +143,8 @@ public record WorkspaceDTO(
             workspace.getFeatures().getProgressionEnabled(),
             workspace.getFeatures().getLeaguesEnabled(),
             workspace.getFeatures().getPracticeReviewAutoTriggerEnabled(),
-            workspace.getFeatures().getPracticeReviewManualTriggerEnabled()
+            workspace.getFeatures().getPracticeReviewManualTriggerEnabled(),
+            workspace.getFeatures().getHealthVisibility()
         );
     }
 }

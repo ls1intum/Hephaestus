@@ -70,8 +70,11 @@ import tools.jackson.databind.JsonNode;
         ),
         // Cross-run locus (ADR 0021 C2): supersession + reaction-history follow one observation across re-detections.
         @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
-        // Reviewer-side observations are filed against the subject (about_user_id); index for subject dashboards.
-        @Index(name = "idx_observation_subject", columnList = "about_user_id"),
+        // Reviewer-side observations are filed against the subject (about_user_id). Composite with
+        // observed_at DESC: every developer-scoped read (reflection cards, report roster/health rollups,
+        // window-bounded standing queries) filters by about_user_id and then bounds/orders by observed_at,
+        // so the single-column form would satisfy the equality filter but force a sort.
+        @Index(name = "idx_observation_subject", columnList = "about_user_id, observed_at DESC"),
     }
 )
 @Getter
