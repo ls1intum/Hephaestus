@@ -1,7 +1,7 @@
 import { CircleAlert, EyeOff, Inbox } from "lucide-react";
 import { useState } from "react";
-import { AreaStatusStrip } from "@/components/practices-design/candidate-a/AreaStatusStrip";
 import { ActivityFeedItem } from "@/components/practices-design/candidate-a/ActivityFeedItem";
+import { AreaStatusStrip } from "@/components/practices-design/candidate-a/AreaStatusStrip";
 import { getArea } from "@/components/practices-design/shared/area-identity";
 import { StatusDot } from "@/components/practices-design/shared/status-language";
 import {

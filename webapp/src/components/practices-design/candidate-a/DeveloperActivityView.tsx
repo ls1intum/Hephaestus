@@ -1,7 +1,7 @@
 import { EyeOff, Inbox } from "lucide-react";
 import { useState } from "react";
-import { AreaStatusStrip } from "@/components/practices-design/candidate-a/AreaStatusStrip";
 import { ActivityFeedItem } from "@/components/practices-design/candidate-a/ActivityFeedItem";
+import { AreaStatusStrip } from "@/components/practices-design/candidate-a/AreaStatusStrip";
 import {
 	type ActivityItem,
 	type DeveloperPracticeProfile,
