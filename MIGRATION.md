@@ -16,7 +16,7 @@ This document helps you upgrade between versions of Hephaestus.
 
 ```bash
 # Deployed version
-curl -s https://api.hephaestus.cit.tum.de/actuator/info | jq '.build.version'
+curl -s https://hephaestus.aet.cit.tum.de/actuator/info | jq '.build.version'
 
 # Git tag
 git describe --tags --abbrev=0
@@ -51,11 +51,13 @@ Before upgrading to any new `0.x.0` version:
 
 ## Version History
 
-### v0.10.0 (Upcoming)
+This section lists releases that shipped breaking changes requiring operator action. Releases not listed here had no documented breaking changes — see the [release notes](https://github.com/ls1intum/Hephaestus/releases) for the full per-version history.
+
+### v0.69.0 (2026-05-19)
 
 #### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset
 
-**Version**: v0.10.0
+**Version**: v0.69.0
 **Affected**: any deployment relying on `docker/agent-image-pin.env` or `docker/agent-image-pin.local.env`.
 
 **Before**: `docker/agent-image-pin.env` was committed to `main` on every release by an auto-commit step in `release.yml`. `compose.app.yaml` loaded it via `env_file:` from the source tree.
@@ -67,11 +69,11 @@ Before upgrading to any new `0.x.0` version:
 1. Deploy host must reach `github.com`, `fulcio.sigstore.dev`, `rekor.sigstore.dev`, and `tuf-repo-cdn.sigstore.dev` over HTTPS.
 2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yaml` or a shell env var instead — see [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
 3. Confirm `HEPHAESTUS_AGENT_IMAGE_REFERENCE` is not pre-set in your deploy substrate; an unintended value shadows the verified pin.
-4. Rolling back to a pre-v0.10.0 release: set `HEPHAESTUS_RELEASE_PIN_SKIP=true` plus an explicit `HEPHAESTUS_AGENT_IMAGE_REFERENCE=...@sha256:<digest>` env override on the init service.
+4. Rolling back to a pre-v0.69.0 release: set `HEPHAESTUS_RELEASE_PIN_SKIP=true` plus an explicit `HEPHAESTUS_AGENT_IMAGE_REFERENCE=...@sha256:<digest>` env override on the init service.
 
 #### 🔴 Agent runtime: image config consolidated under `hephaestus.agent.image.*`
 
-**Version**: v0.10.0
+**Version**: v0.69.0
 **Affected**: any deployment that pinned the agent-pi image via `HEPHAESTUS_AGENT_PI_IMAGE`, `HEPHAESTUS_MENTOR_AGENT_IMAGE`, or the matching pull-policy env vars.
 
 **Before**:
@@ -89,16 +91,6 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 
 1. Drop the four old env vars from your prod configuration.
 2. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
-
-
-
-### v0.9.0
-
-No breaking changes documented.
-
-### v0.8.0
-
-No breaking changes documented.
 
 ---
 
@@ -194,5 +186,5 @@ Liquibase handles this automatically. If you see errors:
 
 1. 📖 [GitHub Discussions](https://github.com/ls1intum/Hephaestus/discussions) - Ask the community
 2. 🐛 [Issues](https://github.com/ls1intum/Hephaestus/issues) - Report problems
-3. 📝 [CHANGELOG.md](./CHANGELOG.md) - Detailed change history
+3. 📝 [CHANGELOG.md](./CHANGELOG.md) - Pointer to the per-release changelog on GitHub Releases
 4. 🔄 [Release Notes](https://github.com/ls1intum/Hephaestus/releases) - Per-version details
