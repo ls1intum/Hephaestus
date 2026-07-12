@@ -10,6 +10,7 @@ const featureFlags = {
 	leaderboardEnabled: true,
 	progressionEnabled: false,
 	leaguesEnabled: false,
+	healthVisibility: "MENTORS_ONLY",
 } as const;
 
 /**
