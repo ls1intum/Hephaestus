@@ -31,6 +31,12 @@ hephaestus:
       gitlab-workspace-creation: true
   dev:
     trigger-enabled: true
+  # Run the agent review loop locally: the dev trigger only ENQUEUES a job — the worker's NATS pull
+  # consumer (AgentNatsConsumerConfig, worker-role + this flag) is what executes it in the Docker
+  # sandbox. Without this, `POST /api/dev/trigger-review` silently leaves the job QUEUED forever.
+  agent:
+    nats:
+      enabled: true
   # Enable the GitLab integration so a connected workspace actually syncs MRs/commits for review.
   integration:
     gitlab:
