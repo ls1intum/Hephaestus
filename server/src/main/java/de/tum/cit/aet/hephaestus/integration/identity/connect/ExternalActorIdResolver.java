@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.identity.connect;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ExternalActorQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -15,7 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Lookup order mirrors the read-side fallback in {@code workspace.CurrentAccountUsers}: the
  * provider-native id (the OAuth {@code subject} for GitHub/GitLab, immutable) wins over the login
- * (mutable — a rename between sync and first login would mismatch).
+ * (mutable — a rename between sync and first login would mismatch). The login fallback is an EXACT
+ * case-insensitive match and binds only a UNIQUE match: because the bind is persisted onto
+ * {@code identity_link.external_actor_id}, an ambiguous login must resolve to nothing rather than risk
+ * attaching someone else's actor to the account.
  */
 @Component
 public class ExternalActorIdResolver implements ExternalActorQuery {
@@ -38,7 +42,10 @@ public class ExternalActorIdResolver implements ExternalActorQuery {
         if (username == null || username.isBlank()) {
             return Optional.empty();
         }
-        return userRepository.findByLoginAndProviderId(username, gitProviderId).map(User::getId);
+        List<User> byLogin = userRepository.findAllByExactLoginAndProviderId(username, gitProviderId);
+        // Only a unique match may bind; ambiguity (however it arose) resolves to "no match" so the login
+        // flow proceeds with an unbound link instead of persisting a possibly-wrong actor or throwing.
+        return byLogin.size() == 1 ? Optional.of(byLogin.get(0).getId()) : Optional.empty();
     }
 
     private static Optional<Long> parseNativeId(String subject) {

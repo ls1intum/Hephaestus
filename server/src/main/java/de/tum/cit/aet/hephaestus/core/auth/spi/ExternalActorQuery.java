@@ -13,7 +13,9 @@ import org.jspecify.annotations.Nullable;
  * <p>Implemented in {@code integration} (which owns the {@code User} aggregate); consumed by
  * {@code core.auth} — the same dependency-inversion shape as {@link GitProviderRegistry}. Resolution is
  * best-effort: an empty result simply leaves the link unbound for the existing lazy bind
- * ({@code IdentityLinkRepository#linkExternalActorIfAbsent}) to fill later.
+ * ({@code IdentityLinkRepository#linkExternalActorIfAbsent}) to fill later. That lazy bind fills only
+ * NULL columns, so a WRONG eager bind never self-heals — implementations must prefer returning empty
+ * over any uncertain match.
  */
 public interface ExternalActorQuery {
     /**

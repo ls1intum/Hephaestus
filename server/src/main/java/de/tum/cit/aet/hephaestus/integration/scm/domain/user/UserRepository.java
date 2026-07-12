@@ -41,6 +41,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
     )
     Optional<User> findByLoginAndProviderId(@Param("login") String login, @Param("providerId") Long providerId);
 
+    /**
+     * EXACT case-insensitive login match (no pattern semantics). Unlike the sibling
+     * {@code findByLoginAndProviderId}, {@code ILIKE} wildcards in the input ({@code _}, {@code %}) cannot
+     * match a different user, and returning a list lets the caller treat an ambiguous login as "no match"
+     * instead of throwing. Used by the login-time external-actor bind, where a wrong or failed match must
+     * never break the OAuth flow.
+     */
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE LOWER(u.login) = LOWER(:login)
+              AND u.provider.id = :providerId
+        """
+    )
+    List<User> findAllByExactLoginAndProviderId(@Param("login") String login, @Param("providerId") Long providerId);
+
     @Query(
         """
             SELECT u
