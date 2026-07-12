@@ -1,10 +1,10 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
 Hephaestus is pre-1.0 software under active development. Security fixes land on the latest release line (currently 0.73.x) — see [GitHub Releases](https://github.com/ls1intum/Hephaestus/releases) for the current version. Older 0.x releases do not receive backported fixes; please upgrade to the latest release.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
 We take the security of this project seriously. If you discover a vulnerability, please report it privately:
 

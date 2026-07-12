@@ -13,7 +13,7 @@ Hephaestus gives developers the mentoring feedback they would otherwise only get
 
 The core loop: **gather** activity from connected repositories, **observe** engineering practices in it, **compose** feedback worth reading, **deliver** it where the work happens, and let the developer **respond**.
 
-Hephaestus works well for university software engineering courses and open-source projects — anywhere many contributors would benefit from feedback that one mentor cannot give everyone personally.
+Hephaestus works well for university software engineering courses, open-source projects, and any team where contributors outnumber the people who can mentor them.
 
 <img alt="Illustration of Hephaestus working alongside a software team" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 

@@ -4,7 +4,7 @@ This document helps you upgrade between versions of Hephaestus.
 
 > ⚠️ **Pre-1.0 Notice**: We are in active development. Minor versions (0.x.0) may contain breaking changes. Always test in staging before production.
 
-## Quick Reference
+## Quick reference
 
 | Symbol | Meaning |
 |--------|---------|
@@ -12,7 +12,7 @@ This document helps you upgrade between versions of Hephaestus.
 | 🟡 | **Deprecated**: Works now, removed in next major |
 | 🟢 | **New**: No action needed |
 
-## Check Your Version
+## Check your version
 
 ```bash
 # Deployed version
@@ -24,20 +24,20 @@ git describe --tags --abbrev=0
 
 ---
 
-## Pre-1.0 Development (Current)
+## Pre-1.0 development (current)
 
 During pre-1.0, we follow [Semantic Versioning 0.x conventions](https://semver.org/#spec-item-4):
 
 > Major version zero (0.y.z) is for initial development. Anything MAY change at any time.
 
-### What This Means
+### What this means
 
 | Version Bump | May Contain |
 |--------------|-------------|
 | `0.x.0` → `0.y.0` | Breaking changes |
 | `0.x.y` → `0.x.z` | Bug fixes, minor features |
 
-### Upgrade Checklist
+### Upgrade checklist
 
 Before upgrading to any new `0.x.0` version:
 
@@ -49,7 +49,7 @@ Before upgrading to any new `0.x.0` version:
 
 ---
 
-## Version History
+## Version history
 
 This section lists releases that shipped breaking changes requiring operator action. Releases not listed here had no documented breaking changes — see the [release notes](https://github.com/ls1intum/Hephaestus/releases) for the full per-version history.
 
@@ -94,7 +94,7 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 
 ---
 
-## Breaking Change Template
+## Breaking change template
 
 When breaking changes occur, they're documented like this:
 
@@ -124,16 +124,16 @@ When breaking changes occur, they're documented like this:
 
 ---
 
-## Automatic vs Manual Migrations
+## Automatic vs manual migrations
 
-### Automatic (No Action Needed)
+### Automatic (no action needed)
 
 | Component | Tool | Notes |
 |-----------|------|-------|
 | Database schema | Liquibase | Runs on server startup |
 | Entity relationships | JPA | Schema changes auto-applied |
 
-### Manual (Action Required)
+### Manual (action required)
 
 | Component | How | Notes |
 |-----------|-----|-------|
@@ -143,7 +143,7 @@ When breaking changes occur, they're documented like this:
 
 ---
 
-## Stability Roadmap
+## Stability roadmap
 
 ### v1.0.0 (Future)
 
@@ -158,21 +158,21 @@ Until then, expect rapid iteration and occasional breaking changes.
 
 ---
 
-## Common Migration Scenarios
+## Common migration scenarios
 
-### API Response Shape Changed
+### API response shape changed
 
 1. Regenerate client: `pnpm run generate:api`
 2. Fix TypeScript errors
 3. Update any manual type assertions
 
-### New Required Environment Variable
+### New required environment variable
 
 1. Check `.env.example` for new variables
 2. Add to your `.env` and deployment configs
 3. Restart services
 
-### Database Schema Changed
+### Database schema changed
 
 Liquibase handles this automatically. If you see errors:
 
@@ -182,7 +182,7 @@ Liquibase handles this automatically. If you see errors:
 
 ---
 
-## Getting Help
+## Getting help
 
 1. 📖 [GitHub Discussions](https://github.com/ls1intum/Hephaestus/discussions) - Ask the community
 2. 🐛 [Issues](https://github.com/ls1intum/Hephaestus/issues) - Report problems
