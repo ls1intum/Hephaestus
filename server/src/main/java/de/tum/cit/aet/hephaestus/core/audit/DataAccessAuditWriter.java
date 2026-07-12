@@ -7,6 +7,7 @@ import java.sql.Statement;
 import java.time.Clock;
 import org.hibernate.Session;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,17 @@ public class DataAccessAuditWriter {
     @PersistenceContext
     private EntityManager entityManager;
 
-    public DataAccessAuditWriter(DataAccessEventRepository repository, Clock clock) {
+    /**
+     * Self-constructed clock (like {@code ReviewCycleWindowResolver}): the only {@link Clock} bean in the
+     * context ({@code authClock}) is server-role-gated, and this writer must also wire on the worker and
+     * webhook runtimes, where {@code PracticesWorkspacePurgeAdapter} (ungated) injects it.
+     */
+    @Autowired
+    public DataAccessAuditWriter(DataAccessEventRepository repository) {
+        this(repository, Clock.systemUTC());
+    }
+
+    DataAccessAuditWriter(DataAccessEventRepository repository, Clock clock) {
         this.repository = repository;
         this.clock = clock;
     }
