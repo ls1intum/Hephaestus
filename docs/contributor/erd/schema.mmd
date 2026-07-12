@@ -216,6 +216,15 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
+    DataAccessEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT workspace_id "NOT NULL"
+        BIGINT actor_user_id "NOT NULL"
+        BIGINT subject_user_id
+        VARCHAR(48) resource_type "NOT NULL"
+    }
+
     Discussion {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -1018,6 +1027,7 @@ erDiagram
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
+        VARCHAR(32) health_visibility "NOT NULL"
     }
 
     WorkspaceMembership {

@@ -1,0 +1,156 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ONE consolidated branch changelog (leaderboard-flag-phase-out): additive schema for the
+        practice read model shipped dark alongside the flag-gated legacy leaderboard. Nothing is
+        dropped or renamed — the leaderboard/league columns stay untouched.
+
+        Each changeSet is preconditioned (onFail="MARK_RAN") + has a <rollback>.
+    -->
+
+    <!-- 1. Generalized, append-only data-access disclosure audit (core.audit.DataAccessEvent): one row
+         each time a privileged actor is shown a subject's (or several subjects at once, in a bulk view)
+         data, resource-typed so any future disclosure surface reuses the same table. Scalar identity
+         columns (no FK) mirror observation.about_user_id (avoids a Modulith cycle + stays off the drift
+         gate). subject_user_id is nullable — a bulk/list view (the roster) has no single subject;
+         resource_type is CHECK-constrained to the two values the application writes today (mirrors the
+         house convention: login_provider.type, observation.presence).
+
+         Indexes: idx_data_access_event_subject on (subject_user_id, workspace_id, resource_type) —
+         subject_user_id leads because "every disclosure about this person" (GDPR subject-access / erasure)
+         is the query shape. A partial WHERE subject_user_id IS NOT NULL clause would be marginally smaller,
+         but JPA @Index cannot express it and the schema-drift gate diffs DDL against the entity annotations,
+         so the plain form is used (the table is low-write; the difference is negligible).
+         idx_data_access_event_actor on actor_user_id serves the mirror GDPR query ("everything this actor
+         disclosed").
+
+         SECURITY — storage-layer append-only. A BEFORE UPDATE OR DELETE trigger RAISEs so the app cannot
+         silently alter or erase a disclosure record. UPDATE is allowed only for the account-erasure redaction
+         marker hephaestus.audit_redact='on'; DELETE is allowed only for the workspace-purge marker
+         hephaestus.audit_purge='on'.
+
+         Unlike auth_event's trigger (context="prod"), this one carries NO context: the integration test tier
+         runs on Hibernate ddl-auto (Liquibase disabled) so the trigger is simply absent there and cannot
+         interfere, while the DataAccessEventAppendOnlyLiquibaseTest proof runs the real changelog and needs it. -->
+    <changeSet author="hephaestus-leaderboard-phase-out" id="1783869213712-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="data_access_event already present">
+            <not>
+                <tableExists tableName="data_access_event"/>
+            </not>
+        </preConditions>
+        <comment>Create data_access_event (generalized append-only disclosure audit) + resource-type CHECK + subject/actor indexes + append-only trigger.</comment>
+        <createTable tableName="data_access_event">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="pk_data_access_event" nullable="false"/>
+            </column>
+            <column name="occurred_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="actor_user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <!-- Nullable: NULL for a bulk/list view (e.g. the roster) which discloses many subjects at once. -->
+            <column name="subject_user_id" type="BIGINT"/>
+            <column name="resource_type" type="VARCHAR(48)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>ALTER TABLE data_access_event ADD CONSTRAINT chk_data_access_event_resource_type CHECK (resource_type IN ('PRACTICE_REPORT', 'PRACTICE_ROSTER'))</sql>
+        <createIndex tableName="data_access_event" indexName="idx_data_access_event_subject">
+            <column name="subject_user_id"/>
+            <column name="workspace_id"/>
+            <column name="resource_type"/>
+        </createIndex>
+        <createIndex tableName="data_access_event" indexName="idx_data_access_event_actor">
+            <column name="actor_user_id"/>
+        </createIndex>
+        <sql splitStatements="false"><![CDATA[
+            CREATE OR REPLACE FUNCTION data_access_event_block_mutation() RETURNS trigger AS $data_access_immut$
+            BEGIN
+                IF TG_OP = 'UPDATE' THEN
+                    IF current_setting('hephaestus.audit_redact', true) IS DISTINCT FROM 'on' THEN
+                        RAISE EXCEPTION 'data_access_event is append-only: UPDATE is permitted only via account erasure';
+                    END IF;
+                    RETURN NEW;
+                END IF;
+                IF current_setting('hephaestus.audit_purge', true) IS DISTINCT FROM 'on' THEN
+                    RAISE EXCEPTION 'data_access_event is append-only: DELETE is permitted only via the workspace purge';
+                END IF;
+                RETURN OLD;
+            END;
+            $data_access_immut$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER trg_data_access_event_block_mutation
+                BEFORE UPDATE OR DELETE ON data_access_event
+                FOR EACH ROW EXECUTE FUNCTION data_access_event_block_mutation();
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TRIGGER IF EXISTS trg_data_access_event_block_mutation ON data_access_event;
+                DROP FUNCTION IF EXISTS data_access_event_block_mutation();
+            ]]></sql>
+            <dropIndex tableName="data_access_event" indexName="idx_data_access_event_actor"/>
+            <dropIndex tableName="data_access_event" indexName="idx_data_access_event_subject"/>
+            <dropTable tableName="data_access_event"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 2. Per-workspace workspace-health-aggregate visibility (a privacy control). Gates only whether
+         ordinary members see the k-anonymised workspace health card; roster + drill-down stay
+         admin/owner-only in both values. NOT NULL, default 'MENTORS_ONLY', CHECK-constrained to the two
+         enum values (house convention: login_provider.type, observation.presence). The workspace_features
+         embeddable maps onto the workspace table (like every other *_enabled feature flag), so the column
+         lives on workspace. -->
+    <changeSet author="hephaestus-leaderboard-phase-out" id="1783869213712-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.health_visibility already present">
+            <not>
+                <columnExists tableName="workspace" columnName="health_visibility"/>
+            </not>
+        </preConditions>
+        <comment>Add workspace.health_visibility (MENTORS_ONLY | EVERYONE) + CHECK constraint, NOT NULL default MENTORS_ONLY.</comment>
+        <addColumn tableName="workspace">
+            <column name="health_visibility" type="VARCHAR(32)" defaultValue="MENTORS_ONLY">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>ALTER TABLE workspace ADD CONSTRAINT chk_workspace_health_visibility CHECK (health_visibility IN ('MENTORS_ONLY', 'EVERYONE'))</sql>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="health_visibility"/>
+        </rollback>
+    </changeSet>
+
+    <!-- 3. Widen the PRE-EXISTING shipped index idx_observation_subject (from migration 1781092589259)
+         from (about_user_id) to (about_user_id, observed_at DESC). Serves the developer-scoped
+         window-bounded queries on ObservationRepository (findRecentByDeveloperAndWorkspace,
+         findPracticeStandingForDeveloperBetween, findAreaRollupStandingBetween,
+         findAreaStandingByDeveloperAndWorkspace, existsVisibleReportSubjectBetween), all of which filter
+         by about_user_id and then bound/order by observed_at — the single-column index could satisfy the
+         equality filter but not the range/order, forcing a sort. Drop + recreate (Postgres has no
+         ALTER INDEX ADD COLUMN); rollback restores the original single-column form. -->
+    <changeSet author="hephaestus-leaderboard-phase-out" id="1783869213712-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_observation_subject already widened or absent">
+            <indexExists tableName="observation" indexName="idx_observation_subject"/>
+        </preConditions>
+        <comment>Widen idx_observation_subject from (about_user_id) to (about_user_id, observed_at DESC).</comment>
+        <dropIndex tableName="observation" indexName="idx_observation_subject"/>
+        <createIndex tableName="observation" indexName="idx_observation_subject">
+            <column name="about_user_id"/>
+            <column name="observed_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="observation" indexName="idx_observation_subject"/>
+            <createIndex tableName="observation" indexName="idx_observation_subject">
+                <column name="about_user_id"/>
+            </createIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
