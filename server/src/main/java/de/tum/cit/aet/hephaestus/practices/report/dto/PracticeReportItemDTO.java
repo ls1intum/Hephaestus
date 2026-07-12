@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.report.dto;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -12,9 +14,10 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * One piece of feedback on the reflective dashboard — a single observation rendered for a developer to READ:
- * the headline, the actionable guidance, where it is, and a handle to open the full observation. Deliberately
- * NOT the raw {@link Observation}: no observation enum, no reasoning machinery, and never any criteria — the
- * dashboard is a learner surface, so it carries only what helps the developer act.
+ * the headline, the actionable guidance, where it is, when it was seen, and the concrete PR/issue it came
+ * from (title, link, repository) so every claim stays anchored to real work. Deliberately NOT the raw
+ * {@link Observation}: no observation enum, no reasoning machinery, and never any criteria — the dashboard
+ * is a learner surface, so it carries only what helps the developer act.
  */
 @Schema(description = "A single piece of practice feedback to read and act on")
 public record PracticeReportItemDTO(
@@ -28,9 +31,37 @@ public record PracticeReportItemDTO(
     @Schema(description = "The kind of work this is about (PR / issue / Slack conversation thread)")
     WorkArtifact artifactType,
     @NonNull @Schema(description = "Id of the PR / issue / conversation thread this is about") Long artifactId,
-    @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
+    @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator,
+    @NonNull @Schema(description = "When the observation was made") Instant observedAt,
+    @Nullable
+    @Schema(description = "Title of the PR / issue this is about (null when the artifact has no linkable page)")
+    String artifactTitle,
+    @Nullable @Schema(description = "Deep link to the PR / issue this is about") String artifactUrl,
+    @Nullable @Schema(description = "PR / issue number within its repository") Integer artifactNumber,
+    @Nullable @Schema(description = "Repository full name, e.g. \"owner/name\"") String artifactRepository,
+    @Nullable @Schema(description = "State of the PR / issue") State artifactState
 ) {
+    /**
+     * Presentation context of the concrete PR/issue an observation targets — resolved by the caller in one
+     * batch query, null for artifact kinds without a linkable page (e.g. a conversation thread).
+     */
+    public record ArtifactContext(
+        @Nullable String title,
+        @Nullable String htmlUrl,
+        @Nullable Integer number,
+        @Nullable String repository,
+        @Nullable State state
+    ) {}
+
     public static PracticeReportItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
+        return from(observation, deliveredGuidance, null);
+    }
+
+    public static PracticeReportItemDTO from(
+        Observation observation,
+        @Nullable String deliveredGuidance,
+        @Nullable ArtifactContext artifact
+    ) {
         return new PracticeReportItemDTO(
             observation.getId(),
             observation.getTitle(),
@@ -38,7 +69,13 @@ public record PracticeReportItemDTO(
             observation.getSeverity(),
             observation.getArtifactType(),
             observation.getArtifactId(),
-            locatorOf(observation.getEvidence())
+            locatorOf(observation.getEvidence()),
+            observation.getObservedAt(),
+            artifact == null ? null : artifact.title(),
+            artifact == null ? null : artifact.htmlUrl(),
+            artifact == null ? null : artifact.number(),
+            artifact == null ? null : artifact.repository(),
+            artifact == null ? null : artifact.state()
         );
     }
 

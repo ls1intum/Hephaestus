@@ -6008,6 +6008,24 @@ components:
           type: integer
           format: int64
           description: Id of the PR / issue / conversation thread this is about
+        artifactNumber:
+          type: integer
+          format: int32
+          description: PR / issue number within its repository
+        artifactRepository:
+          type: string
+          description: "Repository full name, e.g. \"owner/name\""
+        artifactState:
+          type: string
+          description: State of the PR / issue
+          enum:
+          - OPEN
+          - CLOSED
+          - MERGED
+        artifactTitle:
+          type: string
+          description: Title of the PR / issue this is about (null when the artifact
+            has no linkable page)
         artifactType:
           type: string
           description: The kind of work this is about (PR / issue / Slack conversation
@@ -6016,6 +6034,9 @@ components:
           - PULL_REQUEST
           - ISSUE
           - CONVERSATION_THREAD
+        artifactUrl:
+          type: string
+          description: Deep link to the PR / issue this is about
         guidance:
           type: string
           description: What to do — the delivered feedback for this observation (null
@@ -6028,6 +6049,10 @@ components:
           type: string
           format: uuid
           description: Observation id — handle to open the full detail
+        observedAt:
+          type: string
+          format: date-time
+          description: When the observation was made
         severity:
           type: string
           description: Impact level (null unless assessed BAD)
@@ -6043,6 +6068,7 @@ components:
       - artifactId
       - artifactType
       - observationId
+      - observedAt
       - title
     PracticeReportSummary:
       type: object

@@ -5,6 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -24,6 +27,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,6 +65,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
 
     @Mock
     private ReviewCycleWindowResolver reviewCycleWindowResolver;
+
+    @Mock
+    private IssueRepository issueRepository;
 
     @InjectMocks
     private ObservationService observationService;
@@ -296,5 +303,70 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         assertThat(cards).hasSize(1);
         // Both share a locus seen on 2 targets → neither quarantined → both displayed.
         assertThat(cards.get(0).toWorkOn()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("items are anchored to their PR/issue: title, link, repository and state come from ONE batch fetch")
+    void itemsCarryArtifactContextFromBatchFetch() {
+        Practice practice = practice("robust-error-handling");
+        Observation onPullRequest = bad(practice, Severity.MAJOR, 0.9f, 42L);
+
+        Repository repository = new Repository();
+        repository.setNameWithOwner("acme/payments-api");
+        Issue pullRequest = new Issue();
+        pullRequest.setId(42L);
+        pullRequest.setNumber(575);
+        pullRequest.setTitle("Add distance warnings to the AR recorder");
+        pullRequest.setHtmlUrl("https://github.com/acme/payments-api/pull/575");
+        pullRequest.setState(Issue.State.MERGED);
+        pullRequest.setRepository(repository);
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(onPullRequest));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+        when(issueRepository.findAllWithRepositoryByIdIn(Set.of(42L))).thenReturn(List.of(pullRequest));
+
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        PracticeReportItemDTO item = cards.get(0).toWorkOn().get(0);
+        assertThat(item.artifactTitle()).isEqualTo("Add distance warnings to the AR recorder");
+        assertThat(item.artifactUrl()).isEqualTo("https://github.com/acme/payments-api/pull/575");
+        assertThat(item.artifactNumber()).isEqualTo(575);
+        assertThat(item.artifactRepository()).isEqualTo("acme/payments-api");
+        assertThat(item.artifactState()).isEqualTo(Issue.State.MERGED);
+    }
+
+    @Test
+    @DisplayName("an artifact the batch fetch cannot resolve leaves the item without a deep link, never failing")
+    void unresolvableArtifactLeavesContextNull() {
+        Practice practice = practice("robust-error-handling");
+        Observation onPullRequest = bad(practice, Severity.MAJOR, 0.9f, 42L);
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(onPullRequest));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+        when(issueRepository.findAllWithRepositoryByIdIn(Set.of(42L))).thenReturn(List.of());
+
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        PracticeReportItemDTO item = cards.get(0).toWorkOn().get(0);
+        assertThat(item.artifactTitle()).isNull();
+        assertThat(item.artifactUrl()).isNull();
+        assertThat(item.artifactRepository()).isNull();
+        assertThat(item.artifactState()).isNull();
     }
 }

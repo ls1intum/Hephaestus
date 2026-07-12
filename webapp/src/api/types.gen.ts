@@ -1505,9 +1505,29 @@ export type PracticeReportItem = {
      */
     artifactId: number;
     /**
+     * PR / issue number within its repository
+     */
+    artifactNumber?: number;
+    /**
+     * Repository full name, e.g. "owner/name"
+     */
+    artifactRepository?: string;
+    /**
+     * State of the PR / issue
+     */
+    artifactState?: 'OPEN' | 'CLOSED' | 'MERGED';
+    /**
+     * Title of the PR / issue this is about (null when the artifact has no linkable page)
+     */
+    artifactTitle?: string;
+    /**
      * The kind of work this is about (PR / issue / Slack conversation thread)
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Deep link to the PR / issue this is about
+     */
+    artifactUrl?: string;
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
@@ -1520,6 +1540,10 @@ export type PracticeReportItem = {
      * Observation id — handle to open the full detail
      */
     observationId: string;
+    /**
+     * When the observation was made
+     */
+    observedAt: Date;
     /**
      * Impact level (null unless assessed BAD)
      */

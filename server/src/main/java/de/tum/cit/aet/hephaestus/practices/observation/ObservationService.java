@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -56,6 +58,7 @@ public class ObservationService {
     private final UserRepository userRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ReviewCycleWindowResolver reviewCycleWindowResolver;
+    private final IssueRepository issueRepository;
 
     /**
      * Paginated findings for the current user in a workspace, with optional filters.
@@ -186,6 +189,11 @@ public class ObservationService {
             observations.stream().map(Observation::getId).collect(Collectors.toSet())
         );
 
+        // Anchor every item to the concrete PR/issue it came from (title, link, repository, state) so the
+        // report surfaces can deep-link the evidence. ONE batch query for the whole request; a conversation
+        // thread (or a since-deleted artifact) simply carries no artifact context rather than failing.
+        Map<Long, PracticeReportItemDTO.ArtifactContext> artifactContexts = loadArtifactContexts(observations);
+
         // Group by practice, preserving first-seen (recency) order from the query.
         Map<String, List<Observation>> byPractice = new LinkedHashMap<>();
         for (Observation f : observations) {
@@ -230,7 +238,9 @@ public class ObservationService {
                 .filter(f -> !quarantined(f, locusSingleTarget(f, targetsByLocus, groupSingleTarget)))
                 .sorted(Comparator.comparingDouble(ObservationService::priorityScore).reversed())
                 .limit(MAX_ITEMS_PER_PRACTICE)
-                .map(f -> PracticeReportItemDTO.from(f, deliveredGuidance.get(f.getId())))
+                .map(f ->
+                    PracticeReportItemDTO.from(f, deliveredGuidance.get(f.getId()), contextFor(f, artifactContexts))
+                )
                 .toList();
             List<PracticeReportItemDTO> strengths = isDefectDetector
                 ? List.of()
@@ -238,7 +248,13 @@ public class ObservationService {
                       .stream()
                       .filter(f -> f.getAssessment() == Assessment.GOOD)
                       .limit(MAX_STRENGTHS_PER_PRACTICE)
-                      .map(f -> PracticeReportItemDTO.from(f, deliveredGuidance.get(f.getId())))
+                      .map(f ->
+                          PracticeReportItemDTO.from(
+                              f,
+                              deliveredGuidance.get(f.getId()),
+                              contextFor(f, artifactContexts)
+                          )
+                      )
                       .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
                 // This fires for a defect-detector practice whose only rows are GOOD: strengths are suppressed
@@ -289,10 +305,52 @@ public class ObservationService {
     }
 
     /**
+     * Batch-resolves the PR/issue behind each observation to its presentation context (title, link,
+     * repository, state) — ONE query for the whole report, keyed by artifact id. Conversation threads have
+     * no linkable page and are skipped; an artifact id with no surviving row (deleted repo) is simply absent
+     * from the map, and the item renders without a deep link rather than failing.
+     */
+    private Map<Long, PracticeReportItemDTO.ArtifactContext> loadArtifactContexts(List<Observation> observations) {
+        Set<Long> linkableIds = observations
+            .stream()
+            .filter(o -> o.getArtifactType() == WorkArtifact.PULL_REQUEST || o.getArtifactType() == WorkArtifact.ISSUE)
+            .map(Observation::getArtifactId)
+            .collect(Collectors.toSet());
+        if (linkableIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, PracticeReportItemDTO.ArtifactContext> contexts = new HashMap<>();
+        for (Issue issue : issueRepository.findAllWithRepositoryByIdIn(linkableIds)) {
+            contexts.put(
+                issue.getId(),
+                new PracticeReportItemDTO.ArtifactContext(
+                    issue.getTitle(),
+                    issue.getHtmlUrl(),
+                    issue.getNumber(),
+                    issue.getRepository() == null ? null : issue.getRepository().getNameWithOwner(),
+                    issue.getState()
+                )
+            );
+        }
+        return contexts;
+    }
+
+    /** The artifact context for one observation — null for conversation threads and unresolvable artifacts. */
+    private static PracticeReportItemDTO.ArtifactContext contextFor(
+        Observation observation,
+        Map<Long, PracticeReportItemDTO.ArtifactContext> contexts
+    ) {
+        if (observation.getArtifactType() == WorkArtifact.CONVERSATION_THREAD) {
+            return null;
+        }
+        return contexts.get(observation.getArtifactId());
+    }
+
+    /**
      * Normalises the derived {@link PracticeStatus} for a reflection card. A card with neither problems nor
      * strengths is skipped upstream, so {@link PracticeStatus#NO_ACTIVITY} never reaches a card; it folds
      * defensively to {@link PracticeStatus#STRENGTH} — the "nothing to act on" reading — so the reflection
-     * surface only ever shows DEVELOPING / STRENGTH / MIXED.
+     * surface only ever shows DEVELOPING / MIXED / STRENGTH.
      */
     private static PracticeStatus toCardStanding(PracticeStatus standing) {
         return standing == PracticeStatus.NO_ACTIVITY ? PracticeStatus.STRENGTH : standing;
