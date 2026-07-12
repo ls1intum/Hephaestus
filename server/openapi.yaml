@@ -5697,8 +5697,8 @@ components:
       - title
     PracticeReportSummary:
       type: object
-      description: "A developer on the mentor roster (admin/owner-only; a triage view,\
-        \ never a ranking)"
+      description: "A developer on the mentor roster (admin/owner-only), sorted so\
+        \ people who may need support come first"
       properties:
         areas:
           type: array

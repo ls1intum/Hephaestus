@@ -38,26 +38,15 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code since} only (an explicit {@code until} bound of "now" is passed alongside it), so activity after
  * the cycle's nominal close is included.
  *
- * <p><b>Scope (P1 generalisation):</b> the mentor-facing roster and workspace health surfaces here now cover
- * EVERY active practice area, at an area-rollup grain (one cell/card per area, summing that area's practices'
- * good/bad signal). They used to be hardcoded to the single {@link #REVIEWING_PRACTICE_AREA_SLUG} area — a
- * live test proved that scoping left the mentor blind to risk concentrated in other areas (security,
- * testing, error-handling). The developer's own {@code /reports/me} reflection (in {@code
- * ObservationService}) was never area-scoped: it already spans every practice, at PRACTICE grain (not
- * rolled up), which the roster/health surfaces deliberately do NOT match — a per-practice roster column
- * count would not stay legible as the catalogue grows, hence the area rollup.
+ * <p><b>Grain:</b> the mentor-facing roster and workspace health surfaces cover every active practice
+ * area at an area-rollup grain (one cell/card per area, summing that area's practices' good/bad signal) —
+ * a per-practice roster would not stay legible as the catalogue grows. The developer's own
+ * {@code /reports/me} reflection (in {@code ObservationService}) is the per-practice complement: it spans
+ * every practice individually, and the mentor drill-down reuses it.
  */
 @Service
 @RequiredArgsConstructor
 public class PracticeReportService {
-
-    /**
-     * Historical scope constant: the mentor roster + workspace health used to be hardcoded to this single
-     * area (see the class javadoc). It is no longer a scope gate for {@link #listReports} or
-     * {@link #getWorkspaceHealth} — both now cover every active area. Kept because a few tests still seed a
-     * fixture area under this slug.
-     */
-    public static final String REVIEWING_PRACTICE_AREA_SLUG = "constructive-code-review";
 
     /** Minimum active developers before a workspace health card exposes counts. */
     private static final int K_ANONYMITY_THRESHOLD = 5;

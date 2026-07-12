@@ -50,7 +50,7 @@ public class WorkspaceFeatures {
 
     /**
      * Audience for the k-anonymised workspace health aggregate on the practice overview (a privacy control,
-     * never a ranking control). Defaults to {@link HealthVisibility#MENTORS_ONLY}. The roster and
+     * Defaults to {@link HealthVisibility#MENTORS_ONLY}. The roster and
      * per-developer drill-down stay admin/owner-only in both values; see {@link HealthVisibility}.
      */
     @NotNull

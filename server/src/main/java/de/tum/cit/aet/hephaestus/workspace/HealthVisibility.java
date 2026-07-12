@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 /**
  * Per-workspace audience for the k-anonymised <b>workspace health</b> aggregate on the practice overview — a
- * privacy control, never a ranking control. This setting gates <em>only</em> whether ordinary members can see
+ * privacy control. This setting gates <em>only</em> whether ordinary members can see
  * the health card; it changes nothing else.
  *
  * <p>In <b>both</b> values the roster and the per-developer drill-down (which name individuals) stay

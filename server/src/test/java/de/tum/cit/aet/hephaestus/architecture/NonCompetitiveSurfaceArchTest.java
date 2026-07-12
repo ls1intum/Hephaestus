@@ -15,8 +15,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The practice surfaces are criterion-referenced by design (ADR 0023): they must never expose a
  * field that orders or scores developers against each other. This pins that invariant on the wire
- * layer — a DTO field named like a score/rank re-creates the retired leaderboard the moment a
- * client renders it, no matter how the docs frame it.
+ * layer — a DTO field named like a score or rank invites a client to render a comparison, no matter
+ * how the docs frame it.
  */
 class NonCompetitiveSurfaceArchTest extends HephaestusArchitectureTest {
 

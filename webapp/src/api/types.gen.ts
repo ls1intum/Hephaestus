@@ -1307,7 +1307,7 @@ export type ProblemDetail = {
 };
 
 /**
- * A developer on the mentor roster (admin/owner-only; a triage view, never a ranking)
+ * A developer on the mentor roster (admin/owner-only), sorted so people who may need support come first
  */
 export type PracticeReportSummary = {
     /**

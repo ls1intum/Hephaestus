@@ -42,7 +42,7 @@ export function LandingFeaturesSection() {
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Growth signals, never scores or rankings</span>
+									<span>Growth signals grounded in your own work</span>
 								</li>
 							</ul>
 						</CardContent>

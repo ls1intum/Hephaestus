@@ -221,7 +221,7 @@
         </rollback>
     </changeSet>
 
-    <!-- 11. Per-workspace workspace-health-aggregate visibility (privacy control, NOT a ranking control). Gates
+    <!-- 11. Per-workspace workspace-health-aggregate visibility (a privacy control). Gates
          only whether ordinary members see the k-anonymised workspace health card; roster + drill-down stay
          admin/owner-only in both values. NOT NULL, default 'MENTORS_ONLY', CHECK-constrained to the two enum
          values (house convention: login_provider.type, observation.presence). The workspace_features

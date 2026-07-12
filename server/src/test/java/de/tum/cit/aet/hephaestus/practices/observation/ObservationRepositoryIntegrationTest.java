@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.practices.model.ReviewerAudiencePractices;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaRollupRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
-import de.tum.cit.aet.hephaestus.practices.report.PracticeReportService;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -1021,7 +1020,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         private void seedReviewingArea() {
             PracticeArea area = new PracticeArea();
             area.setWorkspace(workspace);
-            area.setSlug(PracticeReportService.REVIEWING_PRACTICE_AREA_SLUG);
+            area.setSlug("constructive-code-review");
             area.setName("Constructive code review");
             area = practiceAreaRepository.save(area);
 

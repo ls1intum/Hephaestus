@@ -31,7 +31,7 @@ export const Default: Story = {
 			title: "Practice Feedback",
 			description: "Turning technical work into personal growth",
 			content:
-				"Transform code reviews into personal, practice-by-practice feedback on each developer's own work, with a mentoring overview across the workspace. It highlights strengths and what to work on — growth signals for everyone, never scores or rankings.",
+				"Transform code reviews into personal, practice-by-practice feedback on each developer's own work, with a mentoring overview across the workspace. It highlights strengths and what to work on, so everyone can see where to grow next.",
 		},
 	},
 };

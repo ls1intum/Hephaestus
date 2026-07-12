@@ -9,7 +9,9 @@ import org.jspecify.annotations.Nullable;
  * One developer on the mentor roster: their identity plus a per-AREA standing (rolled up across all practice
  * areas, P1 generalisation) and a needs-attention triage flag. Admin/owner-only (it names an individual).
  */
-@Schema(description = "A developer on the mentor roster (admin/owner-only; a triage view, never a ranking)")
+@Schema(
+    description = "A developer on the mentor roster (admin/owner-only), sorted so people who may need support come first"
+)
 public record PracticeReportSummaryDTO(
     @NonNull @Schema(description = "Stable SCM user id for drill-down calls") Long userId,
     @NonNull @Schema(description = "Developer login") String userLogin,

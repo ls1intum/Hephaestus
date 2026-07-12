@@ -5,7 +5,7 @@ import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { PracticeReflectionCard } from "@/components/practices/reflection/PracticeReflectionCard";
 import { Button } from "@/components/ui/button";
 
-// Sample practice reflection for the marketing preview — non-competitive, no scores or ranks.
+// Sample practice reflection for the marketing preview.
 const SAMPLE_PRACTICE: PracticeReportCard = {
 	name: "Write a clear pull request description",
 	areaName: "Pull requests",
