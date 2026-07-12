@@ -46,7 +46,9 @@ export const Suppressed: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("Reproduce before fixing")).toBeVisible();
 		await expect(
-			canvas.getByText("Not enough activity yet to show without naming anyone."),
+			canvas.getByText(
+				"Shown once five or more developers are active here, so nobody can be singled out.",
+			),
 		).toBeVisible();
 		await expect(canvas.queryByText("No activity in this area yet.")).toBeNull();
 		await expect(canvas.queryByText("Strength")).toBeNull();
@@ -69,7 +71,9 @@ export const NoData: Story = {
 		await expect(canvas.getByText("Reproduce before fixing")).toBeVisible();
 		await expect(canvas.getByText("No activity in this area yet.")).toBeVisible();
 		await expect(
-			canvas.queryByText("Not enough activity yet to show without naming anyone."),
+			canvas.queryByText(
+				"Shown once five or more developers are active here, so nobody can be singled out.",
+			),
 		).toBeNull();
 		await expect(canvas.queryByText("Strength")).toBeNull();
 	},

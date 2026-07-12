@@ -29,7 +29,7 @@ export function WorkspaceHealthCard({ health }: WorkspaceHealthCardProps) {
 				</CardHeader>
 				<CardContent>
 					<p className="text-sm text-muted-foreground">
-						Not enough activity yet to show without naming anyone.
+						Shown once five or more developers are active here, so nobody can be singled out.
 					</p>
 				</CardContent>
 			</Card>

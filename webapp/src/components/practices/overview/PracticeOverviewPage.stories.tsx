@@ -100,7 +100,9 @@ export const WorkspaceHealth: Story = {
 		// The suppressed area and the no-data area render distinct, honest messages side by side.
 		const canvas = within(canvasElement);
 		await expect(
-			canvas.getByText("Not enough activity yet to show without naming anyone."),
+			canvas.getByText(
+				"Shown once five or more developers are active here, so nobody can be singled out.",
+			),
 		).toBeVisible();
 		await expect(canvas.getByText("No activity in this area yet.")).toBeVisible();
 	},
