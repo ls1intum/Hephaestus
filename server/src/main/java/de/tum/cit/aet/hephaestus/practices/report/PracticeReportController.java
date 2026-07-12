@@ -126,7 +126,7 @@ public class PracticeReportController {
     )
     @SecurityRequirements
     public ResponseEntity<List<PracticeReportCardDTO>> getMyPracticeReport(WorkspaceContext workspaceContext) {
-        reportService.requireAuditableCurrentUserId();
+        reportService.requireCurrentUserId();
         return ResponseEntity.ok(observationService.getPracticeReport(workspaceContext.id()));
     }
 

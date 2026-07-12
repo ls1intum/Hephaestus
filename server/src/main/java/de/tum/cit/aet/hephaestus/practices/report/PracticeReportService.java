@@ -227,15 +227,27 @@ public class PracticeReportService {
         return observationService.getPracticeReport(workspaceId, subjectUserId);
     }
 
+    /** The caller's SCM actor id, or 403 — used by views that only need a resolvable caller identity. */
+    public Long requireCurrentUserId() {
+        return requireCurrentUserId("Requires a synced developer identity in this workspace");
+    }
+
+    /**
+     * Like {@link #requireCurrentUserId()}, but for the roster/drill-down views that must write a
+     * disclosure-audit row: without a resolvable viewer there is no auditable actor, so the read is
+     * refused with a message that says why.
+     */
     public Long requireAuditableCurrentUserId() {
+        return requireCurrentUserId(
+            "Cannot record the required access audit for this view (no resolvable viewer identity)"
+        );
+    }
+
+    private Long requireCurrentUserId(String forbiddenDetail) {
         return userRepository
             .getCurrentUser()
             .map(User::getId)
-            .orElseThrow(() ->
-                new AccessForbiddenException(
-                    "Cannot record the required access audit for this view (no resolvable viewer identity)"
-                )
-            );
+            .orElseThrow(() -> new AccessForbiddenException(forbiddenDetail));
     }
 
     private void validateSubjectInCurrentRoster(Long workspaceId, Long subjectUserId) {
