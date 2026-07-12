@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
@@ -17,12 +18,14 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.core.task.AsyncTaskExecutor;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,6 +46,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    // Executes tasks inline so the create-event path is deterministic under test. In production this is
+    // the shared monitoringExecutor.
+    private final AsyncTaskExecutor directExecutor = Runnable::run;
+
     private DefaultPracticeCatalogSeeder seeder(boolean enabled) {
         return new DefaultPracticeCatalogSeeder(
             enabled,
@@ -51,7 +58,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             practiceService,
             areaRepository,
             practiceRepository,
-            workspaceRepository
+            workspaceRepository,
+            directExecutor
         );
     }
 
@@ -191,12 +199,63 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
+    void onWorkspaceCreated_seedsTheNewWorkspaceOffTheRequestThread() {
+        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(new Workspace()));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+        when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
+
+        seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+
+        // A runtime-created workspace gets the full catalog (mirrors the boot path), dispatched via the executor.
+        verify(areaService, times(12)).createArea(any(), any(), any());
+        verify(practiceService, times(35)).createPractice(any(), any());
+        verify(areaService, times(35)).bindPractice(any(), any(), any());
+    }
+
+    @Test
+    void onWorkspaceCreated_noOpsWhenWorkspaceRowIsGone() {
+        when(workspaceRepository.findById(any())).thenReturn(Optional.empty());
+
+        seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(99L, IntegrationKind.GITLAB));
+
+        verify(areaService, never()).createArea(any(), any(), any());
+        verify(practiceService, never()).createPractice(any(), any());
+    }
+
+    @Test
+    void onWorkspaceCreated_noOpsWhenDisabled() {
+        seeder(false).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+
+        verifyNoInteractions(workspaceRepository, areaService, practiceService);
+    }
+
+    @Test
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(areaService.createArea(any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void workspaceLookupFailureAtBoot_isIsolatedAndDoesNotThrow() {
+        // The startup listener runs inside workspace provisioning: even the workspace lookup itself failing
+        // must degrade to a missing catalog, never abort workspace activation for the boot.
+        when(workspaceRepository.findAll()).thenThrow(new RuntimeException("db down"));
+
+        assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void onWorkspaceCreated_lookupFailure_isContainedInsideTheTask() {
+        // The executor's outcome is discarded, so the task must contain its own failures — a throwing
+        // lookup may not propagate to (and kill) the executor thread unlogged.
+        when(workspaceRepository.findById(any())).thenThrow(new RuntimeException("db down"));
+
+        assertThatCode(() ->
+            seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB))
+        ).doesNotThrowAnyException();
     }
 
     @Test
