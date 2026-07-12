@@ -121,7 +121,13 @@ jobs:
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
               pnpm exec playwright install chromium --with-deps
-              pnpm run test:storybook
+              # A single serial run. vitest.config.storybook.ts pre-bundles every runtime dependency up
+              # front (optimizeDeps.include) and executes all files in one shared iframe (isolate:false,
+              # fileParallelism:false): Vite discovering a dependency mid-run reloads the shared page
+              # under in-flight tests and deadlocks the suite, so no retry loop can help — the config
+              # must prevent the reload. The timeout is a defensive backstop: a fast loud kill instead
+              # of a 30-minute hung job.
+              timeout 5m pnpm run test:storybook
               ;;
             "webapp-visual")
               pnpm run build-storybook
