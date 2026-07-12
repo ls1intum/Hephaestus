@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextResolver;
@@ -28,6 +29,11 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * <p>Provides ranked contributor lists based on configurable time ranges,
  * team filters, and scoring modes.
+ *
+ * <p>Both endpoints are gated on the workspace's feature flags ({@code leaderboardEnabled} /
+ * {@code leaguesEnabled}): a workspace with the feature off answers 404 {@code ProblemDetail}
+ * (the resource does not exist there), keeping the server the enforcement point rather than
+ * relying on the webapp hiding the navigation.
  */
 @WorkspaceScopedController
 @RequestMapping("/leaderboard")
@@ -74,6 +80,7 @@ public class LeaderboardController {
         @RequestParam LeaderboardMode mode
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        requireLeaderboardEnabled(workspace);
         log.info("Received leaderboard request: workspaceId={}, mode={}", workspace.getId(), mode);
         return ResponseEntity.ok(leaderboardService.createLeaderboard(workspace, after, before, team, sort, mode));
     }
@@ -106,11 +113,26 @@ public class LeaderboardController {
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
+        requireLeaguesEnabled(workspace);
         log.info(
             "Received league stats request: workspaceId={}, userLogin={}",
             workspace.getId(),
             LoggingUtils.sanitizeForLog(login)
         );
         return ResponseEntity.ok(leaderboardService.computeUserLeagueStats(workspace, login, after, before));
+    }
+
+    /** 404 (via {@link EntityNotFoundException}) when the workspace has the leaderboard feature off. */
+    private static void requireLeaderboardEnabled(Workspace workspace) {
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getLeaderboardEnabled())) {
+            throw new EntityNotFoundException("Leaderboard", workspace.getWorkspaceSlug());
+        }
+    }
+
+    /** 404 (via {@link EntityNotFoundException}) when the workspace has the leagues feature off. */
+    private static void requireLeaguesEnabled(Workspace workspace) {
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getLeaguesEnabled())) {
+            throw new EntityNotFoundException("League statistics", workspace.getWorkspaceSlug());
+        }
     }
 }

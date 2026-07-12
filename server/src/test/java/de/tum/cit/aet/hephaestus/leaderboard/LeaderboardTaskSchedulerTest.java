@@ -121,6 +121,19 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
     }
 
     @Test
+    void leaderboardFeatureDisabled_skipsNotificationsAndLeagueUpdate() {
+        Runnable tick = registerAndCaptureTick(true, List.of(notificationTask));
+        when(lockProvider.lock(any())).thenReturn(Optional.of(lock));
+        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(flagOffWorkspace(7L)));
+
+        tick.run();
+
+        verify(notificationTask, never()).runForWorkspace(any(Workspace.class));
+        verify(leaguePointsUpdateTask, never()).runForWorkspace(any(Workspace.class));
+        verify(lock).unlock();
+    }
+
+    @Test
     void notificationChannelThrows_leagueUpdateStillRuns() {
         Runnable tick = registerAndCaptureTick(true, List.of(notificationTask));
         when(lockProvider.lock(any())).thenReturn(Optional.of(lock));
@@ -135,7 +148,16 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
         verify(lock).unlock();
     }
 
+    /** A workspace with the leaderboard feature ON — the scheduler's per-workspace flag gate lets it run. */
     private static Workspace workspace(long id) {
+        Workspace w = new Workspace();
+        w.setId(id);
+        w.getFeatures().setLeaderboardEnabled(true);
+        return w;
+    }
+
+    /** New-workspace default: the leaderboard feature flag is off. */
+    private static Workspace flagOffWorkspace(long id) {
         Workspace w = new Workspace();
         w.setId(id);
         return w;
