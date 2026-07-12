@@ -412,8 +412,10 @@ public class PullRequestContentSource implements ContentSource {
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
         if (headSha == null || headSha.isBlank()) {
-            log.warn("No commit_sha in metadata, skipping diff pre-computation");
-            return;
+            // Fail closed: a PR review without a head SHA has no diff to judge. Proceeding would hand
+            // the model a repo mount with no diff.patch, and it can fabricate findings about changes
+            // that do not exist (observed live on a zero-commit MR).
+            throw new JobPreparationException("No commit_sha in metadata — nothing to review");
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
@@ -432,15 +434,18 @@ public class PullRequestContentSource implements ContentSource {
                             repositoryId
                     );
                 }
-                log.error(
-                    "Cannot compute diff: head commit not available locally. " +
-                        "headSha={}, targetBranch={}, sourceBranch={}, repoId={}",
-                    headSha,
-                    targetBranch,
-                    sourceBranch,
-                    repositoryId
+                // Fail closed (same fabrication risk as a missing commit_sha): without a resolvable
+                // range there is no diff.patch, and the review must not run against a bare repo mount.
+                throw new JobPreparationException(
+                    "Cannot compute diff: head commit not available locally. headSha=" +
+                        headSha +
+                        ", targetBranch=" +
+                        targetBranch +
+                        ", sourceBranch=" +
+                        sourceBranch +
+                        ", repoId=" +
+                        repositoryId
                 );
-                return;
             }
             String diffStat = gitDiffOperations.diffStat(repoPath, range[0], range[1]);
             String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
@@ -482,11 +487,9 @@ public class PullRequestContentSource implements ContentSource {
         } catch (JobPreparationException e) {
             throw e;
         } catch (Exception e) {
-            log.warn(
-                "Failed to pre-compute diff, agent will compute its own: headSha={}, error={}",
-                headSha,
-                e.getMessage()
-            );
+            // Fail closed on unexpected git errors too: a job that reaches the sandbox without
+            // diff.patch reviews a phantom change. Preparation failures are retryable and loud.
+            throw new JobPreparationException("Failed to pre-compute diff: " + e.getMessage(), e);
         }
     }
 

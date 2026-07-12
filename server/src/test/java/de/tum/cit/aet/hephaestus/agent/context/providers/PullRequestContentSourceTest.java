@@ -110,6 +110,19 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             .thenReturn(Path.of("/tmp/hephaestus-git-repos/123"));
     }
 
+    /** stubGit() plus a resolvable range with a real one-hunk diff — diff pre-computation fails closed otherwise. */
+    private void stubGitWithDiff() {
+        stubGit();
+        Path repo = Path.of("/tmp/hephaestus-git-repos/123");
+        lenient()
+            .when(gitDiffOperations.resolveDiffRange(repo, "main", "feature/auth-fix", "abc123def456"))
+            .thenReturn(new String[] { "main", "abc123def456" });
+        lenient().when(gitDiffOperations.diffStat(repo, "main", "abc123def456")).thenReturn("1 file");
+        lenient()
+            .when(gitDiffOperations.diff(repo, "main", "abc123def456"))
+            .thenReturn("diff --git a/src/A.java b/src/A.java\n@@ -1,1 +1,2 @@\n context\n+added\n");
+    }
+
     @Nested
     class Supports {
 
@@ -124,7 +137,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         @Test
         void writesMetadataJson() throws Exception {
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
@@ -149,7 +162,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             author.setLogin("testuser");
             pr.setAuthor(author);
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
@@ -179,7 +192,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             minimal.setLine(5);
             minimal.setBody("Old comment");
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
                 List.of(full, minimal)
@@ -206,7 +219,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                 comments.add(c);
             }
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(comments);
 
@@ -231,7 +244,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             author.setLogin("alice");
             pr.setAuthor(author);
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
@@ -256,7 +269,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             author.setLogin("alice");
             pr.setAuthor(author);
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
             when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
@@ -276,7 +289,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             author.setLogin("alice");
             pr.setAuthor(author);
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
             when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
@@ -295,7 +308,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             PullRequest pr = new PullRequest();
             pr.setTitle("Orphan PR");
 
-            stubGit();
+            stubGitWithDiff();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
@@ -361,6 +374,42 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("Empty diff");
+        }
+
+        @Test
+        void missingCommitSha_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            // A zero-commit PR has no head SHA. Reviewing it anyway hands the model a bare repo
+            // mount with no diff.patch, and it can fabricate findings about changes that do not exist.
+            ObjectNode metadata = sampleMetadata();
+            metadata.remove("commit_sha");
+
+            assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("commit_sha");
+        }
+
+        @Test
+        void headUnavailableAndRangeUnresolvable_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            // Head commit absent locally AND no resolution strategy works: previously a silent skip
+            // (the job ran diff-less); now it must abort like the verified-head sibling below.
+            when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(false);
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(null);
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("head commit not available");
         }
 
         @Test
