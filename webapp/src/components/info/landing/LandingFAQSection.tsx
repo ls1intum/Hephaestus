@@ -12,22 +12,22 @@ const faqItems = [
 	{
 		key: "faq-item-1",
 		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus integrates with GitHub, providing insights without disrupting your current processes. Setup is simple with our guided configuration.",
+		a: "Hephaestus connects to your GitHub or GitLab repositories and reads the activity that is already there. Setup is a guided configuration in your workspace settings.",
 	},
 	{
 		key: "faq-item-2",
 		q: "Is Hephaestus suitable for small teams?",
-		a: "Yes! Hephaestus is built with flexibility in mind and works well for teams of any size, from small student projects to larger development teams.",
+		a: "Yes. Hephaestus works for teams of any size, from small student projects to larger development teams and open-source projects.",
 	},
 	{
 		key: "faq-item-3",
-		q: "How does the AI Mentor work?",
-		a: "The AI Mentor analyzes your GitHub activity and reflection inputs to provide personalized guidance, helping team members set goals and track their progress.",
+		q: "How does Heph, your AI mentor, work?",
+		a: "Heph looks at your pull requests, issues, and reviews and gives you feedback on what was done well, what could be better, and a way to get there. You can also chat with it about your work, in the app or in Slack.",
 	},
 	{
 		key: "faq-item-4",
-		q: "Do we need to change how we use GitHub?",
-		a: "No, Hephaestus works alongside your existing GitHub workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
+		q: "Do we need to change how we work?",
+		a: "No. Hephaestus works alongside your existing GitHub or GitLab workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
 	},
 ];
 
@@ -40,7 +40,7 @@ export function LandingFAQSection() {
 						FAQ
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Frequently Asked Questions
+						Frequently asked questions
 					</h2>
 				</div>
 
@@ -72,7 +72,7 @@ export function LandingFAQSection() {
 							}
 						>
 							<Github className="h-4 w-4" />
-							<span>Ask the Community</span>
+							<span>Ask the community</span>
 						</Button>
 					</div>
 				</div>

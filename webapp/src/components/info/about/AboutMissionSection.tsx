@@ -5,19 +5,19 @@ import { FeatureCard, type FeatureData } from "./FeatureCard";
 const FEATURES_DATA: FeatureData[] = [
 	{
 		icon: Code,
-		badge: "Core Feature",
-		title: "Code Review Gamification",
-		description: "Turning technical work into team growth",
+		badge: "Core feature",
+		title: "Practice feedback on your work",
+		description: "What was done well, what could be better, and a way to get there",
 		content:
-			"Transform code reviews into engaging experiences with dynamic leaderboards, team competitions, and a structured league system that recognizes excellence and encourages participation from developers at all skill levels.",
+			"Hephaestus reviews pull requests and issues in your GitHub and GitLab repositories against real engineering practices and posts its feedback right where the work happens. You can act on it, push back with a reason, or let it pass.",
 	},
 	{
 		icon: Sparkles,
-		badge: "Core Feature",
-		title: "Process-Aware AI Mentoring",
-		description: "Guidance grounded in your repo activity",
+		badge: "Core feature",
+		title: "Heph, your AI mentor",
+		description: "A mentor chat grounded in your repository activity",
 		content:
-			"Heph — our AI mentor — delivers personalized, data-informed feedback based on issues, commits, reviews, and pull requests. It supports self-regulated learning with goal setting, reflection, and practical next steps.",
+			"Heph knows your recent issues, commits, reviews, and pull requests, so its answers start from your actual work. Ask it about your changes, reflect on your week, or get a suggestion for what to do next, in the app or in Slack.",
 	},
 ];
 
@@ -26,21 +26,22 @@ export function AboutMissionSection() {
 		<section className="space-y-12">
 			<div>
 				<Badge className="mb-4" variant="outline">
-					Our Purpose
+					Our purpose
 				</Badge>
-				<h2 className="text-3xl font-bold mb-6">The Mission</h2>
+				<h2 className="text-3xl font-bold mb-6">The mission</h2>
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We help novice developers onboard and grow in agile software teams by combining smart
-						gamification with process-aware AI mentoring. Our guidance is grounded in your actual
-						repository activity and supports self-regulated learning.
+						Good mentoring feedback helps developers grow, but few people ever get enough of it.
+						Hephaestus carries the routine feedback no one has time to give everyone, grounded in
+						the work you actually do. It supports mentors, teachers, and maintainers rather than
+						replacing them.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							We believe the best software isn't just about code — it's about building teams that
-							practice healthy habits and continuous reflection.
+							We believe every developer deserves thoughtful feedback on their work and a clear way
+							to get better.
 						</p>
 					</div>
 				</div>

@@ -20,21 +20,22 @@ export function LandingWhyChooseSection({
 				<div className="grid gap-10 lg:grid-cols-[1fr_500px] lg:gap-12">
 					<img
 						src={agileHephaestus}
-						alt="Agile Hephaestus"
+						alt="Illustration of Heph, the Hephaestus mentor, working alongside a software team"
 						width="500"
 						height="350"
 						className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
 					/>
 					<div className="flex flex-col justify-center space-y-5">
 						<Badge className="w-fit" variant="outline">
-							Our Approach
+							Our approach
 						</Badge>
 						<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-							Why Choose Hephaestus?
+							Why choose Hephaestus?
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Named after the Greek god of craftsmen, Hephaestus combines creativity with technical
-							expertise to build better team habits through process-aware, AI-guided mentoring.
+							Good mentors are rare and their time is scarce. Hephaestus carries the routine
+							feedback no one has time to give everyone, so that every developer gets some. It
+							supports mentors rather than replacing them.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
@@ -43,9 +44,9 @@ export function LandingWhyChooseSection({
 									<Hammer className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Empower engineers</p>
+									<p className="font-medium">Grounded in real work</p>
 									<p className="text-sm text-muted-foreground">
-										Tools that accelerate learning through real-world feedback
+										Feedback comes from your actual pull requests, issues, and reviews
 									</p>
 								</div>
 							</li>
@@ -54,9 +55,9 @@ export function LandingWhyChooseSection({
 									<Users className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Foster collaboration</p>
+									<p className="font-medium">You stay in charge</p>
 									<p className="text-sm text-muted-foreground">
-										Build team habits that strengthen your engineering culture
+										Act on the feedback, push back with a reason, or let it pass
 									</p>
 								</div>
 							</li>
@@ -65,9 +66,10 @@ export function LandingWhyChooseSection({
 									<Code className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Improve code quality</p>
+									<p className="font-medium">Fits your team's setup</p>
 									<p className="text-sm text-muted-foreground">
-										Motivate better code reviews through friendly competition
+										Workspaces connect GitHub, GitLab, and Slack, with optional features like
+										achievements and a weekly leaderboard
 									</p>
 								</div>
 							</li>
