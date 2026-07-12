@@ -13,7 +13,7 @@ FEATURE GUIDELINES:
 - Link mockups/designs when available—even rough sketches help
 
 GOOD USER STORIES:
-  ✓ As a team lead, I want to export leaderboard data as CSV so that I can share metrics in presentations.
+  ✓ As a workspace admin, I want to choose which repositories are synced so that feedback only covers active projects.
   ✓ As a new user, I want to see an onboarding tour so that I understand the main features.
 
 BAD USER STORIES:
@@ -33,9 +33,9 @@ BAD USER STORIES:
      Write testable statements a reviewer can verify.
      
      Examples:
-     - [ ] CSV download button appears on leaderboard page
-     - [ ] Downloaded file includes all visible columns
-     - [ ] File name includes the current date
+     - [ ] Repository picker appears on the workspace settings page
+     - [ ] Deselected repositories stop syncing within one cycle
+     - [ ] The current selection is visible after a page reload
 -->
 
 - [ ] 

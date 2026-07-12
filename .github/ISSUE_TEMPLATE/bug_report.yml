@@ -20,8 +20,8 @@ body:
       label: What's broken?
       description: Describe what happened vs. what you expected.
       placeholder: |
-        When I click "Submit" on the leaderboard filter, the page shows a blank screen.
-        Expected: The leaderboard should filter by the selected repository.
+        When I save the repository selection in workspace settings, the page shows a blank screen.
+        Expected: The repository list should update with my selection.
     validations:
       required: true
 
@@ -31,11 +31,11 @@ body:
       label: Steps to reproduce
       description: Minimal steps so we can see the bug. No repro = low priority fix.
       placeholder: |
-        1. Go to /leaderboard
-        2. Select "Weekly" timeframe
+        1. Open your workspace settings
+        2. Go to "Repositories"
         3. Click the repository dropdown
         4. Select any repository
-        5. Click "Apply"
+        5. Click "Save"
         6. → Blank screen appears
     validations:
       required: true
@@ -63,5 +63,5 @@ body:
       render: shell
       placeholder: |
         TypeError: Cannot read property 'map' of undefined
-            at LeaderboardTable.tsx:42
+            at RepositorySettings.tsx:42
             at renderWithHooks (react-dom.development.js:14985)
