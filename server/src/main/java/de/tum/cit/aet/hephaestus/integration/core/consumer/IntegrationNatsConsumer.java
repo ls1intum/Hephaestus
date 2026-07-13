@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -82,15 +81,6 @@ public class IntegrationNatsConsumer {
      */
     private static final IntegrationKind INSTALLATION_AWARE_KIND = IntegrationKind.GITHUB;
 
-    /**
-     * Kind whose stream backs the fleet-wide flat (non-repository-scoped) consumer. Today only
-     * the messaging kind (Slack) publishes to a flat {@code <stream>.>} subject space; we go
-     * through {@link ConsumerSubjectMath#streamNameFor} so the field name and wiring stay
-     * vendor-neutral while the singular supported value stays explicit (mirrors
-     * {@link #INSTALLATION_AWARE_KIND}). New flat-stream vendors will need a sibling consumer.
-     */
-    private static final IntegrationKind FLAT_STREAM_KIND = IntegrationKind.SLACK;
-
     /** NATS client connection timeout — keep short; reconnect handles long outages. */
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(10);
 
@@ -122,14 +112,6 @@ public class IntegrationNatsConsumer {
     /** Installation consumer — single-instance, mutable across restarts. */
     private volatile ScopeConsumer installationConsumer;
 
-    /**
-     * Fleet-wide flat-stream consumer — single-instance, subscribes to {@code <stream>.>} for
-     * {@link #FLAT_STREAM_KIND}. Flat-stream subjects are not repository-scoped, so (like the
-     * installation consumer) one consumer resolves the tenant inside its handler. Null unless the
-     * flat-stream kind is enabled.
-     */
-    private volatile ScopeConsumer flatStreamConsumer;
-
     /** Virtual-thread executor for scope setup and installation kicks. */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -142,22 +124,13 @@ public class IntegrationNatsConsumer {
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
 
-    /**
-     * Whether the fleet-wide flat-stream consumer should be started. Gated on the vendor-neutral
-     * {@code hephaestus.integration.flat-stream.enabled} (driven by the messaging integrations —
-     * today only Slack) so deployments without a flat-stream kind never create a consumer on the
-     * flat stream (which they also never bootstrap).
-     */
-    private final boolean flatStreamConsumerEnabled;
-
     public IntegrationNatsConsumer(
         NatsConnectionProperties connectionProperties,
         NatsConsumerProperties consumerProperties,
         NatsSubscriptionProvider subscriptionProvider,
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats,
-        @Value("${hephaestus.integration.flat-stream.enabled:false}") boolean flatStreamConsumerEnabled
+        IntegrationConsumerStats stats
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
@@ -165,7 +138,6 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
-        this.flatStreamConsumerEnabled = flatStreamConsumerEnabled;
     }
 
     // Lifecycle
@@ -214,16 +186,6 @@ public class IntegrationNatsConsumer {
                 log.error("Failed to start installation consumer", e);
             }
         });
-        if (flatStreamConsumerEnabled) {
-            virtualThreadExecutor.submit(() -> {
-                try {
-                    ensureNatsConnectionEstablished();
-                    setupFlatStreamConsumer();
-                } catch (Exception e) {
-                    log.error("Failed to start flat-stream consumer", e);
-                }
-            });
-        }
     }
 
     @PreDestroy
@@ -257,17 +219,6 @@ public class IntegrationNatsConsumer {
             }
             installationConsumer = null;
             stats.setInstallationConsumerActive(false);
-        }
-
-        ScopeConsumer flatStream = flatStreamConsumer;
-        if (flatStream != null) {
-            try {
-                flatStream.stop();
-            } catch (Exception e) {
-                log.debug("Failed to stop flat-stream consumer", e);
-            }
-            flatStreamConsumer = null;
-            stats.setFlatStreamConsumerActive(false);
         }
 
         virtualThreadExecutor.shutdown();
@@ -328,6 +279,13 @@ public class IntegrationNatsConsumer {
      * yet — scope startup picks up the latest subscription info when {@link #startConsumingScope(Long)}
      * fires. When a scope gains a stream (e.g. Outline is connected after boot) the reconcile creates
      * the additional consumer; when it loses one the reconcile tears that consumer down.
+     *
+     * <p>Shares {@link #pendingScopeSetup} with {@link #startConsumingScope(Long)}: two concurrent
+     * reconciles of one scope would race the read-modify-write on {@link #scopeConsumers} and the loser's
+     * freshly-created consumer would be overwritten without {@code stop()} — leaking its virtual thread
+     * and an orphaned server-side durable. A membership change that arrives while a reconcile is in
+     * flight is not lost: the in-flight reconcile re-reads the subscription info, and the callers
+     * (lifecycle listeners, repo monitors) re-fire on the next change.
      */
     public void updateScopeConsumer(Long scopeId) {
         if (!connectionProperties.enabled() || shuttingDown.get() || scopeId == null) {
@@ -337,11 +295,17 @@ public class IntegrationNatsConsumer {
             log.debug("Skipped consumer update: reason=notRunning, scopeId={}", scopeId);
             return;
         }
+        if (!pendingScopeSetup.add(scopeId)) {
+            log.debug("Scope reconcile already in progress: scopeId={}", scopeId);
+            return;
+        }
         virtualThreadExecutor.submit(() -> {
             try {
                 reconcileScope(scopeId);
             } catch (Exception e) {
                 log.error("Failed to update scope consumer: scopeId={}", scopeId, e);
+            } finally {
+                pendingScopeSetup.remove(scopeId);
             }
         });
     }
@@ -506,38 +470,6 @@ public class IntegrationNatsConsumer {
             log.info("Started installation consumer: consumerName={}", consumerName);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to set up installation consumer", e);
-        }
-    }
-
-    private void setupFlatStreamConsumer() throws IOException {
-        String streamName = ConsumerSubjectMath.streamNameFor(FLAT_STREAM_KIND).orElseThrow(() ->
-            new IllegalStateException("No NATS stream resolved for flat-stream kind=" + FLAT_STREAM_KIND)
-        );
-        String[] subjects = new String[] { ConsumerSubjectMath.flatStreamSubjectFilter(FLAT_STREAM_KIND) };
-        String consumerName = ConsumerSubjectMath.flatStreamConsumerName(durableBaseName(), FLAT_STREAM_KIND);
-
-        try {
-            JetStreamOptions jsOptions = JetStreamOptions.builder()
-                .requestTimeout(connectionProperties.consumer().requestTimeout())
-                .build();
-            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
-            ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
-
-            ScopeConsumer flatStream = new ScopeConsumer(
-                null,
-                consumerName,
-                streamName,
-                consumerContext,
-                streamContext,
-                subjects,
-                this::handleMessage
-            );
-            flatStream.start();
-            flatStreamConsumer = flatStream;
-            stats.setFlatStreamConsumerActive(true);
-            log.info("Started flat-stream consumer: consumerName={}", consumerName);
-        } catch (JetStreamApiException e) {
-            throw new IOException("Failed to set up flat-stream consumer", e);
         }
     }
 

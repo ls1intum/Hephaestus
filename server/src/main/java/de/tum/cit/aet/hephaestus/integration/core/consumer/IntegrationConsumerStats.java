@@ -19,7 +19,6 @@ public class IntegrationConsumerStats {
     private final AtomicReference<String> natsStatus = new AtomicReference<>(STATUS_UNINITIALISED);
     private final AtomicInteger activeScopeConsumers = new AtomicInteger(0);
     private final AtomicReference<Boolean> installationActive = new AtomicReference<>(Boolean.FALSE);
-    private final AtomicReference<Boolean> flatStreamActive = new AtomicReference<>(Boolean.FALSE);
     private final AtomicReference<Instant> lastDispatchAt = new AtomicReference<>();
     private final AtomicReference<Instant> lastNakAt = new AtomicReference<>();
 
@@ -48,14 +47,6 @@ public class IntegrationConsumerStats {
      */
     public boolean installationConsumerActive() {
         return Boolean.TRUE.equals(installationActive.get());
-    }
-
-    /**
-     * @return {@code true} when the fleet-wide flat-stream consumer has been started AND
-     *     not yet stopped. Slack DM/app-home events use this path.
-     */
-    public boolean flatStreamConsumerActive() {
-        return Boolean.TRUE.equals(flatStreamActive.get());
     }
 
     /**
@@ -89,11 +80,6 @@ public class IntegrationConsumerStats {
     /** Set whether the installation-wide consumer is currently running. */
     public void setInstallationConsumerActive(boolean active) {
         installationActive.set(active);
-    }
-
-    /** Set whether the fleet-wide flat-stream consumer is currently running. */
-    public void setFlatStreamConsumerActive(boolean active) {
-        flatStreamActive.set(active);
     }
 
     /** Record a successful dispatch (handler returned without throwing). Null tolerated. */

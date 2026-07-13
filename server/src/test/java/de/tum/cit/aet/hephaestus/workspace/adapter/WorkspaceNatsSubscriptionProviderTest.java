@@ -120,4 +120,31 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
 
         assertThat(info.hasSubscriptions()).isFalse();
     }
+
+    @Test
+    void slackConnectedWorkspaceEmitsAPerTeamSlackFilter() {
+        when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
+        when(connectionService.findActiveOutlineConfig(WS)).thenReturn(Optional.empty());
+        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(
+            Optional.of(new ConnectionConfig.SlackConfig("T0ABC123", "Acme", null, null, null, Set.of()))
+        );
+
+        NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
+
+        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName)).containsExactly("slack");
+        assertThat(streamNamed(info, "slack").subjects()).containsExactly("slack.T0ABC123.>");
+    }
+
+    @Test
+    void slackConnectionWithoutTeamIdIsSkipped() {
+        when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
+        when(connectionService.findActiveOutlineConfig(WS)).thenReturn(Optional.empty());
+        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(
+            Optional.of(new ConnectionConfig.SlackConfig(null, "Acme", null, null, null, Set.of()))
+        );
+
+        NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
+
+        assertThat(info.hasSubscriptions()).isFalse();
+    }
 }

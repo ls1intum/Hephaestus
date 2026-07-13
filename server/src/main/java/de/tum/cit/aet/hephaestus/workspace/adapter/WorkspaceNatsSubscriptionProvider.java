@@ -46,6 +46,7 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
         List<StreamSubscription> subscriptions = new ArrayList<>();
         addScmSubscription(workspace, subscriptions);
         addOutlineSubscription(workspace, subscriptions);
+        addSlackSubscription(workspace, subscriptions);
         return new NatsSubscriptionInfo(workspace.getId(), subscriptions);
     }
 
@@ -98,6 +99,22 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
                         Set.of(ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId))
                     )
                 )
+            );
+    }
+
+    /**
+     * The Slack stream subscription. Added when the workspace has an ACTIVE Slack connection with a
+     * team id, filtered to {@code slack.<team>.>} — one per-workspace consumer instead of a fleet-wide
+     * flat {@code slack.>} lane, so one team's message burst never delays another workspace's ingest
+     * and per-workspace ordering is preserved.
+     */
+    private void addSlackSubscription(Workspace workspace, List<StreamSubscription> out) {
+        connectionService
+            .findSlackNotificationConfig(workspace.getId())
+            .map(ConnectionConfig.SlackConfig::teamId)
+            .filter(teamId -> teamId != null && !teamId.isBlank())
+            .ifPresent(teamId ->
+                out.add(new StreamSubscription("slack", Set.of(ConsumerSubjectMath.slackTeamFilter(teamId))))
             );
     }
 }

@@ -177,6 +177,22 @@ public final class ConsumerSubjectMath {
         return streamName + "." + subscriptionId.trim() + ".>";
     }
 
+    /**
+     * Wildcard subject filter that matches every event for one Slack team:
+     * {@code slack.<team>.>}. Dots in the team id are replaced with {@code ~}, matching
+     * {@code SlackSubjectKeyDeriver}'s publish-side sanitisation so the filter and the
+     * published subject always agree.
+     *
+     * @param teamId the Slack team id from the workspace's {@code SlackConfig}
+     * @return a subject like {@code slack.T0ABC123.>}
+     */
+    public static String slackTeamFilter(String teamId) {
+        if (teamId == null || teamId.isBlank()) {
+            throw new IllegalArgumentException("Slack team id cannot be null or empty.");
+        }
+        return "slack." + teamId.trim().replace('.', '~') + ".>";
+    }
+
     // Subject → kind
 
     /**
@@ -217,34 +233,5 @@ public final class ConsumerSubjectMath {
             throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
         }
         return baseConsumerName + "-installation";
-    }
-
-    /**
-     * Builds the durable consumer name for a fleet-wide flat-stream consumer:
-     * {@code <base>-<stream>}. A flat-stream kind is not repository-scoped, so a single
-     * fleet-wide consumer subscribes to {@link #flatStreamSubjectFilter(IntegrationKind)} and
-     * resolves the tenant inside the handler (mirroring the installation-wide consumer's shape;
-     * today only the messaging kinds, e.g. Slack).
-     */
-    public static String flatStreamConsumerName(String baseConsumerName, IntegrationKind kind) {
-        if (baseConsumerName == null || baseConsumerName.isBlank()) {
-            throw new IllegalArgumentException("Base consumer name cannot be null or blank.");
-        }
-        return baseConsumerName + "-" + resolveStream(kind);
-    }
-
-    /**
-     * Wildcard subject filter matching every event on a flat-stream kind's stream
-     * ({@code <stream>.>}). One fleet-wide filter — a flat-stream kind has no per-scope
-     * repository fan-out.
-     */
-    public static String flatStreamSubjectFilter(IntegrationKind kind) {
-        return resolveStream(kind) + ".>";
-    }
-
-    private static String resolveStream(IntegrationKind kind) {
-        return streamNameFor(kind).orElseThrow(() ->
-            new IllegalArgumentException("No NATS stream resolved for kind=" + kind)
-        );
     }
 }
