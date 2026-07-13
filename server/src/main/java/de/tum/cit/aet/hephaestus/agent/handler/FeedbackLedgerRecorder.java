@@ -275,7 +275,7 @@ public class FeedbackLedgerRecorder {
         // (external_ref) comes from the per-note DeliveredSignal the channel emitted this run. A note with no
         // matching signal (append-only GitHub, or a channel that emitted none) keeps the anchor-only fallback:
         // a null external_ref.
-        if (artifact == WorkArtifact.PULL_REQUEST) {
+        if (artifact.hasInlineLane()) {
             for (DiffNote note : delivery.diffNotes()) {
                 DeliveredSignal signal = matchSignal(note, inlineSignals);
                 feedbackPlacementRepository.save(
@@ -309,7 +309,7 @@ public class FeedbackLedgerRecorder {
             job.getId(),
             feedback.getId(),
             assessed.size(),
-            artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
+            artifact.hasInlineLane() ? delivery.diffNotes().size() : 0,
             feedbackThreadKey
         );
     }

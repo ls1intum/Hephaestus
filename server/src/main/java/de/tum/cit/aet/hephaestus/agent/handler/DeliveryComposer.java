@@ -323,7 +323,7 @@ class DeliveryComposer {
         // Issues carry no diff, so a positional note can never be posted on them — every issue finding
         // must be expanded in full in the issue note itself rather than demoted to a diff note that
         // silently vanishes, leaving the student a bare title with no reasoning or guidance.
-        boolean inlineSupported = artifact == WorkArtifact.PULL_REQUEST;
+        boolean inlineSupported = artifact.hasInlineLane();
         List<ValidatedFinding> inlinable = new ArrayList<>();
         List<ValidatedFinding> nonInlinable = new ArrayList<>();
         for (ValidatedFinding f : negatives) {

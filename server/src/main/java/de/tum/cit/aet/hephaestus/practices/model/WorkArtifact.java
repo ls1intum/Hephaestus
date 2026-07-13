@@ -21,5 +21,16 @@ public enum WorkArtifact {
     /** An issue — title, body, labels, assignees, comment thread, state-transition timeline (no diff). */
     ISSUE,
     /** A chat conversation thread — the human turns of a settled discussion (no diff, no code). */
-    CONVERSATION_THREAD,
+    CONVERSATION_THREAD;
+
+    /**
+     * Whether this artifact carries a diff-anchored inline-comment lane. Only a pull request does: a
+     * finding can be posted there as a positional diff note, while every other artifact expands its
+     * findings in the summary/thread surface. The delivery pipeline branches on this capability, not on
+     * artifact identity, so a new artifact type states its lane here instead of growing another
+     * {@code == PULL_REQUEST} check.
+     */
+    public boolean hasInlineLane() {
+        return this == PULL_REQUEST;
+    }
 }
