@@ -598,6 +598,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "PracticeDetectionCompletedEvent", // carries workspaceId directly (mentor cache eviction)
                                 "PracticeDetectionDeliveredEvent", // carries workspaceId directly (conversational routing)
+                                "ConversationFeedbackPreparedEvent", // carries workspaceId directly (Slack nudge)
                                 "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
                                 "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
                                 "WorkspaceCreatedEvent", // Carries workspaceId + kind

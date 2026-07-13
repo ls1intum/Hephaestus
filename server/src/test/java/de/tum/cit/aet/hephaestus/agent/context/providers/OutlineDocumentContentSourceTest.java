@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -17,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
+import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +38,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 class OutlineDocumentContentSourceTest extends BaseUnitTest {
@@ -53,11 +58,20 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     @Mock
     private IssueRepository issueRepository;
 
+    @Mock
+    private ChatMessageRepository chatMessageRepository;
+
     private OutlineDocumentContentSource provider;
 
     @BeforeEach
     void setUp() {
-        provider = new OutlineDocumentContentSource(projection, objectMapper, pullRequestRepository, issueRepository);
+        provider = new OutlineDocumentContentSource(
+            projection,
+            objectMapper,
+            pullRequestRepository,
+            issueRepository,
+            chatMessageRepository
+        );
     }
 
     // --- helpers ---
@@ -689,5 +703,164 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
 
         assertThat(files).isEmpty();
         verify(projection, never()).documentsByReference(anyLong(), any());
+    }
+
+    // --- relevance retrieval ---
+
+    @Test
+    void deriveQueryTextStripsUrlsAndOrJoinsDistinctLowercasedTerms() {
+        String query = OutlineDocumentContentSource.deriveQueryText(
+            "Fix Webhook retries",
+            "See https://wiki.example.com/doc/setup-abc123 — the **webhook** retry backoff is wrong."
+        );
+
+        assertThat(query).isEqualTo("fix OR webhook OR retries OR see OR the OR retry OR backoff OR wrong");
+    }
+
+    @Test
+    void deriveQueryTextIsEmptyWhenOnlyNoiseRemains() {
+        assertThat(
+            OutlineDocumentContentSource.deriveQueryText(null, "a b https://wiki.example.com/doc/x-1 !!")
+        ).isEmpty();
+        assertThat(OutlineDocumentContentSource.deriveQueryText(null, null)).isEmpty();
+    }
+
+    @Test
+    void reviewPathFillsWithRelevanceHitsWhenLinksUndershootTheTarget() {
+        String body = "Rework retry backoff. See https://wiki.example.com/doc/setup-guide-abc123.";
+        extractsReferences(body, "https://wiki.example.com/doc/setup-guide-abc123");
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(doc("Ops", "setup-guide", "Setup Guide", "Steps."))
+        );
+        when(projection.searchDocuments(eq(WORKSPACE_ID), anyString(), eq(4))).thenReturn(
+            List.of(
+                doc("Ops", "setup-guide", "Setup Guide", "Steps."), // already linked — deduped by path
+                doc("Ops", "retry-policy", "Retry Policy", "Backoff rules."),
+                doc("Dev", "error-budget", "Error Budget", "Limits."),
+                doc("Dev", "overflow", "Overflow", "Beyond the fill target.")
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        // Linked doc first, then retrieval hits in rank order up to the target; the dupe and overflow drop.
+        assertThat(files.keySet()).containsExactly(
+            "inputs/context/outline/ops/setup-guide.md",
+            "inputs/context/outline/ops/retry-policy.md",
+            "inputs/context/outline/dev/error-budget.md"
+        );
+        // Retrieved docs ride the same quarantine path as linked ones.
+        assertThat(
+            new String(files.get("inputs/context/outline/ops/retry-policy.md"), StandardCharsets.UTF_8)
+        ).contains("UNTRUSTED_EXTERNAL");
+    }
+
+    @Test
+    void reviewPathRetrievesRelevantDocsWhenTheArtifactLinksNothing() {
+        String body = "Change the webhook retry backoff so bursts stop dead-lettering.";
+        when(projection.searchDocuments(eq(WORKSPACE_ID), anyString(), eq(3))).thenReturn(
+            List.of(doc("Ops", "retry-policy", "Retry Policy", "Backoff rules."))
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        assertThat(files.keySet()).containsExactly("inputs/context/outline/ops/retry-policy.md");
+        verify(projection, never()).documentsByReference(anyLong(), any());
+        ArgumentCaptor<String> query = ArgumentCaptor.forClass(String.class);
+        verify(projection).searchDocuments(eq(WORKSPACE_ID), query.capture(), eq(3));
+        assertThat(query.getValue()).contains("webhook OR retry");
+    }
+
+    @Test
+    void reviewPathSkipsRetrievalWhenLinksAlreadyMeetTheTarget() {
+        String body =
+            "See https://wiki.example.com/doc/alpha-1 https://wiki.example.com/doc/beta-2 https://wiki.example.com/doc/gamma-3";
+        extractsReferences(
+            body,
+            "https://wiki.example.com/doc/alpha-1",
+            "https://wiki.example.com/doc/beta-2",
+            "https://wiki.example.com/doc/gamma-3"
+        );
+        when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
+            List.of(
+                doc("Ops", "alpha", "Alpha", "A."),
+                doc("Ops", "beta", "Beta", "B."),
+                doc("Ops", "gamma", "Gamma", "C.")
+            )
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(prRequest(body), files);
+
+        assertThat(files).hasSize(3);
+        verify(projection, never()).searchDocuments(anyLong(), anyString(), anyInt());
+    }
+
+    @Test
+    void mentorPathRanksByTheCurrentUserMessageWhenOneExists() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        ContextRequest.MentorChatRequest request = new ContextRequest.MentorChatRequest(
+            WORKSPACE_ID,
+            7L,
+            UUID.randomUUID(),
+            messageId
+        );
+        when(chatMessageRepository.findById(messageId)).thenReturn(
+            Optional.of(userMessage("How do we deploy the webhook server?"))
+        );
+        when(
+            projection.searchDocuments(
+                eq(WORKSPACE_ID),
+                anyString(),
+                eq(OutlineDocumentContentSource.MAX_MENTOR_DOCUMENTS)
+            )
+        ).thenReturn(List.of(doc("Ops", "deploy-guide", "Deploy Guide", "Steps.")));
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(request, files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/outline_docs.json"));
+        assertThat(root).hasSize(1);
+        assertThat(root.get(0).get("slug").asString()).isEqualTo("deploy-guide");
+        verify(projection, never()).documentsForWorkspace(anyLong());
+    }
+
+    @Test
+    void mentorPathFallsBackToRecencyWhenTheQueryMatchesNothing() {
+        UUID messageId = UUID.randomUUID();
+        ContextRequest.MentorChatRequest request = new ContextRequest.MentorChatRequest(
+            WORKSPACE_ID,
+            7L,
+            UUID.randomUUID(),
+            messageId
+        );
+        when(chatMessageRepository.findById(messageId)).thenReturn(Optional.of(userMessage("something niche")));
+        when(
+            projection.searchDocuments(
+                eq(WORKSPACE_ID),
+                anyString(),
+                eq(OutlineDocumentContentSource.MAX_MENTOR_DOCUMENTS)
+            )
+        ).thenReturn(List.of());
+        when(projection.documentsForWorkspace(WORKSPACE_ID)).thenReturn(
+            List.of(doc("Engineering", "onboarding-guide", "Onboarding Guide", "Welcome."))
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(request, files);
+
+        assertThat(files.keySet()).containsExactly("inputs/context/outline_docs.json");
+    }
+
+    private ChatMessage userMessage(String text) {
+        ChatMessage message = new ChatMessage();
+        ArrayNode parts = objectMapper.createArrayNode();
+        ObjectNode part = parts.addObject();
+        part.put("type", "text");
+        part.put("text", text);
+        message.setParts(parts);
+        return message;
     }
 }

@@ -60,6 +60,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     private FeedbackChannelRouter router() {
         return new FeedbackChannelRouter(feedbackRepository);
     }
@@ -67,7 +70,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     private ConversationalFeedbackPreparer preparer() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        return new ConversationalFeedbackPreparer(feedbackRepository, feedbackObservationRepository);
+        return new ConversationalFeedbackPreparer(feedbackRepository, feedbackObservationRepository, eventPublisher);
     }
 
     private ConversationalDeliveryReconciler reconciler() {
@@ -142,6 +145,36 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             assertThat(f.getRecipientUserId()).isEqualTo(RECIPIENT);
         });
         assertThat(saved.getAllValues()).extracting(Feedback::getPosition).containsExactly(3000, 3001, 3002);
+    }
+
+    @Test
+    void preparerPublishesOnePreparedEventPerRecipient_countingOnlyNewUnits() {
+        UUID job = UUID.randomUUID();
+        List<Observation> admitted = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            admitted.add(problem(null, null, 0.9f - i * 0.1f)); // single recipient, capped at 3
+        }
+
+        preparer().prepare(job, WS, admitted);
+
+        ArgumentCaptor<ConversationFeedbackPreparedEvent> event = ArgumentCaptor.forClass(
+            ConversationFeedbackPreparedEvent.class
+        );
+        verify(eventPublisher).publishEvent(event.capture());
+        assertThat(event.getValue()).isEqualTo(new ConversationFeedbackPreparedEvent(WS, RECIPIENT, 3));
+    }
+
+    @Test
+    void preparerReRunPublishesNoEvent() {
+        ConversationalFeedbackPreparer preparer = preparer();
+        // Every (job, position) already exists → pure idempotent re-run, nothing newly prepared.
+        when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
+
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, null, 0.9f)));
+
+        assertThat(prepared).isZero();
+        // any(Object.class), not any(): binds the publishEvent(Object) overload the record actually dispatches to.
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test

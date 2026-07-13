@@ -36,6 +36,18 @@ public interface DocumentProjection {
     List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs);
 
     /**
+     * The workspace's live mirrored documents ranked by full-text relevance to {@code queryText} — the
+     * retrieval path that surfaces relevant-but-unlinked documentation. Tombstoned/evicted documents are
+     * excluded (there is no body to rank against); a blank query or no match yields an empty list, the
+     * caller's cue to fall back to {@link #documentsForWorkspace}.
+     *
+     * @param workspaceId the workspace to scope the read to
+     * @param queryText   free text describing what is relevant (websearch syntax; {@code OR}-joined terms)
+     * @param limit       maximum number of documents to return
+     */
+    List<ProjectedDocument> searchDocuments(long workspaceId, String queryText, int limit);
+
+    /**
      * Pulls documentation references — ids, slugs, links — out of free text (an artifact body). What counts
      * as a reference (link grammar, token derivation) is the implementation's vendor knowledge; the consumer
      * stays vendor-blind and feeds the result straight into {@link #documentsByReference}. Bounded and

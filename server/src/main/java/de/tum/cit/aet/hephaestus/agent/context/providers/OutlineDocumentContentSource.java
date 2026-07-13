@@ -8,17 +8,22 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.PracticeReviewRequ
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -49,13 +54,15 @@ import tools.jackson.databind.node.ObjectNode;
  *       {@code author}/{@code last_edited_by} display names and the resolved workspace {@code *_member_id}s
  *       (linked accounts only — an unlinked author degrades to name-only). The mentor runner JSON-parses every
  *       context key by exact basename ({@code MentorChatService#handleFetchContext}), so a {@code .md} tree would
- *       break it; the corpus is telescoped (bounded doc count + per-body excerpt) rather than dumping a whole
- *       wiki. Author names are third-party text and ride inside this already-quarantined JSON, never as trusted
+ *       break it; the corpus is telescoped (bounded doc count + per-body excerpt, ranked by relevance to the
+ *       turn's user message when one is available, recency otherwise) rather than dumping a whole wiki.
+ *       Author names are third-party text and ride inside this already-quarantined JSON, never as trusted
  *       metadata.</li>
  *   <li><b>PR / issue review</b> ({@link PracticeReviewRequest}, {@link IssueReviewRequest}) materialises a
  *       {@code .md} tree under {@code inputs/context/outline/<collection-slug>/<doc-slug>.md}, scoped to the
- *       documents actually linked from the artifact under review (Outline URLs resolved from the artifact body),
- *       never the whole corpus. A tombstoned/evicted document is written as a one-line placeholder {@code .md} — a
+ *       documents actually linked from the artifact under review (Outline URLs resolved from the artifact body)
+ *       plus, when links undershoot {@link #REVIEW_RETRIEVAL_TARGET}, top full-text hits for the artifact
+ *       title+body — never the whole corpus. A tombstoned/evicted document is written as a one-line placeholder {@code .md} — a
  *       stale link resolves to a marker, never a missing file. When a reference was extracted from the artifact
  *       but did not resolve to a mirrored row, that gap itself is surfaced — never silent — as
  *       {@code inputs/context/outline/unresolved-references.md} (see {@link #UNRESOLVED_REFERENCES_KEY}), so a
@@ -83,7 +90,23 @@ public class OutlineDocumentContentSource implements ContentSource {
     static final String REVIEW_PREFIX = OUTPUT_PREFIX + "outline/";
 
     /** Cap on documents surfaced to the mentor per turn — the corpus-breadth envelope (telescope, not dump). */
-    static final int MAX_MENTOR_DOCUMENTS = 40;
+    static final int MAX_MENTOR_DOCUMENTS = 15;
+
+    /**
+     * Review-path retrieval fill target: when fewer documents than this were link-resolved, retrieval fills
+     * the set with top full-text hits for the artifact title+body. Links stay first — they are explicit
+     * author intent; retrieval only fills so a relevant-but-unlinked doc still reaches the review.
+     */
+    static final int REVIEW_RETRIEVAL_TARGET = 3;
+
+    /** Cap on distinct query terms derived from an artifact — bounds the tsquery, keeps ranking sharp. */
+    static final int MAX_QUERY_TERMS = 24;
+
+    /** URLs carry no retrieval signal (slugs/hosts pollute the term set) — stripped before tokenizing. */
+    private static final Pattern URL_NOISE = Pattern.compile("https?://\\S+");
+
+    /** Splits artifact text into candidate terms; everything non-alphanumeric is markdown/punctuation noise. */
+    private static final Pattern NON_TERM = Pattern.compile("[^\\p{L}\\p{Nd}]+");
 
     /** Per-document body excerpt fed to the mentor; keeps the single JSON file bounded. */
     static final int MENTOR_BODY_CHARS = 4_000;
@@ -112,17 +135,20 @@ public class OutlineDocumentContentSource implements ContentSource {
     private final ObjectMapper objectMapper;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     public OutlineDocumentContentSource(
         DocumentProjection projection,
         ObjectMapper objectMapper,
         PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository
+        IssueRepository issueRepository,
+        ChatMessageRepository chatMessageRepository
     ) {
         this.projection = projection;
         this.objectMapper = objectMapper;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
+        this.chatMessageRepository = chatMessageRepository;
     }
 
     @Override
@@ -165,7 +191,7 @@ public class OutlineDocumentContentSource implements ContentSource {
     // Mentor path — a single JSON array, telescoped.
 
     private void contributeMentor(MentorChatRequest request, Map<String, byte[]> files) {
-        List<ProjectedDocument> documents = projection.documentsForWorkspace(request.workspaceId());
+        List<ProjectedDocument> documents = rankedMentorDocuments(request);
         if (documents.isEmpty()) {
             return;
         }
@@ -229,6 +255,73 @@ public class OutlineDocumentContentSource implements ContentSource {
         }
     }
 
+    /**
+     * Ranked by relevance to the turn's user message when one is available and matches anything;
+     * recency order ({@link DocumentProjection#documentsForWorkspace}) otherwise, so a query-less turn
+     * (or a corpus the query misses entirely) still gets documentation instead of nothing.
+     */
+    private List<ProjectedDocument> rankedMentorDocuments(MentorChatRequest request) {
+        String query = deriveQueryText(null, currentUserMessageText(request));
+        if (!query.isBlank()) {
+            List<ProjectedDocument> ranked = projection.searchDocuments(
+                request.workspaceId(),
+                query,
+                MAX_MENTOR_DOCUMENTS
+            );
+            if (!ranked.isEmpty()) {
+                return ranked;
+            }
+        }
+        return projection.documentsForWorkspace(request.workspaceId());
+    }
+
+    @Nullable
+    private String currentUserMessageText(MentorChatRequest request) {
+        if (request.currentUserMessageId() == null) {
+            return null;
+        }
+        return chatMessageRepository
+            .findById(request.currentUserMessageId())
+            .map(message -> visibleText(message.getParts()))
+            .orElse(null);
+    }
+
+    /** Concatenated {@code text} parts of a UIMessage parts array (the mentor message substrate). */
+    private static String visibleText(@Nullable JsonNode parts) {
+        if (parts == null || !parts.isArray()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        for (JsonNode part : parts) {
+            if ("text".equals(part.path("type").asString())) {
+                out.append(part.path("text").asString()).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Distinct keywords from the artifact title + body, {@code OR}-joined for {@code websearch_to_tsquery}:
+     * unquoted websearch terms are ANDed, which over-constrains any real artifact text to zero matches, so
+     * relevance has to come from {@code ts_rank} over OR'd terms instead. URLs and sub-3-char tokens carry
+     * no signal and are dropped; empty when nothing survives.
+     */
+    static String deriveQueryText(@Nullable String title, @Nullable String body) {
+        String raw = (title == null ? "" : title) + " " + (body == null ? "" : body);
+        String cleaned = URL_NOISE.matcher(raw).replaceAll(" ");
+        Set<String> terms = new LinkedHashSet<>();
+        for (String token : NON_TERM.split(cleaned)) {
+            if (token.length() < 3) {
+                continue;
+            }
+            terms.add(token.toLowerCase(Locale.ROOT));
+            if (terms.size() >= MAX_QUERY_TERMS) {
+                break;
+            }
+        }
+        return String.join(" OR ", terms);
+    }
+
     private static String excerptBody(ProjectedDocument doc) {
         if (doc.deleted() || doc.bodyMarkdown() == null) {
             return "(document removed upstream or evicted from the local mirror)";
@@ -265,32 +358,27 @@ public class OutlineDocumentContentSource implements ContentSource {
             return;
         }
         long workspaceId = job.getWorkspace().getId();
-        String body = pullRequest
-            ? pullRequestRepository
-                  .findById(artifactId)
-                  .map(pr -> pr.getBody())
-                  .orElse(null)
-            : issueRepository
-                  .findById(artifactId)
-                  .map(issue -> issue.getBody())
-                  .orElse(null);
+        Optional<Issue> artifact = pullRequest
+            ? pullRequestRepository.findById(artifactId).map(pr -> (Issue) pr)
+            : issueRepository.findById(artifactId);
+        String title = artifact.map(Issue::getTitle).orElse(null);
+        String body = artifact.map(Issue::getBody).orElse(null);
         // The link grammar (what a documentation reference looks like) is the projection impl's vendor
         // knowledge — this source stays vendor-blind.
         Set<String> references = projection.extractReferences(body);
-        if (references.isEmpty()) {
-            return;
+        List<ProjectedDocument> linked = references.isEmpty()
+            ? List.of()
+            : projection.documentsByReference(workspaceId, references);
+        if (!references.isEmpty()) {
+            Set<String> unresolved = unresolvedReferences(references, linked);
+            if (!unresolved.isEmpty()) {
+                files.put(UNRESOLVED_REFERENCES_KEY, renderUnresolvedNote(unresolved).getBytes(StandardCharsets.UTF_8));
+            }
         }
-        List<ProjectedDocument> documents = projection.documentsByReference(workspaceId, references);
-        Set<String> unresolved = unresolvedReferences(references, documents);
-        if (!unresolved.isEmpty()) {
-            files.put(UNRESOLVED_REFERENCES_KEY, renderUnresolvedNote(unresolved).getBytes(StandardCharsets.UTF_8));
-        }
-        if (documents.isEmpty()) {
-            return;
-        }
-        // Deterministic order + de-dup: sorted by (collection, slug, title) so a slug collision resolves stably to
-        // the first document and the materialised bytes are identical across runs.
-        List<ProjectedDocument> ordered = documents
+        // Deterministic order + de-dup by path: linked docs sorted by (collection, slug, title) so a slug
+        // collision resolves stably to the first document and the materialised bytes are identical across runs.
+        Map<String, ProjectedDocument> byPath = new LinkedHashMap<>();
+        linked
             .stream()
             .sorted(
                 Comparator.comparing(
@@ -300,16 +388,41 @@ public class OutlineDocumentContentSource implements ContentSource {
                     .thenComparing(ProjectedDocument::slug, Comparator.nullsFirst(Comparator.naturalOrder()))
                     .thenComparing(ProjectedDocument::title, Comparator.nullsFirst(Comparator.naturalOrder()))
             )
-            .toList();
-        for (ProjectedDocument doc : ordered) {
-            String path =
-                REVIEW_PREFIX +
-                slugSegment(doc.collectionSlug(), "uncategorized") +
-                "/" +
-                slugSegment(doc.slug(), "untitled") +
-                ".md";
-            files.computeIfAbsent(path, unused -> renderReviewDocument(doc).getBytes(StandardCharsets.UTF_8));
+            .forEach(doc -> byPath.putIfAbsent(reviewPath(doc), doc));
+        // Retrieval fill: links are explicit author intent and always materialise; when they undershoot the
+        // target, full-text hits for the artifact text fill the remainder (rank order, deduped by path) so a
+        // relevant-but-unlinked document still reaches the review.
+        if (byPath.size() < REVIEW_RETRIEVAL_TARGET) {
+            String query = deriveQueryText(title, body);
+            if (!query.isBlank()) {
+                List<ProjectedDocument> hits = projection.searchDocuments(
+                    workspaceId,
+                    query,
+                    REVIEW_RETRIEVAL_TARGET + byPath.size()
+                );
+                for (ProjectedDocument hit : hits) {
+                    if (byPath.size() >= REVIEW_RETRIEVAL_TARGET) {
+                        break;
+                    }
+                    byPath.putIfAbsent(reviewPath(hit), hit);
+                }
+            }
         }
+        for (Map.Entry<String, ProjectedDocument> entry : byPath.entrySet()) {
+            files.computeIfAbsent(entry.getKey(), unused ->
+                renderReviewDocument(entry.getValue()).getBytes(StandardCharsets.UTF_8)
+            );
+        }
+    }
+
+    private static String reviewPath(ProjectedDocument doc) {
+        return (
+            REVIEW_PREFIX +
+            slugSegment(doc.collectionSlug(), "uncategorized") +
+            "/" +
+            slugSegment(doc.slug(), "untitled") +
+            ".md"
+        );
     }
 
     /**

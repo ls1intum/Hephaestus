@@ -504,7 +504,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceScopedTables", // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
                 "MentorChatService", // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
                 "OutlineWorkspacePurgeAdapter", // OutlineWebhookRegistrar is optional (gated by @ConditionalOnProperty(hephaestus.integration.outline.enabled)); the always-on purge contributor resolves it lazily so it still drops leftover documents when Outline is disabled
-                "OutlineWebhookRegistrar" // IntegrationNatsConsumer is optional (gated on hephaestus.sync.nats.enabled and the server runtime role); the registrar reconciles the scope consumer after every subscription-id change and must not require the bean
+                "OutlineWebhookRegistrar", // IntegrationNatsConsumer is optional (gated on hephaestus.sync.nats.enabled and the server runtime role); the registrar reconciles the scope consumer after every subscription-id change and must not require the bean
+                "SlackScopeConsumerReconciler" // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {

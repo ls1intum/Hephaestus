@@ -51,6 +51,10 @@
         // The Slack mentor adapter (integration.slack.mentor) runs a turn via the narrow MentorTurnRunner
         // port and streams through MentorChannel (propagate pulls in UIMessageChunk + MentorTurnRequest).
         "agent::mentor-chat",
+        // SlackConversationNudgeService listens to the agent-published ConversationFeedbackPreparedEvent (a
+        // type-level named interface: only the event record is exposed, the conversation-delivery internals stay
+        // module-private) to DM a count-only "feedback is waiting" doorbell.
+        "agent::conversation-nudge",
         // integration.slack.conversation implements the agent-owned conversation-source SPIs
         // (ConversationThreadProjection / ConversationSourceLiveness / ConversationCandidateSource): Slack owns the
         // slack_thread/slack_message/slack_monitored_channel tables and PROJECTS them to the agent through these

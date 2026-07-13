@@ -53,6 +53,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Mock
     private OutlineIdentityResolver identityResolver;
 
+    @Mock
+    private OutlineDocumentSelector documentSelector;
+
     @Captor
     private ArgumentCaptor<Set<String>> refsCaptor;
 
@@ -64,7 +67,8 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
             documentRepository,
             collectionRepository,
             connectionService,
-            identityResolver
+            identityResolver,
+            documentSelector
         );
         lenient()
             .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
@@ -473,5 +477,29 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
         // "design-doc" splits to "design" / "doc" — "doc" is far too short to be mistaken for a urlId.
         assertThat(refsCaptor.getValue()).doesNotContain("doc");
+    }
+
+    @Test
+    @DisplayName("searchDocuments projects the selector's ranked hits in order")
+    void searchDocuments_projectsSelectorHitsInOrder() {
+        OutlineDocument second = liveDocument();
+        second.setDocumentId("doc-uuid-9");
+        second.setSlug("runbook");
+        when(documentSelector.select(WORKSPACE_ID, "deploy OR rollback", 5)).thenReturn(
+            List.of(liveDocument(), second)
+        );
+
+        List<ProjectedDocument> result = projector.searchDocuments(WORKSPACE_ID, "deploy OR rollback", 5);
+
+        assertThat(result).extracting(ProjectedDocument::slug).containsExactly("design-doc", "runbook");
+    }
+
+    @Test
+    @DisplayName("searchDocuments with no hits skips the author/collection lookups entirely")
+    void searchDocuments_noHits_returnsEmptyWithoutContextLookups() {
+        when(documentSelector.select(WORKSPACE_ID, "nothing", 5)).thenReturn(List.of());
+
+        assertThat(projector.searchDocuments(WORKSPACE_ID, "nothing", 5)).isEmpty();
+        verify(connectionService, never()).findActive(anyLong(), any());
     }
 }

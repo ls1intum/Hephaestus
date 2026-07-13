@@ -114,7 +114,7 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
             .map(ConnectionConfig.SlackConfig::teamId)
             .filter(teamId -> teamId != null && !teamId.isBlank())
             .ifPresent(teamId ->
-                out.add(new StreamSubscription("slack", Set.of(ConsumerSubjectMath.slackTeamFilter(teamId))))
+                out.add(new StreamSubscription("slack", Set.of(ConsumerSubjectMath.teamFilter("slack", teamId))))
             );
     }
 }

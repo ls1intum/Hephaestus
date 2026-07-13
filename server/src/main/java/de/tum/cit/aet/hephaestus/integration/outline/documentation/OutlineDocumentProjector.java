@@ -72,17 +72,20 @@ public class OutlineDocumentProjector implements DocumentProjection {
     private final OutlineCollectionRepository collectionRepository;
     private final ConnectionService connectionService;
     private final OutlineIdentityResolver identityResolver;
+    private final OutlineDocumentSelector documentSelector;
 
     public OutlineDocumentProjector(
         OutlineDocumentRepository documentRepository,
         OutlineCollectionRepository collectionRepository,
         ConnectionService connectionService,
-        OutlineIdentityResolver identityResolver
+        OutlineIdentityResolver identityResolver,
+        OutlineDocumentSelector documentSelector
     ) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
         this.connectionService = connectionService;
         this.identityResolver = identityResolver;
+        this.documentSelector = documentSelector;
     }
 
     @Override
@@ -135,6 +138,20 @@ public class OutlineDocumentProjector implements DocumentProjection {
         Map<String, String> collectionNames = collectionNames(workspaceId);
         return documentRepository
             .findByWorkspaceIdAndReferenceIn(workspaceId, tokens)
+            .stream()
+            .map(doc -> project(doc, authors, collectionNames))
+            .toList();
+    }
+
+    @Override
+    public List<ProjectedDocument> searchDocuments(long workspaceId, String queryText, int limit) {
+        List<OutlineDocument> hits = documentSelector.select(workspaceId, queryText, limit);
+        if (hits.isEmpty()) {
+            return List.of();
+        }
+        AuthorContext authors = authorContext(workspaceId);
+        Map<String, String> collectionNames = collectionNames(workspaceId);
+        return hits
             .stream()
             .map(doc -> project(doc, authors, collectionNames))
             .toList();

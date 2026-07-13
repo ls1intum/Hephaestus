@@ -96,6 +96,29 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     );
 
     /**
+     * Live documents ranked by full-text relevance to {@code query} (websearch syntax) — the retrieval path
+     * behind {@code OutlineDocumentSelector}. The {@code simple} FTS config keeps matching language-neutral
+     * (no stemming, no stopword list) for mixed-language wikis. Tombstoned and body-evicted rows are excluded:
+     * there is no body to rank against. Works unindexed (sequential scan over the bounded per-workspace
+     * mirror); carries the {@code workspace_id} predicate.
+     */
+    @Query(
+        value = "SELECT * FROM outline_document WHERE workspace_id = :workspaceId " +
+            "AND deleted_at IS NULL AND body_markdown IS NOT NULL " +
+            "AND to_tsvector('simple', COALESCE(title, '') || ' ' || body_markdown) " +
+            "@@ websearch_to_tsquery('simple', :query) " +
+            "ORDER BY ts_rank(to_tsvector('simple', COALESCE(title, '') || ' ' || body_markdown), " +
+            "websearch_to_tsquery('simple', :query)) DESC, outline_updated_at DESC NULLS LAST, id ASC " +
+            "LIMIT :limit",
+        nativeQuery = true
+    )
+    List<OutlineDocument> searchByRelevance(
+        @Param("workspaceId") long workspaceId,
+        @Param("query") String query,
+        @Param("limit") int limit
+    );
+
+    /**
      * Staleness drop: delete every tombstoned row whose {@code deleted_at} is older than {@code cutoff} for
      * one workspace — the hard ceiling on how long a vanished document lingers as a marker. Derived DELETE
      * carrying the {@code workspace_id} predicate; idempotent (0 when nothing is stale).

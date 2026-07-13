@@ -9,9 +9,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Pure subject helpers for NATS consumers. Repository integrations use scoped wildcard filters such as
- * {@code github.owner.repo.>}; Slack Events API callbacks use the flat {@code slack.>} consumer (Slack
- * interactivity/button postbacks stay on the separate signed HTTP endpoint); Outline change notifications
- * use per-subscription filters {@code outline.<subscriptionId>.>}.
+ * {@code github.owner.repo.>}; Slack Events API callbacks use per-workspace filters
+ * {@code slack.<team>.>} (Slack interactivity/button postbacks stay on the separate signed HTTP
+ * endpoint); Outline change notifications use per-subscription filters {@code outline.<subscriptionId>.>}.
  *
  * <p>{@link #kindFromSubjectPrefix(String)} is the single source of truth for NATS-subject routing. It
  * lists the kinds that publish to JetStream (GitHub, GitLab, Slack, Outline) and never calls
@@ -178,19 +178,23 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Wildcard subject filter that matches every event for one Slack team:
-     * {@code slack.<team>.>}. Dots in the team id are replaced with {@code ~}, matching
-     * {@code SlackSubjectKeyDeriver}'s publish-side sanitisation so the filter and the
-     * published subject always agree.
+     * Wildcard subject filter that matches every event for one messaging-team tenant:
+     * {@code <stream>.<team>.>}. Dots in the team id are replaced with {@code ~}, matching the
+     * publish-side sanitisation of the messaging subject derivers so the filter and the published
+     * subject always agree.
      *
-     * @param teamId the Slack team id from the workspace's {@code SlackConfig}
+     * @param streamName the NATS stream name (e.g. {@code slack})
+     * @param teamId     the vendor team id from the workspace's connection config
      * @return a subject like {@code slack.T0ABC123.>}
      */
-    public static String slackTeamFilter(String teamId) {
-        if (teamId == null || teamId.isBlank()) {
-            throw new IllegalArgumentException("Slack team id cannot be null or empty.");
+    public static String teamFilter(String streamName, String teamId) {
+        if (streamName == null || streamName.isBlank()) {
+            throw new IllegalArgumentException("Stream name cannot be null or empty.");
         }
-        return "slack." + teamId.trim().replace('.', '~') + ".>";
+        if (teamId == null || teamId.isBlank()) {
+            throw new IllegalArgumentException("Team id cannot be null or empty.");
+        }
+        return streamName + "." + teamId.trim().replace('.', '~') + ".>";
     }
 
     // Subject → kind

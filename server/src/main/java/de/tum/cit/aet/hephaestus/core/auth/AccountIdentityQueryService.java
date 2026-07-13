@@ -48,6 +48,15 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Long> resolveAccountIdForActor(Long externalActorId) {
+        if (externalActorId == null) {
+            return Optional.empty();
+        }
+        return identityLinkRepository.findActiveAccountIdsByExternalActorId(externalActorId).stream().findFirst();
+    }
+
+    @Override
     @Transactional
     public void linkExternalActor(Long identityLinkId, Long externalActorId) {
         if (identityLinkId == null || externalActorId == null) {
