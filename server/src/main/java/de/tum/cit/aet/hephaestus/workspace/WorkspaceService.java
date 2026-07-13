@@ -298,6 +298,11 @@ public class WorkspaceService {
 
     public void resetAndRecalculateLeagues(WorkspaceContext workspaceContext) {
         Workspace workspace = requireWorkspace(requireSlug(workspaceContext));
+        // Feature-flag gate: a workspace with leagues off has no league resource to reset — 404,
+        // matching the read endpoints in LeaderboardController.
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getLeaguesEnabled())) {
+            throw new EntityNotFoundException("League statistics", workspace.getWorkspaceSlug());
+        }
         resetAndRecalculateLeaguesInternal(workspace.getId());
     }
 

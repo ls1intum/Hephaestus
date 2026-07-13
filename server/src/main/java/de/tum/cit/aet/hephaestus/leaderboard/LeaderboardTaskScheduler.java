@@ -179,9 +179,11 @@ public class LeaderboardTaskScheduler {
 
     /**
      * Run all leaderboard work for one workspace on its tick. Re-loads the workspace by id so a row
-     * deleted since registration self-cancels (and notification-enabled / schedule reflect the
-     * latest persisted state). Leagues always run; notification channels run only when the global
-     * notification kill-switch is on.
+     * deleted since registration self-cancels (and feature flags / notification-enabled / schedule
+     * reflect the latest persisted state). A workspace with the leaderboard feature flag off skips
+     * everything — no digest, no league-points recompute; the trigger stays registered so flipping
+     * the flag back on needs no restart. Otherwise leagues always run; notification channels run
+     * only when the global notification kill-switch is on.
      */
     private void runForWorkspace(long workspaceId) {
         Optional<Workspace> current = workspaceRepository.findById(workspaceId);
@@ -191,6 +193,11 @@ public class LeaderboardTaskScheduler {
             return;
         }
         Workspace workspace = current.get();
+
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getLeaderboardEnabled())) {
+            log.info("Skipped leaderboard tasks: reason=leaderboardFeatureDisabled, workspaceId={}", workspaceId);
+            return;
+        }
 
         if (leaderboardProperties.notification().enabled()) {
             for (LeaderboardNotificationTask task : notificationTasks) {

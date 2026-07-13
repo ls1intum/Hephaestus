@@ -322,6 +322,16 @@ hephaestus:
     webapp:
         url: ${HEPHAESTUS_WEBAPP_URL:${APPLICATION_HOST_URL:http://localhost:4200}}
 
+    practices:
+        # Day/time (and zone) at which a workspace's weekly practice review recency window closes.
+        # Each workspace may override day/time; unset falls back to this global default. The
+        # per-workspace override is stored on the leaderboard schedule columns (shared with the
+        # flag-gated legacy digest below), so the two never drift apart.
+        review-cycle:
+            day: 2
+            time: "9:00"
+            zone: "Europe/Berlin"
+
     leaderboard:
         schedule:
             day: 2

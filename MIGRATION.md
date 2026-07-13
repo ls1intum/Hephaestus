@@ -51,6 +51,22 @@ Before upgrading to any new `0.x.0` version:
 
 ## Version History
 
+### Unreleased (2026-07)
+
+#### 🟡 Leaderboard and leagues are workspace-flagged legacy features being retired
+
+**Version**: Unreleased
+**Affected**: workspaces that use the leaderboard, leagues, or the weekly Slack leaderboard digest; external API clients of the practice reflection endpoint.
+
+The competitive leaderboard is being retired in favor of the practice report surfaces (ADR 0023). No schema or leaderboard code is deleted — the leaderboard behavior change is enforcement of the existing per-workspace feature flags:
+
+- **New workspaces** default to `leaderboardEnabled=false` and `leaguesEnabled=false` (this was already the stored default; the flags are now enforced server-side). **Existing workspaces keep their current flag values** — no data or configuration changes on upgrade.
+- Leaderboard/league REST endpoints now answer `404` for workspaces with the corresponding flag off. The weekly leaderboard job (Slack digest + league-points recompute) skips flag-off workspaces.
+- The practice report read model (practice reports, workspace health, disclosure audit) ships dark in this release: endpoints and schema exist, but there is no navigation or UI yet.
+- 🔴 One API endpoint is replaced: `GET /workspaces/{slug}/practices/observations/reflection` is removed in favor of `GET /workspaces/{slug}/practices/reports/me` (same per-practice cards, now with a cycle-over-cycle trend). The bundled webapp never consumed the old endpoint, but any external client calling it must switch.
+
+**Migration**: none required for the leaderboard itself. To keep using the leaderboard on a workspace, leave (or turn) its leaderboard toggle on under workspace settings → Features. Expect removal of the leaderboard in a later release, announced separately. External clients of the reflection endpoint switch to `/practices/reports/me`.
+
 ### v0.10.0 (Upcoming)
 
 #### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset

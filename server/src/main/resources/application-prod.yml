@@ -69,6 +69,13 @@ hephaestus:
     webapp:
         url: ${APPLICATION_HOST_URL}
 
+    practices:
+        # Day/time at which a workspace's weekly practice review recency window closes.
+        review-cycle:
+            day: ${REVIEW_CYCLE_DAY:2}
+            time: ${REVIEW_CYCLE_TIME:9}
+            zone: ${REVIEW_CYCLE_ZONE:Europe/Berlin}
+
     leaderboard:
         schedule:
             day: ${LEADERBOARD_SCHEDULE_DAY:2}

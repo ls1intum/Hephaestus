@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.observation.dto;
+package de.tum.cit.aet.hephaestus.practices.report.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -17,19 +17,21 @@ import tools.jackson.databind.JsonNode;
  * dashboard is a learner surface, so it carries only what helps the developer act.
  */
 @Schema(description = "A single piece of practice feedback to read and act on")
-public record ReflectionItemDTO(
+public record PracticeReportItemDTO(
     @NonNull @Schema(description = "Observation id — handle to open the full detail") UUID observationId,
     @NonNull @Schema(description = "The headline of the feedback") String title,
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String guidance,
     @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
-    @NonNull @Schema(description = "The kind of work this is about (PR / issue)") WorkArtifact artifactType,
-    @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
+    @NonNull
+    @Schema(description = "The kind of work this is about (PR / issue / Slack conversation thread)")
+    WorkArtifact artifactType,
+    @NonNull @Schema(description = "Id of the PR / issue / conversation thread this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
 ) {
-    public static ReflectionItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
-        return new ReflectionItemDTO(
+    public static PracticeReportItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
+        return new PracticeReportItemDTO(
             observation.getId(),
             observation.getTitle(),
             deliveredGuidance,

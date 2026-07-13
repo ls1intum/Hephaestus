@@ -137,6 +137,10 @@ export type WorkspaceListItem = {
      */
     displayName: string;
     /**
+     * Audience for the k-anonymised workspace health aggregate on the practice report surface
+     */
+    healthVisibility: 'MENTORS_ONLY' | 'EVERYONE';
+    /**
      * Unique identifier of the workspace
      */
     id: number;
@@ -206,6 +210,10 @@ export type Workspace = {
      * Whether Slack token is configured
      */
     hasSlackToken: boolean;
+    /**
+     * Audience for the k-anonymised workspace health aggregate on the practice report surface (MENTORS_ONLY, EVERYONE)
+     */
+    healthVisibility: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Unique identifier of the workspace
      */
@@ -466,6 +474,10 @@ export type UpdateWorkspaceFeaturesRequest = {
      * Enable the achievements system
      */
     achievementsEnabled?: boolean;
+    /**
+     * Audience for the k-anonymised workspace health aggregate on the practice report surface (MENTORS_ONLY, EVERYONE)
+     */
+    healthVisibility?: 'MENTORS_ONLY' | 'EVERYONE';
     /**
      * Enable the leaderboard ranking page
      */
@@ -1063,82 +1075,6 @@ export type RegisterSlackChannelRequest = {
 };
 
 /**
- * A developer's readable feedback for one practice
- */
-export type ReflectionPractice = {
-    /**
-     * Area name this practice belongs to, if any
-     */
-    areaName?: string;
-    /**
-     * Area slug this practice belongs to, if any
-     */
-    areaSlug?: string;
-    /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * Practice slug
-     */
-    slug: string;
-    /**
-     * Where the developer stands on this practice
-     */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
-    /**
-     * What the developer already does well here
-     */
-    strengths: Array<ReflectionItem>;
-    /**
-     * Specific feedback to act on (highest-impact first)
-     */
-    toWorkOn: Array<ReflectionItem>;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
-/**
- * A single piece of practice feedback to read and act on
- */
-export type ReflectionItem = {
-    /**
-     * Id of the PR / issue this is about
-     */
-    artifactId: number;
-    /**
-     * The kind of work this is about (PR / issue)
-     */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
-    /**
-     * What to do — the delivered feedback for this observation (null if nothing was delivered)
-     */
-    guidance?: string;
-    /**
-     * Where in the work, e.g. "FrameRecorder.swift:212", when known
-     */
-    locator?: string;
-    /**
-     * Observation id — handle to open the full detail
-     */
-    observationId: string;
-    /**
-     * Impact level (null unless assessed BAD)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * The headline of the feedback
-     */
-    title: string;
-};
-
-/**
  * Reaction engagement for a developer, split into the response (uptake) and validity axes
  */
 export type ReactionEngagement = {
@@ -1470,6 +1406,174 @@ export type Profile = {
      * XP progress information for the users' profile
      */
     xpRecord: ProfileXpRecord;
+};
+
+/**
+ * RFC 7807 / RFC 9457 problem detail response
+ */
+export type ProblemDetail = {
+    /**
+     * Human-readable detail
+     */
+    detail?: string;
+    /**
+     * Validation errors keyed by field name, when present
+     */
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Request instance URI
+     */
+    instance?: string;
+    /**
+     * HTTP status code
+     */
+    status?: number;
+    /**
+     * Short, human-readable summary
+     */
+    title?: string;
+    /**
+     * Problem type URI
+     */
+    type?: string;
+};
+
+/**
+ * A developer on the mentor roster (admin/owner-only), sorted so people who may need support come first
+ */
+export type PracticeReportSummary = {
+    /**
+     * The developer's status on each practice area
+     */
+    areas: Array<AreaStatusCell>;
+    /**
+     * Plain-language reasons behind needsAttention (empty when none)
+     */
+    attentionReasons: Array<string>;
+    /**
+     * Developer avatar URL
+     */
+    avatarUrl: string;
+    /**
+     * Developer display name (may be null; UI falls back to login)
+     */
+    name?: string;
+    /**
+     * Whether the developer has unresolved gaps a mentor should look at (a triage flag)
+     */
+    needsAttention?: boolean;
+    /**
+     * Stable SCM user id for drill-down calls
+     */
+    userId: number;
+    /**
+     * Developer login
+     */
+    userLogin: string;
+};
+
+/**
+ * A developer's status on one practice area
+ */
+export type AreaStatusCell = {
+    /**
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * Where the developer stands on this area (criterion-referenced, not a rank)
+     */
+    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NO_ACTIVITY';
+    /**
+     * Direction versus the prior review cycle (criterion-referenced, never a peer comparison)
+     */
+    trend: 'IMPROVING' | 'WORSENING' | 'STEADY' | 'NEW';
+};
+
+/**
+ * A single piece of practice feedback to read and act on
+ */
+export type PracticeReportItem = {
+    /**
+     * Id of the PR / issue / conversation thread this is about
+     */
+    artifactId: number;
+    /**
+     * The kind of work this is about (PR / issue / Slack conversation thread)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
+     */
+    guidance?: string;
+    /**
+     * Where in the work, e.g. "FrameRecorder.swift:212", when known
+     */
+    locator?: string;
+    /**
+     * Observation id — handle to open the full detail
+     */
+    observationId: string;
+    /**
+     * Impact level (null unless assessed BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The headline of the feedback
+     */
+    title: string;
+};
+
+/**
+ * A developer's readable feedback for one practice
+ */
+export type PracticeReportCard = {
+    /**
+     * Area name this practice belongs to, if any
+     */
+    areaName?: string;
+    /**
+     * Area slug this practice belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice
+     */
+    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
+    /**
+     * What the developer already does well here
+     */
+    strengths: Array<PracticeReportItem>;
+    /**
+     * Specific feedback to act on (highest-impact first)
+     */
+    toWorkOn: Array<PracticeReportItem>;
+    /**
+     * Direction versus the prior review cycle (criterion-referenced, never a peer comparison)
+     */
+    trend: 'IMPROVING' | 'WORSENING' | 'STEADY' | 'NEW';
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
 };
 
 /**
@@ -2642,6 +2746,40 @@ export type AssignRoleRequest = {
      * User ID of the member to update
      */
     userId: number;
+};
+
+/**
+ * Workspace health distribution for one practice area (k-anonymised, never per-person)
+ */
+export type AreaHealth = {
+    /**
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * Whether counts are available, suppressed for k-anonymity, or there was no data at all
+     */
+    availability: 'AVAILABLE' | 'SUPPRESSED' | 'NO_DATA';
+    /**
+     * Developers standing at DEVELOPING (null unless availability is AVAILABLE)
+     */
+    developingCount?: number;
+    /**
+     * Developers standing at MIXED (null unless availability is AVAILABLE)
+     */
+    mixedCount?: number;
+    /**
+     * Developers with activity but no problems/strengths this window (null unless availability is AVAILABLE)
+     */
+    noActivityCount?: number;
+    /**
+     * Developers standing at STRENGTH (null unless availability is AVAILABLE)
+     */
+    strengthCount?: number;
 };
 
 /**
@@ -4791,6 +4929,36 @@ export type SubmitReactionResponses = {
 
 export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
 
+export type ListPracticeHealthData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/health';
+};
+
+export type ListPracticeHealthErrors = {
+    /**
+     * Not permitted for this workspace's health visibility
+     */
+    403: ProblemDetail;
+};
+
+export type ListPracticeHealthError = ListPracticeHealthErrors[keyof ListPracticeHealthErrors];
+
+export type ListPracticeHealthResponses = {
+    /**
+     * Workspace health cards returned
+     */
+    200: Array<AreaHealth>;
+};
+
+export type ListPracticeHealthResponse = ListPracticeHealthResponses[keyof ListPracticeHealthResponses];
+
 export type ListLearnerPracticesData = {
     body?: never;
     path: {
@@ -4865,27 +5033,6 @@ export type GetObservationsForPullRequestResponses = {
 };
 
 export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
-
-export type GetReflectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/reflection';
-};
-
-export type GetReflectionResponses = {
-    /**
-     * Per-practice reflection cards returned
-     */
-    200: Array<ReflectionPractice>;
-};
-
-export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
 
 export type GetSummaryData = {
     body?: never;
@@ -4964,6 +5111,104 @@ export type ReorderPracticesResponses = {
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type ListPracticeReportsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reports';
+};
+
+export type ListPracticeReportsErrors = {
+    /**
+     * Requires workspace ADMIN or OWNER
+     */
+    403: ProblemDetail;
+};
+
+export type ListPracticeReportsError = ListPracticeReportsErrors[keyof ListPracticeReportsErrors];
+
+export type ListPracticeReportsResponses = {
+    /**
+     * Report summaries returned
+     */
+    200: Array<PracticeReportSummary>;
+};
+
+export type ListPracticeReportsResponse = ListPracticeReportsResponses[keyof ListPracticeReportsResponses];
+
+export type GetMyPracticeReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reports/me';
+};
+
+export type GetMyPracticeReportErrors = {
+    /**
+     * Requires a synced developer identity in this workspace
+     */
+    403: ProblemDetail;
+};
+
+export type GetMyPracticeReportError = GetMyPracticeReportErrors[keyof GetMyPracticeReportErrors];
+
+export type GetMyPracticeReportResponses = {
+    /**
+     * Per-practice report cards returned
+     */
+    200: Array<PracticeReportCard>;
+};
+
+export type GetMyPracticeReportResponse = GetMyPracticeReportResponses[keyof GetMyPracticeReportResponses];
+
+export type GetDeveloperPracticeReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        userId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reports/{userId}';
+};
+
+export type GetDeveloperPracticeReportErrors = {
+    /**
+     * Requires workspace ADMIN or OWNER
+     */
+    403: ProblemDetail;
+    /**
+     * No current-cycle report subject exists for this user in the workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetDeveloperPracticeReportError = GetDeveloperPracticeReportErrors[keyof GetDeveloperPracticeReportErrors];
+
+export type GetDeveloperPracticeReportResponses = {
+    /**
+     * Report cards for the developer returned
+     */
+    200: Array<PracticeReportCard>;
+};
+
+export type GetDeveloperPracticeReportResponse = GetDeveloperPracticeReportResponses[keyof GetDeveloperPracticeReportResponses];
 
 export type DeletePracticeData = {
     body?: never;

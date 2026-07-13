@@ -1,6 +1,6 @@
 Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
 
-_Last updated: 2026-05-07._
+_Last updated: 2026-07-12._
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates Hephaestus at https://hephaestus.aet.cit.tum.de. This statement explains what personal data the platform processes, why, on what legal basis, who receives it, how long it is kept, and the rights you have. Personal data is processed under the GDPR, the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
 
@@ -59,6 +59,8 @@ Hephaestus uses only technically necessary browser-side storage: the session coo
 ## 5. Recipients
 
 Within Hephaestus your data is visible to AET operators (platform administration and support) and, depending on the workspace, to other workspace members (your username, avatar, the findings attached to pull/merge requests you authored, per-practice summaries of your activity, and recognition signals where the workspace has enabled them). Workspaces marked publicly viewable by their administrator can be read by anyone on the open web; the upstream open-source contributor list at `/contributors` is also public.
+
+Workspace administrators and owners can additionally view a named per-developer practice report to support mentoring: your status per practice area, derived from the same observations described in section 3. Regular members can view their own report only. Every time an administrator or owner is shown the report roster or an individual report, Hephaestus writes an append-only disclosure record — which user accessed it, whose report, which resource, and when. These records are kept for the life of the workspace for accountability, are deleted with the workspace, and on account erasure the reference to the erased person is redacted. Where the workspace administrator enables it, regular members can also see an aggregated health view per practice area; in that member view, groups of fewer than five active developers are suppressed so no individual can be singled out from the aggregate.
 
 External recipients, all engaged under data-processing agreements (Auftragsverarbeitungsverträge) at the appropriate level:
 

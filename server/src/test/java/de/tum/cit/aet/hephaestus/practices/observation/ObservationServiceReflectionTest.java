@@ -14,9 +14,13 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportCardDTO;
+import de.tum.cit.aet.hephaestus.practices.report.dto.PracticeReportItemDTO;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewCycleWindowResolver.CycleWindow;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +56,12 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private ReviewCycleWindowResolver reviewCycleWindowResolver;
+
     @InjectMocks
     private ObservationService observationService;
 
@@ -60,6 +70,21 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         User user = new User();
         user.setId(USER_ID);
         when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
+        // The self-view resolves the workspace then its review-cycle window; the recency `since` is passed as
+        // any(Instant) to the finding query, so the concrete instant here is irrelevant.
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(new Workspace()));
+        when(reviewCycleWindowResolver.previousCycleWindow(any())).thenReturn(
+            new ReviewCycleWindowResolver.CycleWindow(Instant.now().minusSeconds(604800), Instant.now())
+        );
+        // Trend computation needs a prior-cycle window too; the prior-standing query itself is unstubbed
+        // (Mockito's default answer returns an empty list), so every card in these tests defaults to a NEW
+        // trend — irrelevant here since none of these tests assert on trend.
+        when(reviewCycleWindowResolver.priorCycleWindow(any())).thenReturn(
+            new ReviewCycleWindowResolver.CycleWindow(
+                Instant.now().minusSeconds(1209600),
+                Instant.now().minusSeconds(604800)
+            )
+        );
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
@@ -122,7 +147,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
         when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         List<Severity> order = cards
@@ -136,7 +161,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("gap #1c: a single low-confidence BAD is FILTERED OUT of the card, not merely sorted last (P4)")
+    @DisplayName("a single low-confidence BAD is FILTERED OUT of the card, not merely sorted last")
     void lowConfidenceSingleTargetGapIsNotDisplayed() {
         Practice practice = practice("robust-error-handling");
 
@@ -154,19 +179,19 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(lowConfCritical, confidentMinor));
         when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
+        List<PracticeReportItemDTO> items = cards.get(0).toWorkOn();
         // Only the confident MINOR is shown; the quarantined low-confidence CRITICAL is withheld from the
         // learner's dashboard entirely (the read-model firewall, not just a sort).
         assertThat(items).hasSize(1);
         assertThat(items.get(0).observationId()).isEqualTo(confidentMinor.getId());
-        assertThat(items.stream().map(ReflectionItemDTO::observationId)).doesNotContain(lowConfCritical.getId());
+        assertThat(items.stream().map(PracticeReportItemDTO::observationId)).doesNotContain(lowConfCritical.getId());
     }
 
     @Test
-    @DisplayName("gap #1c: an all-quarantined practice contributes no toWorkOn items (sub-floor BAD never shown)")
+    @DisplayName("an all-quarantined practice contributes no toWorkOn items (sub-floor BAD never shown)")
     void allQuarantinedGapsAreFullyWithheld() {
         Practice practice = practice("robust-error-handling");
         // Two coin-flip BADs on the SAME single target → both quarantined → nothing to display.
@@ -183,7 +208,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(q1, q2));
         when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
 
         // No toWorkOn items and no strengths → the card is empty and contributes nothing to the dashboard.
         assertThat(cards).isEmpty();
@@ -208,7 +233,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(minorTargetB, criticalTargetA));
         when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         // Neither is quarantined (2 distinct targets) → the CRITICAL leads on severity-weight.
@@ -236,15 +261,15 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
         when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
-        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
+        List<PracticeReportItemDTO> items = cards.get(0).toWorkOn();
         // Only locus-B (confident) survives; the single-target coin-flip at locus-A is withheld even though an
         // unrelated BAD exists on a second target for the same practice.
         assertThat(items).hasSize(1);
         assertThat(items.get(0).observationId()).isEqualTo(confidentLocusB.getId());
-        assertThat(items.stream().map(ReflectionItemDTO::observationId)).doesNotContain(lowConfLocusA.getId());
+        assertThat(items.stream().map(PracticeReportItemDTO::observationId)).doesNotContain(lowConfLocusA.getId());
     }
 
     @Test
@@ -266,7 +291,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         ).thenReturn(List.of(locusOnA, locusOnB));
         when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+        List<PracticeReportCardDTO> cards = observationService.getPracticeReport(WORKSPACE_ID);
 
         assertThat(cards).hasSize(1);
         // Both share a locus seen on 2 targets → neither quarantined → both displayed.

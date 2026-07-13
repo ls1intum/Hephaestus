@@ -3,7 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-export type FeatureKey = keyof UpdateWorkspaceFeaturesRequest;
+// healthVisibility rides on the same PATCH request but is an enum tier, not a boolean toggle,
+// and has no admin UI yet, so it is excluded from the switch list.
+export type FeatureKey = Exclude<keyof UpdateWorkspaceFeaturesRequest, "healthVisibility">;
 export type FeatureValues = Record<FeatureKey, boolean>;
 
 export interface AdminFeaturesSettingsProps {
@@ -51,7 +53,8 @@ const FEATURES: ReadonlyArray<FeatureDefinition> = [
 	{
 		key: "leaderboardEnabled",
 		label: "Leaderboard",
-		description: "Enable the leaderboard ranking contributors by their activity scores.",
+		description:
+			"Show the contributor leaderboard, a legacy feature that is being retired in favor of practice feedback.",
 	},
 	{
 		key: "progressionEnabled",
