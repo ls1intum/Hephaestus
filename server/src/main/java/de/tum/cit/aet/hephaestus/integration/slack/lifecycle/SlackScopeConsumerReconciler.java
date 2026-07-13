@@ -16,7 +16,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * boundary crossing (either direction) the scope's filter subjects are rebuilt so the per-workspace
  * {@code slack.<team>.>} filter is added or dropped. {@code startConsumingScope} no-ops when the scope
  * already has consumers and {@code updateScopeConsumer} no-ops when it has none yet — calling both
- * reconciles every state (model: {@code OutlineWebhookRegistrar#reconcileScopeConsumer}).
+ * reconciles every state.
  *
  * <p>Runs async AFTER_COMMIT so the connect/disconnect transaction never waits on NATS; a failure here
  * only costs ingest freshness until the next scope reconcile, so it is logged, never rethrown.

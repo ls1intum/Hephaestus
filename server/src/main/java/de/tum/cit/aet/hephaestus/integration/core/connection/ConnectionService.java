@@ -249,8 +249,7 @@ public class ConnectionService {
     ) {
         String instanceKey = Long.toString(installationId);
 
-        // Retire any non-matching SCM-side row before introducing the new instance_key
-        // (invariant: one ACTIVE GitHub Connection per workspace).
+        // Invariant: one ACTIVE GitHub Connection per workspace.
         for (Connection existing : connectionRepository.findByWorkspaceIdAndState(
             workspace.getId(),
             IntegrationState.ACTIVE
@@ -453,7 +452,7 @@ public class ConnectionService {
         return "INITIATE".equals(request.eventType());
     }
 
-    /** Parameter object for {@link #transition} — collapses 6 params to one record. */
+    /** Parameter object for {@link #transition}. */
     public record TransitionRequest(
         IntegrationState next,
         String eventType,

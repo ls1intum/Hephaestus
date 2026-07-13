@@ -27,11 +27,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
  * Per-workspace Outline collection mirroring control plane — the admin surface that decides which
- * collections are mirrored ({@code register → ENABLED ⇄ PAUSED → deleted}), mirroring
- * {@link de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelAdminController}'s
- * resource-oriented lifecycle convention (a PATCH to the target state driving a guarded, idempotent
- * transition). Outline-side sharing ≠ Hephaestus consent, so mirroring choices live in the webapp
- * admin plane guarded by {@link RequireAtLeastWorkspaceAdmin}.
+ * collections are mirrored ({@code register → ENABLED ⇄ PAUSED → deleted}), with a PATCH to the
+ * target state driving a guarded, idempotent transition. Outline-side sharing ≠ Hephaestus consent,
+ * so mirroring choices live in the webapp admin plane guarded by {@link RequireAtLeastWorkspaceAdmin}.
  *
  * <p>The path variable is the Outline collection UUID — the stable natural key
  * {@code (workspace_id, connection_id, collection_id)}. Every method scopes on the

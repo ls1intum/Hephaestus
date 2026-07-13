@@ -147,10 +147,8 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         );
 
         // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT. IDENTITY_LINKED
-        // only when a NEW identity was actually attached to an existing account; a returning login or a
-        // re-affirm of an already-linked identity is a LOGIN (the provisioning result tells us which, so a
-        // LINK-mode re-affirm no longer writes a phantom IDENTITY_LINKED). Audit writes are best-effort and
-        // never break the login — see AuthEventLogger.
+        // only when a NEW identity was actually attached to an existing account (per the provisioning
+        // result); otherwise LOGIN. Audit writes are best-effort and never break the login — see AuthEventLogger.
         authEventLogger
             .event(
                 provisioned.identityLinked() ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN,

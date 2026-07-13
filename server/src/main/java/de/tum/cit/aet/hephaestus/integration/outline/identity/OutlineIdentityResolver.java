@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Resolves an Outline document author {@code (server, team_id, user UUID)} to the workspace member the
- * projection should attribute authorship to. Mirrors {@code SlackMentorIdentityResolver}.
+ * projection should attribute authorship to.
  *
  * <p>The chain is deliberately SPI-only so this adapter never imports {@code core.auth} domain types —
  * or the SCM schema:

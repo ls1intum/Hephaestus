@@ -68,8 +68,6 @@ public class IssueContentSource implements ContentSource {
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
-        // Strict shared reader: an absent / null / non-numeric issue_id is a job-preparation failure, not
-        // a silently-defaulted 0 that would later surface as the misleading "Issue not found: issueId=0".
         long issueId = requireLong(metadata, "issue_id");
         // TYPE(i)=Issue finder: a target_type=ISSUE job must resolve to an Issue, never a PullRequest
         // (both share the single inheritance table + id space).
@@ -81,7 +79,6 @@ public class IssueContentSource implements ContentSource {
 
         String repoFullName = issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
 
-        // metadata.json
         ObjectNode meta = objectMapper.createObjectNode();
         meta.put("issue_number", issue.getNumber());
         meta.put("title", issue.getTitle());
@@ -114,7 +111,6 @@ public class IssueContentSource implements ContentSource {
             .forEach(assignees::add);
         writeJson(files, "metadata.json", meta);
 
-        // comments.json — ordered thread
         List<IssueComment> ordered = issue
             .getComments()
             .stream()
@@ -133,7 +129,6 @@ public class IssueContentSource implements ContentSource {
         }
         writeJson(files, "comments.json", commentsArr);
 
-        // issue_summary.md — single AI-readable rendering
         StringBuilder md = new StringBuilder(512);
         md.append("# Issue #").append(issue.getNumber()).append(" — ").append(issue.getTitle()).append("\n\n");
         md.append("- **State:** ").append(issue.getState());

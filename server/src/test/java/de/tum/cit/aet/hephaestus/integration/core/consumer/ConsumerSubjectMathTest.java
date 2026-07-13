@@ -73,7 +73,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
                 IntegrationKind.GITHUB
             );
             assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z")).contains(IntegrationKind.GITLAB);
-            // Slack now rides the durable transport (slack.<team>.<channel>.message), so it IS in the allow-list.
             assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.message")).contains(IntegrationKind.SLACK);
         }
 
@@ -107,7 +106,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
         void streamingKindsHaveStreamNames() {
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITHUB)).contains("github");
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITLAB)).contains("gitlab");
-            // Slack maps to the "slack" stream (monitored-channel message ingest).
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).contains("slack");
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.OUTLINE)).contains("outline");
         }

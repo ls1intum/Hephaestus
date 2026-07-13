@@ -49,7 +49,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
 
     /**
      * Hard-deletes one collection's mirrored rows — the erase behind removing a collection from the
-     * mirror. Erase is the point: the mirrored bodies leave the database, they are not tombstoned.
+     * mirror; the bodies leave the database, they are not tombstoned.
      */
     long deleteByWorkspaceIdAndConnectionIdAndCollectionId(Long workspaceId, Long connectionId, String collectionId);
 
@@ -72,8 +72,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
 
     /**
      * The agent-facing projection breadth: a bounded page of the workspace's mirrored documents, live rows first
-     * (tombstoned last) and most-recently-updated first within each group. Carries the {@code workspace_id}
-     * predicate the tenancy {@code StatementInspector} requires; the {@link Pageable} caps the result.
+     * (tombstoned last) and most-recently-updated first within each group; the {@link Pageable} caps the result.
      */
     @Query(
         "SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId " +
@@ -84,7 +83,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     /**
      * The workspace's mirrored documents matching a set of reference tokens (Outline document ids and/or slugs) —
      * the linked-document lookup for the review path. Matches on either the document id or the slug so a raw id or
-     * a URL's trailing segment resolves. Carries the {@code workspace_id} predicate.
+     * a URL's trailing segment resolves.
      */
     @Query(
         "SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId " +
@@ -99,8 +98,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * Live documents ranked by full-text relevance to {@code query} (websearch syntax) — the retrieval path
      * behind {@code OutlineDocumentSelector}. The {@code simple} FTS config keeps matching language-neutral
      * (no stemming, no stopword list) for mixed-language wikis. Tombstoned and body-evicted rows are excluded:
-     * there is no body to rank against. Works unindexed (sequential scan over the bounded per-workspace
-     * mirror); carries the {@code workspace_id} predicate.
+     * there is no body to rank against. Works unindexed (sequential scan over the bounded per-workspace mirror).
      */
     @Query(
         value = "SELECT * FROM outline_document WHERE workspace_id = :workspaceId " +
@@ -120,15 +118,14 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
 
     /**
      * Staleness drop: delete every tombstoned row whose {@code deleted_at} is older than {@code cutoff} for
-     * one workspace — the hard ceiling on how long a vanished document lingers as a marker. Derived DELETE
-     * carrying the {@code workspace_id} predicate; idempotent (0 when nothing is stale).
+     * one workspace — the hard ceiling on how long a vanished document lingers as a marker. Idempotent.
      */
     long deleteByWorkspaceIdAndDeletedAtBefore(Long workspaceId, Instant cutoff);
 
     /**
      * Total size (in characters) of the workspace's mirrored Markdown bodies — the figure the size cap is
-     * enforced against. Native for the {@code SUM(LENGTH(...))} aggregate; carries the {@code workspace_id}
-     * predicate and coalesces an all-null/empty workspace to 0.
+     * enforced against. Native for the {@code SUM(LENGTH(...))} aggregate; coalesces an all-null/empty
+     * workspace to 0.
      */
     @Query(
         value = "SELECT COALESCE(SUM(LENGTH(body_markdown)), 0) FROM outline_document WHERE workspace_id = :workspaceId",
@@ -140,7 +137,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * Eviction candidates: {@code [id, body length]} for every row that still holds a body, ordered
      * least-recently-exported first (a never-exported row evicts before a recently-refreshed one). The
      * service walks this list, nulling bodies until the workspace is back under the cap. Native for the
-     * {@code LENGTH(...)} projection; carries the {@code workspace_id} predicate.
+     * {@code LENGTH(...)} projection.
      */
     @Query(
         value = "SELECT id, LENGTH(body_markdown) FROM outline_document " +
@@ -155,7 +152,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * {@code body_evicted_at} for the given rows. {@code content_hash} is deliberately KEPT so the
      * unchanged-check still holds — an evicted-but-unmodified document is not re-exported (and
      * re-evicted) on every pass; the body comes back only when upstream changes or a targeted refresh
-     * asks for it. Native bulk UPDATE carrying the {@code workspace_id} predicate. Returns rows affected.
+     * asks for it. Returns rows affected.
      */
     @Modifying
     @Transactional

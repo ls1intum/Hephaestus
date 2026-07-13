@@ -51,15 +51,6 @@ import org.springframework.stereotype.Service;
  * point: per-scope consumers, the installation-wide consumer, lifecycle, reconnect, and
  * the per-message dispatch path.
  *
- * <h2>Collaborators</h2>
- * <ul>
- *   <li>{@link IntegrationMessageDispatcher} — vendor-agnostic subject → handler routing.</li>
- *   <li>{@link IntegrationPoisonHandler} — NAK-with-backoff + ACK-after-N on redelivery exhaustion.</li>
- *   <li>{@link IntegrationConsumerStats} — read-side surface for the actuator probe.</li>
- *   <li>{@link ConsumerSubjectMath} — pure subject-arithmetic (wildcard filters, consumer-name conventions).</li>
- *   <li>{@link ScopeConsumer} — per-scope queue + virtual-thread dispatch.</li>
- * </ul>
- *
  * <h2>Concurrency</h2>
  * Per-scope lifecycle is gated by an in-flight {@link Set} ({@code pendingScopeSetup}) so
  * two callers can't race to create the same JetStream consumer. Connection creation is
@@ -99,7 +90,7 @@ public class IntegrationNatsConsumer {
     /**
      * JetStream consumers per scope ID. A scope may bind to more than one stream (an SCM stream plus
      * the {@code outline} stream), so each scope maps to a list of {@link ScopeConsumer}s — one per
-     * (scope, stream) with a stream-suffixed durable name so SCM and Outline durables never collide.
+     * (scope, stream).
      */
     private final Map<Long, List<ScopeConsumer>> scopeConsumers = new ConcurrentHashMap<>();
 
@@ -335,10 +326,9 @@ public class IntegrationNatsConsumer {
     // JetStream setup
 
     /**
-     * Bring the scope's set of JetStream consumers in line with its current subscription info: one
-     * consumer per (scope, stream), keyed by stream name with a stream-suffixed durable so SCM and
-     * Outline durables never collide. Existing consumers whose stream is still desired are updated
-     * in place; new streams create a fresh consumer; streams no longer desired are torn down.
+     * Bring the scope's set of JetStream consumers in line with its current subscription info:
+     * existing consumers whose stream is still desired are updated in place; new streams create
+     * a fresh consumer; streams no longer desired are torn down.
      */
     private void reconcileScope(Long scopeId) throws IOException {
         Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
@@ -572,8 +562,6 @@ public class IntegrationNatsConsumer {
         try {
             Optional<IntegrationMessageHandler> handler = dispatcher.dispatch(subject);
             if (handler.isEmpty()) {
-                // No handler — expected for events we deliberately don't process
-                // (e.g. check_run). ACK to keep the stream moving.
                 log.debug("No handler for subject, ACK-as-no-op: subject={}", sanitizeForLog(subject));
                 msg.ack();
                 return;

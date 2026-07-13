@@ -43,7 +43,6 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
     @Transactional // @Modifying query requires an active tx; JdbcTemplate shares the connection so it
     // observes the uncommitted state. The tx rolls back at test end (cleanup).
     void linkExternalActorIfAbsent_doesNotClobberAlreadySetActor() {
-        // An IdentityLink already bound to actor 1000 (the legitimate "your activity" owner).
         Account account = accountRepository.save(new Account("Victim"));
         IdentityLink link = new IdentityLink();
         link.setAccount(account);

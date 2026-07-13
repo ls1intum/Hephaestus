@@ -14,17 +14,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Unified webhook ingest controller.
- *
- * <p>{@code POST /webhooks/{kind}} is the unified vendor event entry point. Per-kind
- * routing resolves the {@link IntegrationKindRouting kind} from the path and
- * delegates to {@link WebhookIngestPipeline}, which dispatches signature
- * verification, subject derivation and JetStream publication through the per-kind
- * {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
- * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
- * GitHub, GitLab and Slack Events API all share this endpoint. Slack interactivity
- * stays on {@code /webhooks/slack/interactivity} because Slack configures it as a
- * separate Request URL and it needs a fast ACK before postback work runs.
+ * Unified webhook ingest controller: {@code POST /webhooks/{kind}} resolves the
+ * {@link IntegrationKindRouting kind} from the path and delegates to
+ * {@link WebhookIngestPipeline}. GitHub, GitLab and Slack Events API all share this
+ * endpoint. Slack interactivity stays on {@code /webhooks/slack/interactivity} because
+ * Slack configures it as a separate Request URL and it needs a fast ACK before postback
+ * work runs.
  *
  * <p>Active only on the webhook runtime role.
  */

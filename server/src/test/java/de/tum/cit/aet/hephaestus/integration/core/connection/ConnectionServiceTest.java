@@ -84,7 +84,6 @@ class ConnectionServiceTest extends BaseUnitTest {
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isEqualTo("linked");
 
-        // Exactly one audit row, carrying the correct from/to and request metadata.
         ArgumentCaptor<ConnectionAudit> audit = ArgumentCaptor.forClass(ConnectionAudit.class);
         verify(auditRepository).save(audit.capture());
         assertThat(audit.getValue().getFromState()).isEqualTo(IntegrationState.PENDING);
@@ -176,8 +175,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             )
         );
 
-        // Same-state call returns the unchanged instance without touching audit or repo,
-        // and (per the code) does NOT overwrite stateReason.
+        // Same-state no-op must NOT overwrite stateReason.
         assertThat(result).isSameAs(connection);
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isNull();
@@ -233,7 +231,6 @@ class ConnectionServiceTest extends BaseUnitTest {
             )
         );
 
-        // Idempotent short-circuit: state is NOT advanced and the row is not saved.
         assertThat(result).isSameAs(connection);
         assertThat(result.getState()).isEqualTo(IntegrationState.PENDING);
         verify(connectionRepository, never()).save(any());

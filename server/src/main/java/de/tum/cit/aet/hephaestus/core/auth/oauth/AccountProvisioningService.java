@@ -20,9 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Resolves (or just-in-time creates) the {@link Account} for a federated login, and
- * attaches {@link IdentityLink}s. Extracted from {@code HephaestusAuthSuccessHandler} so
- * the handler stays under the parameter-count limit and the provisioning logic is unit-
- * testable in isolation.
+ * attaches {@link IdentityLink}s.
  *
  * <p><strong>nOAuth defence:</strong> lookup is always {@code (provider, subject)} via
  * {@link IdentityLinkRepository#findActiveByProviderSubject}. Email is captured for
@@ -122,7 +120,6 @@ public class AccountProvisioningService {
                 registrationId,
                 link.getAccount().getId()
             );
-            // Returning login / re-affirm of an already-linked identity: no NEW link is persisted.
             return new ProvisionResult(
                 promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal)),
                 false
@@ -145,7 +142,6 @@ public class AccountProvisioningService {
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
             log.info("auth.success: linked provider={} to existing accountId={}", registrationId, account.getId());
-            // The one genuine "identity attached to an existing account" outcome.
             return new ProvisionResult(account, true);
         }
 

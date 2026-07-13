@@ -35,11 +35,7 @@ public class ConversationThreadContentSource implements ContentSource {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadContentSource.class);
 
-    /**
-     * The single context file this provider emits. A conversation-review job also carries
-     * {@code project_inventory.json} (see {@code WorkspaceInventoryContentSource}), but that provider is
-     * best-effort and workspace-scoped rather than thread-specific.
-     */
+    /** The single context file this provider emits. */
     static final String OUTPUT_KEY = OUTPUT_PREFIX + "conversation_thread.json";
 
     private final ObjectMapper objectMapper;

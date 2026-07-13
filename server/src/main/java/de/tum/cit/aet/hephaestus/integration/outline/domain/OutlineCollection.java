@@ -20,9 +20,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One Outline collection a workspace admin chose to mirror — the Outline analog of
- * {@code SlackMonitoredChannel}. A row exists only for collections that were deliberately
- * added through the admin surface; the rest of the Outline instance is never read.
+ * One Outline collection a workspace admin chose to mirror. A row exists only for collections that
+ * were deliberately added through the admin surface; the rest of the Outline instance is never read.
  *
  * <p>Carries the human-facing catalog fields (name, urlId, color, icon) captured server-side
  * at registration so the admin table renders real names, the mirror lifecycle

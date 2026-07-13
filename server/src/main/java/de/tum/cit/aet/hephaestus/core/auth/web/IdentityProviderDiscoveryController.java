@@ -71,9 +71,6 @@ public class IdentityProviderDiscoveryController {
     @PreAuthorize("permitAll()")
     @Operation(summary = "List available identity providers", operationId = "listIdentityProviders")
     public ResponseEntity<List<IdentityProviderViewDTO>> list() {
-        // The authoritative type per registration comes from the login_provider row itself — a
-        // self-hosted Outline (or GitLab) has no stable host to sniff. The host sniff below stays as
-        // the fallback for a registration without a row (defensive; the catalog is built from rows).
         Map<String, LoginProvider.ProviderType> typesByRegistrationId = loginProviderService
             .listEnabled()
             .stream()

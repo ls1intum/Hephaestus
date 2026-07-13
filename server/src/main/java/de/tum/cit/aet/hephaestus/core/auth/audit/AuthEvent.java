@@ -19,8 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed
- * by pg_partman (create-ahead + 12-month retention, oldest dropped) —
- * runs on stock Postgres with no {@code pg_partman} / custom image. Records the
+ * by pg_partman (create-ahead + 12-month retention, oldest dropped). Records the
  * {@code (account_id, acting_account_id)} pair for every impersonation so every action attributable
  * to an impersonator is reconstructible.
  *

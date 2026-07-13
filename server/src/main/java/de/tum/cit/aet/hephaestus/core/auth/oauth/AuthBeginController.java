@@ -32,8 +32,7 @@ import org.springframework.web.servlet.view.RedirectView;
  * {@code /oauth2/authorization/{registrationId}} initiation endpoint.
  *
  * <p>This is the SPA's "Sign in with X" target. The intent cookie survives the round-trip
- * to the IdP and is read by the success handler (later commit) to decide where to land
- * the user post-login.
+ * to the IdP and is read by the success handler to decide where to land the user post-login.
  */
 @ConditionalOnServerRole
 @RestController
@@ -67,7 +66,7 @@ public class AuthBeginController {
 
     @GetMapping("/login")
     @PreAuthorize("permitAll()")
-    @Hidden // Behavior endpoint; OpenAPI catalogs the public-facing surface in commit 11.
+    @Hidden
     @Operation(summary = "Begin OAuth login flow against the given registrationId")
     public RedirectView begin(
         @RequestParam("provider") String registrationId,
@@ -88,8 +87,8 @@ public class AuthBeginController {
         boolean linkMode = "link".equalsIgnoreCase(mode);
         // Link-only providers (Slack, Outline) can never begin a LOGIN — only the authenticated
         // account-linking flow may reach them. Classified by the row's TYPE, not by URL: Outline is
-        // self-hosted, so there is no stable host to sniff (and a URL sniff was already the wrong shape
-        // for Slack). AccountProvisioningService re-checks this at the callback (defence in depth).
+        // self-hosted, so there is no stable host to sniff. AccountProvisioningService re-checks this
+        // at the callback (defence in depth).
         if (!linkMode && provider.get().getType().isLinkOnly()) {
             return new RedirectView("/auth/error?code=link_requires_auth", false);
         }

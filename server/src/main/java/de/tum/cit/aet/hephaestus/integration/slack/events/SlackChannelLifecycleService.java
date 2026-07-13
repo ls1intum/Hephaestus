@@ -7,20 +7,17 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Decision logic for Slack channel-lifecycle events (the bot removed, a channel archived/deleted/renamed). The manifest never subscribed to these before, so Slack-side membership/lifecycle changes silently
- * diverged from our {@code consent_state}: a channel the bot was removed from stayed {@code ACTIVE} forever (a
- * trust defect in a consent-first feature), an archived/deleted channel left a zombie allow-list row (and, for
- * deletion, lingering thread-aggregate PII), and a renamed channel showed a stale name in the admin UI and audit
- * trail indefinitely.
+ * Decision logic for Slack channel-lifecycle events (the bot removed, a channel archived/deleted/renamed),
+ * keeping {@code consent_state} and channel metadata in step with Slack-side reality.
  *
  * <p>{@code channel_unarchive}/{@code group_unarchive} are deliberately NOT subscribed: resuming monitoring is a
  * decision only a workspace admin may make through the consent control plane, never an automatic reaction to the
  * channel becoming available again.
  *
  * <p>Every method is workspace-resolution-first and best-effort: an unresolved {@code team_id} (no ACTIVE Slack
- * connection) or a missing/blank channel id is a silent no-op, matching the tolerant, guard-first
- * {@code *ForPlatformEvent} wrappers on {@link SlackChannelConsentService} this class delegates to. Nothing here
- * ever throws back into the NATS consumer.
+ * connection) or a missing/blank channel id is a silent no-op, matching the guard-first
+ * {@code *ForPlatformEvent} wrappers on {@link SlackChannelConsentService}. Nothing here ever throws back into
+ * the NATS consumer.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

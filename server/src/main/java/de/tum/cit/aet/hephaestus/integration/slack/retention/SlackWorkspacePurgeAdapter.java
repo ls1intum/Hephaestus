@@ -39,7 +39,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SlackWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 
-    /** Runs before {@code ConnectionPurgeContributor} ({@code -100}); must be strictly less than it. */
     static final int PURGE_ORDER = -200;
 
     private final SlackMessageRepository slackMessageRepository;
@@ -51,8 +50,6 @@ public class SlackWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 
     @Override
     public void deleteWorkspaceData(Long workspaceId) {
-        // Erase the derived CONVERSATION_THREAD observations/feedback before the slack_thread aggregates they point
-        // at are dropped. Scoped to CONVERSATION_THREAD + this workspace; idempotent, so a double purge is a no-op.
         conversationFeedbackErasure.eraseAllConversationForWorkspace(workspaceId);
         slackMessageRepository.deleteByWorkspaceId(workspaceId);
         slackThreadRepository.deleteByWorkspaceId(workspaceId);

@@ -203,14 +203,11 @@ public class IssueReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Posts the composed student-facing note as a comment on the issue (via the integration-resolved
-     * FeedbackChannel). Best-effort: a posting failure is logged, not thrown, so a transient delivery error
-     * never marks an otherwise-successful
-     * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
-     * already persisted above, so the formative loop is intact even if the comment does not land.
+     * Posts the composed student-facing note as an issue comment. Best-effort: a posting failure is logged,
+     * not thrown, so a transient delivery error never marks an otherwise-successful detection job FAILED.
+     * Findings are already persisted, so the formative loop is intact even if the comment does not land.
+     * Package-private for direct testing of the suppression + soft-failure contract.
      */
-    // Package-private for direct testing of the suppression + soft-failure contract (mirrors how
-    // FeedbackDeliveryService.deliverFeedback is tested), without driving the real result parser.
     void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         if (delivery == null || delivery.mrNote() == null) {
             return;
@@ -234,8 +231,6 @@ public class IssueReviewHandler implements JobTypeHandler {
                 posted = true;
                 log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
             } else {
-                // Best-effort issue post returned no comment id (vendor returned nothing without raising).
-                // Issue delivery is intentionally best-effort, so this is not fatal — but log it for diagnosis.
                 log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
         } catch (JobDeliveryException e) {
@@ -247,14 +242,11 @@ public class IssueReviewHandler implements JobTypeHandler {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
 
-        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed. A null /
-        // swallowed post means the student saw nothing — recording a DELIVERED unit (and superseding the real
-        // prior) would corrupt the ledger exactly like the PR TRANSIENT no-op (A3). Best-effort, REQUIRES_NEW +
-        // try/catch so it can never affect the issue note the developer already received. Issues have no inline
-        // placements.
+        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed: recording a
+        // DELIVERED unit (and superseding the real prior) when the student saw nothing would corrupt the ledger.
+        // Best-effort, REQUIRES_NEW + try/catch so it can never affect the note the developer already received.
+        // Issues have no inline placements.
         if (!posted) {
-            // Nothing landed (null comment id or a swallowed non-fatal error): not a DELIVERED unit — persist the
-            // composed body as FAILED for auditability, then stop.
             recordUndelivered(job, delivery);
             return;
         }

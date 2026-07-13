@@ -5,9 +5,6 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Response of Outline's {@code auth.info} identity probe: the calling user and their team.
- *
- * <p>A tolerant reader — unknown fields are ignored so an Outline-side addition never breaks the
- * connect flow. This is a raw wire record and stays inside the client package by design.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OutlineAuthInfoResponse(@Nullable Data data) {

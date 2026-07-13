@@ -64,13 +64,8 @@ import org.springframework.transaction.annotation.Transactional;
  * tombstone-by-absence sweep advance only on a CLEAN pass — full enumeration succeeded and no export was
  * skipped for budget. Visibility loss (collection absent from {@code collections.list}) records an error
  * and skips the collection but never tombstones its documents: forbidden/gone is not "documents removed".
- * An HTTP 429 aborts the pass — progress so far commits and the remainder resumes next tick.
- *
- * <p>Archive is soft/recoverable, NOT delete: {@code documents.archive} only stamps {@code archivedAt}
- * (body/hash/authors kept), and both {@code documents.list} and {@code collections.documents} exclude
- * archived documents by default, so {@link #syncOneCollection} runs one extra enumeration
- * ({@link #syncArchivedDocuments}) to keep them in the {@code seen} set — otherwise the tombstone-by-absence
- * sweep above would wipe an archived-but-recoverable document as if it had been permanently deleted.
+ * An HTTP 429 aborts the pass — progress so far commits and the remainder resumes next tick. Archived
+ * documents are never tombstoned: see {@link #syncArchivedDocuments}.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -82,10 +77,9 @@ public class OutlineDocumentSyncService {
     private static final Set<String> TOMBSTONE_EVENTS = Set.of("documents.delete", "documents.permanent_delete");
 
     /**
-     * The archive event is soft/recoverable — NOT a delete. Outline keeps an archived document's content
-     * intact and lets it be restored, so unlike {@link #TOMBSTONE_EVENTS} this never wipes the body/hash/
-     * authors; it only stamps {@code archivedAt} on the mirrored row. No API round-trip needed either: the
-     * event itself is the only fact that changed.
+     * Archive is soft/recoverable — NOT a delete. Unlike {@link #TOMBSTONE_EVENTS} this never wipes the
+     * body/hash/authors; it only stamps {@code archivedAt} on the mirrored row. No API round-trip needed:
+     * the event itself is the only fact that changed.
      */
     private static final String ARCHIVE_EVENT = "documents.archive";
 
@@ -247,11 +241,10 @@ public class OutlineDocumentSyncService {
 
     /**
      * Webhook targeted refresh of one document. Delete-shaped events tombstone the mirrored row without
-     * any call; {@link #ARCHIVE_EVENT} stamps {@code archivedAt} in place, also without a call — the
-     * body/hash/authors are untouched, since archiving is soft and recoverable. Everything else resolves
-     * metadata and exports iff its collection is a mirrored ENABLED collection: a vanished document
-     * tombstones, a live one upserts (which clears any stale {@code archivedAt} once the document is seen
-     * live again, e.g. via {@code documents.unarchive}).
+     * any call; {@link #ARCHIVE_EVENT} stamps {@code archivedAt} in place, also without a call. Everything
+     * else resolves metadata and exports iff its collection is a mirrored ENABLED collection: a vanished
+     * document tombstones, a live one upserts (which clears any stale {@code archivedAt}, e.g. after
+     * {@code documents.unarchive}).
      *
      * <p>{@code prefetchedMeta} is the webhook payload's own {@code model} — authenticated by the whole
      * envelope's HMAC, so a usable one (carrying at least an id and a collection id) is trusted as metadata
@@ -416,9 +409,7 @@ public class OutlineDocumentSyncService {
             throw e;
         } catch (OutlineApiException e) {
             String message = e.getMessage() == null ? "Outline API call failed" : e.getMessage();
-            // Unlike the catalog-refresh failure above (cosmetic, so only logged), a per-collection sync
-            // failure is a real gap in the mirror — log it so ops has a trace without having to inspect
-            // the DB, in addition to the lastSyncError the admin surface already reads.
+            // A real gap in the mirror — log for ops in addition to the lastSyncError the admin surface reads.
             log.warn(
                 "outline.sync: collection sync failed for workspaceId={}, collectionId={}: {}",
                 ctx.workspaceId(),
@@ -487,9 +478,6 @@ public class OutlineDocumentSyncService {
             }
         }
 
-        // Archived documents are excluded from documents.list/collections.documents above by default —
-        // without this second enumeration, the tombstone-by-absence sweep below would wipe a merely
-        // archived (soft, recoverable) document as if it had been permanently deleted.
         skippedForBudget += syncArchivedDocuments(ctx, collection, existing, seen, budget, now);
 
         // Coverage counters are written on EVERY full enumeration (clean or budget-exhausted): the seen
@@ -565,10 +553,8 @@ public class OutlineDocumentSyncService {
         );
         doc.setTitle(node != null && node.title() != null ? node.title() : (meta == null ? null : meta.title()));
         doc.setSlug(resolveSlug(node, meta));
-        // documents.list/collections.documents (meta from either) exclude archived documents by default, so
-        // any document reaching this normal upsert path is unambiguously live — clear a stale archivedAt the
-        // moment it is seen this way again (e.g. after documents.unarchive). A null meta (a tree-only node
-        // with no matching documents.list entry) leaves it untouched rather than guessing.
+        // meta comes from listings that exclude archived documents, so a document reaching this path is
+        // unambiguously live — clear a stale archivedAt. A null meta (tree-only node) leaves it untouched.
         if (meta != null) {
             doc.setArchivedAt(meta.archivedAt());
         }
@@ -605,16 +591,12 @@ public class OutlineDocumentSyncService {
 
     /**
      * Enumerates a collection's ARCHIVED documents (a second, separate {@code documents.list} call —
-     * Outline's default listing excludes them) and upserts each into the mirror via {@link
-     * #upsertArchived}, adding every one to {@code seen} so the caller's tombstone-by-absence sweep never
-     * touches them: an archived document is soft/recoverable, not deleted.
+     * Outline's default listing excludes them) and upserts each via {@link #upsertArchived}, adding every
+     * one to {@code seen} so the caller's tombstone-by-absence sweep never touches them: an archived
+     * document is soft/recoverable, not deleted.
      *
-     * <p><strong>Deliberately excluded from the watermark.</strong> {@code documentsSyncedThrough} is a
-     * freshness signal over the actively-edited corpus; archived documents are, by definition, not being
-     * edited, so their {@code updatedAt} never feeds {@code maxUpdatedAt} in the caller. Counting them
-     * separately in a dedicated coverage figure would be over-engineering for what the admin surface needs
-     * today — they still land in {@code documentsUpstream} (the shared {@code seen} set), so "how much of
-     * the wiki do we hold" stays accurate; only the freshness watermark stays scoped to live content.
+     * <p>Deliberately excluded from the freshness watermark ({@code documentsSyncedThrough} tracks the
+     * actively-edited corpus), but counted in {@code documentsUpstream} via the shared {@code seen} set.
      *
      * @return exports skipped for budget among the archived documents enumerated this pass
      */

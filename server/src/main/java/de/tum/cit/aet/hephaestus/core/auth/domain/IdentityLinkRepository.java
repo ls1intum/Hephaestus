@@ -55,12 +55,7 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
     )
     int touchLastLogin(@Param("id") Long id, @Param("now") Instant now);
 
-    /**
-     * Active (non-disabled) identity links for an account. Replaces a {@code findAll()}-then-filter
-     * on the JWT-issue hot path ({@code JwtPrincipalFactory.resolveLogin}) and the
-     * {@code /user/identities} read ({@code AccountService.activeIdentities}) — both ran a full table
-     * scan per call. The join column is {@code account_id}.
-     */
+    /** Active (non-disabled) identity links for an account. */
     @Query(
         """
         SELECT il

@@ -28,8 +28,6 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Filters by {@link WorkArtifact}: a PR job injects only PR-focus practices, an issue job only
  * issue-focus practices — so a diff-anchored practice never reaches an issue (and vice-versa).
- *
- * <p>Package-private; instantiated as a {@code @Bean} in {@link JobTypeHandlerConfiguration}.
  */
 class PracticeCatalogInjector {
 
@@ -44,12 +42,10 @@ class PracticeCatalogInjector {
     }
 
     /**
-     * Resolve {@code slug -> whyItMatters} (the catalogue-authored transferable principle) for the
-     * {@code focus}-scoped active practices of a workspace. The delivery layer surfaces this verbatim as the
-     * "Why this matters" feed-forward line on critiques (see {@code DeliveryComposer#appendPrinciple}). It is
-     * deliberately NOT written into the model workspace — only {@code getCriteria()} reaches the agent — so the
-     * principle stays server-controlled and cannot be fabricated or drift in model prose. Practices with a
-     * blank principle are omitted, leaving their delivery unchanged.
+     * Resolve {@code slug -> whyItMatters} for the {@code focus}-scoped active practices of a workspace,
+     * surfaced verbatim as the "Why this matters" line on critiques. Deliberately NOT written into the model
+     * workspace — only {@code getCriteria()} reaches the agent — so the principle stays server-controlled and
+     * cannot be fabricated or drift in model prose. Practices with a blank principle are omitted.
      */
     Map<String, String> whyBySlug(Long workspaceId, WorkArtifact focus) {
         return practiceRepository

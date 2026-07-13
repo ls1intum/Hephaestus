@@ -12,8 +12,6 @@ import org.jspecify.annotations.Nullable;
  * {@code url} (e.g. {@code /doc/<title-slug>-<urlId>}) is the same field the document tree exposes — the sync
  * derives the mirrored slug from it so the webhook targeted-refresh path and the full-reconcile path store
  * the identical, full slug for a document.
- *
- * <p>A tolerant reader — unknown fields are ignored. Raw wire record; stays inside the client package.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OutlineDocumentListResponse(@Nullable List<Meta> data, @Nullable OutlinePagination pagination) {

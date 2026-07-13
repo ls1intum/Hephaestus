@@ -11,8 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Wires the ShedLock {@link LockProvider} (PostgreSQL-backed via the existing app
- * {@link DataSource}) and activates {@link EnableSchedulerLock @EnableSchedulerLock}
- * so {@code @SchedulerLock} annotations on {@code @Scheduled} methods take effect.
+ * {@link DataSource}) and activates {@link EnableSchedulerLock @EnableSchedulerLock}.
  *
  * <p>Gated by the same flag as {@link ServerSchedulingConfig} — schedulers only run
  * on the server-role pod, so the lock provider has nothing to provide elsewhere.

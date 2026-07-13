@@ -25,23 +25,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service responsible for workspace activation and startup operations.
- * Handles activating workspaces on application startup, including metadata
- * population, sync orchestration, and NATS consumer initialization.
+ * Activates workspaces on application startup: metadata population, sync orchestration,
+ * and NATS consumer initialization.
  */
 @Service
 public class WorkspaceActivationService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceActivationService.class);
 
-    // Configuration
     private final NatsConnectionProperties natsProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
-    // Core repositories
     private final WorkspaceRepository workspaceRepository;
 
-    // Services — natsConsumerService absent under webhook profile (server.enabled=false);
+    // natsConsumerService is absent under the webhook profile (server.enabled=false);
     // activation paths that need it are themselves server-only.
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
@@ -49,13 +46,11 @@ public class WorkspaceActivationService {
 
     /**
      * Per-kind sync triggers, collected through the SPI so workspace activation never
-     * imports a specific provider's sync service. The dispatch dispatches strictly by the
-     * workspace's bound {@link IntegrationKind}; an unmapped kind is treated as "no sync
-     * needed for this workspace" rather than throwing — symmetric with shouldSkipActivation.
+     * imports a specific provider's sync service. An unmapped {@link IntegrationKind} is
+     * treated as "no sync needed" rather than throwing.
      */
     private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
 
-    // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceActivationService(
@@ -84,12 +79,8 @@ public class WorkspaceActivationService {
 
     /**
      * Prepare every workspace and start monitoring/sync routines for those that are ready.
-     * <p>
-     * This method runs the full GraphQL sync for each workspace, including repositories,
-     * issues, PRs, and other entities. The installation consumer has already been started
-     * by the time this runs (it only needs workspaces to exist, not the full sync).
-     * <p>
-     * Intended to run after provisioning so the workspace catalog is populated.
+     * Runs after provisioning so the workspace catalog is populated; the installation
+     * consumer is already running by then (it only needs workspaces to exist, not the full sync).
      */
     public void activateAllWorkspaces() {
         List<Workspace> workspaces = workspaceRepository.findAll();
@@ -115,13 +106,11 @@ public class WorkspaceActivationService {
 
         log.info("Activating workspaces: count={}", workspacesToActivate.size());
 
-        // Activate all workspaces in parallel for scalability.
-        // Each workspace's monitoring runs independently and can sync repos concurrently.
         List<CompletableFuture<Void>> activationFutures = workspacesToActivate
             .stream()
             .map(workspace ->
                 CompletableFuture.runAsync(() -> activateWorkspace(workspace), monitoringExecutor).exceptionally(ex -> {
-                    // Handle unexpected errors (e.g., thread pool rejection) with workspace context
+                    // Catches errors outside activateWorkspace itself, e.g. thread pool rejection.
                     log.error(
                         "Unexpected error during workspace activation: workspaceId={}, accountLogin={}",
                         workspace.getId(),
@@ -133,9 +122,7 @@ public class WorkspaceActivationService {
             )
             .toList();
 
-        // Log completion status (non-blocking)
         CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).whenComplete((result, ex) -> {
-            // Note: Individual workspace errors are logged above, this catches aggregate issues
             if (ex != null) {
                 log.error("Workspace activation completed with errors", ex);
             } else {
@@ -147,14 +134,11 @@ public class WorkspaceActivationService {
     /**
      * Checks if a workspace should skip activation based on its configuration and status.
      *
-     * <p>Provider classification is now driven by the active {@code GITHUB} / {@code GITLAB}
-     * Connection rather than the legacy {@code git_provider_mode} column. The PAT-bearing
-     * variants (GitHub PAT, GitLab PAT) require a bearer credential blob; the GitHub App
-     * variant mints installation tokens on demand, so its credential blob is intentionally
-     * empty and we must not gate activation on it.
+     * <p>The PAT-bearing variants (GitHub PAT, GitLab PAT) require a bearer credential blob;
+     * the GitHub App variant mints installation tokens on demand, so its credential blob is
+     * intentionally empty and must not gate activation.
      */
     private boolean shouldSkipActivation(Workspace workspace) {
-        // Skip non-active workspaces (SUSPENDED, PURGED) - don't waste cycles on dead workspaces
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
                 "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
@@ -171,8 +155,6 @@ public class WorkspaceActivationService {
         }
         return switch (providerKind.get()) {
             case GITHUB -> {
-                // GitHub PAT variant requires a token; App variant mints on demand and
-                // never carries a blob, so only the PAT branch gates activation.
                 if (
                     connectionService.findActiveGitHubPatConfig(workspace.getId()).isPresent() &&
                     !hasBearerToken(workspace.getId(), IntegrationKind.GITHUB)
@@ -208,7 +190,6 @@ public class WorkspaceActivationService {
 
     /** Activate a single workspace: run startup sync, then start its NATS consumer scope. */
     public void activateWorkspace(Workspace workspace) {
-        // Early exit for non-active workspaces - don't waste cycles
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.debug(
                 "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
@@ -226,8 +207,7 @@ public class WorkspaceActivationService {
         if (syncSchedulerProperties.runOnStartup()) {
             log.info("Starting monitoring on startup: workspaceId={}", workspace.getId());
 
-            // Set workspace context for the sync operations (enables proper logging via MDC).
-            // installationId is sourced from the active GitHub App connection (if any).
+            // Set workspace context for the sync operations (enables MDC logging).
             Long installationId = connectionService
                 .findActiveGitHubAppConfig(workspace.getId())
                 .map(ConnectionConfig.GitHubAppConfig::installationId)
@@ -251,9 +231,8 @@ public class WorkspaceActivationService {
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
             } catch (Exception e) {
-                // Log failure with full context - don't swallow silently.
-                // We continue to start NATS consumer so webhook events can still be processed.
-                // Missing entities from failed sync will be handled via NAK/retry.
+                // Continue to start the NATS consumer so webhook events can still be processed;
+                // entities missing from the failed sync are handled via NAK/retry.
                 log.error(
                     "Failed monitoring on startup: workspaceId={}, accountLogin={}, error={}",
                     workspace.getId(),
@@ -262,32 +241,18 @@ public class WorkspaceActivationService {
                     e
                 );
             } finally {
-                // Clear context after sync operations complete
                 WorkspaceContextHolder.clearContext();
             }
         }
 
-        // Start NATS consumer AFTER startup sync completes to avoid race conditions.
-        // The startup sync ensures all entities exist before NATS starts processing
-        // webhook events that might reference them.
+        // Start the NATS consumer AFTER startup sync so webhook events never reference
+        // entities the sync has not created yet.
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.startConsumingScope(workspace.getId()));
         }
     }
 
-    /**
-     * Ensure workspace metadata (account login) is populated. This method persists
-     * changes if metadata was missing or derived.
-     *
-     * <p>The legacy {@code git_provider_mode} derivation has been removed — provider
-     * identity is now carried by the {@code Connection} registry, which the migration
-     * backfills from the legacy columns at startup. A workspace without a Connection
-     * after backfill is simply "not yet bound to a provider" and {@link #shouldSkipActivation}
-     * handles that path by returning {@code false} (nothing to sync, nothing to gate on).
-     *
-     * @param workspace the workspace to ensure metadata for
-     * @return the workspace with metadata populated
-     */
+    /** Ensures workspace metadata (account login) is populated, persisting when it was derived. */
     @Transactional
     public Workspace ensureWorkspaceMetadata(Workspace workspace) {
         if (isBlank(workspace.getAccountLogin())) {
@@ -319,9 +284,6 @@ public class WorkspaceActivationService {
         return null;
     }
 
-    /**
-     * Extracts the owner portion from a repository name with owner (e.g., "owner/repo" -> "owner").
-     */
     private String extractOwner(String nameWithOwner) {
         if (isBlank(nameWithOwner)) {
             return null;
@@ -333,9 +295,6 @@ public class WorkspaceActivationService {
         return nameWithOwner.substring(0, idx);
     }
 
-    /**
-     * Checks if NATS should be used for the given workspace.
-     */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }

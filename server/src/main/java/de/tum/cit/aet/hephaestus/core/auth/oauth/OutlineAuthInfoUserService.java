@@ -80,8 +80,8 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
     }
 
     /**
-     * Flattens Outline's nested {@code {data:{user,team}}} payload into principal attributes. Pure —
-     * the parsing/validation policy under test. Fails closed when the user id or team id is missing.
+     * Flattens Outline's nested {@code {data:{user,team}}} payload into principal attributes.
+     * Fails closed when the user id or team id is missing.
      */
     static Map<String, Object> toAttributes(Map<String, Object> body) {
         Map<String, Object> data = nestedObject(body, "data");
@@ -102,7 +102,6 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
         putIfPresent(attributes, "name", stringValue(user, "name"));
         putIfPresent(attributes, "email", stringValue(user, "email"));
         putIfPresent(attributes, "avatar_url", stringValue(user, "avatarUrl"));
-        // Flat tenant key — AccountProvisioningService.teamIdOf resolves "team_id" without a special case.
         attributes.put(TEAM_ID_ATTRIBUTE, teamId);
         putIfPresent(attributes, "team_name", stringValue(team, "name"));
         return attributes;

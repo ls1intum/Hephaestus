@@ -58,9 +58,8 @@ public sealed interface ConnectionConfig
         }
 
         /**
-         * Returns a copy with {@link #gitlabWebhookId} replaced. Used after webhook
-         * registration / adoption to stamp the new id without mutating the persisted
-         * record. Caller pairs this with {@code connectionService.updateConfig(...)} to
+         * Returns a copy with {@link #gitlabWebhookId} replaced, stamped after webhook
+         * registration/adoption. Pair with {@code connectionService.updateConfig(...)} to
          * persist the swap atomically.
          */
         public GitLabConfig withGitlabWebhookId(@Nullable Long webhookId) {
@@ -68,9 +67,8 @@ public sealed interface ConnectionConfig
         }
 
         /**
-         * Returns a copy with {@link #gitlabGroupId} replaced. Used when the GraphQL
-         * group lookup resolves the numeric id on a workspace that was only carrying
-         * the human-readable group path.
+         * Returns a copy with {@link #gitlabGroupId} replaced, for when the GraphQL group
+         * lookup resolves the numeric id on a workspace that only carried the group path.
          */
         public GitLabConfig withGitlabGroupId(@Nullable Long groupId) {
             return new GitLabConfig(serverUrl, groupId, gitlabWebhookId, signingMode, enabledStreams);

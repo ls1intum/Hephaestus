@@ -10,10 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for {@link Workspace} entities.
- * Provides methods for finding workspaces by various identifiers.
- */
 @Repository
 @WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {

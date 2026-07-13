@@ -23,8 +23,8 @@ import org.mockito.Mock;
 /**
  * The provider maps a workspace onto one {@link StreamSubscription} per bound stream. An SCM-connected
  * workspace gets its {@code github}/{@code gitlab} stream; an Outline connection with a registered
- * subscription adds the {@code outline} stream; a workspace with only Outline gets ONLY the outline
- * stream (never the {@code github} fallthrough it used to be mislabeled with).
+ * subscription adds the {@code outline} stream; a Slack connection adds the {@code slack} stream; a
+ * workspace with only Outline binds ONLY the outline stream, never an SCM stream.
  */
 class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
 

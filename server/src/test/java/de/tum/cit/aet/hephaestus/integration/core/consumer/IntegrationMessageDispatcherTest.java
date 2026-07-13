@@ -45,10 +45,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
             ALL_PARSERS
         );
 
-        // Slack monitored-channel messages now ride the NATS framework: the subject resolves to
-        // SLACK and the SlackSubjectParser parses it, but with no handler registered the dispatcher
-        // still short-circuits to empty (the consumer ACKs and skips) — same contract as the SCM
-        // "known kind, no handler" cases above.
         assertThat(dispatcher.dispatch("slack.T0123.C456.message")).isEmpty();
     }
 
@@ -69,8 +65,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
             ALL_PARSERS
         );
 
-        // Explicit allow-list never reflects on input — bitbucket, blank, dot-less, and
-        // weird inputs all collapse to empty before any parser is consulted.
+        // All collapse to empty before any parser is consulted — the allow-list never reflects on input.
         assertThat(dispatcher.dispatch("bitbucket.foo")).isEmpty();
         assertThat(dispatcher.dispatch("bitbucket")).isEmpty();
         assertThat(dispatcher.dispatch("")).isEmpty();
@@ -107,8 +102,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     @Test
     void dispatchSkipsHandlerThatDeclaresItselfDisabled() {
         // A handler whose feature flag is off reports isEnabled()=false; the dispatcher must
-        // treat it as no handler so the consumer ACKs and skips (e.g. project/discussion sync
-        // disabled). Mirrors the pre-#1198 GitHubMessageHandlerRegistry getHandler->null gate.
+        // treat it as no handler so the consumer ACKs and skips.
         RecordingHandler disabled = new RecordingHandler(
             new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"),
             false

@@ -18,9 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>Our JWTs carry {@code sub = Account.id} (decimal), {@code jti} (UUID), and optionally
  * {@code act} (impersonator id). This is the single place those are parsed so controllers
  * stay declarative.
- *
- * <p>The resource-server chain validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder},
- * whose {@code sub} is the decimal account id; these accessors parse it directly.
  */
 public final class CurrentAccount {
 

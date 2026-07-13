@@ -37,9 +37,7 @@ import org.jspecify.annotations.Nullable;
 public class SlackMonitoredChannel {
 
     /**
-     * Per-channel consent lifecycle (value-constrained by {@code chk_slack_monitored_channel_consent}).
-     *
-     * <p>Mentoring-only, minimal state machine (no research gate, no forced wait window):
+     * Per-channel consent lifecycle (value-constrained by {@code chk_slack_monitored_channel_consent}):
      * {@code PENDING → ACTIVE → (PAUSED ⇄ ACTIVE) → REVOKED}. Discovery lands a channel in {@code PENDING};
      * a workspace admin activates it ({@code SlackChannelConsentService.transition}), which posts the in-channel
      * consent announcement and stamps {@code consentAnnouncedAt} so ingestion is forward-only (only messages after

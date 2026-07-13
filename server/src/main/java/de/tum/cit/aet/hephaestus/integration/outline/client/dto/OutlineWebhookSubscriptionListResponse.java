@@ -9,8 +9,6 @@ import org.jspecify.annotations.Nullable;
  * token owns. The registrar's self-heal pass diffs the stored subscription id against this list —
  * Outline auto-disables a subscription after repeated delivery failures, so a missing or
  * {@code enabled=false} entry means the stored id is dead and must be re-registered.
- *
- * <p>A tolerant reader — unknown fields are ignored. Raw wire record; stays inside the client package.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OutlineWebhookSubscriptionListResponse(

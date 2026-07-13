@@ -40,12 +40,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for managing repository monitoring within workspaces.
- * Handles adding, removing, and listing monitored repositories.
- *
- * <p>Workspace-agnostic: This service manages the workspace-repository mapping
- * configuration itself. All methods take workspace slug/context as parameters
- * to identify which workspace to operate on.
+ * Manages monitored repositories within workspaces. All methods take workspace
+ * slug/context as parameters to identify which workspace to operate on.
  */
 @Service
 @WorkspaceAgnostic("Manages workspace-repository mapping configuration")
@@ -53,16 +49,14 @@ public class WorkspaceRepositoryMonitorService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
 
-    // Configuration
     private final NatsConnectionProperties natsProperties;
 
-    // Core repositories
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
     private final IdentityProviderRepository gitProviderRepository;
 
-    // Services — natsConsumerService absent under webhook profile.
+    // natsConsumerService absent under webhook profile.
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitRepositoryManager gitRepositoryManager;
@@ -78,7 +72,6 @@ public class WorkspaceRepositoryMonitorService {
     private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
     private final ApplicationEventPublisher eventPublisher;
 
-    // Authoritative source for provider mode and credentials
     private final ConnectionService connectionService;
 
     public WorkspaceRepositoryMonitorService(
@@ -126,8 +119,6 @@ public class WorkspaceRepositoryMonitorService {
         this.dataSyncTriggers = triggerMap;
     }
 
-    // Public API: Get Monitored Repositories
-
     @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(String slug) {
         Workspace workspace = requireWorkspace(slug);
@@ -143,13 +134,10 @@ public class WorkspaceRepositoryMonitorService {
         return getMonitoredRepositories(requireSlug(workspaceContext));
     }
 
-    // Public API: Add Repository to Monitor
-
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
         throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
 
-        // Block repository management for GitHub App Installation workspaces
         if (isGitHubAppWorkspace(workspace)) {
             throw new RepositoryManagementNotAllowedException(slug);
         }
@@ -169,7 +157,6 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         // For GitLab PAT workspaces, the repo may not be synced yet — allow adding by name.
-        // For other modes, validate that the repository exists in the database.
         if (!isGitLabWorkspace(workspace)) {
             var repository = findRepository(nameWithOwner);
             if (repository.isEmpty()) {
@@ -198,12 +185,6 @@ public class WorkspaceRepositoryMonitorService {
         addRepositoryToMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
-    /**
-     * Batch add multiple repositories to monitor for a workspace.
-     *
-     * @param slug            the workspace slug
-     * @param namesWithOwners the repository full names (e.g., "owner/repo")
-     */
     public void addRepositoriesToMonitor(String slug, Collection<String> namesWithOwners)
         throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
         for (String nameWithOwner : namesWithOwners) {
@@ -216,12 +197,9 @@ public class WorkspaceRepositoryMonitorService {
         addRepositoriesToMonitor(requireSlug(workspaceContext), namesWithOwners);
     }
 
-    // Public API: Remove Repository from Monitor
-
     public void removeRepositoryFromMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
 
-        // Block repository management for GitHub App Installation workspaces
         if (isGitHubAppWorkspace(workspace)) {
             throw new RepositoryManagementNotAllowedException(slug);
         }
@@ -250,7 +228,6 @@ public class WorkspaceRepositoryMonitorService {
 
         deleteRepositoryMonitor(workspace, repositoryToMonitor);
 
-        // Only delete repository if no other workspace is monitoring it
         deleteRepositoryIfOrphaned(nameWithOwner);
     }
 
@@ -258,8 +235,6 @@ public class WorkspaceRepositoryMonitorService {
         throws EntityNotFoundException {
         removeRepositoryFromMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
-
-    // Public API: Installation-based Repository Monitor Management
 
     /**
      * Idempotently ensure a repository monitor exists for a given installation id
@@ -284,10 +259,8 @@ public class WorkspaceRepositoryMonitorService {
         String nameWithOwner,
         boolean deferSync
     ) {
-        // Check if installation is suspended BEFORE adding repo monitor.
-        // This prevents NATS replay from adding repos to suspended installations.
-        // Installation-bound suspension is a GitHub-App concept today; the GitLab kind
-        // does not register a tracker and the check short-circuits to "not suspended".
+        // Check suspension BEFORE adding the repo monitor so NATS replay cannot
+        // add repos to suspended installations.
         if (isInstallationSuspended(installationId)) {
             log.debug(
                 "Skipped repository monitor: reason=installationSuspended, installationId={}, repoName={}",
@@ -306,10 +279,7 @@ public class WorkspaceRepositoryMonitorService {
         return ensureRepositoryMonitorInternal(workspace, nameWithOwner, deferSync);
     }
 
-    /**
-     * Remove a repository monitor for a given installation id if it exists. No-op
-     * if missing.
-     */
+    /** Remove a repository monitor for a given installation id if it exists; no-op if missing. */
     @Transactional
     public Optional<Workspace> removeRepositoryMonitorForInstallation(long installationId, String nameWithOwner) {
         var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
@@ -329,8 +299,7 @@ public class WorkspaceRepositoryMonitorService {
         RepositoryToMonitor monitor = monitorOpt.get();
         var result = removeRepositoryMonitorInternal(workspace, monitor);
 
-        // Also delete the Repository entity if no other workspace is monitoring it
-        // This prevents orphan repos that cause permanent sync errors
+        // Orphan repos would cause permanent sync errors.
         deleteRepositoryIfOrphaned(nameWithOwner);
 
         return result;
@@ -351,7 +320,6 @@ public class WorkspaceRepositoryMonitorService {
                 String nameWithOwner = monitor.getNameWithOwner();
                 deleteRepositoryMonitor(workspace, monitor);
 
-                // Delete the Repository entity only if no other workspace is monitoring it
                 if (deleteRepositories && nameWithOwner != null) {
                     deleteRepositoryIfOrphaned(nameWithOwner);
                 }
@@ -360,24 +328,16 @@ public class WorkspaceRepositoryMonitorService {
         return workspaceOpt;
     }
 
-    /**
-     * Remove all repository monitors tied to an installation.
-     * Does not delete the Repository entities.
-     */
+    /** Remove all repository monitors tied to an installation; keeps the Repository entities. */
     @Transactional
     public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId) {
         return removeAllRepositoriesFromMonitor(installationId, false);
     }
 
     /**
-     * Creates a Repository entity and corresponding RepositoryToMonitor from a provisioning snapshot.
-     * This is used during installation provisioning to create repositories from webhook metadata.
-     *
-     * <p>Idempotent: If the repository already exists, it will be updated with the snapshot data.
-     * If the monitor already exists, no duplicate will be created.
-     *
-     * @param installationId the GitHub App installation ID
-     * @param snapshot       the repository snapshot from the webhook payload
+     * Creates a Repository entity and corresponding RepositoryToMonitor from a provisioning
+     * snapshot (webhook metadata). Idempotent: an existing repository is updated with the
+     * snapshot data; an existing monitor is left alone.
      */
     @Transactional
     public void ensureRepositoryAndMonitorFromSnapshot(
@@ -401,7 +361,6 @@ public class WorkspaceRepositoryMonitorService {
                 new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=https://github.com")
             );
 
-        // Create or update the Repository entity with organization linking
         ensureRepositoryFromSnapshot(
             workspace,
             provider,
@@ -411,13 +370,8 @@ public class WorkspaceRepositoryMonitorService {
             snapshot.isPrivate()
         );
 
-        // Create the RepositoryToMonitor if it doesn't exist.
-        // Defer sync: provisioning creates monitors in bulk; the activation phase
-        // will trigger a full sync for all repositories in the workspace.
         ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), true);
     }
-
-    // Public API: Ensure All Installation Repositories Covered
 
     /**
      * Enumerate all repositories available to the installation when repository
@@ -434,8 +388,8 @@ public class WorkspaceRepositoryMonitorService {
         Collection<String> protectedRepositories,
         boolean deferSync
     ) {
-        // Check if installation is suspended BEFORE adding repos and triggering syncs.
-        // This prevents NATS replay of old "created" events from triggering hundreds of failed syncs.
+        // Check suspension BEFORE adding repos so NATS replay of old "created" events
+        // cannot trigger hundreds of failed syncs.
         if (isInstallationSuspended(installationId)) {
             log.info("Skipped repository enumeration: reason=installationSuspended, installationId={}", installationId);
             return;
@@ -508,7 +462,6 @@ public class WorkspaceRepositoryMonitorService {
             );
 
         allowedSnapshots.forEach(snapshot -> {
-            // Create or update Repository entity with organization linking
             ensureRepositoryFromSnapshot(
                 workspace,
                 provider,
@@ -517,7 +470,6 @@ public class WorkspaceRepositoryMonitorService {
                 snapshot.name(),
                 snapshot.isPrivate()
             );
-            // Create the RepositoryToMonitor if it doesn't exist
             ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), deferSync);
         });
 
@@ -529,10 +481,7 @@ public class WorkspaceRepositoryMonitorService {
             .forEach(monitor -> removeRepositoryMonitorForInstallation(installationId, monitor.getNameWithOwner()));
     }
 
-    // Internal Helper Methods
-
     /**
-     * Finds a repository by its full name if it exists in the database.
      * Repositories are global entities (integration.scm is workspace-agnostic),
      * so this lookup is intentionally not scoped to a workspace.
      */
@@ -545,20 +494,15 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
-     * Deletes a repository only if no workspace is monitoring it.
-     * This preserves repositories that are shared across multiple workspaces.
-     * <p>
-     * Also cascades deletion to any projects owned by this repository to maintain
-     * referential integrity for the polymorphic project ownership model.
-     *
-     * @param nameWithOwner the repository full name (e.g., "owner/repo")
+     * Deletes a repository only if no workspace is monitoring it (repositories are shared
+     * across workspaces). Cascades deletion to any projects owned by this repository to
+     * maintain referential integrity for the polymorphic project ownership model.
      */
     private void deleteRepositoryIfOrphaned(String nameWithOwner) {
         if (StringUtils.isBlank(nameWithOwner)) {
             return;
         }
 
-        // Check if any workspace is still monitoring this repository
         long monitorCount = repositoryToMonitorRepository.countByNameWithOwner(nameWithOwner);
         if (monitorCount > 0) {
             log.debug(
@@ -569,7 +513,6 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        // No workspace is monitoring this repository, safe to delete
         repositoryRepository
             .findByNameWithOwner(nameWithOwner)
             .ifPresent(repository -> {
@@ -595,8 +538,6 @@ public class WorkspaceRepositoryMonitorService {
     /**
      * Persist a repository monitor and optionally trigger immediate sync.
      *
-     * @param workspace the workspace to add the monitor to
-     * @param monitor   the repository monitor to persist
      * @param deferSync if true, skip immediate sync (useful during provisioning
      *                  when activation will sync all repositories in bulk)
      */
@@ -618,10 +559,8 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
         if (repositoryAllowed) {
-            // Sync the just-persisted target through the bound kind's trigger. We pass
-            // the freshly-saved monitor's id; the trigger looks it up via the SyncTargetProvider
-            // and dispatches asynchronously. Falls back to a debug log when no trigger is
-            // registered for the active kind (e.g. PAT-only deployments without sync wiring).
+            // Sync the just-persisted target through the bound kind's trigger (async, looked up
+            // by monitor id). No trigger for the active kind = no sync wiring, not an error.
             connectionService
                 .findActiveProviderKind(workspace.getId())
                 .ifPresent(kind -> {
@@ -670,12 +609,10 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.ofNullable(workspace);
         }
 
-        // Fast path: check if already exists (covers most replay cases)
         if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner)) {
             return Optional.of(workspace);
         }
 
-        // Slow path: create new monitor with idempotent handling for race conditions
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(nameWithOwner);
         monitor.setWorkspace(workspace);
@@ -683,7 +620,6 @@ public class WorkspaceRepositoryMonitorService {
         try {
             persistRepositoryMonitor(workspace, monitor, deferSync);
         } catch (DataIntegrityViolationException e) {
-            // Another message already created this monitor - we're idempotent, this is fine
             log.debug(
                 "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
                 LoggingUtils.sanitizeForLog(nameWithOwner),
@@ -704,26 +640,14 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
-     * Creates or updates a Repository entity from a snapshot (installation enumeration or provisioning).
-     * This ensures the repository exists in the database with basic metadata from the payload.
-     *
-     * <p>Note: Repositories are global entities (integration.scm is workspace-agnostic).
-     * The workspace-repository association is managed through RepositoryToMonitor.
-     *
-     * <p>The organization is obtained from the workspace to ensure repositories from
-     * organization installations have the proper organization_id set.
+     * Creates or updates a Repository entity from a snapshot (installation enumeration or
+     * provisioning). The organization comes from the workspace so repositories from
+     * organization installations get the proper organization_id.
      *
      * <p>Uses a native SQL upsert ({@code INSERT ... ON CONFLICT DO UPDATE}) to atomically
      * handle concurrent inserts from NATS event processing and GraphQL sync, eliminating
      * optimistic locking errors. Visibility and HTML URL are derived inside the SQL from
      * {@code isPrivate} and {@code nameWithOwner} respectively.
-     *
-     * @param workspace     the workspace (used to get the organization)
-     * @param provider      the resolved IdentityProvider instance
-     * @param nativeId      the provider's original numeric ID for the repository
-     * @param nameWithOwner the full name (e.g., "owner/repo")
-     * @param name          the short repository name
-     * @param isPrivate     whether the repository is private
      */
     private void ensureRepositoryFromSnapshot(
         Workspace workspace,
@@ -766,11 +690,8 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     /**
-     * Dispatches the installation-suspension check across kind-specific trackers.
-     *
-     * <p>Today only the GitHub adapter contributes an impl. If a future kind also exposes
-     * an installation-suspension concept, its tracker will participate without changes
-     * here — short-circuit on the first {@code true} result.
+     * Dispatches the installation-suspension check across kind-specific trackers (today only
+     * the GitHub adapter contributes an impl); true if any tracker reports suspended.
      */
     private boolean isInstallationSuspended(long installationId) {
         for (InstallationSuspensionTracker t : suspensionTrackers.values()) {

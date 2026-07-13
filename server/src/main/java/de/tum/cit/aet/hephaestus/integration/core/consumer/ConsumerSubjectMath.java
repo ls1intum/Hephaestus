@@ -21,10 +21,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class ConsumerSubjectMath {
 
-    /**
-     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack Events API callbacks publish as
-     * {@code slack.<team>.<scope>.<event>}; Slack interactivity/button postbacks carry no subject.
-     */
+    /** Subject-prefix allow-list — the kinds that publish to JetStream. */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
         "github",
         IntegrationKind.GITHUB,
@@ -36,9 +33,7 @@ public final class ConsumerSubjectMath {
         IntegrationKind.OUTLINE
     );
 
-    private ConsumerSubjectMath() {
-        // utility class - no instances
-    }
+    private ConsumerSubjectMath() {}
 
     // Subject prefix construction (publisher-mirror)
 
@@ -116,17 +111,11 @@ public final class ConsumerSubjectMath {
 
     /**
      * Wildcard subject filter that matches every installation-level event for the given
-     * {@link IntegrationKind}. Today only GitHub publishes installation events (GitLab
-     * uses PAT-based auth and has no installation concept); the kind is taken as a
-     * parameter so the SPI signature stays vendor-neutral and new installation-capable
-     * vendors can plug in without renaming the call site.
+     * {@link IntegrationKind}. Only GitHub publishes installation events today; the kind
+     * stays a parameter so the SPI signature remains vendor-neutral.
      *
-     * @param kind installation-aware kind. Must be {@link IntegrationKind#GITHUB} today;
-     *             any other kind throws {@link UnsupportedOperationException} with a
-     *             clear message rather than silently producing a bogus filter.
      * @return the subject e.g. {@code github.?.?.>}
-     * @throws UnsupportedOperationException if {@code kind} does not yet have installation
-     *             semantics (anything other than GITHUB today).
+     * @throws UnsupportedOperationException if {@code kind} has no installation semantics
      */
     public static String installationAwareSubjectFilter(IntegrationKind kind) {
         if (kind == null) {
@@ -143,12 +132,8 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Resolves the NATS stream name for an {@link IntegrationKind}. Currently a 1:1 mapping
-     * (GitHub → {@code "github"}, GitLab → {@code "gitlab"}); kinds without a stream return
-     * {@link Optional#empty()} so callers can short-circuit without exceptions on the path.
-     *
-     * <p>Slack maps to the {@code "slack"} stream (monitored-channel {@code message} ingest).
-     * A null kind returns {@link Optional#empty()} so callers can short-circuit on the path.
+     * Resolves the NATS stream name for an {@link IntegrationKind}; a null kind returns
+     * {@link Optional#empty()} so callers can short-circuit on the path.
      */
     public static Optional<String> streamNameFor(@Nullable IntegrationKind kind) {
         if (kind == null) {
@@ -201,8 +186,7 @@ public final class ConsumerSubjectMath {
 
     /**
      * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns
-     * {@link Optional#empty()} for null, blank, dot-less, or unknown prefixes. Never
-     * reflects on input.
+     * {@link Optional#empty()} for null, blank, dot-less, or unknown prefixes.
      */
     public static Optional<IntegrationKind> kindFromSubjectPrefix(@Nullable String fullSubject) {
         if (fullSubject == null || fullSubject.isBlank()) {
@@ -217,9 +201,7 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Builds the durable consumer name for a scope. Format:
-     * {@code <base>-scope-<scopeId>}. Returned name is suitable for direct use as a
-     * JetStream durable identifier.
+     * Builds the durable consumer name for a scope. Format: {@code <base>-scope-<scopeId>}.
      */
     public static String scopeConsumerName(String baseConsumerName, long scopeId) {
         if (baseConsumerName == null || baseConsumerName.isBlank()) {

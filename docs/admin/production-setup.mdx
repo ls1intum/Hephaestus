@@ -59,7 +59,7 @@ If you run the webhook receiver on a separate public host, route only `/webhooks
 public prefix if you use one) must reach the application-server role.
 
 The bot token scope set (`SlackConnectionStrategy.DEFAULT_SCOPES`) stays minimal — every scope maps to a
-feature the shipped code actually exercises:
+feature the code exercises:
 
 | Scope | Feature |
 | --- | --- |
@@ -86,22 +86,16 @@ their Slack identity to their Hephaestus account.
 
 Do not add unused broad scopes such as `chat:write.public`, `commands`, `team:read`,
 `app_mentions:read`, `im:write`, `mpim:read`, or `users:read.email` unless code is added that
-actually uses them. `channels:join` is intentionally present so Hephaestus can join selected
-public channels from the admin picker.
+actually uses them.
 
-Subscribe to the bot events listed under `settings.event_subscriptions` in
-[`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) — the manifest is the single
-source of truth for event subscriptions, so do not duplicate the list here. It covers the DM/channel
-`message` events that drive mentor turns and channel ingestion, the channel-lifecycle events
-(`channel_archive`, `channel_deleted`, `channel_left`, `channel_rename`, `group_archive`, `group_left`,
-`group_rename`) that keep the monitored-channel allow-list in sync, and the app-lifecycle events
-(`app_home_opened`, `app_context_changed`, `app_uninstalled`, `tokens_revoked`).
+Use [`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) as the dashboard baseline —
+it is the single source of truth for scopes, event subscriptions, and request URLs. Its
+`settings.event_subscriptions` list covers the DM/channel `message` events that drive mentor turns and
+channel ingestion, the channel-lifecycle events that keep the monitored-channel allow-list in sync, and
+the app-lifecycle events.
 
 The nightly Slack history-reconciliation sweep replays `conversations.history` for already-consented
 channels through this same bot token, so it needs no scopes beyond the set above.
-
-Use [`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) as the dashboard
-baseline so scopes, events, and request URLs do not drift from the code.
 
 ### GitHub integration
 

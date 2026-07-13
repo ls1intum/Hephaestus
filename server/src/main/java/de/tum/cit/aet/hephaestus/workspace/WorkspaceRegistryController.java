@@ -31,9 +31,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Workspace registry endpoints that operate outside of a specific workspace slug.
- * These routes stay under the classic /workspaces base path while slugged routes
- * live in {@link WorkspaceController} via {@code @WorkspaceScopedController}.
+ * Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
+ * slugged routes live in {@link WorkspaceController} via {@code @WorkspaceScopedController}.
  */
 @RestController
 @RequestMapping("/workspaces")
@@ -69,9 +68,7 @@ public class WorkspaceRegistryController {
     public ResponseEntity<WorkspaceDTO> createWorkspace(
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
-        // Actor gate (configurable). ADMIN_ONLY (default) restricts creation to instance admins; flip to
-        // SELF_SERVICE to let any authenticated user create a workspace. Orthogonal to per-provider
-        // availability (the GitLab feature flag below).
+        // Actor gate; orthogonal to per-provider availability (the GitLab feature flag below).
         if (
             workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY &&
             !SecurityUtils.isSuperAdmin()
@@ -89,8 +86,7 @@ public class WorkspaceRegistryController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GitLab workspace creation is not enabled");
         }
 
-        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity. This provisions
-        // the User entity from the account's GitLab IdentityLink, or returns 409 if none is linked.
+        // Provisions the User entity from the account's GitLab IdentityLink, or returns 409 if none is linked.
         if (createWorkspaceRequest.kind() == IntegrationKind.GITLAB) {
             workspaceProvisioningService.ensureAuthenticatedUserExists();
         }

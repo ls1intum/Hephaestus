@@ -165,7 +165,6 @@ class AccountServiceTest extends BaseUnitTest {
         verify(auditWriter).write(event.capture());
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.APP_ROLE_CHANGED);
         assertThat(event.getValue().details()).contains("\"from\":\"USER\"", "\"to\":\"APP_ADMIN\"");
-        // Promotion never needs the admin-count query.
         verify(accountRepository, never()).findByAppRoleAndStatusForUpdate(any(), any());
         // Promotion does NOT revoke sessions — the new role is picked up on the next silent refresh,
         // so the user is not forced to re-login.
@@ -258,7 +257,6 @@ class AccountServiceTest extends BaseUnitTest {
 
         service.softDelete(2L, null);
 
-        // No-op: cooldown clock untouched, nothing re-saved/revoked/audited.
         assertThat(account.getDeletedAt()).isEqualTo(cooldownStart);
         verify(accountRepository, never()).save(any());
         verify(issuedJwtRepository, never()).revokeAllForAccount(anyLong(), any(), any());

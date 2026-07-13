@@ -29,9 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Outline-owned implementation of the agent {@link DocumentProjection} SPI: projects the mirrored
  * {@code outline_document} rows into the flat, agent-facing view the documentation content source materialises.
- * This is the sole agent-facing reader of the mirror — the agent consumes the projected payload through the SPI,
- * never the schema, so a column rename in {@code outline_document} is a compile-and-SQL change <em>inside
- * Outline</em>, not a silent runtime break in the agent.
+ * This is the sole agent-facing reader of the mirror — the agent consumes the projected payload through the
+ * SPI, never the schema.
  *
  * <p><strong>Tombstones and evictions.</strong> A document removed upstream ({@code deleted_at} set) or whose body
  * was evicted under the size cap comes back as a marker ({@code deleted = true} / {@code bodyMarkdown = null})
@@ -119,10 +118,9 @@ public class OutlineDocumentProjector implements DocumentProjection {
             if (lastSlash >= 0 && lastSlash < trimmed.length() - 1) {
                 tokens.add(lastSegment);
             }
-            // Defense-in-depth: a row synced before the webhook path stored the full slug may still carry
-            // only the short Outline urlId (e.g. "psUl8qCles") as its slug. A full-URL-shaped reference's
-            // trailing "-<urlId>" segment (e.g. "setup-guide-psUl8qCles") lets such a legacy row still
-            // resolve without waiting for the next full reconcile.
+            // Defense-in-depth: a mirrored row may carry only the short Outline urlId (e.g. "psUl8qCles")
+            // as its slug; the trailing "-<urlId>" segment of a full-URL-shaped reference
+            // (e.g. "setup-guide-psUl8qCles") lets such a row still resolve.
             int lastDash = lastSegment.lastIndexOf('-');
             if (lastDash >= 0 && lastDash < lastSegment.length() - 1) {
                 String urlIdCandidate = lastSegment.substring(lastDash + 1);

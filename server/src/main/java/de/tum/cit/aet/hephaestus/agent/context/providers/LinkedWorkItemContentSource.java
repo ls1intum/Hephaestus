@@ -124,7 +124,6 @@ public class LinkedWorkItemContentSource implements ContentSource {
         return request instanceof ContextRequest.PracticeReviewRequest;
     }
 
-    /** Cross-context enrichment: never abort the job if linkage cannot be resolved. */
     @Override
     public boolean required() {
         return false;
@@ -148,7 +147,6 @@ public class LinkedWorkItemContentSource implements ContentSource {
                 return;
             }
 
-            // Resolve closing vs. bare numbers from the PR body (metadata first, DB fallback for branches).
             PullRequest pullRequest =
                 pullRequestId == null ? null : pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
@@ -158,8 +156,6 @@ public class LinkedWorkItemContentSource implements ContentSource {
                 pullRequest != null ? pullRequest.getHeadRefName() : null
             );
 
-            // closing[number]=true|false (closing wins on conflict); insertion order preserved.
-            // resolvedFrom records which signals actually yielded a reference.
             Refs refs = new Refs();
 
             collectFromText(body, refs, "body");
@@ -201,7 +197,6 @@ public class LinkedWorkItemContentSource implements ContentSource {
             files.put(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), resolvedFrom={}", items.size(), refs.resolvedFrom);
         } catch (Exception e) {
-            // Best-effort: cross-context enrichment must never fail the job.
             log.warn("LinkedWorkItemContentSource failed, continuing without linkage: {}", e.getMessage());
         }
     }
@@ -253,8 +248,6 @@ public class LinkedWorkItemContentSource implements ContentSource {
         }
         return node;
     }
-
-    // Reference collection
 
     private void collectFromText(String text, Refs refs, String source) {
         if (text == null || text.isBlank()) {
@@ -340,15 +333,12 @@ public class LinkedWorkItemContentSource implements ContentSource {
                 if (subject == null || subject.isBlank()) {
                     continue;
                 }
-                // collectFromText records any matched number and tags resolvedFrom("commits") itself.
                 collectFromText(subject, refs, "commits");
             }
         } catch (Exception e) {
             log.debug("Commit-subject scan for linked work items skipped: {}", e.getMessage());
         }
     }
-
-    // Helpers
 
     private static Integer parseNumber(String raw) {
         try {
@@ -370,12 +360,12 @@ public class LinkedWorkItemContentSource implements ContentSource {
     }
 
     /**
-     * Accumulates distinct issue numbers with their closing/bare classification, preserving
-     * first-seen order, plus the ordered set of signals that produced at least one reference.
+     * Accumulates distinct issue numbers with their closing/bare classification (closing wins on
+     * merge), preserving first-seen order, plus the ordered set of signals that produced at least
+     * one reference.
      */
     private static final class Refs {
 
-        // number -> closingKeyword, first-seen order preserved; closing wins on merge.
         private final LinkedHashMap<Integer, Boolean> numbers = new LinkedHashMap<>();
         private final LinkedHashSet<String> resolvedFrom = new LinkedHashSet<>();
 

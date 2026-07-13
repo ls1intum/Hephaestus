@@ -116,9 +116,8 @@ public class AgentJobService {
      * Build a detached PR review submission request from an already-loaded entity. Reads the PR's lazy
      * associations (repository/author via {@link ScmEventPayload.PullRequestData#from}), so it MUST be called
      * inside the caller's open session/transaction. Returns {@code null} when the branch refs needed to
-     * clone/diff are absent (a merged PR retains them). Used by the dev-trigger path, where the controller
-     * keeps load + gate + this build inside one {@link TransactionTemplate} and then submits OUTSIDE it via
-     * {@link #submitPrepared} — because {@link #submit} forbids an outer transaction (SYSTEMIC #5).
+     * clone/diff are absent (a merged PR retains them). Callers must then submit OUTSIDE that
+     * transaction via {@link #submitPrepared}, honouring {@link #submit}'s no-outer-transaction contract.
      */
     @Nullable
     PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable String triggerEvent) {
@@ -161,8 +160,8 @@ public class AgentJobService {
 
     /**
      * Submit a prepared dev request and render the result message. Invoked by the dev-trigger controller
-     * AFTER the load/gate/build transaction has committed, so {@link #submit}'s no-outer-transaction contract
-     * (SYSTEMIC #5) is honoured.
+     * AFTER the load/gate/build transaction has committed, honouring {@link #submit}'s
+     * no-outer-transaction contract.
      */
     public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
         Optional<AgentJob> job = submit(workspaceId, jobType, request);
@@ -192,18 +191,15 @@ public class AgentJobService {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // 1. Resolve which config(s) run (see resolvePracticeConfigs).
         List<AgentConfig> configs = resolvePracticeConfigs(workspace);
         if (configs.isEmpty()) {
             log.debug("No agent config to run practice detection: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
-        // 2. Handler creates submission (metadata + base idempotency key)
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        // 3. Submit a job for each resolved config (each in its own transaction)
         AgentJob firstJob = null;
         for (AgentConfig config : configs) {
             AgentJob job = submitForConfig(workspace, config, jobType, submission);
@@ -296,9 +292,8 @@ public class AgentJobService {
             job.setWorkspace(workspace);
             job.setConfig(config);
             job.setJobType(jobType);
-            // Stamp the polymorphic subject discriminator from the job type so downstream dispatch (e.g.
-            // DiffNotePoster short-circuits when subjectClass != PULL_REQUEST) is driven off an explicit
-            // value rather than the legacy PULL_REQUEST backfill. Wires SLACK_MESSAGE_THREAD.
+            // Explicit subject discriminator drives downstream dispatch (e.g. DiffNotePoster
+            // short-circuits when subjectClass != PULL_REQUEST).
             job.setSubjectClass(subjectClassFor(jobType));
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
@@ -372,11 +367,7 @@ public class AgentJobService {
      * @return the job after delivery attempt
      */
     public AgentJob retryDelivery(Long workspaceId, UUID jobId) {
-        // CAS: atomically transition FAILED → PENDING (prevents concurrent retry races).
-        // Only FAILED is allowed as source — including PENDING would let two concurrent retries
-        // both CAS successfully (PENDING→PENDING is a no-op that returns updated=1).
         int updated = transactionTemplate.execute(status -> {
-            // Verify the job exists in this workspace first
             agentJobRepository
                 .findByIdAndWorkspaceId(jobId, workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
@@ -498,7 +489,7 @@ public class AgentJobService {
             .findByIdAndWorkspaceId(jobId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
 
-        // Split deployment: ask the owning worker to stop its container over the WSS channel (#1138).
+        // Split deployment: ask the owning worker to stop its container over the WSS channel (ADR 0009).
         // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
         workerJobCancelDispatcher.ifPresent(d -> d.dispatch(fresh.getWorkerId(), jobId, "user-cancel"));
 
@@ -514,14 +505,6 @@ public class AgentJobService {
         return fresh;
     }
 
-    // Cooldown helpers
-
-    /**
-     * Extract the (PR, phase)-scoped prefix from an idempotency key by stripping the trailing freshness
-     * segment (the commit SHA for PRs, the updatedAt version for issues).
-     * Input: {@code "pr_review:owner/repo:42:authoring:abc123"} → Output: {@code "pr_review:owner/repo:42:authoring:"}
-     * This allows LIKE-matching against any freshness for the same (PR, phase).
-     */
     /**
      * The persisted {@link SubjectClass} discriminator for a job type. Exhaustive over
      * {@link AgentJobType} so a new job type must declare its subject class here (compile gate).
@@ -534,10 +517,12 @@ public class AgentJobService {
         };
     }
 
+    /**
+     * Strip the trailing freshness segment (commit SHA / updatedAt) from an idempotency key of the form
+     * {@code "<type>:{nameWithOwner}:{number}:{phase}:{freshness}"}, preserving the (number, phase) scope
+     * so cooldown can LIKE-match any freshness of the same subject.
+     */
     static String extractCooldownKeyPrefix(String idempotencyKey) {
-        // The key format is "<type>:{nameWithOwner}:{number}:{phase}:{freshness}" — only the trailing
-        // freshness segment is stripped, so the (number, phase) scope is preserved.
-        // We want everything up to and including the last ':' before the freshness.
         int lastColon = idempotencyKey.lastIndexOf(':');
         if (lastColon > 0) {
             return idempotencyKey.substring(0, lastColon + 1);

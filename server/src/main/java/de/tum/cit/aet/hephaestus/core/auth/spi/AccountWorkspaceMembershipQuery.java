@@ -12,7 +12,7 @@ import java.util.Set;
  * resolved login set; the {@code workspace} module resolves {@code login → User → membership}
  * internally. This keeps the boundary clean: {@code core.auth} never imports workspace domain
  * types, and {@code workspace} never imports auth domain types — the contract lives here and is
- * implemented in {@code workspace} (dependency inversion, same shape as {@link AccountRoleQuery}).
+ * implemented in {@code workspace}.
  */
 public interface AccountWorkspaceMembershipQuery {
     /**

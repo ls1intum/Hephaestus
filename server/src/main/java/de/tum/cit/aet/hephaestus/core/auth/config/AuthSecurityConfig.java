@@ -58,8 +58,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * silently create a session that the callback request on a different pod could not see.
  *
  * <p>Everything outside the URLs above is handled by the resource-server chain, which
- * validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder} (replaces the former
- * Keycloak setup; ADR 0017).
+ * validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder} (ADR 0017).
  */
 @ConditionalOnServerRole
 @Configuration
@@ -67,14 +66,8 @@ public class AuthSecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthSecurityConfig.class);
 
-    /** github.com's user-info API host — selects the email-enriching user service (see {@link #isGitHub}). */
     private static final String GITHUB_USERINFO_PREFIX = "https://api.github.com";
 
-    /**
-     * Routes OUTLINE-typed registrations to {@link OutlineAuthInfoUserService} (see
-     * {@link #oauthUserService()}). Outline is self-hosted, so unlike GitHub there is no stable host to
-     * sniff — the {@code login_provider} row's type is the signal.
-     */
     private final LoginProviderRepository loginProviderRepository;
 
     public AuthSecurityConfig(LoginProviderRepository loginProviderRepository) {
@@ -149,13 +142,11 @@ public class AuthSecurityConfig {
         };
     }
 
-    /** A registration is GitHub when its user-info endpoint is github.com's API ({@code api.github.com}). */
     private static boolean isGitHub(ClientRegistration registration) {
         String userInfoUri = registration.getProviderDetails().getUserInfoEndpoint().getUri();
         return userInfoUri != null && userInfoUri.startsWith(GITHUB_USERINFO_PREFIX);
     }
 
-    /** A registration is Outline when its {@code login_provider} row is OUTLINE-typed (self-hosted → no host sniff). */
     private boolean isOutline(ClientRegistration registration) {
         return loginProviderRepository
             .findByRegistrationId(registration.getRegistrationId())
@@ -198,8 +189,6 @@ public class AuthSecurityConfig {
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
                 oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
                 oauth.successHandler(successHandler);
-                // Audit failed logins (LOGIN_FAILED) + redirect the SPA to its error page; see
-                // HephaestusAuthFailureHandler.
                 oauth.failureHandler(failureHandler);
             });
 
@@ -217,10 +206,8 @@ public class AuthSecurityConfig {
      * tolerated only for dev / CI where we generate a per-boot ephemeral key and log a
      * warning (in-flight logins are abandoned across restarts).
      *
-     * <p>In the {@code prod} profile a blank key is fatal (fail-closed) — mirroring
-     * {@code JwtSigningKeySealer}'s prod fail-fast — because an ephemeral key silently
-     * invalidates every in-flight login on each pod restart and differs per replica, which
-     * {@link AuthProperties} documents as a misconfiguration rather than a degraded mode.
+     * <p>In the {@code prod} profile a blank key is fatal (fail-closed) — an ephemeral key silently
+     * invalidates every in-flight login on each pod restart and differs per replica.
      */
     static byte[] resolveStateCookieKey(AuthProperties properties, boolean prodProfile) {
         if (!properties.stateCookieKey().isBlank()) {

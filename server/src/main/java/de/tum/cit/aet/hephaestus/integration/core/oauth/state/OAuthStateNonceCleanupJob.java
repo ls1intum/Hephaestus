@@ -16,18 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Daily sweeper for {@link OAuthStateNonce} rows older than the configured retention
- * window. With a 10-minute HMAC TTL, anything past a few hours is guaranteed
- * unrecoverable — keeping the table empty bounds storage and keeps the
- * {@link OAuthStateNonceRepository#markConsumed} hot path cheap.
- *
- * <p><b>Multi-pod safety.</b> Wrapped in {@link SchedulerLock @SchedulerLock} so
- * concurrent server pods don't both race the DELETE. {@code lockAtMostFor=PT10M}
- * is generous for what amounts to one indexed range delete.
- *
- * <p>Retention defaults to 7 days via
- * {@code hephaestus.integration.oauth-state.nonce-retention} — anything longer
- * means a vendor callback that took DAYS to arrive, which is well past every
- * sensible TTL. Shorten in tests via the property.
+ * window (default 7 days, {@code hephaestus.integration.oauth-state.nonce-retention}).
+ * With a 10-minute HMAC TTL, anything past a few hours is guaranteed unrecoverable —
+ * pruning bounds storage and keeps the {@link OAuthStateNonceRepository#markConsumed}
+ * hot path cheap. {@link SchedulerLock @SchedulerLock} keeps concurrent server pods
+ * from racing the DELETE.
  */
 @ConditionalOnServerRole
 @Component
@@ -63,7 +56,6 @@ public class OAuthStateNonceCleanupJob {
             .register(meterRegistry);
     }
 
-    /** Runs daily at 04:00 server time. */
     @Scheduled(cron = "0 0 4 * * *")
     @SchedulerLock(name = "oauth-state-nonce-cleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional

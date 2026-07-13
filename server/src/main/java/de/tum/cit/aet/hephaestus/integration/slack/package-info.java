@@ -27,12 +27,9 @@
         // SlackWorkspacePurgeAdapter implements the WorkspacePurgeContributor SPI so a workspace
         // PURGE cascades into a bulk delete of the four Slack-owned tables.
         "workspace::spi",
-        // SlackLeaderboardDigestPublisher subscribes to LeaderboardDigestReadyEvent.
-        // The leaderboard task owns schedule + data assembly; this adapter owns the
-        // Slack publish (block-kit build + chat.postMessage). The event payload carries
-        // LeaderboardEntryDTO (leaderboard root package), which references UserInfoDTO
-        // transitively (integration.scm.domain). Slack consumes both as read-only data —
-        // it never reaches into leaderboard repositories / services.
+        // SlackLeaderboardDigestPublisher subscribes to LeaderboardDigestReadyEvent; the leaderboard task owns
+        // schedule + data assembly, this adapter owns the Slack publish. The payload's LeaderboardEntryDTO
+        // (and transitively UserInfoDTO) is consumed as read-only data — never leaderboard repositories/services.
         "leaderboard",
         "leaderboard::spi",
         "integration.scm",
@@ -42,7 +39,7 @@
         // workspace from the payload's team_id, not the URL).
         "core",
         // SlackChannelConsentService throws the shared EntityNotFoundException (→ 404) for an unknown /
-        // cross-workspace channel, mirroring how the workspace + leaderboard controllers reuse it.
+        // cross-workspace channel.
         "core::exception",
         // SlackMentorIdentityResolver resolves a Slack (team, user) to the workspace developer login through the
         // auth SPI ports only (GitProviderRegistry + AccountIdentityQuery + AccountWorkspaceMembershipQuery) —
@@ -52,19 +49,15 @@
         // port and streams through MentorChannel (propagate pulls in UIMessageChunk + MentorTurnRequest).
         "agent::mentor-chat",
         // SlackConversationNudgeService listens to the agent-published ConversationFeedbackPreparedEvent (a
-        // type-level named interface: only the event record is exposed, the conversation-delivery internals stay
-        // module-private) to DM a count-only "feedback is waiting" doorbell.
+        // type-level named interface: only the event record is exposed).
         "agent::conversation-nudge",
-        // integration.slack.conversation implements the agent-owned conversation-source SPIs
-        // (ConversationThreadProjection / ConversationSourceLiveness / ConversationCandidateSource): Slack owns the
-        // slack_thread/slack_message/slack_monitored_channel tables and PROJECTS them to the agent through these
-        // ports, so the agent's mentor/detection read path carries no raw SQL against the Slack schema. This edge
-        // runs one way (integration.slack -> agent), the same direction as the mentor-chat and practices::spi
-        // inversions, so no bounded-context cycle forms.
+        // integration.slack.conversation implements the agent-owned conversation-source SPIs: Slack owns the
+        // slack_thread/slack_message/slack_monitored_channel tables and projects them through these ports, so the
+        // agent's read path carries no raw SQL against the Slack schema. One-way integration.slack -> agent edge,
+        // so no bounded-context cycle forms.
         "agent::conversation-source",
         // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the CONVERSATION_THREAD-derived
-        // observations/feedback via the practices-owned ConversationFeedbackErasure port (implementation lives
-        // inside practices, so this one-way integration.slack → practices::spi edge forms no module cycle).
+        // observations/feedback via the practices-owned ConversationFeedbackErasure port (one-way edge, no cycle).
         "practices::spi",
     }
 )

@@ -96,13 +96,10 @@ public class DevTriggerController {
             return "Error: workspaceId and one of prId / issueId are required";
         }
 
-        // Phase 1 (transactional): load + optional gate + build the detached request. This needs an open
-        // session for lazy associations; it deliberately does NOT call submit().
         Prepared prepared = transactionTemplate.execute(status ->
             issueId != null ? prepareIssue(issueId, triggerEvent) : preparePullRequest(prId, triggerEvent)
         );
 
-        // Phase 2 (OUTSIDE the transaction): submit, honouring submit()'s no-outer-transaction contract.
         if (prepared == null || prepared.request() == null) {
             return prepared == null ? "No submission prepared" : prepared.message();
         }

@@ -20,9 +20,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * An instance-scoped OAuth2 login provider (a sign-in option offered on the login page) — GitHub,
- * GitLab.com, or a self-hosted GitLab. Replaces the env-only defaults and the per-workspace OIDC
- * Connections with a single runtime-manageable table: a deployment ships with seeded defaults (env →
- * seed) and an instance admin can add more (e.g. a self-hosted GitLab) without a redeploy.
+ * GitLab.com, or a self-hosted GitLab. A deployment ships with seeded defaults (env → seed) and an
+ * instance admin can add more (e.g. a self-hosted GitLab) without a redeploy.
  *
  * <p>{@code registrationId} is the OAuth callback id ({@code /login/oauth2/code/{registrationId}}) and
  * what {@code IdentityLink} provider resolution and the admin allowlist key on, so it is stable and

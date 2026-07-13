@@ -25,7 +25,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Three sweeps:
  * <ol>
  *   <li><b>Orphan requeue</b> (every 20s): requeues RUNNING jobs whose owning worker's heartbeat went
- *       stale, so a sibling re-runs them within seconds rather than waiting out the full timeout (#1138).</li>
+ *       stale, so a sibling re-runs them within seconds rather than waiting out the full timeout.</li>
  *   <li><b>Zombie QUEUED</b> (every 5 min): re-publishes QUEUED jobs older than 10 minutes that were
  *       never picked up — typically a NATS publish failure after DB commit.</li>
  *   <li><b>Stale RUNNING</b> (every 2 min): the absolute-timeout backstop — marks RUNNING jobs
@@ -52,7 +52,7 @@ public class AgentJobZombieSweeper {
     /**
      * Startup grace: only consider a RUNNING job orphaned once it has been running longer than this,
      * giving a freshly-(re)connected worker time to write its first heartbeat before we reason about
-     * its liveness. Mirrors Artemis's stale-detection startup grace.
+     * its liveness.
      */
     private static final Duration ORPHAN_STARTUP_GRACE = Duration.ofSeconds(120);
 
@@ -142,7 +142,6 @@ public class AgentJobZombieSweeper {
 
         for (AgentJob job : staleJobs) {
             try {
-                // Check per-job timeout from config snapshot
                 int timeoutSeconds = getTimeoutFromSnapshot(job);
                 Duration maxLifetime = Duration.ofSeconds(timeoutSeconds).plus(RUNNING_BUFFER);
                 if (job.getStartedAt() != null && job.getStartedAt().plus(maxLifetime).isAfter(Instant.now())) {
@@ -168,7 +167,7 @@ public class AgentJobZombieSweeper {
     }
 
     /**
-     * Fast orphan recovery (#1138): requeue RUNNING jobs whose owning worker stopped heartbeating
+     * Fast orphan recovery: requeue RUNNING jobs whose owning worker stopped heartbeating
      * (crash / partition / kill), so a sibling worker picks them up within seconds instead of waiting
      * out the full job timeout. CAS-guarded so concurrent sweepers on multiple replicas can't
      * double-requeue. Jobs past the retry cap are failed. Runs more often than the absolute-timeout
@@ -227,7 +226,7 @@ public class AgentJobZombieSweeper {
     }
 
     /**
-     * Bound {@code worker_registry} growth: purge registrations whose heartbeat is long stale (#1138).
+     * Bound {@code worker_registry} growth: purge registrations whose heartbeat is long stale.
      * Workers that exit cleanly delete their own row; this reaps the rest — SIGKILLed workers and
      * {@code worker_id} churn (hostname-derived ids across pod restarts). The TTL is far longer than the
      * orphan lease, so jobs owned by such a worker are already requeued before its row is removed.

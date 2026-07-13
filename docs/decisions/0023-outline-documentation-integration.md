@@ -41,8 +41,8 @@ cross-cutting logic (context assembly, retention) treat "a documentation source"
 
 ### 2. Content source, not detection surface
 
-Outline contributes context; it produces no observations, findings, or reactions. There are no
-pre-baked Outline doc-quality practices in this iteration (an explicit non-goal). Because nothing
+Outline contributes context; it produces no observations, findings, or reactions. Pre-baked
+Outline doc-quality practices are an explicit non-goal. Because nothing
 touches the observation/finding schema, [ADR 0021](0021-findings-feedback-synthesis-seam.md) and
 [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) are untouched. Documents are
 mirrored into `outline_document` and projected to the agent through an agent-owned
@@ -86,14 +86,14 @@ material — which is why the secret rides its own encrypted field rather than t
 (`credentials_encrypted`), which models only the single API token. Rotation is a de-register/re-register
 of the subscription.
 
-**Multi-stream consumer fleet.** A workspace may now bind to more than one JetStream stream — its SCM
+**Multi-stream consumer fleet.** A workspace may bind to more than one JetStream stream — its SCM
 stream (`github`/`gitlab`) for repository/organization events and, independently, the `outline` stream
 for documentation change notifications. `NatsSubscriptionProvider.NatsSubscriptionInfo` therefore
 carries a `List<StreamSubscription>` (one `{streamName, subjects}` per stream) instead of a single
 stream name, and the consumer fleet creates one durable consumer per `(scope, stream)` with a
 stream-suffixed durable name (`…-scope-<id>-outline`) so SCM and Outline durables never collide. An
-Outline-only workspace binds solely to the `outline` stream — it is no longer mislabeled onto the
-`github` stream by the old single-stream fallback.
+Outline-only workspace binds solely to the `outline` stream (a single-stream fallback would
+mislabel it onto `github`).
 
 ### 4. SSRF posture is reuse, not new work
 
@@ -137,11 +137,9 @@ on delete) and a per-workspace least-recently-materialized size cap, with a hard
 tombstoned rows as defense-in-depth. This is a deliberate divergence from the wall-clock retention the
 messaging integration runs.
 
-## Implementation notes (2026-07-10)
+## Mechanism refinements
 
-This ADR was drafted before the collections admin plane and archive handling were designed; both
-shipped in the same branch. Recorded here rather than rewritten into the decisions above, since
-neither changes the decision, only the mechanism:
+Two mechanisms refine the decisions above without changing them:
 
 - **The collection allow-list is a live admin registry, not a static list.** "Allow-listed set of
   Outline collections" (Context, Decision 6) is implemented as the `outline_collection` table: an
@@ -151,7 +149,7 @@ neither changes the decision, only the mechanism:
   collections are mirrored; a paused collection stops syncing without losing its registration, and
   removal hard-deletes both the row and its mirrored documents.
 - **Archive is tracked as a distinct, soft/recoverable state.** Decision 6 and 7's "tombstones
-  documents that vanished upstream" describes the delete case only. In practice `OutlineDocument`
+  documents that vanished upstream" describes the delete case only. `OutlineDocument`
   carries an `archivedAt` column separate from `deletedAt`: an Outline `documents.archive` event (or a
   sync pass) stamps `archivedAt` in place — the content stays mirrored and un-tombstoned — while
   `documents.unarchive` (or the document reappearing live) clears it. The sync service enumerates
@@ -160,10 +158,10 @@ neither changes the decision, only the mechanism:
 
 ## Consequences
 
-- A documentation vendor now extends the framework with a family, a kind, a config subtype, a content
+- A documentation vendor extends the framework with a family, a kind, a config subtype, a content
   source, and an agent projection — no schema change to detection or feedback.
-- The webhook is authenticated by a per-subscription HMAC resolved in process; the generic NATS lane
-  is untouched and no `OUTLINE` stream exists.
+- The webhook is authenticated by a per-subscription HMAC resolved in process and rides the unified
+  `/webhooks/{kind}` JetStream lane on its own `outline` stream (Decision 3).
 - The SSRF surface is covered by existing, tested guards.
 - The next documentation vendor (Confluence, Notion) reuses the family, the mirror shape, the
   projection seam, and this privacy and retention posture.

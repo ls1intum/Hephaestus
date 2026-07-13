@@ -24,9 +24,7 @@ public interface InlineFindingChannel {
      * it: GitLab deletes every marker-bearing note; GitHub (whose threads cannot be deleted, only minimized)
      * minimizes each vanished thread as {@code OUTDATED}. "Append-only" therefore does NOT mean "no-op" here.
      */
-    default void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {
-        // no-op — see Javadoc: only deletable-note vendors override.
-    }
+    default void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {}
 
     /**
      * One finding to post inline. {@code recurrenceKey} carries the stable

@@ -58,7 +58,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         GitProviderRegistry gitProviderRegistry = mock(GitProviderRegistry.class);
         verifiedEmailResolver = mock(VerifiedEmailResolver.class);
         accountJitCreator = mock(AccountJitCreator.class);
-        // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
         adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
         loginProviderRepository = mock(LoginProviderRepository.class);
         var githubProvider = new LoginProvider();
@@ -70,7 +69,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         lenient()
             .when(accountRepository.save(any()))
             .thenAnswer(inv -> inv.getArgument(0));
-        // Default happy-path: the JIT creator persists and returns the supplied account.
         lenient()
             .when(accountJitCreator.create(any(), any()))
             .thenAnswer(inv -> inv.getArgument(0));
@@ -202,7 +200,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
             new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
         );
-        // adminBootstrapPolicy.shouldPromote defaults to false.
 
         var result = service.resolveOrProvision(
             "github",
@@ -307,7 +304,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             AuthIntentCookie.Intent.login(null, null)
         );
 
-        // Fail closed: return the concurrently-created winner, never a second orphan account.
         assertThat(result.account().getId()).isEqualTo(7L);
         assertThat(result.identityLinked()).isFalse();
         verify(accountRepository, never()).save(any());

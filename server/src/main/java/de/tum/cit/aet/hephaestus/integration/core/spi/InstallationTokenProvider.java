@@ -17,7 +17,6 @@ public interface InstallationTokenProvider {
     /** Get personal access token (for PAT mode — works for both GitHub and GitLab PATs). */
     Optional<String> getPersonalAccessToken(Long scopeId);
 
-    /** Get authentication mode for a scope. */
     AuthMode getAuthMode(Long scopeId);
 
     /**

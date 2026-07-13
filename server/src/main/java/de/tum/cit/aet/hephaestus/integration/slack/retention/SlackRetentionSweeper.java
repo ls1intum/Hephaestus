@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  * {@link WorkspaceAgnostic} because {@link SlackMessageRepository#findDistinctWorkspaceIds()} is an
  * unscoped native query — the tenancy inspector would otherwise reject it — and because the sweep is
  * inherently cross-workspace. Scheduling is gated to the server role, and {@link SchedulerLock}
- * stops concurrent pods from both running it (same pattern as {@code ExportRetentionSweeper}).
+ * stops concurrent pods from both running it.
  */
 @ConditionalOnServerRole
 @Component
@@ -86,10 +86,6 @@ public class SlackRetentionSweeper {
         return totalDeleted;
     }
 
-    /**
-     * The retention window for a workspace: its configured value (or the default when unset / no Slack
-     * Connection), clamped to {@value #MAX_RETENTION_DAYS}.
-     */
     private int retentionWindowDays(long workspaceId) {
         int configured = connectionService
             .findSlackNotificationConfig(workspaceId)

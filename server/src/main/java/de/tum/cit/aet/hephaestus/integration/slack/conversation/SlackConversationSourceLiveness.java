@@ -12,12 +12,9 @@ import org.springframework.stereotype.Service;
  * {@code CONVERSATION_THREAD}-derived rows may still surface, by joining {@code slack_thread} to
  * {@code slack_monitored_channel} and keeping only threads on an {@code ACTIVE} channel.
  *
- * <p><strong>Ownership.</strong> This lives in {@code integration.slack} because it reads Slack's own tables; the
- * agent {@code ConversationConsentGate} delegates here through the SPI, so the mentor derived-feedback content
+ * <p>Lives in {@code integration.slack} because it reads Slack's own tables; the agent
+ * {@code ConversationConsentGate} delegates here through the SPI, so the mentor derived-feedback content
  * sources never reach into the Slack schema.
- *
- * <p><strong>Persistence.</strong> Delegates to {@link SlackThreadRepository#findActiveThreadIds} — scoped JPQL,
- * no raw {@code JdbcTemplate}.
  */
 @Service
 public class SlackConversationSourceLiveness implements ConversationSourceLiveness {

@@ -21,21 +21,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Per-workspace Slack channel activation control plane — the admin surface that makes a monitored channel's consent
- * reachable ({@code PENDING → ACTIVE ⇄ PAUSED → REVOKED}), mirroring the repo's resource-oriented lifecycle
- * convention ({@code WorkspaceController.updateStatus → WorkspaceLifecycleService.updateStatus}: a PATCH to the
- * target state driving a guarded, idempotent {@code switch}). Slack-workspace admin ≠ Hephaestus admin, so
- * activation lives in the webapp admin plane guarded by {@link RequireAtLeastWorkspaceAdmin}, never in a Slack modal.
+ * Per-workspace Slack channel activation control plane: drives a monitored channel's consent lifecycle
+ * ({@code PENDING → ACTIVE ⇄ PAUSED → REVOKED}). Slack-workspace admin ≠ Hephaestus admin, so activation lives in
+ * the webapp admin plane guarded by {@link RequireAtLeastWorkspaceAdmin}, never in a Slack modal.
  *
- * <p>Revocation (+ erasure) is expressed only as {@code PATCH consentState=REVOKED} — there is deliberately no
- * {@code DELETE}: it would be the identical transition under different semantics, and the row is NOT removed from
- * the collection (a REVOKED row documents that a channel was revoked, and {@code register()} resurrects it to
- * {@code PENDING} when an admin sets it up again).
+ * <p>Revocation (+ erasure) is expressed only as {@code PATCH consentState=REVOKED} — deliberately no {@code DELETE}:
+ * a REVOKED row stays as an audit record, and {@code register()} resurrects it to {@code PENDING}.
  *
- * <p>The path variable is the Slack {@code C…}/{@code G…} channel id — the stable, non-enumerable natural key
- * {@code (workspace_id, slack_channel_id)}. Every method scopes on the {@link WorkspaceContext} workspace id, so a
- * channel of another workspace resolves to 404 (isolation). Illegal transitions surface as {@code 409 ProblemDetail}
- * through {@link SlackChannelControllerAdvice}; not-found / validation / auth flow through the shared advice chain.
+ * <p>The path variable is the Slack channel id — the natural key {@code (workspace_id, slack_channel_id)}. Every
+ * method scopes on the {@link WorkspaceContext} workspace id, so a channel of another workspace resolves to 404.
+ * Illegal transitions surface as {@code 409 ProblemDetail} through {@link SlackChannelControllerAdvice}.
  */
 @WorkspaceScopedController
 @RequestMapping("/slack/channels")

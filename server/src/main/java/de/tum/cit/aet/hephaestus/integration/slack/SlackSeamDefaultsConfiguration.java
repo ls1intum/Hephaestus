@@ -10,9 +10,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Registers the overridable default bean for the Slack mentor input guard.
  *
- * <p>The default uses {@code @ConditionalOnMissingBean} so a richer implementation can replace it without touching
- * the mentor flow. It lives here, on a {@code @Bean} factory method, rather than as a component-scanned
- * {@code @Component}:
+ * <p>The default lives on a {@code @Bean} factory method rather than a component-scanned {@code @Component}:
  * {@code @ConditionalOnMissingBean} is only evaluated deterministically for {@code @Bean} methods, so on a
  * scanned component it left the default unregistered and broke context startup.
  */

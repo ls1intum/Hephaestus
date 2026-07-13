@@ -21,8 +21,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Registers (and tears down) the Outline change-notification subscription for a workspace, mirroring
- * {@code GitLabWebhookService}. Runs at connect time (via the connection-lifecycle listener) and as a
+ * Registers (and tears down) the Outline change-notification subscription for a workspace.
+ * Runs at connect time (via the connection-lifecycle listener) and as a
  * self-heal inside every full reconcile: Outline auto-disables a subscription after repeated delivery
  * failures, so {@link #ensureSubscription} verifies a stored id upstream and re-registers when the
  * subscription went missing or was disabled. The subscription points at

@@ -26,12 +26,6 @@ public record EventContext(
 ) {
     private static final Logger log = LoggerFactory.getLogger(EventContext.class);
 
-    /**
-     * Creates an EventContext from a ProcessingContext.
-     *
-     * <p>Note: The provider type is resolved eagerly here because the ProcessingContext
-     * may hold a detached JPA proxy that is inaccessible outside the original session.
-     */
     public static EventContext from(ProcessingContext ctx) {
         // ProcessingContext.provider() may hold a detached JPA proxy when the
         // surrounding transaction has already committed. Best-effort eager-resolve;
@@ -61,9 +55,6 @@ public record EventContext(
         );
     }
 
-    /**
-     * Creates an EventContext for sync operations.
-     */
     public static EventContext forSync(Long scopeId, RepositoryRef repository) {
         return new EventContext(
             UUID.randomUUID(),
@@ -77,9 +68,6 @@ public record EventContext(
         );
     }
 
-    /**
-     * Creates an EventContext for sync operations with a known provider type.
-     */
     public static EventContext forSync(Long scopeId, RepositoryRef repository, IdentityProviderType providerType) {
         return new EventContext(
             UUID.randomUUID(),

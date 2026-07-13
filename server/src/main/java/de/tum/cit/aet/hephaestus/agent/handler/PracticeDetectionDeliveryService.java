@@ -98,13 +98,10 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 job.getId()
             );
-            // Empty-catalog discards fold into the discardedUnknownSlug count: with no active practices
-            // every finding's slug is unknown to this workspace, so the per-finding loop would attribute
-            // them identically — this early-return is just the bulk form of the same reason.
+            // With no active practices every slug is unknown, so the discards fold into discardedUnknownSlug.
             return new DeliveryResult(0, validFindings.size(), 0, false);
         }
 
-        // Resolve the typed target + the developer the finding is about, routing on the artifact.
         Target target = resolveTarget(job, metadata);
         Long aboutUserId = target.aboutUserId();
         WorkArtifact artifactType = target.type();
@@ -116,11 +113,8 @@ public class PracticeDetectionDeliveryService {
         boolean hasNegative = false;
         Instant observedAt = Instant.now();
 
-        // The exact correlation key persisted per finding, keyed by finding IDENTITY (not value-equality — two
-        // findings can be value-equal yet must each carry their own key). Returned so the handler stamps the
-        // SAME key onto the deliverable findings instead of recomputing it downstream, which could drift from
-        // what was persisted. Only known-slug findings are entered here; unknown-slug ones are skipped below
-        // (no key computed, never delivered), so the map aligns exactly with what the handler composes.
+        // Keyed by finding IDENTITY, not value-equality — two findings can be value-equal yet must each carry
+        // their own key. Only known-slug findings are entered; unknown-slug ones never get a key.
         Map<ValidatedFinding, String> findingFingerprints = new IdentityHashMap<>();
 
         // Current criteria-revision per practice, memoized — every finding pins to the criteria as it was
@@ -153,10 +147,6 @@ public class PracticeDetectionDeliveryService {
                     log.debug("Failed to serialize evidence, storing null: jobId={}", job.getId());
                 }
             }
-
-            // aboutUserId is whose conduct the finding is filed against — always explicit (never null): the
-            // developer for author-side practices (the whole catalogue today), the reviewer for
-            // reviewer-audience practices once they ship (ADR 0021 C2).
 
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
@@ -248,8 +238,7 @@ public class PracticeDetectionDeliveryService {
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String artifactType = metadata.has("artifact_type") ? metadata.get("artifact_type").asString() : "PULL_REQUEST";
         if (WorkArtifact.CONVERSATION_THREAD.name().equals(artifactType)) {
-            // A conversation-review job is repo-less: the subject is a settled Slack thread and the
-            // person the finding is about is carried EXPLICITLY in metadata (about_user_id), not resolved
+            // Repo-less: the subject user is carried EXPLICITLY in metadata (about_user_id), not resolved
             // from an SCM artifact author. artifactId is the slack_thread aggregate id.
             JsonNode threadIdNode = metadata.get("slack_thread_id");
             if (threadIdNode == null || threadIdNode.isNull() || !threadIdNode.isNumber()) {
@@ -303,7 +292,7 @@ public class PracticeDetectionDeliveryService {
      * The file path of a finding's first evidence location, or {@code null} when it has none (a metadata
      * practice like PR-description quality). Feeds {@link ObservationFingerprint} — the PATH only, never a line
      * number, so a finding that survives a few lines moving keeps one cross-run identity. Package-private so
-     * {@code ReactionSuppressionFilter} (B2) recomputes the same locus the SAME way.
+     * {@code ReactionSuppressionFilter} recomputes the same locus the SAME way.
      */
     static String firstLocationPath(JsonNode evidence) {
         if (evidence == null || evidence.isNull()) {

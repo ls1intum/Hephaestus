@@ -1,8 +1,8 @@
 # Migration guide — Unified integration framework (#1198 / PR #1306)
 
-Actionable, post-merge migration steps for operators upgrading from `main` to the unified
+Actionable, post-merge migration steps for operators upgrading from pre-#1198 releases to the unified
 `integration/{core,scm}` framework. Steps marked **VERIFIED** were exercised at runtime against a
-fresh database + the live GitHub App during PR review; steps marked **MANUAL** require an operator
+fresh database and a live GitHub App; steps marked **MANUAL** require an operator
 action that cannot be automated by the deploy.
 
 ## What changed (operator-relevant)
@@ -12,9 +12,9 @@ action that cannot be automated by the deploy.
   `workspace.installation_id / personal_access_token / git_provider_mode / gitlab_* / slack_* /
   leaderboard_notification_*` columns.
 - All SCM/Slack config consolidated under `hephaestus.integration.*` (was `hephaestus.scm.*` /
-  `hephaestus.gitprovider.*` / standalone Slack props). `application.yml` / `application-prod.yml`
-  in this PR are already migrated — **only out-of-band overrides (env, k8s secrets, compose) need
-  updating.**
+  `hephaestus.gitprovider.*` / standalone Slack props). The in-repo `application.yml` /
+  `application-prod.yml` are already migrated — **only out-of-band overrides (env, k8s secrets,
+  compose) need updating.**
 - Inbound webhooks moved from `POST /github` & `POST /gitlab` to a single `POST /webhooks/{kind}`
   (`github`, `gitlab`). **This is a hard cutover — there is no 308 redirect from the old paths.**
 
@@ -42,8 +42,8 @@ schema validates. The credential migration is changeset `1780313973588` →
    table (`ON CONFLICT DO NOTHING` — idempotent, safe to re-run).
 2. A **HALT guard** (`-21c`) aborts the migration if workspaces exist but no `connection` rows
    were produced *and* credentials were present — preventing the subsequent column drops from
-   destroying un-migrated credentials. (Hardened in this PR to not false-trip when every workspace
-   has a `NULL git_provider_mode`, i.e. genuinely nothing to migrate.)
+   destroying un-migrated credentials. It does not trip when every workspace has a
+   `NULL git_provider_mode`, i.e. genuinely nothing to migrate.
 3. **Drops** the legacy `workspace.*` credential columns.
 
 Because the encryption key is read during the backfill, **`HEPHAESTUS_SECURITY_ENCRYPTION_KEY`
@@ -70,7 +70,7 @@ scheduled sync backfills anything missed.
 4. Verify: a workspace's connection is `ACTIVE`, a manual sync pulls data, and a test webhook is
    received (`/actuator/health` on the webhook-server pod).
 
-## 5. Explicitly NOT in this PR (so you don't wait for them)
+## 5. Explicitly NOT in this migration (so you don't wait for them)
 
 - **No 308 redirect** from legacy `/github`·`/gitlab` (hard cutover — §3).
 - **No canonical versioned `IntegrationEvent` wire envelope** — the in-process `ScmDomainEvent`
@@ -78,15 +78,6 @@ scheduled sync backfills anything missed.
 - **No anonymous-installation bootstrap table** (waived).
 - **No JetStream DLQ** (ADR 0013 — by design).
 
-## 6. What was runtime-verified during review
-
-- Clean migration from `main` on a fresh DB (all changesets, schema validates).
-- App boots in all three runtime roles; a boot-blocking bug (OAuth-state secret unconditionally
-  required) was fixed so local dev boots without extra config.
-- **GitHub App end-to-end:** App installations auto-provisioned workspaces + `connection` rows,
-  discovered repositories, and ran incremental sync + commit backfill (issues, PRs, reviews,
-  commits, users) with **zero errors**; per-repo watermarks set for incremental re-sync.
-
-> Live webhook delivery, GitLab, Slack OAuth, and LLM-review paths were **not** exercised in the
-> review session (they need a public tunnel + live OAuth apps). Use the steps above plus the
-> service `AGENTS.md` runbooks to validate them in a staging environment.
+> Live webhook delivery, GitLab, Slack OAuth, and LLM-review paths need a public tunnel + live
+> OAuth apps to exercise. Use the steps above plus the service `AGENTS.md` runbooks to validate
+> them in a staging environment.

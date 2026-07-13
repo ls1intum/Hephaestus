@@ -41,19 +41,14 @@ import org.springframework.web.server.ResponseStatusException;
 public class LoginProviderService {
 
     static final String GITHUB_SCOPES = "read:user user:email";
-    // GitLab login uses the OAuth2 flow (userInfo = /api/v4/user, keyed on "id"), NOT OIDC — so the
-    // scope must NOT contain "openid". A request carrying "openid" makes Spring Security take the OIDC
-    // path and validate the id_token JWS via a jwkSetUri the registration never sets, which 500s the
-    // callback. "read_user" alone returns id + username + email from /api/v4/user. See ADR 0017.
+    // GitLab is plain OAuth2, NOT OIDC — scope must NOT contain "openid" (see sanitizeScopesOrThrow).
+    // "read_user" alone returns id + username + email from /api/v4/user. See ADR 0017.
     static final String GITLAB_SCOPES = "read_user";
-    // "Sign in with Slack" is OIDC (unlike the SCM providers' OAuth2 flow): the id_token carries the sub +
-    // verified team_id claim. "openid" is REQUIRED here (it makes Spring take the OIDC path); the GitLab
-    // "must not contain openid" guard in sanitizeScopesOrThrow is scoped to GITLAB, so it never fires for SLACK.
+    // "Sign in with Slack" is OIDC: the id_token carries the sub + verified team_id claim, and
+    // "openid" is REQUIRED (it makes Spring take the OIDC path).
     static final String SLACK_SCOPES = "openid profile email";
-    // Outline is a plain OAuth2 provider (NOT OIDC) — like GitLab the scope must NOT contain "openid"
-    // (enforced in sanitizeScopesOrThrow; Spring's OIDC path would 500 the callback with no jwkSetUri).
-    // "read" is Outline's read-everything scope and is sufficient for the POST /api/auth.info identity
-    // probe. The scope grammar is pinned against the self-hosted Outline E2E instance (v0.87).
+    // Outline is plain OAuth2, NOT OIDC — scope must NOT contain "openid" (see sanitizeScopesOrThrow).
+    // "read" is Outline's read-everything scope, sufficient for the POST /api/auth.info identity probe.
     static final String OUTLINE_SCOPES = "read";
     private static final String GITHUB_COM = "https://github.com";
     // The single Slack instance. Canonical origin the seeded identity_provider + SlackMentorIdentityResolver key on.
@@ -195,7 +190,7 @@ public class LoginProviderService {
                 return;
             }
             if (repository.existsByRegistrationId(id)) {
-                return; // seed-once: env is the seed, never the live source — admin edits survive reboots
+                return; // seed-once (see class javadoc)
             }
             String baseUrl;
             try {

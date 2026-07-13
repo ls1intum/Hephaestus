@@ -124,15 +124,11 @@ public class OutlineDocument {
      * {@code identity_link} lazily at projection time; no member id is stamped here.
      *
      * <p><strong>Account-erasure posture.</strong> The author subject/name columns are integration-mirror
-     * data, NOT Hephaestus account PII: they are captured from Outline's own {@code Document.createdBy}
-     * and are on the same GDPR Art. 17(3) footing as the SCM activity mirror ({@code
-     * integration.scm.domain.user.User}) that {@code AccountHardDeleteSweeper} documents. An account
-     * hard-delete severs the personal ↔ mirror association by deleting {@code identity_link} (so the
-     * Outline subject can no longer be joined back to the erased account) rather than scrubbing every
-     * workspace's mirror — the same posture Slack's ingested content follows (its person-erasure fires on
-     * Slack-side consent revocation / opt-out, not on account hard-delete). Full erasure of these columns
-     * happens with the workspace/connection purge and on tombstone. Adding an Outline-only account-erasure
-     * hook would diverge from that established repo-wide posture, so it is deliberately not done here.
+     * data, NOT Hephaestus account PII — the same GDPR Art. 17(3) footing as the SCM activity mirror. An
+     * account hard-delete severs the personal ↔ mirror association by deleting {@code identity_link} (so
+     * the Outline subject can no longer be joined back to the erased account) rather than scrubbing every
+     * workspace's mirror; an Outline-only account-erasure hook is deliberately absent. Full erasure of
+     * these columns happens with the workspace/connection purge and on tombstone.
      */
     @Column(name = "created_by_subject", length = 64)
     private @Nullable String createdBySubject;

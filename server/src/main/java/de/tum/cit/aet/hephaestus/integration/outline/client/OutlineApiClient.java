@@ -141,7 +141,6 @@ public class OutlineApiClient {
                 return all;
             }
         }
-        // The loop ran out of budget with the last page still full — more collections likely exist upstream.
         log.info(
             "outline.client: collections.list stopped at the {}-page cap ({} collections) for {} — result may be truncated",
             maxPages,
@@ -389,10 +388,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Issues one {@code POST {resolvedUrl}{path}}, retried by the {@code outlineRestApiRetry} decorator for
-     * transient failures (5xx, transport errors, 429 — the last waiting out its {@code Retry-After}). The
-     * inner call goes through the circuit breaker on every attempt, so each failure counts toward the
-     * failure rate. Permanent failures (4xx, an open breaker) are not retried.
+     * Issues one {@code POST {resolvedUrl}{path}} through the retry decorator. The inner call goes
+     * through the circuit breaker on every attempt, so each failure counts toward the failure rate.
      */
     private <T> T post(String resolvedUrl, String token, String path, Object requestBody, Class<T> responseType) {
         return retry.executeSupplier(() -> executeOnce(resolvedUrl, token, path, requestBody, responseType));

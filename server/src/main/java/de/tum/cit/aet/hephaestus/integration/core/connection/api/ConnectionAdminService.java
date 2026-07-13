@@ -160,9 +160,8 @@ public class ConnectionAdminService {
 
     /**
      * Encrypt + persist the credential bundle alongside the Connection. Null bundle is a
-     * no-op (some inline flows may persist credentials in a follow-up step). The actual
-     * encryption + algorithm-tag bookkeeping lives in {@link Connection#setCredentials}
-     * so this method stays a thin wrapper around dependency wiring.
+     * no-op (some inline flows persist credentials in a follow-up step); encryption +
+     * algorithm-tag bookkeeping lives in {@link Connection#setCredentials}.
      */
     private void persistCredentials(Connection connection, @Nullable CredentialBundle bundle) {
         if (bundle == null) {
@@ -213,7 +212,6 @@ public class ConnectionAdminService {
                 /* retentionDays */ null,
                 enabledStreams
             );
-            // Collections to mirror are registered post-connect in the outline_collection registry.
             case OUTLINE -> new ConnectionConfig.OutlineConfig(
                 userInput.getOrDefault("server_url", null),
                 /* webhookSubscriptionId */ null,

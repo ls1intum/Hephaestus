@@ -35,17 +35,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Admin control plane for the mirrored-collection registry — the Outline analog of the Slack channel
- * consent/directory services. Owns every repository touch for the collection admin surface (the
- * controller stays thin per the {@code controllersDoNotAccessRepositories} arch rule) and resolves
- * the workspace's ACTIVE Outline connection up front so every operation 404s cleanly when the
- * integration is not connected.
+ * Admin control plane for the mirrored-collection registry. Owns every repository touch for the
+ * collection admin surface (the controller stays thin per the {@code controllersDoNotAccessRepositories}
+ * arch rule) and resolves the workspace's ACTIVE Outline connection up front so every operation 404s
+ * cleanly when the integration is not connected.
  *
- * <p>Registration verifies the requested id against the live {@code collections.list} (an unknown id
- * is a 422, not a silent dead row), captures the catalog fields server-side, and kicks a targeted
- * recency-first sync off the request thread through the {@link OutlineDocumentSyncScheduler}'s
- * tenancy-bypass hop. Deliberately not transactional around live Outline calls so no pooled
- * connection is held across the wire (mirrors {@code SlackChannelDirectoryService}).
+ * <p>Deliberately not transactional around live Outline calls so no pooled connection is held across
+ * the wire.
  */
 @Service
 @ConditionalOnServerRole
@@ -223,7 +219,6 @@ public class OutlineCollectionAdminService {
             collectionId
         );
         collectionRepository.delete(row);
-        // Erase audit: who removed what, and how much mirrored content left the database with it.
         log.info(
             "outline.audit: collection erase — actor={} removed collectionId={} from the mirror for workspaceId={} ({} mirrored document(s) erased)",
             LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),

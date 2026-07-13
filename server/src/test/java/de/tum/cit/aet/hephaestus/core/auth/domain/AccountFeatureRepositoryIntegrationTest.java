@@ -17,9 +17,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Real-Postgres proof that {@code existsActiveFeatureForProviderSubject} is provider-scoped — closing
- * the cross-provider feature-flag leak the login-only lookup had. The unit test
- * ({@code AccountRoleQueryServiceTest}) stubs the repository, so only a real query can prove the
+ * Real-Postgres proof that {@code existsActiveFeatureForProviderSubject} is provider-scoped. The unit
+ * test ({@code AccountRoleQueryServiceTest}) stubs the repository, so only a real query can prove the
  * {@code (gitProviderId, subject)} join actually isolates identical usernames/subjects across SCM
  * instances. Two people can share a username (and even a numeric subject) on two providers
  * ({@code uk_user_provider_login}); one holding a flag must NOT grant it to the other.
@@ -67,11 +66,9 @@ class AccountFeatureRepositoryIntegrationTest {
         link(withFlag, PROVIDER_A, SUBJECT);
         link(withoutFlag, PROVIDER_B, SUBJECT);
 
-        // Granted-on provider resolves true...
         assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_A, SUBJECT, ROLE)).isTrue();
-        // ...the other provider's identity with the SAME subject does NOT (the leak is closed).
+        // The other provider's identity with the SAME subject must NOT carry the flag.
         assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_B, SUBJECT, ROLE)).isFalse();
-        // A different flag, and an unknown provider, both deny.
         assertThat(
             accountFeatureRepository.existsActiveFeatureForProviderSubject(PROVIDER_A, SUBJECT, "mentor_access")
         ).isFalse();

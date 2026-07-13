@@ -66,14 +66,11 @@ class StaleAuthCookieEvictionIntegrationTest {
 
     @Test
     void staleCookieDoesNotBlockPublicEndpointAndIsCleared() {
-        // A logged-out browser still holding a structurally-invalid cookie (e.g. signed by a key that
-        // rotated across a restart, or simply garbage) hits the public sign-in discovery endpoint.
         var result = webTestClient
             .get()
             .uri("/identity-providers")
             .header(HttpHeaders.COOKIE, cookieName + "=not-a-valid-jwt")
             .exchange()
-            // Served, NOT 401: the permitAll endpoint is reachable so the login page renders.
             .expectStatus()
             .isOk()
             .returnResult(Void.class);
@@ -111,13 +108,11 @@ class StaleAuthCookieEvictionIntegrationTest {
             .get()
             .uri("/user")
             .header(HttpHeaders.COOKIE, cookieName + "=" + token)
-            // A locally-valid cookie passes the filter untouched and authenticates normally.
             .exchange()
             .expectStatus()
             .isOk()
             .returnResult(Void.class);
 
-        // The filter must NOT clear a valid cookie.
         assertThat(result.getResponseCookies().getFirst(cookieName))
             .as("a valid cookie is left untouched (no clearing Set-Cookie)")
             .isNull();

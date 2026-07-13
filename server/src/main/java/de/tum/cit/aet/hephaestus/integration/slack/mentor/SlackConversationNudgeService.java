@@ -43,8 +43,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * before the send (so two same-cycle events yield one DM) and released again on a send failure.
  *
  * <p>Runs {@code @Async @TransactionalEventListener(AFTER_COMMIT)} against the preparer's REQUIRES_NEW
- * transaction (shape: {@code SlackScopeConsumerReconciler}), so it only sees committed units and a Slack outage
- * never touches the preparation path; failures are logged, never rethrown. The DM posts with the recipient's
+ * transaction, so it only sees committed units and a Slack outage never touches the preparation path;
+ * failures are logged, never rethrown. The DM posts with the recipient's
  * {@code U…} id as the channel — {@code chat.postMessage} opens the app DM itself, the same surface the Slack
  * mentor already lives in.
  */

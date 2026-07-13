@@ -11,28 +11,13 @@ import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Connection-level configuration for the integration framework's NATS surface.
+ * Owns the {@code hephaestus.sync.nats.*} property block: the connection/replay knobs shared
+ * between the JetStream publisher (inbound webhook fan-out) and the consumer fleet. Consumer-side
+ * tuning (ack-wait, max-ack-pending, poison handling, …) lives on {@link NatsConsumerProperties}
+ * under {@code hephaestus.integration.consumer.*}.
  *
- * <p>Owns the {@code hephaestus.sync.nats.*} property block that drives the JetStream
- * publisher (inbound webhook fan-out) AND the consumer fleet (per-scope + installation
- * subscriptions) — see {@code application.yml}.
- *
- * <p>The consumer-side tuning knobs (ack-wait, max-ack-pending, poison handling, …)
- * live separately on {@link NatsConsumerProperties} under
- * {@code hephaestus.integration.consumer.*}. This bean covers ONLY the
- * connection/replay knobs that are shared with the publisher half of the pipeline:
- *
- * <ul>
- *   <li>{@code enabled} — master switch (mirrors the publisher gate)</li>
- *   <li>{@code server} — NATS URL; required when enabled</li>
- *   <li>{@code durable-consumer-name} — base name for JetStream durables (one per scope
- *       plus one installation)</li>
- *   <li>{@code replay-timeframe-days} — how far back to replay on first consumer create</li>
- * </ul>
- *
- * <p><b>Note.</b> The {@code hephaestus.agent.nats.*} prefix used by the agent runtime is
- * a deliberately separate connection (different cluster in some deployments — see the
- * project memory note on "Separate NATS"). This bean does NOT bind that prefix.
+ * <p>The agent runtime's {@code hephaestus.agent.nats.*} prefix is a deliberately separate
+ * connection (different cluster in some deployments); this bean does NOT bind it.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sync.nats")
@@ -52,9 +37,6 @@ public record NatsConnectionProperties(
         }
     }
 
-    /**
-     * Connection-side knobs shared between the consumer fleet and the publisher.
-     * Ack-wait and poison handling live on {@link NatsConsumerProperties}.
-     */
+    /** Connection-side knobs shared between the consumer fleet and the publisher. */
     public record Consumer(@DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout) {}
 }

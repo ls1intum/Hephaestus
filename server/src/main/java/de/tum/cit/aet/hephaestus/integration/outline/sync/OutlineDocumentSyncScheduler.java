@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
  * {@link WorkspaceAgnostic} because the loops are inherently cross-workspace, and the {@code *Now}
  * pass-throughs exist so webhook consumers and async listeners (whose threads carry no bypass scope)
  * reach the sync service through it. Scheduling is gated to the server role, and {@link SchedulerLock}
- * stops concurrent pods from both running a loop (same pattern as {@code SlackRetentionSweeper}).
+ * stops concurrent pods from both running a loop.
  */
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

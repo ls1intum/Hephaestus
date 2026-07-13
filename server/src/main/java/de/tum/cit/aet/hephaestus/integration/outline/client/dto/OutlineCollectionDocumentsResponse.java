@@ -9,8 +9,6 @@ import org.jspecify.annotations.Nullable;
  * document id, its title, its {@code url} (the last path segment is the document slug), and its nested
  * {@code children}. The nesting is the source of a document's parent — the sync flattens the tree to learn
  * collection membership and parent relationships.
- *
- * <p>A tolerant reader — unknown fields are ignored. Raw wire record; stays inside the client package.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OutlineCollectionDocumentsResponse(@Nullable List<Node> data) {
