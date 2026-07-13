@@ -45,9 +45,8 @@ public final class TriggerEventCatalog {
 
     /**
      * The events a practice with the given focus is allowed to subscribe to. Exhaustive over
-     * {@link WorkArtifact} so a new artifact type is forced to declare its event set here instead of
-     * silently inheriting the PR events (the pre-switch ternary handed CONVERSATION_THREAD the PR set,
-     * which its quiescence-scheduled detection never consumes).
+     * {@link WorkArtifact} so a new artifact type must declare its event set here instead of silently
+     * inheriting another focus's events.
      */
     public static Set<String> eligibleFor(WorkArtifact focus) {
         return switch (focus) {

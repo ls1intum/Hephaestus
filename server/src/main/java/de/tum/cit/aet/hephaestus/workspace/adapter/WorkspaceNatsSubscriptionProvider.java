@@ -104,9 +104,8 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
 
     /**
      * The Slack stream subscription. Added when the workspace has an ACTIVE Slack connection with a
-     * team id, filtered to {@code slack.<team>.>} — one per-workspace consumer instead of a fleet-wide
-     * flat {@code slack.>} lane, so one team's message burst never delays another workspace's ingest
-     * and per-workspace ordering is preserved.
+     * team id, filtered to {@code slack.<team>.>}: one consumer per workspace, so one team's message
+     * burst never delays another workspace's ingest and per-workspace ordering is preserved.
      */
     private void addSlackSubscription(Workspace workspace, List<StreamSubscription> out) {
         connectionService

@@ -59,10 +59,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param scopeId the scope ID (must not be null)
      * @return true if the scope is active and can be synced, false otherwise
      */
-    default boolean isScopeActiveForSync(Long scopeId) {
-        // Default implementation assumes scope is active (backward compatibility)
-        return true;
-    }
+    boolean isScopeActiveForSync(Long scopeId);
 
     /**
      * Gets repository nameWithOwner values for a scope's active sync targets.

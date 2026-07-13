@@ -10,18 +10,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
-// idleHeartbeat / heartbeatRestartThreshold / heartbeatLogInterval / installationStaleAfter
-// were dropped — declared but never read. Heartbeat-alarm restart logic from the legacy
-// NatsConsumerService has not been ported.
-
 /**
  * Connection-level configuration for the integration framework's NATS surface.
  *
  * <p>Owns the {@code hephaestus.sync.nats.*} property block that drives the JetStream
  * publisher (inbound webhook fan-out) AND the consumer fleet (per-scope + installation
- * subscriptions). The prefix is preserved verbatim from the pre-unification connection
- * properties so production YAML continues to bind without an operator-facing rename —
- * see {@code application.yml}.
+ * subscriptions) — see {@code application.yml}.
  *
  * <p>The consumer-side tuning knobs (ack-wait, max-ack-pending, poison handling, …)
  * live separately on {@link NatsConsumerProperties} under

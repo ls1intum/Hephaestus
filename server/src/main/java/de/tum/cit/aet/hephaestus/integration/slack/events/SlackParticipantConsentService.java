@@ -31,19 +31,6 @@ public class SlackParticipantConsentService {
     }
 
     /**
-     * Legacy combined App Home decision. Kept only for older tests/callers; new UI should call the focused methods
-     * below so message use and research participation cannot drift from the labels.
-     */
-    @Transactional
-    public void recordAppHomeDecision(long workspaceId, String slackUserId, boolean optIn) {
-        if (slackUserId == null || slackUserId.isBlank()) {
-            return;
-        }
-        boolean optedOut = !optIn;
-        participantConsentRepository.upsert(workspaceId, slackUserId, optedOut, optedOut, SOURCE_SLACK_APP_HOME);
-    }
-
-    /**
      * Persist an ingestion-only opt-out from the in-channel notice. This excludes the person's monitored-channel
      * messages but deliberately does not change research participation.
      */

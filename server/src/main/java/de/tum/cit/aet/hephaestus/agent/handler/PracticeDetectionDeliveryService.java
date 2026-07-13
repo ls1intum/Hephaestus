@@ -241,9 +241,9 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * Route the delivery target on the job's artifact. Issue jobs carry {@code artifact_type=ISSUE} +
-     * {@code issue_id}; PR jobs carry {@code pull_request_id} (no {@code artifact_type} → defaults to PR,
-     * keeping existing PR jobs and replays working).
+     * Route the delivery target on the job's artifact. Issue and conversation jobs stamp
+     * {@code artifact_type}; PR jobs omit it by convention (they carry only {@code pull_request_id}), so
+     * the missing discriminator defaults to PULL_REQUEST.
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String artifactType = metadata.has("artifact_type") ? metadata.get("artifact_type").asString() : "PULL_REQUEST";

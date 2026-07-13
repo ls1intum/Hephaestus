@@ -50,8 +50,7 @@ class TriggerEventCatalogTest extends BaseUnitTest {
 
     @Test
     void conversationFocus_hasNoSubscribableEvents() {
-        // Conversation detection is quiescence-scheduled, not event-subscribed; the pre-switch ternary
-        // silently handed CONVERSATION_THREAD the PR events, which its scheduler never consumes.
+        // Conversation detection is quiescence-scheduled, not event-subscribed — no event may be offered.
         assertThat(TriggerEventCatalog.eligibleFor(WorkArtifact.CONVERSATION_THREAD)).isEmpty();
     }
 

@@ -27,9 +27,7 @@ public interface InstallationTokenProvider {
      * @param scopeId the scope to check
      * @return true if active, false if suspended/purged/not found
      */
-    default boolean isScopeActive(Long scopeId) {
-        return true; // Default: assume active for backward compatibility
-    }
+    boolean isScopeActive(Long scopeId);
 
     /**
      * Get the custom server URL for a scope (for self-hosted git provider instances).
