@@ -129,6 +129,7 @@ export function AppSidebar({
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
 						practicesEnabled={activeWorkspace.practicesEnabled}
 						mentorEnabled={activeWorkspace.mentorEnabled}
+						scmProviderType={activeWorkspace.providerType === "GITLAB" ? "GITLAB" : "GITHUB"}
 					/>
 				)}
 				{/* Instance-admin lives in its own /admin shell (reached via the footer entry), never in

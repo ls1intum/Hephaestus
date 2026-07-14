@@ -30,7 +30,6 @@ const healthyStatus = {
 	documentCount: 128,
 	lastSyncedAt: new Date(Date.now() - 15 * 60 * 1000),
 	syncRunning: false,
-	pendingCollections: 0,
 	erroredCollections: 0,
 };
 
@@ -210,7 +209,6 @@ export const ConnectedPollingOnly: Story = {
 			webhookRegistered: false,
 			documentCount: 0,
 			syncRunning: false,
-			pendingCollections: 0,
 			erroredCollections: 0,
 		},
 		tokenStatus: healthyToken,
@@ -242,7 +240,7 @@ export const SyncRunningWithErrors: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: { ...healthyStatus, syncRunning: true, pendingCollections: 2, erroredCollections: 1 },
+		status: { ...healthyStatus, syncRunning: true, erroredCollections: 1 },
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {

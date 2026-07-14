@@ -19,34 +19,11 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		repositories: [
-			{ nameWithOwner: "octocat/Hello-World" },
-			{ nameWithOwner: "microsoft/vscode" },
-			{ nameWithOwner: "facebook/react" },
-		],
-		isLoadingRepositories: false,
-		repositoriesError: null,
-		addRepositoryError: null,
-		isAddingRepository: false,
-		isRemovingRepository: false,
 		isResettingLeagues: false,
-		isAppInstallationWorkspace: false,
-		onAddRepository: fn(),
-		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
 		features: allOff,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
-		workspaceSlug: "demo",
-		hasSlackConnection: false,
-		slackNotificationsEnabled: false,
-		onSlackSaved: fn(),
-		slackChannels: [],
-		slackChannelCandidates: [],
-		isLoadingSlackChannels: false,
-		onRegisterSlackChannel: fn(),
-		onUpdateSlackChannelConsent: fn(),
-		onRemoveSlackChannel: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
@@ -55,20 +32,9 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const LoadingRepositories: Story = {
-	args: { isLoadingRepositories: true, repositories: [] },
+export const ResettingLeagues: Story = {
+	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },
 };
-
-export const RepositoriesError: Story = {
-	args: { repositoriesError: new Error("Failed to load repositories"), repositories: [] },
-};
-
-export const AddingRepository: Story = { args: { isAddingRepository: true } };
-
-export const ResettingLeagues: Story = { args: { isResettingLeagues: true } };
-
-/** GitHub App Installation workspace — repository management is read-only. */
-export const AppInstallationWorkspace: Story = { args: { isAppInstallationWorkspace: true } };
 
 /** Practice Review on with auto-trigger only — exercises the nested sub-toggle layout. */
 export const PracticeReviewWithSubToggles: Story = {
@@ -82,13 +48,7 @@ export const PracticeReviewWithSubToggles: Story = {
 	},
 };
 
-/** Slack connected + configured — pins that the Slack digest card renders within the page. */
-export const SlackConfigured: Story = {
-	args: {
-		hasSlackConnection: true,
-		slackChannelId: "C0974LJBPBK",
-		slackNotificationsEnabled: true,
-		slackScheduleDay: 3,
-		slackScheduleTime: "09:00",
-	},
+/** Leagues enabled — pins that the reset-leagues card renders within the page. */
+export const LeaguesEnabled: Story = {
+	args: { features: { ...allOff, leaguesEnabled: true } },
 };

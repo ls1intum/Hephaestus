@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { SlackMonitoredChannel } from "@/api/types.gen";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage, type AdminSettingsPageProps } from "./AdminSettingsPage";
 
@@ -24,82 +23,32 @@ const features: FeatureValues = {
 	practiceReviewManualTriggerEnabled: true,
 };
 
-const staleChannel: SlackMonitoredChannel = {
-	id: 1,
-	slackTeamId: "T0000000000",
-	slackChannelId: "C01STALE001",
-	channelName: "old-channel",
-	consentState: "ACTIVE",
-	optedOutMemberCount: 0,
-	createdAt: new Date("2026-01-01T00:00:00Z"),
-};
-
 function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 	const props: AdminSettingsPageProps = {
-		repositories: [],
-		isLoadingRepositories: false,
-		repositoriesError: null,
-		addRepositoryError: null,
-		isAddingRepository: false,
-		isRemovingRepository: false,
 		isResettingLeagues: false,
-		onAddRepository: vi.fn(),
-		onRemoveRepository: vi.fn(),
 		onResetLeagues: vi.fn(),
 		features,
 		isSavingFeatures: false,
 		onToggleFeature: vi.fn(),
-		workspaceSlug: "demo",
-		hasSlackConnection: false,
-		slackNotificationsEnabled: false,
-		onSlackSaved: vi.fn(),
-		slackChannels: [],
-		slackChannelCandidates: [],
-		isLoadingSlackChannels: false,
-		onRegisterSlackChannel: vi.fn(),
-		onUpdateSlackChannelConsent: vi.fn(),
-		onRemoveSlackChannel: vi.fn(),
 		...overrides,
 	};
 	renderWithClient(<AdminSettingsPage {...props} />);
 	return { props };
 }
 
-describe("AdminSettingsPage — Slack integration structure", () => {
-	it("keeps channel monitoring discoverable while disconnected, but renders no stale channels", () => {
-		setup({ hasSlackConnection: false, slackChannels: [staleChannel] });
-
-		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
-		// The section explains itself before an admin commits to installing the app…
-		expect(screen.getByRole("heading", { name: /slack channel monitoring/i })).toBeTruthy();
-		expect(screen.getByText(/connect slack to monitor channels/i)).toBeTruthy();
-		// …but without a connection it shows no channel data, stale or otherwise.
-		expect(screen.queryByText(/old-channel/i)).toBeNull();
-		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
+describe("AdminSettingsPage — non-integration content", () => {
+	it("renders the features section", () => {
+		setup();
+		expect(screen.getByRole("heading", { name: /^features$/i })).toBeTruthy();
 	});
 
-	it("shows connected Slack management under one integration section", () => {
-		setup({ hasSlackConnection: true, slackChannels: [staleChannel] });
-
-		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: /weekly digest/i })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: /slack channel monitoring/i })).toBeTruthy();
-		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
+	it("hides the league reset card when leagues are disabled", () => {
+		setup({ features: { ...features, leaguesEnabled: false } });
+		expect(screen.queryByText(/reset and recalculate leagues/i)).toBeNull();
 	});
 
-	it("threads the channel-list query failure into a retry panel, not the empty state", () => {
-		const onRetrySlackChannels = vi.fn();
-		setup({
-			hasSlackConnection: true,
-			slackChannels: [],
-			isSlackChannelsError: true,
-			onRetrySlackChannels,
-		});
-
-		expect(screen.queryByText(/no channels monitored yet/i)).toBeNull();
-		expect(screen.getByText(/couldn't load the monitored channels/i)).toBeTruthy();
-
-		screen.getByRole("button", { name: /^retry$/i }).click();
-		expect(onRetrySlackChannels).toHaveBeenCalledOnce();
+	it("shows the league reset card when leagues are enabled", () => {
+		setup({ features: { ...features, leaguesEnabled: true } });
+		expect(screen.getByText(/reset and recalculate leagues/i)).toBeTruthy();
 	});
 });

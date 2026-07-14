@@ -50,13 +50,24 @@ const engineering = {
 	createdAt: "2026-06-01T00:00:00Z",
 };
 
+/** Unified `ConnectionSyncStatus` for the connected Outline connection (id 7). */
 const healthyStatus = {
+	connectionId: 7,
+	connectionState: "ACTIVE",
+	kind: "OUTLINE",
+	health: "HEALTHY",
 	webhookRegistered: true,
-	documentCount: 12,
-	lastSyncedAt: "2026-07-01T00:00:00Z",
-	syncRunning: false,
-	pendingCollections: 0,
-	erroredCollections: 0,
+	lastSuccessfulSyncAt: "2026-07-01T00:00:00Z",
+	resourceCounts: { total: 1, errored: 0 },
+};
+
+const runningJob = {
+	id: 1,
+	type: "RECONCILIATION",
+	trigger: "MANUAL",
+	status: "RUNNING",
+	cancelRequested: false,
+	createdAt: "2026-07-01T00:00:00Z",
 };
 
 const healthyToken = {
@@ -70,9 +81,7 @@ const healthyToken = {
 function useConnectedHandlers(collectionsRef: { current: unknown[] }) {
 	server.use(
 		http.get("*/workspaces/demo/connections", () => HttpResponse.json([activeOutlineConnection])),
-		http.get("*/workspaces/demo/connections/outline/status", () =>
-			HttpResponse.json(healthyStatus),
-		),
+		http.get("*/workspaces/demo/connections/7/sync", () => HttpResponse.json(healthyStatus)),
 		http.get("*/workspaces/demo/connections/outline/token", () => HttpResponse.json(healthyToken)),
 		http.get("*/workspaces/demo/outline/collections", () =>
 			HttpResponse.json(collectionsRef.current),
@@ -95,13 +104,14 @@ describe("AdminOutlineSettings — connect happy path", () => {
 				connections = [activeOutlineConnection];
 				return HttpResponse.json({ connectionId: activeOutlineConnection.id, mode: "LINKED" });
 			}),
-			http.get("*/workspaces/demo/connections/outline/status", () =>
+			http.get("*/workspaces/demo/connections/7/sync", () =>
 				HttpResponse.json({
+					connectionId: 7,
+					connectionState: "ACTIVE",
+					kind: "OUTLINE",
+					health: "HEALTHY",
 					webhookRegistered: true,
-					documentCount: 0,
-					syncRunning: false,
-					pendingCollections: 0,
-					erroredCollections: 0,
+					resourceCounts: { total: 0, errored: 0 },
 				}),
 			),
 			http.get("*/workspaces/demo/connections/outline/token", () =>
@@ -306,21 +316,21 @@ describe("AdminOutlineSettings — remove with confirm", () => {
 });
 
 describe("AdminOutlineSettings — sync now", () => {
-	it("fires the 202 reconcile and confirms with a toast", async () => {
+	it("fires the reconcile trigger and confirms with a toast", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
-		let syncRequested = false;
+		let syncRequestBody: unknown;
 		useConnectedHandlers(collectionsRef);
 		server.use(
-			http.post("*/workspaces/demo/connections/outline/sync", () => {
-				syncRequested = true;
-				return new HttpResponse(null, { status: 202 });
+			http.post("*/workspaces/demo/connections/7/sync/jobs", async ({ request }) => {
+				syncRequestBody = await request.json();
+				return HttpResponse.json(runningJob);
 			}),
 		);
 
 		renderContainer();
 		fireEvent.click(await screen.findByRole("button", { name: /sync now/i }));
 
-		await waitFor(() => expect(syncRequested).toBe(true));
+		await waitFor(() => expect(syncRequestBody).toEqual({ type: "RECONCILIATION" }));
 		await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Sync started"));
 	});
 });
@@ -354,15 +364,18 @@ describe("AdminOutlineSettings — token lifecycle", () => {
 });
 
 describe("AdminOutlineSettings — a running sync is polled, not left as dead pixels", () => {
-	it("keeps refetching the status while syncRunning, and stops once it settles", async () => {
+	it("keeps refetching the status while a job is active, and stops once it settles", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
 		useConnectedHandlers(collectionsRef);
 		server.use(
-			http.get("*/workspaces/demo/connections/outline/status", () => {
+			http.get("*/workspaces/demo/connections/7/sync", () => {
 				statusReads += 1;
 				// The reconcile is running on the first read and finished by the second.
-				return HttpResponse.json({ ...healthyStatus, syncRunning: statusReads < 2 });
+				return HttpResponse.json({
+					...healthyStatus,
+					activeJob: statusReads < 2 ? runningJob : undefined,
+				});
 			}),
 		);
 

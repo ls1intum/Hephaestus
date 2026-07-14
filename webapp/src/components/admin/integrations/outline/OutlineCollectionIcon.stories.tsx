@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { OutlineCollectionIcon } from "@/components/admin/outline/OutlineCollectionIcon";
+import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
 
 const meta = {
 	title: "Admin/Outline/OutlineCollectionIcon",

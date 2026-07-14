@@ -8,7 +8,7 @@ import {
 	TriangleAlertIcon,
 } from "lucide-react";
 import type { OutlineCollection } from "@/api/types.gen";
-import { OutlineCollectionIcon } from "@/components/admin/outline/OutlineCollectionIcon";
+import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

@@ -1,21 +1,21 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.status.GithubConnectionSyncStateProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.status.GithubIntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -28,14 +28,13 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiConsumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -43,15 +42,18 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * connection (must NOT 404), the manual-trigger idempotent-absorb ("Sync now" then a duplicate),
  * cancel, the catalog endpoint, and the class-level {@code @RequireAtLeastWorkspaceAdmin} gate.
  *
- * <p>{@link TestSyncProviders} registers a single stub {@link ConnectionSyncStateProvider} +
- * {@link IntegrationSyncRunner} for {@code GITHUB} — this PR ships the core substrate only; real
- * per-kind wiring is a follow-up (see class doc on {@code ConnectionSyncStateProvider}).
+ * <p>{@link #githubSyncStateProvider} and {@link #githubSyncRunner} replace the real GitHub beans
+ * with {@code @MockitoBean} doubles for {@code GITHUB} — the real beans do live DB/vendor-adjacent
+ * work that this controller-level test doesn't want to exercise. {@code kind()} is stubbed in
+ * {@link #setUp} to the real {@code GITHUB} value so {@link SyncStatusService}'s lazy per-lookup
+ * dispatch (a linear scan over the injected {@code List<>}, see its class doc) resolves them like
+ * any other kind's beans.
  *
  * <p>The test-profile {@code applicationTaskExecutor} runs {@code @Async}/executor work
  * SYNCHRONOUSLY on the calling thread (see {@code TestAsyncConfiguration}), so a POST that
  * dispatches work through it only returns once the dispatched body finishes. Scenarios that need to
  * observe a job while still RUNNING therefore fire the request on a background thread and use the
- * stub runner's cooperative-cancellation loop (or a start/release latch pair) to control timing.
+ * mock runner's cooperative-cancellation answer (or a start/release latch pair) to control timing.
  */
 class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -61,15 +63,24 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private ConnectionRepository connectionRepository;
 
-    @Autowired
-    private StubRunnerState stubRunnerState;
+    @MockitoBean
+    private GithubConnectionSyncStateProvider githubSyncStateProvider;
+
+    @MockitoBean
+    private GithubIntegrationSyncRunner githubSyncRunner;
 
     private Workspace workspace;
     private Connection connection;
 
     @BeforeEach
     void setUp() {
-        stubRunnerState.reset();
+        Mockito.reset(githubSyncStateProvider, githubSyncRunner);
+        Mockito.when(githubSyncStateProvider.kind()).thenReturn(IntegrationKind.GITHUB);
+        Mockito.when(githubSyncStateProvider.describe(any(), anyLong())).thenReturn(ConnectionSyncDetails.empty());
+        Mockito.when(githubSyncStateProvider.resources(any(), anyLong())).thenReturn(List.of());
+        Mockito.when(githubSyncRunner.kind()).thenReturn(IntegrationKind.GITHUB);
+        Mockito.doNothing().when(githubSyncRunner).reconcile(any(), any());
+
         User owner = persistUser("sync-owner-" + System.nanoTime());
         workspace = createWorkspace(
             "sync-ws-" + System.nanoTime(),
@@ -151,14 +162,17 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         String adminToken = TestAuthUtils.getCurrentUserToken();
         CountDownLatch runnerStarted = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        stubRunnerState.reconcile = (ref, handle) -> {
+        Mockito.doAnswer(invocation -> {
             runnerStarted.countDown();
             try {
                 release.await(5, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-        };
+            return null;
+        })
+            .when(githubSyncRunner)
+            .reconcile(any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken)));
@@ -205,18 +219,22 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ensureAdminMembership(workspace);
         String adminToken = TestAuthUtils.getCurrentUserToken();
         CountDownLatch runnerStarted = new CountDownLatch(1);
-        stubRunnerState.reconcile = (ref, handle) -> {
+        Mockito.doAnswer(invocation -> {
             runnerStarted.countDown();
+            SyncJobHandle handle = invocation.getArgument(1);
             long deadline = System.currentTimeMillis() + 5000;
             while (!handle.isCancellationRequested() && System.currentTimeMillis() < deadline) {
                 try {
                     Thread.sleep(25);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    return;
+                    return null;
                 }
             }
-        };
+            return null;
+        })
+            .when(githubSyncRunner)
+            .reconcile(any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken)));
@@ -329,59 +347,5 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .expectBody(SyncJobDTO.class)
             .returnResult()
             .getResponseBody();
-    }
-
-    /** Mutable per-test hook the stub runner delegates to; reset between tests. */
-    static class StubRunnerState {
-
-        volatile BiConsumer<IntegrationRef, SyncJobHandle> reconcile = (ref, handle) -> {};
-
-        void reset() {
-            reconcile = (ref, handle) -> {};
-        }
-    }
-
-    @TestConfiguration
-    static class TestSyncProviders {
-
-        @Bean
-        StubRunnerState stubRunnerState() {
-            return new StubRunnerState();
-        }
-
-        @Bean
-        ConnectionSyncStateProvider githubSyncStateProvider() {
-            return new ConnectionSyncStateProvider() {
-                @Override
-                public IntegrationKind kind() {
-                    return IntegrationKind.GITHUB;
-                }
-
-                @Override
-                public ConnectionSyncDetails describe(IntegrationRef ref, long connectionId) {
-                    return ConnectionSyncDetails.empty();
-                }
-
-                @Override
-                public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
-                    return List.of();
-                }
-            };
-        }
-
-        @Bean
-        IntegrationSyncRunner githubSyncRunner(StubRunnerState state) {
-            return new IntegrationSyncRunner() {
-                @Override
-                public IntegrationKind kind() {
-                    return IntegrationKind.GITHUB;
-                }
-
-                @Override
-                public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
-                    state.reconcile.accept(ref, handle);
-                }
-            };
-        }
     }
 }

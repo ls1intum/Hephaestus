@@ -3,7 +3,7 @@ import { LibraryIcon, LockIcon } from "lucide-react";
 import { useState } from "react";
 import { listOutlineCollectionCandidatesOptions } from "@/api/@tanstack/react-query.gen";
 import type { OutlineCollectionCandidate } from "@/api/types.gen";
-import { OutlineCollectionIcon } from "@/components/admin/outline/OutlineCollectionIcon";
+import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

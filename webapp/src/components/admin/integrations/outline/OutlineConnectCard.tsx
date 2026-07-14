@@ -9,7 +9,7 @@ import {
 	ZapOffIcon,
 } from "lucide-react";
 import { useState } from "react";
-import type { OutlineConnectionStatus, OutlineTokenStatus } from "@/api/types.gen";
+import type { OutlineTokenStatus } from "@/api/types.gen";
 import { OutlineIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -28,16 +28,31 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { asDate } from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
 	token: string;
 }
 
+/**
+ * Connection-level sync summary for the card, composed by the container from the unified
+ * `ConnectionSyncStatus` (health/webhook/lastSuccessfulSyncAt/activeJob) plus a document-count
+ * rollup derived from the mirrored-collections list. Outline's old bespoke
+ * `GET /connections/outline/status` DTO was absorbed into the unified sync API.
+ */
+export interface OutlineSyncSummary {
+	webhookRegistered?: boolean;
+	documentCount: number;
+	lastSyncedAt?: Date | string;
+	syncRunning: boolean;
+	erroredCollections: number;
+}
+
 export interface OutlineConnectCardProps {
 	connected: boolean;
 	connectionLabel?: string;
-	status?: OutlineConnectionStatus;
+	status?: OutlineSyncSummary;
 	isStatusLoading?: boolean;
 	tokenStatus?: OutlineTokenStatus;
 	isTokenStatusLoading?: boolean;
@@ -58,16 +73,6 @@ const CLOUD_SERVER_URL = "https://app.getoutline.com";
 
 /** Inside this window the admin has to act: Outline keys cannot be rotated through the API. */
 const EXPIRY_WARNING_DAYS = 14;
-
-/**
- * The API fields carry `Date` types, but this repo does not wire hey-api's date transformers —
- * at runtime they arrive as ISO strings. Normalize both shapes and drop anything unparseable.
- */
-function asDate(value: Date | string | undefined): Date | undefined {
-	if (value == null) return undefined;
-	const date = value instanceof Date ? value : new Date(value);
-	return Number.isNaN(date.getTime()) ? undefined : date;
-}
 
 /**
  * Workspace-admin card for the Outline integration: captures the server URL and API token when disconnected,

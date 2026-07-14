@@ -28,7 +28,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -53,8 +53,8 @@ public class SyncStatusService {
     private final SyncJobRepository syncJobRepository;
     private final ConnectionActivityRepository connectionActivityRepository;
     private final AsyncTaskExecutor taskExecutor;
-    private final Map<IntegrationKind, ConnectionSyncStateProvider> providers;
-    private final Map<IntegrationKind, IntegrationSyncRunner> runners;
+    private final List<ConnectionSyncStateProvider> providerBeans;
+    private final List<IntegrationSyncRunner> runnerBeans;
 
     public SyncStatusService(
         ConnectionAdminService connectionAdminService,
@@ -70,25 +70,44 @@ public class SyncStatusService {
         this.syncJobRepository = syncJobRepository;
         this.connectionActivityRepository = connectionActivityRepository;
         this.taskExecutor = taskExecutor;
-        this.providers = providerBeans
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(
-                    ConnectionSyncStateProvider::kind,
-                    p -> p,
-                    SyncStatusService::rejectDuplicate
-                )
-            );
-        this.runners = runnerBeans
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(IntegrationSyncRunner::kind, r -> r, SyncStatusService::rejectDuplicate)
-            );
+        // Resolved lazily per-lookup (see #providerFor/#runnerFor) rather than built into a map at
+        // construction time: eagerly collecting into a Map<IntegrationKind, ...> forces every bean of
+        // every kind to be present and duplicate-free at CONTEXT BOOT, which couples this service's
+        // startup to whichever test doubles happen to be on the classpath. Lookup-time duplicate
+        // detection preserves the "one impl per kind" invariant without that coupling.
+        this.providerBeans = List.copyOf(providerBeans);
+        this.runnerBeans = List.copyOf(runnerBeans);
+    }
+
+    private @Nullable ConnectionSyncStateProvider providerFor(IntegrationKind kind) {
+        return resolveSingle(providerBeans, ConnectionSyncStateProvider::kind, kind);
+    }
+
+    private @Nullable IntegrationSyncRunner runnerFor(IntegrationKind kind) {
+        return resolveSingle(runnerBeans, IntegrationSyncRunner::kind, kind);
+    }
+
+    /** Linear scan over the (small, fixed-size) per-kind bean list — same duplicate-detection as before, deferred to lookup time. */
+    private static <T> @Nullable T resolveSingle(
+        List<T> beans,
+        Function<T, IntegrationKind> kindOf,
+        IntegrationKind kind
+    ) {
+        T match = null;
+        for (T bean : beans) {
+            if (kindOf.apply(bean) == kind) {
+                if (match != null) {
+                    rejectDuplicate(match, bean);
+                }
+                match = bean;
+            }
+        }
+        return match;
     }
 
     public ConnectionSyncStatusDTO getStatus(long workspaceId, long connectionId) {
         Connection connection = connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
-        ConnectionSyncStateProvider provider = providers.get(connection.getKind());
+        ConnectionSyncStateProvider provider = providerFor(connection.getKind());
         IntegrationRef ref = connection.toRef();
         ConnectionSyncDetails providerDetails =
             provider == null ? ConnectionSyncDetails.empty() : provider.describe(ref, connectionId);
@@ -146,7 +165,7 @@ public class SyncStatusService {
 
     public List<SyncResourceStateDTO> getResources(Long workspaceId, long connectionId) {
         Connection connection = connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
-        ConnectionSyncStateProvider provider = providers.get(connection.getKind());
+        ConnectionSyncStateProvider provider = providerFor(connection.getKind());
         if (provider == null) {
             return List.of();
         }
@@ -188,7 +207,7 @@ public class SyncStatusService {
                     ")"
             );
         }
-        IntegrationSyncRunner runner = runners.get(connection.getKind());
+        IntegrationSyncRunner runner = runnerFor(connection.getKind());
         if (runner == null || (type == SyncJobType.BACKFILL && !runner.supportsBackfill())) {
             throw new SyncNotSupportedException(connection.getKind());
         }
