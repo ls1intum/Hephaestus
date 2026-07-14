@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { LogInIcon } from "lucide-react";
 import type { ComponentPropsWithoutRef, SVGAttributes } from "react";
 import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProviderView } from "@/api/types.gen";
@@ -191,6 +193,23 @@ export function SignInButtons({
 	);
 
 	if (header) {
+		// The dev sign-in needs a username, and a link-only provider is not a way in — so with neither
+		// GitHub nor GitLab configured there is nothing the header can render inline. It must still
+		// offer a way in: send the user to the full sign-in page rather than showing an empty header.
+		if (oauthProviders.length === 0) {
+			return (
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={disabled}
+					render={<Link to="/login" />}
+					aria-label="Sign in"
+				>
+					<LogInIcon aria-hidden />
+					Sign in
+				</Button>
+			);
+		}
 		return (
 			<div className="flex items-center gap-2">
 				{oauthProviders.map((provider) => (
