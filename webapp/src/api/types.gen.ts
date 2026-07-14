@@ -757,6 +757,16 @@ export type UpdateAccountRequest = {
 };
 
 /**
+ * Manual sync trigger request body
+ */
+export type TriggerSyncJobRequest = {
+    /**
+     * RECONCILIATION for a full re-sync, BACKFILL for historical data
+     */
+    type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
+};
+
+/**
  * Detailed information about a team including members, repositories, and labels
  */
 export type TeamInfo = {
@@ -868,6 +878,116 @@ export type LabelInfo = {
      * Repository the label belongs to
      */
     repository?: RepositoryInfo;
+};
+
+/**
+ * One synced resource (repository / channel / collection) — unified read-model row
+ */
+export type SyncResourceState = {
+    /**
+     * Per-resource backfill horizon
+     */
+    backfillCompletedThrough?: Date;
+    /**
+     * Per-resource backfill percent
+     */
+    backfillPercent?: number;
+    /**
+     * Vendor-side identifier
+     */
+    externalId: string;
+    /**
+     * The integration's own row id
+     */
+    id: number;
+    /**
+     * Mirrored item count
+     */
+    itemCount?: number;
+    /**
+     * Last sync error, if any
+     */
+    lastError?: string;
+    /**
+     * Last successful sync timestamp
+     */
+    lastSyncedAt?: Date;
+    /**
+     * Display name
+     */
+    name: string;
+    /**
+     * Integration-defined status string
+     */
+    state: string;
+    /**
+     * Resource kind
+     */
+    type: 'REPOSITORY' | 'CHANNEL' | 'COLLECTION';
+    /**
+     * Vendor-reported upstream count, if cheaply available
+     */
+    upstreamCount?: number;
+};
+
+/**
+ * One sync_job row — a single INITIAL/RECONCILIATION/BACKFILL pass for a connection
+ */
+export type SyncJob = {
+    /**
+     * Whether a cooperative cancel was requested
+     */
+    cancelRequested: boolean;
+    /**
+     * When the job row was created
+     */
+    createdAt: Date;
+    /**
+     * Truncated error summary, set on FAILED
+     */
+    errorSummary?: string;
+    /**
+     * When the job finished (any terminal status)
+     */
+    finishedAt?: Date;
+    /**
+     * Job id
+     */
+    id: number;
+    /**
+     * Coarse progress: items processed so far
+     */
+    itemsProcessed?: number;
+    /**
+     * Coarse progress: total items, if known
+     */
+    itemsTotal?: number;
+    /**
+     * Per-phase progress detail, integration-specific shape
+     */
+    progress?: {
+        [key: string]: unknown;
+    };
+    /**
+     * When the job started running
+     */
+    startedAt?: Date;
+    /**
+     * Job status
+     */
+    status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'SUCCEEDED_WITH_WARNINGS' | 'FAILED' | 'CANCELLED';
+    /**
+     * What initiated this job
+     */
+    trigger: 'SCHEDULED' | 'MANUAL' | 'LIFECYCLE' | 'SYSTEM';
+    /**
+     * Account id of the admin who triggered this job, if MANUAL
+     */
+    triggeredByUserId?: number;
+    /**
+     * What kind of pass this is
+     */
+    type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
 };
 
 export type SortObject = {
@@ -1022,6 +1142,20 @@ export type SessionView = {
 
 export type RevokeSessionsResult = {
     revoked?: number;
+};
+
+/**
+ * Resource-level rollup for the connection overview badge
+ */
+export type ResourceCounts = {
+    /**
+     * Resources currently reporting a sync error
+     */
+    errored: number;
+    /**
+     * Total resources known to this connection
+     */
+    total: number;
 };
 
 /**
@@ -1200,6 +1334,24 @@ export type Reaction = {
      * Unique reaction ID
      */
     id: string;
+};
+
+/**
+ * Vendor API rate-limit budget snapshot, read from in-memory trackers (not persisted across restarts)
+ */
+export type RateLimitSnapshot = {
+    /**
+     * Total budget for the window
+     */
+    limit: number;
+    /**
+     * Remaining budget
+     */
+    remaining: number;
+    /**
+     * When the window resets
+     */
+    resetAt?: Date;
 };
 
 /**
@@ -1609,6 +1761,20 @@ export type PageableObject = {
     unpaged?: boolean;
 };
 
+export type PageSyncJob = {
+    content?: Array<SyncJob>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
 export type PageObservationList = {
     content?: Array<ObservationList>;
     empty?: boolean;
@@ -1863,36 +2029,6 @@ export type OutlineTokenStatus = {
      * The token's name in Outline. Absent when the token cannot list its own key (a scoped key, or one owned by a user who cannot see it) — sync is unaffected.
      */
     name?: string;
-};
-
-/**
- * Health of the workspace's active Outline connection
- */
-export type OutlineConnectionStatus = {
-    /**
-     * Live (non-tombstoned) mirrored document count across all collections
-     */
-    documentCount: number;
-    /**
-     * Collections whose last sync attempt recorded an error (cleared on the next clean pass)
-     */
-    erroredCollections: number;
-    /**
-     * When a mirrored collection last completed a full reconcile pass, if any
-     */
-    lastSyncedAt?: Date;
-    /**
-     * Enabled collections still awaiting a clean sync pass
-     */
-    pendingCollections: number;
-    /**
-     * Whether a manually triggered full reconcile is currently running for this workspace
-     */
-    syncRunning: boolean;
-    /**
-     * Whether a webhook subscription id is currently stored for this connection. This is existence only, not a liveness check: Outline auto-disables a subscription after repeated delivery failures, and a stale id here self-heals on the next reconcile rather than being verified live by this endpoint.
-     */
-    webhookRegistered: boolean;
 };
 
 /**
@@ -2205,6 +2341,32 @@ export type LeaderboardEntry = {
      * User info (populated in INDIVIDUAL mode, null in TEAM mode)
      */
     user?: UserInfo;
+};
+
+/**
+ * Integration kind availability + connection status for this workspace
+ */
+export type IntegrationCatalogEntry = {
+    /**
+     * Whether this workspace has a (non-UNINSTALLED) connection for this kind
+     */
+    connected: boolean;
+    /**
+     * Connection id, if connected
+     */
+    connectionId?: number;
+    /**
+     * Connection state, if connected
+     */
+    connectionState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    /**
+     * Human-readable display name
+     */
+    displayName: string;
+    /**
+     * Integration kind
+     */
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
 /**
@@ -2668,6 +2830,78 @@ export type Contributor = {
      * Display name of the contributor
      */
     name: string;
+};
+
+/**
+ * Unified sync-observability status for one connection
+ */
+export type ConnectionSyncStatus = {
+    /**
+     * Currently PENDING/RUNNING job, if any
+     */
+    activeJob?: SyncJob;
+    /**
+     * Connection-level backfill rollup, if applicable
+     */
+    backfill?: BackfillSummary;
+    /**
+     * Connection id
+     */
+    connectionId: number;
+    /**
+     * Raw connection lifecycle state
+     */
+    connectionState: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    /**
+     * Derived health
+     */
+    health: 'PENDING' | 'HEALTHY' | 'DEGRADED' | 'FAILED' | 'SUSPENDED';
+    /**
+     * Integration kind
+     */
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    /**
+     * Most recently finished job, if any
+     */
+    lastJob?: SyncJob;
+    /**
+     * Most recent successful job's finish time
+     */
+    lastSuccessfulSyncAt?: Date;
+    /**
+     * When the next periodic reconciliation is expected
+     */
+    nextScheduledSyncAt?: Date;
+    /**
+     * Current rate-limit budget, if known
+     */
+    rateLimit?: RateLimitSnapshot;
+    /**
+     * Resource-level rollup
+     */
+    resourceCounts: ResourceCounts;
+    /**
+     * Whether the vendor webhook registration is present; null if not applicable/unknown
+     */
+    webhookRegistered?: boolean;
+};
+
+/**
+ * Connection-level backfill rollup
+ */
+export type BackfillSummary = {
+    /**
+     * Oldest point-in-time the backfill has reached
+     */
+    completedThrough?: Date;
+    /**
+     * 0-100 completion estimate, if computable
+     */
+    percent?: number;
+    /**
+     * Integration-defined backfill state string
+     */
+    state: string;
 };
 
 /**
@@ -4117,7 +4351,7 @@ export type InitiateResponses = {
 
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
 
-export type GetOutlineConnectionStatusData = {
+export type GetIntegrationCatalogData = {
     body?: never;
     path: {
         /**
@@ -4126,50 +4360,17 @@ export type GetOutlineConnectionStatusData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/outline/status';
+    url: '/workspaces/{workspaceSlug}/connections/catalog';
 };
 
-export type GetOutlineConnectionStatusErrors = {
+export type GetIntegrationCatalogResponses = {
     /**
-     * The workspace has no ACTIVE Outline connection
+     * OK
      */
-    404: unknown;
+    200: Array<IntegrationCatalogEntry>;
 };
 
-export type GetOutlineConnectionStatusResponses = {
-    /**
-     * Connection health snapshot returned
-     */
-    200: OutlineConnectionStatus;
-};
-
-export type GetOutlineConnectionStatusResponse = GetOutlineConnectionStatusResponses[keyof GetOutlineConnectionStatusResponses];
-
-export type SyncOutlineConnectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/outline/sync';
-};
-
-export type SyncOutlineConnectionErrors = {
-    /**
-     * The workspace has no ACTIVE Outline connection
-     */
-    404: unknown;
-};
-
-export type SyncOutlineConnectionResponses = {
-    /**
-     * Reconcile accepted (or already running — duplicate submits are absorbed); poll the connection status resource in the Location header
-     */
-    202: unknown;
-};
+export type GetIntegrationCatalogResponse = GetIntegrationCatalogResponses[keyof GetIntegrationCatalogResponses];
 
 export type GetOutlineTokenStatusData = {
     body?: never;
@@ -4222,6 +4423,120 @@ export type SendSlackTestMessageResponses = {
 };
 
 export type SendSlackTestMessageResponse = SendSlackTestMessageResponses[keyof SendSlackTestMessageResponses];
+
+export type GetConnectionSyncStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync';
+};
+
+export type GetConnectionSyncStatusResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionSyncStatus;
+};
+
+export type GetConnectionSyncStatusResponse = GetConnectionSyncStatusResponses[keyof GetConnectionSyncStatusResponses];
+
+export type ListConnectionSyncJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs';
+};
+
+export type ListConnectionSyncJobsResponses = {
+    /**
+     * OK
+     */
+    200: PageSyncJob;
+};
+
+export type ListConnectionSyncJobsResponse = ListConnectionSyncJobsResponses[keyof ListConnectionSyncJobsResponses];
+
+export type TriggerSyncJobData = {
+    body: TriggerSyncJobRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs';
+};
+
+export type TriggerSyncJobResponses = {
+    /**
+     * OK
+     */
+    200: SyncJob;
+};
+
+export type TriggerSyncJobResponse = TriggerSyncJobResponses[keyof TriggerSyncJobResponses];
+
+export type CancelConnectionSyncJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+        jobId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}/cancel';
+};
+
+export type CancelConnectionSyncJobResponses = {
+    /**
+     * OK
+     */
+    200: SyncJob;
+};
+
+export type CancelConnectionSyncJobResponse = CancelConnectionSyncJobResponses[keyof CancelConnectionSyncJobResponses];
+
+export type ListConnectionSyncResourcesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        connectionId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/resources';
+};
+
+export type ListConnectionSyncResourcesResponses = {
+    /**
+     * OK
+     */
+    200: Array<SyncResourceState>;
+};
+
+export type ListConnectionSyncResourcesResponse = ListConnectionSyncResourcesResponses[keyof ListConnectionSyncResourcesResponses];
 
 export type ReadData = {
     body?: never;

@@ -55,13 +55,13 @@ public class SyncController {
 
     @GetMapping("/{connectionId}/sync")
     @Operation(summary = "Unified sync status for one connection")
-    public ResponseEntity<ConnectionSyncStatusDTO> status(WorkspaceContext workspace, @PathVariable Long connectionId) {
+    public ResponseEntity<ConnectionSyncStatusDTO> getConnectionSyncStatus(WorkspaceContext workspace, @PathVariable Long connectionId) {
         return ResponseEntity.ok(syncStatusService.getStatus(workspace.id(), connectionId));
     }
 
     @GetMapping("/{connectionId}/sync/resources")
     @Operation(summary = "Per-resource sync state (repos / channels / collections) for one connection")
-    public ResponseEntity<List<SyncResourceStateDTO>> resources(
+    public ResponseEntity<List<SyncResourceStateDTO>> listConnectionSyncResources(
         WorkspaceContext workspace,
         @PathVariable Long connectionId
     ) {
@@ -70,7 +70,7 @@ public class SyncController {
 
     @GetMapping("/{connectionId}/sync/jobs")
     @Operation(summary = "Paginated sync job history for one connection")
-    public ResponseEntity<Page<SyncJobDTO>> jobs(
+    public ResponseEntity<Page<SyncJobDTO>> listConnectionSyncJobs(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
         @RequestParam(defaultValue = "0") int page,
@@ -88,7 +88,7 @@ public class SyncController {
      */
     @PostMapping("/{connectionId}/sync/jobs")
     @Operation(summary = "Trigger a manual sync or backfill", operationId = "triggerSyncJob")
-    public ResponseEntity<SyncJobDTO> trigger(
+    public ResponseEntity<SyncJobDTO> triggerConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
         @RequestBody @Valid @NotNull TriggerSyncJobRequestDTO body
@@ -107,7 +107,7 @@ public class SyncController {
 
     @PostMapping("/{connectionId}/sync/jobs/{jobId}/cancel")
     @Operation(summary = "Request cooperative cancellation of a running sync job")
-    public ResponseEntity<SyncJobDTO> cancel(
+    public ResponseEntity<SyncJobDTO> cancelConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
         @PathVariable Long jobId
@@ -118,7 +118,7 @@ public class SyncController {
 
     @GetMapping("/catalog")
     @Operation(summary = "Every integration kind this workspace could connect, joined against existing connections")
-    public ResponseEntity<List<IntegrationCatalogEntryDTO>> catalog(WorkspaceContext workspace) {
+    public ResponseEntity<List<IntegrationCatalogEntryDTO>> getIntegrationCatalog(WorkspaceContext workspace) {
         return ResponseEntity.ok(syncStatusService.catalog(workspace.id()));
     }
 
