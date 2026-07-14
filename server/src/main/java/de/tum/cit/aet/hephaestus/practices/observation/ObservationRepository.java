@@ -223,7 +223,15 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * re-review multiplier (a target re-reviewed N times shows N× the findings). The dashboard reflects each
      * target's CURRENT state, so this query keeps only the findings from each target's LATEST detection run
      * ({@code agent_job_id} with the most recent {@code observed_at} for that
-     * {@code (artifact_type, artifact_id)}). Superseded runs do not count toward the habit signal.
+     * {@code (artifact_type, artifact_id)}, tiebroken by {@code agent_job_id} so two runs sharing a timestamp
+     * still select ONE run deterministically). Superseded runs do not count toward the habit signal.
+     *
+     * <p><b>Hidden repositories:</b> observations on artifacts in a repository that ANY team's settings mark
+     * {@code hidden_from_contributions} are excluded. Unlike the team-scoped activity/leaderboard queries,
+     * these endpoints carry no viewing-team context, so the exclusion fails closed: hidden for one team means
+     * hidden here for everyone. This applies to the aggregate serving queries (this one and the five siblings
+     * that reference it); the raw per-artifact fetches ({@link #findByAboutUserAndWorkspace},
+     * {@link #findByPullRequestAndWorkspace}) are unfiltered.
      *
      * <p>Native (not JPQL) because the latest-run-per-target selection needs {@code ORDER BY ... LIMIT 1} in a
      * correlated subquery, which JPQL cannot express. Aliases are quoted so the JDBC column labels match the
@@ -243,11 +251,21 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type
                 AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC
               LIMIT 1
           )
         GROUP BY p.slug, p.name
@@ -312,7 +330,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p>Re-review deduped to each target's latest run (same grain as the sibling histogram queries), so a
      * twice-reviewed target contributes only its current state rather than inflating the good/bad counts that
-     * drive the contributor-history ranking.
+     * drive the contributor-history ranking. Observations on artifacts in hidden repositories are excluded
+     * (see {@link #findSummaryByDeveloperAndWorkspace}).
      *
      * @param aboutUserId the about-user whose history to aggregate
      * @param workspaceId   the workspace scope (via practice → workspace relationship)
@@ -329,10 +348,20 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY p.slug, f.presence, f.assessment
         ORDER BY p.slug, f.presence
@@ -357,7 +386,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * awaiting review" rows) the mentor cannot coach from, and would bury the actionable {@code BAD} problems
      * and {@code GOOD} strengths within the page budget. The NA total still reaches the mentor via the
      * presence-count summary; this is the drill-down list only, and stays recency-ordered (NOT re-ordered by
-     * severity) to preserve its "what happened lately" purpose.
+     * severity) to preserve its "what happened lately" purpose. Observations on artifacts in hidden
+     * repositories are excluded (see {@link #findSummaryByDeveloperAndWorkspace}).
      */
     @Query(
         value = """
@@ -365,12 +395,22 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND f.presence <> 'NOT_APPLICABLE'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         ORDER BY f.observed_at DESC
         """,
@@ -389,7 +429,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p>Re-review deduped to each target's latest run (see {@link #findRecentByDeveloperAndWorkspace}) so
      * the mentor's "how am I doing" histogram reflects current state, not the re-push multiplier. Only
-     * {@code BAD} findings carry a non-null severity, so the histogram is over problems.
+     * {@code BAD} findings carry a non-null severity, so the histogram is over problems. Observations on
+     * artifacts in hidden repositories are excluded (see {@link #findSummaryByDeveloperAndWorkspace}).
      */
     @Query(
         value = """
@@ -398,12 +439,22 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND f.severity IS NOT NULL
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.severity
         """,
@@ -419,6 +470,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * Presence histogram for a developer's findings within a workspace.
      *
      * <p>Re-review deduped to each target's latest run (see {@link #findRecentByDeveloperAndWorkspace}).
+     * Observations on artifacts in hidden repositories are excluded (see
+     * {@link #findSummaryByDeveloperAndWorkspace}).
      */
     @Query(
         value = """
@@ -427,11 +480,21 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY f.presence
         """,
@@ -529,7 +592,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * recent-window sub-count and the most-recent detection. The sign decision (problem vs strength)
      * is the per-observation {@code assessment} (ADR 0022): {@code BAD} is a problem, {@code GOOD} a strength.
      * Ungrouped practices ({@code p.area IS NULL}) are excluded; they remain visible in
-     * {@code findings_history.json}.
+     * {@code findings_history.json}. Observations on artifacts in hidden repositories are excluded (see
+     * {@link #findSummaryByDeveloperAndWorkspace}).
      */
     @Query(
         value = """
@@ -543,12 +607,22 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN practice_area pa ON pa.id = p.practice_area_id
         WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_type IN ('PULL_REQUEST', 'ISSUE')
+                AND target_artifact.id = f.artifact_id
+          )
           AND f.observed_at >= :since
           AND p.practice_area_id IS NOT NULL
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
-              ORDER BY f2.observed_at DESC LIMIT 1
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
           )
         GROUP BY pa.slug, pa.name, f.presence, f.assessment, f.severity
         """,
