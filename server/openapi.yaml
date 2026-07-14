@@ -32,6 +32,10 @@ tags:
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
 - description: |-
+    Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
+     slugged routes live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
+  name: workspace-registry-controller
+- description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
@@ -57,11 +61,6 @@ tags:
   name: Auth
 - description: Active sessions
   name: Account
-- description: |-
-    Workspace registry endpoints that operate outside of a specific workspace slug.
-     These routes stay under the classic /workspaces base path while slugged routes
-     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
-  name: workspace-registry-controller
 - description: Workspace integration connection management
   name: Connections
 - description: Up/down votes on mentor assistant messages
