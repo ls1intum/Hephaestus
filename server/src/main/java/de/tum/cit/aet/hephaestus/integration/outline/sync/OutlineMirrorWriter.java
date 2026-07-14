@@ -14,25 +14,18 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 /**
- * Retry-once façade over {@link OutlineMirrorTransactions} — the seam {@link OutlineDocumentSyncService}
- * writes the mirror through.
+ * Retry-once façade over {@link OutlineMirrorTransactions} — the seam the mirror is written through.
  *
- * <p>Both Outline mirror rows carry a {@code @Version} column because they have genuinely concurrent
- * writers that are NOT serialized per workspace: a webhook-triggered {@code refreshDocument} versus a
- * mid-flight full reconcile for the same document, and the admin PATCH versus a request-thread sync kick
- * for the same collection. Without the version column both writers do a full-column save and the loser's
- * commit silently clobbers the winner's — a lost update.
+ * <p>Both mirror rows carry a {@code @Version} column because they have concurrent writers that nothing
+ * serializes per workspace (a webhook refresh versus a mid-flight reconcile; an admin PATCH versus a sync kick).
+ * Without it, the loser's full-column save silently clobbers the winner.
  *
- * <p>The retry deliberately re-runs the <em>whole</em> unit of work in a <strong>fresh</strong>
- * transaction rather than re-saving inside the failed one. An optimistic-lock failure at flush marks its
- * transaction rollback-only (JPA spec: {@code OptimisticLockException} ⇒ rollback), so a same-transaction
- * retry could never commit — it would look like it worked and quietly lose the write. Re-running instead
- * re-reads the row at its current version and re-applies the caller's mutation to it, which is exactly
- * what "merge my change onto whatever the winner wrote" means. The mutations are pure functions of the
- * upstream payload the caller already fetched, so a replay costs no extra Outline call.
+ * <p>The retry re-runs the whole unit of work in a <em>fresh</em> transaction rather than re-saving inside the
+ * failed one: an optimistic-lock failure marks its transaction rollback-only, so a same-transaction retry could
+ * never commit and would quietly lose the write. Re-running re-reads the row at its current version and re-applies
+ * the mutation; the mutations are pure functions of already-fetched payload, so a replay costs no extra API call.
  *
- * <p>Losing twice is logged and skipped: the field mutations are dropped, and the next reconcile re-diffs
- * and converges on its own.
+ * <p>Losing twice is logged and skipped — the next reconcile re-diffs and converges.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

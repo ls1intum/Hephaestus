@@ -73,7 +73,6 @@ class OutlineIdentityLinkIntegrationTest {
         seedProvider("github-outlinelink", LoginProvider.ProviderType.GITHUB);
         seedProvider("outline-link", LoginProvider.ProviderType.OUTLINE);
 
-        // A developer signs in with GitHub → their base account.
         Account github = service
             .resolveOrProvision(
                 "github-outlinelink",

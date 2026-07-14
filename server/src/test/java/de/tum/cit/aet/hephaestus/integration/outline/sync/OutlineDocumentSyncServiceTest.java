@@ -46,18 +46,14 @@ import org.mockito.Mock;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit coverage for the sync paths the real-Postgres integration test cannot cheaply pin: the export
- * budget (exhaustion keeps a collection PENDING with no completion timestamp and no tombstones), the webhook
- * targeted-refresh routing (delete tombstones without an API call; an update outside the mirrored
- * collections is ignored; a vanished document tombstones), the optimistic-lock retry, and — the
- * load-bearing one — the <em>no-wipe</em> invariant: a pass that dies mid-way (429, revoked token) must
- * leave the already-mirrored documents intact, because the alternative is silent, irreversible data loss.
+ * Unit coverage for the sync paths a real-Postgres test cannot cheaply pin. The load-bearing invariant is
+ * <em>no-wipe</em>: a pass that dies mid-way (429, revoked token) must leave already-mirrored documents
+ * intact, because the alternative is silent, irreversible data loss.
  *
- * <p>The persistence seam is exercised for real: {@link OutlineMirrorWriter} and
- * {@link OutlineMirrorTransactions} are the production objects over mocked repositories, so the
- * load-or-create + mutate + save + retry-in-a-fresh-transaction shape is under test rather than stubbed
- * away. (The {@code @Transactional} boundaries themselves need a container — they are pinned by
- * {@code OutlineDocumentSyncIntegrationTest}.)
+ * <p>{@link OutlineMirrorWriter} and {@link OutlineMirrorTransactions} are the real production objects over
+ * mocked repositories, so the load-or-create + mutate + save + retry-in-a-fresh-transaction shape is under
+ * test rather than stubbed. The {@code @Transactional} boundaries themselves need a container and are pinned
+ * by {@code OutlineDocumentSyncIntegrationTest}.
  */
 class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 

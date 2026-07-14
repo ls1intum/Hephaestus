@@ -7,31 +7,18 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Agent-owned SPI: projects a workspace's mirrored documentation into the flat, agent-facing view the
- * documentation content source materialises into the sandbox context. Implemented by the integration module
- * that owns the mirrored-document schema; the agent content source consumes it and never touches that schema.
- *
- * <p>The implementation is the sole agent-facing reader of the mirror: it maps rows to {@link ProjectedDocument}
- * and represents a tombstoned (removed upstream) or size-cap-evicted document as a {@code deleted} / null-body
- * marker rather than dropping it, so a link to a vanished document still resolves to a placeholder. All methods
- * are pure reads (extract/load only); no practice, verdict, or threshold logic lives on this seam.
+ * Agent-owned SPI projecting a workspace's mirrored documentation into the agent-facing view. Implemented by the
+ * integration module that owns the schema, so the agent never touches it. A tombstoned or size-cap-evicted document
+ * is returned as a {@code deleted} / null-body marker rather than dropped, so a link to a vanished document still
+ * resolves. Pure reads: no practice, verdict, or threshold logic lives on this seam.
  */
 public interface DocumentProjection {
-    /**
-     * A bounded breadth of the workspace's mirrored documents — the corpus the mentor sees. Live documents are
-     * surfaced ahead of tombstoned ones and the result is capped, so a large workspace never floods the context.
-     *
-     * @param workspaceId the workspace to scope the read to
-     */
+    /** A bounded breadth of the workspace's mirrored documents — live ahead of tombstoned, capped so a large workspace never floods the context. */
     List<ProjectedDocument> documentsForWorkspace(long workspaceId);
 
     /**
-     * The workspace's mirrored documents matching a set of references — the linked-document lookup for the review
-     * path. Each reference may be a document id or a document URL; a tombstoned/evicted match is still returned
-     * (as a {@code deleted} / null-body marker) so a stale link resolves rather than silently vanishing.
-     *
-     * @param workspaceId  the workspace to scope the read to
-     * @param documentRefs the document ids or URLs referenced from the artifact under review
+     * The linked-document lookup. Each reference may be a document id or URL; a tombstoned/evicted match is still
+     * returned as a marker so a stale link resolves rather than silently vanishing.
      */
     List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs);
 

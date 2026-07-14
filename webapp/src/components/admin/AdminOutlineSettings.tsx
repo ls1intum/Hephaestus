@@ -30,23 +30,13 @@ const SYNC_POLL_MS = 3_000;
 const TOKEN_STATUS_STALE_MS = 5 * 60_000;
 
 /**
- * Container for the Outline admin surface: reads the workspace's connections to derive the
- * connected state, and — while connected — the connection health and the mirrored-collections
- * plane. Drives connect (generic inline initiate: server URL + token only), disconnect
- * (status → UNINSTALLED), the fire-and-forget full reconcile, and the collection lifecycle
- * (register / pause / resume / remove + erase) through the generated hooks. Every mutation
- * invalidates both the collection list and the status line so the UI reflects server truth.
- * The components below are pure presentation.
+ * Container for the Outline admin surface: connection state, health, and the mirrored-collections plane.
+ * Every mutation invalidates the collection list, the status line and the token state, so the UI reflects
+ * server truth. The components below are pure presentation.
  *
- * <p><b>Why this self-fetches (deliberate divergence from the route-level Slack pattern in
- * CLAUDE.md §6):</b> the Outline reads are consumer-coupled and must stay lazy, so hoisting them
- * to the admin route would be wrong, not merely inconsistent. The status/token queries only exist
- * while a connection is ACTIVE and poll based on live sync state, and the candidates probe (in
- * {@link AddCollectionDialog}) is a live proxy into Outline that doubles as the connectivity check —
- * firing it eagerly at route level would hit Outline on every settings visit whether or not the
- * admin ever opens the picker. Colocating each query with the state that gates it (`connected`,
- * dialog `open`) keeps the fetch lazy and self-healing; the Slack sibling has no such lazy-probe, so
- * route-level prop passing suits it. Keep the fetching here.
+ * This fetches here rather than at the route (the Slack sibling's pattern) because the Outline reads must stay
+ * lazy: the status/token queries only exist while a connection is ACTIVE, and the candidates probe is a live
+ * proxy into Outline that would otherwise hit it on every settings visit whether or not the picker is opened.
  */
 export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProps) {
 	const queryClient = useQueryClient();
@@ -62,10 +52,8 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	);
 	const connected = outlineConnection != null;
 
-	// Collections + status only exist server-side while a connection is ACTIVE — gate the
-	// queries on the derived connected state instead of firing guaranteed-404 requests.
-	// A sync is a 202 fire-and-forget: nothing pushes its progress, so both planes poll while
-	// (and only while) work is in flight, then fall back to a single fetch per invalidation.
+	// Gated on `connected` — these 404 without an ACTIVE connection. A sync is a 202 fire-and-forget with
+	// nothing pushing progress, so both planes poll only while work is in flight.
 	const statusQueryOptions = getOutlineConnectionStatusOptions({ path: { workspaceSlug } });
 	const { data: connectionStatus, isLoading: isStatusLoading } = useQuery({
 		...statusQueryOptions,
@@ -88,8 +76,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 				: false,
 	});
 
-	// The token state is a live call into Outline (and one an admin reads, not watches): cache it
-	// hard and never poll. Connect/disconnect invalidate it explicitly.
+	// A live call into Outline that an admin reads rather than watches: cache hard, never poll.
 	const tokenStatusQueryOptions = getOutlineTokenStatusOptions({ path: { workspaceSlug } });
 	const { data: tokenStatus, isLoading: isTokenStatusLoading } = useQuery({
 		...tokenStatusQueryOptions,
@@ -101,9 +88,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	const invalidateConnections = () =>
 		queryClient.invalidateQueries({ queryKey: connectionsQueryOptions.queryKey });
 
-	// Every collection/sync mutation refreshes all three planes: the list (rows, counts,
-	// watermarks), the status line (aggregate document count, last sync), and the token state
-	// (a connect stores a different key).
+	// Every mutation refreshes all three planes: the collection list, the status line, and the token state.
 	const invalidateOutline = () => {
 		queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
 		queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
@@ -113,8 +98,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	const connect = useMutation({
 		...initiateMutation(),
 		onSuccess: () => {
-			// Outline uses inline-credential connect (LINKED); the server persists an ACTIVE
-			// connection, so a refetch of the connections list flips the card to its connected state.
+			// Inline-credential connect: the server persists an ACTIVE connection, so refetching the list flips the card.
 			toast.success("Outline connected");
 			invalidateConnections();
 			invalidateOutline();
@@ -139,8 +123,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	const syncNow = useMutation({
 		...syncOutlineConnectionMutation(),
 		onSuccess: () => {
-			// 202 fire-and-forget: the reconcile runs async; the invalidated queries pick up
-			// progress (sync_status flips, watermarks advance) as it lands.
+			// 202 fire-and-forget: the invalidated queries pick up progress as the reconcile lands.
 			toast.success("Sync started");
 			invalidateOutline();
 		},
@@ -183,12 +166,9 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 		},
 	});
 
-	// No server capability signal tells the SPA up front whether this deployment has the Outline
-	// integration enabled (the connections list only enumerates existing connections). When it is
-	// disabled the server has no ConnectionStrategy for the kind, so POST /connections rejects the
-	// initiate with a 400 whose detail is exactly this. Match it to turn the otherwise-cryptic error
-	// into a clear "not available here" hint instead of a dead-end connect form. A dedicated
-	// capability field on the workspace/connections response would be the cleaner gate.
+	// Nothing tells the SPA up front whether this deployment has Outline enabled. When it is disabled the
+	// server has no ConnectionStrategy for the kind and rejects the initiate with this exact 400 detail;
+	// matching it turns a cryptic error into a clear "not available here". A capability field would be cleaner.
 	const connectErrorMessage = connect.error != null ? problemDetailOf(connect.error) : undefined;
 	const connectUnavailable =
 		connectErrorMessage != null && /no connectionstrategy registered/i.test(connectErrorMessage);
@@ -216,8 +196,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 		});
 	};
 
-	// Dialog-driven mutations use mutateAsync so the dialogs await the result and only close
-	// on success (pessimistic); onError above still surfaces the toast.
+	// mutateAsync so the dialogs await the result and only close on success; onError still toasts.
 	const handleRegisterCollection = async ({ collectionId }: { collectionId: string }) => {
 		await registerCollection.mutateAsync({
 			path: { workspaceSlug },

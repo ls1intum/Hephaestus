@@ -32,19 +32,16 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Thin client for the handful of Outline API calls the integration makes. Outline is RPC-over-POST:
- * every call is {@code POST {serverUrl}/api/<resource>.<action>} with a JSON body and a bearer token.
+ * Thin client for the Outline API. Outline is RPC-over-POST: every call is
+ * {@code POST {serverUrl}/api/<resource>.<action>} with a JSON body and a bearer token.
  *
  * <p>The server URL is admin-supplied, so every request goes through the SSRF-guarded connector
- * ({@link WebClientConnectors#ssrfGuarded()}, which blocks hostnames that resolve to private ranges
- * and closes the DNS-rebind bypass) and the URL is validated up front with {@link ServerUrlValidator}
- * (which rejects literal private/loopback/metadata addresses). The two together are the SSRF posture.
+ * ({@link WebClientConnectors#ssrfGuarded()}, which blocks private-range resolution and closes the
+ * DNS-rebind bypass) and is validated up front with {@link ServerUrlValidator}.
  *
- * <p>Every remote call runs through the {@code outlineRestApi} circuit breaker so repeated outages fail
- * fast rather than stalling the sync cycle, wrapped in the {@code outlineRestApiRetry} decorator that
- * retries transient failures (5xx, transport errors, 429) with bounded backoff — a 429 waits out its
- * {@code Retry-After} hint. An HTTP 429 that survives the retries surfaces as
- * {@link OutlineRateLimitedException} so the sync pauses and resumes next cycle instead of aborting.
+ * <p>Calls run through the {@code outlineRestApi} circuit breaker wrapped in the {@code outlineRestApiRetry}
+ * decorator (retries 5xx/transport/429 with bounded backoff, honoring {@code Retry-After}); a 429 that
+ * survives surfaces as {@link OutlineRateLimitedException} so the sync pauses and resumes next cycle.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -53,7 +50,7 @@ public class OutlineApiClient {
     private static final Logger log = LoggerFactory.getLogger(OutlineApiClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
-    /** Outline caps list endpoints at 100 rows per page; using the max keeps a full pass cheapest in calls. */
+    /** Outline caps list pages at 100 rows; the max keeps a full pass cheapest in calls. */
     private static final int PAGE_LIMIT = 100;
 
     /** Guards against a malformed {@code pagination} block looping forever. */
@@ -78,17 +75,12 @@ public class OutlineApiClient {
         this.retry = retry;
     }
 
-    /**
-     * Identity resolved from Outline's {@code auth.info}: the team the token belongs to and the
-     * calling user. The team id is stable per Outline instance and becomes the Connection's
-     * instance key.
-     */
+    /** Identity from Outline's {@code auth.info}. The team id is stable per instance and becomes the Connection's instance key. */
     public record OutlineIdentity(String teamId, String teamName, String userId) {}
 
     /**
-     * Validates an Outline API token by calling {@code auth.info} against the given server, returning
-     * the resolved identity. Throws {@link OutlineApiException} on an unreachable host, a rejected
-     * token, or a response without a team — the connect flow turns that into a structured error.
+     * Validates a token via {@code auth.info}, returning the resolved identity. Throws
+     * {@link OutlineApiException} on an unreachable host, a rejected token, or a response without a team.
      */
     public OutlineIdentity validateToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
@@ -112,14 +104,12 @@ public class OutlineApiClient {
         return new OutlineIdentity(team.id(), team.name(), user == null ? null : user.id());
     }
 
-    /** An Outline API key's own metadata: how it is labelled there, when it lapses, when it was last used. */
     public record OutlineTokenDescription(String name, String last4, Instant expiresAt, Instant lastActiveAt) {}
 
     /**
-     * Describes the token itself via {@code apiKeys.list}, matched on the {@code last4} suffix Outline
-     * returns in place of the (write-only) key value. Empty when the key is not in the list — a key
-     * scoped away from {@code apiKeys.list}, or one belonging to a user who cannot see it, still works
-     * for content sync, so the absence of metadata is not an error and must not be surfaced as one.
+     * Describes the token via {@code apiKeys.list}, matched on the {@code last4} suffix. Empty when the key
+     * is absent or {@code apiKeys.list} is out of scope — such a token still works for content sync, so
+     * missing metadata must not surface as an error.
      */
     public Optional<OutlineTokenDescription> describeToken(String serverUrl, String token) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
@@ -151,19 +141,14 @@ public class OutlineApiClient {
             .map(key -> new OutlineTokenDescription(key.name(), key.last4(), key.expiresAt(), key.lastActiveAt()));
     }
 
-    /**
-     * Lists the collections the token can see ({@code collections.list}, offset/limit paged). The sync's
-     * catalog pass refreshes mirrored-collection metadata and visibility from it.
-     */
+    /** Lists the collections the token can see ({@code collections.list}); the catalog pass refreshes mirrored-collection metadata. */
     public List<OutlineCollectionListResponse.Collection> listCollections(String serverUrl, String token) {
         return listCollections(serverUrl, token, MAX_PAGES);
     }
 
     /**
-     * {@link #listCollections(String, String)} under an explicit page budget — the interactive admin
-     * paths pass a small cap so a pathological instance cannot stall a request-thread proxy call.
-     * When the cap stops a still-full page stream, the truncation is logged and the partial result
-     * returned.
+     * {@link #listCollections(String, String)} under an explicit page cap — interactive admin paths pass a
+     * small cap so a pathological instance cannot stall a request thread; a hit cap logs and returns partial.
      */
     public List<OutlineCollectionListResponse.Collection> listCollections(
         String serverUrl,
@@ -199,8 +184,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Fetches a collection's document tree ({@code collections.documents}). Returns the root nodes; each
-     * node's {@code children} carry the nesting the sync flattens into parent relationships.
+     * Fetches a collection's document tree ({@code collections.documents}); {@code children} carry the
+     * nesting the sync flattens into parent relationships.
      */
     public List<OutlineCollectionDocumentsResponse.Node> listCollectionDocuments(
         String serverUrl,
@@ -220,10 +205,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Lists per-document metadata for a collection ({@code documents.list}, offset/limit paged,
-     * newest-{@code updatedAt} first). The ordering matters: the sync spends its bounded export budget
-     * front-to-back, so the most recently edited documents mirror first. {@code updatedAt} is also the
-     * incremental cursor the sync diffs against.
+     * Lists per-document metadata ({@code documents.list}, newest-{@code updatedAt} first). Ordering matters:
+     * the sync spends its bounded export budget front-to-back, and {@code updatedAt} is the incremental cursor.
      */
     public List<OutlineDocumentListResponse.Meta> listDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
@@ -260,9 +243,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Fetches one document's metadata ({@code documents.info}). Returns {@link Optional#empty()} when the
-     * document no longer exists upstream (HTTP 404) — the webhook refresh path treats that as "tombstone" —
-     * and rethrows every other failure.
+     * Fetches one document's metadata ({@code documents.info}); empty on HTTP 404 (the webhook refresh treats
+     * that as a tombstone), rethrows every other failure.
      */
     public Optional<OutlineDocumentListResponse.Meta> getDocumentInfo(
         String serverUrl,
@@ -308,11 +290,9 @@ public class OutlineApiClient {
     }
 
     /**
-     * Lists a collection's ARCHIVED documents ({@code documents.list} with {@code statusFilter: ["archived"]}).
-     * Outline's default {@code documents.list} (and {@code collections.documents}) excludes archived documents
-     * entirely — archive is soft and recoverable, not a delete — so without this second call the live-enumeration
-     * tombstone-by-absence sweep would wipe an archived document as if it had been permanently deleted. Same
-     * offset/limit paging as {@link #listDocuments}, and the same all-or-nothing contract.
+     * Lists a collection's ARCHIVED documents ({@code documents.list} with {@code statusFilter:["archived"]}).
+     * Outline's default listing excludes archived documents, so without this call the tombstone-by-absence
+     * sweep would wipe an archived (soft-deleted, recoverable) document as a permanent delete.
      */
     public List<OutlineDocumentListResponse.Meta> listArchivedDocuments(
         String serverUrl,
@@ -359,13 +339,11 @@ public class OutlineApiClient {
     }
 
     /**
-     * The page's rows, or an {@link OutlineApiException} when Outline answered without a {@code data} array
-     * at all.
+     * The page's rows, or {@link OutlineApiException} when Outline answered without a {@code data} array.
      *
-     * <p>This is a data-loss guard: a short read treated as the end of the listing becomes the reconcile's
-     * {@code seen} set, and the tombstone-by-absence sweep then irreversibly deletes every mirrored document
-     * that fell off the truncated tail. Failing the call skips the sweep instead, leaving the mirror intact
-     * until Outline answers properly.
+     * <p>Data-loss guard: a short read treated as end-of-listing becomes the reconcile's {@code seen} set, and
+     * the tombstone-by-absence sweep then deletes every mirrored document past the truncated tail. Failing the
+     * call skips the sweep, leaving the mirror intact.
      */
     private static List<OutlineDocumentListResponse.Meta> requirePage(
         OutlineDocumentListResponse body,
@@ -401,8 +379,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Lists the change-notification subscriptions the token owns ({@code webhookSubscriptions.list},
-     * offset/limit paged). The registrar's self-heal pass diffs its stored subscription id against this.
+     * Lists the change-notification subscriptions the token owns ({@code webhookSubscriptions.list}). The
+     * registrar's self-heal pass diffs its stored subscription id against this.
      */
     public List<OutlineWebhookSubscriptionListResponse.Subscription> listWebhookSubscriptions(
         String serverUrl,
@@ -440,10 +418,7 @@ public class OutlineApiClient {
         return (e.getCause() instanceof WebClientResponseException wire && wire.getStatusCode().value() == 403);
     }
 
-    /**
-     * Exports a document's body as Markdown ({@code documents.export}). Returns {@code null} when Outline
-     * responds without a body.
-     */
+    /** Exports a document's body as Markdown ({@code documents.export}); {@code null} when Outline responds without a body. */
     public String exportDocument(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         OutlineExportResponse body = post(
@@ -457,9 +432,8 @@ public class OutlineApiClient {
     }
 
     /**
-     * Registers a change-notification subscription ({@code webhookSubscriptions.create}) that posts the given
-     * document events to {@code deliveryUrl}, signed with {@code signingSecret}. Returns the created
-     * subscription's id, or {@code null} when Outline responds without one.
+     * Creates a subscription ({@code webhookSubscriptions.create}) posting the given events to
+     * {@code deliveryUrl}, signed with {@code signingSecret}; returns its id, or {@code null} when Outline responds without one.
      */
     public String createWebhookSubscription(
         String serverUrl,
@@ -480,16 +454,12 @@ public class OutlineApiClient {
         return body == null || body.data() == null ? null : body.data().id();
     }
 
-    /** Deletes a change-notification subscription ({@code webhookSubscriptions.delete}) by its id. */
     public void deleteWebhookSubscription(String serverUrl, String token, String subscriptionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
         post(resolvedUrl, token, "/api/webhookSubscriptions.delete", Map.of("id", subscriptionId), Void.class);
     }
 
-    /**
-     * Issues one {@code POST {resolvedUrl}{path}} through the retry decorator. The inner call goes
-     * through the circuit breaker on every attempt, so each failure counts toward the failure rate.
-     */
+    /** One {@code POST} through the retry decorator; each attempt goes through the circuit breaker so every failure counts toward the rate. */
     private <T> T post(String resolvedUrl, String token, String path, Object requestBody, Class<T> responseType) {
         return retry.executeSupplier(() -> executeOnce(resolvedUrl, token, path, requestBody, responseType));
     }

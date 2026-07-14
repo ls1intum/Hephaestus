@@ -40,18 +40,14 @@ export interface AddCollectionDialogProps {
 	workspaceSlug: string;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/**
-	 * Register one collection for mirroring. The dialog registers a multi-selection sequentially;
-	 * a rejection stops the run and keeps the dialog open with the failure inline.
-	 */
+	/** Register one collection; a rejection stops the sequential run and keeps the dialog open with the failure inline. */
 	onRegister: (input: { collectionId: string }) => Promise<void> | void;
 }
 
 /**
  * Searchable picker for the Outline collections the API token can see. The candidates call is a live
- * proxy to Outline and doubles as the connectivity probe, so it runs lazily (only while the dialog is
- * open) and its 502/503 ProblemDetail surfaces inline instead of a silent empty list.
- * Already-mirrored collections stay visible but disabled+checked so the picker reflects reality.
+ * proxy to Outline and doubles as the connectivity probe, so it stays lazy (only while the dialog is
+ * open) and its 502/503 surfaces inline instead of a silent empty list.
  */
 export function AddCollectionDialog({
 	workspaceSlug,

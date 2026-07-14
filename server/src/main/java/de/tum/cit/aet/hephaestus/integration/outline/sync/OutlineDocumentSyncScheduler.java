@@ -16,26 +16,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduling fan-out for the Outline document sync.
+ * Scheduling fan-out for the Outline sync: a six-hour full reconcile over every workspace with an ACTIVE
+ * connection, and a fast catch-up tick over only those with a collection still awaiting a clean pass (normally
+ * none, so zero API calls). Each workspace is delegated to {@link OutlineDocumentSyncService} across a real proxy
+ * hop, so one workspace's failure is isolated. This bean owns scheduling and cross-pod locking only.
  *
- * <p>Two loops: the six-hour full reconcile enumerates every workspace with an ACTIVE Outline
- * Connection, and the fast catch-up tick sweeps only workspaces with a collection still awaiting a
- * clean pass (normally none → zero API calls). Each workspace is delegated to
- * {@link OutlineDocumentSyncService} — a separate bean whose {@code REQUIRES_NEW} boundary only takes
- * effect across a real proxy hop, so one workspace's failure is isolated and the fan-out continues.
- * Webhook-subscription upkeep lives inside the reconcile itself (the registrar's self-heal), not here.
- *
- * <p>This bean owns only scheduling and cross-pod locking. Scheduling is gated to the server role, and
- * {@link SchedulerLock} stops concurrent pods from both running a loop.
- *
- * <p><b>Tenancy.</b> {@link WorkspaceAgnostic} is on the FAN-OUT methods only — they enumerate the fleet
- * ({@code findWorkspaceIdsWithActiveConnection}, {@code findDistinctWorkspaceIdsWithPendingSync}) before any
- * tenant is bound, so their SQL cannot carry a {@code workspace_id} predicate. It is deliberately NOT on the
- * type: a type-level bypass would also blanket the single-workspace {@code *Now} pass-throughs, disabling
- * {@code WorkspaceStatementInspector} on precisely the paths that take vendor-supplied ids straight off a
- * webhook. Those paths are already workspace-scoped (every query takes the {@code workspaceId}), so they keep
- * the safety net on. The {@code *Now} methods are a bean hop for webhook consumers and async listeners;
- * they carry no tenancy bypass.
+ * <p><b>Tenancy.</b> {@link WorkspaceAgnostic} sits on the fan-out methods alone: they enumerate the fleet before
+ * any tenant is bound, so their SQL cannot carry a {@code workspace_id} predicate. Putting it on the type would
+ * also blanket the single-workspace {@code *Now} pass-throughs, disabling {@code WorkspaceStatementInspector} on
+ * exactly the paths that take vendor-supplied ids off a webhook — those stay scoped and keep the safety net.
  */
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

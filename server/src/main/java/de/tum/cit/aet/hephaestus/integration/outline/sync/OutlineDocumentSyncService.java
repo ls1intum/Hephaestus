@@ -37,48 +37,24 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Reconciles a workspace's registered Outline collections ({@code outline_collection}, ENABLED rows)
- * into the local {@code outline_document} mirror.
+ * Reconciles a workspace's ENABLED {@code outline_collection} rows into the {@code outline_document} mirror.
+ * Four entry paths share one upsert core: {@link #syncWorkspace} (authoritative full reconcile),
+ * {@link #syncPendingCollections} (catch-up tick), {@link #syncCollection} (targeted), and
+ * {@link #refreshDocument} / {@link #refreshCollectionCatalog} (webhook).
  *
- * <p>Four entry paths share one upsert core:
- * <ul>
- *   <li>{@link #syncWorkspace} — the authoritative full reconcile (6h cron + connect + admin "sync now"):
- *       catalog refresh, every ENABLED collection stalest-first under a shared export budget, webhook
- *       subscription self-heal, size cap + staleness drop.</li>
- *   <li>{@link #syncPendingCollections} — the catch-up tick's worklist: only ENABLED rows still
- *       {@code PENDING} (a budget-exhausted or freshly registered collection); zero rows → zero API calls.</li>
- *   <li>{@link #syncCollection} — one collection, targeted (admin registration kick).</li>
- *   <li>{@link #refreshDocument} / {@link #refreshCollectionCatalog} — webhook targeted refresh (≤2 API
- *       calls per document event; tombstone routing without any call for delete events).</li>
- * </ul>
+ * <p><b>Nothing here is transactional.</b> Enumeration and export are blocking HTTP; holding a transaction
+ * across them would pin a pooled connection and leave a Postgres backend {@code idle in transaction} for as
+ * long as Outline is slow. Each write is its own short {@code REQUIRES_NEW} transaction via
+ * {@link OutlineMirrorWriter}, so progress commits incrementally and a pass that dies mid-way keeps what it
+ * already wrote.
  *
- * <h2>Transaction shape</h2>
- * <p>Nothing here is transactional. Enumeration and export — up to ~1500 blocking HTTP calls with a
- * 10-second timeout each, plus retries — run with no JDBC connection in hand; every write is a separate
- * short {@code REQUIRES_NEW} transaction opened by {@link OutlineMirrorWriter} for one row and closed
- * immediately. A transaction spanning the pass would pin a HikariCP connection and leave a Postgres
- * backend {@code idle in transaction} for as long as Outline is slow, blocking vacuum on the mirror and
- * starving the request path — the same reason
- * {@code OutlineCollectionAdminService} keeps its live Outline calls out of a transaction.
+ * <p>The diff runs on {@link OutlineDocumentSnapshot}s, never entities — bodies are unbounded {@code text}
+ * and the diff needs only timestamps, hashes and body presence. Only rows actually written are loaded whole.
  *
- * <p>The corollary is that progress commits incrementally: a pass that dies mid-way keeps every document
- * it had already written.
- *
- * <h2>Memory shape</h2>
- * <p>The diff runs against {@link OutlineDocumentSnapshot}s, never entities: the mirror's Markdown bodies
- * are unbounded {@code text} columns capped at hundreds of megabytes per workspace, and the diff needs
- * only timestamps, hashes and body <em>presence</em>. Only rows that are actually written are re-read as
- * full entities, one at a time, inside their own write transaction.
- *
- * <h2>Correctness invariants</h2>
- * <p>A collection's tombstone-by-absence sweep runs only on a CLEAN pass — full enumeration succeeded and
- * no export was skipped for budget. Visibility loss
- * (collection absent from {@code collections.list}) records an error and skips the collection but never
- * tombstones its documents: forbidden/gone is not "documents removed". A truncated enumeration is an error,
- * not an empty tail — {@link OutlineApiClient} throws rather than returning a short list, so the sweep is
- * skipped instead of deleting the documents that fell off it. An HTTP 429 pauses the pass — progress so far
- * is committed and the remainder resumes next tick. Archived documents are never tombstoned: see
- * {@link #syncArchivedDocuments}.
+ * <p><b>Invariants.</b> Tombstone-by-absence runs only on a clean pass (full enumeration, nothing skipped for
+ * budget): losing visibility of a collection, a truncated enumeration ({@link OutlineApiClient} throws rather
+ * than returning a short list), and an HTTP 429 all skip the sweep instead of deleting documents. Archived
+ * documents are never tombstoned — see {@link #syncArchivedDocuments}.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -86,14 +62,10 @@ public class OutlineDocumentSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineDocumentSyncService.class);
 
-    /** Document events whose meaning is "the mirrored body must go away" — no API round-trip needed. */
+    /** Events that mean "the mirrored body must go away" — no API round-trip needed. */
     private static final Set<String> TOMBSTONE_EVENTS = Set.of("documents.delete", "documents.permanent_delete");
 
-    /**
-     * Archive is soft/recoverable — NOT a delete. Unlike {@link #TOMBSTONE_EVENTS} this never wipes the
-     * body/hash/authors; it only stamps {@code archivedAt} on the mirrored row. No API round-trip needed:
-     * the event itself is the only fact that changed.
-     */
+    /** Archive is soft: it stamps {@code archivedAt} and never wipes body/hash/authors. */
     private static final String ARCHIVE_EVENT = "documents.archive";
 
     private static final int MAX_ERROR_LENGTH = 2048;
@@ -101,18 +73,10 @@ public class OutlineDocumentSyncService {
     /** Matches {@code outline_collection.description}'s column width. */
     private static final int MAX_DESCRIPTION_LENGTH = 2048;
 
-    /**
-     * Ids per size-cap eviction statement. {@code evictBodies} binds one parameter per id and Postgres
-     * caps a statement at 65 535 of them (degrading in the planner long before that), so the candidate
-     * query is paged at this width and the update is issued per page.
-     */
+    /** Postgres caps a statement at 65 535 bind parameters, so eviction pages its id list at this width. */
     static final int EVICTION_BATCH_SIZE = 1000;
 
-    /**
-     * Hard stop on the eviction loop. Each round evicts up to {@link #EVICTION_BATCH_SIZE} bodies that then
-     * drop out of the candidate query, so the loop terminates on its own; this only bounds the damage of a
-     * pathological state (e.g. an {@code UPDATE} that silently affects nothing) rather than spinning forever.
-     */
+    /** The eviction loop terminates on its own; this only bounds a pathological no-op {@code UPDATE}. */
     private static final int MAX_EVICTION_ROUNDS = 100;
 
     private final ConnectionService connectionService;
@@ -190,9 +154,8 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Catch-up: sync only the ENABLED collections still awaiting a clean pass ({@code PENDING}). This is
-     * the resume path after a budget-exhausted pass and the convergence path for a freshly registered
-     * collection; a fully caught-up workspace makes zero API calls.
+     * Syncs only ENABLED collections still {@code PENDING} — the resume path after a budget-exhausted pass.
+     * A fully caught-up workspace makes zero API calls.
      */
     public void syncPendingCollections(long workspaceId) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
@@ -217,9 +180,8 @@ public class OutlineDocumentSyncService {
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }
-        // The catch-up tick exports bodies too — without this only the 6h reconcile would ever
-        // shrink an over-cap mirror grown by catch-up passes. Runs even after a rate-limited abort: the
-        // bodies exported before the pause still count against the cap.
+        // The catch-up tick exports bodies too, so it must also enforce the cap — including after a
+        // rate-limited abort, since bodies exported before the pause still count against it.
         enforceSizeCap(workspaceId);
     }
 
@@ -260,17 +222,13 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Webhook targeted refresh of one document. Delete-shaped events tombstone the mirrored row without
-     * any call; {@link #ARCHIVE_EVENT} stamps {@code archivedAt} in place, also without a call. Everything
-     * else resolves metadata and exports iff its collection is a mirrored ENABLED collection: a vanished
-     * document tombstones, a live one upserts (which clears any stale {@code archivedAt}, e.g. after
-     * {@code documents.unarchive}).
+     * Webhook targeted refresh of one document. Delete-shaped events tombstone and {@link #ARCHIVE_EVENT}
+     * stamps {@code archivedAt}, both without an API call; anything else upserts if the document's
+     * collection is mirrored, and a vanished document tombstones.
      *
-     * <p>{@code prefetchedMeta} is the webhook payload's own {@code model} — authenticated by the whole
-     * envelope's HMAC, so a usable one (carrying at least an id and a collection id) is trusted as metadata
-     * and the {@code documents.info} round-trip is skipped entirely; only the body export still calls out,
-     * since the payload never carries content. A {@code null}/incomplete {@code prefetchedMeta} falls back
-     * to fetching {@code documents.info} directly.
+     * <p>{@code prefetchedMeta} is the payload's own {@code model}, authenticated by the envelope's HMAC, so
+     * a usable one is trusted and the {@code documents.info} round-trip is skipped; the body still exports,
+     * since the payload never carries content.
      */
     public void refreshDocument(
         long workspaceId,
@@ -412,8 +370,8 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Sync one collection, converting a per-collection API failure into {@code lastSyncError} so the
-     * remaining collections still run. Rate limits propagate — they abort the whole pass.
+     * Syncs one collection, recording a per-collection API failure as {@code lastSyncError} so the remaining
+     * collections still run. Rate limits propagate and abort the whole pass.
      *
      * @return whether the collection synced without an API failure
      */
@@ -532,15 +490,13 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Upsert one document. A present-and-unchanged document — body current (hash + {@code updatedAt} match)
-     * and every denormalized field already equal to what this pass would write — returns UNCHANGED without
-     * touching the row at all, so a stable wiki does zero writes and zero body loads per reconcile. If the
-     * body is current but metadata shifted (renamed/moved), the row is rewritten without a re-export. An
-     * export consumes one budget unit — with the budget exhausted the document is left entirely untouched
-     * (a partially-written row would masquerade as an eviction placeholder).
+     * Upserts one document. An unchanged document (body current and every denormalized field already equal to
+     * what this pass would write) touches no row at all, so a stable wiki does zero writes per reconcile; a
+     * current body with shifted metadata rewrites without re-exporting. With the budget exhausted the document
+     * is left entirely untouched — a partially-written row would masquerade as an eviction placeholder.
      *
-     * <p>The export happens <em>before</em> the write transaction opens: the body crosses the wire with
-     * no JDBC connection held, and only then is the row read, mutated and committed.
+     * <p>The export happens before the write transaction opens, so the body crosses the wire with no JDBC
+     * connection held.
      */
     private UpsertOutcome upsert(
         SyncContext ctx,
@@ -558,8 +514,7 @@ public class OutlineDocumentSyncService {
         Instant upstreamUpdatedAt = meta == null ? null : meta.updatedAt();
         OutlineDocumentSnapshot existingRow = existing.get(documentId);
 
-        // The denormalized metadata this pass would persist, computed once so the skip decision compares
-        // against exactly what the mutator would write.
+        // Computed once so the skip decision compares against exactly what the mutator would write.
         String desiredCollectionId = collection.getCollectionId();
         String desiredCollectionSlug = OutlineSyncMapping.collectionSlug(collection);
         String desiredParentDocumentId =
@@ -577,8 +532,7 @@ public class OutlineDocumentSyncService {
             upstreamUpdatedAt != null &&
             existingRow.outlineUpdatedAt().equals(upstreamUpdatedAt);
 
-        // Present, body current, and every denormalized field already matches: nothing to persist. Skip
-        // the whole write transaction and the full-entity load it would incur.
+        // Nothing to persist: skip the write transaction and the full-entity load it would incur.
         if (
             bodyUnchanged &&
             Objects.equals(existingRow.collectionId(), desiredCollectionId) &&
@@ -608,8 +562,8 @@ public class OutlineDocumentSyncService {
                 doc.setParentDocumentId(desiredParentDocumentId);
                 doc.setTitle(desiredTitle);
                 doc.setSlug(desiredSlug);
-                // meta comes from listings that exclude archived documents, so a document reaching this path is
-                // unambiguously live — clear a stale archivedAt. A null meta (tree-only node) leaves it untouched.
+                // Listings exclude archived documents, so a document reaching this path is live — clear a
+                // stale archivedAt. A null meta (tree-only node) leaves it untouched.
                 if (meta != null) {
                     doc.setArchivedAt(desiredArchivedAt);
                 }
@@ -635,11 +589,8 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Enumerates a collection's ARCHIVED documents (a second, separate {@code documents.list} call —
-     * Outline's default listing excludes them) and upserts each via {@link #upsertArchived}, adding every
-     * one to {@code seen} so the caller's tombstone-by-absence sweep never touches them: an archived
-     * document is soft/recoverable, not deleted. Counted in {@code documentsUpstream} via the shared
-     * {@code seen} set.
+     * Enumerates a collection's archived documents (Outline's default listing excludes them) and adds each to
+     * {@code seen}, so the tombstone-by-absence sweep never touches them — archive is recoverable, not a delete.
      *
      * @return exports skipped for budget among the archived documents enumerated this pass
      */

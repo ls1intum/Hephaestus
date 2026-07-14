@@ -49,11 +49,8 @@ public class OutlineConnectionAdminService {
     private final AsyncTaskExecutor taskExecutor;
 
     /**
-     * Per-workspace in-flight guard for the manual reconcile: a workspace id is present while its
-     * manually triggered sync is running. A duplicate submit while running dispatches nothing — the
-     * endpoint still answers 202 pointing at the same status monitor. Per-pod on purpose: the guard
-     * absorbs the double-click, not cross-pod concurrency (the sync itself is idempotent and the
-     * scheduler's {@code SchedulerLock} covers the cron path).
+     * In-flight guard for the manual reconcile: a duplicate submit dispatches nothing and still answers 202.
+     * Per-pod on purpose — it absorbs the double-click, not cross-pod concurrency (the sync is idempotent).
      */
     private final Set<Long> syncsInFlight = ConcurrentHashMap.newKeySet();
 
@@ -73,12 +70,7 @@ public class OutlineConnectionAdminService {
         this.taskExecutor = taskExecutor;
     }
 
-    /**
-     * The connection health snapshot: webhook subscription presence (from the ACTIVE connection's
-     * config), the freshest clean-pass timestamp across the install's collections, the live mirrored
-     * document count, whether a manual reconcile is in flight, and the pending / errored collection
-     * counts (the figures the 202 monitor loop watches converge).
-     */
+    /** The connection health snapshot the admin card renders and the 202 monitor loop watches converge. */
     public OutlineConnectionStatusDTO status(long workspaceId) {
         Connection connection = requireActiveConnection(workspaceId);
         ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();

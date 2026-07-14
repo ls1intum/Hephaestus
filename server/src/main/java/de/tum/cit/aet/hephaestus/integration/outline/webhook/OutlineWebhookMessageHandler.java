@@ -24,25 +24,17 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Consumes a verified Outline event off the unified JetStream lane and triggers a <em>targeted</em>
- * refresh of the owning workspace's mirror: {@code documents.*} → {@link
- * OutlineDocumentSyncScheduler#refreshDocumentNow} (falling back to a whole-workspace reconcile when
- * the delivery carries no payload id), {@code collections.*} → {@link
- * OutlineDocumentSyncScheduler#refreshCollectionCatalogNow}, anything else logged at debug and acked.
- * The envelope's {@code payload.model} rides along as trusted metadata — see {@link #parseModel}.
+ * Consumes a verified Outline event off the JetStream lane and triggers a targeted refresh of the owning
+ * workspace's mirror: {@code documents.*} refreshes one document (falling back to a whole-workspace reconcile when
+ * the delivery carries no payload id), {@code collections.*} refreshes the catalog, anything else is acked and
+ * ignored. Every {@code documents.*} delivery also appends one {@link OutlineDocumentEvent} before routing — the
+ * longitudinal editing-habit log.
  *
- * <p>Every {@code documents.*} delivery (including deletes) additionally appends one
- * {@link OutlineDocumentEvent} row from the envelope ({@code actorId} + {@code createdAt}) BEFORE
- * routing — the longitudinal editing-habit log.
+ * <p>All Outline events collapse onto a single logical key ({@link #EVENT_TYPE}); routing happens on the body's
+ * event name, while the specific event still travels on the subject and dedup key for observability.
  *
- * <p>All Outline events collapse onto a single logical event key ({@link #EVENT_TYPE}) —
- * {@link OutlineSubjectParser} maps any {@code outline.<sub>.<event>} subject to it — and the routing
- * above happens on the body's event name. The specific event still travels on the wire (subject +
- * dedup key) for observability.
- *
- * <p>Resolution mirrors the secret source: the delivery names its subscription in the body, that id
- * resolves to the ACTIVE Outline Connection's workspace. Throwing propagates to the consumer's
- * {@code IntegrationPoisonHandler} (NAK + backoff, ACK-after-N) rather than being swallowed.
+ * <p>The workspace is resolved from the subscription id in the (HMAC-covered) body, never from the subject.
+ * Throwing propagates to the consumer's poison handler rather than being swallowed.
  */
 @Component
 @ConditionalOnServerRole

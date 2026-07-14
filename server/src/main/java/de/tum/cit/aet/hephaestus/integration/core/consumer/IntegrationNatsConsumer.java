@@ -49,14 +49,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 /**
- * Unified JetStream consumer fleet for every integration kind. Sole consumer-side entry
- * point: per-scope consumers, the installation-wide consumer, lifecycle, reconnect, and
- * the per-message dispatch path.
- *
- * <h2>Concurrency</h2>
- * Per-scope lifecycle is gated by an in-flight {@link Set} ({@code pendingScopeSetup}) so
- * two callers can't race to create the same JetStream consumer. Connection creation is
- * double-checked-locked. The virtual-thread executor scales linearly with the scope count.
+ * Unified JetStream consumer fleet for every integration kind and the sole consumer-side entry point:
+ * per-scope consumers, the installation-wide consumer, lifecycle, reconnect, and dispatch. Per-scope
+ * lifecycle is gated by the in-flight {@code pendingScopeSetup} set so two callers can't race to create
+ * the same JetStream consumer; connection creation is double-checked-locked.
  */
 @Order(1)
 @Service
@@ -87,11 +83,9 @@ public class IntegrationNatsConsumer {
     private static final long RECONNECT_MAX_MS = 30_000L;
 
     /**
-     * Attempts a scope reconcile gets before we stop re-arming it. A scope binds several streams now
-     * (an SCM stream plus {@code outline}), and a stream can be legitimately absent for a while — the
-     * webhook pod creates the {@code outline} stream on ITS boot, which may land after ours. That failure
-     * is transient, so the reconcile self-heals on a backoff instead of needing an app restart. Reuses the
-     * connect-retry backoff curve: ~1s → ~30s, giving roughly a minute of grace.
+     * Attempts a scope reconcile gets before it stops re-arming. A scope binds several streams, and one can be
+     * legitimately absent for a while (the webhook pod creates the {@code outline} stream on its own boot, which
+     * may land after ours), so the reconcile self-heals on the connect-retry backoff rather than needing a restart.
      */
     private static final int MAX_SCOPE_RECONCILE_ATTEMPTS = 6;
 
@@ -99,9 +93,8 @@ public class IntegrationNatsConsumer {
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
     /**
-     * JetStream consumers per scope ID. A scope may bind to more than one stream (an SCM stream plus
-     * the {@code outline} stream), so each scope maps to a list of {@link ScopeConsumer}s — one per
-     * (scope, stream).
+     * JetStream consumers per scope id. A scope may bind more than one stream, so each maps to a list of
+     * {@link ScopeConsumer}s — one per (scope, stream).
      */
     private final Map<Long, List<ScopeConsumer>> scopeConsumers = new ConcurrentHashMap<>();
 

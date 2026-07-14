@@ -12,12 +12,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for the mirrored {@link OutlineDocument} rows.
- *
- * <p>The mirror is the only place the agent read path resolves Outline content from; nothing here
- * reaches the Outline API. {@link #deleteByWorkspaceId(Long)} is the bulk-erase used by workspace
- * teardown so a purge drops this module's rows before the Connection is torn down. Every finder carries
- * the {@code workspace_id} predicate the tenancy {@code StatementInspector} requires.
+ * Repository for the mirrored {@link OutlineDocument} rows — the only place the agent read path resolves
+ * Outline content from; nothing here reaches the Outline API. Every finder carries the {@code workspace_id}
+ * predicate the tenancy {@code StatementInspector} requires.
  */
 public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument, Long> {
     long deleteByWorkspaceId(Long workspaceId);
@@ -32,10 +29,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
         String collectionId
     );
 
-    /**
-     * Live (non-tombstoned) document counts grouped by collection — one query for the whole admin
-     * collection list instead of a count per row. Each element is {@code [collectionId, count]}.
-     */
+    /** Live document counts by collection — one query for the whole admin list. Each element is {@code [collectionId, count]}. */
     @Query(
         "SELECT d.collectionId, COUNT(d) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId " +
             "AND d.connectionId = :connectionId AND d.deletedAt IS NULL GROUP BY d.collectionId"
@@ -45,10 +39,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
         @Param("connectionId") long connectionId
     );
 
-    /**
-     * Hard-deletes one collection's mirrored rows — the erase behind removing a collection from the
-     * mirror; the bodies leave the database, they are not tombstoned.
-     */
+    /** Hard-deletes one collection's mirrored rows: removing a collection erases the bodies, it does not tombstone them. */
     long deleteByWorkspaceIdAndConnectionIdAndCollectionId(Long workspaceId, Long connectionId, String collectionId);
 
     /** One mirrored document by its Outline id — the row a write transaction re-reads before mutating it. */
@@ -59,9 +50,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     );
 
     /**
-     * The body-free diff set the reconcile runs against: one {@link OutlineDocumentSnapshot} per mirrored
-     * row of this install. {@code LENGTH(body_markdown)} is evaluated in Postgres, so no Markdown body ever
-     * crosses the wire or lands on the heap — see {@link OutlineDocumentSnapshot} for why that matters.
+     * The body-free diff set the reconcile runs against. {@code LENGTH(body_markdown)} is evaluated in Postgres,
+     * so no Markdown body crosses the wire or lands on the heap.
      */
     @Query(
         "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
@@ -105,10 +95,7 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
         @Param("documentId") String documentId
     );
 
-    /**
-     * The agent-facing projection breadth: a bounded page of the workspace's mirrored documents, live rows first
-     * (tombstoned last) and most-recently-updated first within each group; the {@link Pageable} caps the result.
-     */
+    /** A bounded page of the workspace's mirrored documents: live rows first, most-recently-updated first within each group. */
     @Query(
         "SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId " +
             "ORDER BY d.deletedAt ASC NULLS FIRST, d.outlineUpdatedAt DESC NULLS LAST, d.id ASC"
@@ -116,9 +103,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     List<OutlineDocument> findForProjection(@Param("workspaceId") long workspaceId, Pageable pageable);
 
     /**
-     * The workspace's mirrored documents matching a set of reference tokens (Outline document ids and/or slugs) —
-     * the linked-document lookup for the review path. Matches on either the document id or the slug so a raw id or
-     * a URL's trailing segment resolves.
+     * The linked-document lookup: matches reference tokens against either the document id or the slug, so a raw id
+     * or a URL's trailing segment both resolve.
      */
     @Query(
         "SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId " +
@@ -130,17 +116,13 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     );
 
     /**
-     * The character bound the searchable tsvector is built over. Postgres hard-refuses a tsvector larger
-     * than 1 MB ({@code string is too long for tsvector}), and {@code body_markdown} is unbounded — without
-     * this truncation ONE oversized mirrored document makes the query <em>ERROR</em>, permanently breaking
-     * Outline retrieval for the whole workspace rather than just ranking that document poorly. 900 000
-     * characters leaves headroom under the 1 MB (1 048 576 byte) ceiling for multi-byte content and the
-     * title prefix.
+     * The character bound the searchable tsvector is built over. Postgres refuses a tsvector over 1 MB and
+     * {@code body_markdown} is unbounded, so without this truncation one oversized document makes the query ERROR
+     * and permanently breaks retrieval for the whole workspace.
      *
-     * <p>This constant is documentation only: the value is inlined in {@link #searchByRelevance}'s SQL,
-     * which must stay byte-for-byte equivalent to the {@code ix_outline_document_fts} GIN index expression
-     * in the Liquibase changelog — a mismatch silently drops the index and reintroduces the per-row
-     * tsvector rebuild.
+     * <p>Documentation only — the value is inlined in {@link #searchByRelevance}'s SQL, which must stay
+     * byte-for-byte equivalent to the {@code ix_outline_document_fts} index expression or the index is silently
+     * dropped.
      */
     int FTS_BODY_CHAR_LIMIT = 900_000;
 

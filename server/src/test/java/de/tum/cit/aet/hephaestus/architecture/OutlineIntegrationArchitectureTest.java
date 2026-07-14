@@ -19,26 +19,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Structural invariants of the Outline footprint — the {@code integration.outline} module plus its two
- * agent-side outposts ({@code agent.documentation} and {@code agent.context.providers.OutlineDocumentContentSource})
- * — that a careless commit would otherwise break silently. Sibling of
- * {@link SlackIntegrationArchitectureTest}, holding Outline to the same bar:
- *
- * <ul>
- *   <li>every REST controller in the module is workspace-scoped (or an {@code @Hidden} inbound receiver, should
- *       one ever appear) — an unscoped Outline endpoint would bypass tenancy authorization;</li>
- *   <li>every Outline NATS consumer extends the core envelope-handler base — a hand-rolled handler would skip the
- *       shared deserialization/subject discipline (the one deliberate exception is individually allowlisted with
- *       its reason, see {@link #HANDLER_BASE_ALLOWLIST});</li>
- *   <li>every Outline repository finder carries the workspace predicate in its signature — the compile-time
- *       complement to the runtime tenancy {@code StatementInspector} (the one deliberately unscoped
- *       fleet-enumeration query is allowlisted and its caller pinned {@code @WorkspaceAgnostic});</li>
- *   <li>no class in the footprint reaches for raw {@code JdbcTemplate} SQL — DB queries belong in Spring Data
- *       repositories, not hand-rolled JDBC tucked inside a {@code @Component} (unlike Slack, Outline has no
- *       pre-scoping tenant-resolution exception, so the rule holds with an empty allowlist); and</li>
- *   <li>a class whose name promises a stereotype ({@code *Service}/{@code *Repository}/{@code *Controller}) is not
- *       lying about it — directional on purpose (see {@link #outlineServiceNamesAreServices()}).</li>
- * </ul>
+ * Structural invariants of the Outline footprint — the module plus its agent-side outposts — that a careless
+ * commit would otherwise break silently. Sibling of {@link SlackIntegrationArchitectureTest}, holding Outline to
+ * the same bar: controllers are workspace-scoped, NATS consumers extend the core envelope-handler base,
+ * repository finders carry the workspace predicate, nothing reaches for raw {@code JdbcTemplate}, and a class
+ * whose name promises a stereotype actually carries it.
  */
 class OutlineIntegrationArchitectureTest extends HephaestusArchitectureTest {
 
@@ -47,11 +32,7 @@ class OutlineIntegrationArchitectureTest extends HephaestusArchitectureTest {
     private static final String OUTLINE_CONTENT_SOURCE =
         "de.tum.cit.aet.hephaestus.agent.context.providers.OutlineDocumentContentSource";
 
-    /**
-     * The whole Outline footprint: the integration module itself, the agent-side projection SPI package it
-     * implements ({@code agent.documentation}), and the agent context provider that reads the mirror
-     * ({@code OutlineDocumentContentSource}, matched by name prefix so nested classes count too).
-     */
+    /** The integration module, the projection SPI it implements, and the context provider that reads the mirror. */
     private static final DescribedPredicate<JavaClass> OUTLINE_FOOTPRINT = DescribedPredicate.describe(
         "belong to the Outline footprint (integration.outline, agent.documentation, OutlineDocumentContentSource)",
         javaClass ->
@@ -63,9 +44,8 @@ class OutlineIntegrationArchitectureTest extends HephaestusArchitectureTest {
     @Test
     @DisplayName("every Outline REST controller is workspace-scoped or a hidden webhook receiver")
     void outlineControllersAreWorkspaceScopedOrHiddenReceivers() {
-        // Selection is meta-annotation aware because @WorkspaceScopedController IS the @RestController
-        // meta-annotation here — a controller carrying only the meta-annotation must still be caught if it
-        // is ever swapped for a bare @RestController without workspace scoping.
+        // Meta-annotation aware: @WorkspaceScopedController IS the @RestController meta-annotation, and a
+        // controller must still be caught if it is ever swapped for a bare @RestController.
         classes()
             .that()
             .resideInAPackage(OUTLINE)
@@ -96,13 +76,10 @@ class OutlineIntegrationArchitectureTest extends HephaestusArchitectureTest {
     }
 
     /**
-     * The one Outline consumer allowed to implement {@code IntegrationMessageHandler} directly instead of
-     * extending {@code AbstractIntegrationMessageHandler}: all Outline events collapse onto a single logical
-     * event key ({@code OutlineWebhookMessageHandler.EVENT_TYPE}) while the wire subject still carries the
-     * specific event name, so the base's exact-equality last-subject-segment validation (one handler = one
-     * subject token) cannot hold; the handler also deliberately treats the payload as routing-only (no typed
-     * DTO), skipping the base's Jackson deserialization on purpose. Any NEW Outline handler must extend the
-     * base or earn its own justified entry here.
+     * The one consumer allowed to implement {@code IntegrationMessageHandler} directly: Outline events collapse
+     * onto a single logical key while the subject still carries the specific event, so the base's one-handler-
+     * one-subject validation cannot hold, and the payload is routing-only. A new handler must extend the base or
+     * earn its own entry here.
      */
     private static final Set<String> HANDLER_BASE_ALLOWLIST = Set.of("OutlineWebhookMessageHandler");
 

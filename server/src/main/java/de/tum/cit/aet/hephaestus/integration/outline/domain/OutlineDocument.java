@@ -21,20 +21,14 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A local copy of one Outline document, mirrored from an allow-listed collection.
+ * A local copy of one Outline document. Workspace-scoped and tied to the {@code connectionId} of the install it
+ * came from, so a workspace can mirror several Outline instances without document-id collisions. The mirror is
+ * what the agent reads — a sandbox run never calls Outline.
  *
- * <p>Workspace-scoped (scalar {@code workspaceId}) and tied to the {@code connectionId} of the
- * Outline install it came from, so a workspace can mirror more than one Outline instance without
- * document-id collisions. The mirror is the source of truth the agent reads from — a sandbox run
- * never calls Outline directly.
- *
- * <p>{@code bodyMarkdown} carries the rendered Markdown body. It is {@code null} in two states that
- * both render as a placeholder rather than a missing file: {@code deletedAt} set (the document was
- * removed upstream) and a size-cap eviction ({@code bodyEvictedAt} set; the row survives as a
- * directory marker pointing at the document URL). {@code contentHash} + {@code outlineUpdatedAt}
- * drive incremental sync so an unchanged document is never re-exported — an evicted row KEEPS its
- * hash, so the body comes back only when upstream actually changes or a targeted refresh asks for it,
- * never in a cap-evict-re-export thrash loop.
+ * <p>{@code bodyMarkdown} is {@code null} in two states that both render as a placeholder rather than a missing
+ * file: removed upstream ({@code deletedAt}) and size-cap evicted ({@code bodyEvictedAt}). An evicted row keeps
+ * its {@code contentHash}, so the body returns only when upstream actually changes — never in an
+ * evict-re-export thrash loop.
  */
 @Entity
 @Table(
@@ -54,12 +48,9 @@ public class OutlineDocument {
     private Long id;
 
     /**
-     * Optimistic-lock guard. A webhook-triggered {@code refreshDocument} and a mid-flight full reconcile's
-     * per-document upsert both run in their own {@code REQUIRES_NEW} transaction with nothing serializing
-     * them per-workspace, so they CAN race the SAME row (e.g. a document edited right as the 6h reconcile
-     * reaches its collection). Without a version column, both writers do a full-column save and the loser's
-     * commit silently clobbers the winner's — a lost update. {@code OutlineDocumentSyncService} retries a
-     * losing write once against the row's current version before giving up to the next reconcile.
+     * Optimistic-lock guard. A webhook refresh and a mid-flight reconcile can write the same row concurrently;
+     * without a version column the loser's full-column save would silently clobber the winner. A losing write is
+     * retried once against the row's current version.
      */
     @Version
     @ColumnDefault("0")

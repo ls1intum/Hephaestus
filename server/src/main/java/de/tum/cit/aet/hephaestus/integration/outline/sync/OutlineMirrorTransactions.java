@@ -16,21 +16,14 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The Outline mirror's <em>only</em> write transactions. Every method here is a short
- * {@code REQUIRES_NEW} unit of work that touches nothing but the database: read the row, apply the
- * caller's mutation, flush, commit.
+ * The Outline mirror's only write transactions: short {@code REQUIRES_NEW} units that touch nothing but the
+ * database, so {@link OutlineDocumentSyncService} can run its enumeration and HTTP calls holding no pooled
+ * connection. Holding one across the wire turns a slow-but-alive Outline into pool starvation and a Postgres
+ * backend {@code idle in transaction}, blocking vacuum on the mirror.
  *
- * <p>This class exists so {@link OutlineDocumentSyncService} can run its enumeration and its (up to
- * ~1500 blocking, 10-second-timeout) Outline HTTP calls with <strong>no</strong> transaction and no
- * pooled JDBC connection in hand. Holding a connection across the wire is what turns one slow-but-alive
- * Outline instance into a HikariCP starvation event and a Postgres backend sitting {@code idle in
- * transaction} for a quarter of an hour, blocking vacuum on the mirror table. Same reasoning
- * {@code OutlineCollectionAdminService} already states for the admin surface.
- *
- * <p>Splitting these methods out of {@link OutlineMirrorWriter} is not cosmetic: Spring's
- * {@code @Transactional} only takes effect across a proxy hop, and the retry that {@code OutlineMirrorWriter}
- * layers on top must run <em>outside</em> any transaction — a failed optimistic-lock flush marks its
- * transaction rollback-only (JPA spec), so retrying inside it could never commit.
+ * <p>These live apart from {@link OutlineMirrorWriter} because {@code @Transactional} only takes effect across a
+ * proxy hop, and the retry layered on top must run outside any transaction — a failed optimistic-lock flush marks
+ * its transaction rollback-only, so retrying inside it could never commit.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -50,9 +43,8 @@ public class OutlineMirrorTransactions {
     }
 
     /**
-     * Upsert one mirrored document: read (or create) the row, apply {@code mutator}, flush. The row is
-     * re-read <em>inside</em> this transaction rather than carried in from the caller's diff, so the write
-     * is applied to current state and the {@code @Version} check has the narrowest possible window.
+     * Upserts one mirrored document. The row is re-read inside this transaction rather than carried in from the
+     * caller's diff, so the write applies to current state and the {@code @Version} window stays narrow.
      *
      * @return the body-free snapshot of the row as written, so the caller's diff map stays current
      */

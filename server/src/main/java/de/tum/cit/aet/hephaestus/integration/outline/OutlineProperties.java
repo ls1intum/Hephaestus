@@ -10,19 +10,12 @@ import org.springframework.boot.convert.DurationUnit;
 /**
  * Configuration for the Outline document sync and its local mirror.
  *
- * <h2>Configuration Example</h2>
  * <pre>{@code
- * hephaestus:
- *   integration:
- *     outline:
- *       enabled: true
- *       sync:
- *         cron: "0 0 0/6 * * *"
- *         export-budget: 500
- *         catch-up-delay: PT5M
- *       cache:
- *         max-size-mb: 200
- *       staleness: 30d
+ * hephaestus.integration.outline:
+ *   enabled: true
+ *   sync: { cron: "0 0 0/6 * * *", export-budget: 500, catch-up-delay: PT5M }
+ *   cache: { max-size-mb: 200 }
+ *   staleness: 30d
  * }</pre>
  *
  * @param sync      scheduling and pacing of the reconcile passes

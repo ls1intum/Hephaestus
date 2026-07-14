@@ -27,22 +27,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Outline-owned implementation of the agent {@link DocumentProjection} SPI: projects the mirrored
- * {@code outline_document} rows into the flat, agent-facing view the documentation content source materialises.
- * This is the sole agent-facing reader of the mirror — the agent consumes the projected payload through the
- * SPI, never the schema.
+ * Outline's implementation of the agent {@link DocumentProjection} SPI — the sole agent-facing reader of the
+ * mirror; the agent consumes the projected payload, never the schema.
  *
- * <p><strong>Tombstones and evictions.</strong> A document removed upstream ({@code deleted_at} set) or whose body
- * was evicted under the size cap comes back as a marker ({@code deleted = true} / {@code bodyMarkdown = null})
- * rather than being dropped, so a link to a vanished document still resolves to a placeholder. Reads are pure: this
- * projector never mutates {@code last_materialized_at} (that write belongs to the content source that actually
- * materialises a body into a sandbox run), which the {@code readOnly} transaction enforces.
+ * <p>A document removed upstream or size-cap evicted projects as a marker rather than being dropped, so a link to
+ * a vanished document still resolves to a placeholder. Reads are pure — the {@code readOnly} transaction enforces
+ * that this projector never stamps {@code last_materialized_at}.
  *
- * <p><strong>Authorship.</strong> The row's author substrate (subject + display name) projects as-is; the
- * workspace member id is resolved <em>lazily per batch</em> through {@link OutlineIdentityResolver} — the
- * connection context (server URL from the ACTIVE {@code OutlineConfig}, team id = the connection's
- * {@code instance_key}) is looked up once per projection call and each distinct subject resolves once (memoised).
- * An unlinked author degrades to name-only ({@code memberId = null}); no member id is ever stamped on the row.
+ * <p>Authorship projects as-is; the workspace member id resolves lazily per batch (memoised per subject) through
+ * {@link OutlineIdentityResolver}. An unlinked author degrades to name-only — no member id is ever stamped on the row.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

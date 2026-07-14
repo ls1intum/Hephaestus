@@ -21,28 +21,19 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Registers (and tears down) the Outline change-notification subscription for a workspace.
- * Runs at connect time (via the connection-lifecycle listener) and as a
- * self-heal inside every full reconcile: Outline auto-disables a subscription after repeated delivery
- * failures, so {@link #ensureSubscription} verifies a stored id upstream and re-registers when the
- * subscription went missing or was disabled. The subscription points at
- * {@code <externalUrl>/webhooks/outline} (the unified JetStream lane) with a freshly generated signing
- * secret; both the returned subscription id and the secret are stored on the Connection
- * ({@link ConnectionConfig.OutlineConfig#withWebhookSubscription}). The signing secret never leaves the
- * server except as the shared secret Outline HMACs each delivery with.
+ * Registers and tears down a workspace's Outline change-notification subscription. Runs at connect time and
+ * as a self-heal inside every full reconcile, because Outline auto-disables a subscription after repeated
+ * delivery failures. The subscription id and a freshly generated signing secret are stored on the Connection;
+ * the secret never leaves the server except as the shared secret Outline HMACs each delivery with.
  *
- * <p>Everything here is best-effort and never throws: without a configured external URL, token, or on
- * any Outline-side failure the periodic reconcile remains the source of truth, so a missing
- * subscription only costs freshness.
+ * <p>Best-effort and never throws: without an external URL or token, or on any Outline-side failure, the
+ * periodic reconcile remains the source of truth and a missing subscription only costs freshness.
  *
- * <p>This is also the single seam through which a workspace's outline subscription id changes — fresh
- * registration, self-heal re-registration (a new id replaces the old one), and both deregister paths all
- * run through this class. The workspace-side {@code NatsSubscriptionProvider} derives the {@code outline}
- * stream subject from that stored id, so every id change must be followed by a scope-consumer reconcile or
- * the running consumer keeps filtering on a stale (or absent) subject: without it, a workspace that
- * connects Outline while the server is already running would never receive its webhook deliveries until
- * the next restart. {@link #reconcileScopeConsumer} is called from every branch that actually changes what
- * the subscription provider would report, never from the early no-op returns.
+ * <p>The single seam through which a subscription id changes. The workspace's {@code NatsSubscriptionProvider}
+ * derives the {@code outline} subject from that id, so every change must be followed by a scope-consumer
+ * reconcile — otherwise the running consumer keeps filtering on a stale subject and the workspace receives no
+ * deliveries until the next restart. {@link #reconcileScopeConsumer} therefore runs from every branch that
+ * changes the id, never from the early no-op returns.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -59,11 +50,7 @@ public class OutlineWebhookRegistrar {
     private final EncryptedStringConverter secretCipher;
     private final String externalUrl;
 
-    /**
-     * Absent when {@code hephaestus.sync.nats.enabled=false} (the consumer bean is conditional on it);
-     * the registrar itself carries no such requirement, so every use goes through {@link
-     * ObjectProvider#ifAvailable}.
-     */
+    /** Absent when {@code hephaestus.sync.nats.enabled=false}, so every use goes through {@link ObjectProvider#ifAvailable}. */
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumer;
 
     public OutlineWebhookRegistrar(

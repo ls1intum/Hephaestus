@@ -36,32 +36,19 @@ export interface OutlineConnectInput {
 
 export interface OutlineConnectCardProps {
 	connected: boolean;
-	/** Label for the connected instance (team name or id), shown next to the connected state. */
 	connectionLabel?: string;
-	/** Connection health (webhook, document count, last sync), shown while connected. */
 	status?: OutlineConnectionStatus;
-	/** The status query is still resolving — show a placeholder line instead of stale zeros. */
 	isStatusLoading?: boolean;
-	/** Live state of the stored API token (accepted, name/last4, last use, expiry). */
 	tokenStatus?: OutlineTokenStatus;
-	/** The token-status query is still resolving. */
 	isTokenStatusLoading?: boolean;
 	isConnecting?: boolean;
 	isDisconnecting?: boolean;
-	/** The fire-and-forget full reconcile has been requested and not yet acknowledged. */
 	isSyncing?: boolean;
-	/** Connect error surfaced inline under the form. */
 	errorMessage?: string;
-	/**
-	 * The connect attempt failed because this instance has no Outline integration (the server has no
-	 * ConnectionStrategy for the kind). The connect form is a dead end here, so the card explains that
-	 * instead of inviting another doomed attempt. Derived reactively from the connect error — see the
-	 * container — because no server capability signal is exposed to gate it up front.
-	 */
+	/** This instance has no Outline integration, so the connect form is a dead end and the card says so. */
 	connectUnavailable?: boolean;
 	onConnect: (input: OutlineConnectInput) => void;
 	onDisconnect: () => void;
-	/** Trigger the full reconcile (202 fire-and-forget). */
 	onSyncNow: () => void;
 }
 
@@ -83,14 +70,9 @@ function asDate(value: Date | string | undefined): Date | undefined {
 }
 
 /**
- * Workspace-admin card for the Outline documentation integration. When disconnected it captures the
- * Outline server URL and an API token, then hands them to the generic connection initiate flow.
- * When connected it shows the linked instance, a health line (webhook vs polling, document count,
- * last sync), the state of the API token itself (accepted, expiry), a Sync-now action, and a guarded
- * disconnect. Which collections are mirrored is managed post-connect in
- * {@link OutlineCollectionsSection}.
- *
- * <p>Pure presentation: all data fetching and mutations live in the container that renders this card.
+ * Workspace-admin card for the Outline integration: captures the server URL and API token when disconnected,
+ * and shows the linked instance, health, token state, sync and a guarded disconnect when connected. Which
+ * collections are mirrored is managed in {@link OutlineCollectionsSection}. Pure presentation.
  */
 export function OutlineConnectCard({
 	connected,
@@ -312,10 +294,8 @@ interface OutlineTokenPanelProps {
 }
 
 /**
- * The state of the stored API key. Outline API keys cannot rotate themselves — `apiKeys.create` and
- * `apiKeys.delete` only accept an interactive session, never a bearer token — so the most this can do
- * is warn early and point the admin at Outline. Rejection and imminent expiry are the two states that
- * silently kill the mirror, so both are alerts rather than muted text.
+ * The state of the stored API key. Outline keys cannot rotate themselves through the API, so the most this can do
+ * is warn early. Rejection and imminent expiry both silently kill the mirror, so both are alerts, not muted text.
  */
 function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 	if (isLoading) {

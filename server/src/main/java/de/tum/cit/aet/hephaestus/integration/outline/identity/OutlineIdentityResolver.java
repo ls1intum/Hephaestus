@@ -15,29 +15,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Resolves an Outline document author {@code (server, team_id, user UUID)} to the workspace member the
- * projection should attribute authorship to.
+ * Resolves an Outline document author {@code (server, teamId, user UUID)} to the workspace member the
+ * projection attributes authorship to, through auth SPI ports only — never {@code core.auth} or SCM domain
+ * types.
  *
- * <p>The chain is deliberately SPI-only so this adapter never imports {@code core.auth} domain types —
- * or the SCM schema:
- * <ol>
- *   <li>{@link GitProviderRegistry#resolveProviderId} → the {@code identity_provider} row id for
- *       {@code (OUTLINE, serverUrl)}. The registry canonicalizes the URL to its origin
- *       (scheme://host[:port]), so the Connection's {@code serverUrl} and a login provider's
- *       {@code base_url} land on the SAME provider row even when one carries a path or trailing slash,</li>
- *   <li>{@link AccountIdentityQuery#resolveAccountId} → the Hephaestus {@code Account} keyed by the
- *       {@code (OUTLINE, uuid, team)} triple ({@code teamId} — the Connection's {@code instance_key} —
- *       keeps a shared self-hosted instance from aliasing users across tenants),</li>
- *   <li>the account's active identity links → their SCM logins, narrowed to the one that is actually a
- *       member of {@code workspaceId} via {@link AccountWorkspaceMembershipQuery} — whose membership view
- *       carries the member's SCM {@code User} id, so no SCM repository read is needed here. The Outline
- *       link's own {@code usernameAtSignup} is an Outline display name and matches no SCM membership, so
- *       it drops out naturally.</li>
- * </ol>
+ * <p>The registry canonicalizes the server URL to its origin (scheme://host[:port]) so a Connection's
+ * {@code serverUrl} and a login provider's {@code base_url} resolve to the same provider row. {@code teamId}
+ * (the Connection's {@code instance_key}) is part of the identity key so a shared self-hosted instance
+ * cannot alias users across tenants.
  *
- * <p>Resolution is lazy (projection-time, never stamped onto {@code outline_document} — documents are
- * mutable and re-synced, so a stamp would strand stale member ids when a user links later) and
- * membership-gated: an author only ever resolves to the member they are linked to within THAT workspace.
+ * <p>Resolution is lazy (projection-time) and never stamped onto {@code outline_document}: documents are
+ * mutable and re-synced, so a stamp would strand stale member ids when a user links later. It is
+ * membership-gated — an author only resolves to a member linked within THAT workspace (cross-workspace
+ * firewall).
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -57,20 +47,7 @@ public class OutlineIdentityResolver {
         this.workspaceMembershipQuery = workspaceMembershipQuery;
     }
 
-    /**
-     * The workspace {@code User} (member) id the Outline author resolves to — what the document
-     * projection exposes so the mentor/review context can attribute a mirrored document to a developer.
-     * The member id comes straight off the membership view, so the chain never needs the intermediate
-     * login as an output.
-     *
-     * @param workspaceId    the workspace the projection is scoped to
-     * @param serverUrl      the Outline instance URL (from the ACTIVE connection's config; canonicalized
-     *                       to its origin by the registry)
-     * @param teamId         the Outline team UUID (= the Connection's {@code instance_key}; part of the
-     *                       identity key)
-     * @param outlineSubject the Outline user UUID captured on the document row
-     * @return the SCM {@code User} id, or empty when the author is not linked to a member of {@code workspaceId}
-     */
+    /** The workspace member id the author resolves to, or empty when it is not linked to a member of {@code workspaceId}. */
     @Transactional(readOnly = true)
     public Optional<Long> resolveMemberId(
         long workspaceId,

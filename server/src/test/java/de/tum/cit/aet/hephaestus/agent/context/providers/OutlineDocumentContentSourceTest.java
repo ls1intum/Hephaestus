@@ -74,8 +74,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         );
     }
 
-    // --- helpers ---
-
     private ContextRequest.PracticeReviewRequest prRequest(String body) {
         PullRequest pr = new PullRequest();
         pr.setBody(body);
@@ -159,7 +157,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         );
     }
 
-    /** An archived (soft, recoverable) document: not deleted, body intact, {@code archived=true}. */
     private static ProjectedDocument archivedDoc(String collection, String slug, String title, String body) {
         return new ProjectedDocument(
             collection,
@@ -181,7 +178,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         );
     }
 
-    /** A document carrying a human-facing collection display name distinct from its path slug. */
     private static ProjectedDocument docWithCollectionName(
         String collectionSlug,
         String collectionName,
@@ -209,12 +205,9 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         );
     }
 
-    /** Stubs the projection's reference extraction the way the real projector would resolve {@code body}. */
     private void extractsReferences(String body, String... refs) {
         when(projection.extractReferences(body)).thenReturn(new LinkedHashSet<>(List.of(refs)));
     }
-
-    // --- originId + supports ---
 
     @Test
     void originIdIsOutline() {
@@ -233,8 +226,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     void isBestEffort() {
         assertThat(provider.required()).isFalse();
     }
-
-    // --- (a) deterministic materialization snapshot + no ELT leak ---
 
     @Test
     void reviewPathMaterializesByteStableMarkdownTree() {
@@ -273,19 +264,15 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
                 "local mirror)._\n"
         );
 
-        // Byte-stable across runs.
         assertThat(first.get(livePath)).isEqualTo(second.get(livePath));
         assertThat(first.get(tombstonePath)).isEqualTo(second.get(tombstonePath));
     }
-
-    // --- title de-duplication: documents.export bodies always open with "# {title}" ---
 
     @Test
     void reviewPathDoesNotDuplicateTheHeadingWhenTheBodyAlreadyOpensWithIt() {
         String body = "Design in https://wiki.example.com/doc/onboarding-guide-a1b2c3";
         extractsReferences(body, "https://wiki.example.com/doc/onboarding-guide-a1b2c3");
-        // The exported body already carries its own "# Onboarding Guide" H1 — exactly what
-        // documents.export always emits.
+        // documents.export bodies always open with their own "# {title}" H1.
         when(projection.documentsByReference(eq(WORKSPACE_ID), any())).thenReturn(
             List.of(doc("Engineering", "onboarding-guide", "Onboarding Guide", "# Onboarding Guide\n\nWelcome."))
         );
@@ -297,7 +284,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
             files.get("inputs/context/outline/engineering/onboarding-guide.md"),
             StandardCharsets.UTF_8
         );
-        // The heading appears exactly once, carried over from the body — never duplicated.
         assertThat(rendered.split("# Onboarding Guide", -1)).hasSize(2);
         assertThat(rendered).contains("# Onboarding Guide\n\nWelcome.");
     }

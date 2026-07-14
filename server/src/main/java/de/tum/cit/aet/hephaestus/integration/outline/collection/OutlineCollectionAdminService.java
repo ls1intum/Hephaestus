@@ -53,11 +53,7 @@ public class OutlineCollectionAdminService {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineCollectionAdminService.class);
 
-    /**
-     * Page budget for the interactive candidates proxy (5 pages × 100 = 500 collections). The sync
-     * path keeps the client's large safety cap; this endpoint answers an admin picker on the request
-     * thread, so it must stay bounded — the client logs when the cap truncates the live list.
-     */
+    /** The candidates proxy answers a picker on the request thread, so it stays bounded (5 × 100 collections). */
     private static final int CANDIDATES_MAX_PAGES = 5;
 
     /** Matches {@code outline_collection.description}'s column width. */
@@ -92,11 +88,7 @@ public class OutlineCollectionAdminService {
     /** Whether a registration created the row (201) or hit an existing one (idempotent 200). */
     public record RegistrationOutcome(boolean created, OutlineCollectionDTO collection) {}
 
-    /**
-     * A PAUSED→ENABLED resume that has been <em>persisted</em>. Published from inside
-     * {@link #updateState}'s transaction and consumed only after that transaction commits, so the async
-     * sync it kicks can actually observe the ENABLED row.
-     */
+    /** Consumed only after {@link #updateState} commits, so the sync it kicks can observe the ENABLED row. */
     record OutlineCollectionResumedEvent(long workspaceId, String collectionId) {}
 
     /** The workspace's ACTIVE Outline install, resolved once per operation. */
@@ -119,10 +111,8 @@ public class OutlineCollectionAdminService {
     }
 
     /**
-     * Live proxy to {@code collections.list} with the stored token: every collection the token can
-     * see, flagged with whether it is already mirrored. This doubles as the connectivity probe — an
-     * unreachable server surfaces as 502, throttling as 503 (via {@link OutlineCollectionControllerAdvice}).
-     * Bounded to {@link #CANDIDATES_MAX_PAGES} pages — an interactive picker, not an exhaustive export.
+     * Live proxy to {@code collections.list}: every collection the token can see, flagged with whether it is
+     * already mirrored. Doubles as the connectivity probe — unreachable surfaces as 502, throttled as 503.
      */
     public List<OutlineCollectionCandidateDTO> listCandidates(long workspaceId) {
         OutlineInstall install = requireInstall(workspaceId);
