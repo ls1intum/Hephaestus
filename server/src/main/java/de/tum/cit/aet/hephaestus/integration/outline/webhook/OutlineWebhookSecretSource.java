@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -16,8 +17,13 @@ import tools.jackson.databind.ObjectMapper;
  * <em>body</em> (not a header) as an untrusted routing key, so this source parses it out of
  * {@link SecretLookup#body()} and resolves the stored secret of the ACTIVE Outline Connection that
  * registered it. A forged id matches no connection, so the downstream HMAC check fails.
+ *
+ * <p>Webhook-role only ({@code SlackWebhookSignatureVerifier} precedent): the bean only serves
+ * inbound deliveries, so the app-server and worker roles have no business holding a component whose
+ * single job is handing out signing secrets.
  */
 @Component
+@ConditionalOnWebhookRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineWebhookSecretSource implements WebhookSecretSource {
 

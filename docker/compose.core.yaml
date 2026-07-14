@@ -38,6 +38,14 @@ services:
       # Interactivity may send Slack follow-ups; OAuth/admin and mentor replies stay on application-server.
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:-}
+      # Outline change notifications arrive here under /webhooks/outline. The flag gates
+      # OutlineWebhookSignatureVerifier + OutlineWebhookSecretSource; without it WebhookIngestPipeline
+      # has no verifier for the kind and answers 501 to EVERY delivery, which Outline counts as a
+      # failure and auto-disables the subscription after 25 of them. No signing secret here: Outline's
+      # secret is per-subscription (minted by OutlineWebhookRegistrar on the server pod, stored
+      # encrypted on the connection row) and is read back through JPA, not from the environment.
+      # Keep in lockstep with application-server's value.
+      HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
       # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
       # supplies it (an unset var fails the boot at placeholder resolution).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}

@@ -167,6 +167,22 @@ services:
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:-}
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:-}
       HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:-}
+      # Outline (documentation content source). Every Outline bean is @ConditionalOnProperty with
+      # matchIfMissing=false, so an unset flag means no admin surface, no sync, no content projection.
+      # Inbound change notifications are verified on webhook-server, which needs the same flag — but
+      # NOT a secret: Outline's webhook secret is per-subscription, minted by OutlineWebhookRegistrar
+      # and stored encrypted on the connection row (unlike Slack's one global signing secret).
+      HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      # Link-only login provider (Slack-style): attaches a member's Outline identity to their
+      # Hephaestus account so mirrored documents can be attributed; it is never a sign-in button.
+      # Independent of the flag above and of the per-workspace API key. Callback:
+      # https://<host>/api/login/oauth2/code/outline. BASE_URL is REQUIRED whenever CLIENT_ID is set —
+      # Outline is self-hosted, so there is no default origin, and a blank/invalid value makes
+      # LoginProviderService skip the seed with only a WARN (no boot failure, no linking button).
+      OUTLINE_OAUTH_BASE_URL: ${OUTLINE_OAUTH_BASE_URL:-}
+      OUTLINE_OAUTH_DISPLAY_NAME: ${OUTLINE_OAUTH_DISPLAY_NAME:-Outline}
+      OUTLINE_OAUTH_CLIENT_ID: ${OUTLINE_OAUTH_CLIENT_ID:-}
+      OUTLINE_OAUTH_CLIENT_SECRET: ${OUTLINE_OAUTH_CLIENT_SECRET:-}
       # GitLab integration
       GITLAB_ENABLED: ${GITLAB_ENABLED:-false}
       GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de}
@@ -307,6 +323,13 @@ services:
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      # The worker assembles the sandbox context itself (AgentJobExecutor → JobTypeHandler
+      # #prepareInputFiles → WorkspaceContextBuilder), and OutlineDocumentContentSource carries only
+      # the integration gate — no runtime-role gate. Without this flag the source bean is absent here
+      # and every review/mentor run silently ships a context with no wiki documents. It reads the
+      # mirrored rows from Postgres, so it needs no Outline URL, key or OAuth client of its own.
+      # Keep in lockstep with application-server's value.
+      HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
       # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
       # supplies it so the agent context builds links from a real origin (an unset var fails the boot).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}

@@ -464,4 +464,87 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-outline" id="1783164846747-17">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_connection_outline_subscription already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_connection_outline_subscription'
+            </sqlCheck>
+        </preConditions>
+        <comment>
+            Every Outline webhook delivery resolves its connection by the subscription id carried in the
+            body, and that lookup happens BEFORE the HMAC is checked - an unauthenticated caller can reach
+            it. Without an index the resolver walks every ACTIVE Outline connection, so the cost of a
+            forged delivery grows with the number of connected workspaces. This makes the lookup a single
+            indexed probe whose cost is independent of tenant count.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE INDEX ix_connection_outline_subscription
+                ON connection ((config ->> 'webhookSubscriptionId'))
+                WHERE kind = 'OUTLINE' AND state = 'ACTIVE';
+        ]]></sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_connection_outline_subscription;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-18">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_outline_document_fts already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_outline_document_fts'
+            </sqlCheck>
+        </preConditions>
+        <comment>
+            Document retrieval ranks the mirror with to_tsvector/ts_rank. Unindexed, that rebuilds a
+            tsvector for every live row on every mentor and review call. The expression matches the one in
+            OutlineDocumentRepository#searchByRelevance exactly - including the left() bound, which is not
+            an optimisation but a correctness guard: Postgres refuses a tsvector over 1MB, so a single
+            large mirrored document would otherwise make the query throw for the whole workspace.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE INDEX ix_outline_document_fts ON outline_document USING GIN (
+                to_tsvector('simple',
+                    coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000))
+            );
+        ]]></sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_outline_document_fts;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-19">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_outline_document_updated already dropped">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_outline_document_updated'
+            </sqlCheck>
+        </preConditions>
+        <comment>
+            No query orders or filters on (workspace_id, outline_updated_at) - the projection read is
+            served by ix_outline_document_projection and the search read by the GIN index above. The index
+            only costs writes on the sync path.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            DROP INDEX IF EXISTS ix_outline_document_updated;
+        ]]></sql>
+        <rollback>
+            <sql>
+                CREATE INDEX ix_outline_document_updated ON outline_document (workspace_id, outline_updated_at);
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-outline" id="1783164846747-20">
+        <preConditions onFail="MARK_RAN" onFailMessage="auth_event.provider_id already renamed">
+            <columnExists tableName="auth_event" columnName="git_provider_id"/>
+        </preConditions>
+        <comment>
+            The provider table is identity_provider, not git_provider, and identity_link.provider_id was
+            renamed with it. auth_event kept the old column name, leaving the schema half-renamed and the
+            entity annotated against a name that no longer describes anything.
+        </comment>
+        <renameColumn tableName="auth_event" oldColumnName="git_provider_id" newColumnName="provider_id"/>
+        <rollback>
+            <renameColumn tableName="auth_event" oldColumnName="provider_id" newColumnName="git_provider_id"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

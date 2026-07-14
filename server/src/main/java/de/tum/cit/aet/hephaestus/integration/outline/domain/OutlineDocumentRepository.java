@@ -53,21 +53,63 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      */
     long deleteByWorkspaceIdAndConnectionIdAndCollectionId(Long workspaceId, Long connectionId, String collectionId);
 
-    /** The workspace's mirrored documents for one Outline install; the reconcile diffs against this set. */
+    /**
+     * The workspace's mirrored documents for one Outline install, as full entities — <strong>bodies
+     * included</strong>. Not for the reconcile: a workspace mirror is capped at hundreds of megabytes of
+     * Markdown, and this materializes all of it. The sync path diffs against
+     * {@link #findSnapshotsByWorkspaceIdAndConnectionId} instead and re-reads only the rows it writes.
+     */
     List<OutlineDocument> findByWorkspaceIdAndConnectionId(Long workspaceId, Long connectionId);
 
-    /** One collection's mirrored documents — the scope of a collection-delete tombstone sweep. */
-    List<OutlineDocument> findByWorkspaceIdAndConnectionIdAndCollectionId(
-        Long workspaceId,
-        Long connectionId,
-        String collectionId
-    );
-
-    /** One mirrored document by its Outline id — the webhook targeted-refresh lookup. */
+    /** One mirrored document by its Outline id — the row a write transaction re-reads before mutating it. */
     Optional<OutlineDocument> findByWorkspaceIdAndConnectionIdAndDocumentId(
         Long workspaceId,
         Long connectionId,
         String documentId
+    );
+
+    /**
+     * The body-free diff set the reconcile runs against: one {@link OutlineDocumentSnapshot} per mirrored
+     * row of this install. {@code LENGTH(body_markdown)} is evaluated in Postgres, so no Markdown body ever
+     * crosses the wire or lands on the heap — see {@link OutlineDocumentSnapshot} for why that matters.
+     */
+    @Query(
+        "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
+            "d.id, d.documentId, d.collectionId, d.outlineUpdatedAt, d.contentHash, d.deletedAt, " +
+            "LENGTH(d.bodyMarkdown), d.version) FROM OutlineDocument d " +
+            "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId"
+    )
+    List<OutlineDocumentSnapshot> findSnapshotsByWorkspaceIdAndConnectionId(
+        @Param("workspaceId") long workspaceId,
+        @Param("connectionId") long connectionId
+    );
+
+    /** One collection's mirrored rows, body-free — the scope of a collection-delete tombstone sweep. */
+    @Query(
+        "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
+            "d.id, d.documentId, d.collectionId, d.outlineUpdatedAt, d.contentHash, d.deletedAt, " +
+            "LENGTH(d.bodyMarkdown), d.version) FROM OutlineDocument d " +
+            "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId " +
+            "AND d.collectionId = :collectionId"
+    )
+    List<OutlineDocumentSnapshot> findSnapshotsByCollectionId(
+        @Param("workspaceId") long workspaceId,
+        @Param("connectionId") long connectionId,
+        @Param("collectionId") String collectionId
+    );
+
+    /** One mirrored document's snapshot — the webhook targeted-refresh routing lookup (no body loaded). */
+    @Query(
+        "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
+            "d.id, d.documentId, d.collectionId, d.outlineUpdatedAt, d.contentHash, d.deletedAt, " +
+            "LENGTH(d.bodyMarkdown), d.version) FROM OutlineDocument d " +
+            "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId " +
+            "AND d.documentId = :documentId"
+    )
+    Optional<OutlineDocumentSnapshot> findSnapshotByDocumentId(
+        @Param("workspaceId") long workspaceId,
+        @Param("connectionId") long connectionId,
+        @Param("documentId") String documentId
     );
 
     /**
@@ -95,17 +137,38 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     );
 
     /**
+     * The character bound the searchable tsvector is built over. Postgres hard-refuses a tsvector larger
+     * than 1 MB ({@code string is too long for tsvector}), and {@code body_markdown} is unbounded — without
+     * this truncation ONE oversized mirrored document makes the query <em>ERROR</em>, permanently breaking
+     * Outline retrieval for the whole workspace rather than just ranking that document poorly. 900 000
+     * characters leaves headroom under the 1 MB (1 048 576 byte) ceiling for multi-byte content and the
+     * title prefix.
+     *
+     * <p>This constant is documentation only: the value is inlined in {@link #searchByRelevance}'s SQL,
+     * which must stay byte-for-byte equivalent to the {@code ix_outline_document_fts} GIN index expression
+     * in the Liquibase changelog — a mismatch silently drops the index and reintroduces the per-row
+     * tsvector rebuild.
+     */
+    int FTS_BODY_CHAR_LIMIT = 900_000;
+
+    /**
      * Live documents ranked by full-text relevance to {@code query} (websearch syntax) — the retrieval path
      * behind {@code OutlineDocumentSelector}. The {@code simple} FTS config keeps matching language-neutral
      * (no stemming, no stopword list) for mixed-language wikis. Tombstoned and body-evicted rows are excluded:
-     * there is no body to rank against. Works unindexed (sequential scan over the bounded per-workspace mirror).
+     * there is no body to rank against.
+     *
+     * <p>The {@code to_tsvector(...)} expression is repeated verbatim in the WHERE clause, in {@code ts_rank},
+     * and in the {@code ix_outline_document_fts} GIN index — all three must match exactly or Postgres falls
+     * back to rebuilding a tsvector per row per call. See {@link #FTS_BODY_CHAR_LIMIT} for why the
+     * {@code left(...)} bound is a correctness guard and not an optimisation.
      */
     @Query(
         value = "SELECT * FROM outline_document WHERE workspace_id = :workspaceId " +
             "AND deleted_at IS NULL AND body_markdown IS NOT NULL " +
-            "AND to_tsvector('simple', COALESCE(title, '') || ' ' || body_markdown) " +
+            "AND to_tsvector('simple', coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000)) " +
             "@@ websearch_to_tsquery('simple', :query) " +
-            "ORDER BY ts_rank(to_tsvector('simple', COALESCE(title, '') || ' ' || body_markdown), " +
+            "ORDER BY ts_rank(to_tsvector('simple', coalesce(title, '') || ' ' || " +
+            "left(coalesce(body_markdown, ''), 900000)), " +
             "websearch_to_tsquery('simple', :query)) DESC, outline_updated_at DESC NULLS LAST, id ASC " +
             "LIMIT :limit",
         nativeQuery = true
@@ -134,18 +197,23 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     long sumBodySizeByWorkspaceId(@Param("workspaceId") long workspaceId);
 
     /**
-     * Eviction candidates: {@code [id, body length]} for every row that still holds a body, ordered
-     * least-recently-exported first (a never-exported row evicts before a recently-refreshed one). The
-     * service walks this list, nulling bodies until the workspace is back under the cap. Native for the
+     * Eviction candidates: {@code [id, body length]} for the {@code limit} rows that still hold a body and
+     * were exported longest ago (a never-exported row evicts before a recently-refreshed one). The service
+     * walks this page, nulling bodies until the workspace is back under the cap, and re-queries for the next
+     * page if it is not — an evicted row drops out of this result set, so the pages advance on their own.
+     *
+     * <p>The {@code LIMIT} is load-bearing: {@link #evictBodies} binds one parameter per id, and Postgres
+     * caps a statement at 65 535 bind parameters (with the planner degrading long before that). An unbounded
+     * candidate list on a large over-cap mirror produced exactly that statement. Native for the
      * {@code LENGTH(...)} projection.
      */
     @Query(
         value = "SELECT id, LENGTH(body_markdown) FROM outline_document " +
             "WHERE workspace_id = :workspaceId AND body_markdown IS NOT NULL " +
-            "ORDER BY last_materialized_at ASC NULLS FIRST, id ASC",
+            "ORDER BY last_materialized_at ASC NULLS FIRST, id ASC LIMIT :limit",
         nativeQuery = true
     )
-    List<Object[]> findEvictionCandidates(@Param("workspaceId") long workspaceId);
+    List<Object[]> findEvictionCandidates(@Param("workspaceId") long workspaceId, @Param("limit") int limit);
 
     /**
      * Frees mirrored bodies for the size cap: null {@code body_markdown} and stamp
@@ -153,6 +221,10 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * unchanged-check still holds — an evicted-but-unmodified document is not re-exported (and
      * re-evicted) on every pass; the body comes back only when upstream changes or a targeted refresh
      * asks for it. Returns rows affected.
+     *
+     * <p>Callers must chunk {@code ids} (the sync service does, at
+     * {@code OutlineDocumentSyncService#EVICTION_BATCH_SIZE}): every id is one bind parameter in the
+     * {@code IN} list.
      */
     @Modifying
     @Transactional

@@ -83,6 +83,30 @@ class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
         assertThat(documentRepository.searchByRelevance(workspaceId, "quantum OR entanglement", 10)).isEmpty();
     }
 
+    @Test
+    void oversizedDocumentDoesNotBreakSearchForTheWholeWorkspace() {
+        // Postgres hard-refuses a tsvector over 1MB ("string is too long for tsvector") — it ERRORs, it does
+        // not degrade. body_markdown is unbounded, so without the left(...) bound in the query expression a
+        // single large mirrored wiki page would make EVERY Outline retrieval in this workspace throw, not
+        // just rank that page badly. Seed a body comfortably past the ceiling and prove the query still runs
+        // and still finds the ordinary documents around it.
+        StringBuilder huge = new StringBuilder(1_400_000);
+        while (huge.length() < 1_300_000) {
+            huge.append("lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor ");
+        }
+        seed(workspaceId, "doc-huge", "Enormous appendix", huge.toString(), null);
+
+        assertThat(documentRepository.searchByRelevance(workspaceId, "deployment OR rollback", 10))
+            .extracting(OutlineDocument::getDocumentId)
+            .containsExactly("doc-strong", "doc-weak");
+
+        // The oversized document is still searchable itself — through the truncated prefix, which is what
+        // the index is built over. (Its terms appear well inside the first 900 000 characters.)
+        assertThat(documentRepository.searchByRelevance(workspaceId, "consectetur", 10))
+            .extracting(OutlineDocument::getDocumentId)
+            .containsExactly("doc-huge");
+    }
+
     private void seed(long workspace, String documentId, String title, String body, @Nullable Instant deletedAt) {
         OutlineDocument doc = new OutlineDocument();
         doc.setWorkspaceId(workspace);

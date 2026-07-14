@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.web.server.ResponseStatusException;
@@ -246,6 +248,37 @@ class LoginProviderServiceTest extends BaseUnitTest {
         verify(repository, never()).save(any());
     }
 
+    /**
+     * A half-configured slot (client id exported, secret forgotten) must NOT seed. Seeding it would offer an
+     * ENABLED provider whose every OAuth exchange 401s at the token endpoint with an opaque IdP error. This is
+     * a per-slot property of the seed, so it holds for all four provider types — not just Outline.
+     */
+    @ParameterizedTest
+    @EnumSource(LoginProvider.ProviderType.class)
+    void skipsSeedWithAClientIdButNoClientSecret(LoginProvider.ProviderType type) {
+        service(
+            Map.of(
+                "provider",
+                new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "client-id", "", "")
+            )
+        ).seedFromEnvOnStartup();
+
+        Mockito.verifyNoInteractions(repository);
+    }
+
+    @ParameterizedTest
+    @EnumSource(LoginProvider.ProviderType.class)
+    void skipsSeedWithAClientSecretButNoClientId(LoginProvider.ProviderType type) {
+        service(
+            Map.of(
+                "provider",
+                new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "  ", "secret", "")
+            )
+        ).seedFromEnvOnStartup();
+
+        Mockito.verifyNoInteractions(repository);
+    }
+
     @Test
     void createSelfHostedGitlabDefaultsScopesAndEvictsCache() {
         when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
@@ -372,6 +405,56 @@ class LoginProviderServiceTest extends BaseUnitTest {
         assertThatThrownBy(() -> adminService().delete("gitlab")).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).delete(any());
         verify(registrationCache, never()).evict(any());
+    }
+
+    /**
+     * The lockout guard counts SIGN-IN methods. Slack and Outline are link-only ({@code isLinkOnly()}): they
+     * are filtered off the login picker and rejected at flow begin, so they can never sign anyone in. An
+     * instance whose only provider is Outline must still be able to delete it.
+     */
+    @Test
+    void deleteAllowsTheLastEnabledProviderWhenItIsLinkOnly() {
+        LoginProvider outline = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("outline")).thenReturn(Optional.of(outline));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
+
+        adminService().delete("outline");
+
+        verify(repository).delete(outline);
+        verify(registrationCache).evict("outline");
+    }
+
+    @Test
+    void disableAllowsTheLastEnabledProviderWhenItIsLinkOnly() {
+        LoginProvider outline = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("outline")).thenReturn(Optional.of(outline));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        LoginProvider saved = adminService().update(
+            "outline",
+            new LoginProviderService.Patch(null, null, null, null, null, false)
+        );
+
+        assertThat(saved.isEnabled()).isFalse();
+    }
+
+    /**
+     * The mirror image: a link-only provider must not PROP UP the count either. With GitHub + Outline enabled,
+     * deleting GitHub leaves nobody able to sign in — the old count saw a non-empty list and waved it through.
+     */
+    @Test
+    void deleteRefusesTheLastSignInProviderEvenWhenALinkOnlyProviderRemains() {
+        LoginProvider github = new LoginProvider();
+        github.setRegistrationId("github");
+        github.setType(LoginProvider.ProviderType.GITHUB);
+        github.setEnabled(true);
+        LoginProvider outline = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("github")).thenReturn(Optional.of(github));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(github, outline));
+
+        assertThatThrownBy(() -> adminService().delete("github")).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).delete(any());
     }
 
     @Test

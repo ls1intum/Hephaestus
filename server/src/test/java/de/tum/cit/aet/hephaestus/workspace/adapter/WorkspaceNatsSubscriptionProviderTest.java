@@ -46,10 +46,20 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        provider = new WorkspaceNatsSubscriptionProvider(workspaceRepository, workspaceScopeFilter, connectionService);
+        provider = providerWithFlags(/* outlineEnabled */ true, /* slackEnabled */ true);
         when(workspaceRepository.findById(WS)).thenReturn(Optional.of(workspace));
         when(workspace.getId()).thenReturn(WS);
         lenientReposAndOrg();
+    }
+
+    private WorkspaceNatsSubscriptionProvider providerWithFlags(boolean outlineEnabled, boolean slackEnabled) {
+        return new WorkspaceNatsSubscriptionProvider(
+            workspaceRepository,
+            workspaceScopeFilter,
+            connectionService,
+            outlineEnabled,
+            slackEnabled
+        );
     }
 
     private void lenientReposAndOrg() {
@@ -133,6 +143,36 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
 
         assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName)).containsExactly("slack");
         assertThat(streamNamed(info, "slack").subjects()).containsExactly("slack.T0ABC123.>");
+    }
+
+    /**
+     * The Outline/Slack message handlers are themselves gated on their integration flag, so binding a
+     * durable consumer while the flag is off pulls messages that dispatch to nothing. A stale ACTIVE
+     * connection row (flag flipped off after a workspace connected) must not resurrect the binding.
+     */
+    @Test
+    void outlineArmIsInertWhenTheOutlineIntegrationIsDisabled() {
+        provider = providerWithFlags(/* outlineEnabled */ false, /* slackEnabled */ true);
+        when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
+        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(Optional.empty());
+
+        NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
+
+        assertThat(info.hasSubscriptions()).isFalse();
+        // The disabled arm must not even ask — no connection lookup on a dead code path.
+        org.mockito.Mockito.verify(connectionService, org.mockito.Mockito.never()).findActiveOutlineConfig(WS);
+    }
+
+    @Test
+    void slackArmIsInertWhenTheSlackIntegrationIsDisabled() {
+        provider = providerWithFlags(/* outlineEnabled */ true, /* slackEnabled */ false);
+        when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
+        when(connectionService.findActiveOutlineConfig(WS)).thenReturn(Optional.empty());
+
+        NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
+
+        assertThat(info.hasSubscriptions()).isFalse();
+        org.mockito.Mockito.verify(connectionService, org.mockito.Mockito.never()).findSlackNotificationConfig(WS);
     }
 
     @Test

@@ -69,9 +69,9 @@ public class AuthEvent {
     @Nullable
     private String failureReason;
 
-    @Column(name = "git_provider_id")
+    @Column(name = "provider_id")
     @Nullable
-    private Long gitProviderId;
+    private Long providerId;
 
     @Column(name = "workspace_id")
     @Nullable
@@ -140,7 +140,7 @@ public class AuthEvent {
         e.accountId = data.accountId();
         e.actingAccountId = data.actingAccountId();
         e.failureReason = data.failureReason();
-        e.gitProviderId = data.gitProviderId();
+        e.providerId = data.gitProviderId();
         e.workspaceId = data.workspaceId();
         e.identityLinkId = data.identityLinkId();
         e.ipInet = ipInet;

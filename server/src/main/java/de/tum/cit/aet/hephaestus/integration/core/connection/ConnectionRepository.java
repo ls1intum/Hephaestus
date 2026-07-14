@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -58,4 +59,53 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         @Param("kind") IntegrationKind kind,
         @Param("state") IntegrationState state
     );
+
+    /**
+     * Resolves the ACTIVE Outline Connection that registered {@code subscriptionId} — a single
+     * indexed probe on {@code ix_connection_outline_subscription} (a partial expression index on
+     * {@code (config ->> 'webhookSubscriptionId') WHERE kind='OUTLINE' AND state='ACTIVE'}).
+     *
+     * <p><b>This runs on the unauthenticated webhook hot path</b>, before the HMAC comparison: the
+     * subscription id is attacker-controlled input from the request body. It must therefore cost
+     * O(1) regardless of how many workspaces have Outline connected — a per-workspace loop would
+     * make every forged POST an unauthenticated 1+N query amplifier ({@code /webhooks/**} is exempt
+     * from the auth rate limiter).
+     *
+     * <p>Native, not JPQL: JPQL cannot express the Postgres {@code ->>} JSONB operator, and the
+     * predicate must be literally {@code kind = 'OUTLINE' AND state = 'ACTIVE'} for the planner to
+     * pick the partial index. {@code workspace_id} is in the projection, which is what the tenancy
+     * statement inspector requires; the query is deliberately cross-workspace because the
+     * subscription id IS the tenant selector — see {@code ConnectionService#findOutlineSubscription},
+     * which fails closed on a non-unique match.
+     *
+     * <p>Returns a list (not {@code Optional}) so a corrupt fleet-wide duplicate surfaces as an
+     * ambiguity the caller can reject, rather than as a {@code NonUniqueResultException} thrown at
+     * an anonymous caller.
+     */
+    @Query(
+        value = """
+        SELECT c.workspace_id AS "workspaceId",
+               c.config ->> 'webhookSecret' AS "signingSecret"
+        FROM connection c
+        WHERE c.kind = 'OUTLINE'
+          AND c.state = 'ACTIVE'
+          AND c.config ->> 'webhookSubscriptionId' = :subscriptionId
+        """,
+        nativeQuery = true
+    )
+    List<OutlineSubscriptionProjection> findOutlineSubscriptionsBySubscriptionId(
+        @Param("subscriptionId") String subscriptionId
+    );
+
+    /**
+     * The (workspace, encrypted signing secret) pair behind one Outline change-notification
+     * subscription. Aliases in the native query above are quoted so the JDBC column labels match
+     * these getters exactly (Postgres folds unquoted identifiers to lower-case).
+     */
+    interface OutlineSubscriptionProjection {
+        Long getWorkspaceId();
+
+        @Nullable
+        String getSigningSecret();
+    }
 }

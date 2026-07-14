@@ -258,14 +258,19 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             .getResponseBody();
         assertThat(resumed).isNotNull();
         assertThat(resumed.state()).isEqualTo(MirrorState.ENABLED);
-        // The frozen mirror drifted while paused — the resume forces the catch-up tick to reconverge.
+        // The response reflects the synchronous transition: resume marks the drifted mirror PENDING so
+        // the reconcile has something to converge. The targeted sync itself is kicked only after this
+        // transaction commits (onCollectionResumed), so it cannot have run yet when the DTO is built.
         assertThat(resumed.syncStatus()).isEqualTo(SyncStatus.PENDING);
 
         OutlineCollection stored = collectionRepository
             .findByWorkspaceIdAndConnectionIdAndCollectionId(workspace.getId(), connectionId, COLLECTION_ID)
             .orElseThrow();
         assertThat(stored.getState()).isEqualTo(MirrorState.ENABLED);
-        assertThat(stored.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        // After commit the kicked sync runs (empty catalog in this test) and reconverges the collection
+        // to COMPLETE — proving the after-commit kick actually observes the ENABLED+PENDING row it is
+        // meant to sync, rather than racing the not-yet-committed transaction as the old in-tx kick did.
+        assertThat(stored.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
 
         patchState("no-such-collection", MirrorState.PAUSED).expectStatus().isNotFound();
     }

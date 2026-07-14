@@ -30,9 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Admin control plane for the mirrored-collection registry. Owns every repository touch for the
@@ -66,6 +69,7 @@ public class OutlineCollectionAdminService {
     private final OutlineApiClient outlineApiClient;
     private final OutlineDocumentSyncScheduler syncScheduler;
     private final AsyncTaskExecutor taskExecutor;
+    private final ApplicationEventPublisher eventPublisher;
 
     public OutlineCollectionAdminService(
         ConnectionService connectionService,
@@ -73,7 +77,8 @@ public class OutlineCollectionAdminService {
         OutlineDocumentRepository documentRepository,
         OutlineApiClient outlineApiClient,
         OutlineDocumentSyncScheduler syncScheduler,
-        @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor
+        @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.connectionService = connectionService;
         this.collectionRepository = collectionRepository;
@@ -81,10 +86,18 @@ public class OutlineCollectionAdminService {
         this.outlineApiClient = outlineApiClient;
         this.syncScheduler = syncScheduler;
         this.taskExecutor = taskExecutor;
+        this.eventPublisher = eventPublisher;
     }
 
     /** Whether a registration created the row (201) or hit an existing one (idempotent 200). */
     public record RegistrationOutcome(boolean created, OutlineCollectionDTO collection) {}
+
+    /**
+     * A PAUSED→ENABLED resume that has been <em>persisted</em>. Published from inside
+     * {@link #updateState}'s transaction and consumed only after that transaction commits, so the async
+     * sync it kicks can actually observe the ENABLED row.
+     */
+    record OutlineCollectionResumedEvent(long workspaceId, String collectionId) {}
 
     /** The workspace's ACTIVE Outline install, resolved once per operation. */
     private record OutlineInstall(long workspaceId, long connectionId, String serverUrl) {}
@@ -188,6 +201,11 @@ public class OutlineCollectionAdminService {
      * current state is an idempotent no-op. Resuming resets the sync status to {@code PENDING} —
      * a frozen collection drifted while paused, so the catch-up tick must reconverge it — and kicks
      * a targeted sync off the request thread.
+     *
+     * <p>The kick is <em>published</em>, not called: this method is transactional, and the sync it triggers
+     * runs asynchronously in its own transaction. Calling it inline let the sync read the row before the
+     * ENABLED write committed — it would see PAUSED, no-op, and the collection would sit frozen until the
+     * catch-up tick happened to notice. {@link #onCollectionResumed} runs the kick after commit instead.
      */
     @Transactional
     public OutlineCollectionDTO updateState(long workspaceId, String collectionId, MirrorState targetState) {
@@ -197,11 +215,20 @@ public class OutlineCollectionAdminService {
             row.setState(targetState);
             if (targetState == MirrorState.ENABLED) {
                 row.setSyncStatus(SyncStatus.PENDING);
-                kickCollectionSync(workspaceId, collectionId);
+                eventPublisher.publishEvent(new OutlineCollectionResumedEvent(workspaceId, collectionId));
             }
             row = collectionRepository.save(row);
         }
         return toDto(install, row);
+    }
+
+    /**
+     * Kicks the resumed collection's targeted sync once {@link #updateState}'s transaction has committed,
+     * so the async pass is guaranteed to read the ENABLED + PENDING row it is meant to converge.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void onCollectionResumed(OutlineCollectionResumedEvent event) {
+        kickCollectionSync(event.workspaceId(), event.collectionId());
     }
 
     /**
@@ -274,6 +301,10 @@ public class OutlineCollectionAdminService {
      * {@code OutlineConnectionAdminService.syncNow}: both call sites (a fresh registration, a
      * PAUSED→ENABLED resume) are themselves idempotent/state-gated, so there is no human-repeatable
      * double-click path that would pile up concurrent kicks for the same collection.
+     *
+     * <p>Both call sites reach here only once the row they created/resumed is durably committed —
+     * {@link #register} is non-transactional (its {@code save} commits on its own), and the resume goes
+     * through {@link #onCollectionResumed}'s after-commit hop.
      */
     private void kickCollectionSync(long workspaceId, String collectionId) {
         OutlineSyncDispatch.fireAndForget(

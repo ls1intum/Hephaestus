@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -236,35 +238,42 @@ class ConnectionServiceTest extends BaseUnitTest {
         verify(connectionRepository, never()).save(any());
     }
 
+    /**
+     * The unauthenticated webhook hot path: the subscription id from the delivery body selects which
+     * stored secret the HMAC is checked against. Contract: exactly one indexed lookup (never a scan
+     * over the connected fleet — {@code /webhooks/**} is exempt from the auth rate limiter), a forged
+     * id resolves to nothing, and a delivery can never select another workspace's secret.
+     */
     @org.junit.jupiter.api.Nested
     class FindOutlineSubscription {
 
-        private Connection outlineConnection(String subscriptionId, String secret) {
-            return new Connection(
-                workspace,
-                IntegrationKind.OUTLINE,
-                "team-x",
-                new ConnectionConfig.OutlineConfig("https://o.test", subscriptionId, secret, Set.of())
-            );
-        }
+        /**
+         * A hand-rolled stub, not a Mockito mock: the projections are constructed inside the
+         * argument list of the outer {@code when(...)}, and a nested {@code when()} there trips
+         * {@code UnfinishedStubbingException}.
+         */
+        private ConnectionRepository.OutlineSubscriptionProjection projection(
+            @org.jspecify.annotations.Nullable Long workspaceId,
+            @org.jspecify.annotations.Nullable String secret
+        ) {
+            return new ConnectionRepository.OutlineSubscriptionProjection() {
+                @Override
+                public Long getWorkspaceId() {
+                    return workspaceId;
+                }
 
-        private void stubActiveOutline(long workspaceId, Connection connection) {
-            when(
-                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                    workspaceId,
-                    IntegrationKind.OUTLINE,
-                    IntegrationState.ACTIVE
-                )
-            ).thenReturn(java.util.Optional.of(connection));
+                @Override
+                public String getSigningSecret() {
+                    return secret;
+                }
+            };
         }
 
         @Test
         void resolvesTheMatchingSubscriptionToItsWorkspaceAndSecret() {
-            when(
-                connectionRepository.findWorkspaceIdsByKindAndState(IntegrationKind.OUTLINE, IntegrationState.ACTIVE)
-            ).thenReturn(java.util.List.of(1L, 2L));
-            stubActiveOutline(1L, outlineConnection("sub-a", "secret-a"));
-            stubActiveOutline(2L, outlineConnection("sub-b", "secret-b"));
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
+                java.util.List.of(projection(2L, "secret-b"))
+            );
 
             var resolved = service.findOutlineSubscription("sub-b");
 
@@ -274,26 +283,75 @@ class ConnectionServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void resolvesWithASingleIndexedLookupAndNeverEnumeratesTheFleet() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
+                java.util.List.of(projection(2L, "secret-b"))
+            );
+
+            service.findOutlineSubscription("sub-b");
+
+            verify(connectionRepository, times(1)).findOutlineSubscriptionsBySubscriptionId("sub-b");
+            // The 1+N amplifier this replaced: fleet enumeration + a per-workspace config fetch.
+            verify(connectionRepository, never()).findWorkspaceIdsByKindAndState(any(), any());
+            verify(connectionRepository, never()).findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                anyLong(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        void aForgedSubscriptionIdResolvesToNoSecret() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged")).thenReturn(
+                java.util.List.of()
+            );
+
+            assertThat(service.findOutlineSubscription("forged")).isEmpty();
+        }
+
+        @Test
+        void aDeliveryForWorkspaceANeverSelectsWorkspaceBsSecret() {
+            // The query is keyed on the subscription id, so B's row is simply not in the result set.
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a")).thenReturn(
+                java.util.List.of(projection(1L, "secret-a"))
+            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
+                java.util.List.of(projection(2L, "secret-b"))
+            );
+
+            var a = service.findOutlineSubscription("sub-a").orElseThrow();
+            var b = service.findOutlineSubscription("sub-b").orElseThrow();
+
+            assertThat(a.workspaceId()).isEqualTo(1L);
+            assertThat(a.signingSecret()).isEqualTo("secret-a");
+            assertThat(b.workspaceId()).isEqualTo(2L);
+            assertThat(b.signingSecret()).isEqualTo("secret-b");
+        }
+
+        @Test
+        void failsClosedWhenTwoActiveConnectionsClaimTheSameSubscriptionId() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-dup")).thenReturn(
+                java.util.List.of(projection(1L, "secret-a"), projection(2L, "secret-b"))
+            );
+
+            assertThat(service.findOutlineSubscription("sub-dup")).isEmpty();
+        }
+
+        @Test
         void isEmptyWhenTheSubscriptionMatchesButNoSecretIsStored() {
-            when(
-                connectionRepository.findWorkspaceIdsByKindAndState(IntegrationKind.OUTLINE, IntegrationState.ACTIVE)
-            ).thenReturn(java.util.List.of(1L));
-            stubActiveOutline(1L, outlineConnection("sub-a", null));
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a")).thenReturn(
+                java.util.List.of(projection(1L, null))
+            );
 
             assertThat(service.findOutlineSubscription("sub-a")).isEmpty();
         }
 
         @Test
-        void isEmptyForABlankOrUnknownSubscription() {
+        void isEmptyForABlankSubscriptionWithoutTouchingTheDatabase() {
             assertThat(service.findOutlineSubscription(null)).isEmpty();
             assertThat(service.findOutlineSubscription("  ")).isEmpty();
 
-            when(
-                connectionRepository.findWorkspaceIdsByKindAndState(IntegrationKind.OUTLINE, IntegrationState.ACTIVE)
-            ).thenReturn(java.util.List.of(1L));
-            stubActiveOutline(1L, outlineConnection("sub-a", "secret-a"));
-
-            assertThat(service.findOutlineSubscription("does-not-exist")).isEmpty();
+            verify(connectionRepository, never()).findOutlineSubscriptionsBySubscriptionId(any());
         }
     }
 

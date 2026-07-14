@@ -25,16 +25,21 @@ import org.springframework.stereotype.Component;
  * effect across a real proxy hop, so one workspace's failure is isolated and the fan-out continues.
  * Webhook-subscription upkeep lives inside the reconcile itself (the registrar's self-heal), not here.
  *
- * <p>This bean owns only scheduling, cross-pod locking, and the tenancy-bypass hop: it is
- * {@link WorkspaceAgnostic} because the loops are inherently cross-workspace, and the {@code *Now}
- * pass-throughs exist so webhook consumers and async listeners (whose threads carry no bypass scope)
- * reach the sync service through it. Scheduling is gated to the server role, and {@link SchedulerLock}
- * stops concurrent pods from both running a loop.
+ * <p>This bean owns only scheduling and cross-pod locking. Scheduling is gated to the server role, and
+ * {@link SchedulerLock} stops concurrent pods from both running a loop.
+ *
+ * <p><b>Tenancy.</b> {@link WorkspaceAgnostic} is on the FAN-OUT methods only — they enumerate the fleet
+ * ({@code findWorkspaceIdsWithActiveConnection}, {@code findDistinctWorkspaceIdsWithPendingSync}) before any
+ * tenant is bound, so their SQL cannot carry a {@code workspace_id} predicate. It is deliberately NOT on the
+ * type: a type-level bypass would also blanket the single-workspace {@code *Now} pass-throughs, disabling
+ * {@code WorkspaceStatementInspector} on precisely the paths that take vendor-supplied ids straight off a
+ * webhook. Those paths are already workspace-scoped (every query takes the {@code workspaceId}), so they keep
+ * the safety net on. The {@code *Now} methods still exist as a bean hop for webhook consumers and async
+ * listeners; they simply no longer buy a tenancy bypass.
  */
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 @Component
-@WorkspaceAgnostic("Reconciling Outline documents across every workspace with an active connection")
 public class OutlineDocumentSyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(OutlineDocumentSyncScheduler.class);
@@ -55,6 +60,7 @@ public class OutlineDocumentSyncScheduler {
 
     @Scheduled(cron = "${hephaestus.integration.outline.sync.cron}")
     @SchedulerLock(name = "outline-document-sync", lockAtMostFor = "PT1H", lockAtLeastFor = "PT30S")
+    @WorkspaceAgnostic("Cron fan-out: enumerates every workspace with an ACTIVE Outline connection")
     public void syncAll() {
         syncAllNow();
     }
@@ -65,6 +71,7 @@ public class OutlineDocumentSyncScheduler {
      */
     @Scheduled(fixedDelayString = "${hephaestus.integration.outline.sync.catch-up-delay}")
     @SchedulerLock(name = "outline-sync-catch-up", lockAtMostFor = "PT4M", lockAtLeastFor = "PT10S")
+    @WorkspaceAgnostic("Catch-up fan-out: enumerates the workspaces with a collection still awaiting a clean pass")
     public void catchUp() {
         for (Long workspaceId : collectionRepository.findDistinctWorkspaceIdsWithPendingSync()) {
             try {
@@ -82,6 +89,7 @@ public class OutlineDocumentSyncScheduler {
      *
      * @return the number of workspaces the reconcile was attempted for
      */
+    @WorkspaceAgnostic("Fleet fan-out: enumerates every workspace with an ACTIVE Outline connection")
     public int syncAllNow() {
         List<Long> workspaceIds = connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE);
         for (Long workspaceId : workspaceIds) {
@@ -99,20 +107,21 @@ public class OutlineDocumentSyncScheduler {
     }
 
     /**
-     * Full reconcile of a single workspace immediately. Runs through this {@link WorkspaceAgnostic} bean
-     * so the cross-workspace tenancy bypass is opened on the calling thread (webhook consumers and async
-     * listeners run on worker threads that do not inherit a request's bypass scope).
+     * Full reconcile of a single workspace immediately — the entry point for webhook consumers and async
+     * listeners, which reach the sync service through this bean. Explicitly workspace-SCOPED: it carries no
+     * tenancy bypass, so {@code WorkspaceStatementInspector} stays armed for the whole call (see the class
+     * javadoc — these are the paths fed by vendor-supplied ids).
      */
     public void syncWorkspaceNow(long workspaceId) {
         syncService.syncWorkspace(workspaceId);
     }
 
-    /** Targeted single-collection sync; tenancy-bypass hop, see {@link #syncWorkspaceNow}. */
+    /** Targeted single-collection sync; workspace-scoped, no bypass — see {@link #syncWorkspaceNow}. */
     public void syncCollectionNow(long workspaceId, String collectionId) {
         syncService.syncCollection(workspaceId, collectionId);
     }
 
-    /** Webhook targeted document refresh; tenancy-bypass hop, see {@link #syncWorkspaceNow}. */
+    /** Webhook targeted document refresh; workspace-scoped, no bypass — see {@link #syncWorkspaceNow}. */
     public void refreshDocumentNow(long workspaceId, String eventName, String documentId) {
         syncService.refreshDocument(workspaceId, eventName, documentId);
     }
@@ -120,7 +129,7 @@ public class OutlineDocumentSyncScheduler {
     /**
      * Webhook targeted document refresh carrying the delivery's pre-parsed {@code payload.model} (already
      * authenticated by the envelope's HMAC), letting the sync service skip its own {@code documents.info}
-     * round-trip when the model is usable. Tenancy-bypass hop, see {@link #syncWorkspaceNow}.
+     * round-trip when the model is usable. Workspace-scoped, no bypass — see {@link #syncWorkspaceNow}.
      */
     public void refreshDocumentNow(
         long workspaceId,
@@ -131,7 +140,7 @@ public class OutlineDocumentSyncScheduler {
         syncService.refreshDocument(workspaceId, eventName, documentId, prefetchedMeta);
     }
 
-    /** Webhook collection-event catalog refresh; tenancy-bypass hop, see {@link #syncWorkspaceNow}. */
+    /** Webhook collection-event catalog refresh; workspace-scoped, no bypass — see {@link #syncWorkspaceNow}. */
     public void refreshCollectionCatalogNow(long workspaceId, String eventName, @Nullable String collectionId) {
         syncService.refreshCollectionCatalog(workspaceId, eventName, collectionId);
     }

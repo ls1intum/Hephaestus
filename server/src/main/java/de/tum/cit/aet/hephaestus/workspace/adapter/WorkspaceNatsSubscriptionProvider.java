@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +26,21 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final ConnectionService connectionService;
+    private final boolean outlineEnabled;
+    private final boolean slackEnabled;
 
     public WorkspaceNatsSubscriptionProvider(
         WorkspaceRepository workspaceRepository,
         WorkspaceScopeFilter workspaceScopeFilter,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        @Value("${hephaestus.integration.outline.enabled:false}") boolean outlineEnabled,
+        @Value("${hephaestus.integration.slack.enabled:false}") boolean slackEnabled
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.connectionService = connectionService;
+        this.outlineEnabled = outlineEnabled;
+        this.slackEnabled = slackEnabled;
     }
 
     @Override
@@ -86,8 +93,16 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
     /**
      * The Outline stream subscription. Added when the workspace has an ACTIVE Outline connection with
      * a registered change-notification subscription id, filtered to {@code outline.<subId>.>}.
+     *
+     * <p>Gated on {@code hephaestus.integration.outline.enabled}: with the flag off, every Outline
+     * message handler bean is absent, so a durable consumer bound here would pull messages and
+     * dispatch them to nothing (redelivery → dead-letter). A stale ACTIVE connection row left over
+     * from an enabled deployment must not resurrect the binding.
      */
     private void addOutlineSubscription(Workspace workspace, List<StreamSubscription> out) {
+        if (!outlineEnabled) {
+            return;
+        }
         connectionService
             .findActiveOutlineConfig(workspace.getId())
             .map(ConnectionConfig.OutlineConfig::webhookSubscriptionId)
@@ -106,8 +121,15 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
      * The Slack stream subscription. Added when the workspace has an ACTIVE Slack connection with a
      * team id, filtered to {@code slack.<team>.>}: one consumer per workspace, so one team's message
      * burst never delays another workspace's ingest and per-workspace ordering is preserved.
+     *
+     * <p>Gated on {@code hephaestus.integration.slack.enabled} for the same reason as the Outline arm
+     * above: the Slack message handlers are themselves flag-gated, so binding the consumer while the
+     * flag is off produces deliveries with no handler.
      */
     private void addSlackSubscription(Workspace workspace, List<StreamSubscription> out) {
+        if (!slackEnabled) {
+            return;
+        }
         connectionService
             .findSlackNotificationConfig(workspace.getId())
             .map(ConnectionConfig.SlackConfig::teamId)

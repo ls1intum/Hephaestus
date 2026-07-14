@@ -105,6 +105,8 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     @Test
     @DisplayName("the Outline link's own display-name login drops out; the SCM login with membership wins")
     void picksTheScmLoginWithMembership() {
+        // The Outline link's usernameAtSignup is a display name and matches no SCM membership — it must not
+        // shadow the real SCM login that IS a member of the workspace.
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
             List.of(link(SUBJECT, "Ada Lovelace"), link("gh-123", "octocat"))
@@ -114,7 +116,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
             List.of(membership(WORKSPACE_ID, 555L))
         );
 
-        assertThat(resolver.resolveDeveloperLogin(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).contains("octocat");
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).contains(555L);
     }
 
     @Test

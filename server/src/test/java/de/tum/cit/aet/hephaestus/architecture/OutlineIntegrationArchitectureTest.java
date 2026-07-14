@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -267,20 +269,53 @@ class OutlineIntegrationArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    @DisplayName("the allowlisted fleet enumerator's caller is pinned @WorkspaceAgnostic")
+    @DisplayName("the allowlisted fleet enumerator's caller is pinned @WorkspaceAgnostic — and ONLY the fan-outs are")
     void fleetEnumeratorCallerIsWorkspaceAgnostic() {
         // findDistinctWorkspaceIdsWithPendingSync earns its UNSCOPED_ALLOWLIST entry only because its caller
         // declares the tenancy bypass explicitly. If the scheduler ever dropped the annotation (or was renamed
         // without updating this pin), the justification would silently rot — fail loudly instead.
-        classes()
+        methods()
             .that()
+            .areDeclaredInClassesThat()
             .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler")
+            .and()
+            .haveNameMatching("syncAll|catchUp|syncAllNow")
             .should()
             .beAnnotatedWith("de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic")
             .because(
-                "the scheduler runs the allowlisted fleet enumeration " +
-                    "(OutlineCollectionRepository.findDistinctWorkspaceIdsWithPendingSync) before any tenant is " +
-                    "bound, so it must declare the bypass via @WorkspaceAgnostic"
+                "the fan-out loops run the allowlisted fleet enumerations " +
+                    "(OutlineCollectionRepository.findDistinctWorkspaceIdsWithPendingSync, " +
+                    "ConnectionService.findWorkspaceIdsWithActiveConnection) before any tenant is bound, so they " +
+                    "must declare the bypass via @WorkspaceAgnostic"
+            )
+            .check(classes);
+    }
+
+    @Test
+    @DisplayName("the tenancy bypass does NOT blanket the scheduler's single-workspace pass-throughs")
+    void singleWorkspacePassThroughsKeepTheStatementInspectorArmed() {
+        // The *Now methods take vendor-supplied ids straight off a webhook. A TYPE-level @WorkspaceAgnostic
+        // (or a stray method-level one) would disable WorkspaceStatementInspector on exactly those paths —
+        // the safety net turned off where it matters most. They are workspace-scoped; keep them unbypassed.
+        assertThat(
+            classes
+                .get("de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler")
+                .isAnnotatedWith("de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic")
+        )
+            .as("OutlineDocumentSyncScheduler must NOT carry a type-level @WorkspaceAgnostic")
+            .isFalse();
+
+        noMethods()
+            .that()
+            .areDeclaredInClassesThat()
+            .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler")
+            .and()
+            .haveNameMatching("syncWorkspaceNow|syncCollectionNow|refreshDocumentNow|refreshCollectionCatalogNow")
+            .should()
+            .beAnnotatedWith("de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic")
+            .because(
+                "these pass-throughs are workspace-scoped and are fed by webhook-supplied ids — the tenancy " +
+                    "StatementInspector must stay armed on them"
             )
             .check(classes);
     }

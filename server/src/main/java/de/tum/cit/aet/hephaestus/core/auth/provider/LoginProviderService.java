@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.jspecify.annotations.Nullable;
@@ -175,18 +177,47 @@ public class LoginProviderService {
         log.info("auth.login-provider: admin deleted '{}'", registrationId);
     }
 
+    /**
+     * A seed slot is <em>silence</em> (both credential halves blank — "this deployment has no wiki") or a
+     * <em>promise</em> (credentials present). A promise that cannot be kept — a half-filled credential, an
+     * unusable base URL — is an operator mistake that used to vanish into a single WARN, leaving the admin
+     * with no provider and no reason why. It is now reported at ERROR with the exact knob to fix.
+     *
+     * <p>Deliberately non-fatal: this listener runs on {@link ApplicationReadyEvent}, and an exception here
+     * aborts startup. One misconfigured optional integration must not take the whole app down — so we shout,
+     * we don't die.
+     */
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seedFromEnvOnStartup() {
         // Sorted by registration id for deterministic seeding when two entries collide on (type, baseUrl).
         Set<String> seededInstances = new HashSet<>();
         new TreeMap<>(authProperties.loginProviders()).forEach((registrationId, seed) -> {
-            if (seed == null || !seed.configured()) {
-                return; // blank client id → provider omitted (credential-less pods still boot)
+            if (seed == null) {
+                return;
             }
             String id = registrationId == null ? "" : registrationId.trim();
+            if (seed.partiallyConfigured()) {
+                // Half a credential: seeding it would offer an ENABLED provider whose every OAuth exchange
+                // 401s at the IdP with an opaque error. Skip it — and say exactly which env var is missing.
+                log.error(
+                    "auth.login-provider: NOT seeding '{}' — it is half-configured: {} is blank. " +
+                        "Set {}, or clear the other half to disable this provider entirely.",
+                    id,
+                    seed.missingCredentialField(),
+                    envKnobFor(id, seed.missingCredentialField())
+                );
+                return;
+            }
+            if (!seed.configured()) {
+                return; // blank credentials → provider omitted (credential-less pods still boot)
+            }
             if (!id.matches("^[a-z][a-z0-9-]{1,62}$")) {
-                log.warn("auth.login-provider: skipping seed of invalid registration id '{}'", registrationId);
+                log.error(
+                    "auth.login-provider: NOT seeding '{}' — invalid registration id. It must be 2-63 chars: " +
+                        "a lowercase letter followed by lowercase letters, digits, or hyphens (e.g. 'gitlab-lrz').",
+                    registrationId
+                );
                 return;
             }
             if (repository.existsByRegistrationId(id)) {
@@ -196,7 +227,16 @@ public class LoginProviderService {
             try {
                 baseUrl = resolveBaseUrl(seed.type(), seed.baseUrl());
             } catch (ResponseStatusException e) {
-                log.warn("auth.login-provider: skipping seed '{}' — invalid base URL: {}", id, e.getReason());
+                // The common self-hosted-Outline / self-hosted-GitLab trip-wire: credentials set, base URL
+                // blank, http://, or a private/internal address (rejected by the SSRF guard).
+                log.error(
+                    "auth.login-provider: NOT seeding '{}' ({}) — its base URL is unusable: {}. " +
+                        "Set {} to the instance's public HTTPS origin (e.g. https://wiki.example.com).",
+                    id,
+                    seed.type(),
+                    e.getReason(),
+                    envKnobFor(id, "base-url")
+                );
                 return;
             }
             // One login app per SCM instance (uq on type+base_url): skip a duplicate so a misconfiguration
@@ -225,6 +265,32 @@ public class LoginProviderService {
             );
             log.info("auth.login-provider: seeded '{}' ({} {}) from env", id, seed.type(), baseUrl);
         });
+    }
+
+    /**
+     * The env var that feeds a shipped seed slot's field, so a misconfiguration diagnostic names the knob the
+     * operator actually sets ({@code OUTLINE_OAUTH_CLIENT_SECRET}), not an abstract property path. Slots the
+     * operator declared themselves (e.g. {@code gitlab-lrz}) have no fixed env var — fall back to the canonical
+     * property path, which is always correct. Keep in sync with {@code application.yml}'s
+     * {@code hephaestus.auth.login-providers} block.
+     */
+    private static final Map<String, String> SHIPPED_SLOT_ENV_PREFIX = Map.of(
+        "github",
+        "GITHUB_OAUTH",
+        "gitlab",
+        "GITLAB_OAUTH",
+        "slack",
+        "SLACK_OAUTH",
+        "outline",
+        "OUTLINE_OAUTH"
+    );
+
+    private static String envKnobFor(String registrationId, String field) {
+        String prefix = SHIPPED_SLOT_ENV_PREFIX.get(registrationId);
+        if (prefix == null) {
+            return "hephaestus.auth.login-providers." + registrationId + "." + field;
+        }
+        return prefix + "_" + field.toUpperCase(Locale.ROOT).replace('-', '_');
     }
 
     private void seed(
@@ -315,8 +381,20 @@ public class LoginProviderService {
         return trimmed;
     }
 
+    /**
+     * The lockout guard, counting only providers that can actually sign someone in. A link-only provider
+     * ({@link LoginProvider.ProviderType#isLinkOnly()} — Slack, Outline) is BY CONSTRUCTION never a sign-in
+     * method: it is filtered off the login picker and rejected at flow begin. Counting it here would (a)
+     * refuse to remove the sole Outline provider on an instance that has one, and (b) worse, let an admin
+     * delete the last REAL sign-in provider as long as a link-only one remained — the guard would see a
+     * non-empty "enabled" list and wave it through. Both fall out once the count is sign-in-capable only.
+     */
     private void requireNotLastEnabled(String registrationId, String verb) {
-        List<LoginProvider> enabled = repository.findByEnabledTrueOrderByDisplayNameAsc();
+        List<LoginProvider> enabled = repository
+            .findByEnabledTrueOrderByDisplayNameAsc()
+            .stream()
+            .filter(p -> p.getType() != null && !p.getType().isLinkOnly())
+            .toList();
         boolean isLast = enabled.stream().allMatch(p -> p.getRegistrationId().equals(registrationId));
         if (!enabled.isEmpty() && isLast) {
             throw new ResponseStatusException(

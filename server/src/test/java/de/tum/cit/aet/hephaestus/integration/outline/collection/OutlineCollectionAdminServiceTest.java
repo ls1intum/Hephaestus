@@ -30,7 +30,10 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.task.support.TaskExecutorAdapter;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Deterministic unit tests for {@link OutlineCollectionAdminService} (all collaborators mocked; the
@@ -64,6 +67,9 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private OutlineCollectionAdminService service() {
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
@@ -82,7 +88,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
             documentRepository,
             outlineApiClient,
             syncScheduler,
-            new TaskExecutorAdapter(Runnable::run)
+            new TaskExecutorAdapter(Runnable::run),
+            eventPublisher
         );
     }
 
@@ -234,7 +241,10 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void resume_resetsSyncStatusToPending_andKicksTargetedSync() {
+    void resume_resetsSyncStatusToPending_andDefersTheKickToAfterCommit() {
+        // updateState is transactional and the sync it kicks runs in its OWN transaction. Calling the sync
+        // inline let it read the row before the ENABLED write committed — it would see PAUSED, no-op, and
+        // the collection would stay frozen. The kick must therefore be an event, not a call.
         OutlineCollectionAdminService service = service();
         when(
             collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
@@ -244,7 +254,26 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
 
         assertThat(dto.state()).isEqualTo(MirrorState.ENABLED);
         assertThat(dto.syncStatus()).isEqualTo(SyncStatus.PENDING);
+        verify(syncScheduler, never()).syncCollectionNow(eq(WS), anyString());
+        verify(eventPublisher).publishEvent(
+            new OutlineCollectionAdminService.OutlineCollectionResumedEvent(WS, COLLECTION_ID)
+        );
+    }
+
+    @Test
+    void resumeEvent_isConsumedAfterCommit_andThenKicksTheTargetedSync() throws NoSuchMethodException {
+        OutlineCollectionAdminService service = service();
+
+        service.onCollectionResumed(new OutlineCollectionAdminService.OutlineCollectionResumedEvent(WS, COLLECTION_ID));
+
         verify(syncScheduler).syncCollectionNow(WS, COLLECTION_ID);
+        // The phase is the whole point of the indirection — pin it, not just the fact that an event exists.
+        TransactionalEventListener listener = OutlineCollectionAdminService.class.getDeclaredMethod(
+            "onCollectionResumed",
+            OutlineCollectionAdminService.OutlineCollectionResumedEvent.class
+        ).getAnnotation(TransactionalEventListener.class);
+        assertThat(listener).isNotNull();
+        assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     }
 
     @Test
@@ -259,6 +288,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         assertThat(dto.state()).isEqualTo(MirrorState.PAUSED);
         verify(collectionRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(syncScheduler, never()).syncCollectionNow(eq(WS), anyString());
+        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any(Object.class));
     }
 
     @Test

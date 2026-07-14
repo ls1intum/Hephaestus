@@ -247,16 +247,16 @@ public class OutlineApiClient {
                 ),
                 OutlineDocumentListResponse.class
             );
-            List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
-            if (pageData == null || pageData.isEmpty()) {
-                break;
+            List<OutlineDocumentListResponse.Meta> pageData = requirePage(body, "documents.list", collectionId);
+            if (pageData.isEmpty()) {
+                return all;
             }
             all.addAll(pageData);
             if (pageData.size() < PAGE_LIMIT) {
-                break;
+                return all;
             }
         }
-        return all;
+        throw pageCapExhausted("documents.list", collectionId, all.size());
     }
 
     /**
@@ -312,7 +312,7 @@ public class OutlineApiClient {
      * Outline's default {@code documents.list} (and {@code collections.documents}) excludes archived documents
      * entirely — archive is soft and recoverable, not a delete — so without this second call the live-enumeration
      * tombstone-by-absence sweep would wipe an archived document as if it had been permanently deleted. Same
-     * offset/limit paging as {@link #listDocuments}.
+     * offset/limit paging as {@link #listDocuments}, and the same all-or-nothing contract.
      */
     public List<OutlineDocumentListResponse.Meta> listArchivedDocuments(
         String serverUrl,
@@ -342,16 +342,63 @@ public class OutlineApiClient {
                 ),
                 OutlineDocumentListResponse.class
             );
-            List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
-            if (pageData == null || pageData.isEmpty()) {
-                break;
+            List<OutlineDocumentListResponse.Meta> pageData = requirePage(
+                body,
+                "documents.list[archived]",
+                collectionId
+            );
+            if (pageData.isEmpty()) {
+                return all;
             }
             all.addAll(pageData);
             if (pageData.size() < PAGE_LIMIT) {
-                break;
+                return all;
             }
         }
-        return all;
+        throw pageCapExhausted("documents.list[archived]", collectionId, all.size());
+    }
+
+    /**
+     * The page's rows, or an {@link OutlineApiException} when Outline answered without a {@code data} array
+     * at all.
+     *
+     * <p>This is a data-loss guard, not defensive noise. A document enumeration that quietly stops short
+     * becomes the reconcile's {@code seen} set, and the tombstone-by-absence sweep then <em>deletes</em>
+     * every mirrored document that fell off the truncated tail — irreversibly, while advancing the
+     * watermark as if the pass had been clean. Failing the call instead records the error on the collection
+     * and skips the sweep entirely; the mirror simply stays as it was until Outline answers properly again.
+     */
+    private static List<OutlineDocumentListResponse.Meta> requirePage(
+        OutlineDocumentListResponse body,
+        String call,
+        String collectionId
+    ) {
+        List<OutlineDocumentListResponse.Meta> pageData = body == null ? null : body.data();
+        if (pageData == null) {
+            throw new OutlineApiException(
+                "Outline " +
+                    call +
+                    " returned no data for collection " +
+                    collectionId +
+                    " — refusing to treat a malformed page as the end of the listing"
+            );
+        }
+        return pageData;
+    }
+
+    /** Same contract as {@link #requirePage}: an enumeration that hits the page cap is truncated, i.e. wrong. */
+    private static OutlineApiException pageCapExhausted(String call, String collectionId, int collected) {
+        return new OutlineApiException(
+            "Outline " +
+                call +
+                " exceeded the " +
+                MAX_PAGES +
+                "-page cap for collection " +
+                collectionId +
+                " after " +
+                collected +
+                " documents — refusing to sync a truncated listing"
+        );
     }
 
     /**

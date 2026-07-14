@@ -35,6 +35,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -84,6 +86,15 @@ public class IntegrationNatsConsumer {
     /** Hard cap on the reconnect exponential backoff. */
     private static final long RECONNECT_MAX_MS = 30_000L;
 
+    /**
+     * Attempts a scope reconcile gets before we stop re-arming it. A scope binds several streams now
+     * (an SCM stream plus {@code outline}), and a stream can be legitimately absent for a while — the
+     * webhook pod creates the {@code outline} stream on ITS boot, which may land after ours. That failure
+     * is transient, so the reconcile self-heals on a backoff instead of needing an app restart. Reuses the
+     * connect-retry backoff curve: ~1s → ~30s, giving roughly a minute of grace.
+     */
+    private static final int MAX_SCOPE_RECONCILE_ATTEMPTS = 6;
+
     private final Object connectionLock = new Object();
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
@@ -100,11 +111,24 @@ public class IntegrationNatsConsumer {
      */
     private final Set<Long> pendingScopeSetup = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Consecutive failed reconcile attempts per scope, for the self-healing retry backoff. Cleared on the
+     * first successful reconcile (and when the scope is stopped), so a later transient failure starts fresh.
+     */
+    private final Map<Long, Integer> scopeReconcileAttempts = new ConcurrentHashMap<>();
+
     /** Installation consumer — single-instance, mutable across restarts. */
     private volatile ScopeConsumer installationConsumer;
 
     /** Virtual-thread executor for scope setup and installation kicks. */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    /** Delay timer for the scope-reconcile retry. Single daemon thread — it only ever submits to the executor. */
+    private final ScheduledExecutorService retryScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "integration-consumer-retry");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private Connection natsConnection;
 
@@ -199,7 +223,9 @@ public class IntegrationNatsConsumer {
             }
         }
         scopeConsumers.clear();
+        scopeReconcileAttempts.clear();
         stats.setActiveScopeConsumerCount(0);
+        retryScheduler.shutdownNow();
 
         ScopeConsumer installation = installationConsumer;
         if (installation != null) {
@@ -309,6 +335,7 @@ public class IntegrationNatsConsumer {
         if (scopeId == null) {
             return;
         }
+        scopeReconcileAttempts.remove(scopeId);
         List<ScopeConsumer> consumers = scopeConsumers.remove(scopeId);
         if (consumers == null || consumers.isEmpty()) {
             log.debug("No scope consumer to stop: scopeId={}", scopeId);
@@ -329,8 +356,19 @@ public class IntegrationNatsConsumer {
      * Bring the scope's set of JetStream consumers in line with its current subscription info:
      * existing consumers whose stream is still desired are updated in place; new streams create
      * a fresh consumer; streams no longer desired are torn down.
+     *
+     * <h3>Partial failure</h3>
+     * A scope binds several streams, so this loop can fail halfway — typically because one stream does not
+     * exist yet (the {@code outline} stream is created by the webhook pod, which may boot after us). Every
+     * consumer this pass already {@code start()}ed is therefore <b>committed to {@link #scopeConsumers}
+     * before the failure propagates</b>. Dropping them on the floor would leave a live, untracked consumer:
+     * never stopped on shutdown, invisible to {@link #updateScopeConsumer(Long)} (which would no-op as "not
+     * running"), and duplicated on its own durable by the next {@link #startConsumingScope(Long)}.
+     *
+     * <p>The failure also re-arms a backed-off retry, so a transient one heals itself instead of requiring
+     * an app restart.
      */
-    private void reconcileScope(Long scopeId) throws IOException {
+    void reconcileScope(Long scopeId) throws IOException {
         Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
         if (infoOpt.isEmpty()) {
             log.warn("No subscription info available: scopeId={}", scopeId);
@@ -346,36 +384,130 @@ public class IntegrationNatsConsumer {
         List<ScopeConsumer> current = scopeConsumers.getOrDefault(scopeId, List.of());
         List<ScopeConsumer> next = new ArrayList<>();
         Set<String> kept = new HashSet<>();
-        for (ScopeConsumer existing : current) {
-            StreamSubscription want = desired.get(existing.streamName());
-            if (want == null) {
-                stopAndCleanup(existing);
-                continue;
+        try {
+            for (ScopeConsumer existing : current) {
+                StreamSubscription want = desired.get(existing.streamName());
+                if (want == null) {
+                    stopAndCleanup(existing);
+                    continue;
+                }
+                try {
+                    existing.updateSubjects(want.subjects().toArray(String[]::new));
+                } catch (JetStreamApiException | IOException e) {
+                    // The consumer is still running with its previous subjects — keep it TRACKED (an
+                    // untracked live consumer is exactly the leak this method exists to prevent) and let
+                    // the retry re-apply the new subjects.
+                    next.add(existing);
+                    kept.add(existing.streamName());
+                    throw new IOException("Failed to update scope consumer for scopeId=" + scopeId, e);
+                }
+                next.add(existing);
+                kept.add(existing.streamName());
             }
-            try {
-                existing.updateSubjects(want.subjects().toArray(String[]::new));
-            } catch (JetStreamApiException e) {
-                throw new IOException("Failed to update scope consumer for scopeId=" + scopeId, e);
+            for (StreamSubscription want : desired.values()) {
+                if (!kept.contains(want.streamName())) {
+                    next.add(createScopeConsumer(scopeId, want));
+                }
             }
-            next.add(existing);
-            kept.add(existing.streamName());
-        }
-        for (StreamSubscription want : desired.values()) {
-            if (!kept.contains(want.streamName())) {
-                next.add(createScopeConsumer(scopeId, want));
-            }
+        } catch (IOException | RuntimeException e) {
+            // Commit whatever is already running (see javadoc), then re-arm and rethrow.
+            commitScopeConsumers(scopeId, next);
+            log.error(
+                "Partial scope consumer reconcile: scopeId={}, running={}, desired={} — retrying",
+                scopeId,
+                next.size(),
+                desired.size(),
+                e
+            );
+            scheduleScopeReconcileRetry(scopeId);
+            throw e;
         }
 
-        if (next.isEmpty()) {
+        commitScopeConsumers(scopeId, next);
+        scopeReconcileAttempts.remove(scopeId);
+    }
+
+    /**
+     * Publish this pass's consumer list for the scope. Every {@code start()}ed consumer MUST land here —
+     * {@link #scopeConsumers} is the only handle by which a consumer can later be stopped or updated.
+     */
+    private void commitScopeConsumers(Long scopeId, List<ScopeConsumer> consumers) {
+        if (consumers.isEmpty()) {
             scopeConsumers.remove(scopeId);
             log.info("Skipped scope consumer setup (no subjects): scopeId={}", scopeId);
         } else {
-            scopeConsumers.put(scopeId, next);
+            scopeConsumers.put(scopeId, List.copyOf(consumers));
         }
         stats.setActiveScopeConsumerCount(totalConsumerCount());
     }
 
-    private ScopeConsumer createScopeConsumer(Long scopeId, StreamSubscription subscription) throws IOException {
+    /**
+     * Re-arm a failed reconcile on the connect-retry backoff curve. Gives up (loudly) after
+     * {@link #MAX_SCOPE_RECONCILE_ATTEMPTS} — an indefinite retry against a permanently-broken stream would
+     * just be a log firehose; the successfully-created consumers from the partial pass keep working either way.
+     */
+    private void scheduleScopeReconcileRetry(Long scopeId) {
+        if (shuttingDown.get() || !connectionProperties.enabled()) {
+            return;
+        }
+        int attempt = scopeReconcileAttempts.merge(scopeId, 1, Integer::sum);
+        if (attempt >= MAX_SCOPE_RECONCILE_ATTEMPTS) {
+            log.error(
+                "Giving up on scope consumer reconcile after {} attempts: scopeId={}; " +
+                    "the scope is consuming only the streams that could be bound",
+                attempt,
+                scopeId
+            );
+            scopeReconcileAttempts.remove(scopeId);
+            return;
+        }
+        long delayMs = reconnectBackoffMs(attempt - 1);
+        log.warn("Retrying scope consumer reconcile: scopeId={}, attempt={}, delayMs={}", scopeId, attempt, delayMs);
+        submitDelayed(() -> retryReconcileScope(scopeId), delayMs);
+    }
+
+    /**
+     * Retry pass. Shares {@link #pendingScopeSetup} with the other reconcile entry points: if one is already
+     * in flight for this scope we drop out — that pass re-reads the subscription info and re-arms its own
+     * retry on failure, so nothing is lost. Unlike {@link #updateScopeConsumer(Long)} this does NOT require
+     * the scope to already be in {@link #scopeConsumers}: a reconcile that failed on its very first stream
+     * has no entry there and would otherwise never come back.
+     */
+    private void retryReconcileScope(Long scopeId) {
+        if (shuttingDown.get() || !connectionProperties.enabled()) {
+            return;
+        }
+        if (!pendingScopeSetup.add(scopeId)) {
+            log.debug("Scope reconcile retry skipped: another reconcile in progress, scopeId={}", scopeId);
+            return;
+        }
+        try {
+            virtualThreadExecutor.submit(() -> {
+                try {
+                    ensureNatsConnectionEstablished();
+                    reconcileScope(scopeId);
+                } catch (Exception e) {
+                    // reconcileScope already logged + re-armed; this is the executor's last-resort net.
+                    log.debug("Scope consumer reconcile retry failed: scopeId={}", scopeId, e);
+                } finally {
+                    pendingScopeSetup.remove(scopeId);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            pendingScopeSetup.remove(scopeId); // shutting down
+        }
+    }
+
+    private void submitDelayed(Runnable task, long delayMs) {
+        try {
+            retryScheduler.schedule(task, delayMs, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            log.debug("Scope reconcile retry not scheduled: consumer fleet is shutting down");
+        }
+    }
+
+    /** Package-private + overridable so the reconcile's partial-failure path is unit-testable without a broker. */
+    ScopeConsumer createScopeConsumer(Long scopeId, StreamSubscription subscription) throws IOException {
         String streamName = subscription.streamName();
         String[] subjects = subscription.subjects().toArray(String[]::new);
         // Stream-suffixed durable so a scope's SCM and Outline consumers never share a durable name.
@@ -639,7 +771,8 @@ public class IntegrationNatsConsumer {
             .build();
     }
 
-    private void ensureNatsConnectionEstablished() {
+    /** Package-private + overridable so the reconcile/retry paths are unit-testable without a broker. */
+    void ensureNatsConnectionEstablished() {
         if (natsConnection != null && natsConnection.getStatus() == Connection.Status.CONNECTED) {
             return;
         }
@@ -711,6 +844,11 @@ public class IntegrationNatsConsumer {
 
     int scopeConsumerCount() {
         return scopeConsumers.size();
+    }
+
+    /** The consumers currently TRACKED for a scope — i.e. the ones the fleet can still stop or update. */
+    List<ScopeConsumer> trackedConsumers(Long scopeId) {
+        return scopeConsumers.getOrDefault(scopeId, List.of());
     }
 
     boolean isInstallationActive() {

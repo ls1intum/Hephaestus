@@ -105,11 +105,29 @@ mirror. The key is encrypted at rest in the `connection` table.
 
 | Variable | Purpose |
 | --- | --- |
-| `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection) |
-| `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com` |
+| `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection). Every Outline bean is gated on it and defaults to **off**, so an unset flag means the integration is entirely absent — no admin surface, no sync, no webhook verification. |
+| `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com`. **Required whenever `OUTLINE_OAUTH_CLIENT_ID` is set** — Outline is self-hosted, so there is no default origin. Blank or invalid, the provider seed is skipped with only a `WARN` (the app still boots; the linking button is simply never there). |
 | `OUTLINE_OAUTH_CLIENT_ID` | Outline OAuth app client ID (redirect `https://<host>/api/login/oauth2/code/outline`) |
 | `OUTLINE_OAUTH_CLIENT_SECRET` | Outline OAuth app client secret |
 | `OUTLINE_OAUTH_DISPLAY_NAME` | Label shown on the account-linking button (defaults to `Outline`) |
+
+`HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` must be set on **all three** roles, and the compose files pass
+it to each with the same value:
+
+- **application-server** — connect/admin API, collection registration, the reconcile scheduler, and the
+  webhook-subscription registrar.
+- **application-worker** — the agent context is assembled on the worker, and the Outline content source
+  carries no runtime-role gate. Without the flag there, reviews and mentor turns run with a context that
+  silently contains no wiki documents.
+- **webhook-server** — without the flag no Outline signature verifier is registered, so the receiver
+  answers `501` to every delivery on `POST /webhooks/outline`. Outline counts those as failures and
+  **auto-disables the subscription after 25 of them**.
+
+There is **no Outline signing-secret environment variable**. Unlike Slack's one global signing secret,
+Outline's webhook secret is minted per subscription when Hephaestus registers it and stored encrypted on
+the connection row; the receiver reads it back through JPA. The subscription is registered automatically
+when a workspace connection is activated — its delivery URL is `https://<host>/webhooks/outline`, derived
+from `WEBHOOK_EXTERNAL_URL` (defaulting to the application host).
 
 The `OUTLINE_OAUTH_*` block is independent of the workspace connection: it seeds a **link-only** login
 provider (registration id `outline`) that lets a member attach their Outline identity to their

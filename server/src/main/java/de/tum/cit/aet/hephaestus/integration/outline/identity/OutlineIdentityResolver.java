@@ -60,8 +60,10 @@ public class OutlineIdentityResolver {
     }
 
     /**
-     * The SCM developer login the Outline author resolves to within {@code workspaceId}, or empty when
-     * the author is not linked to an account with membership in that workspace.
+     * The workspace {@code User} (member) id the Outline author resolves to — what the document
+     * projection exposes so the mentor/review context can attribute a mirrored document to a developer.
+     * The member id comes straight off the membership view, so the chain never needs the intermediate
+     * login as an output (a {@code resolveDeveloperLogin} sibling existed and had no caller — deleted).
      *
      * @param workspaceId    the workspace the projection is scoped to
      * @param serverUrl      the Outline instance URL (from the ACTIVE connection's config; canonicalized
@@ -69,25 +71,6 @@ public class OutlineIdentityResolver {
      * @param teamId         the Outline team UUID (= the Connection's {@code instance_key}; part of the
      *                       identity key)
      * @param outlineSubject the Outline user UUID captured on the document row
-     */
-    @Transactional(readOnly = true)
-    public Optional<String> resolveDeveloperLogin(
-        long workspaceId,
-        String serverUrl,
-        @Nullable String teamId,
-        String outlineSubject
-    ) {
-        return linkedLogins(workspaceId, serverUrl, teamId, outlineSubject)
-            .filter(login -> membershipIn(login, workspaceId).isPresent())
-            .findFirst();
-    }
-
-    /**
-     * The workspace {@code User} (member) id the Outline author resolves to — what the document
-     * projection exposes so the mentor/review context can attribute a mirrored document to a developer.
-     * Resolves through the same provider-scoped, membership-gated chain as
-     * {@link #resolveDeveloperLogin}; the member id comes straight off the membership view.
-     *
      * @return the SCM {@code User} id, or empty when the author is not linked to a member of {@code workspaceId}
      */
     @Transactional(readOnly = true)

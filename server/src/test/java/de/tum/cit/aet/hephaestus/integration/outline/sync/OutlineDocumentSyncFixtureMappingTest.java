@@ -24,7 +24,6 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import jakarta.persistence.EntityManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -81,9 +80,6 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
-    @Mock
-    private EntityManager entityManager;
-
     private OutlineCollection collection;
 
     private OutlineDocumentSyncService service() {
@@ -99,7 +95,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             collectionRepository,
             webhookRegistrar,
             properties,
-            entityManager
+            new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository))
         );
     }
 
@@ -116,7 +112,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             .when(connectionService.findActiveBearerToken(WORKSPACE, IntegrationKind.OUTLINE))
             .thenReturn(Optional.of(new BearerToken("token", null)));
         lenient()
-            .when(documentRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION))
+            .when(documentRepository.findSnapshotsByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION))
             .thenReturn(List.of());
         lenient().when(documentRepository.sumBodySizeByWorkspaceId(WORKSPACE)).thenReturn(0L);
         lenient()
@@ -138,6 +134,16 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
         lenient()
             .when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE))
             .thenReturn(List.of(collection));
+        // The bookkeeping write re-reads the registry row inside its own transaction.
+        lenient()
+            .when(
+                collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
+                    WORKSPACE,
+                    CONNECTION,
+                    COLLECTION_ID
+                )
+            )
+            .thenReturn(Optional.of(collection));
 
         // --- wire the mocked client's return values off the real captured fixtures ---
 

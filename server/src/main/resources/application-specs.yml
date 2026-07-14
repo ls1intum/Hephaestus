@@ -37,6 +37,9 @@ hephaestus:
             slack:
                 client-id: ""
                 client-secret: ""
+            outline:
+                client-id: ""
+                client-secret: ""
     # OpenAPI generation boots the full Spring context; HmacOAuthStateService fails fast
     # without a webhook/oauth-state secret. Use a deterministic placeholder for the spec run.
     webhook:

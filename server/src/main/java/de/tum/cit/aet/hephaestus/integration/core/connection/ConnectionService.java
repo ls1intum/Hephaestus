@@ -130,27 +130,40 @@ public class ConnectionService {
      * arrives in an inbound webhook body as an <em>untrusted routing key</em> — it only selects
      * which stored secret to verify against, so a forged id simply matches nothing. Empty when no
      * ACTIVE Outline connection carries that subscription (or it has no stored secret).
+     *
+     * <p>Reached from {@code OutlineWebhookSecretSource#getSecret} BEFORE the HMAC comparison, on a
+     * route the auth rate limiter exempts — so it must be a single indexed probe, never a scan over
+     * the connected fleet. {@link ConnectionRepository#findOutlineSubscriptionsBySubscriptionId}
+     * supplies exactly that.
+     *
+     * <p>Fail-closed on ambiguity: a subscription id is globally unique at Outline, so more than one
+     * ACTIVE match means corrupt data. We reject the delivery rather than pick a row — guessing would
+     * let a hostile/duplicated row decide which workspace's secret verifies a delivery.
      */
     @Transactional(readOnly = true)
     public Optional<OutlineSubscription> findOutlineSubscription(@Nullable String subscriptionId) {
         if (subscriptionId == null || subscriptionId.isBlank()) {
             return Optional.empty();
         }
-        for (Long workspaceId : findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE)) {
-            Optional<ConnectionConfig.OutlineConfig> config = findActiveOutlineConfig(workspaceId);
-            if (config.isEmpty()) {
-                continue;
-            }
-            ConnectionConfig.OutlineConfig outline = config.get();
-            if (
-                subscriptionId.equals(outline.webhookSubscriptionId()) &&
-                outline.webhookSecret() != null &&
-                !outline.webhookSecret().isBlank()
-            ) {
-                return Optional.of(new OutlineSubscription(workspaceId, outline.webhookSecret()));
-            }
+        List<ConnectionRepository.OutlineSubscriptionProjection> matches =
+            connectionRepository.findOutlineSubscriptionsBySubscriptionId(subscriptionId);
+        if (matches.isEmpty()) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (matches.size() > 1) {
+            // Never log the (attacker-supplied) subscription id itself.
+            log.error(
+                "Outline webhook subscription id matches {} ACTIVE connections — rejecting delivery; out-of-band fix required",
+                matches.size()
+            );
+            return Optional.empty();
+        }
+        ConnectionRepository.OutlineSubscriptionProjection match = matches.getFirst();
+        String secret = match.getSigningSecret();
+        if (secret == null || secret.isBlank() || match.getWorkspaceId() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new OutlineSubscription(match.getWorkspaceId(), secret));
     }
 
     /** The workspace a change-notification subscription belongs to and its signing secret. */

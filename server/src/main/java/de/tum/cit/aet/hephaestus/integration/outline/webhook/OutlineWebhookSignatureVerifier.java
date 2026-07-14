@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource.SecretLookup;
@@ -31,8 +32,13 @@ import org.springframework.stereotype.Component;
  * secret via the OUTLINE-filtered {@link WebhookSecretSource} (the {@code GitlabWebhookSignatureVerifier}
  * ctor pattern), recomputes the digest over the exact request bytes, compares constant-time, and enforces
  * a ±{@value #MAX_SKEW_SECONDS}s replay window on the timestamp.
+ *
+ * <p>Webhook-role only, matching {@code SlackWebhookSignatureVerifier}. The bootstrap's
+ * {@code WebhookSignatureVerifier}/{@code SubjectKeyDeriver} requirement is itself gated on the
+ * webhook role, so a non-webhook role boots cleanly without these beans.
  */
 @Component
+@ConditionalOnWebhookRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier {
 

@@ -509,10 +509,16 @@ hephaestus:
             # defense; 10m also covers provider redelivery horizons. See WebhookProperties.Stream.
             duplicate-window: 10m
             max-age: 180d
-            # The Slack stream buffers real channel/DM message text. SQL is the system of record and GDPR
-            # erasure cannot reach inside the broker, so it expires on a transport-buffer horizon, not 180d.
+            # Streams whose messages carry real personal content, not just change pointers. SQL is the
+            # system of record and GDPR erasure cannot reach inside the broker, so these expire on a
+            # transport-buffer horizon rather than the 180d default:
+            #   slack   — the envelope is the channel/DM message text itself.
+            #   outline — an Outline webhook delivery embeds the whole document in payload.model.text
+            #             (full Markdown body, plus author/collaborator ids), so an erased or corrected
+            #             document would otherwise survive in JetStream for six months.
             max-age-by-stream:
                 slack: 72h
+                outline: 72h
             max-messages: 2000000
         shutdown:
             # Drain budget for in-flight publishes after HTTP closes. Docker stop_grace_period
