@@ -21,6 +21,14 @@ const gitlab: IdentityView = {
 	lastLoginAt: new Date("2026-04-02T09:30:00Z"),
 };
 
+const outline: IdentityView = {
+	id: 3,
+	providerType: "OUTLINE",
+	subject: "o-1",
+	username: "octocat",
+	displayName: "Octo Docs",
+};
+
 const githubProvider: IdentityProviderView = {
 	registrationId: "github",
 	displayName: "GitHub",
@@ -30,6 +38,20 @@ const gitlabProvider: IdentityProviderView = {
 	registrationId: "gitlab",
 	displayName: "GitLab",
 	providerType: "GITLAB",
+};
+// An instance can run SEVERAL Outline deployments (unique on type + base URL), so Outline is a LIST
+// of providers, never a single `find(...)` match — each unconnected one gets its own CTA.
+const outlineProvider: IdentityProviderView = {
+	registrationId: "outline-acme",
+	displayName: "ACME Outline",
+	providerType: "OUTLINE",
+	baseUrl: "https://outline.acme.test",
+};
+const secondOutlineProvider: IdentityProviderView = {
+	registrationId: "outline-research",
+	displayName: "Research Outline",
+	providerType: "OUTLINE",
+	baseUrl: "https://docs.research.test",
 };
 
 /**
@@ -55,6 +77,7 @@ const meta = {
 	args: {
 		onLink: fn(),
 		onUnlink: fn(),
+		onRetry: fn(),
 		identities: [github, gitlab],
 		providers: [githubProvider, gitlabProvider],
 	},
@@ -80,6 +103,22 @@ export const Default: Story = {
 	},
 };
 
+/** Several identities, including a link-only Outline one — labels are human, never raw enums. */
+export const MultipleIdentities: Story = {
+	args: {
+		identities: [github, gitlab, outline],
+		providers: [githubProvider, gitlabProvider, outlineProvider],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Outline")).toBeInTheDocument();
+		await expect(canvas.queryByText("OUTLINE")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("GITHUB")).not.toBeInTheDocument();
+		// Outline is already linked → no Outline connect CTA is offered.
+		await expect(canvas.queryByRole("button", { name: /^Connect ACME Outline$/ })).toBeNull();
+	},
+};
+
 /** Only one identity — disconnect is unavailable so the account can never lock itself out. */
 export const SingleIdentity: Story = {
 	args: { identities: [github], providers: [githubProvider] },
@@ -88,6 +127,7 @@ export const SingleIdentity: Story = {
 		// The lockout reason is always-visible text (not a disabled button), so SR/keyboard users
 		// can read why disconnect is unavailable.
 		await expect(canvas.getByText(/only sign-in method/i)).toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: /^disconnect /i })).toBeNull();
 		await expect(args.onUnlink).not.toHaveBeenCalled();
 	},
 };
@@ -101,17 +141,38 @@ export const WithLinkableProvider: Story = {
 	},
 };
 
+/**
+ * Outline connect CTA. Outline is configured but unlinked, so a dedicated row offers it — and with
+ * TWO Outline instances configured, BOTH are offered, each named by its display name.
+ */
+export const OutlineConnectCTA: Story = {
+	args: {
+		identities: [github, gitlab],
+		providers: [githubProvider, gitlabProvider, outlineProvider, secondOutlineProvider],
+	},
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		// Every unconnected Outline instance gets its own CTA, named by its display name.
+		await expect(canvas.getByText("ACME Outline is not connected")).toBeInTheDocument();
+		await expect(canvas.getByText("Research Outline is not connected")).toBeInTheDocument();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Connect Research Outline" }));
+		await expect(args.onLink).toHaveBeenCalledWith("outline-research");
+	},
+};
+
 /** A disconnect is in flight — that row shows a spinner and the button is disabled. */
 export const Disconnecting: Story = {
 	args: { unlinkingId: 1 },
 };
 
-/** No connected accounts yet — empty state, with providers offered to connect. */
+/** No connected accounts yet — Empty state, with providers still offered to connect. */
 export const Empty: Story = {
 	args: { identities: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/no connected accounts yet/i)).toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: /connect github/i })).toBeInTheDocument();
 	},
 };
 
@@ -120,11 +181,18 @@ export const Loading: Story = {
 	args: { isLoading: true },
 };
 
-/** Failed to load — error copy. */
+/** Failed to load — the shared error alert, with a retry. */
 export const ErrorState: Story = {
-	args: { isError: true, identities: [], providers: [] },
-	play: async ({ canvasElement }) => {
+	args: {
+		isError: true,
+		error: { detail: "The identity service is unavailable." },
+		identities: [],
+		providers: [],
+	},
+	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/failed to load connected accounts/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/could not load connected accounts/i)).toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
+		await expect(args.onRetry).toHaveBeenCalled();
 	},
 };

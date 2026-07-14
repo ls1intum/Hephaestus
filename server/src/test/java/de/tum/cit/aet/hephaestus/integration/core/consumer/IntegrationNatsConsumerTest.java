@@ -1,9 +1,24 @@
 package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
+import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
+import io.nats.client.ConsumerContext;
+import io.nats.client.StreamContext;
 import io.nats.client.api.DeliverPolicy;
+import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -87,6 +102,146 @@ class IntegrationNatsConsumerTest {
             for (int i = 0; i < 1000; i++) {
                 long delay = IntegrationNatsConsumer.reconnectBackoffMs(100);
                 assertThat(delay).isLessThanOrEqualTo(30_000L);
+            }
+        }
+    }
+
+    /**
+     * A scope binds SEVERAL streams now (an SCM stream plus {@code outline}). If the second stream's consumer
+     * cannot be created — the common case being that the {@code outline} stream does not exist yet because the
+     * webhook pod creates it on ITS boot — the first stream's consumer has already been {@code start()}ed.
+     *
+     * <p>Two invariants, both broken before:
+     * <ol>
+     *   <li>every started consumer is TRACKED, so it can still be stopped/updated — an untracked one runs
+     *       forever, is invisible to {@code updateScopeConsumer} ("not running"), and gets duplicated on its
+     *       own durable by the next start;</li>
+     *   <li>the failure re-arms a retry, so the transient case self-heals rather than needing a restart.</li>
+     * </ol>
+     */
+    @Nested
+    class ReconcileScopePartialFailure {
+
+        private static final Long SCOPE_ID = 42L;
+        private static final String SCM_STREAM = "github";
+        private static final String OUTLINE_STREAM = "outline";
+
+        private FakeFleet fleet;
+
+        private FakeFleet fleetFailingOn(String... failingStreams) {
+            fleet = new FakeFleet(Set.of(failingStreams));
+            return fleet;
+        }
+
+        @AfterEach
+        void tearDown() {
+            if (fleet != null) {
+                fleet.shutdown(); // stops the retry timer + consumer threads
+            }
+        }
+
+        @Test
+        @DisplayName(
+            "a consumer started before the failing stream stays tracked (never a running-but-orphaned consumer)"
+        )
+        void partialFailureCommitsWhatItStarted() {
+            FakeFleet consumer = fleetFailingOn(OUTLINE_STREAM);
+
+            assertThatThrownBy(() -> consumer.reconcileScope(SCOPE_ID)).isInstanceOf(IOException.class);
+
+            assertThat(consumer.started).hasSize(1);
+            assertThat(consumer.trackedConsumers(SCOPE_ID))
+                .as("the started consumer must remain reachable for stop/update")
+                .containsExactlyElementsOf(consumer.started);
+            assertThat(consumer.trackedConsumers(SCOPE_ID).get(0).streamName()).isEqualTo(SCM_STREAM);
+            assertThat(consumer.trackedConsumers(SCOPE_ID).get(0).isRunning()).isTrue();
+        }
+
+        @Test
+        @DisplayName("a transient stream failure self-heals: the reconcile is retried and the missing consumer appears")
+        void failedReconcileIsRetriedUntilItSucceeds() {
+            FakeFleet consumer = fleetFailingOn(OUTLINE_STREAM);
+
+            assertThatThrownBy(() -> consumer.reconcileScope(SCOPE_ID)).isInstanceOf(IOException.class);
+            assertThat(consumer.trackedConsumers(SCOPE_ID)).hasSize(1);
+
+            // The webhook pod finished booting and created the stream.
+            consumer.failingStreams.clear();
+
+            await()
+                .atMost(Duration.ofSeconds(10))
+                .untilAsserted(() ->
+                    assertThat(consumer.trackedConsumers(SCOPE_ID))
+                        .as("the re-armed retry must bind the stream that failed the first pass")
+                        .hasSize(2)
+                );
+            assertThat(consumer.trackedConsumers(SCOPE_ID))
+                .extracting(ScopeConsumer::streamName)
+                .containsExactlyInAnyOrder(SCM_STREAM, OUTLINE_STREAM);
+        }
+
+        /**
+         * The fleet with its two broker-touching seams stubbed out: consumer creation (which streams exist)
+         * and connection establishment. Everything under test — the reconcile bookkeeping, the commit of
+         * partial successes, the retry re-arm — is the real code.
+         */
+        private static class FakeFleet extends IntegrationNatsConsumer {
+
+            private final Set<String> failingStreams;
+            private final List<ScopeConsumer> started = new CopyOnWriteArrayList<>();
+
+            FakeFleet(Set<String> failingStreams) {
+                super(
+                    new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+                    new NatsConsumerProperties(
+                        Duration.ofMinutes(5),
+                        500,
+                        Duration.ofSeconds(2),
+                        new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
+                    ),
+                    scopeId ->
+                        Optional.of(
+                            new NatsSubscriptionInfo(
+                                scopeId,
+                                List.of(
+                                    new StreamSubscription(SCM_STREAM, Set.of("github.acme.>")),
+                                    new StreamSubscription(OUTLINE_STREAM, Set.of("outline.acme.>"))
+                                )
+                            )
+                        ),
+                    mock(IntegrationMessageDispatcher.class),
+                    mock(IntegrationPoisonHandler.class),
+                    new IntegrationConsumerStats()
+                );
+                this.failingStreams = new ConcurrentSkipListSet<>(failingStreams);
+            }
+
+            @Override
+            void ensureNatsConnectionEstablished() {
+                // no broker in a unit test
+            }
+
+            @Override
+            ScopeConsumer createScopeConsumer(Long scopeId, StreamSubscription subscription) throws IOException {
+                if (failingStreams.contains(subscription.streamName())) {
+                    throw new IOException("stream not found: " + subscription.streamName());
+                }
+                ScopeConsumer scopeConsumer = new ScopeConsumer(
+                    scopeId,
+                    "heph-scope-" + scopeId + "-" + subscription.streamName(),
+                    subscription.streamName(),
+                    mock(ConsumerContext.class),
+                    mock(StreamContext.class),
+                    subscription.subjects().toArray(String[]::new),
+                    msg -> {}
+                );
+                try {
+                    scopeConsumer.start();
+                } catch (Exception e) {
+                    throw new IOException(e);
+                }
+                started.add(scopeConsumer);
+                return scopeConsumer;
             }
         }
     }

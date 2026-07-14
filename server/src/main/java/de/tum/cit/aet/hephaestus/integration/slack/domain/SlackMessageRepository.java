@@ -37,7 +37,6 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         @Param("threadIds") java.util.Collection<Long> threadIds
     );
 
-    /** Workspace purge: delete every ingested message for one workspace. */
     long deleteByWorkspaceId(Long workspaceId);
 
     /**
@@ -49,10 +48,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     /**
      * Person erasure (opt-out / account hard-delete): delete every message this workspace stored that is authored by
      * one member — matched on the {@code author_member_id} firewall stamp, so only that individual's messages go and
-     * co-authors on the same channels/threads are untouched. A native bulk delete that carries the
-     * {@code workspace_id} predicate and is idempotent (0 when the member authored nothing).
-     *
-     * @return the number of message rows deleted
+     * co-authors on the same channels/threads are untouched. Idempotent (0 when the member authored nothing).
      */
     @Modifying
     @Transactional
@@ -73,7 +69,6 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         @Param("slackUserId") String slackUserId
     );
 
-    /** Scoped row count for a workspace. */
     long countByWorkspaceId(Long workspaceId);
 
     /**
@@ -167,8 +162,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      * a scalar firewall stamp). Consent-gated on the SAME read as the message fetch (not only on a prior thread
      * scan): {@code c.consentState = ACTIVE} is a join predicate here, so a channel paused/revoked between enqueue
      * and execution — or on a retry — yields zero rows atomically with the read, never a stale/leaked message.
-     * Workspace-pinned. Plain JPQL (no array operator needed here), unlike
-     * {@link SlackThreadRepository#findParticipatingThreadRows}.
+     * Workspace-pinned.
      *
      * @param pageable caller passes {@code PageRequest.of(0, limit)} for the per-thread message cap
      */
@@ -195,10 +189,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         Pageable pageable
     );
 
-    /**
-     * Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread
-     * (root {@code slack_ts = threadTs} + replies {@code slack_thread_ts = threadTs}), workspace-pinned.
-     */
+    /** Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread, workspace-pinned. */
     @Query(
         "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId " +
             "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL"

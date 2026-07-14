@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -145,6 +146,91 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         assertThat(cfg.enabledStreams()).containsExactly("leaderboard");
 
         assertDiscriminator(id, "SLACK");
+    }
+
+    /**
+     * The webhook signing secret must survive the JSONB round-trip. This is the persistence half of
+     * the API-boundary redaction in {@code ConnectionDetailDTO}: Hibernate serializes this column
+     * with the same Jackson {@code ObjectMapper}, so had we redacted with {@code @JsonIgnore} on the
+     * record component instead, this test would fail — the stored secret would be destroyed on write.
+     */
+    @Test
+    void outlineConfig_roundTrips_includingTheWebhookSecret() {
+        ConnectionConfig.OutlineConfig original = new ConnectionConfig.OutlineConfig(
+            "https://outline.example.com",
+            "sub-abc",
+            "ENC:v2:ciphertext",
+            Set.of("documents")
+        );
+        Long id = persistAndClear(IntegrationKind.OUTLINE, "https://outline.example.com", original);
+
+        Connection reloaded = connectionRepository.findById(id).orElseThrow();
+        assertThat(reloaded.getConfig()).isInstanceOf(ConnectionConfig.OutlineConfig.class);
+        ConnectionConfig.OutlineConfig cfg = (ConnectionConfig.OutlineConfig) reloaded.getConfig();
+        assertThat(cfg.serverUrl()).isEqualTo("https://outline.example.com");
+        assertThat(cfg.webhookSubscriptionId()).isEqualTo("sub-abc");
+        assertThat(cfg.webhookSecret()).isEqualTo("ENC:v2:ciphertext");
+        assertThat(cfg.enabledStreams()).containsExactly("documents");
+
+        assertDiscriminator(id, "OUTLINE");
+    }
+
+    /**
+     * The unauthenticated webhook hot path resolves its signing secret through the JSONB expression
+     * index {@code ix_connection_outline_subscription}. Exercised against real Postgres because the
+     * {@code ->>} operator, the quoted projection aliases, and the ACTIVE/OUTLINE predicates only
+     * exist in native SQL — a mock cannot tell us the query parses, let alone that it isolates
+     * tenants.
+     */
+    @Test
+    void outlineSubscriptionLookup_isKeyedOnTheSubscriptionAndNeverCrossesWorkspaces() {
+        Workspace other = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("conn-roundtrip-b"));
+
+        persistActiveOutline(workspace, "sub-a", "secret-a");
+        persistActiveOutline(other, "sub-b", "secret-b");
+        entityManager.flush();
+        entityManager.clear();
+
+        var a = connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a");
+        assertThat(a).hasSize(1);
+        assertThat(a.getFirst().getWorkspaceId()).isEqualTo(workspace.getId());
+        assertThat(a.getFirst().getSigningSecret()).isEqualTo("secret-a");
+
+        var b = connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b");
+        assertThat(b).hasSize(1);
+        assertThat(b.getFirst().getWorkspaceId()).isEqualTo(other.getId());
+        assertThat(b.getFirst().getSigningSecret()).isEqualTo("secret-b");
+
+        // A forged id matches nothing: the delivery is rejected before any HMAC comparison.
+        assertThat(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged")).isEmpty();
+    }
+
+    /** A non-ACTIVE row is invisible to the webhook resolver: a suspended workspace stops verifying. */
+    @Test
+    void outlineSubscriptionLookup_ignoresNonActiveConnections() {
+        Connection suspended = new Connection(
+            workspace,
+            IntegrationKind.OUTLINE,
+            "https://outline.example.com/suspended",
+            new ConnectionConfig.OutlineConfig("https://outline.example.com", "sub-suspended", "secret-x", Set.of())
+        );
+        suspended.setState(IntegrationState.SUSPENDED);
+        connectionRepository.save(suspended);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-suspended")).isEmpty();
+    }
+
+    private void persistActiveOutline(Workspace ws, String subscriptionId, String secret) {
+        Connection conn = new Connection(
+            ws,
+            IntegrationKind.OUTLINE,
+            "https://outline.example.com/" + subscriptionId,
+            new ConnectionConfig.OutlineConfig("https://outline.example.com", subscriptionId, secret, Set.of())
+        );
+        conn.setState(IntegrationState.ACTIVE);
+        connectionRepository.save(conn);
     }
 
     @Test

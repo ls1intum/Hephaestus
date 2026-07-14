@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.web.server.ResponseStatusException;
@@ -63,11 +65,33 @@ class LoginProviderServiceTest extends BaseUnitTest {
         );
     }
 
+    private static AuthProperties.LoginProviderSeed outlineSeed(String clientId, String secret, String baseUrl) {
+        return new AuthProperties.LoginProviderSeed(
+            LoginProvider.ProviderType.OUTLINE,
+            baseUrl,
+            clientId,
+            secret,
+            "Team Wiki"
+        );
+    }
+
     private static LoginProviderService.Draft gitlabDraft(String registrationId, String baseUrl, String scopes) {
         return new LoginProviderService.Draft(
             registrationId,
             LoginProvider.ProviderType.GITLAB,
             "Self-hosted GitLab",
+            baseUrl,
+            "client-id",
+            "client-secret",
+            scopes
+        );
+    }
+
+    private static LoginProviderService.Draft outlineDraft(String registrationId, String baseUrl, String scopes) {
+        return new LoginProviderService.Draft(
+            registrationId,
+            LoginProvider.ProviderType.OUTLINE,
+            "Team Wiki",
             baseUrl,
             "client-id",
             "client-secret",
@@ -179,6 +203,82 @@ class LoginProviderServiceTest extends BaseUnitTest {
         verify(repository, never()).save(any());
     }
 
+    /**
+     * The shipped {@code outline} seed slot is blank on every deployment that does not run a wiki:
+     * both {@code OUTLINE_OAUTH_CLIENT_ID} and {@code OUTLINE_OAUTH_BASE_URL} default to empty. The
+     * unconfigured gate must fire FIRST — before the id check, the existence probe and, decisively,
+     * before {@code resolveBaseUrl}, which 422s on a blank base URL. Asserted structurally: the entry
+     * touches the repository not at all.
+     */
+    @Test
+    void skipsTheBlankOutlineSeedSlotBeforeItCanValidateTheBlankBaseUrl() {
+        service(Map.of("outline", outlineSeed("", "", ""))).seedFromEnvOnStartup();
+
+        Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
+    void seedsOutlineFromItsBaseUrlWithTheReadScope() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+
+        service(
+            Map.of("outline", outlineSeed("client-id", "secret", "https://wiki.acme.test/"))
+        ).seedFromEnvOnStartup();
+
+        ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
+        verify(repository).save(captor.capture());
+        LoginProvider seeded = captor.getValue();
+        assertThat(seeded.getRegistrationId()).isEqualTo("outline");
+        assertThat(seeded.getType()).isEqualTo(LoginProvider.ProviderType.OUTLINE);
+        assertThat(seeded.getBaseUrl()).isEqualTo("https://wiki.acme.test");
+        assertThat(seeded.getScopes()).isEqualTo("read"); // pinned by type — never 'openid' (Outline is not OIDC)
+        assertThat(seeded.isSeededFromEnv()).isTrue();
+    }
+
+    /**
+     * Half-configured (a client id but no base URL): {@code resolveBaseUrl} 422s, and the seeder must
+     * absorb that into a skip. A credentialed-but-URL-less Outline slot cannot crash startup.
+     */
+    @Test
+    void skipsOutlineSeedWithAClientIdButNoBaseUrl() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+
+        service(Map.of("outline", outlineSeed("client-id", "secret", ""))).seedFromEnvOnStartup();
+
+        verify(repository, never()).save(any());
+    }
+
+    /**
+     * A half-configured slot (client id exported, secret forgotten) must NOT seed. Seeding it would offer an
+     * ENABLED provider whose every OAuth exchange 401s at the token endpoint with an opaque IdP error. This is
+     * a per-slot property of the seed, so it holds for all four provider types — not just Outline.
+     */
+    @ParameterizedTest
+    @EnumSource(LoginProvider.ProviderType.class)
+    void skipsSeedWithAClientIdButNoClientSecret(LoginProvider.ProviderType type) {
+        service(
+            Map.of(
+                "provider",
+                new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "client-id", "", "")
+            )
+        ).seedFromEnvOnStartup();
+
+        Mockito.verifyNoInteractions(repository);
+    }
+
+    @ParameterizedTest
+    @EnumSource(LoginProvider.ProviderType.class)
+    void skipsSeedWithAClientSecretButNoClientId(LoginProvider.ProviderType type) {
+        service(
+            Map.of(
+                "provider",
+                new AuthProperties.LoginProviderSeed(type, "https://host.example.com", "  ", "secret", "")
+            )
+        ).seedFromEnvOnStartup();
+
+        Mockito.verifyNoInteractions(repository);
+    }
+
     @Test
     void createSelfHostedGitlabDefaultsScopesAndEvictsCache() {
         when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
@@ -227,6 +327,54 @@ class LoginProviderServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void createOutlineDefaultsToReadScopeAndValidatesBaseUrl() {
+        // OUTLINE mirrors the GITLAB self-hosted shape: per-instance base URL (validated), plain OAuth2
+        // with a pinned minimal "read" scope — see LoginProviderService.OUTLINE_SCOPES.
+        when(repository.existsByRegistrationId("outline-acme")).thenReturn(false);
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        LoginProvider created = adminService().create(outlineDraft("outline-acme", "https://wiki.acme.test/", null));
+
+        assertThat(created.getType()).isEqualTo(LoginProvider.ProviderType.OUTLINE);
+        assertThat(created.getBaseUrl()).isEqualTo("https://wiki.acme.test"); // trailing slash stripped
+        assertThat(created.getScopes()).isEqualTo("read"); // defaulted by type (plain OAuth2, no openid)
+        verify(registrationCache).evict("outline-acme");
+    }
+
+    @Test
+    void createRejectsOutlineOpenidScope() {
+        // Outline is NOT an OIDC provider: openid flips Spring to the OIDC path and 500s the callback
+        // (no id_token, no jwkSetUri) — same failure mode the GitLab guard closes.
+        assertThatThrownBy(() ->
+            adminService().create(outlineDraft("outline-x", "https://wiki.acme.test", "openid read"))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void updateRejectsOutlineOpenidScope() {
+        LoginProvider existing = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("outline")).thenReturn(java.util.Optional.of(existing));
+
+        assertThatThrownBy(() ->
+            adminService().update(
+                "outline",
+                new LoginProviderService.Patch(null, null, null, null, "openid read", null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsNonHttpsOutlineBaseUrl() {
+        // SSRF / HTTPS guard: the Outline base URL takes the same ServerUrlValidator posture as GitLab.
+        assertThatThrownBy(() ->
+            adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void createRejectsMalformedRegistrationId() {
         assertThatThrownBy(() ->
             adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null))
@@ -259,6 +407,56 @@ class LoginProviderServiceTest extends BaseUnitTest {
         verify(registrationCache, never()).evict(any());
     }
 
+    /**
+     * The lockout guard counts SIGN-IN methods. Slack and Outline are link-only ({@code isLinkOnly()}): they
+     * are filtered off the login picker and rejected at flow begin, so they can never sign anyone in. An
+     * instance whose only provider is Outline must still be able to delete it.
+     */
+    @Test
+    void deleteAllowsTheLastEnabledProviderWhenItIsLinkOnly() {
+        LoginProvider outline = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("outline")).thenReturn(Optional.of(outline));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
+
+        adminService().delete("outline");
+
+        verify(repository).delete(outline);
+        verify(registrationCache).evict("outline");
+    }
+
+    @Test
+    void disableAllowsTheLastEnabledProviderWhenItIsLinkOnly() {
+        LoginProvider outline = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("outline")).thenReturn(Optional.of(outline));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        LoginProvider saved = adminService().update(
+            "outline",
+            new LoginProviderService.Patch(null, null, null, null, null, false)
+        );
+
+        assertThat(saved.isEnabled()).isFalse();
+    }
+
+    /**
+     * The mirror image: a link-only provider must not PROP UP the count either. With GitHub + Outline enabled,
+     * deleting GitHub leaves nobody able to sign in — the old count saw a non-empty list and waved it through.
+     */
+    @Test
+    void deleteRefusesTheLastSignInProviderEvenWhenALinkOnlyProviderRemains() {
+        LoginProvider github = new LoginProvider();
+        github.setRegistrationId("github");
+        github.setType(LoginProvider.ProviderType.GITHUB);
+        github.setEnabled(true);
+        LoginProvider outline = outlineProvider("outline", "sealed");
+        when(repository.findByRegistrationId("github")).thenReturn(Optional.of(github));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(github, outline));
+
+        assertThatThrownBy(() -> adminService().delete("github")).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).delete(any());
+    }
+
     @Test
     void createRejectsNonHttpsGitlabBaseUrl() {
         // SSRF / HTTPS guard: ServerUrlValidator rejects http:// (and loopback/internal) base URLs.
@@ -289,6 +487,19 @@ class LoginProviderServiceTest extends BaseUnitTest {
 
         adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "new-secret", null, null));
         assertThat(existing.getClientSecret()).isEqualTo("new-secret");
+    }
+
+    private static LoginProvider outlineProvider(String registrationId, String clientSecret) {
+        LoginProvider provider = new LoginProvider();
+        provider.setRegistrationId(registrationId);
+        provider.setType(LoginProvider.ProviderType.OUTLINE);
+        provider.setDisplayName("Team Wiki");
+        provider.setBaseUrl("https://wiki.example.com");
+        provider.setClientId("client-id");
+        provider.setClientSecret(clientSecret);
+        provider.setScopes("read");
+        provider.setEnabled(true);
+        return provider;
     }
 
     private static LoginProvider gitlabProvider(String registrationId, String clientSecret) {

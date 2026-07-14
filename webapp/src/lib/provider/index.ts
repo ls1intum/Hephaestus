@@ -5,6 +5,7 @@ export {
 	type PullRequestState,
 	type PullRequestStateIconResult,
 } from "./provider-icons";
+export { getProviderLabel, PROVIDER_LABELS } from "./provider-labels";
 export {
 	getProviderSlug,
 	getProviderTerms,

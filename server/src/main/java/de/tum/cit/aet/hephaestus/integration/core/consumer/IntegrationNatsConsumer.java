@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHand
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
+import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -23,20 +24,24 @@ import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -44,23 +49,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 /**
- * Unified JetStream consumer fleet for every integration kind. Sole consumer-side entry
- * point: per-scope consumers, the installation-wide consumer, lifecycle, reconnect, and
- * the per-message dispatch path.
- *
- * <h2>Collaborators</h2>
- * <ul>
- *   <li>{@link IntegrationMessageDispatcher} — vendor-agnostic subject → handler routing.</li>
- *   <li>{@link IntegrationPoisonHandler} — NAK-with-backoff + ACK-after-N on redelivery exhaustion.</li>
- *   <li>{@link IntegrationConsumerStats} — read-side surface for the actuator probe.</li>
- *   <li>{@link ConsumerSubjectMath} — pure subject-arithmetic (wildcard filters, consumer-name conventions).</li>
- *   <li>{@link ScopeConsumer} — per-scope queue + virtual-thread dispatch.</li>
- * </ul>
- *
- * <h2>Concurrency</h2>
- * Per-scope lifecycle is gated by an in-flight {@link Set} ({@code pendingScopeSetup}) so
- * two callers can't race to create the same JetStream consumer. Connection creation is
- * double-checked-locked. The virtual-thread executor scales linearly with the scope count.
+ * Unified JetStream consumer fleet for every integration kind and the sole consumer-side entry point:
+ * per-scope consumers, the installation-wide consumer, lifecycle, reconnect, and dispatch. Per-scope
+ * lifecycle is gated by the in-flight {@code pendingScopeSetup} set so two callers can't race to create
+ * the same JetStream consumer; connection creation is double-checked-locked.
  */
 @Order(1)
 @Service
@@ -78,15 +70,6 @@ public class IntegrationNatsConsumer {
      */
     private static final IntegrationKind INSTALLATION_AWARE_KIND = IntegrationKind.GITHUB;
 
-    /**
-     * Kind whose stream backs the fleet-wide flat (non-repository-scoped) consumer. Today only
-     * the messaging kind (Slack) publishes to a flat {@code <stream>.>} subject space; we go
-     * through {@link ConsumerSubjectMath#streamNameFor} so the field name and wiring stay
-     * vendor-neutral while the singular supported value stays explicit (mirrors
-     * {@link #INSTALLATION_AWARE_KIND}). New flat-stream vendors will need a sibling consumer.
-     */
-    private static final IntegrationKind FLAT_STREAM_KIND = IntegrationKind.SLACK;
-
     /** NATS client connection timeout — keep short; reconnect handles long outages. */
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(10);
 
@@ -99,11 +82,21 @@ public class IntegrationNatsConsumer {
     /** Hard cap on the reconnect exponential backoff. */
     private static final long RECONNECT_MAX_MS = 30_000L;
 
+    /**
+     * Attempts a scope reconcile gets before it stops re-arming. A scope binds several streams, and one can be
+     * legitimately absent for a while (the webhook pod creates the {@code outline} stream on its own boot, which
+     * may land after ours), so the reconcile self-heals on the connect-retry backoff rather than needing a restart.
+     */
+    private static final int MAX_SCOPE_RECONCILE_ATTEMPTS = 6;
+
     private final Object connectionLock = new Object();
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    /** One JetStream {@link ScopeConsumer} per scope ID. */
-    private final Map<Long, ScopeConsumer> scopeConsumers = new ConcurrentHashMap<>();
+    /**
+     * JetStream consumers per scope id. A scope may bind more than one stream, so each maps to a list of
+     * {@link ScopeConsumer}s — one per (scope, stream).
+     */
+    private final Map<Long, List<ScopeConsumer>> scopeConsumers = new ConcurrentHashMap<>();
 
     /**
      * Atomic placeholder set guarding against duplicate setup. Holding the scope ID
@@ -111,19 +104,24 @@ public class IntegrationNatsConsumer {
      */
     private final Set<Long> pendingScopeSetup = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Consecutive failed reconcile attempts per scope, for the self-healing retry backoff. Cleared on the
+     * first successful reconcile (and when the scope is stopped), so a later transient failure starts fresh.
+     */
+    private final Map<Long, Integer> scopeReconcileAttempts = new ConcurrentHashMap<>();
+
     /** Installation consumer — single-instance, mutable across restarts. */
     private volatile ScopeConsumer installationConsumer;
 
-    /**
-     * Fleet-wide flat-stream consumer — single-instance, subscribes to {@code <stream>.>} for
-     * {@link #FLAT_STREAM_KIND}. Flat-stream subjects are not repository-scoped, so (like the
-     * installation consumer) one consumer resolves the tenant inside its handler. Null unless the
-     * flat-stream kind is enabled.
-     */
-    private volatile ScopeConsumer flatStreamConsumer;
-
     /** Virtual-thread executor for scope setup and installation kicks. */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    /** Delay timer for the scope-reconcile retry. Single daemon thread — it only ever submits to the executor. */
+    private final ScheduledExecutorService retryScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "integration-consumer-retry");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private Connection natsConnection;
 
@@ -134,22 +132,13 @@ public class IntegrationNatsConsumer {
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
 
-    /**
-     * Whether the fleet-wide flat-stream consumer should be started. Gated on the vendor-neutral
-     * {@code hephaestus.integration.flat-stream.enabled} (driven by the messaging integrations —
-     * today only Slack) so deployments without a flat-stream kind never create a consumer on the
-     * flat stream (which they also never bootstrap).
-     */
-    private final boolean flatStreamConsumerEnabled;
-
     public IntegrationNatsConsumer(
         NatsConnectionProperties connectionProperties,
         NatsConsumerProperties consumerProperties,
         NatsSubscriptionProvider subscriptionProvider,
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats,
-        @Value("${hephaestus.integration.flat-stream.enabled:false}") boolean flatStreamConsumerEnabled
+        IntegrationConsumerStats stats
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
@@ -157,7 +146,6 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
-        this.flatStreamConsumerEnabled = flatStreamConsumerEnabled;
     }
 
     // Lifecycle
@@ -206,16 +194,6 @@ public class IntegrationNatsConsumer {
                 log.error("Failed to start installation consumer", e);
             }
         });
-        if (flatStreamConsumerEnabled) {
-            virtualThreadExecutor.submit(() -> {
-                try {
-                    ensureNatsConnectionEstablished();
-                    setupFlatStreamConsumer();
-                } catch (Exception e) {
-                    log.error("Failed to start flat-stream consumer", e);
-                }
-            });
-        }
     }
 
     @PreDestroy
@@ -229,14 +207,18 @@ public class IntegrationNatsConsumer {
         log.info("Shutting down integration NATS consumer fleet");
 
         for (var entry : scopeConsumers.entrySet()) {
-            try {
-                entry.getValue().stop();
-            } catch (Exception e) {
-                log.debug("Failed to stop scope consumer: scopeId={}", entry.getKey(), e);
+            for (ScopeConsumer consumer : entry.getValue()) {
+                try {
+                    consumer.stop();
+                } catch (Exception e) {
+                    log.debug("Failed to stop scope consumer: scopeId={}", entry.getKey(), e);
+                }
             }
         }
         scopeConsumers.clear();
+        scopeReconcileAttempts.clear();
         stats.setActiveScopeConsumerCount(0);
+        retryScheduler.shutdownNow();
 
         ScopeConsumer installation = installationConsumer;
         if (installation != null) {
@@ -247,17 +229,6 @@ public class IntegrationNatsConsumer {
             }
             installationConsumer = null;
             stats.setInstallationConsumerActive(false);
-        }
-
-        ScopeConsumer flatStream = flatStreamConsumer;
-        if (flatStream != null) {
-            try {
-                flatStream.stop();
-            } catch (Exception e) {
-                log.debug("Failed to stop flat-stream consumer", e);
-            }
-            flatStreamConsumer = null;
-            stats.setFlatStreamConsumerActive(false);
         }
 
         virtualThreadExecutor.shutdown();
@@ -304,7 +275,7 @@ public class IntegrationNatsConsumer {
         virtualThreadExecutor.submit(() -> {
             try {
                 ensureNatsConnectionEstablished();
-                setupScopeConsumer(scopeId);
+                reconcileScope(scopeId);
             } catch (Exception e) {
                 log.error("Failed to start scope consumer: scopeId={}", scopeId, e);
             } finally {
@@ -314,78 +285,226 @@ public class IntegrationNatsConsumer {
     }
 
     /**
-     * Update the filter subjects on an already-running scope consumer. No-op if no
-     * consumer exists yet for the scope — scope startup will pick up the latest
-     * subscription info when {@link #startConsumingScope(Long)} fires.
+     * Reconcile the filter subjects of an already-running scope. No-op if the scope has no consumers
+     * yet — scope startup picks up the latest subscription info when {@link #startConsumingScope(Long)}
+     * fires. When a scope gains a stream (e.g. Outline is connected after boot) the reconcile creates
+     * the additional consumer; when it loses one the reconcile tears that consumer down.
+     *
+     * <p>Shares {@link #pendingScopeSetup} with {@link #startConsumingScope(Long)}: two concurrent
+     * reconciles of one scope would race the read-modify-write on {@link #scopeConsumers} and the loser's
+     * freshly-created consumer would be overwritten without {@code stop()} — leaking its virtual thread
+     * and an orphaned server-side durable. A membership change that arrives while a reconcile is in
+     * flight is not lost: the in-flight reconcile re-reads the subscription info, and the callers
+     * (lifecycle listeners, repo monitors) re-fire on the next change.
      */
     public void updateScopeConsumer(Long scopeId) {
         if (!connectionProperties.enabled() || shuttingDown.get() || scopeId == null) {
             return;
         }
-        ScopeConsumer existing = scopeConsumers.get(scopeId);
-        if (existing == null) {
+        if (!scopeConsumers.containsKey(scopeId)) {
             log.debug("Skipped consumer update: reason=notRunning, scopeId={}", scopeId);
+            return;
+        }
+        if (!pendingScopeSetup.add(scopeId)) {
+            log.debug("Scope reconcile already in progress: scopeId={}", scopeId);
             return;
         }
         virtualThreadExecutor.submit(() -> {
             try {
-                Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
-                if (infoOpt.isEmpty()) {
-                    log.warn("No subscription info available during update: scopeId={}", scopeId);
-                    return;
-                }
-                String[] newSubjects = buildScopeSubjects(infoOpt.get());
-                existing.updateSubjects(newSubjects);
-                log.info("Updated scope consumer subjects: scopeId={}, subjectCount={}", scopeId, newSubjects.length);
+                reconcileScope(scopeId);
             } catch (Exception e) {
                 log.error("Failed to update scope consumer: scopeId={}", scopeId, e);
+            } finally {
+                pendingScopeSetup.remove(scopeId);
             }
         });
     }
 
     /**
-     * Stop and delete the JetStream consumer for the given scope. After this returns,
-     * the server-side durable is gone — a subsequent {@link #startConsumingScope(Long)}
-     * will create a fresh one.
+     * Stop and delete every JetStream consumer for the given scope. After this returns, the
+     * server-side durables are gone — a subsequent {@link #startConsumingScope(Long)} recreates them.
      */
     public void stopConsumingScope(Long scopeId) {
         if (scopeId == null) {
             return;
         }
-        ScopeConsumer consumer = scopeConsumers.remove(scopeId);
-        if (consumer == null) {
+        scopeReconcileAttempts.remove(scopeId);
+        List<ScopeConsumer> consumers = scopeConsumers.remove(scopeId);
+        if (consumers == null || consumers.isEmpty()) {
             log.debug("No scope consumer to stop: scopeId={}", scopeId);
             return;
         }
-        stats.setActiveScopeConsumerCount(scopeConsumers.size());
+        stats.setActiveScopeConsumerCount(totalConsumerCount());
         virtualThreadExecutor.submit(() -> {
-            try {
-                consumer.stop();
-                cleanupConsumer(consumer.streamName(), consumer.consumerName());
-                log.info("Stopped scope consumer: scopeId={}", scopeId);
-            } catch (Exception e) {
-                log.error("Failed to stop scope consumer: scopeId={}", scopeId, e);
+            for (ScopeConsumer consumer : consumers) {
+                stopAndCleanup(consumer);
             }
+            log.info("Stopped scope consumers: scopeId={}, count={}", scopeId, consumers.size());
         });
     }
 
     // JetStream setup
 
-    private void setupScopeConsumer(Long scopeId) throws IOException {
+    /**
+     * Bring the scope's set of JetStream consumers in line with its current subscription info:
+     * existing consumers whose stream is still desired are updated in place; new streams create
+     * a fresh consumer; streams no longer desired are torn down.
+     *
+     * <h3>Partial failure</h3>
+     * A scope binds several streams, so this loop can fail halfway — typically because one stream does not
+     * exist yet (the {@code outline} stream is created by the webhook pod, which may boot after us). Every
+     * consumer this pass already {@code start()}ed is therefore <b>committed to {@link #scopeConsumers}
+     * before the failure propagates</b>. Dropping them on the floor would leave a live, untracked consumer:
+     * never stopped on shutdown, invisible to {@link #updateScopeConsumer(Long)} (which would no-op as "not
+     * running"), and duplicated on its own durable by the next {@link #startConsumingScope(Long)}.
+     *
+     * <p>The failure also re-arms a backed-off retry, so a transient one heals itself instead of requiring
+     * an app restart.
+     */
+    void reconcileScope(Long scopeId) throws IOException {
         Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
         if (infoOpt.isEmpty()) {
             log.warn("No subscription info available: scopeId={}", scopeId);
             return;
         }
-        NatsSubscriptionInfo info = infoOpt.get();
-        String[] subjects = buildScopeSubjects(info);
-        if (subjects.length == 0) {
+        Map<String, StreamSubscription> desired = new LinkedHashMap<>();
+        for (StreamSubscription sub : infoOpt.get().streamSubscriptions()) {
+            if (!sub.subjects().isEmpty()) {
+                desired.put(sub.streamName(), sub);
+            }
+        }
+
+        List<ScopeConsumer> current = scopeConsumers.getOrDefault(scopeId, List.of());
+        List<ScopeConsumer> next = new ArrayList<>();
+        Set<String> kept = new HashSet<>();
+        try {
+            for (ScopeConsumer existing : current) {
+                StreamSubscription want = desired.get(existing.streamName());
+                if (want == null) {
+                    stopAndCleanup(existing);
+                    continue;
+                }
+                try {
+                    existing.updateSubjects(want.subjects().toArray(String[]::new));
+                } catch (JetStreamApiException | IOException e) {
+                    // The consumer is still running with its previous subjects — keep it TRACKED (an
+                    // untracked live consumer is exactly the leak this method exists to prevent) and let
+                    // the retry re-apply the new subjects.
+                    next.add(existing);
+                    kept.add(existing.streamName());
+                    throw new IOException("Failed to update scope consumer for scopeId=" + scopeId, e);
+                }
+                next.add(existing);
+                kept.add(existing.streamName());
+            }
+            for (StreamSubscription want : desired.values()) {
+                if (!kept.contains(want.streamName())) {
+                    next.add(createScopeConsumer(scopeId, want));
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            // Commit whatever is already running (see javadoc), then re-arm and rethrow.
+            commitScopeConsumers(scopeId, next);
+            log.error(
+                "Partial scope consumer reconcile: scopeId={}, running={}, desired={} — retrying",
+                scopeId,
+                next.size(),
+                desired.size(),
+                e
+            );
+            scheduleScopeReconcileRetry(scopeId);
+            throw e;
+        }
+
+        commitScopeConsumers(scopeId, next);
+        scopeReconcileAttempts.remove(scopeId);
+    }
+
+    /**
+     * Publish this pass's consumer list for the scope. Every {@code start()}ed consumer MUST land here —
+     * {@link #scopeConsumers} is the only handle by which a consumer can later be stopped or updated.
+     */
+    private void commitScopeConsumers(Long scopeId, List<ScopeConsumer> consumers) {
+        if (consumers.isEmpty()) {
+            scopeConsumers.remove(scopeId);
             log.info("Skipped scope consumer setup (no subjects): scopeId={}", scopeId);
+        } else {
+            scopeConsumers.put(scopeId, List.copyOf(consumers));
+        }
+        stats.setActiveScopeConsumerCount(totalConsumerCount());
+    }
+
+    /**
+     * Re-arm a failed reconcile on the connect-retry backoff curve. Gives up (loudly) after
+     * {@link #MAX_SCOPE_RECONCILE_ATTEMPTS} — an indefinite retry against a permanently-broken stream would
+     * just be a log firehose; the successfully-created consumers from the partial pass keep working either way.
+     */
+    private void scheduleScopeReconcileRetry(Long scopeId) {
+        if (shuttingDown.get() || !connectionProperties.enabled()) {
             return;
         }
-        String streamName = info.natsStreamName();
-        String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId);
+        int attempt = scopeReconcileAttempts.merge(scopeId, 1, Integer::sum);
+        if (attempt >= MAX_SCOPE_RECONCILE_ATTEMPTS) {
+            log.error(
+                "Giving up on scope consumer reconcile after {} attempts: scopeId={}; " +
+                    "the scope is consuming only the streams that could be bound",
+                attempt,
+                scopeId
+            );
+            scopeReconcileAttempts.remove(scopeId);
+            return;
+        }
+        long delayMs = reconnectBackoffMs(attempt - 1);
+        log.warn("Retrying scope consumer reconcile: scopeId={}, attempt={}, delayMs={}", scopeId, attempt, delayMs);
+        submitDelayed(() -> retryReconcileScope(scopeId), delayMs);
+    }
 
+    /**
+     * Retry pass. Shares {@link #pendingScopeSetup} with the other reconcile entry points: if one is already
+     * in flight for this scope we drop out — that pass re-reads the subscription info and re-arms its own
+     * retry on failure, so nothing is lost. Unlike {@link #updateScopeConsumer(Long)} this does NOT require
+     * the scope to already be in {@link #scopeConsumers}: a reconcile that failed on its very first stream
+     * has no entry there and would otherwise never come back.
+     */
+    private void retryReconcileScope(Long scopeId) {
+        if (shuttingDown.get() || !connectionProperties.enabled()) {
+            return;
+        }
+        if (!pendingScopeSetup.add(scopeId)) {
+            log.debug("Scope reconcile retry skipped: another reconcile in progress, scopeId={}", scopeId);
+            return;
+        }
+        try {
+            virtualThreadExecutor.submit(() -> {
+                try {
+                    ensureNatsConnectionEstablished();
+                    reconcileScope(scopeId);
+                } catch (Exception e) {
+                    // reconcileScope already logged + re-armed; this is the executor's last-resort net.
+                    log.debug("Scope consumer reconcile retry failed: scopeId={}", scopeId, e);
+                } finally {
+                    pendingScopeSetup.remove(scopeId);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            pendingScopeSetup.remove(scopeId); // shutting down
+        }
+    }
+
+    private void submitDelayed(Runnable task, long delayMs) {
+        try {
+            retryScheduler.schedule(task, delayMs, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            log.debug("Scope reconcile retry not scheduled: consumer fleet is shutting down");
+        }
+    }
+
+    /** Package-private + overridable so the reconcile's partial-failure path is unit-testable without a broker. */
+    ScopeConsumer createScopeConsumer(Long scopeId, StreamSubscription subscription) throws IOException {
+        String streamName = subscription.streamName();
+        String[] subjects = subscription.subjects().toArray(String[]::new);
+        // Stream-suffixed durable so a scope's SCM and Outline consumers never share a durable name.
+        String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId) + "-" + streamName;
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(connectionProperties.consumer().requestTimeout())
@@ -403,17 +522,36 @@ public class IntegrationNatsConsumer {
                 this::handleMessage
             );
             scope.start();
-            scopeConsumers.put(scopeId, scope);
-            stats.setActiveScopeConsumerCount(scopeConsumers.size());
             log.info(
                 "Started scope consumer: scopeId={}, stream={}, subjectCount={}",
                 scopeId,
                 streamName,
                 subjects.length
             );
+            return scope;
         } catch (JetStreamApiException e) {
-            throw new IOException("Failed to set up scope consumer for scopeId=" + scopeId, e);
+            throw new IOException(
+                "Failed to set up scope consumer for scopeId=" + scopeId + " stream=" + streamName,
+                e
+            );
         }
+    }
+
+    private void stopAndCleanup(ScopeConsumer consumer) {
+        try {
+            consumer.stop();
+            cleanupConsumer(consumer.streamName(), consumer.consumerName());
+        } catch (Exception e) {
+            log.error("Failed to stop scope consumer: consumerName={}", consumer.consumerName(), e);
+        }
+    }
+
+    private int totalConsumerCount() {
+        int total = 0;
+        for (List<ScopeConsumer> list : scopeConsumers.values()) {
+            total += list.size();
+        }
+        return total;
     }
 
     private void setupInstallationConsumer() throws IOException {
@@ -447,38 +585,6 @@ public class IntegrationNatsConsumer {
             log.info("Started installation consumer: consumerName={}", consumerName);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to set up installation consumer", e);
-        }
-    }
-
-    private void setupFlatStreamConsumer() throws IOException {
-        String streamName = ConsumerSubjectMath.streamNameFor(FLAT_STREAM_KIND).orElseThrow(() ->
-            new IllegalStateException("No NATS stream resolved for flat-stream kind=" + FLAT_STREAM_KIND)
-        );
-        String[] subjects = new String[] { ConsumerSubjectMath.flatStreamSubjectFilter(FLAT_STREAM_KIND) };
-        String consumerName = ConsumerSubjectMath.flatStreamConsumerName(durableBaseName(), FLAT_STREAM_KIND);
-
-        try {
-            JetStreamOptions jsOptions = JetStreamOptions.builder()
-                .requestTimeout(connectionProperties.consumer().requestTimeout())
-                .build();
-            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
-            ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
-
-            ScopeConsumer flatStream = new ScopeConsumer(
-                null,
-                consumerName,
-                streamName,
-                consumerContext,
-                streamContext,
-                subjects,
-                this::handleMessage
-            );
-            flatStream.start();
-            flatStreamConsumer = flatStream;
-            stats.setFlatStreamConsumerActive(true);
-            log.info("Started flat-stream consumer: consumerName={}", consumerName);
-        } catch (JetStreamApiException e) {
-            throw new IOException("Failed to set up flat-stream consumer", e);
         }
     }
 
@@ -552,18 +658,6 @@ public class IntegrationNatsConsumer {
         return builder.build();
     }
 
-    private String[] buildScopeSubjects(NatsSubscriptionInfo info) {
-        String streamName = info.natsStreamName();
-        Set<String> subjects = new HashSet<>();
-        for (String nameWithOwner : info.repositoryNamesWithOwner()) {
-            subjects.add(ConsumerSubjectMath.repositoryFilter(streamName, nameWithOwner));
-        }
-        if (info.hasOrganization()) {
-            subjects.add(ConsumerSubjectMath.organizationFilter(streamName, info.organizationLogin()));
-        }
-        return subjects.toArray(String[]::new);
-    }
-
     private String durableBaseName() {
         String name = connectionProperties.durableConsumerName();
         if (isBlank(name)) {
@@ -593,8 +687,6 @@ public class IntegrationNatsConsumer {
         try {
             Optional<IntegrationMessageHandler> handler = dispatcher.dispatch(subject);
             if (handler.isEmpty()) {
-                // No handler — expected for events we deliberately don't process
-                // (e.g. check_run). ACK to keep the stream moving.
                 log.debug("No handler for subject, ACK-as-no-op: subject={}", sanitizeForLog(subject));
                 msg.ack();
                 return;
@@ -672,7 +764,8 @@ public class IntegrationNatsConsumer {
             .build();
     }
 
-    private void ensureNatsConnectionEstablished() {
+    /** Package-private + overridable so the reconcile/retry paths are unit-testable without a broker. */
+    void ensureNatsConnectionEstablished() {
         if (natsConnection != null && natsConnection.getStatus() == Connection.Status.CONNECTED) {
             return;
         }
@@ -744,6 +837,11 @@ public class IntegrationNatsConsumer {
 
     int scopeConsumerCount() {
         return scopeConsumers.size();
+    }
+
+    /** The consumers currently TRACKED for a scope — i.e. the ones the fleet can still stop or update. */
+    List<ScopeConsumer> trackedConsumers(Long scopeId) {
+        return scopeConsumers.getOrDefault(scopeId, List.of());
     }
 
     boolean isInstallationActive() {

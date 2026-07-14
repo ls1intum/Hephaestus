@@ -32,6 +32,10 @@ tags:
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
 - description: |-
+    Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
+     slugged routes live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
+  name: workspace-registry-controller
+- description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
@@ -45,6 +49,8 @@ tags:
   name: Admin
 - description: Current user's Slack privacy preferences
   name: Slack User Preferences
+- description: Per-workspace Outline collection mirroring control plane
+  name: Outline collections
 - description: Team management within workspace
   name: Teams
 - description: User profile and activity data
@@ -55,11 +61,6 @@ tags:
   name: Auth
 - description: Active sessions
   name: Account
-- description: |-
-    Workspace registry endpoints that operate outside of a specific workspace slug.
-     These routes stay under the classic /workspaces base path while slugged routes
-     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
-  name: workspace-registry-controller
 - description: Workspace integration connection management
   name: Connections
 - description: Up/down votes on mentor assistant messages
@@ -1352,6 +1353,81 @@ paths:
           description: OK
       tags:
       - Connections
+  /workspaces/{workspaceSlug}/connections/outline/status:
+    get:
+      operationId: getOutlineConnectionStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineConnectionStatus"
+          description: Connection health snapshot returned
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+      summary: "Health of the workspace's active Outline connection (webhook, last\
+        \ sync, document count)"
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/outline/sync:
+    post:
+      description: Runs off the request thread. Always answers 202 with the connection
+        status resource in the Location header; a duplicate trigger while a reconcile
+        is still running starts nothing new and returns the same 202 pointing at the
+        same monitor.
+      operationId: syncOutlineConnection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "202":
+          description: Reconcile accepted (or already running — duplicate submits
+            are absorbed); poll the connection status resource in the Location header
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+      summary: "Trigger the full Outline reconcile for this workspace (async, 202)"
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/outline/token:
+    get:
+      description: "Probes Outline directly. Reports whether the token is still accepted\
+        \ and, when the token may list its own key, its name, expiry and last use.\
+        \ Outline cannot rotate a key from a key, so an expiring token is renewed\
+        \ in Outline and re-entered here."
+      operationId: getOutlineTokenStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineTokenStatus"
+          description: Token state returned
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+      summary: Live state of the API token behind this workspace's Outline connection
+      tags:
+      - Connections
   /workspaces/{workspaceSlug}/connections/slack/test-message:
     post:
       description: |-
@@ -1447,7 +1523,7 @@ paths:
          (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
          <code>PENDING</code> is internal to the OAuth handshake and rejected as a bad request; illegal
          transitions surface as 400 via the state machine.
-      operationId: updateStatus_1
+      operationId: updateConnectionStatus
       parameters:
       - description: Workspace slug
         in: path
@@ -2033,6 +2109,198 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/outline/collections:
+    get:
+      operationId: listOutlineCollections
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutlineCollection"
+          description: Mirrored collections returned
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+      summary: List the workspace's mirrored Outline collections with their sync state
+      tags:
+      - Outline collections
+    post:
+      operationId: registerOutlineCollection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterOutlineCollectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: Collection was already registered (idempotent repeat)
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: Collection registered; the Location header points at the collection
+            resource
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+        "409":
+          description: A concurrent registration of the same collection won the race
+        "422":
+          description: Outline does not know the requested collection id
+      summary: Register an Outline collection for mirroring (lands ENABLED + PENDING;
+        idempotent on the id)
+      tags:
+      - Outline collections
+  /workspaces/{workspaceSlug}/outline/collections/candidates:
+    get:
+      description: "Proxies Outline's collections.list with the stored token under\
+        \ a bounded interactive page budget. Served with Cache-Control: no-store —\
+        \ the live upstream view must not be cached."
+      operationId: listOutlineCollectionCandidates
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutlineCollectionCandidate"
+          description: "Candidate collections returned (Cache-Control: no-store)"
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+        "502":
+          description: The Outline server could not be reached or answered with an
+            error
+        "503":
+          description: Outline is rate-limiting requests; the Retry-After header carries
+            the seconds to wait before retrying
+      summary: List the Outline collections available to mirror (live proxy; doubles
+        as connectivity probe)
+      tags:
+      - Outline collections
+  /workspaces/{workspaceSlug}/outline/collections/{collectionId}:
+    delete:
+      operationId: deleteOutlineCollection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: collectionId
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Collection removed and its mirrored documents erased
+        "404":
+          description: "The collection is not registered for this workspace, or the\
+            \ workspace has no ACTIVE Outline connection"
+      summary: Remove a collection from the mirror and erase its mirrored documents
+        (terminal)
+      tags:
+      - Outline collections
+    get:
+      operationId: getOutlineCollection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: collectionId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: Mirrored collection returned
+        "404":
+          description: "The collection is not registered for this workspace, or the\
+            \ workspace has no ACTIVE Outline connection"
+      summary: One mirrored Outline collection with its sync state and live document
+        count
+      tags:
+      - Outline collections
+    patch:
+      description: Resuming (PAUSED → ENABLED) resets the sync status to PENDING and
+        kicks a targeted sync; requesting the current state is an idempotent no-op.
+      operationId: updateOutlineCollectionState
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: collectionId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOutlineCollectionStateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineCollection"
+          description: Collection state after the transition returned
+        "404":
+          description: "The collection is not registered for this workspace, or the\
+            \ workspace has no ACTIVE Outline connection"
+      summary: Transition a mirrored collection to a target mirror state (pause /
+        resume)
+      tags:
+      - Outline collections
   /workspaces/{workspaceSlug}/practice-areas:
     get:
       description: Returns the workspace's practice areas
@@ -3963,6 +4231,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         status:
           type: string
         workspaceSlug:
@@ -4401,8 +4670,16 @@ components:
         Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
          sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
          <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
-         client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
-         and is not exposed by this DTO.
+         client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
+         entity, and every secret-bearing key of the config itself is stripped by
+         {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO#redactSensitive #redactSensitive} before serialization.
+
+         <p><b>Why redact here and not with <code>@JsonIgnore</code> on the record component?</b> The very
+         same {@link ObjectMapper ObjectMapper} bean serializes {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO  de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+         <code>connection.config</code> column (Hibernate's <code>json_format_mapper</code> is wired to it in
+         <code>HibernateJacksonFormatMapperConfig</code>). Annotating the component would therefore drop the
+         secret on write and destroy the stored value — the API-boundary filter below is the only place
+         the two concerns can be separated.
 
          <p>Mirroring the summary fields (rather than embedding the summary record) keeps
          the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
@@ -4433,6 +4710,7 @@ components:
           enum:
           - SCM
           - MESSAGING
+          - DOCUMENTATION
         id:
           type: integer
           format: int64
@@ -4444,6 +4722,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         state:
           type: string
           enum:
@@ -4486,6 +4765,7 @@ components:
           enum:
           - SCM
           - MESSAGING
+          - DOCUMENTATION
         id:
           type: integer
           format: int64
@@ -4497,6 +4777,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         state:
           type: string
           enum:
@@ -4635,6 +4916,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
       required:
       - clientId
       - clientSecret
@@ -5105,6 +5387,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         userInput:
           type: object
           additionalProperties:
@@ -5505,6 +5788,175 @@ components:
       - practiceSlug
       - presence
       - title
+    OutlineCollection:
+      type: object
+      description: A mirrored Outline collection with its sync state and live document
+        count
+      properties:
+        collectionId:
+          type: string
+          description: Outline collection id (UUID; the natural key)
+        color:
+          type: string
+          description: Collection color as configured in Outline
+        createdAt:
+          type: string
+          format: date-time
+          description: When the collection was registered for mirroring
+        description:
+          type: string
+          description: Collection description as shown in Outline
+        documentCount:
+          type: integer
+          format: int64
+          description: Live (non-tombstoned) mirrored document count
+        documentsUpstream:
+          type: integer
+          format: int32
+          description: Documents upstream reported for this collection at the last
+            enumeration (coverage denominator)
+        exportsSkippedForBudget:
+          type: integer
+          format: int32
+          description: Exports the last pass skipped because the shared budget ran
+            out (0 on a clean pass)
+        icon:
+          type: string
+          description: Collection icon as configured in Outline
+        id:
+          type: integer
+          format: int64
+          description: Internal registry row id
+        lastSyncError:
+          type: string
+          description: "Last sync failure for this collection, cleared on the next\
+            \ clean pass"
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: "When this collection last completed a full reconcile pass,\
+            \ if any"
+        name:
+          type: string
+          description: "Collection name as shown in Outline, if known"
+        state:
+          type: string
+          description: Mirror lifecycle state (PAUSED freezes sync but keeps documents)
+          enum:
+          - ENABLED
+          - PAUSED
+        syncStatus:
+          type: string
+          description: Whether a clean full pass has completed since registration
+            or the last resume
+          enum:
+          - PENDING
+          - COMPLETE
+        urlId:
+          type: string
+          description: Outline url id (the short slug in collection URLs)
+      required:
+      - collectionId
+      - createdAt
+      - documentCount
+      - id
+      - state
+      - syncStatus
+    OutlineCollectionCandidate:
+      type: object
+      description: "An Outline collection the token can see, offered in the add-collection\
+        \ picker"
+      properties:
+        alreadyMirrored:
+          type: boolean
+          description: Whether this collection is already registered for mirroring
+        collectionId:
+          type: string
+          description: Outline collection id (UUID)
+        color:
+          type: string
+          description: Collection color as configured in Outline
+        description:
+          type: string
+          description: Collection description as shown in Outline
+        icon:
+          type: string
+          description: Collection icon as configured in Outline
+        name:
+          type: string
+          description: Collection name as shown in Outline
+        urlId:
+          type: string
+          description: Outline url id (the short slug in collection URLs)
+      required:
+      - alreadyMirrored
+      - collectionId
+    OutlineConnectionStatus:
+      type: object
+      description: Health of the workspace's active Outline connection
+      properties:
+        documentCount:
+          type: integer
+          format: int64
+          description: Live (non-tombstoned) mirrored document count across all collections
+        erroredCollections:
+          type: integer
+          format: int64
+          description: Collections whose last sync attempt recorded an error (cleared
+            on the next clean pass)
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: "When a mirrored collection last completed a full reconcile\
+            \ pass, if any"
+        pendingCollections:
+          type: integer
+          format: int64
+          description: Enabled collections still awaiting a clean sync pass
+        syncRunning:
+          type: boolean
+          description: Whether a manually triggered full reconcile is currently running
+            for this workspace
+        webhookRegistered:
+          type: boolean
+          description: "Whether a webhook subscription id is currently stored for\
+            \ this connection. This is existence only, not a liveness check: Outline\
+            \ auto-disables a subscription after repeated delivery failures, and a\
+            \ stale id here self-heals on the next reconcile rather than being verified\
+            \ live by this endpoint."
+      required:
+      - documentCount
+      - erroredCollections
+      - pendingCollections
+      - syncRunning
+      - webhookRegistered
+    OutlineTokenStatus:
+      type: object
+      description: Live state of the API token behind the workspace's Outline connection
+      properties:
+        accepted:
+          type: boolean
+          description: "Whether Outline still accepts the stored token. False means\
+            \ revoked, expired or rejected."
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the token lapses. Absent for a key created without an
+            expiry.
+        last4:
+          type: string
+          description: "Last four characters of the token, as Outline reports them"
+        lastActiveAt:
+          type: string
+          format: date-time
+          description: When Outline last saw the token used
+        name:
+          type: string
+          description: "The token's name in Outline. Absent when the token cannot\
+            \ list its own key (a scoped key, or one owned by a user who cannot see\
+            \ it) — sync is unaffected."
+      required:
+      - accepted
     PageAgentJob:
       type: object
       properties:
@@ -6241,6 +6693,17 @@ components:
       - standing
       - strengths
       - toWorkOn
+    RegisterOutlineCollectionRequest:
+      type: object
+      description: Register an Outline collection for mirroring (lands ENABLED + PENDING)
+      properties:
+        collectionId:
+          type: string
+          description: Outline collection id (UUID)
+          maxLength: 64
+          minLength: 0
+      required:
+      - collectionId
     RegisterSlackChannelRequest:
       type: object
       description: Allow-list a Slack channel (lands in PENDING)
@@ -6790,6 +7253,19 @@ components:
           type: boolean
         scopes:
           type: string
+    UpdateOutlineCollectionStateRequest:
+      type: object
+      description: Transition a mirrored Outline collection to a target mirror state
+        (pause / resume)
+      properties:
+        state:
+          type: string
+          description: Target mirror state
+          enum:
+          - ENABLED
+          - PAUSED
+      required:
+      - state
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state
@@ -7230,6 +7706,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         serverUrl:
           type: string
           description: Custom server URL for self-hosted instances (null for cloud
@@ -7315,6 +7792,7 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
+          - OUTLINE
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\

@@ -24,8 +24,7 @@ import org.jspecify.annotations.Nullable;
  * <p><strong>{@code ingestion_opted_out}</strong> is the mentoring-purpose firewall: when {@code true} the ingest
  * write-path ({@code SlackIngestService}) never stores this person's channel messages, composing with the
  * capability flag and the channel {@code ACTIVE} gate — ingestion happens iff capability ON <em>and</em> channel
- * ACTIVE <em>and</em> NOT {@code ingestion_opted_out}. {@code research_opted_out} persists the research bit written
- * by the same App Home toggle; the research-eligibility default (opt-in vs opt-out) is decided separately.
+ * ACTIVE <em>and</em> NOT {@code ingestion_opted_out}.
  *
  * <p>Workspace-scoped by a direct {@code workspaceId} field (part of the composite key), so
  * {@code WorkspaceScopedTables} classifies it scoped and the tenancy {@code StatementInspector} rides a predicate on

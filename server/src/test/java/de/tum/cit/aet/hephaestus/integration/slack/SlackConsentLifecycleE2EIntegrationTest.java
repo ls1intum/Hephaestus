@@ -77,8 +77,7 @@ import tools.jackson.databind.node.ObjectNode;
  * lifecycle — register → activate (announce + stamp + audit) → forward-only ingest → settled-thread detection over
  * the real {@code bigint[]} participant array → person opt-out (stop + channel-data erase) → revoke (full erase +
  * audit survival + sibling-channel isolation) — asserting real DB state at every hop, catching cross-slice wiring
- * breaks where each unit stays green but the pipeline is severed (e.g. activation stamps a column ingest does not
- * read, or opt-out erases messages the detector already enqueued).
+ * breaks where each unit stays green but the pipeline is severed.
  *
  * <p><b>Scope split.</b> The pipeline is driven at the service layer (the outbound {@link SlackMessageService} and
  * {@link AgentJobService} are the only mocks) rather than over HTTP — REST authorization is covered by

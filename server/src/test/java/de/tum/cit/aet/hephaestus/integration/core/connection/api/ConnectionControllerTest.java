@@ -137,6 +137,32 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("read never serializes the Outline webhook signing secret")
+    void read_outlineConnection_redactsWebhookSecret() {
+        long workspaceId = 42L;
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
+        Connection outline = new Connection(
+            ws,
+            IntegrationKind.OUTLINE,
+            "https://o.test",
+            new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "ENC:v2:signing-secret", Set.of())
+        );
+        outline.setState(IntegrationState.ACTIVE);
+        setIdAndTimestamps(outline, 5L);
+        when(admin.findInWorkspaceOrThrow(workspaceId, 5L)).thenReturn(outline);
+        when(manifests.capabilitiesFor(IntegrationKind.OUTLINE)).thenReturn(Set.of(Capability.WEBHOOK_INGEST));
+
+        ResponseEntity<ConnectionDetailDTO> response = controller.read(ctx(workspaceId), 5L);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        Map<String, Object> config = response.getBody().config();
+        assertThat(config).doesNotContainKey("webhookSecret");
+        assertThat(config).containsEntry("webhookSubscriptionId", "sub-1");
+        assertThat(objectMapper.writeValueAsString(response.getBody())).doesNotContain("ENC:v2:signing-secret");
+    }
+
+    @Test
     void initiate_github_returnsRedirect() {
         URI vendor = URI.create("https://github.com/apps/x/installations/new?state=abc");
         githubStrategy.nextInitiation = new ConnectInitiation.RedirectToVendor(vendor, "abc");
@@ -428,6 +454,7 @@ class ConnectionControllerTest extends BaseUnitTest {
                 Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, null, Set.of());
+            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, null, Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

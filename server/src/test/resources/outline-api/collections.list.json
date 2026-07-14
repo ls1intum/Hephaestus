@@ -1,0 +1,194 @@
+{
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "nextPath": "/api/collections.list?limit=10&offset=10",
+    "total": 4
+  },
+  "data": [
+    {
+      "id": "d70d9f42-a1b5-49ae-89e3-030feaeefe62",
+      "url": "/collection/audit-colorful-collection-vD1PXOty0e",
+      "urlId": "vD1PXOty0e",
+      "name": "Audit Colorful Collection",
+      "description": "Testing color+icon fill",
+      "sort": {
+        "field": "index",
+        "direction": "asc"
+      },
+      "icon": "beaker",
+      "color": "#FF5733",
+      "createdAt": "2026-07-11T05:21:58.174Z",
+      "updatedAt": "2026-07-11T05:21:58.174Z",
+      "index": "&",
+      "sharing": true,
+      "commenting": null,
+      "templateManagement": "admin",
+      "permission": "read",
+      "deletedAt": null,
+      "archivedAt": null
+    },
+    {
+      "id": "df40d4a4-09c2-440d-8baf-5f800ef246bb",
+      "url": "/collection/private-notes-HLXU60MaVx",
+      "urlId": "HLXU60MaVx",
+      "name": "Private Notes",
+      "description": "not mirrored",
+      "sort": {
+        "field": "index",
+        "direction": "asc"
+      },
+      "icon": null,
+      "color": null,
+      "createdAt": "2026-07-10T10:01:13.796Z",
+      "updatedAt": "2026-07-10T10:01:14.496Z",
+      "index": ",",
+      "sharing": true,
+      "commenting": null,
+      "templateManagement": "admin",
+      "permission": null,
+      "deletedAt": null,
+      "archivedAt": null
+    },
+    {
+      "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
+      "url": "/collection/engineering-docs-j4Gxqv1NCn",
+      "urlId": "j4Gxqv1NCn",
+      "name": "Engineering Docs",
+      "description": "ADRs and design docs (fixture capture pass)",
+      "sort": {
+        "field": "index",
+        "direction": "asc"
+      },
+      "icon": null,
+      "color": null,
+      "createdAt": "2026-07-10T10:01:13.654Z",
+      "updatedAt": "2026-07-11T05:23:59.894Z",
+      "index": "8",
+      "sharing": true,
+      "commenting": null,
+      "templateManagement": "admin",
+      "permission": null,
+      "deletedAt": null,
+      "archivedAt": null
+    },
+    {
+      "id": "daddbcec-562b-49d1-befe-734617d46ed7",
+      "url": "/collection/welcome-n2XqxNetJ2",
+      "urlId": "n2XqxNetJ2",
+      "name": "Welcome",
+      "description": "This collection is a quick guide to what Outline is all about. Feel free to delete this collection once your team is up to speed with the basics!",
+      "sort": {
+        "field": "index",
+        "direction": "asc"
+      },
+      "icon": null,
+      "color": null,
+      "createdAt": "2026-07-10T10:00:45.061Z",
+      "updatedAt": "2026-07-10T10:00:45.172Z",
+      "index": "P",
+      "sharing": true,
+      "commenting": null,
+      "templateManagement": "admin",
+      "permission": "read_write",
+      "deletedAt": null,
+      "archivedAt": null
+    }
+  ],
+  "policies": [
+    {
+      "id": "d70d9f42-a1b5-49ae-89e3-030feaeefe62",
+      "abilities": {
+        "read": true,
+        "update": true,
+        "delete": true,
+        "move": true,
+        "readDocument": true,
+        "star": true,
+        "unstar": true,
+        "subscribe": true,
+        "unsubscribe": true,
+        "share": true,
+        "updateDocument": true,
+        "createDocument": true,
+        "deleteDocument": true,
+        "createTemplate": true,
+        "manageTemplate": true,
+        "export": true,
+        "archive": true,
+        "restore": false
+      }
+    },
+    {
+      "id": "df40d4a4-09c2-440d-8baf-5f800ef246bb",
+      "abilities": {
+        "read": true,
+        "update": true,
+        "delete": true,
+        "move": true,
+        "readDocument": true,
+        "star": true,
+        "unstar": true,
+        "subscribe": true,
+        "unsubscribe": true,
+        "share": true,
+        "updateDocument": true,
+        "createDocument": true,
+        "deleteDocument": true,
+        "createTemplate": true,
+        "manageTemplate": true,
+        "export": true,
+        "archive": true,
+        "restore": false
+      }
+    },
+    {
+      "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
+      "abilities": {
+        "read": true,
+        "update": true,
+        "delete": true,
+        "move": true,
+        "readDocument": true,
+        "star": true,
+        "unstar": true,
+        "subscribe": true,
+        "unsubscribe": true,
+        "share": true,
+        "updateDocument": true,
+        "createDocument": true,
+        "deleteDocument": true,
+        "createTemplate": true,
+        "manageTemplate": true,
+        "export": true,
+        "archive": true,
+        "restore": false
+      }
+    },
+    {
+      "id": "daddbcec-562b-49d1-befe-734617d46ed7",
+      "abilities": {
+        "read": true,
+        "update": true,
+        "delete": true,
+        "move": true,
+        "readDocument": true,
+        "star": true,
+        "unstar": true,
+        "subscribe": true,
+        "unsubscribe": true,
+        "share": true,
+        "updateDocument": true,
+        "createDocument": true,
+        "deleteDocument": true,
+        "createTemplate": true,
+        "manageTemplate": true,
+        "export": true,
+        "archive": true,
+        "restore": false
+      }
+    }
+  ],
+  "status": 200,
+  "ok": true
+}

@@ -3,24 +3,30 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.lang.reflect.Field;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -39,6 +45,9 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Mock
     private ConnectionAuditRepository auditRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private CredentialBundleConverter credentialConverter;
     private ConnectionService service;
     private Workspace workspace;
@@ -49,7 +58,7 @@ class ConnectionServiceTest extends BaseUnitTest {
         // Real converter so the credential-purge case operates on a genuine AES-GCM blob,
         // not a mock stand-in.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
-        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter);
+        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter, eventPublisher);
         workspace = new Workspace();
         workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
@@ -77,7 +86,6 @@ class ConnectionServiceTest extends BaseUnitTest {
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isEqualTo("linked");
 
-        // Exactly one audit row, carrying the correct from/to and request metadata.
         ArgumentCaptor<ConnectionAudit> audit = ArgumentCaptor.forClass(ConnectionAudit.class);
         verify(auditRepository).save(audit.capture());
         assertThat(audit.getValue().getFromState()).isEqualTo(IntegrationState.PENDING);
@@ -115,6 +123,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             "T1",
             new ConnectionConfig.SlackConfig("T1", "Acme", null, null, null, Set.of())
         );
+        setId(connection, 55L);
         connection.setState(IntegrationState.UNINSTALLED);
 
         Connection result = service.transition(
@@ -168,8 +177,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             )
         );
 
-        // Same-state call returns the unchanged instance without touching audit or repo,
-        // and (per the code) does NOT overwrite stateReason.
+        // Same-state no-op must NOT overwrite stateReason.
         assertThat(result).isSameAs(connection);
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isNull();
@@ -225,10 +233,196 @@ class ConnectionServiceTest extends BaseUnitTest {
             )
         );
 
-        // Idempotent short-circuit: state is NOT advanced and the row is not saved.
         assertThat(result).isSameAs(connection);
         assertThat(result.getState()).isEqualTo(IntegrationState.PENDING);
         verify(connectionRepository, never()).save(any());
+    }
+
+    /**
+     * The unauthenticated webhook hot path: the subscription id from the delivery body selects which
+     * stored secret the HMAC is checked against. Contract: exactly one indexed lookup (never a scan
+     * over the connected fleet — {@code /webhooks/**} is exempt from the auth rate limiter), a forged
+     * id resolves to nothing, and a delivery can never select another workspace's secret.
+     */
+    @org.junit.jupiter.api.Nested
+    class FindOutlineSubscription {
+
+        /**
+         * A hand-rolled stub, not a Mockito mock: the projections are constructed inside the
+         * argument list of the outer {@code when(...)}, and a nested {@code when()} there trips
+         * {@code UnfinishedStubbingException}.
+         */
+        private ConnectionRepository.OutlineSubscriptionProjection projection(
+            @org.jspecify.annotations.Nullable Long workspaceId,
+            @org.jspecify.annotations.Nullable String secret
+        ) {
+            return new ConnectionRepository.OutlineSubscriptionProjection() {
+                @Override
+                public Long getWorkspaceId() {
+                    return workspaceId;
+                }
+
+                @Override
+                public String getSigningSecret() {
+                    return secret;
+                }
+            };
+        }
+
+        @Test
+        void resolvesTheMatchingSubscriptionToItsWorkspaceAndSecret() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
+                java.util.List.of(projection(2L, "secret-b"))
+            );
+
+            var resolved = service.findOutlineSubscription("sub-b");
+
+            assertThat(resolved).isPresent();
+            assertThat(resolved.get().workspaceId()).isEqualTo(2L);
+            assertThat(resolved.get().signingSecret()).isEqualTo("secret-b");
+        }
+
+        @Test
+        void resolvesWithASingleIndexedLookupAndNeverEnumeratesTheFleet() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
+                java.util.List.of(projection(2L, "secret-b"))
+            );
+
+            service.findOutlineSubscription("sub-b");
+
+            verify(connectionRepository, times(1)).findOutlineSubscriptionsBySubscriptionId("sub-b");
+            // The 1+N amplifier this replaced: fleet enumeration + a per-workspace config fetch.
+            verify(connectionRepository, never()).findWorkspaceIdsByKindAndState(any(), any());
+            verify(connectionRepository, never()).findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                anyLong(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        void aForgedSubscriptionIdResolvesToNoSecret() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("forged")).thenReturn(
+                java.util.List.of()
+            );
+
+            assertThat(service.findOutlineSubscription("forged")).isEmpty();
+        }
+
+        @Test
+        void aDeliveryForWorkspaceANeverSelectsWorkspaceBsSecret() {
+            // The query is keyed on the subscription id, so B's row is simply not in the result set.
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a")).thenReturn(
+                java.util.List.of(projection(1L, "secret-a"))
+            );
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b")).thenReturn(
+                java.util.List.of(projection(2L, "secret-b"))
+            );
+
+            var a = service.findOutlineSubscription("sub-a").orElseThrow();
+            var b = service.findOutlineSubscription("sub-b").orElseThrow();
+
+            assertThat(a.workspaceId()).isEqualTo(1L);
+            assertThat(a.signingSecret()).isEqualTo("secret-a");
+            assertThat(b.workspaceId()).isEqualTo(2L);
+            assertThat(b.signingSecret()).isEqualTo("secret-b");
+        }
+
+        @Test
+        void failsClosedWhenTwoActiveConnectionsClaimTheSameSubscriptionId() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-dup")).thenReturn(
+                java.util.List.of(projection(1L, "secret-a"), projection(2L, "secret-b"))
+            );
+
+            assertThat(service.findOutlineSubscription("sub-dup")).isEmpty();
+        }
+
+        @Test
+        void isEmptyWhenTheSubscriptionMatchesButNoSecretIsStored() {
+            when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a")).thenReturn(
+                java.util.List.of(projection(1L, null))
+            );
+
+            assertThat(service.findOutlineSubscription("sub-a")).isEmpty();
+        }
+
+        @Test
+        void isEmptyForABlankSubscriptionWithoutTouchingTheDatabase() {
+            assertThat(service.findOutlineSubscription(null)).isEmpty();
+            assertThat(service.findOutlineSubscription("  ")).isEmpty();
+
+            verify(connectionRepository, never()).findOutlineSubscriptionsBySubscriptionId(any());
+        }
+    }
+
+    /**
+     * The lifecycle-event seam: {@code transition} signals genuine ACTIVE-boundary crossings to
+     * vendor adapters and stays silent on no-ops and idempotent replays.
+     */
+    @Nested
+    class LifecycleEvents {
+
+        @Test
+        void transitionToActive_publishesActivated() {
+            Connection connection = pendingConnection();
+
+            service.transition(
+                connection,
+                new TransitionRequest(IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-1", "linked")
+            );
+
+            verify(eventPublisher).publishEvent(
+                new ConnectionLifecycleEvent.Activated(55L, 7L, IntegrationKind.GITHUB)
+            );
+        }
+
+        @Test
+        void transitionActiveToSuspended_publishesDeactivated() {
+            Connection connection = connectionInState(IntegrationState.ACTIVE);
+
+            service.transition(
+                connection,
+                new TransitionRequest(IntegrationState.SUSPENDED, "SUSPEND", "ADMIN", "actor-1", "corr-2", "paused")
+            );
+
+            verify(eventPublisher).publishEvent(
+                new ConnectionLifecycleEvent.Deactivated(55L, 7L, IntegrationKind.GITHUB)
+            );
+        }
+
+        @Test
+        void sameStateNoOp_publishesNothing() {
+            Connection connection = connectionInState(IntegrationState.ACTIVE);
+
+            service.transition(
+                connection,
+                new TransitionRequest(IntegrationState.ACTIVE, "INSTALL_BIND", "SYSTEM", "actor-1", "corr-3", "again")
+            );
+
+            Mockito.verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        void duplicateCorrelationId_publishesNothing() {
+            Connection connection = pendingConnection();
+            when(auditRepository.save(any(ConnectionAudit.class))).thenThrow(
+                new DataIntegrityViolationException("uq_connection_audit_idempotency")
+            );
+
+            service.transition(
+                connection,
+                new TransitionRequest(
+                    IntegrationState.ACTIVE,
+                    "INSTALL_BIND",
+                    "SYSTEM",
+                    "actor-1",
+                    "corr-dup",
+                    "linked"
+                )
+            );
+
+            Mockito.verifyNoInteractions(eventPublisher);
+        }
     }
 
     private Connection pendingConnection() {
@@ -242,7 +436,19 @@ class ConnectionServiceTest extends BaseUnitTest {
             "100",
             new ConnectionConfig.GitHubAppConfig(100L, null, null, Set.of())
         );
+        // Lifecycle events carry the connection id; persisted rows always have one.
+        setId(connection, 55L);
         connection.setState(state);
         return connection;
+    }
+
+    private static void setId(Connection connection, long id) {
+        try {
+            Field idField = Connection.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(connection, id);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 }

@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, adminCreateLoginProvider, adminDeleteLoginProvider, adminExportAuthEvents, adminListAuthEvents, adminListLoginProviders, adminListUsers, adminListWorkspaces, adminRevokeUserSessions, adminUpdateLoginProvider, adminUpdateUser, assignRole, audit, bindArea, callbackGet, callbackPost, cancelJob, computeUserLeagueStats, createArea, createConfig, createPractice, createWorkspace, deleteArea, deleteConfig, deleteCurrentUser, deletePractice, deleteThread, downloadDataExport, exitImpersonation, getActivityMonitor, getAiSettings, getAllAchievementDefinitions, getAllTeams, getArea, getConfig, getConfigs, getCurrentUser, getCurrentUserMembership, getDataExportStatus, getEngagement, getJob, getJwks, getLabelFilters, getLatestReaction, getLeaderboard, getMember, getObservation, getObservationsForPullRequest, getPractice, getProviders, getReflection, getRepositoriesToMonitor, getRepositorySettings, getSlackUserPreferences, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, impersonate, initiate, list, listAreas, listGitLabGroups, listGlobalContributors, listIdentityProviders, listJobs, listLearnerPractices, listLinkedIdentities, listMembers, listObservations, listPractices, listSessions, listSlackChannelCandidates, listSlackChannelConsentEvents, listSlackChannels, listThreads, listWorkspaces, logout, type Options, purgeWorkspace, read, recalculateUserAchievements, refresh, registerSlackChannel, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, reorderAreas, reorderPractices, requestDataExport, resetAndRecalculateLeagues, retryDelivery, revokeOtherSessions, revokeSession, sendSlackTestMessage, setActive, submitReaction, unlinkIdentity, updateArea, updateConfig, updateFeatures, updateLeaderboardDigest, updateMemberVisibility, updateMentorConfig, updateNotifications, updatePractice, updatePracticeConfig, updatePracticeReviewSettings, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackChannelConsent, updateSlackUserPreferences, updateStatus, updateStatus1, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AdminCreateLoginProviderData, AdminCreateLoginProviderResponse, AdminDeleteLoginProviderData, AdminExportAuthEventsData, AdminExportAuthEventsResponse, AdminListAuthEventsData, AdminListAuthEventsResponse, AdminListLoginProvidersData, AdminListLoginProvidersResponse, AdminListUsersData, AdminListUsersResponse, AdminListWorkspacesData, AdminListWorkspacesResponse, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponse, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponse, AdminUpdateUserData, AdminUpdateUserResponse, AssignRoleData, AssignRoleResponse, AuditData, AuditResponse, BindAreaData, BindAreaResponse, CallbackGetData, CallbackGetResponse, CallbackPostData, CallbackPostResponse, CancelJobData, CancelJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateAreaData, CreateAreaResponse, CreateConfigData, CreateConfigResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteAreaData, DeleteAreaResponse, DeleteConfigData, DeleteConfigResponse, DeleteCurrentUserData, DeletePracticeData, DeletePracticeResponse, DeleteThreadData, DeleteThreadResponse, DownloadDataExportData, DownloadDataExportResponse, ExitImpersonationData, GetActivityMonitorData, GetActivityMonitorResponse, GetAiSettingsData, GetAiSettingsResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetAreaData, GetAreaResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetCurrentUserResponse, GetDataExportStatusData, GetDataExportStatusResponse, GetEngagementData, GetEngagementResponse, GetJobData, GetJobResponse, GetJwksData, GetJwksResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestReactionData, GetLatestReactionResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetObservationData, GetObservationResponse, GetObservationsForPullRequestData, GetObservationsForPullRequestResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetReflectionData, GetReflectionResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSlackUserPreferencesData, GetSlackUserPreferencesResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ImpersonateData, InitiateData, InitiateResponse, ListAreasData, ListAreasResponse, ListData, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListIdentityProvidersData, ListIdentityProvidersResponse, ListJobsData, ListJobsResponse, ListLearnerPracticesData, ListLearnerPracticesResponse, ListLinkedIdentitiesData, ListLinkedIdentitiesResponse, ListMembersData, ListMembersResponse, ListObservationsData, ListObservationsResponse, ListPracticesData, ListPracticesResponse, ListResponse, ListSessionsData, ListSessionsResponse, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponse, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponse, ListSlackChannelsData, ListSlackChannelsResponse, ListThreadsData, ListThreadsResponse, ListWorkspacesData, ListWorkspacesResponse, LogoutData, PurgeWorkspaceData, PurgeWorkspaceResponse, ReadData, ReadResponse, RecalculateUserAchievementsData, RefreshData, RegisterSlackChannelData, RegisterSlackChannelResponse, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ReorderAreasData, ReorderAreasResponse, ReorderPracticesData, ReorderPracticesResponse, RequestDataExportData, RequestDataExportResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, RevokeOtherSessionsData, RevokeSessionData, SendSlackTestMessageData, SendSlackTestMessageResponse, SetActiveData, SetActiveResponse, SubmitReactionData, SubmitReactionResponse, UnlinkIdentityData, UnlinkIdentityResponse, UpdateAreaData, UpdateAreaResponse, UpdateConfigData, UpdateConfigResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateMentorConfigData, UpdateMentorConfigResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeConfigData, UpdatePracticeConfigResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponse, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponse, UpdateStatus1Data, UpdateStatus1Response, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, adminCreateLoginProvider, adminDeleteLoginProvider, adminExportAuthEvents, adminListAuthEvents, adminListLoginProviders, adminListUsers, adminListWorkspaces, adminRevokeUserSessions, adminUpdateLoginProvider, adminUpdateUser, assignRole, audit, bindArea, callbackGet, callbackPost, cancelJob, computeUserLeagueStats, createArea, createConfig, createPractice, createWorkspace, deleteArea, deleteConfig, deleteCurrentUser, deleteOutlineCollection, deletePractice, deleteThread, downloadDataExport, exitImpersonation, getActivityMonitor, getAiSettings, getAllAchievementDefinitions, getAllTeams, getArea, getConfig, getConfigs, getCurrentUser, getCurrentUserMembership, getDataExportStatus, getEngagement, getJob, getJwks, getLabelFilters, getLatestReaction, getLeaderboard, getMember, getObservation, getObservationsForPullRequest, getOutlineCollection, getOutlineConnectionStatus, getOutlineTokenStatus, getPractice, getProviders, getReflection, getRepositoriesToMonitor, getRepositorySettings, getSlackUserPreferences, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, impersonate, initiate, list, listAreas, listGitLabGroups, listGlobalContributors, listIdentityProviders, listJobs, listLearnerPractices, listLinkedIdentities, listMembers, listObservations, listOutlineCollectionCandidates, listOutlineCollections, listPractices, listSessions, listSlackChannelCandidates, listSlackChannelConsentEvents, listSlackChannels, listThreads, listWorkspaces, logout, type Options, purgeWorkspace, read, recalculateUserAchievements, refresh, registerOutlineCollection, registerSlackChannel, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, reorderAreas, reorderPractices, requestDataExport, resetAndRecalculateLeagues, retryDelivery, revokeOtherSessions, revokeSession, sendSlackTestMessage, setActive, submitReaction, syncOutlineConnection, unlinkIdentity, updateArea, updateConfig, updateConnectionStatus, updateFeatures, updateLeaderboardDigest, updateMemberVisibility, updateMentorConfig, updateNotifications, updateOutlineCollectionState, updatePractice, updatePracticeConfig, updatePracticeReviewSettings, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackChannelConsent, updateSlackUserPreferences, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AdminCreateLoginProviderData, AdminCreateLoginProviderResponse, AdminDeleteLoginProviderData, AdminExportAuthEventsData, AdminExportAuthEventsResponse, AdminListAuthEventsData, AdminListAuthEventsResponse, AdminListLoginProvidersData, AdminListLoginProvidersResponse, AdminListUsersData, AdminListUsersResponse, AdminListWorkspacesData, AdminListWorkspacesResponse, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponse, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponse, AdminUpdateUserData, AdminUpdateUserResponse, AssignRoleData, AssignRoleResponse, AuditData, AuditResponse, BindAreaData, BindAreaResponse, CallbackGetData, CallbackGetResponse, CallbackPostData, CallbackPostResponse, CancelJobData, CancelJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateAreaData, CreateAreaResponse, CreateConfigData, CreateConfigResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteAreaData, DeleteAreaResponse, DeleteConfigData, DeleteConfigResponse, DeleteCurrentUserData, DeleteOutlineCollectionData, DeleteOutlineCollectionResponse, DeletePracticeData, DeletePracticeResponse, DeleteThreadData, DeleteThreadResponse, DownloadDataExportData, DownloadDataExportResponse, ExitImpersonationData, GetActivityMonitorData, GetActivityMonitorResponse, GetAiSettingsData, GetAiSettingsResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetAreaData, GetAreaResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetCurrentUserResponse, GetDataExportStatusData, GetDataExportStatusResponse, GetEngagementData, GetEngagementResponse, GetJobData, GetJobResponse, GetJwksData, GetJwksResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestReactionData, GetLatestReactionResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetObservationData, GetObservationResponse, GetObservationsForPullRequestData, GetObservationsForPullRequestResponse, GetOutlineCollectionData, GetOutlineCollectionResponse, GetOutlineConnectionStatusData, GetOutlineConnectionStatusResponse, GetOutlineTokenStatusData, GetOutlineTokenStatusResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetReflectionData, GetReflectionResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSlackUserPreferencesData, GetSlackUserPreferencesResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ImpersonateData, InitiateData, InitiateResponse, ListAreasData, ListAreasResponse, ListData, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListIdentityProvidersData, ListIdentityProvidersResponse, ListJobsData, ListJobsResponse, ListLearnerPracticesData, ListLearnerPracticesResponse, ListLinkedIdentitiesData, ListLinkedIdentitiesResponse, ListMembersData, ListMembersResponse, ListObservationsData, ListObservationsResponse, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesResponse, ListOutlineCollectionsData, ListOutlineCollectionsResponse, ListPracticesData, ListPracticesResponse, ListResponse, ListSessionsData, ListSessionsResponse, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponse, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponse, ListSlackChannelsData, ListSlackChannelsResponse, ListThreadsData, ListThreadsResponse, ListWorkspacesData, ListWorkspacesResponse, LogoutData, PurgeWorkspaceData, PurgeWorkspaceResponse, ReadData, ReadResponse, RecalculateUserAchievementsData, RefreshData, RegisterOutlineCollectionData, RegisterOutlineCollectionResponse, RegisterSlackChannelData, RegisterSlackChannelResponse, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ReorderAreasData, ReorderAreasResponse, ReorderPracticesData, ReorderPracticesResponse, RequestDataExportData, RequestDataExportResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, RevokeOtherSessionsData, RevokeSessionData, SendSlackTestMessageData, SendSlackTestMessageResponse, SetActiveData, SetActiveResponse, SubmitReactionData, SubmitReactionResponse, SyncOutlineConnectionData, UnlinkIdentityData, UnlinkIdentityResponse, UpdateAreaData, UpdateAreaResponse, UpdateConfigData, UpdateConfigResponse, UpdateConnectionStatusData, UpdateConnectionStatusResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateMentorConfigData, UpdateMentorConfigResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateResponse, UpdatePracticeConfigData, UpdatePracticeConfigResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponse, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -1104,6 +1104,63 @@ export const initiateMutation = (options?: Partial<Options<InitiateData>>): UseM
     return mutationOptions;
 };
 
+export const getOutlineConnectionStatusQueryKey = (options: Options<GetOutlineConnectionStatusData>) => createQueryKey('getOutlineConnectionStatus', options);
+
+/**
+ * Health of the workspace's active Outline connection (webhook, last sync, document count)
+ */
+export const getOutlineConnectionStatusOptions = (options: Options<GetOutlineConnectionStatusData>) => queryOptions<GetOutlineConnectionStatusResponse, DefaultError, GetOutlineConnectionStatusResponse, ReturnType<typeof getOutlineConnectionStatusQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getOutlineConnectionStatus({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOutlineConnectionStatusQueryKey(options)
+});
+
+/**
+ * Trigger the full Outline reconcile for this workspace (async, 202)
+ *
+ * Runs off the request thread. Always answers 202 with the connection status resource in the Location header; a duplicate trigger while a reconcile is still running starts nothing new and returns the same 202 pointing at the same monitor.
+ */
+export const syncOutlineConnectionMutation = (options?: Partial<Options<SyncOutlineConnectionData>>): UseMutationOptions<unknown, DefaultError, Options<SyncOutlineConnectionData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<SyncOutlineConnectionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await syncOutlineConnection({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getOutlineTokenStatusQueryKey = (options: Options<GetOutlineTokenStatusData>) => createQueryKey('getOutlineTokenStatus', options);
+
+/**
+ * Live state of the API token behind this workspace's Outline connection
+ *
+ * Probes Outline directly. Reports whether the token is still accepted and, when the token may list its own key, its name, expiry and last use. Outline cannot rotate a key from a key, so an expiring token is renewed in Outline and re-entered here.
+ */
+export const getOutlineTokenStatusOptions = (options: Options<GetOutlineTokenStatusData>) => queryOptions<GetOutlineTokenStatusResponse, DefaultError, GetOutlineTokenStatusResponse, ReturnType<typeof getOutlineTokenStatusQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getOutlineTokenStatus({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOutlineTokenStatusQueryKey(options)
+});
+
 /**
  * Post a test message to verify the Slack connection
  *
@@ -1166,10 +1223,10 @@ export const auditOptions = (options: Options<AuditData>) => queryOptions<AuditR
  * <code>PENDING</code> is internal to the OAuth handshake and rejected as a bad request; illegal
  * transitions surface as 400 via the state machine.
  */
-export const updateStatus1Mutation = (options?: Partial<Options<UpdateStatus1Data>>): UseMutationOptions<UpdateStatus1Response, DefaultError, Options<UpdateStatus1Data>> => {
-    const mutationOptions: UseMutationOptions<UpdateStatus1Response, DefaultError, Options<UpdateStatus1Data>> = {
+export const updateConnectionStatusMutation = (options?: Partial<Options<UpdateConnectionStatusData>>): UseMutationOptions<UpdateConnectionStatusResponse, DefaultError, Options<UpdateConnectionStatusData>> => {
+    const mutationOptions: UseMutationOptions<UpdateConnectionStatusResponse, DefaultError, Options<UpdateConnectionStatusData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await updateStatus1({
+            const { data } = await updateConnectionStatus({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -1579,6 +1636,115 @@ export const updateNotificationsMutation = (options?: Partial<Options<UpdateNoti
     const mutationOptions: UseMutationOptions<UpdateNotificationsResponse, DefaultError, Options<UpdateNotificationsData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await updateNotifications({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listOutlineCollectionsQueryKey = (options: Options<ListOutlineCollectionsData>) => createQueryKey('listOutlineCollections', options);
+
+/**
+ * List the workspace's mirrored Outline collections with their sync state
+ */
+export const listOutlineCollectionsOptions = (options: Options<ListOutlineCollectionsData>) => queryOptions<ListOutlineCollectionsResponse, DefaultError, ListOutlineCollectionsResponse, ReturnType<typeof listOutlineCollectionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listOutlineCollections({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listOutlineCollectionsQueryKey(options)
+});
+
+/**
+ * Register an Outline collection for mirroring (lands ENABLED + PENDING; idempotent on the id)
+ */
+export const registerOutlineCollectionMutation = (options?: Partial<Options<RegisterOutlineCollectionData>>): UseMutationOptions<RegisterOutlineCollectionResponse, DefaultError, Options<RegisterOutlineCollectionData>> => {
+    const mutationOptions: UseMutationOptions<RegisterOutlineCollectionResponse, DefaultError, Options<RegisterOutlineCollectionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await registerOutlineCollection({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listOutlineCollectionCandidatesQueryKey = (options: Options<ListOutlineCollectionCandidatesData>) => createQueryKey('listOutlineCollectionCandidates', options);
+
+/**
+ * List the Outline collections available to mirror (live proxy; doubles as connectivity probe)
+ *
+ * Proxies Outline's collections.list with the stored token under a bounded interactive page budget. Served with Cache-Control: no-store — the live upstream view must not be cached.
+ */
+export const listOutlineCollectionCandidatesOptions = (options: Options<ListOutlineCollectionCandidatesData>) => queryOptions<ListOutlineCollectionCandidatesResponse, DefaultError, ListOutlineCollectionCandidatesResponse, ReturnType<typeof listOutlineCollectionCandidatesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listOutlineCollectionCandidates({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listOutlineCollectionCandidatesQueryKey(options)
+});
+
+/**
+ * Remove a collection from the mirror and erase its mirrored documents (terminal)
+ */
+export const deleteOutlineCollectionMutation = (options?: Partial<Options<DeleteOutlineCollectionData>>): UseMutationOptions<DeleteOutlineCollectionResponse, DefaultError, Options<DeleteOutlineCollectionData>> => {
+    const mutationOptions: UseMutationOptions<DeleteOutlineCollectionResponse, DefaultError, Options<DeleteOutlineCollectionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteOutlineCollection({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getOutlineCollectionQueryKey = (options: Options<GetOutlineCollectionData>) => createQueryKey('getOutlineCollection', options);
+
+/**
+ * One mirrored Outline collection with its sync state and live document count
+ */
+export const getOutlineCollectionOptions = (options: Options<GetOutlineCollectionData>) => queryOptions<GetOutlineCollectionResponse, DefaultError, GetOutlineCollectionResponse, ReturnType<typeof getOutlineCollectionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getOutlineCollection({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOutlineCollectionQueryKey(options)
+});
+
+/**
+ * Transition a mirrored collection to a target mirror state (pause / resume)
+ *
+ * Resuming (PAUSED → ENABLED) resets the sync status to PENDING and kicks a targeted sync; requesting the current state is an idempotent no-op.
+ */
+export const updateOutlineCollectionStateMutation = (options?: Partial<Options<UpdateOutlineCollectionStateData>>): UseMutationOptions<UpdateOutlineCollectionStateResponse, DefaultError, Options<UpdateOutlineCollectionStateData>> => {
+    const mutationOptions: UseMutationOptions<UpdateOutlineCollectionStateResponse, DefaultError, Options<UpdateOutlineCollectionStateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateOutlineCollectionState({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

@@ -80,6 +80,13 @@ public class FeedbackLedgerRecorder {
      */
     public static final int CONVERSATION_UNIT_ORDINAL_BASE = 3000;
 
+    /**
+     * Undelivered (FAILED) units start here — clear of the live unit (0), the B2 base (1000), the policy-floor
+     * base (2000), and the conversational base (3000). One row per job records the composed body a delivery
+     * attempt could not place, so an evaluator can audit what the student WOULD have received.
+     */
+    private static final int UNDELIVERED_UNIT_ORDINAL = 4000;
+
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
@@ -268,7 +275,7 @@ public class FeedbackLedgerRecorder {
         // (external_ref) comes from the per-note DeliveredSignal the channel emitted this run. A note with no
         // matching signal (append-only GitHub, or a channel that emitted none) keeps the anchor-only fallback:
         // a null external_ref.
-        if (artifact == WorkArtifact.PULL_REQUEST) {
+        if (artifact.hasInlineLane()) {
             for (DiffNote note : delivery.diffNotes()) {
                 DeliveredSignal signal = matchSignal(note, inlineSignals);
                 feedbackPlacementRepository.save(
@@ -302,7 +309,7 @@ public class FeedbackLedgerRecorder {
             job.getId(),
             feedback.getId(),
             assessed.size(),
-            artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
+            artifact.hasInlineLane() ? delivery.diffNotes().size() : 0,
             feedbackThreadKey
         );
     }
@@ -431,6 +438,79 @@ public class FeedbackLedgerRecorder {
             feedback.getId(),
             reason,
             finding.getRecurrenceKey()
+        );
+    }
+
+    /**
+     * Persist the composed body a delivery attempt could not place as a single {@link FeedbackDeliveryState#FAILED}
+     * {@code IN_CONTEXT} unit (ordinal {@link #UNDELIVERED_UNIT_ORDINAL}), bind its assessed findings
+     * (BAD=PRIMARY, GOOD=SUPPORTING), and signal the conversational channel to cover the loci the developer never
+     * saw in-context. No-ops entirely when there is no body/workspace or a DELIVERED unit already exists (a prior
+     * run landed); otherwise signals the conversation, then writes the FAILED row unless it already exists (a
+     * retry re-signals harmlessly but never double-persists) or the job has no observations. REQUIRES_NEW,
+     * best-effort: callers wrap in try/catch. The FAILED row feeds only the reflection dashboard; the mentor
+     * reads DELIVERED-only, so it never feeds coaching.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordUndelivered(AgentJob job, DeliveryContent delivery) {
+        if (delivery == null || delivery.mrNote() == null) {
+            return;
+        }
+        if (job.getWorkspace() == null) {
+            return; // a no-workspace integrity failure has no recipient/artifact to bind
+        }
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
+            return; // a DELIVERED unit already exists (a prior run landed) — never contradict it or re-signal
+        }
+        // Failed direct delivery → let the CONVERSATION channel cover the un-delivered loci. Idempotent listener,
+        // so a retry that re-signals is harmless.
+        publishConversationDeliveryTrigger(job);
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), UNDELIVERED_UNIT_ORDINAL)) {
+            return; // already recorded (job retry)
+        }
+        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
+        if (findings.isEmpty()) {
+            return;
+        }
+        Observation any = findings.get(0);
+        Instant now = Instant.now();
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(job.getWorkspace().getId())
+                .artifactType(any.getArtifactType())
+                .artifactId(any.getArtifactId())
+                .recipientUserId(any.getAboutUserId())
+                .aboutUserId(any.getAboutUserId())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(UNDELIVERED_UNIT_ORDINAL)
+                .deliveryState(FeedbackDeliveryState.FAILED)
+                .body(delivery.mrNote())
+                .source(FeedbackSource.AGENT)
+                .threadKey(feedbackThreadKeyFor(any))
+                .createdAt(now)
+                .build()
+        );
+        // Bind the assessed findings (NA excluded) so the undelivered body traces back to its observations.
+        int ordinal = 0;
+        List<Observation> assessed = findings
+            .stream()
+            .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
+            .sorted(
+                Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
+                    .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
+                    .thenComparing(f -> f.getId().toString())
+            )
+            .toList();
+        for (Observation f : assessed) {
+            EvidenceRole role = f.getAssessment() == Assessment.BAD ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
+            feedbackObservationRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
+        }
+        log.info(
+            "Feedback recorded as undelivered (FAILED): jobId={}, unit={}, boundFindings={}",
+            job.getId(),
+            feedback.getId(),
+            assessed.size()
         );
     }
 

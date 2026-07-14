@@ -131,10 +131,8 @@ public class SlackMessageService {
 
     /**
      * Post an <strong>ephemeral</strong> message via {@code chat.postEphemeral} — visible only to {@code slackUserId}
-     * in {@code channelId}, seen by no one else and gone on reload. The seam the just-in-time consent notice (shown
-     * to a member who joins an already-active channel) and the in-message opt-out confirmation render through.
-     * Mirrors {@link #sendForWorkspace}: throws {@link SlackSendException} carrying the Slack error so the caller can
-     * log-and-swallow (the notice is best-effort).
+     * in {@code channelId} and gone on reload. Throws {@link SlackSendException} carrying the Slack error so the
+     * caller can log-and-swallow (the notice is best-effort).
      */
     public void sendEphemeralForWorkspace(
         long workspaceId,
@@ -150,7 +148,7 @@ public class SlackMessageService {
             .channel(channelId)
             .user(slackUserId)
             .blocks(blocks)
-            .text(fallback) // fallback text shown in notifications + accessibility tools
+            .text(fallback)
             .build();
         try {
             ChatPostEphemeralResponse response = callHonoringRateLimit(() ->
@@ -178,21 +176,21 @@ public class SlackMessageService {
         }
     }
 
-    /**
-     * The app's own bot user id ({@code U…}) for this workspace via {@code auth.test}, or empty when it cannot be
-     * resolved (no active connection / Slack failure). Best-effort and never throws — used only to skip the bot's
-     * OWN {@code member_joined_channel} event (adding the app to a channel fires that event too), so an unresolved
-     * id degrades to "cannot confirm it's the bot" rather than blocking the caller.
-     *
-     * <p>Positive results are cached per workspace: the bot user id is stable for an installation, and this runs on
-     * the serial event-consumer thread for every {@code member_joined_channel}, so an uncached remote call per join
-     * would stall unrelated workspaces' events. Failures are not cached (retried on the next event).
-     */
     /** Evict the cached bot user id, e.g. on uninstall — a later reconnect may install a different app. */
     public void evictBotUserId(long workspaceId) {
         botUserIdCache.remove(workspaceId);
     }
 
+    /**
+     * The app's own bot user id ({@code U…}) for this workspace via {@code auth.test}, or empty when it cannot be
+     * resolved (no active connection / Slack failure). Best-effort and never throws — used only to skip the bot's
+     * OWN {@code member_joined_channel} event, so an unresolved id degrades to "cannot confirm it's the bot"
+     * rather than blocking the caller.
+     *
+     * <p>Positive results are cached per workspace: the bot user id is stable for an installation, and this runs on
+     * the serial event-consumer thread for every {@code member_joined_channel}, so an uncached remote call per join
+     * would stall unrelated workspaces' events. Failures are not cached (retried on the next event).
+     */
     public Optional<String> resolveBotUserId(long workspaceId) {
         String cached = botUserIdCache.get(workspaceId);
         if (cached != null) {
@@ -278,10 +276,9 @@ public class SlackMessageService {
     }
 
     /**
-     * Publish (replace) the App Home tab view for one member via {@code views.publish}. The seam the App
-     * Home (disclosure + research-consent toggle) renders through — the sibling of
-     * {@code chat.postMessage} for the Home surface. Throws {@link SlackSendException} carrying the Slack
-     * error so the caller can log-and-swallow (App Home render is best-effort, like the onboarding CTA).
+     * Publish (replace) the App Home tab view for one member via {@code views.publish}. Throws
+     * {@link SlackSendException} carrying the Slack error so the caller can log-and-swallow (App Home render is
+     * best-effort).
      */
     public void publishHomeView(long workspaceId, String slackUserId, View view) {
         String token = resolveToken(workspaceId).orElseThrow(() ->

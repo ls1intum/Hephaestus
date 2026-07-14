@@ -73,6 +73,13 @@ services:
       # the signing secret; OAuth/admin and mentor replies stay on application-server.
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:-}
+      # Outline change notifications arrive here under /webhooks/outline. The flag gates
+      # OutlineWebhookSignatureVerifier + OutlineWebhookSecretSource; without it WebhookIngestPipeline
+      # has no verifier for the kind and answers 501 to EVERY delivery, which Outline counts as a
+      # failure and auto-disables the subscription after 25 of them. No signing secret here: Outline's
+      # secret is per-subscription (minted on the app pod, stored encrypted on the connection row) and
+      # is read back through JPA. Keep in lockstep with the app stack's value.
+      HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
       # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       THC_PORT: "8080"

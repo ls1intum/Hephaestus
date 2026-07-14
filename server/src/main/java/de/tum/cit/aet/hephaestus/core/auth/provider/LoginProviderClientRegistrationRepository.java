@@ -113,6 +113,17 @@ public class LoginProviderClientRegistrationRepository
                 .userInfoUri(base + "/api/openid.connect.userInfo")
                 .jwkSetUri(base + "/openid/connect/keys")
                 .userNameAttributeName("sub");
+        } else if (provider.getType() == LoginProvider.ProviderType.OUTLINE) {
+            // Outline (self-hosted) is a plain OAuth2 provider (v0.77+), NOT OIDC: no id_token, no
+            // discovery, no real userinfo endpoint. The userInfoUri points at POST /api/auth.info —
+            // Spring requires a userinfo endpoint for oauth2Login, and OutlineAuthInfoUserService
+            // (routed by provider type in AuthSecurityConfig) actually calls it correctly (POST +
+            // bearer token) and flattens {data:{user,team}} into principal attributes. The principal
+            // keys on the immutable Outline user UUID ("id") — nOAuth defence, never name/email.
+            builder
+                .authorizationUri(base + "/oauth/authorize")
+                .tokenUri(base + "/oauth/token")
+                .userInfoUri(base + "/api/auth.info");
         } else {
             // GitLab (gitlab.com or self-hosted) — all endpoints hang off the instance base URL.
             builder

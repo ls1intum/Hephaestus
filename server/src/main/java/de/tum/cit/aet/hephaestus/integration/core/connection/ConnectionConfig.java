@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
         @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
         @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
         @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
+        @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
     }
 )
 public sealed interface ConnectionConfig
@@ -24,7 +25,8 @@ public sealed interface ConnectionConfig
         ConnectionConfig.GitHubAppConfig,
         ConnectionConfig.GitHubPatConfig,
         ConnectionConfig.GitLabConfig,
-        ConnectionConfig.SlackConfig
+        ConnectionConfig.SlackConfig,
+        ConnectionConfig.OutlineConfig
 {
     /** Enabled sync streams (subset of the source's catalog). */
     Set<String> enabledStreams();
@@ -56,9 +58,8 @@ public sealed interface ConnectionConfig
         }
 
         /**
-         * Returns a copy with {@link #gitlabWebhookId} replaced. Used after webhook
-         * registration / adoption to stamp the new id without mutating the persisted
-         * record. Caller pairs this with {@code connectionService.updateConfig(...)} to
+         * Returns a copy with {@link #gitlabWebhookId} replaced, stamped after webhook
+         * registration/adoption. Pair with {@code connectionService.updateConfig(...)} to
          * persist the swap atomically.
          */
         public GitLabConfig withGitlabWebhookId(@Nullable Long webhookId) {
@@ -66,9 +67,8 @@ public sealed interface ConnectionConfig
         }
 
         /**
-         * Returns a copy with {@link #gitlabGroupId} replaced. Used when the GraphQL
-         * group lookup resolves the numeric id on a workspace that was only carrying
-         * the human-readable group path.
+         * Returns a copy with {@link #gitlabGroupId} replaced, for when the GraphQL group
+         * lookup resolves the numeric id on a workspace that only carried the group path.
          */
         public GitLabConfig withGitlabGroupId(@Nullable Long groupId) {
             return new GitLabConfig(serverUrl, groupId, gitlabWebhookId, signingMode, enabledStreams);
@@ -90,6 +90,31 @@ public sealed interface ConnectionConfig
         /** The configured retention window, or {@link #DEFAULT_RETENTION_DAYS} when unset. */
         public int retentionDaysOrDefault() {
             return retentionDays != null ? retentionDays : DEFAULT_RETENTION_DAYS;
+        }
+    }
+
+    /**
+     * Outline — the server host and (when the change-notification subscription is registered)
+     * its id plus signing secret. Which collections are mirrored is NOT config: the
+     * {@code outline_collection} registry is the single source of truth, populated post-connect
+     * through the admin surface.
+     *
+     * <p>{@code serverUrl} is validated against the SSRF guard before any request is made.
+     * The webhook fields stay {@code null} until a change-notification subscription is registered.
+     */
+    record OutlineConfig(
+        @Nullable String serverUrl,
+        @Nullable String webhookSubscriptionId,
+        @Nullable String webhookSecret,
+        Set<String> enabledStreams
+    ) implements ConnectionConfig {
+        /**
+         * Returns a copy with the change-notification subscription id and signing secret
+         * replaced, stamped after the subscription is registered. Pair with
+         * {@code connectionService.updateConfig(...)} to persist the swap atomically.
+         */
+        public OutlineConfig withWebhookSubscription(@Nullable String subscriptionId, @Nullable String signingSecret) {
+            return new OutlineConfig(serverUrl, subscriptionId, signingSecret, enabledStreams);
         }
     }
 }

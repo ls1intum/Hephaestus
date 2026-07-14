@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  * (matchIfMissing=true) AND by a non-empty {@code hephaestus.worker.control.endpoint}: the
  * substrate has exactly one runtime path — a WSS-connected worker pod. Monolith dev mode
  * leaves the gate set but never points at an endpoint, so no substrate beans wire and agent
- * jobs route through NATS exactly as before.
+ * jobs route through NATS.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -126,7 +126,7 @@ public class WorkerConfiguration {
     }
 
     /**
-     * Wire hub-originated {@code CancelJob} frames to the executor's local-cancel path (#1138).
+     * Wire hub-originated {@code CancelJob} frames to the executor's local-cancel path.
      * Done after singletons are instantiated so the optional executor (only present when agent
      * NATS is enabled) is resolved without creating a hard dependency cycle.
      */

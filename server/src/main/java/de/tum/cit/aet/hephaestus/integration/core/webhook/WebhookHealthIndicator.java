@@ -11,14 +11,14 @@ import org.springframework.boot.health.contributor.HealthIndicator;
 
 /**
  * Reports {@code UP} only when the NATS connection is CONNECTED and all target streams
- * ({@code gitlab}, {@code github}, {@code slack}) are reachable. Exception messages stay in the log; only the
- * exception class name is exposed in the health detail to avoid leaking NATS topology over an
+ * ({@code gitlab}, {@code github}, {@code slack}, {@code outline}) are reachable. Exception messages stay
+ * in the log; only the exception class name is exposed in the health detail to avoid leaking NATS topology over an
  * actuator endpoint.
  */
 public class WebhookHealthIndicator implements HealthIndicator {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookHealthIndicator.class);
-    private static final String[] STREAMS = { "gitlab", "github", "slack" };
+    private static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
 
     private final Connection connection;
     private final JetStreamManagement jsm;

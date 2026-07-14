@@ -45,7 +45,7 @@ import org.springframework.stereotype.Component;
  * </ul>
  *
  * <p>The watermark advances only when a channel's window completed cleanly (cursor exhausted, no errors); a partial
- * window is simply re-fetched next night. Mirrors the SCM sync's watermark discipline.
+ * window is simply re-fetched next night.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")

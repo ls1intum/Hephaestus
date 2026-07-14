@@ -19,8 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed
- * by pg_partman (create-ahead + 12-month retention, oldest dropped) —
- * runs on stock Postgres with no {@code pg_partman} / custom image. Records the
+ * by pg_partman (create-ahead + 12-month retention, oldest dropped). Records the
  * {@code (account_id, acting_account_id)} pair for every impersonation so every action attributable
  * to an impersonator is reconstructible.
  *
@@ -70,9 +69,9 @@ public class AuthEvent {
     @Nullable
     private String failureReason;
 
-    @Column(name = "git_provider_id")
+    @Column(name = "provider_id")
     @Nullable
-    private Long gitProviderId;
+    private Long providerId;
 
     @Column(name = "workspace_id")
     @Nullable
@@ -141,7 +140,7 @@ public class AuthEvent {
         e.accountId = data.accountId();
         e.actingAccountId = data.actingAccountId();
         e.failureReason = data.failureReason();
-        e.gitProviderId = data.gitProviderId();
+        e.providerId = data.gitProviderId();
         e.workspaceId = data.workspaceId();
         e.identityLinkId = data.identityLinkId();
         e.ipInet = ipInet;

@@ -98,6 +98,29 @@ public class SlackMentorIdentityResolver {
             .map(User::getId);
     }
 
+    /**
+     * Reverse of {@link #resolveMemberId}: the Slack {@code U…} subject a workspace member can be DMed at. Walks
+     * {@code memberId → account (via the wired actor mirror) → active SLACK link}, narrowed to {@code teamId} (the
+     * ACTIVE connection's team) so a member with Slack identities in several teams is never addressed through the
+     * wrong workspace's bot token.
+     *
+     * @return the Slack user id, or empty when the member never signed in or has no Slack link in that team
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> resolveSlackUserId(long memberId, @Nullable String teamId) {
+        long slackProviderId = gitProviderRegistry.resolveProviderId("SLACK", SLACK_SERVER_URL);
+        return accountIdentityQuery
+            .resolveAccountIdForActor(memberId)
+            .map(accountIdentityQuery::activeLinksForAccount)
+            .orElseGet(List::of)
+            .stream()
+            .filter(link -> link.gitProviderId() != null && link.gitProviderId() == slackProviderId)
+            .filter(link -> teamId == null || teamId.equals(link.teamId()))
+            .map(AccountIdentityQuery.IdentityLinkView::subject)
+            .filter(subject -> subject != null && !subject.isBlank())
+            .findFirst();
+    }
+
     private boolean isWorkspaceMember(String login, long workspaceId) {
         return workspaceMembershipQuery
             .membershipsForLogins(Set.of(login))

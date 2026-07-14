@@ -7,8 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The single authority on whether an <em>individual</em> may have their Slack messages ingested — the person layer
- * of the two-layer consent model. Built once (mirroring {@link SlackChannelConsentGate}) so the person-firewall
- * rule lives in exactly one place and cannot diverge between the ingest write-path and any later projector.
+ * of the two-layer consent model. Built once so the person-firewall rule lives in exactly one place and cannot
+ * diverge between the ingest write-path and any later projector.
  *
  * <p><strong>Deny-if-opted-out, allow-if-absent.</strong> A person who explicitly opted out
  * ({@code ingestion_opted_out = true}) is never ingested; a person with no consent row has made no opt-out and is

@@ -1,10 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import {
-	BanIcon,
-	CheckIcon,
-	ClockIcon,
 	HistoryIcon,
-	type LucideIcon,
 	MoreHorizontalIcon,
 	PauseIcon,
 	PlayIcon,
@@ -12,7 +8,6 @@ import {
 	Trash2Icon,
 } from "lucide-react";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -23,46 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-
-/** The consent lifecycle states, sourced from the generated DTO so they never drift. */
-export type SlackConsentState = SlackMonitoredChannel["consentState"];
-
-interface StatusPresentation {
-	label: string;
-	Icon: LucideIcon;
-	variant: "outline" | "secondary" | "destructive";
-	/** Extra classes for the icon so ACTIVE reads green without relying on color alone. */
-	iconClassName?: string;
-}
-
-/**
- * Word + icon for every state (never color-only) so the status survives WCAG 1.4.1.
- * There is no semantic "success" token in the kit, so ACTIVE reuses the same hard-coded
- * green as the connection indicator in {@link AdminSlackNotificationSettings}.
- */
-function statusPresentation(state: SlackConsentState): StatusPresentation {
-	switch (state) {
-		case "ACTIVE":
-			return {
-				label: "Monitoring",
-				Icon: CheckIcon,
-				variant: "outline",
-				iconClassName: "text-green-600 dark:text-green-400",
-			};
-		case "PAUSED":
-			return {
-				label: "Paused",
-				Icon: PauseIcon,
-				variant: "outline",
-				iconClassName: "text-muted-foreground",
-			};
-		case "REVOKED":
-			return { label: "Revoked", Icon: BanIcon, variant: "destructive" };
-		default:
-			return { label: "Not started", Icon: ClockIcon, variant: "secondary" };
-	}
-}
+import { ConsentStateBadge } from "./consent-terms";
 
 export interface SlackChannelRowProps {
 	channel: SlackMonitoredChannel;
@@ -94,7 +50,6 @@ export function SlackChannelRow({
 	onViewHistory,
 }: SlackChannelRowProps) {
 	const label = channel.channelName ?? channel.slackChannelId;
-	const status = statusPresentation(channel.consentState);
 	const isTerminal = channel.consentState === "REVOKED";
 
 	return (
@@ -105,10 +60,7 @@ export function SlackChannelRow({
 			</TableCell>
 
 			<TableCell>
-				<Badge variant={status.variant} className="gap-1">
-					<status.Icon className={cn("size-3", status.iconClassName)} aria-hidden />
-					{status.label}
-				</Badge>
+				<ConsentStateBadge state={channel.consentState} />
 			</TableCell>
 
 			<TableCell>

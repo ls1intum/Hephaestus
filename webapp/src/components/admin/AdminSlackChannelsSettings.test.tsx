@@ -149,7 +149,7 @@ describe("AdminSlackChannelsSettings — reversible row actions swallow rejectio
 });
 
 describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
-	it("keeps the destructive action disabled until the stable channel ID is typed, then reports the reason", async () => {
+	it("refuses the erase until the stable channel ID is typed, then reports the reason", async () => {
 		const { props } = setup({ channels: [active] });
 		openRowMenu("team-standup");
 		fireEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
@@ -158,12 +158,15 @@ describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
 		const confirm = within(dialog).getByRole("button", {
 			name: /remove & erase/i,
 		}) as HTMLButtonElement;
-		expect(confirm.disabled).toBe(true);
+
+		// The gate is validation on submit, not a dead button: confirming without the ID says why.
+		fireEvent.click(confirm);
+		expect(props.onRemoveChannel).not.toHaveBeenCalled();
+		expect(within(dialog).getByText(/that does not match/i)).toBeTruthy();
 
 		fireEvent.change(within(dialog).getByLabelText(/to confirm/i), {
 			target: { value: active.slackChannelId },
 		});
-		expect(confirm.disabled).toBe(false);
 
 		fireEvent.change(within(dialog).getByLabelText(/reason/i), {
 			target: { value: "left the course" },
@@ -200,10 +203,13 @@ describe("AdminSlackChannelsSettings — revoke type-to-confirm", () => {
 });
 
 describe("AdminSlackChannelsSettings — add-channel gating & empty state", () => {
-	it("disables Add channel when Slack is not connected", () => {
+	it("explains how to connect instead of offering an unreachable Add affordance", () => {
 		setup({ hasSlackConnection: false });
-		const addButton = screen.getByRole("button", { name: /add channel/i }) as HTMLButtonElement;
-		expect(addButton.disabled).toBe(true);
+
+		// No dead control: without a Slack app there is nothing to add a channel to, so the
+		// section stays discoverable and points back at the connect card.
+		expect(screen.queryByRole("button", { name: /add channel/i })).toBeNull();
+		expect(screen.getByText(/connect slack to monitor channels/i)).toBeTruthy();
 	});
 
 	it("renders an empty state with an Add affordance when there are no channels", () => {
@@ -261,7 +267,12 @@ describe("AdminSlackChannelsSettings — Slack channel picker", () => {
 
 		fireEvent.click(screen.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");
-		fireEvent.click(within(dialog).getByRole("option", { name: /#general/i }));
+
+		// One combobox, opened on demand — its options live in a portalled popover, not in the
+		// dialog subtree, so they are queried from the document.
+		fireEvent.click(within(dialog).getByRole("combobox", { name: /^channel$/i }));
+		fireEvent.click(await screen.findByRole("option", { name: /#general/i }));
+
 		fireEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
 
 		await waitFor(() => expect(props.onRegisterChannel).toHaveBeenCalledTimes(1));

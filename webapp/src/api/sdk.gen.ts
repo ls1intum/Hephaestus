@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAiSettingsData, GetAiSettingsResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAreasData, ListAreasResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateMentorConfigData, UpdateMentorConfigErrors, UpdateMentorConfigResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeConfigData, UpdatePracticeConfigErrors, UpdatePracticeConfigResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, BindAreaData, BindAreaErrors, BindAreaResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateAreaData, CreateAreaErrors, CreateAreaResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteAreaData, DeleteAreaErrors, DeleteAreaResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeleteOutlineCollectionData, DeleteOutlineCollectionErrors, DeleteOutlineCollectionResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAiSettingsData, GetAiSettingsResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetAreaData, GetAreaErrors, GetAreaResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestReactionData, GetLatestReactionErrors, GetLatestReactionResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetObservationData, GetObservationErrors, GetObservationResponses, GetObservationsForPullRequestData, GetObservationsForPullRequestResponses, GetOutlineCollectionData, GetOutlineCollectionErrors, GetOutlineCollectionResponses, GetOutlineConnectionStatusData, GetOutlineConnectionStatusErrors, GetOutlineConnectionStatusResponses, GetOutlineTokenStatusData, GetOutlineTokenStatusErrors, GetOutlineTokenStatusResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetReflectionData, GetReflectionResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSlackUserPreferencesData, GetSlackUserPreferencesResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, InitiateData, InitiateResponses, ListAreasData, ListAreasResponses, ListData, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLearnerPracticesData, ListLearnerPracticesResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListObservationsData, ListObservationsResponses, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesErrors, ListOutlineCollectionCandidatesResponses, ListOutlineCollectionsData, ListOutlineCollectionsErrors, ListOutlineCollectionsResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponses, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponses, ListSlackChannelsData, ListSlackChannelsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, RegisterOutlineCollectionData, RegisterOutlineCollectionErrors, RegisterOutlineCollectionResponses, RegisterSlackChannelData, RegisterSlackChannelResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ReorderAreasData, ReorderAreasErrors, ReorderAreasResponses, ReorderPracticesData, ReorderPracticesErrors, ReorderPracticesResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendSlackTestMessageData, SendSlackTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitReactionData, SubmitReactionErrors, SubmitReactionResponses, SyncOutlineConnectionData, SyncOutlineConnectionErrors, SyncOutlineConnectionResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateAreaData, UpdateAreaErrors, UpdateAreaResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateConnectionStatusData, UpdateConnectionStatusResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateMentorConfigData, UpdateMentorConfigErrors, UpdateMentorConfigResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateErrors, UpdateOutlineCollectionStateResponses, UpdatePracticeConfigData, UpdatePracticeConfigErrors, UpdatePracticeConfigResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponses, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -554,6 +554,37 @@ export const initiate = <ThrowOnError extends boolean = false>(options: Options<
 });
 
 /**
+ * Health of the workspace's active Outline connection (webhook, last sync, document count)
+ */
+export const getOutlineConnectionStatus = <ThrowOnError extends boolean = false>(options: Options<GetOutlineConnectionStatusData, ThrowOnError>) => (options.client ?? client).get<GetOutlineConnectionStatusResponses, GetOutlineConnectionStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/outline/status',
+    ...options
+});
+
+/**
+ * Trigger the full Outline reconcile for this workspace (async, 202)
+ *
+ * Runs off the request thread. Always answers 202 with the connection status resource in the Location header; a duplicate trigger while a reconcile is still running starts nothing new and returns the same 202 pointing at the same monitor.
+ */
+export const syncOutlineConnection = <ThrowOnError extends boolean = false>(options: Options<SyncOutlineConnectionData, ThrowOnError>) => (options.client ?? client).post<SyncOutlineConnectionResponses, SyncOutlineConnectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/outline/sync',
+    ...options
+});
+
+/**
+ * Live state of the API token behind this workspace's Outline connection
+ *
+ * Probes Outline directly. Reports whether the token is still accepted and, when the token may list its own key, its name, expiry and last use. Outline cannot rotate a key from a key, so an expiring token is renewed in Outline and re-entered here.
+ */
+export const getOutlineTokenStatus = <ThrowOnError extends boolean = false>(options: Options<GetOutlineTokenStatusData, ThrowOnError>) => (options.client ?? client).get<GetOutlineTokenStatusResponses, GetOutlineTokenStatusErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/outline/token',
+    ...options
+});
+
+/**
  * Post a test message to verify the Slack connection
  *
  * Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
@@ -593,7 +624,7 @@ export const audit = <ThrowOnError extends boolean = false>(options: Options<Aud
  * <code>PENDING</code> is internal to the OAuth handshake and rejected as a bad request; illegal
  * transitions surface as 400 via the state machine.
  */
-export const updateStatus1 = <ThrowOnError extends boolean = false>(options: Options<UpdateStatus1Data, ThrowOnError>) => (options.client ?? client).patch<UpdateStatus1Responses, unknown, ThrowOnError>({
+export const updateConnectionStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateConnectionStatusData, ThrowOnError>) => (options.client ?? client).patch<UpdateConnectionStatusResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/{id}/status',
     ...options,
@@ -774,6 +805,72 @@ export const vote = <ThrowOnError extends boolean = false>(options: Options<Vote
 export const updateNotifications = <ThrowOnError extends boolean = false>(options: Options<UpdateNotificationsData, ThrowOnError>) => (options.client ?? client).patch<UpdateNotificationsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/notifications',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List the workspace's mirrored Outline collections with their sync state
+ */
+export const listOutlineCollections = <ThrowOnError extends boolean = false>(options: Options<ListOutlineCollectionsData, ThrowOnError>) => (options.client ?? client).get<ListOutlineCollectionsResponses, ListOutlineCollectionsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/outline/collections',
+    ...options
+});
+
+/**
+ * Register an Outline collection for mirroring (lands ENABLED + PENDING; idempotent on the id)
+ */
+export const registerOutlineCollection = <ThrowOnError extends boolean = false>(options: Options<RegisterOutlineCollectionData, ThrowOnError>) => (options.client ?? client).post<RegisterOutlineCollectionResponses, RegisterOutlineCollectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/outline/collections',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List the Outline collections available to mirror (live proxy; doubles as connectivity probe)
+ *
+ * Proxies Outline's collections.list with the stored token under a bounded interactive page budget. Served with Cache-Control: no-store — the live upstream view must not be cached.
+ */
+export const listOutlineCollectionCandidates = <ThrowOnError extends boolean = false>(options: Options<ListOutlineCollectionCandidatesData, ThrowOnError>) => (options.client ?? client).get<ListOutlineCollectionCandidatesResponses, ListOutlineCollectionCandidatesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/outline/collections/candidates',
+    ...options
+});
+
+/**
+ * Remove a collection from the mirror and erase its mirrored documents (terminal)
+ */
+export const deleteOutlineCollection = <ThrowOnError extends boolean = false>(options: Options<DeleteOutlineCollectionData, ThrowOnError>) => (options.client ?? client).delete<DeleteOutlineCollectionResponses, DeleteOutlineCollectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}',
+    ...options
+});
+
+/**
+ * One mirrored Outline collection with its sync state and live document count
+ */
+export const getOutlineCollection = <ThrowOnError extends boolean = false>(options: Options<GetOutlineCollectionData, ThrowOnError>) => (options.client ?? client).get<GetOutlineCollectionResponses, GetOutlineCollectionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}',
+    ...options
+});
+
+/**
+ * Transition a mirrored collection to a target mirror state (pause / resume)
+ *
+ * Resuming (PAUSED → ENABLED) resets the sync status to PENDING and kicks a targeted sync; requesting the current state is an idempotent no-op.
+ */
+export const updateOutlineCollectionState = <ThrowOnError extends boolean = false>(options: Options<UpdateOutlineCollectionStateData, ThrowOnError>) => (options.client ?? client).patch<UpdateOutlineCollectionStateResponses, UpdateOutlineCollectionStateErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

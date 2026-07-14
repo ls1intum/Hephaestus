@@ -1,16 +1,19 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,15 +31,18 @@ public class ConnectionService {
     private final ConnectionRepository connectionRepository;
     private final ConnectionAuditRepository auditRepository;
     private final CredentialBundleConverter credentialConverter;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ConnectionService(
         ConnectionRepository connectionRepository,
         ConnectionAuditRepository auditRepository,
-        CredentialBundleConverter credentialConverter
+        CredentialBundleConverter credentialConverter,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -46,6 +52,15 @@ public class ConnectionService {
             kind,
             IntegrationState.ACTIVE
         );
+    }
+
+    /**
+     * Ids of every workspace with an ACTIVE Connection of the given kind — the fan-out a periodic sync
+     * scheduler iterates so a freshly connected workspace is picked up even before it has mirrored any data.
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findWorkspaceIdsWithActiveConnection(IntegrationKind kind) {
+        return connectionRepository.findWorkspaceIdsByKindAndState(kind, IntegrationState.ACTIVE);
     }
 
     /**
@@ -101,6 +116,59 @@ public class ConnectionService {
             .map(c -> (ConnectionConfig.SlackConfig) c);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<ConnectionConfig.OutlineConfig> findActiveOutlineConfig(long workspaceId) {
+        return findActive(workspaceId, IntegrationKind.OUTLINE)
+            .map(Connection::getConfig)
+            .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
+            .map(c -> (ConnectionConfig.OutlineConfig) c);
+    }
+
+    /**
+     * Resolves the ACTIVE Outline Connection that registered the given change-notification
+     * subscription id, returning its workspace and stored signing secret. The subscription id
+     * arrives in an inbound webhook body as an <em>untrusted routing key</em> — it only selects
+     * which stored secret to verify against, so a forged id simply matches nothing. Empty when no
+     * ACTIVE Outline connection carries that subscription (or it has no stored secret).
+     *
+     * <p>Reached from {@code OutlineWebhookSecretSource#getSecret} BEFORE the HMAC comparison, on a
+     * route the auth rate limiter exempts — so it must be a single indexed probe, never a scan over
+     * the connected fleet. {@link ConnectionRepository#findOutlineSubscriptionsBySubscriptionId}
+     * supplies exactly that.
+     *
+     * <p>Fail-closed on ambiguity: a subscription id is globally unique at Outline, so more than one
+     * ACTIVE match means corrupt data. We reject the delivery rather than pick a row — guessing would
+     * let a hostile/duplicated row decide which workspace's secret verifies a delivery.
+     */
+    @Transactional(readOnly = true)
+    public Optional<OutlineSubscription> findOutlineSubscription(@Nullable String subscriptionId) {
+        if (subscriptionId == null || subscriptionId.isBlank()) {
+            return Optional.empty();
+        }
+        List<ConnectionRepository.OutlineSubscriptionProjection> matches =
+            connectionRepository.findOutlineSubscriptionsBySubscriptionId(subscriptionId);
+        if (matches.isEmpty()) {
+            return Optional.empty();
+        }
+        if (matches.size() > 1) {
+            // Never log the (attacker-supplied) subscription id itself.
+            log.error(
+                "Outline webhook subscription id matches {} ACTIVE connections — rejecting delivery; out-of-band fix required",
+                matches.size()
+            );
+            return Optional.empty();
+        }
+        ConnectionRepository.OutlineSubscriptionProjection match = matches.getFirst();
+        String secret = match.getSigningSecret();
+        if (secret == null || secret.isBlank() || match.getWorkspaceId() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new OutlineSubscription(match.getWorkspaceId(), secret));
+    }
+
+    /** The workspace a change-notification subscription belongs to and its signing secret. */
+    public record OutlineSubscription(long workspaceId, String signingSecret) {}
+
     /**
      * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,
      * if any. Tampering/cross-row substitution surfaces as {@code EncryptionException}.
@@ -108,6 +176,27 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return findActive(workspaceId, kind)
+            .flatMap(c -> c.credentials(credentialConverter))
+            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
+    }
+
+    /**
+     * The Connection by id within its workspace, regardless of state. Deactivation-time cleanup
+     * (e.g. tearing down a vendor webhook) runs after the row left ACTIVE, so {@link #findActive}
+     * can no longer resolve it.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Connection> findInWorkspace(long workspaceId, long connectionId) {
+        return connectionRepository.findByIdAndWorkspaceId(connectionId, workspaceId);
+    }
+
+    /**
+     * Decrypts the stored {@link BearerToken} of one Connection regardless of state. Empty once
+     * credentials were purged (the UNINSTALLED transition) — SUSPENDED rows still resolve.
+     */
+    @Transactional(readOnly = true)
+    public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
+        return findInWorkspace(workspaceId, connectionId)
             .flatMap(c -> c.credentials(credentialConverter))
             .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
@@ -173,8 +262,7 @@ public class ConnectionService {
     ) {
         String instanceKey = Long.toString(installationId);
 
-        // Retire any non-matching SCM-side row before introducing the new instance_key
-        // (invariant: one ACTIVE GitHub Connection per workspace).
+        // Invariant: one ACTIVE GitHub Connection per workspace.
         for (Connection existing : connectionRepository.findByWorkspaceIdAndState(
             workspace.getId(),
             IntegrationState.ACTIVE
@@ -300,7 +388,7 @@ public class ConnectionService {
             log.debug("Connection {} already in state {}, no-op", connection.getId(), req.next());
             return connection;
         }
-        if (!current.canTransitionTo(req.next()) && !isSlackOAuthReconnect(connection, current, req)) {
+        if (!current.canTransitionTo(req.next()) && !isGuardedReconnect(connection, current, req)) {
             throw new IllegalStateException(
                 "Illegal transition for connection " + connection.getId() + ": " + current + " → " + req.next()
             );
@@ -333,23 +421,51 @@ public class ConnectionService {
             connection.setCredentialsAlg(null);
             log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
         }
-        return connectionRepository.save(connection);
+        Connection saved = connectionRepository.save(connection);
+        publishLifecycleEvent(saved, current, req.next());
+        return saved;
     }
 
-    private static boolean isSlackOAuthReconnect(
+    /**
+     * Signal a genuine ACTIVE-boundary crossing to vendor adapters (AFTER_COMMIT listeners).
+     * Fires inside the transition transaction so a rollback also drops the event; the
+     * same-state and duplicate-correlation early returns above keep replays silent.
+     */
+    private void publishLifecycleEvent(Connection connection, IntegrationState previous, IntegrationState next) {
+        long workspaceId = connection.getWorkspace().getId();
+        if (next == IntegrationState.ACTIVE) {
+            eventPublisher.publishEvent(
+                new ConnectionLifecycleEvent.Activated(connection.getId(), workspaceId, connection.getKind())
+            );
+        } else if (previous == IntegrationState.ACTIVE) {
+            eventPublisher.publishEvent(
+                new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind())
+            );
+        }
+    }
+
+    /**
+     * Guarded revival of a terminal UNINSTALLED row — the kind-specific reconnect flows the
+     * {@link IntegrationState} javadoc reserves. Two doors only: a completed Slack OAuth round-trip,
+     * and an admin-driven inline re-connect ({@code INITIATE}) whose strategy just re-validated
+     * fresh credentials against the vendor. Both preserve the vendor natural key
+     * {@code (workspace, kind, instance_key)} instead of colliding with the unique constraint.
+     */
+    private static boolean isGuardedReconnect(
         Connection connection,
         IntegrationState current,
         TransitionRequest request
     ) {
-        return (
-            connection.getKind() == IntegrationKind.SLACK &&
-            current == IntegrationState.UNINSTALLED &&
-            request.next() == IntegrationState.ACTIVE &&
-            "OAUTH_COMPLETE".equals(request.eventType())
-        );
+        if (current != IntegrationState.UNINSTALLED || request.next() != IntegrationState.ACTIVE) {
+            return false;
+        }
+        if (connection.getKind() == IntegrationKind.SLACK && "OAUTH_COMPLETE".equals(request.eventType())) {
+            return true;
+        }
+        return "INITIATE".equals(request.eventType());
     }
 
-    /** Parameter object for {@link #transition} — collapses 6 params to one record. */
+    /** Parameter object for {@link #transition}. */
     public record TransitionRequest(
         IntegrationState next,
         String eventType,

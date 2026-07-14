@@ -140,6 +140,7 @@ public class SecurityConfig {
                 "/webhooks/gitlab",
                 "/webhooks/slack",
                 "/webhooks/slack/interactivity",
+                "/webhooks/outline",
                 "/oauth/callback/**"
             )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

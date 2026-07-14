@@ -85,10 +85,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(areaService, times(12)).createArea(any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
-        verify(practiceService, times(35)).createPractice(any(), practiceCaptor.capture());
-        verify(areaService, times(35)).bindPractice(any(), any(), any());
+        verify(practiceService, times(37)).createPractice(any(), practiceCaptor.capture());
+        verify(areaService, times(37)).bindPractice(any(), any(), any());
 
-        // Focus breakdown: 6 issue-focused, 3 conversation-focused (the communication area), the rest PR-focused.
+        // Focus breakdown: 7 issue-focused, 3 conversation-focused (the communication area), the rest PR-focused.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::artifactType).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST, WorkArtifact.CONVERSATION_THREAD);
         assertThat(
@@ -96,7 +96,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
                 .stream()
                 .filter(f -> f == WorkArtifact.ISSUE)
                 .count()
-        ).isEqualTo(6);
+        ).isEqualTo(7);
         assertThat(
             foci
                 .stream()
@@ -149,8 +149,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         // No area is re-created (all present), but every absent practice is still seeded and bound.
         verify(areaService, never()).createArea(any(), any(), any());
-        verify(practiceService, times(35)).createPractice(any(), any());
-        verify(areaService, times(35)).bindPractice(any(), any(), any());
+        verify(practiceService, times(37)).createPractice(any(), any());
+        verify(areaService, times(37)).bindPractice(any(), any(), any());
     }
 
     @Test
@@ -167,14 +167,14 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         // Never re-create an existing practice, but bind each unbound one to its catalog area.
         verify(practiceService, never()).createPractice(any(), any());
-        verify(areaService, times(35)).bindPractice(any(), any(), any());
+        verify(areaService, times(37)).bindPractice(any(), any(), any());
     }
 
     @Test
     void perRowFailure_skipsTheBadRowButSeedsTheRest() {
         // Per-ROW resilience: one practice that fails (e.g. a malformed artifactType making createPractice
-        // throw) must skip ONLY that row, not abort the remaining catalog. With 35 practices, a single
-        // throwing createPractice still leaves 34 created and bound.
+        // throw) must skip ONLY that row, not abort the remaining catalog. With 37 practices, a single
+        // throwing createPractice still leaves 36 created and bound.
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
         when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
@@ -185,9 +185,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
 
-        // All 35 are attempted; the 34 that did not throw are bound (the failed row never reaches bindPractice).
-        verify(practiceService, times(35)).createPractice(any(), any());
-        verify(areaService, times(34)).bindPractice(any(), any(), any());
+        // All 37 are attempted; the 36 that did not throw are bound (the failed row never reaches bindPractice).
+        verify(practiceService, times(37)).createPractice(any(), any());
+        verify(areaService, times(36)).bindPractice(any(), any(), any());
     }
 
     @Test

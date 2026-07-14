@@ -19,40 +19,24 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Cross-context, best-effort provider that materialises the <em>general (conversation-tab) review
- * discussion</em> of a merge request into {@code inputs/context/general_comments.json}.
+ * Best-effort provider that materialises the <em>general (conversation-tab) review discussion</em>
+ * of a merge request into {@code inputs/context/general_comments.json}.
  *
- * <p><b>The gap this closes.</b> {@code comments.json} (written by {@link PullRequestContentSource})
- * is built from {@code PullRequestReviewComment} only — a row that, by construction, carries a diff
- * {@code path} + integer {@code line}. It therefore models ONLY position-anchored inline notes.
- * GitLab routes every <em>position-less</em> note (a conversation-tab comment, a non-anchored
- * suggestion, a design back-and-forth) to {@code IssueComment} storage
- * (see {@code GitLabDiscussionSyncService}: discussions whose notes have {@code position == null} →
- * {@code IssueComment}). No PR-scoped provider ever surfaced those, so the reviewer-craft practices
- * (reviews-substantively, leaves-useful, engaging, reviews-respectfully) saw an empty inline thread
- * and either abstained or — worse — fired a confident "rubber-stamp" NEGATIVE on an APPROVED MR
- * whose real review lived entirely in the conversation tab.
+ * <p>{@code comments.json} ({@link PullRequestContentSource}) models only position-anchored inline
+ * notes; GitLab routes every <em>position-less</em> note (conversation-tab comment, non-anchored
+ * suggestion) to {@code IssueComment} storage. Without those, the reviewer-craft practices see an
+ * empty inline thread and can fire a false "rubber-stamp" NEGATIVE on an MR whose real review lives
+ * in the conversation tab. A {@code PullRequest} IS an {@code Issue}, so its conversation notes are
+ * {@code IssueComment} rows keyed by the same id. Output is a judgement-free fact sheet:
+ * {@code {"comments":[{"author","body","createdAt"}],"count"}}.
  *
- * <p>This provider reads the MR's general comments by issue/PR id (a {@code PullRequest} IS an
- * {@code Issue}, so its conversation notes are {@code IssueComment} rows keyed by the same id) and
- * emits a compact, judgement-free fact sheet (telescope, not cage):
+ * <p><b>Self-exclusion.</b> Hephaestus' own MR comments carry the {@code <!-- hephaestus:... -->}
+ * marker and are dropped so the agent never assesses its own output as reviewer input; author/bot
+ * exclusion stays in the criteria.
  *
- * <pre>
- * {
- *   "comments": [{"author":..,"body":..,"createdAt":..}],
- *   "count": N
- * }
- * </pre>
- *
- * <p><b>Self-exclusion.</b> Hephaestus posts its own practice-review summary as an MR comment, which
- * also lands in {@code IssueComment}. Those carry the {@code <!-- hephaestus:practice-review:... -->}
- * marker; this provider drops them so the agent never assesses its own output as reviewer input. The
- * author/bot exclusion (author == the MR author, etc.) stays in the criteria, as it already does for
- * {@code comments.json}.
- *
- * <p>Best-effort ({@link #required()} == {@code false}): a missing PR id, absent rows, or any failure
- * degrades to writing nothing and NEVER aborts the job. When there is no general comment at all the
- * file is omitted, so the reviewer-craft practices keep their existing empty-context behaviour.
+ * <p>Best-effort ({@link #required()} == {@code false}): a missing PR id, absent rows, or any
+ * failure degrades to writing nothing and never aborts the job, preserving the practices'
+ * empty-context behaviour.
  */
 @Component
 @Order(210)
@@ -91,7 +75,6 @@ public class GeneralReviewCommentContentSource implements ContentSource {
         return request instanceof ContextRequest.PracticeReviewRequest;
     }
 
-    /** Cross-context enrichment: never abort the job if the general discussion cannot be resolved. */
     @Override
     public boolean required() {
         return false;
@@ -118,11 +101,9 @@ public class GeneralReviewCommentContentSource implements ContentSource {
                 return;
             }
 
-            // Collect the eligible (non-blank, non-bot) comments first, then — when over the cap — keep the
-            // MOST RECENT MAX_COMMENTS (tail-slice, mirroring PullRequestContentSource#buildReviewComments).
-            // The query is ORDER BY createdAt ASC (oldest first); keeping the head would drop the LATEST
-            // approval/resolution on a chatty MR and manufacture a false "rubber-stamp" verdict — the exact
-            // failure this provider exists to prevent.
+            // When over the cap keep the MOST RECENT MAX_COMMENTS: the query is oldest-first, and
+            // keeping the head would drop the latest approval/resolution on a chatty MR —
+            // manufacturing the exact false "rubber-stamp" verdict this provider exists to prevent.
             List<IssueComment> eligible = new ArrayList<>();
             int skippedSelf = 0;
             for (IssueComment c : comments) {
@@ -141,8 +122,7 @@ public class GeneralReviewCommentContentSource implements ContentSource {
             }
 
             if (eligible.isEmpty()) {
-                // Only the bot's own comment(s) were present — emit nothing so the reviewer-craft
-                // practices keep their empty-context abstention rather than seeing a hollow file.
+                // Only the bot's own comment(s) were present — emit nothing rather than a hollow file.
                 return;
             }
 
@@ -164,7 +144,6 @@ public class GeneralReviewCommentContentSource implements ContentSource {
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
             log.info("GeneralReviewComments: prId={} emitted={} skippedSelf={}", pullRequestId, emitted, skippedSelf);
         } catch (Exception e) {
-            // Best-effort: cross-context enrichment must never fail the job.
             log.warn(
                 "GeneralReviewCommentContentSource failed, continuing without general discussion: {}",
                 e.getMessage()

@@ -1,7 +1,8 @@
 import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
-import { GithubIcon, GitlabIcon, SlackIcon } from "@/components/icons/brand";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -15,18 +16,42 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
+import { getProviderLabel } from "@/lib/provider";
 
 const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,
 	SLACK: SlackIcon,
+	OUTLINE: OutlineIcon,
 };
 
-const PROVIDER_LABELS: Record<string, string> = {
-	GITHUB: "GitHub",
-	GITLAB: "GitLab",
-	SLACK: "Slack",
+/** Providers that can only be *linked* from Settings — they are never a sign-in method. */
+const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
+
+/**
+ * Why each link-only account is worth connecting. Both are linked, never signed in with, so the copy
+ * has to earn the click on its own — the account it links to is not a way into Hephaestus.
+ */
+const LINK_ONLY_RATIONALE: Record<string, string> = {
+	SLACK: "Connect Slack to manage your channel-message preference and reach the mentor in a DM.",
+	OUTLINE: "Connect Outline so the documents you write there are recognised as your work.",
 };
 
 /**
@@ -36,12 +61,6 @@ const PROVIDER_LABELS: Record<string, string> = {
 function getProviderIcon(providerType?: string): LucideIcon {
 	if (!providerType) return LinkIcon;
 	return PROVIDER_ICONS[providerType.toUpperCase()] ?? LinkIcon;
-}
-
-/** Human-friendly provider name for prose ("GITHUB" → "GitHub"). */
-function friendlyProvider(providerType?: string): string {
-	if (!providerType) return "that provider";
-	return PROVIDER_LABELS[providerType.toUpperCase()] ?? providerType;
 }
 
 function formatLastLogin(lastLoginAt?: Date): string | undefined {
@@ -75,6 +94,10 @@ export interface LinkedAccountsSectionProps {
 	unlinkingId?: number | null;
 	isLoading?: boolean;
 	isError?: boolean;
+	/** The thrown query error behind `isError`. */
+	error?: unknown;
+	/** Refetch the identities/providers after a failure. */
+	onRetry?: () => void;
 }
 
 /**
@@ -92,6 +115,8 @@ export function LinkedAccountsSection({
 	unlinkingId = null,
 	isLoading = false,
 	isError = false,
+	error,
+	onRetry,
 }: LinkedAccountsSectionProps) {
 	const linkedProviderTypes = new Set(
 		identities
@@ -99,12 +124,27 @@ export function LinkedAccountsSection({
 			.filter((type): type is string => Boolean(type)),
 	);
 
-	// Providers the account can still link: not already represented among the
-	// linked identities (compared by provider type).
+	// Providers the account can still link: not already represented among the linked identities
+	// (compared by provider type). The synthetic DEV sign-in is not a federated identity — it is never
+	// offered as something to "connect".
 	const linkableProviders = providers.filter((provider) => {
 		const type = provider.providerType?.toUpperCase();
+		if (type === "DEV") return false;
 		return !type || !linkedProviderTypes.has(type);
 	});
+
+	// Slack and Outline link an identity but are never a way in, so they cannot be offered among the
+	// sign-in providers — they get their own explained CTA instead. An instance can run SEVERAL of
+	// either (Outline is unique on (type, base_url), one row per deployment), so this is a list and
+	// never a single `find(...)` match; each unconnected one is named by its display name.
+	const linkOnlyProviders = linkableProviders.filter(
+		(provider) =>
+			LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
+			provider.registrationId,
+	);
+	const signInProviders = linkableProviders.filter(
+		(provider) => !LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
+	);
 
 	// Lockout guard: the account's only remaining sign-in method cannot be removed.
 	const isOnlyIdentity = identities.length <= 1;
@@ -136,8 +176,9 @@ export function LinkedAccountsSection({
 					Connected Accounts
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					The identity providers you can sign in to Hephaestus with. Connect another provider, or
-					disconnect ones you no longer use.
+					The identity providers you can sign in to Hephaestus with, plus content tools you connect
+					so your work is attributed to you. Connect another provider, or disconnect ones you no
+					longer use.
 				</p>
 			</div>
 
@@ -145,66 +186,108 @@ export function LinkedAccountsSection({
 				<div className="flex justify-center py-6">
 					<Spinner aria-label="Loading connected accounts" />
 				</div>
+			) : isError ? (
+				<QueryErrorAlert
+					error={error}
+					title="Could not load connected accounts"
+					onRetry={onRetry}
+				/>
 			) : (
 				<>
-					{isError && (
-						<p className="text-sm text-destructive" role="alert">
-							Failed to load connected accounts. Please try refreshing the page.
-						</p>
-					)}
+					{identities.length === 0 ? (
+						<Empty className="border">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<LinkIcon aria-hidden="true" />
+								</EmptyMedia>
+								<EmptyTitle>No connected accounts yet</EmptyTitle>
+								<EmptyDescription>
+									Connect a provider below to sign in with it or attribute your work to this
+									account.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					) : (
+						<ItemGroup>
+							{identities.map((identity) => {
+								const identityId = identity.id;
+								const Icon = getProviderIcon(identity.providerType);
+								const name =
+									identity.displayName || identity.username || identity.subject || "Account";
+								const lastLogin = formatLastLogin(identity.lastLoginAt);
 
-					{!isError && identities.length === 0 && (
-						<p className="text-sm text-muted-foreground">No connected accounts yet.</p>
-					)}
-
-					<div className="space-y-3">
-						{identities.map((identity) => {
-							const identityId = identity.id;
-							const Icon = getProviderIcon(identity.providerType);
-							const name =
-								identity.displayName || identity.username || identity.subject || "Account";
-							const lastLogin = formatLastLogin(identity.lastLoginAt);
-
-							return (
-								<div
-									key={identityId ?? `${identity.providerType}:${identity.subject}`}
-									className="flex items-center justify-between gap-4 rounded-lg border p-4"
-								>
-									<div className="flex items-center gap-3 min-w-0">
-										<Icon className="size-5 shrink-0" aria-hidden="true" />
-										<div className="min-w-0">
-											<div className="flex items-center gap-2">
-												<span className="text-sm font-medium truncate">{name}</span>
+								return (
+									<Item
+										key={identityId ?? `${identity.providerType}:${identity.subject}`}
+										variant="outline"
+										role="listitem"
+									>
+										<ItemMedia variant="icon">
+											<Icon aria-hidden="true" />
+										</ItemMedia>
+										<ItemContent>
+											<ItemTitle>
+												<span className="truncate">{name}</span>
 												{identity.providerType && (
 													<Badge variant="secondary" className="text-xs">
-														{identity.providerType}
+														{getProviderLabel(identity.providerType)}
 													</Badge>
 												)}
-											</div>
-											{lastLogin && (
-												<p className="text-xs text-muted-foreground truncate">
-													Last sign-in {lastLogin}
-												</p>
-											)}
-										</div>
-									</div>
+											</ItemTitle>
+											{lastLogin && <ItemDescription>Last sign-in {lastLogin}</ItemDescription>}
+										</ItemContent>
+										{identityId != null && (
+											<ItemActions>
+												<UnlinkControl
+													identityId={identityId}
+													name={name}
+													providerType={identity.providerType}
+													isOnlyIdentity={isOnlyIdentity}
+													isUnlinking={unlinkingId === identityId}
+													onConfirm={() => onUnlink(identityId)}
+												/>
+											</ItemActions>
+										)}
+									</Item>
+								);
+							})}
+						</ItemGroup>
+					)}
 
-									{identityId != null && (
-										<UnlinkControl
-											identityId={identityId}
-											name={name}
-											providerType={identity.providerType}
-											isOnlyIdentity={isOnlyIdentity}
-											isUnlinking={unlinkingId === identityId}
-											onConfirm={() => onUnlink(identityId)}
-										/>
-									)}
-								</div>
-							);
-						})}
-					</div>
+					{linkOnlyProviders.length > 0 && (
+						<ItemGroup>
+							{linkOnlyProviders.map((provider) => {
+								const type = provider.providerType?.toUpperCase() ?? "";
+								const Icon = getProviderIcon(type);
+								const label = provider.displayName || getProviderLabel(type, "this account");
+								const registrationId = provider.registrationId as string;
+								return (
+									<Item key={registrationId} variant="outline" role="listitem">
+										<ItemMedia variant="icon">
+											<Icon aria-hidden="true" />
+										</ItemMedia>
+										<ItemContent>
+											<ItemTitle>{label} is not connected</ItemTitle>
+											<ItemDescription>{LINK_ONLY_RATIONALE[type]}</ItemDescription>
+										</ItemContent>
+										<ItemActions>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => onLink(registrationId)}
+												aria-label={`Connect ${label}`}
+											>
+												<Icon className="size-3.5 mr-1.5" aria-hidden="true" />
+												Connect
+											</Button>
+										</ItemActions>
+									</Item>
+								);
+							})}
+						</ItemGroup>
+					)}
 
-					{linkableProviders.length > 0 && (
+					{signInProviders.length > 0 && (
 						<div className="space-y-2 pt-2">
 							<h3 className="text-sm font-medium">Connect another account</h3>
 							<p className="text-xs text-muted-foreground">
@@ -212,7 +295,7 @@ export function LinkedAccountsSection({
 								is then linked to this account.
 							</p>
 							<div className="flex flex-wrap gap-2 pt-1">
-								{linkableProviders.map((provider) => {
+								{signInProviders.map((provider) => {
 									const Icon = getProviderIcon(provider.providerType);
 									const label = provider.displayName || provider.registrationId || "provider";
 									return (
@@ -235,7 +318,7 @@ export function LinkedAccountsSection({
 
 					{linkableProviders.length === 0 && identities.length > 0 && (
 						<p className="pt-2 text-xs text-muted-foreground">
-							You've connected all available sign-in providers.
+							You've connected all available providers.
 						</p>
 					)}
 				</>
@@ -281,6 +364,10 @@ function UnlinkControl({
 		);
 	}
 
+	const provider = getProviderLabel(providerType);
+	// Slack and Outline are link-only — they are never a sign-in method, so the consequence copy must
+	// not claim the user is losing one.
+	const isLinkOnly = LINK_ONLY_PROVIDER_TYPES.has(providerType?.toUpperCase() ?? "");
 	return (
 		<AlertDialog>
 			<AlertDialogTrigger
@@ -306,9 +393,9 @@ function UnlinkControl({
 				<AlertDialogHeader>
 					<AlertDialogTitle>Disconnect {name}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						You'll no longer be able to sign in to Hephaestus with this{" "}
-						{friendlyProvider(providerType)} account. You can reconnect it anytime by signing in
-						with {friendlyProvider(providerType)} again.
+						{isLinkOnly
+							? `Hephaestus will stop attributing your ${provider} activity to this account. You can reconnect ${provider} anytime from Settings.`
+							: `You'll no longer be able to sign in to Hephaestus with this ${provider} account. You can reconnect it anytime by signing in with ${provider} again.`}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

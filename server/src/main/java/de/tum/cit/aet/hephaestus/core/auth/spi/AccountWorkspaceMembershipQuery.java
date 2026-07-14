@@ -12,7 +12,7 @@ import java.util.Set;
  * resolved login set; the {@code workspace} module resolves {@code login → User → membership}
  * internally. This keeps the boundary clean: {@code core.auth} never imports workspace domain
  * types, and {@code workspace} never imports auth domain types — the contract lives here and is
- * implemented in {@code workspace} (dependency inversion, same shape as {@link AccountRoleQuery}).
+ * implemented in {@code workspace}.
  */
 public interface AccountWorkspaceMembershipQuery {
     /**
@@ -25,7 +25,16 @@ public interface AccountWorkspaceMembershipQuery {
 
     /**
      * A single workspace membership, flattened for export. Contains no SCM-user PII beyond what
-     * the principal already owns (the workspace they belong to + their role).
+     * the principal already owns (the workspace they belong to + their role + the id of their own
+     * member row). {@code memberId} is the SCM {@code User} id the membership hangs off — the handle
+     * integration resolvers need to attribute provider-native activity to a workspace member without
+     * reaching into the SCM schema themselves.
      */
-    record WorkspaceMembershipView(Long workspaceId, String workspaceSlug, String workspaceName, String role) {}
+    record WorkspaceMembershipView(
+        Long workspaceId,
+        String workspaceSlug,
+        String workspaceName,
+        String role,
+        Long memberId
+    ) {}
 }

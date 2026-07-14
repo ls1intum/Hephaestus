@@ -20,8 +20,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 
 /**
- * Wires the JWT issuance + verification primitives for our own ES256 cookie-session JWTs
- * (replaces the former Keycloak setup; ADR 0017).
+ * Wires the JWT issuance + verification primitives for our own ES256 cookie-session JWTs (ADR 0017).
  *
  * <h2>Boot order</h2>
  * {@link #seedKeysOnStartup} runs in {@code @PostConstruct} after the JPA EntityManagerFactory

@@ -77,6 +77,9 @@ public class PiRuntimeFactory {
             SandboxLayout.RUNNER_SCRIPT_FILENAME,
             loadClasspathResource(spec.runnerProfile().runnerScript())
         );
+        for (String sidecar : spec.runnerProfile().sidecarScripts()) {
+            inputFiles.put(sidecar, loadClasspathResource(sidecar));
+        }
         inputFiles.putAll(spec.extraInputs());
 
         long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
@@ -207,10 +210,7 @@ public class PiRuntimeFactory {
      */
     static boolean useHephaestusProvider(PiPlanSpec spec) {
         if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
-        // OpenAI rides the proxy via Pi's native openai-completions provider (universal /chat/completions);
-        // Anthropic keeps its Messages API.
         if (spec.credentialMode() == CredentialMode.PROXY) return spec.provider() == LlmProvider.OPENAI;
-        // Direct (operator/worker) mode: custom provider only when a gateway base URL is set.
         return spec.baseUrl() != null && !spec.baseUrl().isBlank();
     }
 

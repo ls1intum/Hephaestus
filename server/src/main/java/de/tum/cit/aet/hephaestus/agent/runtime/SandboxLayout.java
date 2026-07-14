@@ -27,10 +27,8 @@ public final class SandboxLayout {
 
     /**
      * Workspace-relative prefix for per-connector source materialisations (ADR 0020): the SCM checkout
-     * mounts at {@code inputs/sources/scm/repo}, a future Slack/Outline export at {@code inputs/sources/slack/...}
-     * — each connector owns one namespace, none is privileged. Connector-agnostic noun ("source") matching
-     * the {@code ContentSource#originId()} SPI and the host fabric {@code sources/} region; no connector's
-     * native vocabulary (git "worktree", Slack "export") leaks into the shared wire contract.
+     * mounts at {@code inputs/sources/scm/repo}, a future Slack/Outline export at
+     * {@code inputs/sources/slack/...} — each connector owns one namespace, none is privileged.
      */
     public static final String SOURCES_PREFIX = INPUTS_PREFIX + "sources/";
 

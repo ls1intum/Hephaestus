@@ -99,7 +99,8 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                     1L,
                     "hephaestustest",
                     "Hephaestus",
-                    "MEMBER"
+                    "MEMBER",
+                    314L
                 )
             )
         );

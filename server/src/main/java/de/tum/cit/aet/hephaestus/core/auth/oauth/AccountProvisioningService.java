@@ -20,9 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Resolves (or just-in-time creates) the {@link Account} for a federated login, and
- * attaches {@link IdentityLink}s. Extracted from {@code HephaestusAuthSuccessHandler} so
- * the handler stays under the parameter-count limit and the provisioning logic is unit-
- * testable in isolation.
+ * attaches {@link IdentityLink}s.
  *
  * <p><strong>nOAuth defence:</strong> lookup is always {@code (provider, subject)} via
  * {@link IdentityLinkRepository#findActiveByProviderSubject}. Email is captured for
@@ -86,12 +84,17 @@ public class AccountProvisioningService {
         LoginProvider provider = requireLoginProvider(registrationId);
         long providerId = gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
         AuthIntentCookie.Intent.Mode mode = (intent != null) ? intent.mode() : AuthIntentCookie.Intent.Mode.LOGIN;
-        if (provider.getType() == LoginProvider.ProviderType.SLACK && mode != AuthIntentCookie.Intent.Mode.LINK) {
+        // Link-only providers (Slack, Outline) may only ATTACH an identity to an authenticated account —
+        // never act as a primary login. AuthBeginController rejects these at flow begin; this is the
+        // defence-in-depth re-check at the callback.
+        if (provider.getType().isLinkOnly() && mode != AuthIntentCookie.Intent.Mode.LINK) {
             throw new LinkOnlyProviderLoginException(registrationId);
         }
         String teamId = teamIdOf(principal);
-        if (provider.getType() == LoginProvider.ProviderType.SLACK && (teamId == null || teamId.isBlank())) {
-            throw new IllegalStateException("Slack identity is missing team_id");
+        // Both link-only providers are multi-tenant: a Slack U… / Outline user UUID is only unique within
+        // its team, so a null teamId would alias identities across tenants — fail closed.
+        if (provider.getType().isLinkOnly() && (teamId == null || teamId.isBlank())) {
+            throw new IllegalStateException(provider.getType() + " identity is missing team_id");
         }
 
         IdentityLink link = identityLinkRepository
@@ -117,7 +120,6 @@ public class AccountProvisioningService {
                 registrationId,
                 link.getAccount().getId()
             );
-            // Returning login / re-affirm of an already-linked identity: no NEW link is persisted.
             return new ProvisionResult(
                 promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal)),
                 false
@@ -140,7 +142,6 @@ public class AccountProvisioningService {
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
             log.info("auth.success: linked provider={} to existing accountId={}", registrationId, account.getId());
-            // The one genuine "identity attached to an existing account" outcome.
             return new ProvisionResult(account, true);
         }
 
@@ -283,8 +284,9 @@ public class AccountProvisioningService {
     /**
      * The multi-instance IdP tenant id, or {@code null} for single-tenant IdPs (GitHub/GitLab, which emit
      * no team claim). "Sign in with Slack" (OIDC) surfaces the workspace as the {@code https://slack.com/team_id}
-     * claim (flat) or a nested {@code team.id} — check both. Kept general: any future multi-tenant IdP that emits
-     * a {@code team_id}/{@code tenant_id} claim keys correctly without a special case.
+     * claim (flat) or a nested {@code team.id} — check both. Outline rides the flat {@code team_id} attribute
+     * ({@code OutlineAuthInfoUserService} flattens {@code data.team.id} onto it). Kept general: any future
+     * multi-tenant IdP that emits a {@code team_id}/{@code tenant_id} claim keys correctly without a special case.
      */
     private static String teamIdOf(OAuth2User principal) {
         String flat = stringAttr(principal, "https://slack.com/team_id", "team_id", "tenant_id", "tid");

@@ -286,7 +286,7 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Legacy single-method stop used when no {@code WorkerDrainCoordinator} owns the worker
+     * Single-method stop used when no {@code WorkerDrainCoordinator} owns the worker
      * lifecycle (e.g., non-worker monolith mode). Slim, drain-equivalent default — fixes the
      * latent bug where the previous {@code @PreDestroy} never awaited in-flight sandbox tasks.
      */

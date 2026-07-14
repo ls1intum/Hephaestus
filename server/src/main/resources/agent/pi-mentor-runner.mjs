@@ -106,6 +106,7 @@ const FETCH_CONTEXT_ALLOWED = new Set([
     "inputs/context/slack_conversations.json",
     "inputs/context/prepared_conversation_feedback.json",
     "inputs/context/current_thread_history.json",
+    "inputs/context/outline_docs.json",
 ]);
 // JSON-RPC error codes
 const ERR = Object.freeze({

@@ -9,10 +9,8 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * vendor branching.
  */
 public enum SyncCursorKind {
-    /** Issue sync cursor. */
     ISSUE,
-    /** Pull request / merge request sync cursor. */
+    /** Pull request / merge request. */
     PULL_REQUEST,
-    /** Discussion sync cursor. */
     DISCUSSION,
 }

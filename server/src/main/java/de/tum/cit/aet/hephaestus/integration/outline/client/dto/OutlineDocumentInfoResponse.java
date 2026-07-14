@@ -1,0 +1,31 @@
+package de.tum.cit.aet.hephaestus.integration.outline.client.dto;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.time.Instant;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Response of Outline's {@code documents.info}: one document's metadata, mirroring the
+ * {@link OutlineDocumentListResponse.Meta} fields. The webhook targeted-refresh path uses it to
+ * decide whether an event's document still exists and which collection it lives in.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record OutlineDocumentInfoResponse(@Nullable Data data) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Data(
+        @Nullable String id,
+        @Nullable String url,
+        @Nullable String title,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable String urlId,
+        @Nullable String parentDocumentId,
+        @Nullable String collectionId,
+        OutlineDocumentListResponse.@Nullable OutlineUser createdBy,
+        OutlineDocumentListResponse.@Nullable OutlineUser updatedBy,
+        @Nullable List<String> collaboratorIds,
+        /** When the document was archived upstream, or {@code null} when live. */
+        @Nullable Instant archivedAt
+    ) {}
+}

@@ -58,7 +58,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         GitProviderRegistry gitProviderRegistry = mock(GitProviderRegistry.class);
         verifiedEmailResolver = mock(VerifiedEmailResolver.class);
         accountJitCreator = mock(AccountJitCreator.class);
-        // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
         adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
         loginProviderRepository = mock(LoginProviderRepository.class);
         var githubProvider = new LoginProvider();
@@ -70,7 +69,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         lenient()
             .when(accountRepository.save(any()))
             .thenAnswer(inv -> inv.getArgument(0));
-        // Default happy-path: the JIT creator persists and returns the supplied account.
         lenient()
             .when(accountJitCreator.create(any(), any()))
             .thenAnswer(inv -> inv.getArgument(0));
@@ -112,6 +110,68 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void outlineLoginMode_rejectedBecauseOutlineIsLinkOnly() {
+        useOutlineProvider();
+
+        assertThatThrownBy(() ->
+            service.resolveOrProvision(
+                "outline",
+                "0aa1bb2c-user",
+                principal(),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+        ).isInstanceOf(LinkOnlyProviderLoginException.class);
+
+        verify(accountJitCreator, never()).create(any(), any());
+        verify(identityLinkRepository, never()).save(any());
+    }
+
+    @Test
+    void outlineLink_withoutTeamId_failsClosed() {
+        // An Outline user UUID is only unique within its team; a null team_id would alias identities
+        // across tenants of a shared instance — the guard must fail closed, exactly like Slack.
+        useOutlineProvider();
+
+        assertThatThrownBy(() ->
+            service.resolveOrProvision("outline", "0aa1bb2c-user", principal(), AuthIntentCookie.Intent.link(42L, null))
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("team_id");
+
+        verify(identityLinkRepository, never()).save(any());
+    }
+
+    @Test
+    void outlineLink_withFlatTeamId_bindsToCurrentAccountWithTeamKey() {
+        useOutlineProvider();
+        when(
+            identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("0aa1bb2c-user"), any())
+        ).thenReturn(Optional.empty());
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(accountWithId(42L)));
+        // The flat "team_id" attribute OutlineAuthInfoUserService emits (flattened from data.team.id).
+        OAuth2User outlinePrincipal = new DefaultOAuth2User(
+            List.of(new SimpleGrantedAuthority("ROLE_USER")),
+            Map.of("id", "0aa1bb2c-user", "name", "Ada", "team_id", "9ff8ee7d-team"),
+            "id"
+        );
+
+        var result = service.resolveOrProvision(
+            "outline",
+            "0aa1bb2c-user",
+            outlinePrincipal,
+            AuthIntentCookie.Intent.link(42L, null)
+        );
+
+        assertThat(result.account().getId()).isEqualTo(42L);
+        assertThat(result.identityLinked()).isTrue();
+        ArgumentCaptor<IdentityLink> saved = ArgumentCaptor.forClass(IdentityLink.class);
+        verify(identityLinkRepository).save(saved.capture());
+        assertThat(saved.getValue().getSubject()).isEqualTo("0aa1bb2c-user");
+        assertThat(saved.getValue().getTeamId()).isEqualTo("9ff8ee7d-team");
+        assertThat(saved.getValue().getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.MANUAL_LINK);
+    }
+
+    @Test
     void jitCreate_whenOnBootstrapAllowlist_promotesToAppAdmin() {
         when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any())).thenReturn(
             Optional.empty()
@@ -140,7 +200,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
             new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
         );
-        // adminBootstrapPolicy.shouldPromote defaults to false.
 
         var result = service.resolveOrProvision(
             "github",
@@ -166,6 +225,14 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         slackProvider.setType(LoginProvider.ProviderType.SLACK);
         slackProvider.setBaseUrl("https://slack.com");
         when(loginProviderRepository.findByRegistrationId("slack")).thenReturn(Optional.of(slackProvider));
+    }
+
+    private void useOutlineProvider() {
+        var outlineProvider = new de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider();
+        outlineProvider.setRegistrationId("outline");
+        outlineProvider.setType(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType.OUTLINE);
+        outlineProvider.setBaseUrl("https://wiki.example.com");
+        when(loginProviderRepository.findByRegistrationId("outline")).thenReturn(Optional.of(outlineProvider));
     }
 
     private static IdentityLink linkOn(Account account) {
@@ -237,7 +304,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             AuthIntentCookie.Intent.login(null, null)
         );
 
-        // Fail closed: return the concurrently-created winner, never a second orphan account.
         assertThat(result.account().getId()).isEqualTo(7L);
         assertThat(result.identityLinked()).isFalse();
         verify(accountRepository, never()).save(any());

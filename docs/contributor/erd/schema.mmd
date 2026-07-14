@@ -118,7 +118,7 @@ erDiagram
         VARCHAR(48) event_type "NOT NULL"
         VARCHAR(16) result "NOT NULL"
         VARCHAR(64) failure_reason
-        BIGINT git_provider_id FK
+        BIGINT provider_id FK
         BIGINT workspace_id FK
         BIGINT identity_link_id FK
         INET ip_inet
@@ -590,6 +590,66 @@ erDiagram
         BIGINT organization_id PK
         BIGINT user_id PK
         VARCHAR(32) role "NOT NULL"
+    }
+
+    OutlineCollection {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT connection_id FK,UK "NOT NULL"
+        VARCHAR(64) collection_id UK "NOT NULL"
+        VARCHAR(1024) name
+        VARCHAR(512) url_id
+        VARCHAR(32) color
+        VARCHAR(64) icon
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(16) sync_status "NOT NULL"
+        TIMESTAMPTZ documents_synced_at
+        VARCHAR(2048) last_sync_error
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+        INTEGER documents_upstream
+        INTEGER exports_skipped_for_budget
+        VARCHAR(2048) description
+        BIGINT version "NOT NULL"
+    }
+
+    OutlineDocument {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT connection_id FK,UK "NOT NULL"
+        VARCHAR(64) document_id UK "NOT NULL"
+        VARCHAR(64) collection_id "NOT NULL"
+        VARCHAR(512) collection_slug
+        VARCHAR(64) parent_document_id
+        VARCHAR(1024) title
+        VARCHAR(512) slug
+        TEXT body_markdown
+        VARCHAR(64) content_hash
+        TIMESTAMPTZ outline_updated_at
+        TIMESTAMPTZ deleted_at
+        TIMESTAMPTZ last_materialized_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+        VARCHAR(64) created_by_subject
+        VARCHAR(255) created_by_name
+        VARCHAR(64) updated_by_subject
+        VARCHAR(255) updated_by_name
+        TIMESTAMPTZ outline_created_at
+        JSONB collaborator_subjects
+        TIMESTAMPTZ body_evicted_at
+        TIMESTAMPTZ archived_at
+        BIGINT version "NOT NULL"
+    }
+
+    OutlineDocumentEvent {
+        BIGINT id PK
+        BIGINT workspace_id FK "NOT NULL"
+        BIGINT connection_id FK "NOT NULL"
+        VARCHAR(64) document_id "NOT NULL"
+        VARCHAR(64) event_name "NOT NULL"
+        VARCHAR(64) actor_subject
+        TIMESTAMPTZ occurred_at
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Practice {
@@ -1081,6 +1141,10 @@ erDiagram
     Repository ||--|| Milestone : has
     IdentityProvider ||--|| Milestone : references
     IdentityProvider ||--|| Organization : references
+    Workspace ||--|| OutlineCollection : has
+    Connection ||--|| OutlineCollection : has
+    Workspace ||--|| OutlineDocument : has
+    Connection ||--|| OutlineDocument : has
     Workspace ||--|| Practice : has
     Workspace ||--|| PracticeArea : has
     Practice ||--|| PracticeRevision : has
@@ -1156,6 +1220,8 @@ erDiagram
     Practice ||--o{ Observation : has
     User ||--o{ Observation : has
     PracticeRevision ||--o{ Observation : has
+    Workspace ||--o{ OutlineDocumentEvent : has
+    Connection ||--o{ OutlineDocumentEvent : has
     PracticeArea ||--o{ Practice : has
     User ||--o{ Project : created_by
     Issue ||--o{ ProjectItem : has

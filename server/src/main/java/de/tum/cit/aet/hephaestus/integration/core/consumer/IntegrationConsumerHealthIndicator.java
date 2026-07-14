@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import java.time.Instant;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.health.contributor.Health;
@@ -26,18 +25,15 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
     private final IntegrationConsumerStats stats;
     private final IntegrationMessageHandlerRegistry handlerRegistry;
     private final IntegrationMessageDispatcher dispatcher;
-    private final boolean flatStreamConsumerEnabled;
 
     public IntegrationConsumerHealthIndicator(
         IntegrationConsumerStats stats,
         IntegrationMessageHandlerRegistry handlerRegistry,
-        IntegrationMessageDispatcher dispatcher,
-        @Value("${hephaestus.integration.flat-stream.enabled:false}") boolean flatStreamConsumerEnabled
+        IntegrationMessageDispatcher dispatcher
     ) {
         this.stats = stats;
         this.handlerRegistry = handlerRegistry;
         this.dispatcher = dispatcher;
-        this.flatStreamConsumerEnabled = flatStreamConsumerEnabled;
     }
 
     @Override
@@ -53,16 +49,13 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
         String connectionStatus = stats.natsConnectionStatus().orElseThrow();
         boolean disabled = STATUS_DISABLED.equalsIgnoreCase(connectionStatus);
         boolean connected = STATUS_CONNECTED.equalsIgnoreCase(connectionStatus);
-        boolean flatStreamReady = !flatStreamConsumerEnabled || stats.flatStreamConsumerActive();
-        boolean healthy = disabled || (connected && flatStreamReady);
+        boolean healthy = disabled || connected;
         Health.Builder builder = healthy ? Health.up() : Health.down();
 
         builder
             .withDetail("natsConnectionStatus", connectionStatus)
             .withDetail("activeScopeConsumers", stats.activeScopeConsumerCount())
             .withDetail("installationConsumerActive", stats.installationConsumerActive())
-            .withDetail("flatStreamConsumerActive", stats.flatStreamConsumerActive())
-            .withDetail("flatStreamConsumerRequired", flatStreamConsumerEnabled)
             .withDetail("handlerCount", handlerRegistry.handlerCount())
             .withDetail("parserCount", dispatcher.parserCount());
 

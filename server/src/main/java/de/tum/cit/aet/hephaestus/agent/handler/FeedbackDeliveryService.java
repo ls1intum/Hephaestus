@@ -101,7 +101,22 @@ class FeedbackDeliveryService {
         try {
             doDeliver(job, delivery, recomposer);
         } catch (JobDeliveryException e) {
-            // Integrity failure — propagate so the job is marked FAILED, not silently DELIVERED.
+            // Integrity failure — propagate so the job is marked FAILED. Persist the composed body as FAILED (so it
+            // is not discarded and the conversational channel covers it) ONLY when no summary landed this run:
+            // deliveryCommentId is set iff postSummaryNote put a summary live. A summary that landed and then hit an
+            // inline-notes failure is a partial success — the developer already saw the findings, so recording a
+            // false FAILED unit or re-signalling conversation would double-raise them. Best-effort.
+            if (job.getDeliveryCommentId() == null) {
+                try {
+                    feedbackLedgerRecorder.recordUndelivered(job, delivery);
+                } catch (RuntimeException ex) {
+                    log.warn(
+                        "Undelivered-feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                        job.getId(),
+                        ex.getMessage()
+                    );
+                }
+            }
             throw e;
         } catch (Exception e) {
             log.warn("Feedback delivery failed (non-fatal): jobId={}", job.getId(), e);

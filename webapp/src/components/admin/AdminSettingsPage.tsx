@@ -5,6 +5,7 @@ import {
 	type FeatureValues,
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
+import { AdminOutlineSettings } from "./AdminOutlineSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import {
 	AdminSlackChannelsSettings,
@@ -34,7 +35,8 @@ export interface AdminSettingsPageProps {
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 	// Slack integration card props. The card owns connection state and the weekly digest
-	// controls; channel monitoring is shown only while Slack is connected.
+	// controls; the channel-monitoring section renders in either state (inert, with a pointer
+	// back to this card, while Slack is not connected).
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
 	slackConnectionId?: number;
@@ -100,7 +102,7 @@ export function AdminSettingsPage({
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
-			<h1 className="text-3xl font-bold mb-8">Workspace Settings</h1>
+			<h1 className="text-3xl font-bold mb-8">Workspace settings</h1>
 
 			<div className="space-y-10">
 				<AdminFeaturesSettings
@@ -144,7 +146,10 @@ export function AdminSettingsPage({
 					/>
 				)}
 
-				{workspaceSlug != null && hasSlackConnection && (
+				{/* Rendered whether or not Slack is connected: an admin has to be able to discover what
+				    channel monitoring is before deciding to install the app. Without a connection the
+				    section explains itself and points back at the card above. */}
+				{workspaceSlug != null && (
 					<AdminSlackChannelsSettings
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
@@ -158,6 +163,8 @@ export function AdminSettingsPage({
 						onRemoveChannel={onRemoveSlackChannel}
 					/>
 				)}
+
+				{workspaceSlug != null && <AdminOutlineSettings workspaceSlug={workspaceSlug} />}
 			</div>
 		</div>
 	);

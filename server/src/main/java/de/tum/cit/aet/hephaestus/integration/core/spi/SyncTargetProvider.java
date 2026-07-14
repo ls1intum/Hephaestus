@@ -4,95 +4,50 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Provides sync targets (repositories) for the integration.scm ETL engine.
+ * Main SPI for the integration.scm sync engine to discover and manage synchronization
+ * targets. Extends {@link SyncTimestampProvider} (sync timestamps) and
+ * {@link BackfillStateProvider} (backfill tracking).
  * <p>
- * This is the main SPI (Service Provider Interface) for the sync engine to discover
- * and manage synchronization targets. It extends focused sub-interfaces to comply
- * with the Interface Segregation Principle (ISP):
- * <ul>
- *   <li>{@link SyncTimestampProvider} – Sync timestamp operations</li>
- *   <li>{@link BackfillStateProvider} – Backfill tracking for incremental sync</li>
- * </ul>
- * <p>
- * <b>Design Principles:</b>
- * <ul>
- *   <li>This SPI is domain-agnostic - it uses generic terms like "scope" and "sync target"</li>
- *   <li>The host application maps its domain concepts to these generic abstractions</li>
- *   <li>Sync targets are identified by {@code syncTargetId}, not compound keys</li>
- *   <li>Scopes group sync targets and are identified by {@code scopeId}</li>
- * </ul>
+ * The SPI is domain-agnostic: sync targets are identified by {@code syncTargetId},
+ * scopes group sync targets and are identified by {@code scopeId}; the host application
+ * maps its domain concepts onto these abstractions.
  * <p>
  * <b>Thread Safety:</b> Implementations must be thread-safe. The sync engine may call
  * methods concurrently from multiple sync threads.
- *
- * @see SyncTimestampProvider
- * @see BackfillStateProvider
  */
 public interface SyncTargetProvider extends SyncTimestampProvider, BackfillStateProvider {
     // CORE SYNC TARGET OPERATIONS
 
     /**
-     * Gets all active sync targets (repositories) across all scopes.
-     * <p>
-     * Active targets are those in scopes with active status that have
-     * at least one configured repository.
-     *
-     * @return list of active sync targets, never null (may be empty)
+     * Gets all active sync targets across all scopes — targets in active-status scopes with
+     * at least one configured repository. Never null (may be empty).
      */
     List<SyncTarget> getActiveSyncTargets();
 
     /**
-     * Gets sync targets for a specific scope.
-     *
-     * @param scopeId the scope ID (must not be null)
      * @return list of sync targets for the scope, never null (may be empty if scope not found)
      */
     List<SyncTarget> getSyncTargetsForScope(Long scopeId);
 
     /**
-     * Checks if a scope is active and eligible for synchronization.
-     * <p>
-     * A scope is active when its status allows sync operations (e.g., not SUSPENDED or PURGED).
-     * This check should be performed before initiating sync operations to avoid
-     * unnecessary API calls and errors for disabled scopes.
-     *
-     * @param scopeId the scope ID (must not be null)
-     * @return true if the scope is active and can be synced, false otherwise
+     * Checks if a scope is active and eligible for synchronization (e.g., not SUSPENDED or
+     * PURGED). Check before initiating sync to avoid wasted API calls for disabled scopes.
      */
-    default boolean isScopeActiveForSync(Long scopeId) {
-        // Default implementation assumes scope is active (backward compatibility)
-        return true;
-    }
+    boolean isScopeActiveForSync(Long scopeId);
 
     /**
-     * Gets repository nameWithOwner values for a scope's active sync targets.
-     *
-     * <p>This provides a lightweight alternative to fetching full Repository entities
-     * when only the repository identifier is needed (e.g., for GraphQL queries).
-     *
-     * @param scopeId the scope ID (must not be null)
-     * @return list of repository nameWithOwner strings, never null (may be empty)
+     * Gets repository nameWithOwner values for a scope's active sync targets — a lightweight
+     * alternative to full Repository entities when only the identifier is needed.
      */
     default List<String> getRepositoryNamesForScope(Long scopeId) {
         return getSyncTargetsForScope(scopeId).stream().map(SyncTarget::repositoryNameWithOwner).toList();
     }
 
-    /**
-     * Updates the sync timestamp for a repository-level sync operation.
-     *
-     * @param syncTargetId the sync target ID (must not be null)
-     * @param syncType     the type of sync (must not be null)
-     * @param syncedAt     the timestamp of the sync (must not be null)
-     */
     void updateSyncTimestamp(Long syncTargetId, SyncType syncType, Instant syncedAt);
 
     /**
-     * Removes a sync target from the system.
-     * <p>
-     * This is called when a repository no longer exists on GitHub (NOT_FOUND)
+     * Removes a sync target. Called when a repository no longer exists upstream (NOT_FOUND)
      * to stop perpetual sync retries for a deleted repository.
-     *
-     * @param syncTargetId the sync target ID to remove (must not be null)
      */
     void removeSyncTarget(Long syncTargetId);
 
@@ -106,19 +61,11 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * scheduler/backfill service) passes the provider it already drives, instead of the SPI
      * exposing a vendor-named method per provider. Implementations filter active scopes by the
      * scope's configured provider kind.
-     *
-     * @param kind the provider kind to gather sessions for (must not be null)
-     * @return list of sync sessions for scopes whose active provider matches {@code kind}
      */
     default List<SyncSession> getSyncSessions(IntegrationKind kind) {
         return List.of();
     }
 
-    /**
-     * Gets statistics about sync target filtering.
-     *
-     * @return sync statistics
-     */
     default SyncStatistics getSyncStatistics() {
         return new SyncStatistics(0, 0, 0, 0, false);
     }
@@ -134,10 +81,10 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param accountLogin   GitHub organization/user login
      * @param installationId GitHub App installation ID (null for PAT auth)
      * @param serverUrl      per-workspace provider base URL (e.g. {@code https://gitlab.lrz.de}).
-     *                       Used by GitLab sync paths to look up the matching git_provider
-     *                       row instead of stamping the global default — closes the
-     *                       cross-instance identity-fusion defect observed 2026-05-25.
-     *                       Null for GitHub workspaces (always github.com).
+     *                       GitLab sync paths use it to look up the matching git_provider row
+     *                       instead of stamping the global default, so identities on distinct
+     *                       self-hosted instances never fuse. Null for GitHub workspaces
+     *                       (always github.com).
      * @param syncTargets    repositories to sync in this scope
      * @param syncContext    thread-local context for logging and scope isolation
      */
@@ -259,22 +206,12 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         String pullRequestSyncCursor,
         String discussionSyncCursor
     ) {
-        /**
-         * Checks if a full sync is needed based on staleness threshold.
-         *
-         * @param staleThreshold instant before which data is considered stale
-         * @return true if full sync has never run or is stale
-         */
+        /** @return true if full sync has never run or is older than {@code staleThreshold} */
         public boolean needsFullSync(Instant staleThreshold) {
             return lastFullSyncAt == null || lastFullSyncAt.isBefore(staleThreshold);
         }
 
-        /**
-         * Checks if labels need to be synced based on staleness threshold.
-         *
-         * @param staleThreshold instant before which data is considered stale
-         * @return true if labels have never been synced or are stale
-         */
+        /** @return true if labels have never been synced or are older than {@code staleThreshold} */
         public boolean needsLabelSync(Instant staleThreshold) {
             return lastLabelsSyncedAt == null || lastLabelsSyncedAt.isBefore(staleThreshold);
         }
@@ -289,12 +226,10 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
             return pullRequestBackfillHighWaterMark != null;
         }
 
-        /** @return true if any backfill has been initialized */
         public boolean isBackfillInitialized() {
             return isIssueBackfillInitialized() || isPullRequestBackfillInitialized();
         }
 
-        /** @return true if issue backfill has completed */
         public boolean isIssueBackfillComplete() {
             return (
                 isIssueBackfillInitialized() &&
@@ -302,7 +237,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
             );
         }
 
-        /** @return true if pull request backfill has completed */
         public boolean isPullRequestBackfillComplete() {
             return (
                 isPullRequestBackfillInitialized() &&
@@ -311,7 +245,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
             );
         }
 
-        /** @return true if both issue and pull request backfill have completed */
         public boolean isBackfillComplete() {
             return isIssueBackfillComplete() && isPullRequestBackfillComplete();
         }
@@ -330,7 +263,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
             return Math.max(0, pullRequestBackfillCheckpoint);
         }
 
-        /** @return total items remaining to backfill (issues + pull requests) */
         public int getBackfillRemaining() {
             return getIssueBackfillRemaining() + getPullRequestBackfillRemaining();
         }

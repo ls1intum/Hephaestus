@@ -57,6 +57,9 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     @Mock
     private FeedbackPlacementRepository feedbackPlacementRepository;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     private FeedbackLedgerRecorder recorder(boolean policyFloor) {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -71,7 +74,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             feedbackObservationRepository,
             feedbackPlacementRepository,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, policyFloor),
-            mock(ApplicationEventPublisher.class)
+            eventPublisher
         );
     }
 
@@ -356,6 +359,81 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             any(),
             anyInt()
         );
+    }
+
+    @Test
+    void recordUndelivered_persistsFailedBody_bindsFindings_andSignalsConversation() {
+        // A direct-delivery failure: the composed body must be persisted as a FAILED IN_CONTEXT unit (auditable +
+        // dashboard-visible) AND the conversational channel must be signalled so it can pick up the loci the
+        // developer never saw in-context.
+        Observation bad = problem(0.9f);
+        Observation good = strength();
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad, good));
+
+        recorder(false).recordUndelivered(job(), new DeliveryContent("the advice that never landed", List.of()));
+
+        var saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository).save(saved.capture());
+        Feedback unit = saved.getValue();
+        assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.FAILED);
+        assertThat(unit.getBody()).isEqualTo("the advice that never landed");
+        // Ordinal 4000 keeps the FAILED unit clear of the DELIVERED(0)/SUPPRESSED(1000)/policy(2000)/conv(3000) bases.
+        assertThat(unit.getPosition()).isEqualTo(4000);
+        // Both assessed findings are bound (BAD as PRIMARY, GOOD as SUPPORTING); NA would be excluded.
+        verify(feedbackObservationRepository, org.mockito.Mockito.times(2)).insertIfAbsent(
+            any(),
+            any(),
+            any(),
+            anyInt()
+        );
+        // The conversational/reflection surfaces are signalled despite the failed direct delivery.
+        verify(eventPublisher).publishEvent(
+            any(de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent.class)
+        );
+    }
+
+    @Test
+    void recordUndelivered_noOps_whenDeliveredUnitAlreadyExists() {
+        // A DELIVERED unit at ordinal 0 already exists (a prior run landed): never write a contradictory FAILED
+        // unit and never signal — record() already handled both.
+        FeedbackLedgerRecorder rec = recorder(false);
+        // Override AFTER recorder() installed the anyInt()->false default, so eq(0) wins for the IN_CONTEXT unit.
+        when(feedbackRepository.existsByAgentJobIdAndPosition(any(), eq(0))).thenReturn(true);
+
+        rec.recordUndelivered(job(), new DeliveryContent("body", List.of()));
+
+        verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any());
+    }
+
+    @Test
+    void recordUndelivered_reSignalsButDoesNotRepersist_onFailedRetry() {
+        // A failing retry: the FAILED unit (ordinal 4000) was already written. Re-signalling the conversation is
+        // harmless (idempotent listener), but the FAILED row must NOT be persisted twice.
+        FeedbackLedgerRecorder rec = recorder(false);
+        Observation bad = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(bad));
+        // Past the DELIVERED(0) guard (default false), but the FAILED(4000) unit already exists (retry).
+        when(feedbackRepository.existsByAgentJobIdAndPosition(any(), eq(4000))).thenReturn(true);
+
+        rec.recordUndelivered(job(), new DeliveryContent("body", List.of()));
+
+        verify(eventPublisher).publishEvent(
+            any(de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent.class)
+        );
+        verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void recordUndelivered_noOps_whenJobHasNoWorkspace() {
+        // A no-workspace integrity failure (PR path throws before a workspace is resolved) has no recipient or
+        // artifact to bind — persist nothing and signal nothing.
+        AgentJob noWorkspace = TestEntities.agentJob(); // no setWorkspace
+
+        recorder(false).recordUndelivered(noWorkspace, new DeliveryContent("body", List.of()));
+
+        verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any());
     }
 
     private AgentJob job() {

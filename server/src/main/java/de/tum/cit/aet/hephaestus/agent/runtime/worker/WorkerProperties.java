@@ -29,7 +29,7 @@ public record WorkerProperties(
      * Per-process-instance suffix, stable for the JVM's lifetime. Appended to the hostname default so
      * a worker that crashes and restarts (or a fixed-hostname compose/bare-metal redeploy) gets a
      * DIFFERENT id than its dead predecessor — otherwise the restarted process would re-heartbeat the
-     * old id and mask its predecessor's orphaned jobs (#1138). K8s pod names are already unique, but
+     * old id and mask its predecessor's orphaned jobs. K8s pod names are already unique, but
      * this makes fast orphan recovery hold in every topology.
      */
     private static final String INSTANCE_SUFFIX = UUID.randomUUID().toString().substring(0, 8);

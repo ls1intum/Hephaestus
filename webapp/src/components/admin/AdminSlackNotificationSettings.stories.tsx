@@ -81,9 +81,9 @@ export const ToggleDigestOff: Story = {
 };
 
 /**
- * Slack-discovered channels can be searched and selected without manual ID entry — a
- * searchable combobox (roving keyboard focus, no scrollable `aria-pressed` button list), with
- * disabled options carrying a visible reason instead of vanishing from the list.
+ * One control for one value: the digest channel is chosen from a combobox that shows
+ * `#channel-name`. The stable Slack id is held in state and is never dumped into a visible text
+ * box. Disabled options carry a reason instead of vanishing from the list.
  */
 export const WithChannelPicker: Story = {
 	args: {
@@ -107,22 +107,43 @@ export const WithChannelPicker: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const general = canvas.getByRole("option", { name: /#general/i });
-		const privateTeam = canvas.getByRole("option", { name: /#private-team/i });
-		await expect(privateTeam).toHaveAttribute("aria-disabled", "true");
-		await expect(canvas.getByText(/needs invite/i)).toBeInTheDocument();
 
-		// Search narrows the option list to the match. Scope by name — the schedule Day <Select>
-		// on the same page is also exposed as role="combobox".
+		// The options live in a portalled popover — open the combobox, then query the document.
+		// Scope by name: the schedule Day <Select> is also exposed as role="combobox".
+		const trigger = canvas.getByRole("combobox", { name: /digest channel/i });
+		await userEvent.click(trigger);
+
+		await expect(await screen.findByRole("option", { name: /#private-team/i })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(screen.getByText(/needs invite/i)).toBeInTheDocument();
+
+		// Search narrows the option list to the match.
 		await userEvent.type(
-			canvas.getByRole("combobox", { name: /search digest slack channels/i }),
+			screen.getByRole("combobox", { name: /search digest slack channels/i }),
 			"gen",
 		);
-		await expect(canvas.getByRole("option", { name: /#general/i })).toBeInTheDocument();
-		await expect(canvas.queryByRole("option", { name: /#private-team/i })).not.toBeInTheDocument();
+		await expect(screen.getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expect(screen.queryByRole("option", { name: /#private-team/i })).not.toBeInTheDocument();
 
-		await userEvent.click(general);
-		await expect(canvas.getByLabelText(/digest channel/i)).toHaveValue("C01GENERAL01");
+		await userEvent.click(screen.getByRole("option", { name: /#general/i }));
+		await expect(trigger).toHaveTextContent("#general");
+		await expect(canvas.queryByDisplayValue("C01GENERAL01")).not.toBeInTheDocument();
+	},
+};
+
+/** A channel Slack never listed is still reachable — the paste escape hatch resolves a link. */
+export const PasteChannelLink: Story = {
+	args: { hasSlackConnection: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// With no candidates the paste path is the only path, so it is already open.
+		await userEvent.type(
+			canvas.getByLabelText(/paste a channel link or id/i),
+			"https://acme.slack.com/archives/C0974LJBPBK",
+		);
+		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeEnabled();
 	},
 };
 

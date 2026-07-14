@@ -90,12 +90,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     private final AtomicBoolean flushing = new AtomicBoolean(false);
 
     private volatile Runnable disconnectHook;
-    /**
-     * The streaming message ts: {@code null} until the first write opens the stream, set exactly once. Every
-     * open-or-append goes through {@link #openOrAppend} under {@link #streamLock}, so a late flush tick and the
-     * terminal write can never both call {@code startStream} — the one-start/N-append/one-stop contract holds even
-     * if {@link #stopFlusher} times out with a tick still stuck inside an (interrupt-immune) OkHttp call.
-     */
+    /** The streaming message ts: {@code null} until the first successful open, set exactly once ({@link #openOrAppend}). */
     private final AtomicReference<String> streamTs = new AtomicReference<>();
     /** Serializes the open-or-append decision so the stream is opened exactly once across the flush + runner threads. */
     private final ReentrantLock streamLock = new ReentrantLock();

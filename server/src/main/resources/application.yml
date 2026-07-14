@@ -186,6 +186,16 @@ hephaestus:
                 display-name: ${SLACK_OAUTH_DISPLAY_NAME:Slack}
                 client-id: ${SLACK_OAUTH_CLIENT_ID:${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}}
                 client-secret: ${SLACK_OAUTH_CLIENT_SECRET:${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}}
+            # Link-only provider (like Slack): it attaches an Outline identity to an already signed-in
+            # account, it is never a sign-in button. Self-hosted, so the base URL is the wiki's origin.
+            # Scopes are pinned to `read` by type (LoginProviderService.OUTLINE_SCOPES) — Outline is plain
+            # OAuth2, not OIDC, so `openid` must never be requested.
+            outline:
+                type: OUTLINE
+                base-url: ${OUTLINE_OAUTH_BASE_URL:}
+                display-name: ${OUTLINE_OAUTH_DISPLAY_NAME:Outline}
+                client-id: ${OUTLINE_OAUTH_CLIENT_ID:}
+                client-secret: ${OUTLINE_OAUTH_CLIENT_SECRET:}
         # Token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
         # Buckets are SHARED across replicas via a Postgres ProxyManager (no Redis) when
         # postgres-backed=true (default) and a DataSource is present; otherwise an in-JVM
@@ -499,10 +509,16 @@ hephaestus:
             # defense; 10m also covers provider redelivery horizons. See WebhookProperties.Stream.
             duplicate-window: 10m
             max-age: 180d
-            # The Slack stream buffers real channel/DM message text. SQL is the system of record and GDPR
-            # erasure cannot reach inside the broker, so it expires on a transport-buffer horizon, not 180d.
+            # Streams whose messages carry real personal content, not just change pointers. SQL is the
+            # system of record and GDPR erasure cannot reach inside the broker, so these expire on a
+            # transport-buffer horizon rather than the 180d default:
+            #   slack   — the envelope is the channel/DM message text itself.
+            #   outline — an Outline webhook delivery embeds the whole document in payload.model.text
+            #             (full Markdown body, plus author/collaborator ids), so an erased or corrected
+            #             document would otherwise survive in JetStream for six months.
             max-age-by-stream:
                 slack: 72h
+                outline: 72h
             max-messages: 2000000
         shutdown:
             # Drain budget for in-flight publishes after HTTP closes. Docker stop_grace_period
@@ -534,11 +550,6 @@ hephaestus:
     # pure helper/subject classes may still load because they do no external work.
     # Flip `enabled` to `true` once credentials and redirect URLs are configured.
     integration:
-        # Generic gate for the fleet-wide flat-stream NATS consumer (IntegrationNatsConsumer stays
-        # vendor-neutral in core). Driven by the messaging integrations; today only Slack publishes a
-        # flat (non-repository-scoped) stream, so it tracks the same env var as slack.enabled.
-        flat-stream:
-            enabled: ${hephaestus.integration.slack.enabled:false}
         # ─── GitHub authentication (GitHubProperties) ───
         # Can be any OAuth token, such as the PAT.
         github:
@@ -607,8 +618,27 @@ hephaestus:
                 # Slack Events API ingest rides the core /webhooks/slack + NATS/JetStream framework
                 # (subjects slack.<team>.<scope>.<event>, Nats-Msg-Id = slack-<event_id>).
                 # The mentor response stream itself is direct Slack Web API output, not NATS.
-    #     outline:
-    #         enabled: false
+        outline:
+            # Master switch for the Outline documentation integration (install, sync, content projection).
+            # Off by default; a workspace admin still installs per-workspace with a base URL + token.
+            enabled: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:false}
+            sync:
+                # Reconcile schedule for the per-workspace document mirror (default every six hours).
+                cron: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CRON:0 0 */6 * * *}
+                # Max document exports one workspace reconcile pass may spend; bounds the cost of a huge
+                # corpus's first sync. A collection that ran out of budget stays PENDING (no watermark, no
+                # tombstones) and the catch-up tick resumes it. 500 covers most corpora in one pass.
+                export-budget: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_EXPORT_BUDGET:500}
+                # How often the catch-up tick sweeps collections still awaiting a clean pass. Five minutes
+                # converges a freshly registered large collection quickly; a caught-up fleet has no pending
+                # rows, so a tick then costs zero API calls.
+                catch-up-delay: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CATCH_UP_DELAY:PT5M}
+            cache:
+                # Per-workspace cap on the total size of mirrored Markdown bodies; least-recently-materialized
+                # bodies are evicted (the row survives as a directory marker) once the mirror grows past it.
+                max-size-mb: ${HEPHAESTUS_INTEGRATION_OUTLINE_CACHE_MAX_SIZE_MB:200}
+            # How long a document that has vanished upstream is kept as a tombstone before its row is dropped.
+            staleness: ${HEPHAESTUS_INTEGRATION_OUTLINE_STALENESS:30d}
 
     sentry:
         dsn: ${SENTRY_DSN:}

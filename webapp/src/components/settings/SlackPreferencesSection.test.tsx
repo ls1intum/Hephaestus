@@ -15,24 +15,12 @@ const workspace: SlackUserWorkspacePreferences = {
 };
 
 describe("SlackPreferencesSection", () => {
-	it("lets an unlinked user start Slack account linking", () => {
-		const onConnectSlack = vi.fn();
-		render(
-			<SlackPreferencesSection
-				workspaces={[]}
-				isSlackLinked={false}
-				canConnectSlack
-				onConnectSlack={onConnectSlack}
-				onToggleChannelMessages={vi.fn()}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Connect Slack" }));
-
-		expect(onConnectSlack).toHaveBeenCalledOnce();
-	});
-
-	it("shows workspace message-use controls for linked Slack workspaces", () => {
+	// The irreversible-deletion guard is safety-critical, so it is asserted here in the fast jsdom
+	// lane in addition to the `ConfirmTurningOff` Storybook story (browser lane). Flipping the switch
+	// OFF must NOT fire the mutation on its own — only confirming the dialog may, and only with
+	// (workspaceSlug, false). A regression that dropped the confirm gate, or passed the wrong args,
+	// would fail these assertions.
+	it("confirms before turning message use OFF — the switch alone would silently delete collected data", () => {
 		const onToggleChannelMessages = vi.fn();
 		render(
 			<SlackPreferencesSection
@@ -49,7 +37,31 @@ describe("SlackPreferencesSection", () => {
 
 		fireEvent.click(within(row).getByRole("switch", { name: /use my new channel messages/i }));
 
+		// The flip alone must NOT delete anything — an irreversible deletion is gated by a confirmation.
+		expect(onToggleChannelMessages).not.toHaveBeenCalled();
+
+		fireEvent.click(screen.getByRole("button", { name: /turn off & delete/i }));
+
 		expect(onToggleChannelMessages).toHaveBeenCalledWith("hephaestustest", false);
+	});
+
+	it("cancelling the confirmation leaves message use ON", () => {
+		const onToggleChannelMessages = vi.fn();
+		render(
+			<SlackPreferencesSection
+				workspaces={[workspace]}
+				isSlackLinked
+				canConnectSlack
+				onConnectSlack={vi.fn()}
+				onToggleChannelMessages={onToggleChannelMessages}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("switch", { name: /use my new channel messages/i }));
+		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+		expect(onToggleChannelMessages).not.toHaveBeenCalled();
+		expect(screen.getByRole("switch", { name: /use my new channel messages/i })).toBeTruthy();
 	});
 
 	it("does not fake controls when Slack is linked but no workspace is available", () => {

@@ -101,6 +101,31 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
     }
 
     @Test
+    void outlineIsPlainOauth2KeyedOnIdWithAuthInfoUserinfo() {
+        LoginProviderRepository repo = mock(LoginProviderRepository.class);
+        when(repo.findByRegistrationId("outline")).thenReturn(
+            Optional.of(provider("outline", LoginProvider.ProviderType.OUTLINE, "https://wiki.example.com", "read"))
+        );
+
+        ClientRegistration outline = new LoginProviderClientRegistrationRepository(repo, "").findByRegistrationId(
+            "outline"
+        );
+
+        // Plain OAuth2 (NOT OIDC): endpoints hang off the per-instance base URL; the userinfo URI points
+        // at POST /api/auth.info, which OutlineAuthInfoUserService (not the framework default) calls.
+        assertThat(outline.getProviderDetails().getAuthorizationUri()).isEqualTo(
+            "https://wiki.example.com/oauth/authorize"
+        );
+        assertThat(outline.getProviderDetails().getTokenUri()).isEqualTo("https://wiki.example.com/oauth/token");
+        assertThat(outline.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo(
+            "https://wiki.example.com/api/auth.info"
+        );
+        assertThat(outline.getProviderDetails().getJwkSetUri()).isNull(); // no OIDC path
+        // nOAuth defence: the principal keys on the immutable Outline user UUID, never name/email.
+        assertThat(outline.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("id");
+    }
+
+    @Test
     void gitlabEndpointsHangOffTheInstanceBaseUrl() {
         LoginProviderRepository repo = mock(LoginProviderRepository.class);
         when(repo.findByRegistrationId("gitlab-lrz")).thenReturn(

@@ -59,7 +59,7 @@ If you run the webhook receiver on a separate public host, route only `/webhooks
 public prefix if you use one) must reach the application-server role.
 
 The bot token scope set (`SlackConnectionStrategy.DEFAULT_SCOPES`) stays minimal — every scope maps to a
-feature the shipped code actually exercises:
+feature the code exercises:
 
 | Scope | Feature |
 | --- | --- |
@@ -86,22 +86,70 @@ their Slack identity to their Hephaestus account.
 
 Do not add unused broad scopes such as `chat:write.public`, `commands`, `team:read`,
 `app_mentions:read`, `im:write`, `mpim:read`, or `users:read.email` unless code is added that
-actually uses them. `channels:join` is intentionally present so Hephaestus can join selected
-public channels from the admin picker.
+actually uses them.
 
-Subscribe to the bot events listed under `settings.event_subscriptions` in
-[`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) — the manifest is the single
-source of truth for event subscriptions, so do not duplicate the list here. It covers the DM/channel
-`message` events that drive mentor turns and channel ingestion, the channel-lifecycle events
-(`channel_archive`, `channel_deleted`, `channel_left`, `channel_rename`, `group_archive`, `group_left`,
-`group_rename`) that keep the monitored-channel allow-list in sync, and the app-lifecycle events
-(`app_home_opened`, `app_context_changed`, `app_uninstalled`, `tokens_revoked`).
+Use [`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) as the dashboard baseline —
+it is the single source of truth for scopes, event subscriptions, and request URLs. Its
+`settings.event_subscriptions` list covers the DM/channel `message` events that drive mentor turns and
+channel ingestion, the channel-lifecycle events that keep the monitored-channel allow-list in sync, and
+the app-lifecycle events.
 
 The nightly Slack history-reconciliation sweep replays `conversations.history` for already-consented
 channels through this same bot token, so it needs no scopes beyond the set above.
 
-Use [`slack-app-manifest-template.yml`](./slack-app-manifest-template.yml) as the dashboard
-baseline so scopes, events, and request URLs do not drift from the code.
+### Outline integration
+
+Outline is a documentation content source: a workspace admin connects one Outline instance from
+**Settings → Integrations** with the wiki's base URL and an API key, then registers the collections to
+mirror. The key is encrypted at rest in the `connection` table.
+
+| Variable | Purpose |
+| --- | --- |
+| `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection). Every Outline bean is gated on it and defaults to **off**, so an unset flag means the integration is entirely absent — no admin surface, no sync, no webhook verification. |
+| `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com`. **Required whenever `OUTLINE_OAUTH_CLIENT_ID` is set** — Outline is self-hosted, so there is no default origin. Blank or invalid, the provider seed is skipped with only a `WARN` (the app still boots; the linking button is simply never there). |
+| `OUTLINE_OAUTH_CLIENT_ID` | Outline OAuth app client ID (redirect `https://<host>/api/login/oauth2/code/outline`) |
+| `OUTLINE_OAUTH_CLIENT_SECRET` | Outline OAuth app client secret |
+| `OUTLINE_OAUTH_DISPLAY_NAME` | Label shown on the account-linking button (defaults to `Outline`) |
+
+`HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` must be set on **all three** roles, and the compose files pass
+it to each with the same value:
+
+- **application-server** — connect/admin API, collection registration, the reconcile scheduler, and the
+  webhook-subscription registrar.
+- **application-worker** — the agent context is assembled on the worker, and the Outline content source
+  carries no runtime-role gate. Without the flag there, reviews and mentor turns run with a context that
+  silently contains no wiki documents.
+- **webhook-server** — without the flag no Outline signature verifier is registered, so the receiver
+  answers `501` to every delivery on `POST /webhooks/outline`. Outline counts those as failures and
+  **auto-disables the subscription after 25 of them**.
+
+There is **no Outline signing-secret environment variable**. Unlike Slack's one global signing secret,
+Outline's webhook secret is minted per subscription when Hephaestus registers it and stored encrypted on
+the connection row; the receiver reads it back through JPA. The subscription is registered automatically
+when a workspace connection is activated — its delivery URL is `https://<host>/webhooks/outline`, derived
+from `WEBHOOK_EXTERNAL_URL` (defaulting to the application host).
+
+The `OUTLINE_OAUTH_*` block is independent of the workspace connection: it seeds a **link-only** login
+provider (registration id `outline`) that lets a member attach their Outline identity to their
+Hephaestus account so documents can be attributed to them. There is no "sign in with Outline" — the
+provider never appears on the login picker. A blank `OUTLINE_OAUTH_CLIENT_ID` leaves it unseeded, and
+the provider can also be added later under **Instance admin → Login providers**.
+
+**Registering the OAuth app in Outline** (Settings → Applications, admin-only):
+
+- **Redirect URI:** `https://<host>/api/login/oauth2/code/outline` — Outline matches redirect URIs by
+  exact string, so it must include the API path prefix your proxy uses and carry no trailing slash.
+  Between 1 and 10 URIs are allowed; all must be HTTPS except loopback.
+- **Scope:** `read`. Outline is plain OAuth2, not OIDC — never request `openid`. `read` is what
+  `POST /api/auth.info` (the identity probe) needs.
+- **PKCE:** S256, sent automatically. Nothing to configure.
+- Access tokens live one hour; refresh tokens live 30 days and rotate on use with reuse detection.
+
+**API keys do not self-rotate.** Outline's `apiKeys.create` and `apiKeys.delete` accept only an
+interactive session, never a bearer token, so Hephaestus cannot roll its own key. The connection's
+admin card surfaces the key's expiry (via `apiKeys.list`, when the key may see itself) ahead of the
+lapse; renewing means creating a new key in Outline and re-entering it in **Settings → Integrations**.
+A lapsed key reports `accepted=false` and the mirror stops refreshing until it is replaced.
 
 ### GitHub integration
 

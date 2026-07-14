@@ -99,8 +99,7 @@ public class AccountService {
      *   <li><b>Ownership</b> — only a link the account actually owns can be removed (404 otherwise),
      *       so one user can never detach another's identity.</li>
      *   <li><b>Last-identity lockout</b> — the account's only remaining sign-in method cannot be
-     *       removed (409). "The more ways a user can verify their identity, the less likely they lose
-     *       access" (Auth0); to drop the last identity a user deletes the account instead.</li>
+     *       removed (409); to drop the last identity a user deletes the account instead.</li>
      * </ul>
      * Reversible: re-linking only requires signing in with that provider again. The current session
      * is account-scoped (not identity-scoped), so unlinking never logs the user out.
@@ -155,8 +154,8 @@ public class AccountService {
             } catch (IllegalArgumentException e) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "unknown app role: " + appRole);
             }
-            // Last-admin lockout guard (mirrors unlink's last-identity guard): demoting the only
-            // remaining APP_ADMIN — or yourself — would lock everyone out of /admin with no recovery.
+            // Last-admin lockout guard: demoting the only remaining APP_ADMIN — or yourself —
+            // would lock everyone out of /admin with no recovery.
             boolean isDemotion = account.getAppRole() == Account.AppRole.APP_ADMIN && role != Account.AppRole.APP_ADMIN;
             if (isDemotion) {
                 if (accountId.equals(actingAccountId)) {

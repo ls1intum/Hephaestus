@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,13 +46,16 @@ public class ConversationalFeedbackPreparer {
 
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ConversationalFeedbackPreparer(
         FeedbackRepository feedbackRepository,
-        FeedbackObservationRepository feedbackObservationRepository
+        FeedbackObservationRepository feedbackObservationRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -76,6 +80,8 @@ public class ConversationalFeedbackPreparer {
             .collect(Collectors.toList());
 
         Map<Long, Integer> perRecipientCount = new HashMap<>();
+        // Newly CREATED units only (re-run no-ops excluded) — feeds the per-recipient prepared event.
+        Map<Long, Integer> newlyPreparedByRecipient = new HashMap<>();
         Instant now = Instant.now();
         int position = FeedbackLedgerRecorder.CONVERSATION_UNIT_ORDINAL_BASE;
         int prepared = 0;
@@ -111,11 +117,17 @@ public class ConversationalFeedbackPreparer {
                 EvidenceRole.PRIMARY.name(),
                 0
             );
+            newlyPreparedByRecipient.merge(recipient, 1, Integer::sum);
             prepared++;
         }
         if (prepared > 0) {
             log.info("Conversational feedback prepared: jobId={}, units={}", agentJobId, prepared);
         }
+        // Published inside this REQUIRES_NEW transaction so AFTER_COMMIT listeners (the Slack nudge) fire
+        // exactly when the units are durably visible — and not at all on a pure re-run.
+        newlyPreparedByRecipient.forEach((recipient, count) ->
+            eventPublisher.publishEvent(new ConversationFeedbackPreparedEvent(workspaceId, recipient, count))
+        );
         return prepared;
     }
 

@@ -31,9 +31,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * Verifies the cookie-session bearer-token resolution wired on the resource-server chain (ADR 0017).
  *
  * <p>The SPA authenticates by an HttpOnly {@code __Host-HEPHAESTUS_AT} cookie and never sends an
- * {@code Authorization} header. The framework default resolver reads ONLY the header, so this test
- * FAILS on the previous (header-only) wiring: a request carrying just the cookie is rejected 401 and
- * {@code GET /user} never returns the account.
+ * {@code Authorization} header. The framework default resolver reads ONLY the header, so a
+ * cookie-only request proves the custom resolver is wired.
  *
  * <p>Unlike most integration tests this one deliberately uses the <b>real</b>
  * {@code RevocationAwareJwtDecoder} (it does NOT import {@code TestSecurityConfig}'s mock decoder)
@@ -120,7 +119,6 @@ class CookieAuthenticationIntegrationTest {
         // on every request — so a revocation takes effect immediately on the next request.
         IssuedAccount issued = issueRealTokenForNewAccount("Revoked Rita");
 
-        // Freshly minted: the cookie authenticates.
         webTestClient
             .get()
             .uri("/user")

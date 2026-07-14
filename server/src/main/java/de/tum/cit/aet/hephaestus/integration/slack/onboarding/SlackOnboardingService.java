@@ -81,7 +81,6 @@ public class SlackOnboardingService {
             return;
         }
         long ws = workspaceId.get();
-        // Already linked → the mentor can already resolve this member's SCM identity; no CTA needed.
         if (identityResolver.resolveDeveloperLogin(ws, teamId, slackUserId).isPresent()) {
             log.debug("slack.onboarding: member={} already linked in workspace={} — no CTA", slackUserId, ws);
             return;
@@ -97,7 +96,6 @@ public class SlackOnboardingService {
         }
     }
 
-    /** The Block Kit CTA: one section + one URL button wired to the authenticated link-mode deep link. */
     public List<LayoutBlock> linkCtaBlocks() {
         return asBlocks(
             section(s ->

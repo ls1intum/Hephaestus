@@ -43,9 +43,19 @@ public final class TriggerEventCatalog {
 
     private TriggerEventCatalog() {}
 
-    /** The events a practice with the given focus is allowed to subscribe to. */
+    /**
+     * The events a practice with the given focus is allowed to subscribe to. Exhaustive over
+     * {@link WorkArtifact} so a new artifact type must declare its event set here instead of silently
+     * inheriting another focus's events.
+     */
     public static Set<String> eligibleFor(WorkArtifact focus) {
-        return focus == WorkArtifact.ISSUE ? ISSUE_EVENTS : PULL_REQUEST_EVENTS;
+        return switch (focus) {
+            case PULL_REQUEST -> PULL_REQUEST_EVENTS;
+            case ISSUE -> ISSUE_EVENTS;
+            // Conversation detection is quiescence-scheduled (ConversationThreadTriggerScheduler), not
+            // event-subscribed — there is no event a conversation practice could listen to.
+            case CONVERSATION_THREAD -> Set.of();
+        };
     }
 
     /** Every event any practice may subscribe to, across all focuses — the API validation allow-list. */

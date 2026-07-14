@@ -13,11 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * In-{@code workspace}-module implementation of {@link AccountWorkspaceMembershipQuery}. Lives
- * here so it can touch {@link WorkspaceMembership} / {@link Workspace} directly; exposes only the
- * narrow auth-spi contract to {@code core.auth} (dependency inversion — the interface is owned by
- * {@code core.auth}, the implementation by the data owner). Mirrors the
- * {@code AccountRoleQueryService} pattern.
+ * In-{@code workspace}-module implementation of {@link AccountWorkspaceMembershipQuery}: the
+ * interface is owned by {@code core.auth}, the implementation lives with the data owner so it can
+ * touch {@link WorkspaceMembership} / {@link Workspace} directly.
  */
 @Service
 public class AccountWorkspaceMembershipQueryAdapter implements AccountWorkspaceMembershipQuery {
@@ -61,7 +59,8 @@ public class AccountWorkspaceMembershipQueryAdapter implements AccountWorkspaceM
                         workspace.getId(),
                         workspace.getWorkspaceSlug(),
                         workspace.getDisplayName(),
-                        membership.getRole() != null ? membership.getRole().name() : null
+                        membership.getRole() != null ? membership.getRole().name() : null,
+                        membership.getUser() != null ? membership.getUser().getId() : null
                     )
                 );
             }

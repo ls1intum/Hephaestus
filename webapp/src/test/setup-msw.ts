@@ -31,6 +31,13 @@ if (typeof Element.prototype.scrollIntoView !== "function") {
 	Element.prototype.scrollIntoView = () => {};
 }
 
+// jsdom implements no Web Animations API; Base UI's ScrollArea viewport asks its element for
+// running animations on a timer, which would otherwise throw *after* a test finished and surface
+// as an unhandled error. No assertions depend on animations.
+if (typeof Element.prototype.getAnimations !== "function") {
+	Element.prototype.getAnimations = () => [];
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());

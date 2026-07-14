@@ -7,7 +7,7 @@ describe("AddChannelDialog — form submit", () => {
 		const onSubmit = vi.fn().mockResolvedValue(undefined);
 		render(<AddChannelDialog open onOpenChange={vi.fn()} onSubmit={onSubmit} />);
 
-		const input = screen.getByLabelText(/paste channel link or id/i);
+		const input = screen.getByLabelText(/paste a channel link or id/i);
 		fireEvent.change(input, { target: { value: "C0974LJBPBK" } });
 		fireEvent.submit(input.closest("form") as HTMLFormElement);
 
@@ -22,7 +22,7 @@ describe("AddChannelDialog — form submit", () => {
 	it("does not trim the pasted-reference field on every keystroke (no cursor jump)", () => {
 		render(<AddChannelDialog open onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
 
-		const input = screen.getByLabelText(/paste channel link or id/i) as HTMLInputElement;
+		const input = screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "  C0974LJBPBK  " } });
 
 		// The raw value (including interior/leading/trailing whitespace) is kept in state; only
@@ -35,7 +35,7 @@ describe("AddChannelDialog — form submit", () => {
 		const onOpenChange = vi.fn();
 		render(<AddChannelDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
-		const input = screen.getByLabelText(/paste channel link or id/i) as HTMLInputElement;
+		const input = screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement;
 		fireEvent.change(input, { target: { value: "C0974LJBPBK" } });
 		expect(input.value).toBe("C0974LJBPBK");
 
@@ -44,6 +44,39 @@ describe("AddChannelDialog — form submit", () => {
 		fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
 		expect(onOpenChange).toHaveBeenCalledWith(false);
-		expect((screen.getByLabelText(/paste channel link or id/i) as HTMLInputElement).value).toBe("");
+		expect((screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement).value).toBe(
+			"",
+		);
+	});
+
+	it("says what is missing instead of leaving the submit button dead", async () => {
+		const onSubmit = vi.fn();
+		render(
+			<AddChannelDialog
+				open
+				onOpenChange={vi.fn()}
+				onSubmit={onSubmit}
+				candidates={[
+					{
+						slackChannelId: "C01GENERAL01",
+						channelName: "general",
+						privateChannel: false,
+						member: true,
+						archived: false,
+					},
+				]}
+			/>,
+		);
+
+		// Enabled with nothing chosen: clicking it explains the gap rather than doing nothing.
+		const submit = screen.getByRole("button", { name: /^add channel$/i }) as HTMLButtonElement;
+		expect(submit.disabled).toBe(false);
+
+		fireEvent.click(submit);
+
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(
+			await screen.findByText(/choose a channel from the list, or paste a channel link or id/i),
+		).toBeTruthy();
 	});
 });

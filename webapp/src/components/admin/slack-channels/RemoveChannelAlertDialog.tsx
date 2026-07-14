@@ -10,7 +10,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -35,6 +35,7 @@ export function RemoveChannelAlertDialog({
 }: RemoveChannelAlertDialogProps) {
 	const [confirmText, setConfirmText] = useState("");
 	const [reason, setReason] = useState("");
+	const [mismatch, setMismatch] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
 	const label = channel ? (channel.channelName ?? channel.slackChannelId) : "";
@@ -50,13 +51,22 @@ export function RemoveChannelAlertDialog({
 		if (!next) {
 			setConfirmText("");
 			setReason("");
+			setMismatch(false);
 			setSubmitting(false);
 		}
 		onOpenChange(next);
 	}
 
 	async function confirm() {
-		if (!channel || !matches) return;
+		if (!channel || submitting) return;
+		// The confirm action stays enabled and validates here: a disabled button with no stated
+		// reason leaves the admin guessing which of the two fields is wrong.
+		if (!matches) {
+			setMismatch(true);
+			return;
+		}
+
+		setMismatch(false);
 		setSubmitting(true);
 		try {
 			await onConfirm({
@@ -96,7 +106,7 @@ export function RemoveChannelAlertDialog({
 
 				<div className="space-y-4">
 					{!nothingCollected && (
-						<Field>
+						<Field data-invalid={mismatch}>
 							<FieldLabel htmlFor="remove-slack-confirm">
 								Type the channel ID <span className="font-mono font-medium">{channelId}</span> to
 								confirm
@@ -105,11 +115,20 @@ export function RemoveChannelAlertDialog({
 								id="remove-slack-confirm"
 								value={confirmText}
 								disabled={submitting}
-								onChange={(e) => setConfirmText(e.target.value)}
+								onChange={(e) => {
+									setConfirmText(e.target.value);
+									setMismatch(false);
+								}}
 								autoComplete="off"
 								autoCapitalize="off"
 								spellCheck={false}
+								aria-invalid={mismatch}
 							/>
+							{mismatch && (
+								<FieldError>
+									That does not match. Type the channel ID exactly: {channelId}
+								</FieldError>
+							)}
 						</Field>
 					)}
 
@@ -128,11 +147,7 @@ export function RemoveChannelAlertDialog({
 
 				<AlertDialogFooter>
 					<AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-					<AlertDialogAction
-						variant="destructive"
-						disabled={!matches || submitting}
-						onClick={confirm}
-					>
+					<AlertDialogAction variant="destructive" disabled={submitting} onClick={confirm}>
 						{submitting ? "Removing…" : nothingCollected ? "Remove" : "Remove & erase"}
 					</AlertDialogAction>
 				</AlertDialogFooter>

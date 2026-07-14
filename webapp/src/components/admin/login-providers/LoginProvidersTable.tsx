@@ -1,6 +1,8 @@
-import { Copy, KeyRound, Pencil, Trash2 } from "lucide-react";
+import { Copy, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { LoginProviderView } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -10,10 +12,19 @@ import {
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
-	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
+import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -24,48 +35,87 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getProviderLabel } from "@/lib/provider";
 
 interface LoginProvidersTableProps {
 	providers: LoginProviderView[];
 	isLoading: boolean;
 	isError: boolean;
+	/** The thrown query error, surfaced through the shared error alert. */
+	error?: unknown;
+	/** Refetch the provider list after a failure. */
+	onRetry?: () => void;
+	/** Registration id of the row with a mutation in flight (toggle / edit / delete). */
 	mutatingId: string | null;
 	onEdit: (provider: LoginProviderView) => void;
 	onToggleEnabled: (provider: LoginProviderView, enabled: boolean) => void;
 	onDelete: (provider: LoginProviderView) => void;
+	/** Opens the create dialog — offered from the empty state so it is not a dead end. */
+	onAdd?: () => void;
 }
+
+const SKELETON_ROWS = ["a", "b", "c"];
 
 export function LoginProvidersTable({
 	providers,
 	isLoading,
 	isError,
+	error,
+	onRetry,
 	mutatingId,
 	onEdit,
 	onToggleEnabled,
 	onDelete,
+	onAdd,
 }: LoginProvidersTableProps) {
+	// ONE delete dialog for the whole table, driven by the row it targets — a dialog per row means N
+	// portals mounted for a single, rare action.
+	const [deleting, setDeleting] = useState<LoginProviderView | null>(null);
+	const isDeletePending = deleting != null && mutatingId === deleting.registrationId;
+
+	// The delete succeeded exactly when the row leaves the list; close on that, so a *failed* delete
+	// (row still present, mutation settled) keeps the dialog open to retry.
+	useEffect(() => {
+		if (
+			deleting &&
+			!providers.some((provider) => provider.registrationId === deleting.registrationId)
+		) {
+			setDeleting(null);
+		}
+	}, [providers, deleting]);
+
 	if (isError) {
 		return (
-			<p className="py-8 text-center text-sm text-destructive">
-				Could not load login providers. Please try again.
-			</p>
+			<QueryErrorAlert error={error} title="Could not load login providers" onRetry={onRetry} />
 		);
 	}
+
 	if (isLoading) {
-		return (
-			<div className="flex items-center justify-center py-12">
-				<Spinner />
-			</div>
-		);
+		return <LoadingRows />;
 	}
+
 	if (providers.length === 0) {
 		return (
-			<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-				<KeyRound className="size-8" aria-hidden />
-				<p className="text-sm">
-					No login providers yet. Add one so users can sign in or link accounts.
-				</p>
-			</div>
+			<Empty className="border">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<KeyRound aria-hidden />
+					</EmptyMedia>
+					<EmptyTitle>No login providers yet</EmptyTitle>
+					<EmptyDescription>
+						Add one so users can sign in, or link a Slack or Outline account from their settings.
+					</EmptyDescription>
+				</EmptyHeader>
+				{onAdd && (
+					<EmptyContent>
+						<Button onClick={onAdd}>
+							<Plus className="size-4" aria-hidden />
+							Add provider
+						</Button>
+					</EmptyContent>
+				)}
+			</Empty>
 		);
 	}
 
@@ -79,6 +129,138 @@ export function LoginProvidersTable({
 	};
 
 	return (
+		<>
+			<Table>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Provider</TableHead>
+						<TableHead>Type</TableHead>
+						<TableHead>Redirect URI</TableHead>
+						<TableHead>Enabled</TableHead>
+						<TableHead className="text-right">Actions</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{providers.map((provider) => {
+						const busy = mutatingId === provider.registrationId;
+						const redirectInputId = `lp-redirect-${provider.registrationId}`;
+						return (
+							<TableRow key={provider.registrationId}>
+								<TableCell>
+									<div className="font-medium">{provider.displayName}</div>
+									<div className="text-xs text-muted-foreground">
+										{provider.registrationId}
+										{provider.seededFromEnv && (
+											<Badge variant="outline" className="ml-2 align-middle">
+												seeded
+											</Badge>
+										)}
+									</div>
+									<div className="text-xs text-muted-foreground">{provider.baseUrl}</div>
+								</TableCell>
+								<TableCell>
+									<Badge variant="secondary">{getProviderLabel(provider.type)}</Badge>
+								</TableCell>
+								<TableCell>
+									<InputGroup className="max-w-[24rem]">
+										<InputGroupInput
+											id={redirectInputId}
+											readOnly
+											value={provider.redirectUri}
+											aria-label={`Redirect URI for ${provider.displayName}`}
+											onFocus={(event) => event.currentTarget.select()}
+										/>
+										<Tooltip>
+											<TooltipTrigger
+												render={
+													<InputGroupButton
+														size="icon-xs"
+														aria-label={`Copy redirect URI for ${provider.displayName}`}
+														onClick={() => copyRedirect(provider.redirectUri)}
+													>
+														<Copy aria-hidden />
+													</InputGroupButton>
+												}
+											/>
+											<TooltipContent>Copy redirect URI</TooltipContent>
+										</Tooltip>
+									</InputGroup>
+								</TableCell>
+								<TableCell>
+									<div className="flex items-center gap-2">
+										<Switch
+											checked={provider.enabled}
+											disabled={busy}
+											aria-busy={busy}
+											aria-label={`${provider.enabled ? "Disable" : "Enable"} ${provider.displayName}`}
+											onCheckedChange={(checked) => onToggleEnabled(provider, checked)}
+										/>
+										{busy && <Spinner className="size-3.5 text-muted-foreground" />}
+									</div>
+								</TableCell>
+								<TableCell className="text-right">
+									<div className="flex justify-end gap-1">
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											aria-label={`Edit ${provider.displayName}`}
+											disabled={busy}
+											onClick={() => onEdit(provider)}
+										>
+											<Pencil className="size-4" aria-hidden />
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											aria-label={`Delete ${provider.displayName}`}
+											disabled={busy}
+											onClick={() => setDeleting(provider)}
+										>
+											<Trash2 className="size-4 text-destructive" aria-hidden />
+										</Button>
+									</div>
+								</TableCell>
+							</TableRow>
+						);
+					})}
+				</TableBody>
+			</Table>
+
+			<AlertDialog
+				open={deleting != null}
+				onOpenChange={(open) => {
+					if (!open && !isDeletePending) setDeleting(null);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete “{deleting?.displayName}”?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Users will no longer be able to sign in with this provider. Existing linked accounts
+							are unaffected. This cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={isDeletePending}>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={isDeletePending}
+							onClick={() => deleting && onDelete(deleting)}
+						>
+							{isDeletePending ? "Deleting…" : "Delete"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</>
+	);
+}
+
+/** Skeleton rows in the real table shell, so the layout does not jump when the data lands. */
+function LoadingRows() {
+	return (
 		<Table>
 			<TableHeader>
 				<TableRow>
@@ -90,96 +272,29 @@ export function LoginProvidersTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{providers.map((provider) => {
-					const busy = mutatingId === provider.registrationId;
-					return (
-						<TableRow key={provider.registrationId}>
-							<TableCell>
-								<div className="font-medium">{provider.displayName}</div>
-								<div className="text-xs text-muted-foreground">
-									{provider.registrationId}
-									{provider.seededFromEnv && (
-										<Badge variant="outline" className="ml-2 align-middle">
-											seeded
-										</Badge>
-									)}
-								</div>
-								<div className="text-xs text-muted-foreground">{provider.baseUrl}</div>
-							</TableCell>
-							<TableCell>
-								<Badge variant="secondary">{provider.type}</Badge>
-							</TableCell>
-							<TableCell>
-								<div className="flex items-center gap-2">
-									<code className="max-w-[22rem] truncate rounded bg-muted px-1.5 py-0.5 text-xs">
-										{provider.redirectUri}
-									</code>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										aria-label={`Copy redirect URI for ${provider.displayName}`}
-										onClick={() => copyRedirect(provider.redirectUri)}
-									>
-										<Copy className="size-4" aria-hidden />
-									</Button>
-								</div>
-							</TableCell>
-							<TableCell>
-								<Switch
-									checked={provider.enabled}
-									disabled={busy}
-									aria-label={`${provider.enabled ? "Disable" : "Enable"} ${provider.displayName}`}
-									onCheckedChange={(checked) => onToggleEnabled(provider, checked)}
-								/>
-							</TableCell>
-							<TableCell className="text-right">
-								<div className="flex justify-end gap-1">
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon"
-										aria-label={`Edit ${provider.displayName}`}
-										disabled={busy}
-										onClick={() => onEdit(provider)}
-									>
-										<Pencil className="size-4" aria-hidden />
-									</Button>
-									<AlertDialog>
-										<AlertDialogTrigger
-											render={
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon"
-													aria-label={`Delete ${provider.displayName}`}
-													disabled={busy}
-												>
-													<Trash2 className="size-4 text-destructive" aria-hidden />
-												</Button>
-											}
-										/>
-										<AlertDialogContent>
-											<AlertDialogHeader>
-												<AlertDialogTitle>Delete “{provider.displayName}”?</AlertDialogTitle>
-												<AlertDialogDescription>
-													Users will no longer be able to sign in with this provider. Existing
-													linked accounts are unaffected. This cannot be undone.
-												</AlertDialogDescription>
-											</AlertDialogHeader>
-											<AlertDialogFooter>
-												<AlertDialogCancel>Cancel</AlertDialogCancel>
-												<AlertDialogAction onClick={() => onDelete(provider)}>
-													Delete
-												</AlertDialogAction>
-											</AlertDialogFooter>
-										</AlertDialogContent>
-									</AlertDialog>
-								</div>
-							</TableCell>
-						</TableRow>
-					);
-				})}
+				{SKELETON_ROWS.map((id) => (
+					<TableRow key={`loading-${id}`}>
+						<TableCell>
+							<Skeleton className="h-4 w-32" />
+							<Skeleton className="mt-2 h-3 w-20" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-5 w-16" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-8 w-64" />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-5 w-9" />
+						</TableCell>
+						<TableCell>
+							<div className="flex justify-end gap-1">
+								<Skeleton className="size-8" />
+								<Skeleton className="size-8" />
+							</div>
+						</TableCell>
+					</TableRow>
+				))}
 			</TableBody>
 		</Table>
 	);

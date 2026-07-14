@@ -74,7 +74,7 @@ public class FeedbackChannelRouter {
      * observations with no file location have no natural inline home and are candidates for the conversation.
      */
     private static boolean hasNaturalInlineAnchor(Observation observation) {
-        if (observation.getArtifactType() != WorkArtifact.PULL_REQUEST) {
+        if (!observation.getArtifactType().hasInlineLane()) {
             return false;
         }
         JsonNode evidence = observation.getEvidence();

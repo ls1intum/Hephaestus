@@ -137,12 +137,17 @@ export const NoChannelName: Story = {
 	},
 };
 
-/** Slack not connected — the Add-channel affordance is disabled. */
+/**
+ * Slack not connected — the section stays visible so an admin can discover what channel
+ * monitoring does before installing the app, and points back at the connect card instead of
+ * offering an Add button that could not work.
+ */
 export const NotConnected: Story = {
 	args: { hasSlackConnection: false, channels: [pending] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /add channel/i })).toBeDisabled();
+		await expect(canvas.queryByRole("button", { name: /add channel/i })).not.toBeInTheDocument();
+		await expect(canvas.getByText(/connect slack to monitor channels/i)).toBeInTheDocument();
 	},
 };
 
@@ -161,7 +166,7 @@ export const ActivateConfirm: Story = {
 	},
 };
 
-/** Revoke is gated by a type-to-confirm AlertDialog. */
+/** Revoke is gated by a type-to-confirm AlertDialog that validates on submit. */
 export const RevokeTypeToConfirm: Story = {
 	args: { channels: [active] },
 	play: async ({ canvasElement }) => {
@@ -169,10 +174,15 @@ export const RevokeTypeToConfirm: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
 		const dialog = await screen.findByRole("alertdialog");
+
+		// Enabled, but it will not erase anything until the ID matches — and it says so.
 		const confirm = within(dialog).getByRole("button", { name: /remove & erase/i });
-		await expect(confirm).toBeDisabled();
-		await userEvent.type(within(dialog).getByLabelText(/to confirm/i), active.slackChannelId);
 		await expect(confirm).toBeEnabled();
+		await userEvent.click(confirm);
+		await expect(within(dialog).getByText(/that does not match/i)).toBeInTheDocument();
+
+		await userEvent.type(within(dialog).getByLabelText(/to confirm/i), active.slackChannelId);
+		await expect(within(dialog).queryByText(/that does not match/i)).not.toBeInTheDocument();
 	},
 };
 
@@ -210,8 +220,10 @@ export const RemovePendingNothingCollected: Story = {
 	},
 };
 
-/** The searchable channel picker: search filters the list, and a selection registers without
- * manual id entry. */
+/**
+ * The one channel control: a combobox. Search filters the list, disabled options keep a visible
+ * reason, and a selection registers without the admin ever handling a raw channel id.
+ */
 export const AddChannelPicker: Story = {
 	args: {
 		channels: [],
@@ -237,23 +249,26 @@ export const AddChannelPicker: Story = {
 		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");
 
-		// The archived channel is a disabled option with a reason, not silently missing from
-		// the list.
-		const archived = within(dialog).getByRole("option", { name: /#team-standup/i });
-		await expect(archived).toHaveAttribute("aria-disabled", "true");
-		await expect(within(dialog).getByText(/^archived$/i)).toBeInTheDocument();
+		// The options live in the combobox's popover — open it. (The popover is portalled, so
+		// the options are queried from the document, not from the dialog subtree.)
+		await userEvent.click(within(dialog).getByRole("combobox", { name: /^channel$/i }));
+
+		// The archived channel is a disabled option with a reason, not silently missing.
+		await expect(await screen.findByRole("option", { name: /#team-standup/i })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(screen.getByText(/^archived$/i)).toBeInTheDocument();
 
 		// Searching narrows the option list instead of scrolling a flat button list.
 		await userEvent.type(
-			within(dialog).getByRole("combobox", { name: /search available slack channels/i }),
+			screen.getByRole("combobox", { name: /search available slack channels/i }),
 			"general",
 		);
-		await expect(within(dialog).getByRole("option", { name: /#general/i })).toBeInTheDocument();
-		await expect(
-			within(dialog).queryByRole("option", { name: /#team-standup/i }),
-		).not.toBeInTheDocument();
+		await expect(screen.getByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expect(screen.queryByRole("option", { name: /#team-standup/i })).not.toBeInTheDocument();
 
-		await userEvent.click(within(dialog).getByRole("option", { name: /#general/i }));
+		await userEvent.click(screen.getByRole("option", { name: /#general/i }));
 		await userEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
 	},
 };
@@ -271,7 +286,10 @@ export const MutationError: Story = {
 		// Empty list ⇒ both a header button and an empty-state CTA; open via the header one.
 		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");
-		await userEvent.type(within(dialog).getByLabelText(/paste channel link or id/i), "C0974LJBPBK");
+		await userEvent.type(
+			within(dialog).getByLabelText(/paste a channel link or id/i),
+			"C0974LJBPBK",
+		);
 		await userEvent.click(within(dialog).getByRole("button", { name: /^add channel$/i }));
 		// Rejected mutation ⇒ the dialog stays open for a retry.
 		await expect(await screen.findByRole("dialog")).toBeInTheDocument();

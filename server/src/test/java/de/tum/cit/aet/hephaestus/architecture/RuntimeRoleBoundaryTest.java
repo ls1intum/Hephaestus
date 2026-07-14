@@ -131,6 +131,19 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         Map.entry(
             "de.tum.cit.aet.hephaestus.integration.slack.leaderboard.SlackLeaderboardDigestPublisher",
             RuntimeRole.SERVER_PROPERTY
+        ),
+        // Outline admin/connect surface — server-only, mirroring the Slack entries above.
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionStrategy",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionAdminController",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.outline.collection.OutlineCollectionAdminController",
+            RuntimeRole.SERVER_PROPERTY
         )
     );
 

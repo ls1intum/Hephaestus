@@ -34,7 +34,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Locks the post-cutover identity resolution: {@code sub → Account → active IdentityLink → User}.
+ * Locks the identity resolution: {@code sub → Account → active IdentityLink → User}.
  * The Hephaestus cookie-JWT carries no {@code gitlab_id} / {@code github_id} claim, so the SCM
  * actor mirror must be provisioned from {@link AccountIdentityQuery}, never from JWT claims.
  */
@@ -75,7 +75,6 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
 
     @Test
     void resolveOrProvision_provisionsGitLabUserFromIdentityLink_whenNoClaimPresent() {
-        // No pre-existing SCM user → must provision from the account's GitLab IdentityLink.
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         IdentityLinkView gitlab = view(100L, GITLAB_PROVIDER_ID, "18024", "gitlabuser");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(gitlab));
@@ -156,7 +155,6 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         );
         lenient().when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
-        // No exception — a GitLab-logged-in user is allowed to create a GitLab workspace.
         service.ensureCurrentGitLabUserExists();
 
         verify(accountIdentityQuery).linkExternalActor(100L, 555L);

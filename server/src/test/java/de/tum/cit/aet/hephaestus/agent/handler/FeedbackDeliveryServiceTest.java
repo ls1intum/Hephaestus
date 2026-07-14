@@ -184,7 +184,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            // Edit found the prior comment GONE (a human deleted it) → post a fresh one.
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.GONE, null)
             );
@@ -203,7 +202,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            // A rate-limit / network blip → TRANSIENT: keep the live summary, never create-fallback (no double-post).
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
             );
@@ -211,7 +209,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
 
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
-            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior"); // still points at the live summary
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
         }
 
         @Test
@@ -359,6 +357,29 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isNull();
+            // The composed body is persisted as FAILED (auditable + dashboard-visible) BEFORE the exception
+            // propagates — a failed direct delivery must not discard it.
+            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), eq(delivery));
+        }
+
+        @Test
+        void summaryLandedThenInlineFailed_doesNotRecordFalseUndelivered() {
+            // Partial success: the summary posted (developer saw the findings), then the inline-notes step threw
+            // JobDeliveryException. recordUndelivered must NOT run — a FAILED unit + conversation re-signal here
+            // would falsely mark the landed summary undelivered and double-raise its loci.
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_summary_1");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenThrow(
+                new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("no inline channel wired")
+            );
+
+            var delivery = new DeliveryContent("Summary.", List.of(new DiffNote("src/Foo.java", 3, null, "x")));
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
+                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
+            );
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_summary_1");
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test
@@ -409,9 +430,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void emptyDiffNotesStillReconcilesToClearStaleNotesOnOpenPr() {
-            // G1 regression: a re-review that now produces ZERO inline notes must STILL reconcile so an
-            // earlier run's stale line-numbered notes are cleared (the empty-diff pathology). Reconciliation
-            // runs with an empty list — the clear half of clear-then-post.
+            // A re-review that produces ZERO inline notes must STILL reconcile so an earlier run's stale
+            // line-numbered notes are cleared (the empty-diff pathology) — the clear half of clear-then-post.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
@@ -494,7 +514,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
                 new DiffNotePoster.DiffNoteResult(1, 0, List.of(landedSignal("corr-1")))
             );
-            // The demotion edit lands.
             when(commentPoster.updateFormattedBody(eq(job), eq("IC_summary"), any(String.class))).thenReturn(
                 new PullRequestCommentPoster.UpdateResult(
                     PullRequestCommentPoster.UpdateResult.Kind.EDITED,
@@ -532,7 +551,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 return "should-not-be-used";
             });
 
-            // The recomposer is never consulted and the summary is never re-edited.
             assertThat(recomposed[0]).isFalse();
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
@@ -556,7 +574,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> "demoted");
 
-            // No non-FAILED key → no demotion edit; the full-line fallback summary already posted stands.
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
     }

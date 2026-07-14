@@ -427,6 +427,20 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
+                    // Skip if EVERY @Scheduled method declares the bypass itself. This is the tighter form of
+                    // the type-level annotation and the one to prefer: a scheduler whose cron fan-outs are
+                    // cross-tenant but whose other (single-workspace) entry points are not must NOT blanket
+                    // the whole class in a bypass — that would silently disarm WorkspaceStatementInspector on
+                    // the scoped methods too (see OutlineDocumentSyncScheduler).
+                    boolean everyScheduledMethodDeclaresBypass = javaClass
+                        .getMethods()
+                        .stream()
+                        .filter(m -> m.isAnnotatedWith(Scheduled.class))
+                        .allMatch(m -> m.isAnnotatedWith(WorkspaceAgnostic.class));
+                    if (everyScheduledMethodDeclaresBypass) {
+                        return;
+                    }
+
                     // Skip explicitly workspace-agnostic schedulers
                     if (WORKSPACE_AGNOSTIC_SCHEDULERS.contains(javaClass.getSimpleName())) {
                         return;
@@ -598,9 +612,14 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "PracticeDetectionCompletedEvent", // carries workspaceId directly (mentor cache eviction)
                                 "PracticeDetectionDeliveredEvent", // carries workspaceId directly (conversational routing)
+                                "ConversationFeedbackPreparedEvent", // carries workspaceId directly (Slack nudge)
                                 "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
                                 "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
                                 "WorkspaceCreatedEvent", // Carries workspaceId + kind
+                                // ConnectionLifecycleEvent.Activated / .Deactivated carry workspaceId directly
+                                // (published from ConnectionService.transition; consumed by vendor adapters).
+                                "Activated",
+                                "Deactivated",
                                 "WorkspaceScheduleChangedEvent", // Carries workspaceId for leaderboard reschedule
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
@@ -611,7 +630,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 // exempted below). These Spring Security login events drive auth.login metrics
                                 // in AuthLoginEventMetrics and carry no workspace by design.
                                 "InteractiveAuthenticationSuccessEvent",
-                                "AbstractAuthenticationFailureEvent"
+                                "AbstractAuthenticationFailureEvent",
+                                // Carries workspaceId + collectionId. An in-module after-commit hop: the
+                                // Outline collection resume must not kick its async sync until the ENABLED
+                                // write is committed, or the sync reads PAUSED and no-ops.
+                                "OutlineCollectionResumedEvent"
                             );
 
                             boolean isWorkspaceAware = workspaceAwareEventPrefixes

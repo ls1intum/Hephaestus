@@ -25,12 +25,6 @@ public record SlackMonitoredChannelDTO(
     Long optedOutMemberCount,
     @NonNull @Schema(description = "When the channel was first discovered / allow-listed") Instant createdAt
 ) {
-    /**
-     * Projects a {@link SlackMonitoredChannel} plus the workspace-wide opted-out member count into the DTO.
-     *
-     * @param channel the allow-list row
-     * @param optedOutMemberCount the workspace-wide count of ingestion-opted-out members
-     */
     public static SlackMonitoredChannelDTO from(SlackMonitoredChannel channel, long optedOutMemberCount) {
         return new SlackMonitoredChannelDTO(
             channel.getId(),

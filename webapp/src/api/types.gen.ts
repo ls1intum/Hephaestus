@@ -163,7 +163,7 @@ export type WorkspaceListItem = {
     /**
      * High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound
      */
-    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -277,7 +277,7 @@ export type Workspace = {
     /**
      * High-level git provider type for the workspace's SCM connection (null if none bound)
      */
-    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
@@ -632,6 +632,16 @@ export type UpdatePracticeActiveRequest = {
      * Whether the practice should be active
      */
     active: boolean;
+};
+
+/**
+ * Transition a mirrored Outline collection to a target mirror state (pause / resume)
+ */
+export type UpdateOutlineCollectionStateRequest = {
+    /**
+     * Target mirror state
+     */
+    state: 'ENABLED' | 'PAUSED';
 };
 
 export type UpdateLoginProviderRequest = {
@@ -1060,6 +1070,16 @@ export type RegisterSlackChannelRequest = {
      * Slack public/private channel id (stable C… or G… id)
      */
     slackChannelId: string;
+};
+
+/**
+ * Register an Outline collection for mirroring (lands ENABLED + PENDING)
+ */
+export type RegisterOutlineCollectionRequest = {
+    /**
+     * Outline collection id (UUID)
+     */
+    collectionId: string;
 };
 
 /**
@@ -1820,6 +1840,162 @@ export type AgentJob = {
 };
 
 /**
+ * Live state of the API token behind the workspace's Outline connection
+ */
+export type OutlineTokenStatus = {
+    /**
+     * Whether Outline still accepts the stored token. False means revoked, expired or rejected.
+     */
+    accepted: boolean;
+    /**
+     * When the token lapses. Absent for a key created without an expiry.
+     */
+    expiresAt?: Date;
+    /**
+     * Last four characters of the token, as Outline reports them
+     */
+    last4?: string;
+    /**
+     * When Outline last saw the token used
+     */
+    lastActiveAt?: Date;
+    /**
+     * The token's name in Outline. Absent when the token cannot list its own key (a scoped key, or one owned by a user who cannot see it) — sync is unaffected.
+     */
+    name?: string;
+};
+
+/**
+ * Health of the workspace's active Outline connection
+ */
+export type OutlineConnectionStatus = {
+    /**
+     * Live (non-tombstoned) mirrored document count across all collections
+     */
+    documentCount: number;
+    /**
+     * Collections whose last sync attempt recorded an error (cleared on the next clean pass)
+     */
+    erroredCollections: number;
+    /**
+     * When a mirrored collection last completed a full reconcile pass, if any
+     */
+    lastSyncedAt?: Date;
+    /**
+     * Enabled collections still awaiting a clean sync pass
+     */
+    pendingCollections: number;
+    /**
+     * Whether a manually triggered full reconcile is currently running for this workspace
+     */
+    syncRunning: boolean;
+    /**
+     * Whether a webhook subscription id is currently stored for this connection. This is existence only, not a liveness check: Outline auto-disables a subscription after repeated delivery failures, and a stale id here self-heals on the next reconcile rather than being verified live by this endpoint.
+     */
+    webhookRegistered: boolean;
+};
+
+/**
+ * An Outline collection the token can see, offered in the add-collection picker
+ */
+export type OutlineCollectionCandidate = {
+    /**
+     * Whether this collection is already registered for mirroring
+     */
+    alreadyMirrored: boolean;
+    /**
+     * Outline collection id (UUID)
+     */
+    collectionId: string;
+    /**
+     * Collection color as configured in Outline
+     */
+    color?: string;
+    /**
+     * Collection description as shown in Outline
+     */
+    description?: string;
+    /**
+     * Collection icon as configured in Outline
+     */
+    icon?: string;
+    /**
+     * Collection name as shown in Outline
+     */
+    name?: string;
+    /**
+     * Outline url id (the short slug in collection URLs)
+     */
+    urlId?: string;
+};
+
+/**
+ * A mirrored Outline collection with its sync state and live document count
+ */
+export type OutlineCollection = {
+    /**
+     * Outline collection id (UUID; the natural key)
+     */
+    collectionId: string;
+    /**
+     * Collection color as configured in Outline
+     */
+    color?: string;
+    /**
+     * When the collection was registered for mirroring
+     */
+    createdAt: Date;
+    /**
+     * Collection description as shown in Outline
+     */
+    description?: string;
+    /**
+     * Live (non-tombstoned) mirrored document count
+     */
+    documentCount: number;
+    /**
+     * Documents upstream reported for this collection at the last enumeration (coverage denominator)
+     */
+    documentsUpstream?: number;
+    /**
+     * Exports the last pass skipped because the shared budget ran out (0 on a clean pass)
+     */
+    exportsSkippedForBudget?: number;
+    /**
+     * Collection icon as configured in Outline
+     */
+    icon?: string;
+    /**
+     * Internal registry row id
+     */
+    id: number;
+    /**
+     * Last sync failure for this collection, cleared on the next clean pass
+     */
+    lastSyncError?: string;
+    /**
+     * When this collection last completed a full reconcile pass, if any
+     */
+    lastSyncedAt?: Date;
+    /**
+     * Collection name as shown in Outline, if known
+     */
+    name?: string;
+    /**
+     * Mirror lifecycle state (PAUSED freezes sync but keeps documents)
+     */
+    state: 'ENABLED' | 'PAUSED';
+    /**
+     * Whether a clean full pass has completed since registration or the last resume
+     */
+    syncStatus: 'PENDING' | 'COMPLETE';
+    /**
+     * Outline url id (the short slug in collection URLs)
+     */
+    urlId?: string;
+};
+
+/**
  * Full practice observation detail including guidance and evidence
  */
 export type ObservationDetail = {
@@ -2064,7 +2240,7 @@ export type InitiateConnectionResponse = {
  * <code>IllegalArgumentException</code>.
  */
 export type InitiateConnectionRequest = {
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     userInput?: {
         [key: string]: string;
     };
@@ -2415,7 +2591,7 @@ export type CreateLoginProviderRequest = {
      * Space-separated scopes; defaulted by provider type if omitted
      */
     scopes?: string;
-    type: 'GITHUB' | 'GITLAB' | 'SLACK';
+    type: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
 /**
@@ -2504,10 +2680,10 @@ export type ConnectionSummary = {
     capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     createdAt?: Date;
     displayName?: string;
-    family?: 'SCM' | 'MESSAGING';
+    family?: 'SCM' | 'MESSAGING' | 'DOCUMENTATION';
     id?: number;
     instanceKey?: string;
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
     updatedAt?: Date;
@@ -2517,8 +2693,16 @@ export type ConnectionSummary = {
  * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
  * sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
  * <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
- * client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
- * and is not exposed by this DTO.
+ * client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
+ * entity, and every secret-bearing key of the config itself is stripped by
+ * {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO#redactSensitive #redactSensitive} before serialization.
+ *
+ * <p><b>Why redact here and not with <code>@JsonIgnore</code> on the record component?</b> The very
+ * same {@link ObjectMapper ObjectMapper} bean serializes {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO  de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+ * <code>connection.config</code> column (Hibernate's <code>json_format_mapper</code> is wired to it in
+ * <code>HibernateJacksonFormatMapperConfig</code>). Annotating the component would therefore drop the
+ * secret on write and destroy the stored value — the API-boundary filter below is the only place
+ * the two concerns can be separated.
  *
  * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
  * the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
@@ -2531,10 +2715,10 @@ export type ConnectionDetail = {
     };
     createdAt?: Date;
     displayName?: string;
-    family?: 'SCM' | 'MESSAGING';
+    family?: 'SCM' | 'MESSAGING' | 'DOCUMENTATION';
     id?: number;
     instanceKey?: string;
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
     updatedAt?: Date;
@@ -2766,7 +2950,7 @@ export type AdminWorkspaceView = {
     id: number;
     memberCount: number;
     ownerLogin?: string;
-    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     status: string;
     workspaceSlug: string;
 };
@@ -3933,6 +4117,88 @@ export type InitiateResponses = {
 
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
 
+export type GetOutlineConnectionStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/outline/status';
+};
+
+export type GetOutlineConnectionStatusErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type GetOutlineConnectionStatusResponses = {
+    /**
+     * Connection health snapshot returned
+     */
+    200: OutlineConnectionStatus;
+};
+
+export type GetOutlineConnectionStatusResponse = GetOutlineConnectionStatusResponses[keyof GetOutlineConnectionStatusResponses];
+
+export type SyncOutlineConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/outline/sync';
+};
+
+export type SyncOutlineConnectionErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type SyncOutlineConnectionResponses = {
+    /**
+     * Reconcile accepted (or already running — duplicate submits are absorbed); poll the connection status resource in the Location header
+     */
+    202: unknown;
+};
+
+export type GetOutlineTokenStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/outline/token';
+};
+
+export type GetOutlineTokenStatusErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type GetOutlineTokenStatusResponses = {
+    /**
+     * Token state returned
+     */
+    200: OutlineTokenStatus;
+};
+
+export type GetOutlineTokenStatusResponse = GetOutlineTokenStatusResponses[keyof GetOutlineTokenStatusResponses];
+
 export type SendSlackTestMessageData = {
     /**
      * optional channel override; when blank, the persisted notification channel is used.
@@ -4001,7 +4267,7 @@ export type AuditResponses = {
 
 export type AuditResponse = AuditResponses[keyof AuditResponses];
 
-export type UpdateStatus1Data = {
+export type UpdateConnectionStatusData = {
     body: UpdateConnectionStatusRequest;
     path: {
         /**
@@ -4014,14 +4280,14 @@ export type UpdateStatus1Data = {
     url: '/workspaces/{workspaceSlug}/connections/{id}/status';
 };
 
-export type UpdateStatus1Responses = {
+export type UpdateConnectionStatusResponses = {
     /**
      * OK
      */
     200: ConnectionSummary;
 };
 
-export type UpdateStatus1Response = UpdateStatus1Responses[keyof UpdateStatus1Responses];
+export type UpdateConnectionStatusResponse = UpdateConnectionStatusResponses[keyof UpdateConnectionStatusResponses];
 
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;
@@ -4472,6 +4738,197 @@ export type UpdateNotificationsResponses = {
 };
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
+
+export type ListOutlineCollectionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections';
+};
+
+export type ListOutlineCollectionsErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type ListOutlineCollectionsResponses = {
+    /**
+     * Mirrored collections returned
+     */
+    200: Array<OutlineCollection>;
+};
+
+export type ListOutlineCollectionsResponse = ListOutlineCollectionsResponses[keyof ListOutlineCollectionsResponses];
+
+export type RegisterOutlineCollectionData = {
+    body: RegisterOutlineCollectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections';
+};
+
+export type RegisterOutlineCollectionErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+    /**
+     * A concurrent registration of the same collection won the race
+     */
+    409: unknown;
+    /**
+     * Outline does not know the requested collection id
+     */
+    422: unknown;
+};
+
+export type RegisterOutlineCollectionResponses = {
+    /**
+     * Collection was already registered (idempotent repeat)
+     */
+    200: OutlineCollection;
+    /**
+     * Collection registered; the Location header points at the collection resource
+     */
+    201: OutlineCollection;
+};
+
+export type RegisterOutlineCollectionResponse = RegisterOutlineCollectionResponses[keyof RegisterOutlineCollectionResponses];
+
+export type ListOutlineCollectionCandidatesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/candidates';
+};
+
+export type ListOutlineCollectionCandidatesErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+    /**
+     * The Outline server could not be reached or answered with an error
+     */
+    502: unknown;
+    /**
+     * Outline is rate-limiting requests; the Retry-After header carries the seconds to wait before retrying
+     */
+    503: unknown;
+};
+
+export type ListOutlineCollectionCandidatesResponses = {
+    /**
+     * Candidate collections returned (Cache-Control: no-store)
+     */
+    200: Array<OutlineCollectionCandidate>;
+};
+
+export type ListOutlineCollectionCandidatesResponse = ListOutlineCollectionCandidatesResponses[keyof ListOutlineCollectionCandidatesResponses];
+
+export type DeleteOutlineCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        collectionId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
+};
+
+export type DeleteOutlineCollectionErrors = {
+    /**
+     * The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type DeleteOutlineCollectionResponses = {
+    /**
+     * Collection removed and its mirrored documents erased
+     */
+    204: void;
+};
+
+export type DeleteOutlineCollectionResponse = DeleteOutlineCollectionResponses[keyof DeleteOutlineCollectionResponses];
+
+export type GetOutlineCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        collectionId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
+};
+
+export type GetOutlineCollectionErrors = {
+    /**
+     * The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type GetOutlineCollectionResponses = {
+    /**
+     * Mirrored collection returned
+     */
+    200: OutlineCollection;
+};
+
+export type GetOutlineCollectionResponse = GetOutlineCollectionResponses[keyof GetOutlineCollectionResponses];
+
+export type UpdateOutlineCollectionStateData = {
+    body: UpdateOutlineCollectionStateRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        collectionId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/outline/collections/{collectionId}';
+};
+
+export type UpdateOutlineCollectionStateErrors = {
+    /**
+     * The collection is not registered for this workspace, or the workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type UpdateOutlineCollectionStateResponses = {
+    /**
+     * Collection state after the transition returned
+     */
+    200: OutlineCollection;
+};
+
+export type UpdateOutlineCollectionStateResponse = UpdateOutlineCollectionStateResponses[keyof UpdateOutlineCollectionStateResponses];
 
 export type ListAreasData = {
     body?: never;

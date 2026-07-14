@@ -20,10 +20,7 @@ import org.springframework.stereotype.Service;
  * creates the mentor {@code chat_thread} for that DM, then runs a turn through the {@link MentorTurnRunner} port,
  * streaming the reply natively via {@link SlackStreamingMentorChannel}.
  *
- * <p>The Slack→mentor thread mapping is persisted with the {@code integration.slack.domain} JPA repository; the
- * {@code chat_thread} itself is created inside the mentor module (no cross-module raw insert). The find-or-create
- * of that mapping is delegated to {@link MentorSlackThreadLinker} so its two writes commit atomically across a real
- * proxy hop. Developer identity resolves through {@code identity_link} (SLACK provider) via
+ * <p>Developer identity resolves through {@code identity_link} (SLACK provider) via
  * {@link SlackMentorIdentityResolver}: an unlinked Slack user (or one with no membership in the resolved
  * workspace) gets the friendly "not linked" reply.
  */
@@ -61,18 +58,10 @@ public class SlackMentorService {
 
     private record Developer(String login) {}
 
-    /**
-     * The developer whose practice history the DM should draw on, resolved via {@code identity_link} (SLACK
-     * provider) keyed by {@code (team, user)} and gated on membership in {@code workspaceId}.
-     */
     private Optional<Developer> resolveDeveloper(long workspaceId, String teamId, String slackUserId) {
         return identityResolver.resolveDeveloperLogin(workspaceId, teamId, slackUserId).map(Developer::new);
     }
 
-    /**
-     * Handle one inbound DM message: resolve → run a mentor turn that streams its reply back into
-     * {@code threadTs}'s thread on {@code channelId}.
-     */
     public void handleDm(
         String teamId,
         String channelId,

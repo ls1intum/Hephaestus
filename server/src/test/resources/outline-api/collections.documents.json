@@ -1,0 +1,68 @@
+{
+  "data": [
+    {
+      "id": "7d11d73d-1b36-43e3-9f31-b43e98c69b5b",
+      "url": "/doc/fixture-capture-doc-renamed-JpRHHJuY8M",
+      "title": "Fixture Capture Doc Renamed",
+      "children": [
+        {
+          "id": "cec98e59-623c-4392-a343-6e96b0995e51",
+          "title": "Fixture Capture Child 2",
+          "url": "/doc/fixture-capture-child-2-OHQpaAib7z",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "2b830a56-0007-4752-8602-204b46855c8a",
+      "url": "/doc/logging-convention-r7LT2oFrCx",
+      "title": "Logging Convention",
+      "children": []
+    },
+    {
+      "id": "798c940f-47b5-46b3-93ab-e49fc0e3354c",
+      "url": "/doc/setup-guide-psUl8qCles",
+      "title": "Setup Guide",
+      "children": []
+    },
+    {
+      "id": "f8581b75-8d6d-46d4-a7b5-2af36532ddcf",
+      "url": "/doc/adr-007-keep-timeline-rendering-client-side-Kc3gc7IyEU",
+      "title": "ADR 007: Keep timeline rendering client-side",
+      "children": []
+    },
+    {
+      "id": "0b382fff-f2fd-42ec-9431-cf7027d93e05",
+      "url": "/doc/api-error-handling-convention-sWpj6OP4HH",
+      "title": "API Error Handling Convention",
+      "children": []
+    },
+    {
+      "id": "0ad18868-29be-4e5a-a571-7cd8db7b183b",
+      "url": "/doc/rfc-007-event-contracts-mTz70gf0ND",
+      "title": "RFC 007: Event contracts",
+      "children": []
+    },
+    {
+      "id": "a2a27067-b756-40f2-ae82-041cd1827a6f",
+      "url": "/doc/design-sync-architecture-VdAVl6328w",
+      "title": "Design: Sync architecture",
+      "children": []
+    },
+    {
+      "id": "2cd0339a-ab96-4707-9af4-187de33abaa7",
+      "url": "/doc/adr-001-use-postgresql-for-persistence-utq88TwKuY",
+      "title": "ADR 001: Use PostgreSQL for persistence",
+      "children": [
+        {
+          "id": "dfd50ea2-6b11-41f0-896d-ed243b5b3b1b",
+          "url": "/doc/nested-child-doc-audit-test-dxv9XVhJmC",
+          "title": "Nested Child Doc - Audit Test",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "status": 200,
+  "ok": true
+}

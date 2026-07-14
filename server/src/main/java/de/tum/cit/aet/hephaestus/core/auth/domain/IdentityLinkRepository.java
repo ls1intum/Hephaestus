@@ -55,12 +55,7 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
     )
     int touchLastLogin(@Param("id") Long id, @Param("now") Instant now);
 
-    /**
-     * Active (non-disabled) identity links for an account. Replaces a {@code findAll()}-then-filter
-     * on the JWT-issue hot path ({@code JwtPrincipalFactory.resolveLogin}) and the
-     * {@code /user/identities} read ({@code AccountService.activeIdentities}) — both ran a full table
-     * scan per call. The join column is {@code account_id}.
-     */
+    /** Active (non-disabled) identity links for an account. */
     @Query(
         """
         SELECT il
@@ -105,6 +100,21 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
     @Modifying
     @Query("DELETE FROM IdentityLink il WHERE il.id = :id AND il.account.id = :accountId")
     int deleteByIdAndAccountId(@Param("id") Long id, @Param("accountId") Long accountId);
+
+    /**
+     * Account ids owning an active link wired to {@code externalActorId} — the reverse of
+     * {@link #linkExternalActorIfAbsent}. Ordered by link id so the caller's first pick is deterministic.
+     */
+    @Query(
+        """
+        SELECT il.account.id
+          FROM IdentityLink il
+         WHERE il.externalActorId = :externalActorId
+           AND il.disabledAt IS NULL
+         ORDER BY il.id
+        """
+    )
+    List<Long> findActiveAccountIdsByExternalActorId(@Param("externalActorId") Long externalActorId);
 
     /**
      * Wire an {@link IdentityLink} to its git-provider actor mirror, but only when it is not already

@@ -203,14 +203,11 @@ public class IssueReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Posts the composed student-facing note as a comment on the issue (via the integration-resolved
-     * FeedbackChannel). Best-effort: a posting failure is logged, not thrown, so a transient delivery error
-     * never marks an otherwise-successful
-     * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
-     * already persisted above, so the formative loop is intact even if the comment does not land.
+     * Posts the composed student-facing note as an issue comment. Best-effort: a posting failure is logged,
+     * not thrown, so a transient delivery error never marks an otherwise-successful detection job FAILED.
+     * Findings are already persisted, so the formative loop is intact even if the comment does not land.
+     * Package-private for direct testing of the suppression + soft-failure contract.
      */
-    // Package-private for direct testing of the suppression + soft-failure contract (mirrors how
-    // FeedbackDeliveryService.deliverFeedback is tested), without driving the real result parser.
     void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         if (delivery == null || delivery.mrNote() == null) {
             return;
@@ -234,24 +231,23 @@ public class IssueReviewHandler implements JobTypeHandler {
                 posted = true;
                 log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
             } else {
-                // Best-effort issue post returned no comment id (vendor returned nothing without raising).
-                // Issue delivery is intentionally best-effort, so this is not fatal — but log it for diagnosis.
                 log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
         } catch (JobDeliveryException e) {
-            // A genuine delivery failure (the agent ran, but the student saw nothing) must NOT be reported
-            // as DELIVERED — re-throw so the job is recorded as failed, matching the PR path.
+            // A genuine delivery failure (the student saw nothing) must NOT be reported as DELIVERED — persist the
+            // composed body as FAILED (auditable), then re-throw so the job is recorded failed, matching the PR path.
+            recordUndelivered(job, delivery);
             throw e;
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
 
-        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed. A null /
-        // swallowed post means the student saw nothing — recording a DELIVERED unit (and superseding the real
-        // prior) would corrupt the ledger exactly like the PR TRANSIENT no-op (A3). Best-effort, REQUIRES_NEW +
-        // try/catch so it can never affect the issue note the developer already received. Issues have no inline
-        // placements.
+        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed: recording a
+        // DELIVERED unit (and superseding the real prior) when the student saw nothing would corrupt the ledger.
+        // Best-effort, REQUIRES_NEW + try/catch so it can never affect the note the developer already received.
+        // Issues have no inline placements.
         if (!posted) {
+            recordUndelivered(job, delivery);
             return;
         }
         try {
@@ -259,6 +255,19 @@ public class IssueReviewHandler implements JobTypeHandler {
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+        }
+    }
+
+    /** Best-effort FAILED-unit persist (two call sites). REQUIRES_NEW in the recorder + this catch mean a ledger failure never masks the delivery outcome. */
+    private void recordUndelivered(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+        try {
+            feedbackLedgerRecorder.recordUndelivered(job, delivery);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Undelivered-feedback ledger record failed (delivery unaffected): jobId={}, error={}",
                 job.getId(),
                 e.getMessage()
             );

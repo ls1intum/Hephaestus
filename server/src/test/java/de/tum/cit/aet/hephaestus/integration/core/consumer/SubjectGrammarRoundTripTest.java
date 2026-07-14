@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.scm.github.webhook.GithubSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabSubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -33,9 +34,11 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Path GITLAB_DIR = Paths.get("src/test/resources/gitlab");
     private static final Path GITHUB_DIR = Paths.get("src/test/resources/github");
+    private static final Path OUTLINE_DIR = Paths.get("src/test/resources/outline");
 
     private static final GithubSubjectKeyDeriver GITHUB = new GithubSubjectKeyDeriver();
     private static final GitlabSubjectKeyDeriver GITLAB = new GitlabSubjectKeyDeriver();
+    private static final OutlineSubjectKeyDeriver OUTLINE = new OutlineSubjectKeyDeriver(MAPPER);
 
     static Stream<Path> gitlabFixtures() throws IOException {
         return listJson(GITLAB_DIR);
@@ -43,6 +46,10 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
 
     static Stream<Path> githubFixtures() throws IOException {
         return listJson(GITHUB_DIR);
+    }
+
+    static Stream<Path> outlineFixtures() throws IOException {
+        return listJson(OUTLINE_DIR);
     }
 
     private static Stream<Path> listJson(Path dir) throws IOException {
@@ -90,6 +97,43 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         assertThat(publisherSubject)
             .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
             .startsWith(consumerPrefix + ".");
+    }
+
+    @ParameterizedTest(name = "Outline fixture {0}")
+    @MethodSource("outlineFixtures")
+    void outlineFixtureSubjectMatchesConsumerPrefix(Path fixture) throws IOException {
+        JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
+        String subscriptionId = payload.path("webhookSubscriptionId").asString("");
+        if (subscriptionId.isEmpty()) {
+            return;
+        }
+        String publisherSubject = OUTLINE.deriveSubject(payload, Map.of());
+        String consumerPrefix = consumerSubscriptionPrefix(subscriptionId);
+        assertThat(publisherSubject)
+            .as("publisher %s should start with consumer prefix '%s'", fixture.getFileName(), consumerPrefix)
+            .startsWith(consumerPrefix);
+    }
+
+    /**
+     * Explicit mixed-case guard for the Outline subscription id. Outline sends lowercase UUIDs today, so no
+     * fixture carries uppercase, but the producer must pass the id through byte-for-byte to match the
+     * consumer's subscription filter. If the deriver ever case-folds the id while the consumer (fed the
+     * case-preserved stored id) does not, this fails — the exact producer↔consumer drift this suite guards.
+     */
+    @Test
+    void outlineMixedCaseSubscriptionRoundTrips() throws IOException {
+        String subscriptionId = "Sub-ABC-123";
+        JsonNode payload = MAPPER.readTree(
+            "{\"webhookSubscriptionId\":\"" + subscriptionId + "\",\"event\":\"documents.update\"}"
+        );
+        String publisherSubject = OUTLINE.deriveSubject(payload, Map.of());
+        assertThat(publisherSubject).startsWith(consumerSubscriptionPrefix(subscriptionId));
+    }
+
+    /** The consumer's {@code outline.<sub>.>} filter with its trailing wildcard stripped to a prefix. */
+    private static String consumerSubscriptionPrefix(String subscriptionId) {
+        String filter = ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId);
+        return filter.substring(0, filter.length() - 1); // drop the trailing '>'
     }
 
     /**

@@ -23,7 +23,8 @@ class IntegrationCoreVendorNeutralityTest extends HephaestusArchitectureTest {
             .resideInAnyPackage(
                 "de.tum.cit.aet.hephaestus.integration.scm.github..",
                 "de.tum.cit.aet.hephaestus.integration.scm.gitlab..",
-                "de.tum.cit.aet.hephaestus.integration.slack.."
+                "de.tum.cit.aet.hephaestus.integration.slack..",
+                "de.tum.cit.aet.hephaestus.integration.outline.."
             )
             .because(
                 "integration.core.** is the shared event/registry/SPI substrate. " +

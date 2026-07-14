@@ -6,6 +6,9 @@ import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationReques
 import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthFailureHandler;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.OutlineAuthInfoUserService;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
@@ -55,8 +58,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * silently create a session that the callback request on a different pod could not see.
  *
  * <p>Everything outside the URLs above is handled by the resource-server chain, which
- * validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder} (replaces the former
- * Keycloak setup; ADR 0017).
+ * validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder} (ADR 0017).
  */
 @ConditionalOnServerRole
 @Configuration
@@ -64,8 +66,13 @@ public class AuthSecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthSecurityConfig.class);
 
-    /** github.com's user-info API host — selects the email-enriching user service (see {@link #isGitHub}). */
     private static final String GITHUB_USERINFO_PREFIX = "https://api.github.com";
+
+    private final LoginProviderRepository loginProviderRepository;
+
+    public AuthSecurityConfig(LoginProviderRepository loginProviderRepository) {
+        this.loginProviderRepository = loginProviderRepository;
+    }
 
     @Bean
     public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(
@@ -108,25 +115,43 @@ public class AuthSecurityConfig {
 
     /**
      * OAuth2 user service. Routes GitHub registrations through {@link GitHubEmailOAuth2UserService}
-     * (fetches the primary+verified email from {@code api.github.com/user/emails}); every other
-     * registration uses the framework default. GitHub is detected by its user-info endpoint host
-     * ({@value #GITHUB_USERINFO_PREFIX}), NOT by registration id — the id is operator-chosen (it need
-     * not be {@code github}), and GitHub login is github.com-only (GHE out of scope), so the host is the
-     * stable signal. The GitLab login is OAuth2 (scope {@code read_user}, no {@code openid}), so it takes
-     * the default service and reads its email from {@code /api/v4/user} — see
-     * {@code LoginProviderClientRegistrationRepository}.
+     * (fetches the primary+verified email from {@code api.github.com/user/emails}) and OUTLINE-typed
+     * registrations through {@link OutlineAuthInfoUserService} (Outline has no GET-userinfo endpoint —
+     * identity is a {@code POST /api/auth.info}); every other registration uses the framework default.
+     * GitHub is detected by its user-info endpoint host ({@value #GITHUB_USERINFO_PREFIX}), NOT by
+     * registration id — the id is operator-chosen (it need not be {@code github}), and GitHub login is
+     * github.com-only (GHE out of scope), so the host is the stable signal. Outline is self-hosted (no
+     * stable host), so it is routed by the {@code login_provider} row's provider TYPE. The GitLab login
+     * is OAuth2 (scope {@code read_user}, no {@code openid}), so it takes the default service and reads
+     * its email from {@code /api/v4/user} — see {@code LoginProviderClientRegistrationRepository}.
      */
     @Bean
     public OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService() {
         var github = new GitHubEmailOAuth2UserService();
+        var outline = new OutlineAuthInfoUserService();
         var fallback = new DefaultOAuth2UserService();
-        return request -> (isGitHub(request.getClientRegistration()) ? github : fallback).loadUser(request);
+        return request -> {
+            ClientRegistration registration = request.getClientRegistration();
+            if (isGitHub(registration)) {
+                return github.loadUser(request);
+            }
+            if (isOutline(registration)) {
+                return outline.loadUser(request);
+            }
+            return fallback.loadUser(request);
+        };
     }
 
-    /** A registration is GitHub when its user-info endpoint is github.com's API ({@code api.github.com}). */
     private static boolean isGitHub(ClientRegistration registration) {
         String userInfoUri = registration.getProviderDetails().getUserInfoEndpoint().getUri();
         return userInfoUri != null && userInfoUri.startsWith(GITHUB_USERINFO_PREFIX);
+    }
+
+    private boolean isOutline(ClientRegistration registration) {
+        return loginProviderRepository
+            .findByRegistrationId(registration.getRegistrationId())
+            .map(provider -> provider.getType() == LoginProvider.ProviderType.OUTLINE)
+            .orElse(false);
     }
 
     @Bean
@@ -164,8 +189,6 @@ public class AuthSecurityConfig {
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
                 oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
                 oauth.successHandler(successHandler);
-                // Audit failed logins (LOGIN_FAILED) + redirect the SPA to its error page; see
-                // HephaestusAuthFailureHandler.
                 oauth.failureHandler(failureHandler);
             });
 
@@ -183,10 +206,8 @@ public class AuthSecurityConfig {
      * tolerated only for dev / CI where we generate a per-boot ephemeral key and log a
      * warning (in-flight logins are abandoned across restarts).
      *
-     * <p>In the {@code prod} profile a blank key is fatal (fail-closed) — mirroring
-     * {@code JwtSigningKeySealer}'s prod fail-fast — because an ephemeral key silently
-     * invalidates every in-flight login on each pod restart and differs per replica, which
-     * {@link AuthProperties} documents as a misconfiguration rather than a degraded mode.
+     * <p>In the {@code prod} profile a blank key is fatal (fail-closed) — an ephemeral key silently
+     * invalidates every in-flight login on each pod restart and differs per replica.
      */
     static byte[] resolveStateCookieKey(AuthProperties properties, boolean prodProfile) {
         if (!properties.stateCookieKey().isBlank()) {

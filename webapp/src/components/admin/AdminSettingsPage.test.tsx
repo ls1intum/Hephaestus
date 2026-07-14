@@ -66,11 +66,14 @@ function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 }
 
 describe("AdminSettingsPage — Slack integration structure", () => {
-	it("hides channel monitoring when Slack is disconnected, even if stale channels are present", () => {
+	it("keeps channel monitoring discoverable while disconnected, but renders no stale channels", () => {
 		setup({ hasSlackConnection: false, slackChannels: [staleChannel] });
 
 		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
-		expect(screen.queryByText(/slack channel monitoring/i)).toBeNull();
+		// The section explains itself before an admin commits to installing the app…
+		expect(screen.getByRole("heading", { name: /slack channel monitoring/i })).toBeTruthy();
+		expect(screen.getByText(/connect slack to monitor channels/i)).toBeTruthy();
+		// …but without a connection it shows no channel data, stale or otherwise.
 		expect(screen.queryByText(/old-channel/i)).toBeNull();
 		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});

@@ -13,11 +13,19 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     public static final String SCRIPT = "pi-runner.mjs";
 
+    /** {@code pi-runner.mjs} imports {@code ./pi-finding-normalize.mjs} — stage it beside the runner. */
+    private static final List<String> SIDECARS = List.of("pi-finding-normalize.mjs");
+
     private static final List<String> FLAGS = List.of("--no-warnings");
 
     @Override
     public String runnerScript() {
         return SCRIPT;
+    }
+
+    @Override
+    public List<String> sidecarScripts() {
+        return SIDECARS;
     }
 
     @Override

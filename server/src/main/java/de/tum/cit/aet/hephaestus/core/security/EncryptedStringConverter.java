@@ -17,25 +17,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * JPA AttributeConverter for encrypting sensitive string fields at rest using AES-256-GCM.
+ * JPA AttributeConverter for encrypting sensitive string fields at rest with AES-256-GCM
+ * (authenticated encryption; 12-byte random IV prepended to ciphertext, 128-bit auth tag).
+ * Apply via {@code @Convert(converter = EncryptedStringConverter.class)}.
  *
- * <p>Usage in entities:
- * <pre>
- * &#64;Convert(converter = EncryptedStringConverter.class)
- * &#64;Column(name = "slack_token", columnDefinition = "TEXT")
- * private String slackToken;
- * </pre>
- *
- * <p>Configuration:
- * Set the environment variable or property {@code hephaestus.security.encryption-key}
- * to a 32-character (256-bit) secret key.
- *
- * <p>Security properties:
- * <ul>
- *   <li>AES-256-GCM provides authenticated encryption</li>
- *   <li>12-byte random IV prepended to ciphertext</li>
- *   <li>128-bit authentication tag for integrity</li>
- * </ul>
+ * <p>Configuration: set {@code hephaestus.security.encryption-key} to a
+ * 32-character (256-bit) secret key.
  */
 @Component
 @Converter
@@ -77,8 +64,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
     /**
      * Canonical constructor (also the unit-test seam): builds the cipher key directly from the
-     * raw inputs. Same semantics as before — missing key fails fast in prod, warns elsewhere; a
-     * non-32-char key is rejected.
+     * raw inputs. Missing key fails fast in prod, warns elsewhere; a non-32-char key is rejected.
      */
     public EncryptedStringConverter(@Nullable String encryptionKey, @Nullable String activeProfiles) {
         if (encryptionKey == null || encryptionKey.isBlank()) {
@@ -124,7 +110,6 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
 
             byte[] cipherText = cipher.doFinal(attribute.getBytes(StandardCharsets.UTF_8));
 
-            // Prepend IV to ciphertext
             byte[] combined = new byte[iv.length + cipherText.length];
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(cipherText, 0, combined, iv.length, cipherText.length);
