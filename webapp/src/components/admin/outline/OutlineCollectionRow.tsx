@@ -8,6 +8,7 @@ import {
 	TriangleAlertIcon,
 } from "lucide-react";
 import type { OutlineCollection } from "@/api/types.gen";
+import { OutlineCollectionIcon } from "@/components/admin/outline/OutlineCollectionIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,17 +53,7 @@ export function OutlineCollectionRow({
 		<TableRow>
 			<TableCell>
 				<div className="flex items-center gap-2">
-					{collection.icon ? (
-						<span className="text-base leading-none" aria-hidden>
-							{collection.icon}
-						</span>
-					) : (
-						<span
-							className="size-2.5 shrink-0 rounded-full"
-							style={{ backgroundColor: collection.color ?? "var(--muted-foreground)" }}
-							aria-hidden
-						/>
-					)}
+					<OutlineCollectionIcon icon={collection.icon} color={collection.color} />
 					<span className="font-medium">{label}</span>
 				</div>
 				<div className="text-muted-foreground font-mono text-xs">

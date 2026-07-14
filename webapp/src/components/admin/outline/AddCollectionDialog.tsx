@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { listOutlineCollectionCandidatesOptions } from "@/api/@tanstack/react-query.gen";
 import type { OutlineCollectionCandidate } from "@/api/types.gen";
+import { OutlineCollectionIcon } from "@/components/admin/outline/OutlineCollectionIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -143,58 +144,57 @@ export function AddCollectionDialog({
 							Outline first.
 						</p>
 					) : (
-						<ul className="max-h-72 space-y-1 overflow-y-auto" aria-label="Available collections">
-							{(candidates ?? []).map((candidate) => {
-								const label = candidate.name ?? candidate.collectionId;
-								const checkboxId = `add-outline-collection-${candidate.collectionId}`;
-								return (
-									<li key={candidate.collectionId}>
-										<Label
-											htmlFor={checkboxId}
-											className={cn(
-												"flex w-full items-center gap-3 rounded-md px-2 py-2 font-normal",
-												candidate.alreadyMirrored
-													? "cursor-default opacity-60"
-													: "cursor-pointer hover:bg-accent",
-											)}
-										>
-											<Checkbox
-												id={checkboxId}
-												checked={
-													candidate.alreadyMirrored || selectedIds.includes(candidate.collectionId)
-												}
-												disabled={candidate.alreadyMirrored || submitting}
-												onCheckedChange={(checked) => toggle(candidate, checked === true)}
-											/>
-											{candidate.icon ? (
-												<span className="text-base leading-none" aria-hidden>
-													{candidate.icon}
-												</span>
-											) : (
-												<span
-													className="size-2.5 shrink-0 rounded-full"
-													style={{
-														backgroundColor: candidate.color ?? "var(--muted-foreground)",
-													}}
-													aria-hidden
-												/>
-											)}
-											<span className="min-w-0 flex-1">
-												<span className="block truncate text-sm font-medium">{label}</span>
-												{candidate.urlId && (
-													<span className="text-muted-foreground block truncate font-mono text-xs">
-														{candidate.urlId}
-													</span>
+						<div className="space-y-2">
+							<p className="text-muted-foreground text-xs">
+								{candidates?.length} collection{(candidates?.length ?? 0) === 1 ? "" : "s"}{" "}
+								available
+								{(candidates?.length ?? 0) > 6 ? " — scroll for more" : ""}
+							</p>
+							<ul
+								className="max-h-72 space-y-1 overflow-y-auto rounded-md border p-1"
+								aria-label="Available collections"
+							>
+								{(candidates ?? []).map((candidate) => {
+									const label = candidate.name ?? candidate.collectionId;
+									const checkboxId = `add-outline-collection-${candidate.collectionId}`;
+									return (
+										<li key={candidate.collectionId}>
+											<Label
+												htmlFor={checkboxId}
+												className={cn(
+													"flex w-full items-center gap-3 rounded-md px-2 py-2 font-normal",
+													candidate.alreadyMirrored
+														? "cursor-default opacity-60"
+														: "cursor-pointer hover:bg-accent",
 												)}
-											</span>
-											{candidate.alreadyMirrored && (
-												<Badge variant="outline">Already mirrored</Badge>
-											)}
-										</Label>
-									</li>
-								);
-							})}
-						</ul>
+											>
+												<Checkbox
+													id={checkboxId}
+													checked={
+														candidate.alreadyMirrored ||
+														selectedIds.includes(candidate.collectionId)
+													}
+													disabled={candidate.alreadyMirrored || submitting}
+													onCheckedChange={(checked) => toggle(candidate, checked === true)}
+												/>
+												<OutlineCollectionIcon icon={candidate.icon} color={candidate.color} />
+												<span className="min-w-0 flex-1">
+													<span className="block truncate text-sm font-medium">{label}</span>
+													{candidate.urlId && (
+														<span className="text-muted-foreground block truncate font-mono text-xs">
+															{candidate.urlId}
+														</span>
+													)}
+												</span>
+												{candidate.alreadyMirrored && (
+													<Badge variant="outline">Already mirrored</Badge>
+												)}
+											</Label>
+										</li>
+									);
+								})}
+							</ul>
+						</div>
 					)}
 
 					{!isLoading && !error && selectable.length === 0 && (candidates?.length ?? 0) > 0 && (
