@@ -972,6 +972,26 @@ erDiagram
         VARCHAR(32) last_reviewed_ts
     }
 
+    SyncJob {
+        BIGINT id PK
+        BIGINT workspace_id FK "NOT NULL"
+        BIGINT connection_id FK "NOT NULL"
+        VARCHAR(48) kind "NOT NULL"
+        VARCHAR(32) type "NOT NULL"
+        VARCHAR(32) trigger_source "NOT NULL"
+        VARCHAR(32) status "NOT NULL"
+        BOOLEAN cancel_requested "NOT NULL"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ heartbeat_at
+        INTEGER items_processed
+        INTEGER items_total
+        JSONB progress
+        TEXT error_summary
+        BIGINT triggered_by_user_id
+    }
+
     Team {
         BIGINT id PK
         VARCHAR(255) name
@@ -1244,6 +1264,8 @@ erDiagram
     Workspace ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackMessage : authored_by
+    Workspace ||--o{ SyncJob : has
+    Connection ||--o{ SyncJob : has
     AgentConfig ||--o{ Workspace : practice_config_id
     AgentConfig ||--o{ Workspace : mentor_config_id
     Workspace ||--o{ WorkspaceSlugHistory : has
