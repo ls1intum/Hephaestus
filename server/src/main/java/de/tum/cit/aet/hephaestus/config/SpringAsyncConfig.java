@@ -1,44 +1,58 @@
 package de.tum.cit.aet.hephaestus.config;
 
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.support.TaskExecutorAdapter;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+/**
+ * {@code @Async} advice is ordered outside the transaction advisor (so an {@code @Async @Transactional}
+ * method opens its transaction on the pool thread, not the caller thread) and inside
+ * {@code WorkspaceAgnosticAspect} at {@code HIGHEST_PRECEDENCE}. Both otherwise default to
+ * {@code LOWEST_PRECEDENCE}, hence the explicit {@code HIGHEST_PRECEDENCE + 1}; many
+ * {@code @Async @Transactional} listeners depend on it.
+ *
+ * <p>{@link #getAsyncExecutor()} pins the default executor to the bounded
+ * {@link #applicationTaskExecutor}; with a second {@link AsyncTaskExecutor} bean present, type
+ * resolution is ambiguous and Spring would otherwise fall back to an unbounded
+ * {@code SimpleAsyncTaskExecutor}.
+ */
 @Configuration
-@EnableAsync
+@EnableAsync(order = Ordered.HIGHEST_PRECEDENCE + 1)
 @Profile("!test")
-public class SpringAsyncConfig {
+public class SpringAsyncConfig implements AsyncConfigurer {
 
-    /**
-     * Defining this bean causes {@code TaskExecutionAutoConfiguration} to back off via
-     * {@code @ConditionalOnMissingBean}, so {@code @Async} methods route here even when
-     * {@code spring.threads.virtual.enabled=true} would otherwise install a
-     * {@code SimpleAsyncTaskExecutor}. {@code waitForTasksToCompleteOnShutdown=true} is what
-     * keeps async DB work from racing the {@code EntityManagerFactory} close; the bounded pool
-     * is unrelated load-shedding.
-     */
     @Bean(name = TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
-    public AsyncTaskExecutor applicationTaskExecutor() {
+    public ThreadPoolTaskExecutor applicationTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(10);
-        executor.setMaxPoolSize(50);
+        // Stays below the datasource pool (spring.datasource.hikari.maximum-pool-size = 30) so an
+        // async burst can't starve web requests of connections.
+        executor.setMaxPoolSize(16);
         executor.setQueueCapacity(500);
         executor.setThreadNamePrefix("async-");
+        // Let in-flight async DB work finish before the EntityManagerFactory closes on shutdown.
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
-        executor.initialize();
         return executor;
     }
 
-    /** Virtual-thread executor for blocking I/O monitoring tasks. No graceful shutdown — use
-     * {@link #applicationTaskExecutor} when DB access is involved. */
+    @Override
+    public Executor getAsyncExecutor() {
+        return applicationTaskExecutor();
+    }
+
+    /** Virtual-thread executor for blocking-I/O monitoring tasks. No graceful shutdown — use
+     * {@link #applicationTaskExecutor} for DB work. */
     @Bean(name = "monitoringExecutor")
     @ConditionalOnMissingBean(name = "monitoringExecutor")
     public AsyncTaskExecutor monitoringExecutor() {
