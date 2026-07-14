@@ -97,6 +97,42 @@ the app-lifecycle events.
 The nightly Slack history-reconciliation sweep replays `conversations.history` for already-consented
 channels through this same bot token, so it needs no scopes beyond the set above.
 
+### Outline integration
+
+Outline is a documentation content source: a workspace admin connects one Outline instance from
+**Settings → Integrations** with the wiki's base URL and an API key, then registers the collections to
+mirror. The key is encrypted at rest in the `connection` table.
+
+| Variable | Purpose |
+| --- | --- |
+| `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection) |
+| `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com` |
+| `OUTLINE_OAUTH_CLIENT_ID` | Outline OAuth app client ID (redirect `https://<host>/api/login/oauth2/code/outline`) |
+| `OUTLINE_OAUTH_CLIENT_SECRET` | Outline OAuth app client secret |
+| `OUTLINE_OAUTH_DISPLAY_NAME` | Label shown on the account-linking button (defaults to `Outline`) |
+
+The `OUTLINE_OAUTH_*` block is independent of the workspace connection: it seeds a **link-only** login
+provider (registration id `outline`) that lets a member attach their Outline identity to their
+Hephaestus account so documents can be attributed to them. There is no "sign in with Outline" — the
+provider never appears on the login picker. A blank `OUTLINE_OAUTH_CLIENT_ID` leaves it unseeded, and
+the provider can also be added later under **Instance admin → Login providers**.
+
+**Registering the OAuth app in Outline** (Settings → Applications, admin-only):
+
+- **Redirect URI:** `https://<host>/api/login/oauth2/code/outline` — Outline matches redirect URIs by
+  exact string, so it must include the API path prefix your proxy uses and carry no trailing slash.
+  Between 1 and 10 URIs are allowed; all must be HTTPS except loopback.
+- **Scope:** `read`. Outline is plain OAuth2, not OIDC — never request `openid`. `read` is what
+  `POST /api/auth.info` (the identity probe) needs.
+- **PKCE:** S256, sent automatically. Nothing to configure.
+- Access tokens live one hour; refresh tokens live 30 days and rotate on use with reuse detection.
+
+**API keys do not self-rotate.** Outline's `apiKeys.create` and `apiKeys.delete` accept only an
+interactive session, never a bearer token, so Hephaestus cannot roll its own key. The connection's
+admin card surfaces the key's expiry (via `apiKeys.list`, when the key may see itself) ahead of the
+lapse; renewing means creating a new key in Outline and re-entering it in **Settings → Integrations**.
+A lapsed key reports `accepted=false` and the mirror stops refreshing until it is replaced.
+
 ### GitHub integration
 
 Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** or a **GitHub App**:

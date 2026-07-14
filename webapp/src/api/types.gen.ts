@@ -1840,6 +1840,32 @@ export type AgentJob = {
 };
 
 /**
+ * Live state of the API token behind the workspace's Outline connection
+ */
+export type OutlineTokenStatus = {
+    /**
+     * Whether Outline still accepts the stored token. False means revoked, expired or rejected.
+     */
+    accepted: boolean;
+    /**
+     * When the token lapses. Absent for a key created without an expiry.
+     */
+    expiresAt?: Date;
+    /**
+     * Last four characters of the token, as Outline reports them
+     */
+    last4?: string;
+    /**
+     * When Outline last saw the token used
+     */
+    lastActiveAt?: Date;
+    /**
+     * The token's name in Outline. Absent when the token cannot list its own key (a scoped key, or one owned by a user who cannot see it) — sync is unaffected.
+     */
+    name?: string;
+};
+
+/**
  * Health of the workspace's active Outline connection
  */
 export type OutlineConnectionStatus = {
@@ -4136,6 +4162,34 @@ export type SyncOutlineConnectionResponses = {
      */
     202: unknown;
 };
+
+export type GetOutlineTokenStatusData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/outline/token';
+};
+
+export type GetOutlineTokenStatusErrors = {
+    /**
+     * The workspace has no ACTIVE Outline connection
+     */
+    404: unknown;
+};
+
+export type GetOutlineTokenStatusResponses = {
+    /**
+     * Token state returned
+     */
+    200: OutlineTokenStatus;
+};
+
+export type GetOutlineTokenStatusResponse = GetOutlineTokenStatusResponses[keyof GetOutlineTokenStatusResponses];
 
 export type SendSlackTestMessageData = {
     /**

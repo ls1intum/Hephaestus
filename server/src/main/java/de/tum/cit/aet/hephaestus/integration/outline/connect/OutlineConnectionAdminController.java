@@ -51,6 +51,24 @@ public class OutlineConnectionAdminController {
         return ResponseEntity.ok(adminService.status(workspace.id()));
     }
 
+    @GetMapping("/token")
+    @Operation(
+        operationId = "getOutlineTokenStatus",
+        summary = "Live state of the API token behind this workspace's Outline connection",
+        description = "Probes Outline directly. Reports whether the token is still accepted and, when the token " +
+            "may list its own key, its name, expiry and last use. Outline cannot rotate a key from a key, so an " +
+            "expiring token is renewed in Outline and re-entered here."
+    )
+    @ApiResponse(responseCode = "200", description = "Token state returned")
+    @ApiResponse(
+        responseCode = "404",
+        description = "The workspace has no ACTIVE Outline connection",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    public ResponseEntity<OutlineTokenStatusDTO> getOutlineTokenStatus(WorkspaceContext workspace) {
+        return ResponseEntity.ok(adminService.tokenStatus(workspace.id()));
+    }
+
     @PostMapping("/sync")
     @Operation(
         operationId = "syncOutlineConnection",

@@ -59,6 +59,13 @@ const healthyStatus = {
 	erroredCollections: 0,
 };
 
+const healthyToken = {
+	accepted: true,
+	name: "Hephaestus mirror",
+	last4: "9f2c",
+	lastActiveAt: "2026-07-01T00:00:00Z",
+};
+
 /** Baseline handlers for an already-connected workspace with a mutable collection list. */
 function useConnectedHandlers(collectionsRef: { current: unknown[] }) {
 	server.use(
@@ -66,6 +73,7 @@ function useConnectedHandlers(collectionsRef: { current: unknown[] }) {
 		http.get("*/workspaces/demo/connections/outline/status", () =>
 			HttpResponse.json(healthyStatus),
 		),
+		http.get("*/workspaces/demo/connections/outline/token", () => HttpResponse.json(healthyToken)),
 		http.get("*/workspaces/demo/outline/collections", () =>
 			HttpResponse.json(collectionsRef.current),
 		),
@@ -96,6 +104,9 @@ describe("AdminOutlineSettings — connect happy path", () => {
 					erroredCollections: 0,
 				}),
 			),
+			http.get("*/workspaces/demo/connections/outline/token", () =>
+				HttpResponse.json(healthyToken),
+			),
 			http.get("*/workspaces/demo/outline/collections", () => HttpResponse.json([])),
 		);
 
@@ -106,16 +117,25 @@ describe("AdminOutlineSettings — connect happy path", () => {
 		expect(screen.queryByLabelText(/allow-list/i)).toBeNull();
 		expect(screen.queryByLabelText(/collections/i)).toBeNull();
 
+		// The server URL starts EMPTY: a prefilled cloud URL would send a self-hoster's token to
+		// Outline Cloud if they only pasted the token. Connect stays disabled until it is typed.
+		const serverUrl = screen.getByLabelText(/server url/i) as HTMLInputElement;
+		expect(serverUrl.value).toBe("");
 		fireEvent.change(screen.getByLabelText(/api token/i), {
 			target: { value: "ol_api_secret" },
 		});
+		expect(
+			(screen.getByRole("button", { name: /connect outline/i }) as HTMLButtonElement).disabled,
+		).toBe(true);
+
+		fireEvent.change(serverUrl, { target: { value: "https://wiki.acme.dev" } });
 		fireEvent.click(screen.getByRole("button", { name: /connect outline/i }));
 
 		await waitFor(() => expect(connectBody).toBeTruthy());
 		expect(connectBody).toEqual({
 			kind: "OUTLINE",
 			userInput: {
-				server_url: "https://app.getoutline.com",
+				server_url: "https://wiki.acme.dev",
 				token: "ol_api_secret",
 			},
 		});
@@ -303,6 +323,58 @@ describe("AdminOutlineSettings — sync now", () => {
 		await waitFor(() => expect(syncRequested).toBe(true));
 		await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Sync started"));
 	});
+});
+
+describe("AdminOutlineSettings — token lifecycle", () => {
+	it("surfaces a rejected token as a destructive alert instead of a healthy-looking card", async () => {
+		const collectionsRef = { current: [engineering] as unknown[] };
+		useConnectedHandlers(collectionsRef);
+		server.use(
+			http.get("*/workspaces/demo/connections/outline/token", () =>
+				HttpResponse.json({ accepted: false }),
+			),
+		);
+
+		renderContainer();
+
+		expect(await screen.findByText(/outline no longer accepts this token/i)).toBeTruthy();
+		expect(screen.queryByText(/outline accepts this token/i)).toBeNull();
+	});
+
+	it("names the token and its last4 when Outline lets the key list itself", async () => {
+		const collectionsRef = { current: [engineering] as unknown[] };
+		useConnectedHandlers(collectionsRef);
+
+		renderContainer();
+
+		expect(await screen.findByText(/outline accepts this token/i)).toBeTruthy();
+		expect(screen.getByText(/Hephaestus mirror/)).toBeTruthy();
+		expect(screen.getByText(/…9f2c/)).toBeTruthy();
+	});
+});
+
+describe("AdminOutlineSettings — a running sync is polled, not left as dead pixels", () => {
+	it("keeps refetching the status while syncRunning, and stops once it settles", async () => {
+		const collectionsRef = { current: [engineering] as unknown[] };
+		let statusReads = 0;
+		useConnectedHandlers(collectionsRef);
+		server.use(
+			http.get("*/workspaces/demo/connections/outline/status", () => {
+				statusReads += 1;
+				// The reconcile is running on the first read and finished by the second.
+				return HttpResponse.json({ ...healthyStatus, syncRunning: statusReads < 2 });
+			}),
+		);
+
+		renderContainer();
+
+		expect(await screen.findByText(/sync in progress/i)).toBeTruthy();
+		// No user interaction, no invalidation — only the refetchInterval can clear this.
+		await waitFor(() => expect(screen.queryByText(/sync in progress/i)).toBeNull(), {
+			timeout: 8000,
+		});
+		expect(statusReads).toBeGreaterThanOrEqual(2);
+	}, 10000);
 });
 
 describe("AdminOutlineSettings — collections plane is gated on the connection", () => {

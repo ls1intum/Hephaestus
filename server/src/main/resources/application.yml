@@ -186,6 +186,16 @@ hephaestus:
                 display-name: ${SLACK_OAUTH_DISPLAY_NAME:Slack}
                 client-id: ${SLACK_OAUTH_CLIENT_ID:${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}}
                 client-secret: ${SLACK_OAUTH_CLIENT_SECRET:${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}}
+            # Link-only provider (like Slack): it attaches an Outline identity to an already signed-in
+            # account, it is never a sign-in button. Self-hosted, so the base URL is the wiki's origin.
+            # Scopes are pinned to `read` by type (LoginProviderService.OUTLINE_SCOPES) — Outline is plain
+            # OAuth2, not OIDC, so `openid` must never be requested.
+            outline:
+                type: OUTLINE
+                base-url: ${OUTLINE_OAUTH_BASE_URL:}
+                display-name: ${OUTLINE_OAUTH_DISPLAY_NAME:Outline}
+                client-id: ${OUTLINE_OAUTH_CLIENT_ID:}
+                client-secret: ${OUTLINE_OAUTH_CLIENT_SECRET:}
         # Token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
         # Buckets are SHARED across replicas via a Postgres ProxyManager (no Redis) when
         # postgres-backed=true (default) and a DataSource is present; otherwise an in-JVM

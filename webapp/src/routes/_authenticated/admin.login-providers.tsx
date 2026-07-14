@@ -99,9 +99,9 @@ function AdminLoginProvidersPage() {
 						<h1 className="text-2xl font-semibold">Login providers</h1>
 					</div>
 					<p className="max-w-2xl text-sm text-muted-foreground">
-						Configure OAuth providers for sign-in and account linking. Slack is link-only for
-						Settings and App Home account linking, so its redirect URI is separate from the Slack
-						app-install callback.
+						Configure OAuth providers for sign-in and account linking. Slack and Outline are
+						link-only — users connect them from Settings, they are never offered on the sign-in
+						page. Slack's redirect URI here is separate from the Slack app-install callback.
 					</p>
 				</div>
 				<Button onClick={openCreate}>
@@ -114,10 +114,13 @@ function AdminLoginProvidersPage() {
 				providers={providers}
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
+				error={listQuery.error}
+				onRetry={() => listQuery.refetch()}
 				mutatingId={mutatingId}
 				onEdit={openEdit}
 				onToggleEnabled={handleToggleEnabled}
 				onDelete={handleDelete}
+				onAdd={openCreate}
 			/>
 
 			<LoginProviderFormDialog

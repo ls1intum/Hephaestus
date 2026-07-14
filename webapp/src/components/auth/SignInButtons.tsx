@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import type { ComponentPropsWithoutRef, SVGAttributes } from "react";
 import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProviderView } from "@/api/types.gen";
 import { DevSignInForm } from "@/components/auth/DevSignInForm";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +102,14 @@ function HeaderProviderButton({
 		<Tooltip>
 			<TooltipTrigger
 				render={
-					<Button variant="outline" disabled={disabled} onClick={() => onSignIn(registrationId)} />
+					// Below `sm` the label is hidden and the mark is aria-hidden, so without this the button
+					// has NO accessible name (a tooltip does not supply one). Name it explicitly.
+					<Button
+						variant="outline"
+						disabled={disabled}
+						aria-label={`Continue with ${label}`}
+						onClick={() => onSignIn(registrationId)}
+					/>
 				}
 			>
 				<ProviderIcon provider={provider} />
@@ -155,7 +162,7 @@ export function SignInButtons({
 		if (header) {
 			return (
 				<Button variant="outline" disabled aria-label="Loading sign-in options">
-					<Loader2 className="animate-spin" />
+					<Spinner aria-hidden="true" />
 				</Button>
 			);
 		}
@@ -167,7 +174,7 @@ export function SignInButtons({
 				aria-label="Loading sign-in options"
 				className={cn("w-full", className)}
 			>
-				<Loader2 className="animate-spin" />
+				<Spinner aria-hidden="true" />
 				Loading sign-in options…
 			</Button>
 		);

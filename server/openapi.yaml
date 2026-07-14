@@ -1401,6 +1401,33 @@ paths:
       summary: "Trigger the full Outline reconcile for this workspace (async, 202)"
       tags:
       - Connections
+  /workspaces/{workspaceSlug}/connections/outline/token:
+    get:
+      description: "Probes Outline directly. Reports whether the token is still accepted\
+        \ and, when the token may list its own key, its name, expiry and last use.\
+        \ Outline cannot rotate a key from a key, so an expiring token is renewed\
+        \ in Outline and re-entered here."
+      operationId: getOutlineTokenStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineTokenStatus"
+          description: Token state returned
+        "404":
+          description: The workspace has no ACTIVE Outline connection
+      summary: Live state of the API token behind this workspace's Outline connection
+      tags:
+      - Connections
   /workspaces/{workspaceSlug}/connections/slack/test-message:
     post:
       description: |-
@@ -5895,6 +5922,33 @@ components:
       - pendingCollections
       - syncRunning
       - webhookRegistered
+    OutlineTokenStatus:
+      type: object
+      description: Live state of the API token behind the workspace's Outline connection
+      properties:
+        accepted:
+          type: boolean
+          description: "Whether Outline still accepts the stored token. False means\
+            \ revoked, expired or rejected."
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the token lapses. Absent for a key created without an
+            expiry.
+        last4:
+          type: string
+          description: "Last four characters of the token, as Outline reports them"
+        lastActiveAt:
+          type: string
+          format: date-time
+          description: When Outline last saw the token used
+        name:
+          type: string
+          description: "The token's name in Outline. Absent when the token cannot\
+            \ list its own key (a scoped key, or one owned by a user who cannot see\
+            \ it) — sync is unaffected."
+      required:
+      - accepted
     PageAgentJob:
       type: object
       properties:

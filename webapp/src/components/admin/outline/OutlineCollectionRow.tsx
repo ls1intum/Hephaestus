@@ -18,9 +18,15 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Popover,
+	PopoverContent,
+	PopoverDescription,
+	PopoverTitle,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /** The mirror lifecycle states, sourced from the generated DTO so they never drift. */
 export type OutlineMirrorState = OutlineCollection["state"];
@@ -39,6 +45,10 @@ export interface OutlineCollectionRowProps {
  * One mirrored Outline collection: name with its Outline color/icon, mirror-state badge,
  * sync progress, document count, last clean sync and a state-gated row action menu.
  * Pure — every transition is delegated upward.
+ *
+ * <p>The sync error and the budget-skip detail hang off a {@link Popover}, not a tooltip: a tooltip
+ * never opens on touch, and the sync error is the one string an admin has to be able to read, select
+ * and copy.
  */
 export function OutlineCollectionRow({
 	collection,
@@ -56,9 +66,10 @@ export function OutlineCollectionRow({
 					<OutlineCollectionIcon icon={collection.icon} color={collection.color} />
 					<span className="font-medium">{label}</span>
 				</div>
-				<div className="text-muted-foreground font-mono text-xs">
-					{collection.urlId ?? collection.collectionId}
-				</div>
+				{/* Only the human-facing Outline urlId is worth a subtitle — the raw UUID is noise. */}
+				{collection.urlId && (
+					<div className="text-muted-foreground font-mono text-xs">{collection.urlId}</div>
+				)}
 			</TableCell>
 
 			<TableCell>
@@ -69,8 +80,8 @@ export function OutlineCollectionRow({
 						Paused
 					</Badge>
 				) : (
-					<Badge variant="outline" className="gap-1">
-						<CheckIcon className="size-3 text-green-600 dark:text-green-400" aria-hidden />
+					<Badge variant="success" className="gap-1">
+						<CheckIcon className="size-3" aria-hidden />
 						Mirroring
 					</Badge>
 				)}
@@ -92,16 +103,26 @@ export function OutlineCollectionRow({
 						</Badge>
 					)}
 					{collection.lastSyncError && (
-						<Tooltip>
-							{/* Default TooltipTrigger renders a real <button>, so the error detail is reachable
-							by keyboard and screen-reader users — an icon-only <span> would have no focus stop. */}
-							<TooltipTrigger className="text-destructive" aria-label={`Sync error for ${label}`}>
-								<TriangleAlertIcon className="size-4" aria-hidden />
-							</TooltipTrigger>
-							<TooltipContent className="max-w-xs break-words">
-								{collection.lastSyncError}
-							</TooltipContent>
-						</Tooltip>
+						<Popover>
+							<PopoverTrigger
+								render={
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										className="text-destructive"
+										aria-label={`Sync error for ${label}`}
+									>
+										<TriangleAlertIcon aria-hidden />
+									</Button>
+								}
+							/>
+							<PopoverContent align="start" className="max-w-sm">
+								<PopoverTitle>Last sync failed</PopoverTitle>
+								<PopoverDescription className="break-words whitespace-pre-wrap select-text">
+									{collection.lastSyncError}
+								</PopoverDescription>
+							</PopoverContent>
+						</Popover>
 					)}
 				</div>
 			</TableCell>
@@ -115,21 +136,30 @@ export function OutlineCollectionRow({
 						)}
 					</span>
 					{!!collection.exportsSkippedForBudget && (
-						<Tooltip>
-							{/* Amber, not destructive — this is expected budget throttling, not an error; the
+						<Popover>
+							{/* Warning, not destructive — this is expected budget throttling, not an error; the
 							next reconcile catches these up. */}
-							<TooltipTrigger
-								className="text-amber-600 dark:text-amber-400"
-								aria-label={`${collection.exportsSkippedForBudget} exports skipped for budget for ${label}`}
-							>
-								<TriangleAlertIcon className="size-3.5" aria-hidden />
-							</TooltipTrigger>
-							<TooltipContent className="max-w-xs break-words">
-								{collection.exportsSkippedForBudget} export
-								{collection.exportsSkippedForBudget === 1 ? "" : "s"} skipped for the shared budget
-								in the last pass — will catch up on the next reconcile.
-							</TooltipContent>
-						</Tooltip>
+							<PopoverTrigger
+								render={
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										className="text-warning"
+										aria-label={`${collection.exportsSkippedForBudget} exports skipped for budget for ${label}`}
+									>
+										<TriangleAlertIcon aria-hidden />
+									</Button>
+								}
+							/>
+							<PopoverContent align="start" className="max-w-sm">
+								<PopoverTitle>Exports skipped for budget</PopoverTitle>
+								<PopoverDescription className="break-words">
+									{collection.exportsSkippedForBudget} export
+									{collection.exportsSkippedForBudget === 1 ? "" : "s"} skipped for the shared
+									budget in the last pass — they catch up on the next reconcile.
+								</PopoverDescription>
+							</PopoverContent>
+						</Popover>
 					)}
 				</div>
 			</TableCell>

@@ -1,11 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
+import { LibraryIcon, LockIcon } from "lucide-react";
 import { useState } from "react";
 import { listOutlineCollectionCandidatesOptions } from "@/api/@tanstack/react-query.gen";
 import type { OutlineCollectionCandidate } from "@/api/types.gen";
 import { OutlineCollectionIcon } from "@/components/admin/outline/OutlineCollectionIcon";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
 import {
 	Dialog,
 	DialogClose,
@@ -15,10 +25,16 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
-import { cn } from "@/lib/utils";
 
 export interface AddCollectionDialogProps {
 	workspaceSlug: string;
@@ -32,8 +48,8 @@ export interface AddCollectionDialogProps {
 }
 
 /**
- * Picker for the Outline collections the API token can see. The candidates call is a live proxy
- * to Outline and doubles as the connectivity probe, so it runs lazily (only while the dialog is
+ * Searchable picker for the Outline collections the API token can see. The candidates call is a live
+ * proxy to Outline and doubles as the connectivity probe, so it runs lazily (only while the dialog is
  * open) and its 502/503 ProblemDetail surfaces inline instead of a silent empty list.
  * Already-mirrored collections stay visible but disabled+checked so the picker reflects reality.
  */
@@ -46,6 +62,8 @@ export function AddCollectionDialog({
 	const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
 	const [submitting, setSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
+	/** How far the sequential registration run has got — drives the live progress line. */
+	const [registered, setRegistered] = useState(0);
 
 	const {
 		data: candidates,
@@ -60,7 +78,8 @@ export function AddCollectionDialog({
 		retry: false,
 	});
 
-	const selectable = (candidates ?? []).filter((candidate) => !candidate.alreadyMirrored);
+	const all = candidates ?? [];
+	const selectable = all.filter((candidate) => !candidate.alreadyMirrored);
 	const canSubmit = selectedIds.length > 0 && !submitting;
 
 	// Reset the form state on close instead of remounting the dialog via a changing `key` —
@@ -70,15 +89,17 @@ export function AddCollectionDialog({
 			setSelectedIds([]);
 			setSubmitting(false);
 			setSubmitError(null);
+			setRegistered(0);
 		}
 		onOpenChange(next);
 	}
 
-	function toggle(candidate: OutlineCollectionCandidate, checked: boolean) {
+	function toggle(candidate: OutlineCollectionCandidate) {
+		if (candidate.alreadyMirrored || submitting) return;
 		setSelectedIds((current) =>
-			checked
-				? [...current, candidate.collectionId]
-				: current.filter((id) => id !== candidate.collectionId),
+			current.includes(candidate.collectionId)
+				? current.filter((id) => id !== candidate.collectionId)
+				: [...current, candidate.collectionId],
 		);
 	}
 
@@ -86,6 +107,7 @@ export function AddCollectionDialog({
 		if (!canSubmit) return;
 		setSubmitting(true);
 		setSubmitError(null);
+		setRegistered(0);
 		// Register sequentially: the server verifies each id against a live collections.list and
 		// kicks a targeted sync per registration, so a burst of parallel posts buys nothing.
 		let remaining = [...selectedIds];
@@ -93,6 +115,7 @@ export function AddCollectionDialog({
 			for (const collectionId of selectedIds) {
 				await onRegister({ collectionId });
 				remaining = remaining.filter((id) => id !== collectionId);
+				setRegistered((done) => done + 1);
 			}
 			handleOpenChange(false);
 		} catch (e) {
@@ -105,6 +128,8 @@ export function AddCollectionDialog({
 			setSubmitting(false);
 		}
 	}
+
+	const total = selectedIds.length;
 
 	return (
 		<Dialog open={open} onOpenChange={handleOpenChange}>
@@ -130,52 +155,69 @@ export function AddCollectionDialog({
 							<Skeleton className="h-9 w-full" />
 						</div>
 					) : error ? (
-						<div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-							<p className="text-sm text-destructive" role="alert">
-								Could not reach Outline: {problemDetailOf(error)}
-							</p>
-							<Button type="button" variant="outline" size="sm" onClick={() => refetch()}>
-								Retry
-							</Button>
-						</div>
-					) : (candidates?.length ?? 0) === 0 ? (
-						<p className="text-muted-foreground text-sm">
-							The API token cannot see any collections. Grant the bot user access to a collection in
-							Outline first.
-						</p>
+						<QueryErrorAlert
+							error={error}
+							title="Could not reach Outline"
+							onRetry={() => {
+								refetch();
+							}}
+						/>
+					) : all.length === 0 ? (
+						<Empty className="border">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<LockIcon />
+								</EmptyMedia>
+								<EmptyTitle>This token cannot see any collections</EmptyTitle>
+								<EmptyDescription>
+									Outline only returns the collections its API key's user is a member of. In
+									Outline, open the collection, choose <strong>Members</strong>, and add the bot
+									user that owns this key — then reopen this dialog.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					) : selectable.length === 0 ? (
+						<Empty className="border">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<LibraryIcon />
+								</EmptyMedia>
+								<EmptyTitle>Every visible collection is already mirrored</EmptyTitle>
+								<EmptyDescription>
+									Grant the bot user access to another collection in Outline to mirror more.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					) : (
-						<div className="space-y-2">
-							<p className="text-muted-foreground text-xs">
-								{candidates?.length} collection{(candidates?.length ?? 0) === 1 ? "" : "s"}{" "}
-								available
-								{(candidates?.length ?? 0) > 6 ? " — scroll for more" : ""}
-							</p>
-							<ul
-								className="max-h-72 space-y-1 overflow-y-auto rounded-md border p-1"
-								aria-label="Available collections"
-							>
-								{(candidates ?? []).map((candidate) => {
-									const label = candidate.name ?? candidate.collectionId;
-									const checkboxId = `add-outline-collection-${candidate.collectionId}`;
-									return (
-										<li key={candidate.collectionId}>
-											<Label
-												htmlFor={checkboxId}
-												className={cn(
-													"flex w-full items-center gap-3 rounded-md px-2 py-2 font-normal",
-													candidate.alreadyMirrored
-														? "cursor-default opacity-60"
-														: "cursor-pointer hover:bg-accent",
-												)}
+						// cmdk renders its own visually-hidden <label> and points the input's aria-labelledby
+						// at it, so the accessible name has to come from `label`, not aria-label.
+						<Command className="rounded-lg border" label="Search Outline collections">
+							<CommandInput placeholder="Search collections…" disabled={submitting} />
+							<CommandList>
+								<CommandEmpty>No collections match your search.</CommandEmpty>
+								<CommandGroup>
+									{all.map((candidate) => {
+										const label = candidate.name ?? candidate.collectionId;
+										const checked =
+											candidate.alreadyMirrored || selectedIds.includes(candidate.collectionId);
+										return (
+											<CommandItem
+												key={candidate.collectionId}
+												value={`${label} ${candidate.urlId ?? ""} ${candidate.collectionId}`}
+												disabled={candidate.alreadyMirrored || submitting}
+												onSelect={() => toggle(candidate)}
 											>
+												{/* The command item owns the toggle (click AND keyboard Enter land there),
+												so the checkbox is read-only: an interactive Base UI checkbox re-dispatches
+												its click on a hidden input, which bubbles back into the item and would
+												toggle the selection a second time. Out of the tab order for the same
+												reason — the roving focus lives on the list. */}
 												<Checkbox
-													id={checkboxId}
-													checked={
-														candidate.alreadyMirrored ||
-														selectedIds.includes(candidate.collectionId)
-													}
+													checked={checked}
+													readOnly
 													disabled={candidate.alreadyMirrored || submitting}
-													onCheckedChange={(checked) => toggle(candidate, checked === true)}
+													tabIndex={-1}
+													aria-label={label}
 												/>
 												<OutlineCollectionIcon icon={candidate.icon} color={candidate.color} />
 												<span className="min-w-0 flex-1">
@@ -189,34 +231,34 @@ export function AddCollectionDialog({
 												{candidate.alreadyMirrored && (
 													<Badge variant="outline">Already mirrored</Badge>
 												)}
-											</Label>
-										</li>
-									);
-								})}
-							</ul>
-						</div>
+											</CommandItem>
+										);
+									})}
+								</CommandGroup>
+							</CommandList>
+						</Command>
 					)}
 
-					{!isLoading && !error && selectable.length === 0 && (candidates?.length ?? 0) > 0 && (
-						<p className="text-muted-foreground mt-2 text-sm">
-							Every visible collection is already mirrored.
-						</p>
-					)}
+					{/* One live region for the whole run: progress while it advances, the failure when it
+					stops. Screen-reader users hear "Adding 2 of 5…" without the button label thrashing. */}
+					<div aria-live="polite" className="mt-3 min-h-5 text-sm">
+						{submitting && total > 0 && (
+							<p className="text-muted-foreground">
+								Adding {Math.min(registered + 1, total)} of {total}…
+							</p>
+						)}
+						{!submitting && submitError && <p className="text-destructive">{submitError}</p>}
+					</div>
 
-					{submitError && (
-						<p className="mt-3 text-sm text-destructive" role="alert">
-							{submitError}
-						</p>
-					)}
-
-					<DialogFooter className="mt-6">
+					<DialogFooter className="mt-3">
 						<DialogClose render={<Button type="button" variant="outline" disabled={submitting} />}>
 							Cancel
 						</DialogClose>
 						<Button type="submit" disabled={!canSubmit}>
+							{submitting && <Spinner />}
 							{submitting
 								? "Adding…"
-								: `Add ${selectedIds.length > 0 ? `${selectedIds.length} ` : ""}collection${selectedIds.length === 1 ? "" : "s"}`}
+								: `Add ${total > 0 ? `${total} ` : ""}collection${total === 1 ? "" : "s"}`}
 						</Button>
 					</DialogFooter>
 				</form>

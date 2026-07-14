@@ -1,8 +1,29 @@
+import { useState } from "react";
 import type { SlackUserWorkspacePreferences } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
@@ -15,6 +36,8 @@ export interface SlackPreferencesSectionProps {
 	updatingWorkspaceSlug?: string | null;
 	isLoading?: boolean;
 	isError?: boolean;
+	/** The thrown query error behind `isError`. */
+	error?: unknown;
 	onRetry?: () => void;
 }
 
@@ -27,6 +50,7 @@ export function SlackPreferencesSection({
 	updatingWorkspaceSlug = null,
 	isLoading = false,
 	isError = false,
+	error,
 	onRetry,
 }: SlackPreferencesSectionProps) {
 	return (
@@ -49,43 +73,52 @@ export function SlackPreferencesSection({
 					<Spinner aria-label="Loading Slack preferences" />
 				</div>
 			) : isError ? (
-				<div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-					<p className="text-sm text-destructive" role="alert">
-						We couldn't load your Slack preferences.
-					</p>
-					{onRetry && (
-						<Button variant="outline" size="sm" onClick={onRetry}>
-							Retry
-						</Button>
-					)}
-				</div>
+				<QueryErrorAlert
+					error={error}
+					title="Could not load your Slack preferences"
+					onRetry={onRetry}
+				/>
 			) : !isSlackLinked ? (
-				<div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-					<div className="space-y-1">
-						<p className="text-sm font-medium">Slack is not connected</p>
-						<p className="text-sm text-muted-foreground">
-							Connect Slack to manage your channel-message preference from Hephaestus.
-						</p>
-					</div>
-					{canConnectSlack ? (
-						<Button variant="outline" size="sm" onClick={onConnectSlack}>
-							<SlackIcon className="mr-1.5 size-3.5" aria-hidden="true" />
-							Connect Slack
-						</Button>
-					) : (
-						<Badge variant="secondary">Not available</Badge>
-					)}
-				</div>
+				<ItemGroup>
+					<Item variant="outline" role="listitem">
+						<ItemMedia variant="icon">
+							<SlackIcon aria-hidden="true" />
+						</ItemMedia>
+						<ItemContent>
+							<ItemTitle>Slack is not connected</ItemTitle>
+							<ItemDescription>
+								Connect Slack to manage your channel-message preference from Hephaestus.
+							</ItemDescription>
+						</ItemContent>
+						<ItemActions>
+							{canConnectSlack ? (
+								<Button variant="outline" size="sm" onClick={onConnectSlack}>
+									<SlackIcon className="mr-1.5 size-3.5" aria-hidden="true" />
+									Connect Slack
+								</Button>
+							) : (
+								<Badge variant="secondary">Not available</Badge>
+							)}
+						</ItemActions>
+					</Item>
+				</ItemGroup>
 			) : workspaces.length === 0 ? (
-				<div className="space-y-2 rounded-lg border p-4">
-					<div className="flex items-center gap-2">
-						<p className="text-sm font-medium">Slack is connected</p>
-						<Badge variant="secondary">Connected</Badge>
-					</div>
-					<p className="text-sm text-muted-foreground">
-						No linked Hephaestus workspace currently has this Slack workspace installed.
-					</p>
-				</div>
+				<ItemGroup>
+					<Item variant="outline" role="listitem">
+						<ItemMedia variant="icon">
+							<SlackIcon aria-hidden="true" />
+						</ItemMedia>
+						<ItemContent>
+							<ItemTitle>
+								Slack is connected
+								<Badge variant="success">Connected</Badge>
+							</ItemTitle>
+							<ItemDescription>
+								No linked Hephaestus workspace currently has this Slack workspace installed.
+							</ItemDescription>
+						</ItemContent>
+					</Item>
+				</ItemGroup>
 			) : (
 				<div className="space-y-3">
 					{workspaces.map((workspace) => (
@@ -116,49 +149,90 @@ function WorkspacePreferenceRow({
 	const switchId = `slack-channel-messages-${workspace.workspaceSlug}`;
 	const channelMessagesAllowed = workspace.channelMessagesAllowed ?? true;
 
+	// Turning the toggle OFF *deletes* already-collected channel messages — irreversible, so it is
+	// confirmed. Turning it ON only starts collecting from now on, so it stays instant.
+	const [confirmingOff, setConfirmingOff] = useState(false);
+
+	const handleCheckedChange = (checked: boolean) => {
+		if (checked) {
+			onToggleChannelMessages(workspace.workspaceSlug, true);
+			return;
+		}
+		setConfirmingOff(true);
+	};
+
 	return (
 		<div
 			role="group"
 			aria-label={`${workspace.workspaceName} Slack preferences`}
 			className="space-y-4 rounded-lg border p-4"
 		>
-			<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-				<div className="space-y-1">
-					<div className="flex flex-wrap items-center gap-2">
-						<h3 className="text-sm font-medium">{workspace.workspaceName}</h3>
-						<Badge variant={channelMessagesAllowed ? "secondary" : "outline"}>
-							{channelMessagesAllowed ? "Message use on" : "Message use off"}
-						</Badge>
-					</div>
-					<p className="text-xs text-muted-foreground">
-						Slack workspace {workspace.slackTeamName ?? workspace.slackTeamId}
-					</p>
-					<p className="text-xs text-muted-foreground">
-						{channelCountText(workspace.activeMonitoredChannelCount)}
-					</p>
+			<div className="space-y-1">
+				<div className="flex flex-wrap items-center gap-2">
+					<h3 className="text-sm font-medium">{workspace.workspaceName}</h3>
+					<Badge variant={channelMessagesAllowed ? "success" : "outline"}>
+						{channelMessagesAllowed ? "Message use on" : "Message use off"}
+					</Badge>
 				</div>
+				<p className="text-xs text-muted-foreground">
+					Slack workspace {workspace.slackTeamName ?? workspace.slackTeamId}
+				</p>
+				<p className="text-xs text-muted-foreground">
+					{channelCountText(workspace.activeMonitoredChannelCount)}
+				</p>
 			</div>
 
-			<div className="flex items-start justify-between gap-6">
-				<div className="space-y-1">
-					<Label htmlFor={switchId} className="text-sm font-medium">
-						Use my new channel messages
-					</Label>
-					<p className="text-sm text-muted-foreground leading-relaxed">
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor={switchId}>Use my new channel messages</FieldLabel>
+					<FieldDescription>
 						When this is on, new messages you send in monitored Slack channels can be used as
 						context for your private mentor conversations. Turning it off deletes already collected
 						channel-message data for you in this workspace.
-					</p>
-				</div>
+					</FieldDescription>
+				</FieldContent>
 				<Switch
 					id={switchId}
-					className="mt-1"
 					checked={channelMessagesAllowed}
-					onCheckedChange={(checked) => onToggleChannelMessages(workspace.workspaceSlug, checked)}
+					onCheckedChange={handleCheckedChange}
 					disabled={isUpdating}
 					aria-busy={isUpdating}
 				/>
-			</div>
+			</Field>
+
+			<AlertDialog
+				open={confirmingOff}
+				onOpenChange={(open) => {
+					if (!open && !isUpdating) setConfirmingOff(false);
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Stop using your messages and delete them?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Hephaestus will stop reading your new messages in monitored channels of{" "}
+							{workspace.workspaceName} and{" "}
+							<strong>
+								permanently delete the channel-message data already collected from you
+							</strong>{" "}
+							in this workspace. Your messages in Slack itself are untouched. This cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={isUpdating}
+							onClick={() => {
+								onToggleChannelMessages(workspace.workspaceSlug, false);
+								setConfirmingOff(false);
+							}}
+						>
+							Turn off & delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

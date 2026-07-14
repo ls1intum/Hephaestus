@@ -175,6 +175,11 @@ function RouteComponent() {
 		unlinkingId: unlinkMutation.isPending ? (unlinkMutation.variables?.path?.id ?? null) : null,
 		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
+		error: linkedIdentitiesQuery.error ?? identityProvidersQuery.error,
+		onRetry: () => {
+			linkedIdentitiesQuery.refetch();
+			identityProvidersQuery.refetch();
+		},
 	};
 
 	const slackProvider = identityProvidersQuery.data?.find(
@@ -214,6 +219,7 @@ function RouteComponent() {
 			identityProvidersQuery.isLoading ||
 			(slackAvailable && slackPreferencesQuery.isLoading),
 		isError: slackAvailable && slackPreferencesQuery.isError,
+		error: slackPreferencesQuery.error,
 		onRetry: () => slackPreferencesQuery.refetch(),
 	};
 

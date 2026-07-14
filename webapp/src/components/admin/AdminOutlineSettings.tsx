@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
 	deleteOutlineCollectionMutation,
 	getOutlineConnectionStatusOptions,
+	getOutlineTokenStatusOptions,
 	initiateMutation,
 	listOptions,
 	listOutlineCollectionsOptions,
@@ -21,6 +22,12 @@ import { OutlineConnectCard, type OutlineConnectInput } from "./outline/OutlineC
 export interface AdminOutlineSettingsProps {
 	workspaceSlug: string;
 }
+
+/** How often the status/collection planes re-read the server while a reconcile is in flight. */
+const SYNC_POLL_MS = 3_000;
+
+/** The token state changes on the scale of months — one read per admin visit is plenty. */
+const TOKEN_STATUS_STALE_MS = 5 * 60_000;
 
 /**
  * Container for the Outline admin surface: reads the workspace's connections to derive the
@@ -47,31 +54,50 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 
 	// Collections + status only exist server-side while a connection is ACTIVE — gate the
 	// queries on the derived connected state instead of firing guaranteed-404 requests.
+	// A sync is a 202 fire-and-forget: nothing pushes its progress, so both planes poll while
+	// (and only while) work is in flight, then fall back to a single fetch per invalidation.
 	const statusQueryOptions = getOutlineConnectionStatusOptions({ path: { workspaceSlug } });
 	const { data: connectionStatus, isLoading: isStatusLoading } = useQuery({
 		...statusQueryOptions,
 		enabled: connected,
+		refetchInterval: (query) => (query.state.data?.syncRunning ? SYNC_POLL_MS : false),
 	});
 
 	const collectionsQueryOptions = listOutlineCollectionsOptions({ path: { workspaceSlug } });
 	const {
 		data: collections,
 		isLoading: isLoadingCollections,
-		isError: isCollectionsError,
+		error: collectionsError,
 		refetch: refetchCollections,
 	} = useQuery({
 		...collectionsQueryOptions,
 		enabled: connected,
+		refetchInterval: (query) =>
+			query.state.data?.some((collection) => collection.syncStatus === "PENDING")
+				? SYNC_POLL_MS
+				: false,
+	});
+
+	// The token state is a live call into Outline (and one an admin reads, not watches): cache it
+	// hard and never poll. Connect/disconnect invalidate it explicitly.
+	const tokenStatusQueryOptions = getOutlineTokenStatusOptions({ path: { workspaceSlug } });
+	const { data: tokenStatus, isLoading: isTokenStatusLoading } = useQuery({
+		...tokenStatusQueryOptions,
+		enabled: connected,
+		staleTime: TOKEN_STATUS_STALE_MS,
+		retry: false,
 	});
 
 	const invalidateConnections = () =>
 		queryClient.invalidateQueries({ queryKey: connectionsQueryOptions.queryKey });
 
-	// Every collection/sync mutation refreshes both planes: the list (rows, counts, watermarks)
-	// and the status line (aggregate document count, last sync).
+	// Every collection/sync mutation refreshes all three planes: the list (rows, counts,
+	// watermarks), the status line (aggregate document count, last sync), and the token state
+	// (a connect stores a different key).
 	const invalidateOutline = () => {
 		queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
 		queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
+		queryClient.invalidateQueries({ queryKey: tokenStatusQueryOptions.queryKey });
 	};
 
 	const connect = useMutation({
@@ -203,6 +229,8 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 				connectionLabel={outlineConnection?.displayName ?? outlineConnection?.instanceKey}
 				status={connectionStatus}
 				isStatusLoading={connected && isStatusLoading}
+				tokenStatus={tokenStatus}
+				isTokenStatusLoading={connected && isTokenStatusLoading}
 				isConnecting={connect.isPending}
 				isDisconnecting={disconnect.isPending}
 				isSyncing={syncNow.isPending}
@@ -217,7 +245,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 					workspaceSlug={workspaceSlug}
 					collections={collections ?? []}
 					isLoading={isLoadingCollections}
-					isError={isCollectionsError}
+					error={collectionsError}
 					onRetry={() => {
 						refetchCollections();
 					}}

@@ -140,14 +140,12 @@ export const PausedCollection: Story = {
 	},
 };
 
-/** A collection whose last sync failed — the error is a focusable destructive indicator. */
+/** A collection whose last sync failed — the error opens on click, so touch users can read it too. */
 export const SyncErrorRow: Story = {
 	args: { collections: [failing] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const trigger = canvas.getByRole("button", { name: /sync error for legacy wiki/i });
-		await expect(trigger).toBeInTheDocument();
-		await userEvent.hover(trigger);
+		await userEvent.click(canvas.getByRole("button", { name: /sync error for legacy wiki/i }));
 		await expect(await screen.findByText(/lost access/i)).toBeInTheDocument();
 	},
 };
@@ -159,11 +157,9 @@ export const BudgetThrottled: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("480")).toBeInTheDocument();
 		await expect(canvas.getByText(/\/ 512/)).toBeInTheDocument();
-		const trigger = canvas.getByRole("button", {
-			name: /32 exports skipped for budget for research notes/i,
-		});
-		await expect(trigger).toBeInTheDocument();
-		await userEvent.hover(trigger);
+		await userEvent.click(
+			canvas.getByRole("button", { name: /32 exports skipped for budget for research notes/i }),
+		);
 		await expect(await screen.findByText(/skipped for the shared budget/i)).toBeInTheDocument();
 	},
 };
@@ -173,13 +169,18 @@ export const Loading: Story = {
 	args: { isLoading: true, collections: [] },
 };
 
-/** The collection-list query failed — a distinct error panel with Retry, not the empty state. */
+/** The collection-list query failed — the shared error alert with Retry, not the empty state. */
 export const LoadError: Story = {
-	args: { collections: [], isError: true, onRetry: fn() },
+	args: {
+		collections: [],
+		error: { status: 503, title: "Service Unavailable", detail: "Outline sync is unavailable." },
+		onRetry: fn(),
+	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByText(/no collections mirrored yet/i)).not.toBeInTheDocument();
 		await expect(canvas.getByText(/couldn't load the mirrored collections/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/outline sync is unavailable/i)).toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
 	},
 };

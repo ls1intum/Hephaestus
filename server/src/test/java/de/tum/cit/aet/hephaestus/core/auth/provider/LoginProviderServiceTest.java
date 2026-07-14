@@ -63,6 +63,16 @@ class LoginProviderServiceTest extends BaseUnitTest {
         );
     }
 
+    private static AuthProperties.LoginProviderSeed outlineSeed(String clientId, String secret, String baseUrl) {
+        return new AuthProperties.LoginProviderSeed(
+            LoginProvider.ProviderType.OUTLINE,
+            baseUrl,
+            clientId,
+            secret,
+            "Team Wiki"
+        );
+    }
+
     private static LoginProviderService.Draft gitlabDraft(String registrationId, String baseUrl, String scopes) {
         return new LoginProviderService.Draft(
             registrationId,
@@ -187,6 +197,51 @@ class LoginProviderServiceTest extends BaseUnitTest {
         service(
             Map.of("github", githubSeed("", ""), "gitlab", gitlabSeed("", "", "https://gitlab.com", "GitLab"))
         ).seedFromEnvOnStartup();
+
+        verify(repository, never()).save(any());
+    }
+
+    /**
+     * The shipped {@code outline} seed slot is blank on every deployment that does not run a wiki:
+     * both {@code OUTLINE_OAUTH_CLIENT_ID} and {@code OUTLINE_OAUTH_BASE_URL} default to empty. The
+     * unconfigured gate must fire FIRST — before the id check, the existence probe and, decisively,
+     * before {@code resolveBaseUrl}, which 422s on a blank base URL. Asserted structurally: the entry
+     * touches the repository not at all.
+     */
+    @Test
+    void skipsTheBlankOutlineSeedSlotBeforeItCanValidateTheBlankBaseUrl() {
+        service(Map.of("outline", outlineSeed("", "", ""))).seedFromEnvOnStartup();
+
+        Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
+    void seedsOutlineFromItsBaseUrlWithTheReadScope() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+
+        service(
+            Map.of("outline", outlineSeed("client-id", "secret", "https://wiki.acme.test/"))
+        ).seedFromEnvOnStartup();
+
+        ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
+        verify(repository).save(captor.capture());
+        LoginProvider seeded = captor.getValue();
+        assertThat(seeded.getRegistrationId()).isEqualTo("outline");
+        assertThat(seeded.getType()).isEqualTo(LoginProvider.ProviderType.OUTLINE);
+        assertThat(seeded.getBaseUrl()).isEqualTo("https://wiki.acme.test");
+        assertThat(seeded.getScopes()).isEqualTo("read"); // pinned by type — never 'openid' (Outline is not OIDC)
+        assertThat(seeded.isSeededFromEnv()).isTrue();
+    }
+
+    /**
+     * Half-configured (a client id but no base URL): {@code resolveBaseUrl} 422s, and the seeder must
+     * absorb that into a skip. A credentialed-but-URL-less Outline slot cannot crash startup.
+     */
+    @Test
+    void skipsOutlineSeedWithAClientIdButNoBaseUrl() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+
+        service(Map.of("outline", outlineSeed("client-id", "secret", ""))).seedFromEnvOnStartup();
 
         verify(repository, never()).save(any());
     }

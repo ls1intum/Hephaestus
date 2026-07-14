@@ -14,7 +14,8 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
-import { SlackChannelPicker } from "./SlackChannelPicker";
+import { SlackChannelCombobox } from "./SlackChannelCombobox";
+import { SlackChannelPasteField } from "./SlackChannelPasteField";
 
 export interface AddChannelDialogProps {
 	open: boolean;
@@ -30,47 +31,63 @@ export function AddChannelDialog({
 	candidates = [],
 	onSubmit,
 }: AddChannelDialogProps) {
+	const [selectedCandidate, setSelectedCandidate] = useState<SlackChannelCandidate | null>(null);
 	const [channelReference, setChannelReference] = useState("");
 	const [channelName, setChannelName] = useState("");
-	const [selectedCandidate, setSelectedCandidate] = useState<SlackChannelCandidate | null>(null);
+	// With no channels to pick from, the paste path is the only path — don't hide it behind a toggle.
+	const [pasteOpen, setPasteOpen] = useState(candidates.length === 0);
+	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
+	const hasCandidates = candidates.length > 0;
 	const parsedReference = parseSlackChannelReference(channelReference);
-	const idInvalid = channelReference.trim().length > 0 && parsedReference == null;
-	const canSubmit = (selectedCandidate != null || parsedReference != null) && !submitting;
+	const referenceInvalid = channelReference.trim().length > 0 && parsedReference == null;
+
+	const resolved = selectedCandidate
+		? {
+				slackChannelId: selectedCandidate.slackChannelId,
+				channelName: selectedCandidate.channelName,
+			}
+		: parsedReference
+			? {
+					slackChannelId: parsedReference.channelId,
+					channelName:
+						channelName.trim().length > 0 ? channelName.trim() : parsedReference.channelName,
+				}
+			: null;
 
 	// Reset the form fields on close instead of remounting the dialog via a changing `key` —
 	// that killed the close animation. The next open (of the same, single Add-channel dialog
 	// instance) always starts from a clean slate.
 	function handleOpenChange(next: boolean) {
 		if (!next) {
+			setSelectedCandidate(null);
 			setChannelReference("");
 			setChannelName("");
-			setSelectedCandidate(null);
+			setPasteOpen(candidates.length === 0);
+			setSubmitError(null);
 			setSubmitting(false);
 		}
 		onOpenChange(next);
 	}
 
 	async function submit() {
-		if (submitting || !canSubmit) return;
-		const trimmedName = channelName.trim();
-		const input = selectedCandidate
-			? {
-					slackChannelId: selectedCandidate.slackChannelId,
-					channelName: selectedCandidate.channelName,
-				}
-			: parsedReference
-				? {
-						slackChannelId: parsedReference.channelId,
-						channelName: trimmedName.length > 0 ? trimmedName : parsedReference.channelName,
-					}
-				: null;
-		if (!input) return;
+		if (submitting) return;
+		// The submit button stays enabled: an admin who clicks it gets told what is missing rather
+		// than staring at a dead control with no stated reason.
+		if (!resolved) {
+			setSubmitError(
+				hasCandidates
+					? "Choose a channel from the list, or paste a channel link or ID."
+					: "Paste a Slack channel link or ID to add it.",
+			);
+			return;
+		}
 
+		setSubmitError(null);
 		setSubmitting(true);
 		try {
-			await onSubmit(input);
+			await onSubmit(resolved);
 			handleOpenChange(false);
 		} catch {
 			// Rejection = keep the dialog open. The mutation's onError already surfaced the toast.
@@ -97,14 +114,21 @@ export function AddChannelDialog({
 					}}
 				>
 					<FieldGroup>
-						{candidates.length > 0 && (
-							<Field>
-								<FieldLabel>Available channels</FieldLabel>
-								<SlackChannelPicker
+						{hasCandidates && (
+							<Field data-invalid={submitError != null}>
+								<FieldLabel htmlFor="add-slack-channel">Channel</FieldLabel>
+								<SlackChannelCombobox
+									id="add-slack-channel"
 									aria-label="Search available Slack channels"
 									candidates={candidates}
 									disabled={submitting}
-									selectedChannelId={selectedCandidate?.slackChannelId}
+									invalid={submitError != null}
+									selectedChannelId={
+										selectedCandidate?.slackChannelId ?? parsedReference?.channelId
+									}
+									selectedChannelName={
+										parsedReference ? channelName.trim() || undefined : undefined
+									}
 									getDisabledReason={(candidate) =>
 										candidate.archived
 											? "Archived"
@@ -121,36 +145,41 @@ export function AddChannelDialog({
 										setSelectedCandidate(candidate);
 										setChannelReference("");
 										setChannelName("");
+										setSubmitError(null);
 									}}
 								/>
 								<FieldDescription>
 									Private channels appear here after someone invites Hephaestus to them in Slack.
 								</FieldDescription>
+								{submitError && <FieldError>{submitError}</FieldError>}
 							</Field>
 						)}
 
-						<Field data-invalid={idInvalid}>
-							<FieldLabel htmlFor="add-slack-channel-id">Paste channel link or ID</FieldLabel>
-							<Input
+						{pasteOpen ? (
+							<SlackChannelPasteField
 								id="add-slack-channel-id"
 								value={channelReference}
 								disabled={submitting}
-								onChange={(e) => {
-									setChannelReference(e.target.value);
+								invalid={referenceInvalid}
+								onChange={(value) => {
+									setChannelReference(value);
 									setSelectedCandidate(null);
+									setSubmitError(null);
 								}}
-								placeholder="https://…slack.com/archives/C0974LJBPBK"
-								autoComplete="off"
-								aria-invalid={idInvalid}
 							/>
-							<FieldDescription>
-								Use this when the channel is not in the list yet. For private channels, invite
-								Hephaestus in Slack first.
-							</FieldDescription>
-							{idInvalid && (
-								<FieldError>Paste a Slack channel URL, mention, or C…/G… channel ID.</FieldError>
-							)}
-						</Field>
+						) : (
+							<Button
+								type="button"
+								variant="link"
+								size="sm"
+								className="h-auto w-fit p-0"
+								onClick={() => setPasteOpen(true)}
+							>
+								Paste a channel link or ID instead
+							</Button>
+						)}
+
+						{!hasCandidates && submitError && <FieldError>{submitError}</FieldError>}
 
 						{parsedReference && !selectedCandidate && (
 							<Field>
@@ -163,6 +192,9 @@ export function AddChannelDialog({
 									placeholder="e.g. team-standup"
 									autoComplete="off"
 								/>
+								<FieldDescription>
+									Shown in the table. Slack's own name is used when you leave this blank.
+								</FieldDescription>
 							</Field>
 						)}
 					</FieldGroup>
@@ -171,7 +203,7 @@ export function AddChannelDialog({
 						<DialogClose render={<Button type="button" variant="outline" disabled={submitting} />}>
 							Cancel
 						</DialogClose>
-						<Button type="submit" disabled={!canSubmit}>
+						<Button type="submit" disabled={submitting}>
 							{submitting ? "Adding…" : "Add channel"}
 						</Button>
 					</DialogFooter>

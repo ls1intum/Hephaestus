@@ -137,6 +137,26 @@ on delete) and a per-workspace least-recently-materialized size cap, with a hard
 tombstoned rows as defense-in-depth. This is a deliberate divergence from the wall-clock retention the
 messaging integration runs.
 
+### 8. Identity linking is link-only OAuth, never a sign-in
+
+Attributing a document to a Hephaestus member needs an Outline identity on the account. Outline
+(v0.77+) exposes an **OAuth2** authorization-code provider — *not* OIDC: it issues no `id_token`, and
+serves no userinfo or discovery endpoint. Identity therefore comes from `POST /api/auth.info` with the
+member's access token, which returns `{data:{user:{id,…}, team:{id,…}}}`. The link is keyed on
+`(OUTLINE, user-uuid, team-id)` — an Outline user UUID is only unique within its team, so the tenant
+key is mandatory and a missing one fails the flow closed.
+
+The provider is **link-only**, exactly like Slack: it never appears on the login picker and can only
+attach an identity to an already-signed-in account (`ProviderType.isLinkOnly()`, re-checked at the
+callback). A wiki is not an identity authority for this instance, and the scope requested (`read`) is
+minimal. Email is captured for forensics and **never** matched to resolve an account — matching on it
+would reopen the nOAuth takeover class (ADR 0017).
+
+The scope grammar (`read | write | create | <ns>:<verb> | /api/<ns>.<method>`) admits `openid` as a
+literal token, but Outline is not an OIDC provider: requesting it flips Spring to the OIDC path and
+breaks the callback. The scope is therefore pinned to `read` by provider type, and `openid` is
+rejected on write.
+
 ## Mechanism refinements
 
 Two mechanisms refine the decisions above without changing them:

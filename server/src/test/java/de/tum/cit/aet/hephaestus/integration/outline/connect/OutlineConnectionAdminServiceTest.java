@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.connect;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -12,7 +13,11 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineTokenDescription;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -47,6 +52,9 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
     private ConnectionService connectionService;
 
     @Mock
+    private OutlineApiClient apiClient;
+
+    @Mock
     private OutlineCollectionRepository collectionRepository;
 
     @Mock
@@ -77,10 +85,18 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
         lenient().when(connectionService.findActive(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection));
         return new OutlineConnectionAdminService(
             connectionService,
+            apiClient,
             collectionRepository,
             documentRepository,
             syncScheduler,
             new TaskExecutorAdapter(executor)
+        );
+    }
+
+    /** The stored token, as the connection's credential bundle hands it to the probe. */
+    private void storedToken(String token) {
+        when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE)).thenReturn(
+            Optional.of(new BearerToken(token, null))
         );
     }
 
@@ -189,6 +205,77 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
 
         dispatched.get(0).run();
         assertThat(service.status(WS).syncRunning()).isFalse();
+    }
+
+    @Test
+    void tokenStatus_rejectedToken_isNotAccepted_ratherThanAnError() {
+        // "Your token no longer works" is the answer the admin card came to ask — not a 5xx.
+        OutlineConnectionAdminService service = deferredService();
+        storedToken("ol_dead_key");
+        org.mockito.Mockito.doThrow(new OutlineApiException("Outline /api/auth.info failed (HTTP 401)"))
+            .when(apiClient)
+            .validateToken(SERVER_URL, "ol_dead_key");
+
+        OutlineTokenStatusDTO status = service.tokenStatus(WS);
+
+        assertThat(status.accepted()).isFalse();
+        assertThat(status.name()).isNull();
+        assertThat(status.expiresAt()).isNull();
+        // A dead token is never described — the metadata probe is not even attempted.
+        verify(apiClient, never()).describeToken(any(), any());
+    }
+
+    @Test
+    void tokenStatus_acceptedAndDescribable_carriesTheKeysMetadata() {
+        OutlineConnectionAdminService service = deferredService();
+        storedToken("ol_live_key");
+        Instant expiresAt = Instant.parse("2026-12-01T10:00:00Z");
+        Instant lastActiveAt = Instant.parse("2026-07-13T08:30:00Z");
+        when(apiClient.describeToken(SERVER_URL, "ol_live_key")).thenReturn(
+            Optional.of(new OutlineTokenDescription("Hephaestus", "ab12", expiresAt, lastActiveAt))
+        );
+
+        OutlineTokenStatusDTO status = service.tokenStatus(WS);
+
+        assertThat(status.accepted()).isTrue();
+        assertThat(status.name()).isEqualTo("Hephaestus");
+        assertThat(status.last4()).isEqualTo("ab12");
+        assertThat(status.expiresAt()).isEqualTo(expiresAt);
+        assertThat(status.lastActiveAt()).isEqualTo(lastActiveAt);
+    }
+
+    @Test
+    void tokenStatus_acceptedButUndescribable_isAcceptedWithoutMetadata() {
+        // apiKeys.list answered 403 (an out-of-scope key, or an owner who cannot see it) — the token
+        // still syncs content, so the absence of metadata must not read as "token broken".
+        OutlineConnectionAdminService service = deferredService();
+        storedToken("ol_scoped_key");
+        when(apiClient.describeToken(SERVER_URL, "ol_scoped_key")).thenReturn(Optional.empty());
+
+        OutlineTokenStatusDTO status = service.tokenStatus(WS);
+
+        assertThat(status.accepted()).isTrue();
+        assertThat(status.name()).isNull();
+        assertThat(status.last4()).isNull();
+        assertThat(status.expiresAt()).isNull();
+        assertThat(status.lastActiveAt()).isNull();
+    }
+
+    @Test
+    void tokenStatus_withoutAStoredToken_isNotAccepted() {
+        OutlineConnectionAdminService service = deferredService();
+        when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
+
+        assertThat(service.tokenStatus(WS).accepted()).isFalse();
+        verify(apiClient, never()).validateToken(any(), any());
+    }
+
+    @Test
+    void tokenStatus_withoutActiveConnection_isNotFound() {
+        OutlineConnectionAdminService service = deferredService();
+        when(connectionService.findActive(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.tokenStatus(WS)).isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test

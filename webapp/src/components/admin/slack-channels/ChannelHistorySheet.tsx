@@ -1,9 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, HistoryIcon } from "lucide-react";
+import { Fragment } from "react";
 import { listSlackChannelConsentEventsOptions } from "@/api/@tanstack/react-query.gen";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
-import { Button } from "@/components/ui/button";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemSeparator,
+	ItemTitle,
+} from "@/components/ui/item";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Sheet,
 	SheetContent,
@@ -12,6 +29,7 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConsentStateBadge } from "./consent-terms";
 
 export interface ChannelHistorySheetProps {
 	workspaceSlug: string;
@@ -39,6 +57,8 @@ export function ChannelHistorySheet({
 		enabled: open,
 	});
 
+	const events = data ?? [];
+
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
 			<SheetContent className="w-full sm:max-w-md">
@@ -49,7 +69,7 @@ export function ChannelHistorySheet({
 					</SheetDescription>
 				</SheetHeader>
 
-				<div className="overflow-y-auto px-4 pb-4">
+				<ScrollArea className="min-h-0 flex-1 px-4 pb-4">
 					{isLoading && (
 						<div className="space-y-3">
 							<Skeleton className="h-12 w-full" />
@@ -59,47 +79,63 @@ export function ChannelHistorySheet({
 					)}
 
 					{!isLoading && error && (
-						<div className="space-y-3">
-							<p className="text-destructive text-sm">Could not load the consent history.</p>
-							<Button variant="outline" size="sm" onClick={() => refetch()}>
-								Retry
-							</Button>
-						</div>
+						<QueryErrorAlert
+							error={error}
+							title="Could not load the consent history"
+							onRetry={() => refetch()}
+						/>
 					)}
 
-					{!isLoading && !error && (data?.length ?? 0) === 0 && (
-						<p className="text-muted-foreground text-sm">No consent changes recorded yet.</p>
+					{!isLoading && !error && events.length === 0 && (
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<HistoryIcon />
+								</EmptyMedia>
+								<EmptyTitle>No consent changes recorded yet</EmptyTitle>
+								<EmptyDescription>
+									Every activation, pause, resume and removal lands here as an immutable audit
+									entry.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					)}
 
-					{!isLoading && !error && data && data.length > 0 && (
-						<ol className="border-border relative space-y-4 border-l pl-4">
-							{data.map((event) => (
-								<HistoryEntry key={event.id} event={event} />
+					{!isLoading && !error && events.length > 0 && (
+						<ItemGroup>
+							{events.map((event, index) => (
+								<Fragment key={event.id}>
+									{index > 0 && <ItemSeparator />}
+									<HistoryEntry event={event} />
+								</Fragment>
 							))}
-						</ol>
+						</ItemGroup>
 					)}
-				</div>
+				</ScrollArea>
 			</SheetContent>
 		</Sheet>
 	);
 }
 
+/** One audit entry: the transition it recorded, when, and the reason the admin gave. */
 function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
 	return (
-		<li className="space-y-1">
-			<div className="flex items-center gap-1.5 text-sm font-medium">
-				{event.fromState ? (
-					<>
-						<span className="text-muted-foreground">{event.fromState}</span>
-						<ArrowRightIcon className="text-muted-foreground size-3.5" aria-hidden />
-					</>
-				) : null}
-				<span>{event.toState}</span>
-			</div>
-			<div className="text-muted-foreground text-xs">
-				{format(new Date(event.createdAt), "PPpp")}
-			</div>
-			{event.reason ? <p className="text-sm">{event.reason}</p> : null}
-		</li>
+		<Item render={<li />} size="sm" className="items-start">
+			<ItemContent>
+				<ItemTitle className="gap-1.5">
+					{event.fromState && (
+						<>
+							<ConsentStateBadge state={event.fromState} />
+							<ArrowRightIcon className="text-muted-foreground size-3.5" aria-hidden />
+						</>
+					)}
+					<ConsentStateBadge state={event.toState} />
+				</ItemTitle>
+				<ItemDescription>{format(new Date(event.createdAt), "PPpp")}</ItemDescription>
+				{event.reason && (
+					<ItemDescription className="text-foreground">{event.reason}</ItemDescription>
+				)}
+			</ItemContent>
+		</Item>
 	);
 }

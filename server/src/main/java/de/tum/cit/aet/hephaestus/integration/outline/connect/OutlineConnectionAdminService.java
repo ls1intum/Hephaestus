@@ -4,6 +4,10 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -38,6 +42,7 @@ public class OutlineConnectionAdminService {
     private static final Logger log = LoggerFactory.getLogger(OutlineConnectionAdminService.class);
 
     private final ConnectionService connectionService;
+    private final OutlineApiClient apiClient;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineDocumentRepository documentRepository;
     private final OutlineDocumentSyncScheduler syncScheduler;
@@ -54,12 +59,14 @@ public class OutlineConnectionAdminService {
 
     public OutlineConnectionAdminService(
         ConnectionService connectionService,
+        OutlineApiClient apiClient,
         OutlineCollectionRepository collectionRepository,
         OutlineDocumentRepository documentRepository,
         OutlineDocumentSyncScheduler syncScheduler,
         @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor
     ) {
         this.connectionService = connectionService;
+        this.apiClient = apiClient;
         this.collectionRepository = collectionRepository;
         this.documentRepository = documentRepository;
         this.syncScheduler = syncScheduler;
@@ -104,6 +111,34 @@ public class OutlineConnectionAdminService {
             pendingCollections,
             erroredCollections
         );
+    }
+
+    /**
+     * Probes the stored API token against Outline: {@code auth.info} answers whether the token is still
+     * accepted at all, and {@code apiKeys.list} — when the token may see its own key — adds the name,
+     * expiry and last-use Outline keeps for it. A rejected token yields {@code accepted=false} rather
+     * than an error: "your token no longer works" is exactly the answer the admin card came to ask.
+     */
+    public OutlineTokenStatusDTO tokenStatus(long workspaceId) {
+        Connection connection = requireActiveConnection(workspaceId);
+        ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();
+        String token = connectionService
+            .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
+            .map(BearerToken::token)
+            .orElse(null);
+        if (token == null) {
+            return new OutlineTokenStatusDTO(false, null, null, null, null);
+        }
+        try {
+            apiClient.validateToken(config.serverUrl(), token);
+        } catch (OutlineApiException e) {
+            log.debug("outline.admin: token probe rejected for workspaceId={}: {}", workspaceId, e.toString());
+            return new OutlineTokenStatusDTO(false, null, null, null, null);
+        }
+        return apiClient
+            .describeToken(config.serverUrl(), token)
+            .map(d -> new OutlineTokenStatusDTO(true, d.name(), d.last4(), d.expiresAt(), d.lastActiveAt()))
+            .orElseGet(() -> new OutlineTokenStatusDTO(true, null, null, null, null));
     }
 
     /** Whether a manually triggered full reconcile is currently running for this workspace (on this pod). */

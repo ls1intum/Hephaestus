@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineApiKeyListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineAuthInfoResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
@@ -14,6 +15,7 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
@@ -60,11 +63,17 @@ public class OutlineApiClient {
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
 
+    @Autowired
     public OutlineApiClient(
         @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,
         @Qualifier("outlineRestApiRetry") Retry retry
     ) {
-        this.webClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
+        this(circuitBreaker, retry, WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build());
+    }
+
+    /** Test seam: inject a WebClient with a stubbed exchange function (the guarded connector needs a real host). */
+    OutlineApiClient(CircuitBreaker circuitBreaker, Retry retry, WebClient webClient) {
+        this.webClient = webClient;
         this.circuitBreaker = circuitBreaker;
         this.retry = retry;
     }
@@ -101,6 +110,45 @@ public class OutlineApiClient {
         OutlineAuthInfoResponse.Team team = response.data().team();
         OutlineAuthInfoResponse.User user = response.data().user();
         return new OutlineIdentity(team.id(), team.name(), user == null ? null : user.id());
+    }
+
+    /** An Outline API key's own metadata: how it is labelled there, when it lapses, when it was last used. */
+    public record OutlineTokenDescription(String name, String last4, Instant expiresAt, Instant lastActiveAt) {}
+
+    /**
+     * Describes the token itself via {@code apiKeys.list}, matched on the {@code last4} suffix Outline
+     * returns in place of the (write-only) key value. Empty when the key is not in the list — a key
+     * scoped away from {@code apiKeys.list}, or one belonging to a user who cannot see it, still works
+     * for content sync, so the absence of metadata is not an error and must not be surfaced as one.
+     */
+    public Optional<OutlineTokenDescription> describeToken(String serverUrl, String token) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+        OutlineApiKeyListResponse response;
+        try {
+            response = post(
+                resolvedUrl,
+                token,
+                "/api/apiKeys.list",
+                Map.of("limit", PAGE_LIMIT),
+                OutlineApiKeyListResponse.class
+            );
+        } catch (OutlineApiException e) {
+            if (isForbidden(e)) {
+                log.debug("Outline apiKeys.list is not in this token's scope — token metadata unavailable");
+                return Optional.empty();
+            }
+            throw e;
+        }
+        if (response == null || response.data() == null || token.length() < 4) {
+            return Optional.empty();
+        }
+        String suffix = token.substring(token.length() - 4);
+        return response
+            .data()
+            .stream()
+            .filter(key -> suffix.equals(key.last4()))
+            .findFirst()
+            .map(key -> new OutlineTokenDescription(key.name(), key.last4(), key.expiresAt(), key.lastActiveAt()));
     }
 
     /**
@@ -339,6 +387,11 @@ public class OutlineApiClient {
     /** A permanent failure whose wire cause was an HTTP 404 — the addressed resource is gone upstream. */
     private static boolean isNotFound(OutlineApiException e) {
         return (e.getCause() instanceof WebClientResponseException wire && wire.getStatusCode().value() == 404);
+    }
+
+    /** Outline answers 403 both for an out-of-scope token and for a call the key's user may not make. */
+    private static boolean isForbidden(OutlineApiException e) {
+        return (e.getCause() instanceof WebClientResponseException wire && wire.getStatusCode().value() == 403);
     }
 
     /**

@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { CheckIcon, ExternalLinkIcon, LoaderIcon, SendIcon } from "lucide-react";
+import { ExternalLinkIcon, LoaderIcon, SendIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -9,6 +9,7 @@ import {
 	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { SlackChannelCandidate } from "@/api/types.gen";
+import { SlackIcon } from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -19,8 +20,10 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import {
 	Field,
 	FieldContent,
@@ -31,6 +34,14 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item";
+import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -39,7 +50,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
-import { SlackChannelPicker } from "./slack-channels/SlackChannelPicker";
+import { SlackChannelCombobox } from "./slack-channels/SlackChannelCombobox";
+import { SlackChannelPasteField } from "./slack-channels/SlackChannelPasteField";
+import { slackErrorMessage } from "./slack-channels/slack-error-copy";
 
 export interface AdminSlackNotificationSettingsProps {
 	workspaceSlug: string;
@@ -80,13 +93,30 @@ export function AdminSlackNotificationSettings({
 	channelCandidates = [],
 	onSaved,
 }: AdminSlackNotificationSettingsProps) {
-	const [channelInput, setChannelInput] = useState(channelId ?? "");
+	const selectableDigestChannels = channelCandidates.filter((candidate) => !candidate.archived);
+
+	// The persisted value is a stable Slack id. Anything that does not parse (legacy garbage, a
+	// half-typed value from an older build) is surfaced in the paste escape hatch so an admin can
+	// see and repair it, instead of silently becoming the invisible value of a hidden control.
+	const persisted = channelId ? parseSlackChannelReference(channelId) : null;
+	const persistedIsUnparseable = Boolean(channelId) && persisted == null;
+
+	// The one digest-channel value. Both entry points (combobox, paste) write here; nothing
+	// renders it as editable text.
+	const [selectedChannelId, setSelectedChannelId] = useState(persisted?.channelId ?? "");
+	const [channelReference, setChannelReference] = useState(persistedIsUnparseable ? channelId : "");
+	const [pasteOpen, setPasteOpen] = useState(
+		persistedIsUnparseable || selectableDigestChannels.length === 0,
+	);
 	const [teamInput, setTeamInput] = useState(teamLabel ?? "");
 	const [enabledInput, setEnabledInput] = useState(enabled);
 	const [dayInput, setDayInput] = useState(String(scheduleDay ?? DEFAULT_DAY));
 	const [timeInput, setTimeInput] = useState(scheduleTime ?? DEFAULT_TIME);
 	const [disconnectOpen, setDisconnectOpen] = useState(false);
 
+	// The OAuth landing route hands the outcome over through sessionStorage. The keys are cleared
+	// before the toast fires, so a remount (the parent re-keys this form on every server refetch)
+	// cannot replay it. This belongs on the landing route, not here — see the note in the PR.
 	useEffect(() => {
 		const result = window.sessionStorage.getItem("slack-connect-result");
 		if (!result) return;
@@ -97,12 +127,19 @@ export function AdminSlackNotificationSettings({
 		else toast.error("Slack connection failed", { description: reason });
 	}, []);
 
-	const parsedChannel = parseSlackChannelReference(channelInput);
-	const channelInvalid = channelInput.length > 0 && parsedChannel == null;
-	const channelValid = parsedChannel != null;
-	const channelRequired = enabledInput && !channelValid && channelInput.length === 0;
+	const referenceText = channelReference ?? "";
+	const parsedReference = parseSlackChannelReference(referenceText);
+	const channelInvalid = referenceText.trim().length > 0 && parsedReference == null;
+	const channelRequired = enabledInput && selectedChannelId.length === 0 && !channelInvalid;
 	const timeInvalid = !TIME_24H.test(timeInput);
-	const selectableDigestChannels = channelCandidates.filter((candidate) => !candidate.archived);
+
+	/** The paste hatch and the combobox write the same single value; the last one used wins. */
+	function handlePastedReference(value: string) {
+		setChannelReference(value);
+		if (value.trim().length === 0) return;
+		const parsed = parseSlackChannelReference(value);
+		setSelectedChannelId(parsed ? parsed.channelId : "");
+	}
 
 	const save = useMutation({
 		...updateLeaderboardDigestMutation(),
@@ -126,11 +163,11 @@ export function AdminSlackNotificationSettings({
 				});
 				return;
 			}
-			const reason =
-				data.slackError === "no_channel_configured"
-					? "No channel is configured — enter a channel ID first."
-					: (data.slackError ?? "unknown error");
-			toast.error(`Slack rejected: ${reason}`);
+			// Slack's machine codes (channel_not_found, not_in_channel, …) are for us, not for the
+			// admin reading the toast.
+			toast.error("Slack did not post the test message", {
+				description: slackErrorMessage(data.slackError),
+			});
 		},
 		onError: (e) => {
 			toast.error("Test message failed", {
@@ -170,219 +207,241 @@ export function AdminSlackNotificationSettings({
 	});
 
 	return (
-		<div className="space-y-6">
-			<div>
-				<h2 className="text-lg font-semibold mb-4">Slack integration</h2>
-				<Card>
+		<>
+			<Card>
+				<CardHeader>
+					{/* CardTitle renders a div; the settings page is navigated by heading, so the
+					    section title has to be a real h2. */}
+					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
+						Slack integration
+					</h2>
+					<CardDescription>
+						Install Hephaestus in Slack for weekly digests, the DM mentor, App Home privacy
+						controls, and optional monitored channels. Channel messages are not stored until an
+						admin activates a channel.
+					</CardDescription>
+				</CardHeader>
+
+				{hasSlackConnection && (
 					<CardContent className="space-y-4">
-						<p className="text-sm text-muted-foreground">
-							Install Hephaestus in Slack for weekly digests, the DM mentor, App Home privacy
-							controls, and optional monitored channels. Channel messages are not stored until an
-							admin activates a channel.
-						</p>
+						<Item variant="outline" size="sm">
+							<ItemMedia variant="icon">
+								<SlackIcon />
+							</ItemMedia>
+							<ItemContent>
+								<ItemTitle>Slack workspace</ItemTitle>
+								<ItemDescription>Hephaestus is installed and can post as the app.</ItemDescription>
+							</ItemContent>
+							<ItemActions>
+								<Badge variant="success">Connected</Badge>
+							</ItemActions>
+						</Item>
 
-						{!hasSlackConnection ? (
-							<Button
-								onClick={() => {
-									// Persist the originating slug so the OAuth landing route can route back.
-									window.sessionStorage.setItem("slack-connect-return-slug", workspaceSlug);
-									connect.mutate({
-										path: { workspaceSlug },
-										body: { kind: "SLACK", userInput: {} },
-									});
-								}}
-								disabled={connect.isPending}
-								className="w-full"
-							>
-								{connect.isPending ? (
-									<>
-										<LoaderIcon className="mr-2 size-4 animate-spin" />
-										Redirecting to Slack…
-									</>
-								) : (
-									<>
-										Connect Slack workspace
-										<ExternalLinkIcon className="ml-2 size-3.5" />
-									</>
-								)}
-							</Button>
-						) : (
-							<>
-								<div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
-									<CheckIcon className="text-muted-foreground size-4" />
-									<span>Slack workspace connected</span>
-								</div>
+						<div>
+							<h3 className="font-medium">Weekly digest</h3>
+							<p className="text-muted-foreground text-sm">
+								Optional leaderboard summary posted to one Slack channel on a schedule.
+							</p>
+						</div>
 
-								<div>
-									<h3 className="font-medium">Weekly digest</h3>
-									<p className="text-muted-foreground text-sm">
-										Optional leaderboard summary posted to one Slack channel on a schedule.
-									</p>
-								</div>
+						<FieldGroup>
+							<Field orientation="horizontal">
+								<FieldContent>
+									<FieldLabel htmlFor="slack-enabled" className="font-medium">
+										Send weekly digest
+									</FieldLabel>
+									<FieldDescription>
+										Posts on the schedule below; the leaderboard cycle ends at the same moment.
+									</FieldDescription>
+								</FieldContent>
+								<Switch
+									id="slack-enabled"
+									checked={enabledInput}
+									disabled={save.isPending}
+									onCheckedChange={setEnabledInput}
+								/>
+							</Field>
 
-								<FieldGroup>
-									<Field orientation="horizontal">
-										<FieldContent>
-											<FieldLabel htmlFor="slack-enabled" className="font-medium">
-												Send weekly digest
-											</FieldLabel>
-											<FieldDescription>
-												Posts on the schedule below; the leaderboard cycle ends at the same moment.
-											</FieldDescription>
-										</FieldContent>
-										<Switch
-											id="slack-enabled"
-											checked={enabledInput}
-											disabled={save.isPending}
-											onCheckedChange={setEnabledInput}
-										/>
-									</Field>
-
-									<div className="grid grid-cols-2 gap-4">
-										<Field>
-											<FieldLabel htmlFor="slack-day">Day</FieldLabel>
-											<Select
-												items={DAYS}
-												value={dayInput}
-												disabled={save.isPending}
-												onValueChange={(value) => {
-													if (value) setDayInput(value);
-												}}
-											>
-												<SelectTrigger id="slack-day">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													{DAYS.map((d) => (
-														<SelectItem key={d.value} value={d.value}>
-															{d.label}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</Field>
-
-										<Field data-invalid={timeInvalid}>
-											<FieldLabel htmlFor="slack-time">Time (24h)</FieldLabel>
-											<Input
-												id="slack-time"
-												type="time"
-												value={timeInput}
-												disabled={save.isPending}
-												onChange={(e) => setTimeInput(e.target.value)}
-												aria-invalid={timeInvalid}
-											/>
-											<FieldDescription>
-												When the weekly cycle ends and the digest posts (workspace timezone).
-											</FieldDescription>
-											{timeInvalid && <FieldError>Time must be in HH:mm format.</FieldError>}
-										</Field>
-									</div>
-
-									<Field data-invalid={channelInvalid || channelRequired}>
-										<FieldLabel htmlFor="slack-channel">Digest channel</FieldLabel>
-										{selectableDigestChannels.length > 0 && (
-											<SlackChannelPicker
-												aria-label="Search digest Slack channels"
-												candidates={selectableDigestChannels}
-												disabled={save.isPending}
-												selectedChannelId={parsedChannel?.channelId}
-												getDisabledReason={(candidate) =>
-													candidate.member ? undefined : "Needs invite"
-												}
-												onSelect={(candidate) => setChannelInput(candidate.slackChannelId)}
-											/>
-										)}
-										<Input
-											id="slack-channel"
-											value={channelInput}
-											disabled={save.isPending}
-											onChange={(e) => setChannelInput(e.target.value)}
-											placeholder="https://…slack.com/archives/C0974LJBPBK"
-											autoComplete="off"
-											aria-invalid={channelInvalid}
-										/>
-										<FieldDescription>
-											Invite Hephaestus to the channel in Slack, then paste a channel URL or stable
-											C…/G… ID.
-										</FieldDescription>
-										{channelRequired && (
-											<FieldError>Choose a channel before enabling the weekly digest.</FieldError>
-										)}
-										{channelInvalid && (
-											<FieldError>
-												Paste a Slack channel URL, mention, or C…/G… channel ID.
-											</FieldError>
-										)}
-									</Field>
-
-									<Field>
-										<FieldLabel htmlFor="slack-team">Team filter (optional)</FieldLabel>
-										<Input
-											id="slack-team"
-											value={teamInput}
-											disabled={save.isPending}
-											onChange={(e) => setTeamInput(e.target.value)}
-											placeholder="e.g. engineering"
-											autoComplete="off"
-										/>
-										<FieldDescription>
-											Restrict the leaderboard to a single team. Leave blank to include every
-											contributor in the workspace.
-										</FieldDescription>
-									</Field>
-								</FieldGroup>
-
-								<div className="flex gap-2 pt-2">
-									<Button
-										onClick={() =>
-											save.mutate({
-												path: { workspaceSlug },
-												body: {
-													day: Number(dayInput),
-													time: timeInput,
-													enabled: enabledInput,
-													channelId: parsedChannel?.channelId,
-													team: teamInput.length > 0 ? teamInput : undefined,
-												},
-											})
-										}
-										disabled={save.isPending || channelInvalid || channelRequired || timeInvalid}
+							<div className="grid grid-cols-2 gap-4">
+								<Field>
+									<FieldLabel htmlFor="slack-day">Day</FieldLabel>
+									<Select
+										items={DAYS}
+										value={dayInput}
+										disabled={save.isPending}
+										onValueChange={(value) => {
+											if (value) setDayInput(value);
+										}}
 									>
-										{save.isPending ? "Saving…" : "Save"}
-									</Button>
-									<Button
-										variant="outline"
-										onClick={() =>
-											test.mutate({
-												path: { workspaceSlug },
-												body: { channelId: parsedChannel?.channelId },
-											})
-										}
-										disabled={test.isPending || !channelValid}
-									>
-										<SendIcon className="mr-2 size-3.5" />
-										{test.isPending ? "Sending…" : "Send test message"}
-									</Button>
-								</div>
+										<SelectTrigger id="slack-day">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											{DAYS.map((d) => (
+												<SelectItem key={d.value} value={d.value}>
+													{d.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</Field>
 
-								{slackConnectionId != null && (
-									<div className="flex justify-end border-t pt-4">
-										<Button
-											variant="outline"
-											className="text-destructive"
-											onClick={() => setDisconnectOpen(true)}
-											disabled={disconnect.isPending}
-										>
-											{disconnect.isPending ? "Disconnecting…" : "Disconnect Slack…"}
-										</Button>
-									</div>
+								<Field data-invalid={timeInvalid}>
+									<FieldLabel htmlFor="slack-time">Time (24h)</FieldLabel>
+									<Input
+										id="slack-time"
+										type="time"
+										value={timeInput}
+										disabled={save.isPending}
+										onChange={(e) => setTimeInput(e.target.value)}
+										aria-invalid={timeInvalid}
+									/>
+									<FieldDescription>
+										When the weekly cycle ends and the digest posts (workspace timezone).
+									</FieldDescription>
+									{timeInvalid && <FieldError>Time must be in HH:mm format.</FieldError>}
+								</Field>
+							</div>
+
+							<Field data-invalid={channelRequired}>
+								<FieldLabel htmlFor="slack-channel">Digest channel</FieldLabel>
+								<SlackChannelCombobox
+									id="slack-channel"
+									aria-label="Search digest Slack channels"
+									candidates={selectableDigestChannels}
+									disabled={save.isPending}
+									invalid={channelRequired}
+									selectedChannelId={selectedChannelId}
+									selectedChannelName={parsedReference?.channelName}
+									getDisabledReason={(candidate) => (candidate.member ? undefined : "Needs invite")}
+									onSelect={(candidate) => {
+										setSelectedChannelId(candidate.slackChannelId);
+										setChannelReference("");
+									}}
+								/>
+								<FieldDescription>
+									Invite Hephaestus to the channel in Slack, then pick it here.
+								</FieldDescription>
+								{channelRequired && (
+									<FieldError>Choose a channel before enabling the weekly digest.</FieldError>
 								)}
-							</>
-						)}
+							</Field>
+
+							{pasteOpen ? (
+								<SlackChannelPasteField
+									id="slack-channel-reference"
+									value={referenceText}
+									disabled={save.isPending}
+									invalid={channelInvalid}
+									onChange={handlePastedReference}
+									description="For a channel Slack did not list — its link, mention or C…/G… ID resolves to the same stable channel."
+								/>
+							) : (
+								<Button
+									type="button"
+									variant="link"
+									size="sm"
+									className="h-auto w-fit p-0"
+									onClick={() => setPasteOpen(true)}
+								>
+									Paste a channel link or ID instead
+								</Button>
+							)}
+
+							<Field>
+								<FieldLabel htmlFor="slack-team">Team filter (optional)</FieldLabel>
+								<Input
+									id="slack-team"
+									value={teamInput}
+									disabled={save.isPending}
+									onChange={(e) => setTeamInput(e.target.value)}
+									placeholder="e.g. engineering"
+									autoComplete="off"
+								/>
+								<FieldDescription>
+									Restrict the leaderboard to a single team. Leave blank to include every
+									contributor in the workspace.
+								</FieldDescription>
+							</Field>
+						</FieldGroup>
 					</CardContent>
-				</Card>
-			</div>
+				)}
+
+				<CardFooter className="justify-between gap-2">
+					{hasSlackConnection ? (
+						<>
+							<ButtonGroup>
+								<Button
+									onClick={() =>
+										save.mutate({
+											path: { workspaceSlug },
+											body: {
+												day: Number(dayInput),
+												time: timeInput,
+												enabled: enabledInput,
+												channelId: selectedChannelId.length > 0 ? selectedChannelId : undefined,
+												team: teamInput.length > 0 ? teamInput : undefined,
+											},
+										})
+									}
+									disabled={save.isPending || channelInvalid || channelRequired || timeInvalid}
+								>
+									{save.isPending ? "Saving…" : "Save"}
+								</Button>
+								<Button
+									variant="outline"
+									onClick={() =>
+										test.mutate({
+											path: { workspaceSlug },
+											body: { channelId: selectedChannelId },
+										})
+									}
+									disabled={test.isPending || selectedChannelId.length === 0}
+								>
+									<SendIcon className="mr-2 size-3.5" />
+									{test.isPending ? "Sending…" : "Send test message"}
+								</Button>
+							</ButtonGroup>
+
+							{slackConnectionId != null && (
+								<Button
+									variant="outline"
+									className="text-destructive"
+									onClick={() => setDisconnectOpen(true)}
+									disabled={disconnect.isPending}
+								>
+									{disconnect.isPending ? "Disconnecting…" : "Disconnect Slack…"}
+								</Button>
+							)}
+						</>
+					) : (
+						<Button
+							onClick={() => {
+								// Persist the originating slug so the OAuth landing route can route back.
+								window.sessionStorage.setItem("slack-connect-return-slug", workspaceSlug);
+								connect.mutate({
+									path: { workspaceSlug },
+									body: { kind: "SLACK", userInput: {} },
+								});
+							}}
+							disabled={connect.isPending}
+							className="w-full"
+						>
+							{connect.isPending ? (
+								<>
+									<LoaderIcon className="mr-2 size-4 animate-spin" />
+									Redirecting to Slack…
+								</>
+							) : (
+								<>
+									Connect Slack workspace
+									<ExternalLinkIcon className="ml-2 size-3.5" />
+								</>
+							)}
+						</Button>
+					)}
+				</CardFooter>
+			</Card>
 
 			<AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
 				<AlertDialogContent>
@@ -411,6 +470,6 @@ export function AdminSlackNotificationSettings({
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</div>
+		</>
 	);
 }

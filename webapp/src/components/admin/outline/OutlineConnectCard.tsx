@@ -1,16 +1,17 @@
-import { formatDistanceToNow } from "date-fns";
+import { differenceInCalendarDays, format, formatDistanceToNow } from "date-fns";
 import {
 	BookTextIcon,
 	CheckIcon,
-	ExternalLinkIcon,
 	FileTextIcon,
+	KeyRoundIcon,
 	RefreshCwIcon,
 	TriangleAlertIcon,
 	WebhookIcon,
 	ZapOffIcon,
 } from "lucide-react";
 import { useState } from "react";
-import type { OutlineConnectionStatus } from "@/api/types.gen";
+import type { OutlineConnectionStatus, OutlineTokenStatus } from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,10 +23,18 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
@@ -40,6 +49,10 @@ export interface OutlineConnectCardProps {
 	status?: OutlineConnectionStatus;
 	/** The status query is still resolving — show a placeholder line instead of stale zeros. */
 	isStatusLoading?: boolean;
+	/** Live state of the stored API token (accepted, name/last4, last use, expiry). */
+	tokenStatus?: OutlineTokenStatus;
+	/** The token-status query is still resolving. */
+	isTokenStatusLoading?: boolean;
 	isConnecting?: boolean;
 	isDisconnecting?: boolean;
 	/** The fire-and-forget full reconcile has been requested and not yet acknowledged. */
@@ -54,14 +67,28 @@ export interface OutlineConnectCardProps {
 
 // Client-side format hint only — the server re-validates the URL through the SSRF guard on connect.
 const HTTPS_URL = /^https:\/\/.+/i;
-const DEFAULT_SERVER_URL = "https://app.getoutline.com";
+const CLOUD_SERVER_URL = "https://app.getoutline.com";
+
+/** Inside this window the admin has to act: Outline keys cannot be rotated through the API. */
+const EXPIRY_WARNING_DAYS = 14;
+
+/**
+ * The API fields carry `Date` types, but this repo does not wire hey-api's date transformers —
+ * at runtime they arrive as ISO strings. Normalize both shapes and drop anything unparseable.
+ */
+function asDate(value: Date | string | undefined): Date | undefined {
+	if (value == null) return undefined;
+	const date = value instanceof Date ? value : new Date(value);
+	return Number.isNaN(date.getTime()) ? undefined : date;
+}
 
 /**
  * Workspace-admin card for the Outline documentation integration. When disconnected it captures the
  * Outline server URL and an API token, then hands them to the generic connection initiate flow.
  * When connected it shows the linked instance, a health line (webhook vs polling, document count,
- * last sync), a Sync-now action, and a guarded disconnect. Which collections are mirrored is managed
- * post-connect in {@link OutlineCollectionsSection}.
+ * last sync), the state of the API token itself (accepted, expiry), a Sync-now action, and a guarded
+ * disconnect. Which collections are mirrored is managed post-connect in
+ * {@link OutlineCollectionsSection}.
  *
  * <p>Pure presentation: all data fetching and mutations live in the container that renders this card.
  */
@@ -70,6 +97,8 @@ export function OutlineConnectCard({
 	connectionLabel,
 	status,
 	isStatusLoading = false,
+	tokenStatus,
+	isTokenStatusLoading = false,
 	isConnecting = false,
 	isDisconnecting = false,
 	isSyncing = false,
@@ -78,7 +107,7 @@ export function OutlineConnectCard({
 	onDisconnect,
 	onSyncNow,
 }: OutlineConnectCardProps) {
-	const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
+	const [serverUrl, setServerUrl] = useState("");
 	const [token, setToken] = useState("");
 	const [disconnectOpen, setDisconnectOpen] = useState(false);
 
@@ -87,145 +116,148 @@ export function OutlineConnectCard({
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-					<BookTextIcon className="size-5 text-muted-foreground" />
-					Outline documentation
-				</h2>
-				<Card>
-					<CardContent className="space-y-4">
-						<p className="text-sm text-muted-foreground">
-							Mirror Outline collections so their design docs and decision records reach practice
-							detection as context. Use a dedicated bot-user API token; after connecting you choose
-							exactly which collections are mirrored.
-						</p>
+			<Card>
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2 text-lg">
+						<BookTextIcon className="size-5 text-muted-foreground" aria-hidden />
+						Outline documentation
+					</CardTitle>
+					<CardDescription>
+						Mirror Outline collections so their design docs and decision records reach practice
+						detection as context. Use a dedicated bot-user API token; after connecting you choose
+						exactly which collections are mirrored.
+					</CardDescription>
+				</CardHeader>
 
-						{!connected ? (
-							<FieldGroup>
-								<Field data-invalid={serverUrlInvalid}>
-									<FieldLabel htmlFor="outline-server-url">Server URL</FieldLabel>
-									<Input
-										id="outline-server-url"
-										value={serverUrl}
-										disabled={isConnecting}
-										onChange={(e) => setServerUrl(e.target.value)}
-										placeholder={DEFAULT_SERVER_URL}
-										autoComplete="off"
-										aria-invalid={serverUrlInvalid}
-									/>
-									<FieldDescription>
-										Outline Cloud (<code>{DEFAULT_SERVER_URL}</code>) or your self-hosted host.
-									</FieldDescription>
-									{serverUrlInvalid && <FieldError>Enter an https:// URL.</FieldError>}
-								</Field>
+				<CardContent className="space-y-4">
+					{!connected ? (
+						<FieldGroup>
+							<Field data-invalid={serverUrlInvalid}>
+								<FieldLabel htmlFor="outline-server-url">Server URL</FieldLabel>
+								<Input
+									id="outline-server-url"
+									value={serverUrl}
+									disabled={isConnecting}
+									onChange={(e) => setServerUrl(e.target.value)}
+									// Placeholder, never a default value: a prefilled cloud URL would ship a
+									// self-hoster's token to Outline Cloud if they only pasted the token.
+									placeholder={CLOUD_SERVER_URL}
+									autoComplete="off"
+									aria-invalid={serverUrlInvalid}
+								/>
+								<FieldDescription>
+									Your Outline host — <code>{CLOUD_SERVER_URL}</code> for Outline Cloud, otherwise
+									your self-hosted URL.
+								</FieldDescription>
+								{serverUrlInvalid && <FieldError>Enter an https:// URL.</FieldError>}
+							</Field>
 
-								<Field>
-									<FieldLabel htmlFor="outline-token">API token</FieldLabel>
-									<Input
-										id="outline-token"
-										type="password"
-										value={token}
-										disabled={isConnecting}
-										onChange={(e) => setToken(e.target.value)}
-										placeholder="ol_api_…"
-										autoComplete="off"
-									/>
-									<FieldDescription>
-										Create it in Outline under <em>Settings → API tokens</em>. A dedicated bot-user
-										token is recommended.
-									</FieldDescription>
-								</Field>
+							<Field>
+								<FieldLabel htmlFor="outline-token">API token</FieldLabel>
+								<Input
+									id="outline-token"
+									type="password"
+									value={token}
+									disabled={isConnecting}
+									onChange={(e) => setToken(e.target.value)}
+									placeholder="ol_api_…"
+									autoComplete="off"
+								/>
+								<FieldDescription>
+									Create it in Outline under <em>Settings → API Keys</em>. A dedicated bot-user
+									token is recommended.
+								</FieldDescription>
+							</Field>
 
-								{errorMessage && <FieldError>{errorMessage}</FieldError>}
+							{errorMessage && <FieldError>{errorMessage}</FieldError>}
 
-								<Button
-									onClick={() => onConnect({ serverUrl: serverUrl.trim(), token: token.trim() })}
-									disabled={!canConnect}
-									className="w-full"
-								>
-									{isConnecting ? "Connecting…" : "Connect Outline"}
-									{!isConnecting && <ExternalLinkIcon className="ml-2 size-3.5" />}
-								</Button>
-							</FieldGroup>
-						) : (
-							<>
-								<div className="flex items-center gap-2 text-sm">
-									{/* no semantic success token in the kit */}
-									<CheckIcon className="size-4 text-green-600 dark:text-green-400" />
-									<span>
-										Outline connected
-										{connectionLabel ? ` — ${connectionLabel}` : ""}
-									</span>
-								</div>
+							<Button
+								onClick={() => onConnect({ serverUrl: serverUrl.trim(), token: token.trim() })}
+								disabled={!canConnect}
+								className="w-full"
+							>
+								{isConnecting && <Spinner />}
+								{isConnecting ? "Connecting…" : "Connect Outline"}
+							</Button>
+						</FieldGroup>
+					) : (
+						<>
+							<div className="flex items-center gap-2 text-sm">
+								<CheckIcon className="size-4 text-success" aria-hidden />
+								<span>
+									Outline connected
+									{connectionLabel ? ` — ${connectionLabel}` : ""}
+								</span>
+							</div>
 
-								{isStatusLoading ? (
-									<Skeleton className="h-5 w-full max-w-md" />
-								) : (
-									status && (
-										<>
-											<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-												{status.webhookRegistered ? (
-													<span className="flex items-center gap-1.5">
-														<WebhookIcon
-															className="size-4 text-green-600 dark:text-green-400"
-															aria-hidden
-														/>
-														Live updates via webhook
-													</span>
-												) : (
-													<span className="flex items-center gap-1.5">
-														<ZapOffIcon className="size-4" aria-hidden />
-														Polling only — webhook not registered
-													</span>
-												)}
+							{isStatusLoading ? (
+								<Skeleton className="h-5 w-full max-w-md" />
+							) : (
+								status && (
+									<>
+										<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+											{status.webhookRegistered ? (
 												<span className="flex items-center gap-1.5">
-													<FileTextIcon className="size-4" aria-hidden />
-													{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
-													mirrored
+													<WebhookIcon className="size-4 text-success" aria-hidden />
+													Live updates via webhook
 												</span>
-												<span>
-													{status.lastSyncedAt
-														? `Last synced ${formatDistanceToNow(new Date(status.lastSyncedAt), { addSuffix: true })}`
-														: "Not synced yet"}
+											) : (
+												<span className="flex items-center gap-1.5">
+													<ZapOffIcon className="size-4" aria-hidden />
+													Polling only — webhook not registered
 												</span>
-												{status.syncRunning && (
-													<span className="flex items-center gap-1.5">
-														<RefreshCwIcon className="size-4 animate-spin" aria-hidden />
-														Sync in progress…
-													</span>
-												)}
-											</div>
-											{status.erroredCollections > 0 && (
-												<p className="flex items-center gap-1.5 text-sm text-destructive">
-													<TriangleAlertIcon className="size-4" aria-hidden />
-													{status.erroredCollections} collection
-													{status.erroredCollections === 1 ? "" : "s"} hit a sync error — check the
-													collections list below.
-												</p>
 											)}
-										</>
-									)
-								)}
+											<span className="flex items-center gap-1.5">
+												<FileTextIcon className="size-4" aria-hidden />
+												{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
+												mirrored
+											</span>
+											<span>
+												{status.lastSyncedAt
+													? `Last synced ${formatDistanceToNow(new Date(status.lastSyncedAt), { addSuffix: true })}`
+													: "Not synced yet"}
+											</span>
+											{status.syncRunning && (
+												<span className="flex items-center gap-1.5">
+													<RefreshCwIcon className="size-4 animate-spin" aria-hidden />
+													Sync in progress…
+												</span>
+											)}
+										</div>
+										{status.erroredCollections > 0 && (
+											<p className="flex items-center gap-1.5 text-sm text-destructive">
+												<TriangleAlertIcon className="size-4" aria-hidden />
+												{status.erroredCollections} collection
+												{status.erroredCollections === 1 ? "" : "s"} hit a sync error — check the
+												collections list below.
+											</p>
+										)}
+									</>
+								)
+							)}
 
-								<div className="flex items-center justify-between gap-2 border-t pt-4">
-									<Button variant="outline" size="sm" onClick={onSyncNow} disabled={isSyncing}>
-										<RefreshCwIcon className="size-4" />
-										{isSyncing ? "Starting sync…" : "Sync now"}
-									</Button>
-									<Button
-										variant="outline"
-										className="text-destructive"
-										onClick={() => setDisconnectOpen(true)}
-										disabled={isDisconnecting}
-									>
-										{isDisconnecting ? "Disconnecting…" : "Disconnect Outline…"}
-									</Button>
-								</div>
-							</>
-						)}
-					</CardContent>
-				</Card>
-			</div>
+							<OutlineTokenPanel tokenStatus={tokenStatus} isLoading={isTokenStatusLoading} />
+						</>
+					)}
+				</CardContent>
+
+				{connected && (
+					<CardFooter className="justify-between gap-2">
+						<Button variant="outline" size="sm" onClick={onSyncNow} disabled={isSyncing}>
+							{isSyncing ? <Spinner /> : <RefreshCwIcon className="size-4" />}
+							{isSyncing ? "Starting sync…" : "Sync now"}
+						</Button>
+						<Button
+							variant="destructive-outline"
+							size="sm"
+							onClick={() => setDisconnectOpen(true)}
+							disabled={isDisconnecting}
+						>
+							{isDisconnecting ? "Disconnecting…" : "Disconnect Outline…"}
+						</Button>
+					</CardFooter>
+				)}
+			</Card>
 
 			<AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
 				<AlertDialogContent>
@@ -252,6 +284,95 @@ export function OutlineConnectCard({
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
+		</div>
+	);
+}
+
+interface OutlineTokenPanelProps {
+	tokenStatus?: OutlineTokenStatus;
+	isLoading: boolean;
+}
+
+/**
+ * The state of the stored API key. Outline API keys cannot rotate themselves — `apiKeys.create` and
+ * `apiKeys.delete` only accept an interactive session, never a bearer token — so the most this can do
+ * is warn early and point the admin at Outline. Rejection and imminent expiry are the two states that
+ * silently kill the mirror, so both are alerts rather than muted text.
+ */
+function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
+	if (isLoading) {
+		return <Skeleton className="h-5 w-64" />;
+	}
+	if (!tokenStatus) {
+		return null;
+	}
+
+	if (!tokenStatus.accepted) {
+		return (
+			<Alert variant="destructive">
+				<TriangleAlertIcon />
+				<AlertTitle>Outline no longer accepts this token — reconnect with a new one</AlertTitle>
+				<AlertDescription>
+					Syncing is stopped until a working API key is stored. Create a key in Outline under{" "}
+					<strong>Settings → API Keys</strong>, then disconnect and reconnect here with it.
+				</AlertDescription>
+			</Alert>
+		);
+	}
+
+	const expiresAt = asDate(tokenStatus.expiresAt);
+	const lastActiveAt = asDate(tokenStatus.lastActiveAt);
+	// A scoped key (or one owned by a user who cannot see it) cannot list itself, so Outline accepts
+	// the token while telling us nothing about it. Say only what we know.
+	const hasMetadata =
+		tokenStatus.name != null ||
+		tokenStatus.last4 != null ||
+		expiresAt != null ||
+		lastActiveAt != null;
+
+	const daysLeft = expiresAt ? differenceInCalendarDays(expiresAt, new Date()) : undefined;
+	const expiringSoon = daysLeft != null && daysLeft <= EXPIRY_WARNING_DAYS;
+
+	return (
+		<div className="space-y-2">
+			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+				<span className="flex items-center gap-1.5">
+					<KeyRoundIcon className="size-4 text-success" aria-hidden />
+					Outline accepts this token
+				</span>
+				{hasMetadata && (tokenStatus.name || tokenStatus.last4) && (
+					<span>
+						{tokenStatus.name ?? "API key"}
+						{tokenStatus.last4 ? ` (…${tokenStatus.last4})` : ""}
+					</span>
+				)}
+				{lastActiveAt && (
+					<span>Last used {formatDistanceToNow(lastActiveAt, { addSuffix: true })}</span>
+				)}
+				{hasMetadata && !expiresAt && <span>Never expires</span>}
+				{expiresAt && !expiringSoon && (
+					<span>
+						Expires in {daysLeft} day{daysLeft === 1 ? "" : "s"} (on{" "}
+						{format(expiresAt, "d MMM yyyy")})
+					</span>
+				)}
+			</div>
+
+			{expiresAt && expiringSoon && (
+				<Alert variant="warning">
+					<TriangleAlertIcon />
+					<AlertTitle>
+						{daysLeft != null && daysLeft <= 0
+							? `This API key expired on ${format(expiresAt, "d MMM yyyy")}`
+							: `This API key expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"} (on ${format(expiresAt, "d MMM yyyy")})`}
+					</AlertTitle>
+					<AlertDescription>
+						Outline API keys cannot be rotated through the API, so create a fresh key in Outline
+						under <strong>Settings → API Keys</strong> and re-enter it here before this one lapses —
+						the mirror stops the moment it does.
+					</AlertDescription>
+				</Alert>
+			)}
 		</div>
 	);
 }
