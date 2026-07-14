@@ -137,6 +137,12 @@ on delete) and a per-workspace least-recently-materialized size cap, with a hard
 tombstoned rows as defense-in-depth. This is a deliberate divergence from the wall-clock retention the
 messaging integration runs.
 
+The broker is the exception. An Outline webhook envelope carries the document body, so a JetStream
+stream retaining it for the platform default would keep document text that SQL erasure cannot reach.
+The `outline` stream therefore takes the same 72-hour `max-age` as the Slack stream: long enough to
+replay a delivery, short enough that the broker is a transit buffer and never a second copy of the
+wiki. The mirror in Postgres is the only durable store, and it is what erasure acts on.
+
 ### 8. Identity linking is link-only OAuth, never a sign-in
 
 Attributing a document to a Hephaestus member needs an Outline identity on the account. Outline
@@ -164,8 +170,8 @@ Two mechanisms refine the decisions above without changing them:
 - **The collection allow-list is a live admin registry, not a static list.** "Allow-listed set of
   Outline collections" (Context, Decision 6) is implemented as the `outline_collection` table: an
   admin registers/pauses/resumes/removes individual collections through a dedicated control plane
-  (`OutlineCollectionAdminService` + its REST surface), each row tracking its own sync status and
-  watermark. The registry table — not a JSONB config field — is the single source of truth for which
+  (`OutlineCollectionAdminService` + its REST surface), each row tracking its own sync status and the
+  time of its last clean pass. The registry table — not a JSONB config field — is the single source of truth for which
   collections are mirrored; a paused collection stops syncing without losing its registration, and
   removal hard-deletes both the row and its mirrored documents.
 - **Archive is tracked as a distinct, soft/recoverable state.** Decision 6 and 7's "tombstones
