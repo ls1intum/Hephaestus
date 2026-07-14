@@ -9,6 +9,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.LOW_REMAINING_THRESHOLD;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -120,6 +122,7 @@ public class GitLabRateLimitTracker {
             if (observedStr != null) {
                 state.lastQueryCost.set(Integer.parseInt(observedStr));
             }
+            state.observed.set(true);
 
             // Calculate used points
             int currentLimit = state.limit.get();
@@ -309,6 +312,24 @@ public class GitLabRateLimitTracker {
     }
 
     /**
+     * Point-in-time snapshot for the sync-observability provider — {@code null} if this scope has
+     * never had a real rate-limit header observed since the last restart (as opposed to the
+     * optimistic {@link #getRemaining}/{@link #getLimit} defaults, which exist to drive throttling
+     * decisions and would otherwise misrepresent "unknown" as "100/100 available").
+     */
+    @Nullable
+    public RateLimitSnapshot snapshot(Long scopeId) {
+        if (scopeId == null) {
+            return null;
+        }
+        ScopeRateLimitState state = stateByScope.get(scopeId);
+        if (state == null || !state.observed.get()) {
+            return null;
+        }
+        return new RateLimitSnapshot(state.limit.get(), state.remaining.get(), state.resetAt.get());
+    }
+
+    /**
      * Evicts stale scope state to prevent unbounded memory growth.
      * Runs every hour, removes entries inactive for 24+ hours.
      */
@@ -422,5 +443,6 @@ public class GitLabRateLimitTracker {
             Instant.now().plusSeconds(DEFAULT_RESET_SECONDS)
         );
         final AtomicReference<Instant> lastUpdated = new AtomicReference<>(Instant.now());
+        final AtomicBoolean observed = new AtomicBoolean(false);
     }
 }

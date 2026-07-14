@@ -72,6 +72,14 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     long countByWorkspaceId(Long workspaceId);
 
     /**
+     * Locally stored message count for one channel — the cheap, already-indexed
+     * ({@code idx_slack_message_thread} covers the {@code (workspace_id, slack_channel_id)} prefix) count backing
+     * {@code SyncResourceState.itemCount} in the sync-observability read model. Includes tombstoned rows (a
+     * deleted message is still "stored", just contentless) since this is a storage count, not a content count.
+     */
+    long countByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
+
+    /**
      * Retention-sweep fan-out: every workspace that currently has at least one ingested message. Native +
      * unscoped by design (the {@link de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper}
      * runs {@code @WorkspaceAgnostic}, so the tenancy {@code StatementInspector} treats this as exempt). Callers

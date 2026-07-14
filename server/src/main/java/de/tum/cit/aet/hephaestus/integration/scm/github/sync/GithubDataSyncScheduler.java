@@ -2,15 +2,23 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncStatistics;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
@@ -25,6 +33,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncServi
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -97,6 +106,8 @@ public class GithubDataSyncScheduler {
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final RateLimitTracker rateLimitTracker;
     private final Executor monitoringExecutor;
+    private final ConnectionRepository connectionRepository;
+    private final SyncJobService syncJobService;
 
     public GithubDataSyncScheduler(
         SyncTargetProvider syncTargetProvider,
@@ -111,7 +122,9 @@ public class GithubDataSyncScheduler {
         OrganizationRepository organizationRepository,
         SyncSchedulerProperties syncSchedulerProperties,
         RateLimitTracker rateLimitTracker,
-        @Qualifier("monitoringExecutor") Executor monitoringExecutor
+        @Qualifier("monitoringExecutor") Executor monitoringExecutor,
+        ConnectionRepository connectionRepository,
+        SyncJobService syncJobService
     ) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
@@ -126,6 +139,8 @@ public class GithubDataSyncScheduler {
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.rateLimitTracker = rateLimitTracker;
         this.monitoringExecutor = monitoringExecutor;
+        this.connectionRepository = connectionRepository;
+        this.syncJobService = syncJobService;
     }
 
     /**
@@ -259,7 +274,52 @@ public class GithubDataSyncScheduler {
         }
     }
 
+    /**
+     * Resolves the workspace's ACTIVE GitHub {@link Connection} (if any) and wraps the scope sync in
+     * {@link SyncJobService#run} as a {@code RECONCILIATION}/{@code SCHEDULED} job row, so the daily
+     * cron shows up in the connection's job history (design doc §3.4). Workspaces without an ACTIVE
+     * GitHub connection (shouldn't normally reach here, since {@code getSyncSessions} already filters
+     * by active provider — defensive) run the sync unrecorded rather than skipping it outright.
+     *
+     * <p>A {@link SyncJobConflictException} means a manual sync is already active for this
+     * connection — the scheduled run is skipped for this tick rather than queued or run unrecorded,
+     * so the manual job's progress/outcome isn't clobbered.
+     */
     private void syncScope(SyncSession session) {
+        Optional<Connection> connection =
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                session.scopeId(),
+                IntegrationKind.GITHUB,
+                IntegrationState.ACTIVE
+            );
+        if (connection.isEmpty()) {
+            runScopeSyncBody(session);
+            return;
+        }
+
+        try {
+            syncJobService.run(
+                new SyncJobRequest(
+                    session.scopeId(),
+                    connection.get().getId(),
+                    IntegrationKind.GITHUB,
+                    SyncJobType.RECONCILIATION,
+                    SyncJobTrigger.SCHEDULED,
+                    null
+                ),
+                handle -> runScopeSyncBody(session)
+            );
+        } catch (SyncJobConflictException e) {
+            log.info(
+                "Skipped scheduled sync: reason=manualSyncAlreadyRunning, scopeId={}, scopeSlug={}, activeJobId={}",
+                session.scopeId(),
+                session.slug(),
+                e.activeJob().getId()
+            );
+        }
+    }
+
+    private void runScopeSyncBody(SyncSession session) {
         try {
             // Set context for logging and isolation
             syncContextProvider.setContext(session.syncContext());

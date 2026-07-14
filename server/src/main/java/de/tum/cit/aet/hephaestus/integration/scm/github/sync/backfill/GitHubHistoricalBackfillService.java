@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -1261,6 +1262,44 @@ public class GitHubHistoricalBackfillService {
     }
 
     /**
+     * Runs a single backfill batch for one repository, applying the same cooldown/failure
+     * bookkeeping and rate-limit gate the scheduled cycle ({@link #backfillSession}) applies
+     * per-target. Exposed for the manual backfill sync-job runner ({@code
+     * GithubIntegrationSyncRunner}), which drives repository-by-repository progress and cooperative
+     * cancellation itself instead of the scheduler's whole-cycle parallel fan-out.
+     *
+     * <p>Deliberately ignores {@link #isEnabled()} — a manually triggered backfill is the point even
+     * when the scheduled cycle is administratively disabled.
+     *
+     * @param target    the sync target (repository) to backfill
+     * @param batchSize maximum pages to process in this batch
+     * @return true if any work was performed; false if skipped (already complete, in cooldown, or
+     *         rate limit below {@code hephaestus.sync.backfill.rate-limit-threshold})
+     */
+    public boolean runBackfillBatch(SyncTarget target, int batchSize) {
+        if (target.isBackfillComplete()) {
+            return false;
+        }
+        if (isInCooldown(target.id())) {
+            return false;
+        }
+        int remainingPoints = graphQlClientProvider.getRateLimitRemaining(target.scopeId());
+        if (remainingPoints < syncSchedulerProperties.backfill().rateLimitThreshold()) {
+            return false;
+        }
+        try {
+            boolean didWork = backfillRepository(target, batchSize);
+            if (didWork) {
+                clearFailureState(target.id());
+            }
+            return didWork;
+        } catch (Exception e) {
+            handleBackfillFailure(target, e);
+            return false;
+        }
+    }
+
+    /**
      * Result of a backfill batch operation with progress tracking information.
      *
      * @param itemsSynced       number of primary items synced (issues or PRs)
@@ -1313,6 +1352,10 @@ public class GitHubHistoricalBackfillService {
 
     /**
      * Represents the backfill progress for a repository.
+     *
+     * @param itemsRemaining issues + pull requests still to backfill (0 if not initialized)
+     * @param itemsTotal     issue + pull request high-water-mark total captured at backfill start
+     *                       (0 if not initialized, or if the repository has no issues/PRs)
      */
     public record BackfillProgress(
         String repositoryName,
@@ -1320,16 +1363,24 @@ public class GitHubHistoricalBackfillService {
         boolean isComplete,
         Instant lastRunAt,
         String issueCursor,
-        String prCursor
+        String prCursor,
+        int itemsRemaining,
+        int itemsTotal
     ) {
         public static BackfillProgress fromSyncTarget(SyncTarget target) {
+            int issueHighWaterMark =
+                target.issueBackfillHighWaterMark() != null ? target.issueBackfillHighWaterMark() : 0;
+            int prHighWaterMark =
+                target.pullRequestBackfillHighWaterMark() != null ? target.pullRequestBackfillHighWaterMark() : 0;
             return new BackfillProgress(
                 target.repositoryNameWithOwner(),
                 target.isBackfillInitialized(),
                 target.isBackfillComplete(),
                 target.backfillLastRunAt(),
                 target.issueSyncCursor(),
-                target.pullRequestSyncCursor()
+                target.pullRequestSyncCursor(),
+                target.getBackfillRemaining(),
+                issueHighWaterMark + prHighWaterMark
             );
         }
 
@@ -1341,6 +1392,35 @@ public class GitHubHistoricalBackfillService {
                 return String.format("Backfill not started for %s", repositoryName);
             }
             return String.format("Backfill in progress for %s (last run: %s)", repositoryName, lastRunAt);
+        }
+
+        /**
+         * 0-100 aggregate percent for this repository — the numerator/denominator behind the
+         * sync-observability {@code SyncResourceState#backfillPercent}. {@code null} when backfill
+         * hasn't started yet (no denominator to divide by).
+         */
+        @Nullable
+        public Integer percentComplete() {
+            return percentComplete(isInitialized, itemsRemaining, itemsTotal);
+        }
+
+        /**
+         * Static so callers with the raw fields in hand but no {@link SyncTarget}/{@link
+         * BackfillProgress} instance can share the same math — e.g. {@code
+         * GithubConnectionSyncStateProvider} computing a per-resource percent straight from a {@code
+         * RepositoryToMonitor} entity's mirrored fields, without an extra {@link #getProgress} lookup.
+         */
+        @Nullable
+        public static Integer percentComplete(boolean initialized, int itemsRemaining, int itemsTotal) {
+            if (!initialized) {
+                return null;
+            }
+            if (itemsTotal <= 0) {
+                // High-water-marks captured as 0 (an empty repository) — trivially complete.
+                return 100;
+            }
+            int done = Math.max(0, itemsTotal - itemsRemaining);
+            return (int) Math.round((100.0 * done) / itemsTotal);
         }
     }
 

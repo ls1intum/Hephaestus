@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -50,8 +51,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -510,6 +514,21 @@ public class GithubDataSyncService {
      * @param scopeId the scope ID
      */
     public void syncAllRepositories(Long scopeId) {
+        syncAllRepositories(scopeId, null);
+    }
+
+    /**
+     * Same as {@link #syncAllRepositories(Long)}, additionally threading a {@link SyncJobHandle} for
+     * the manual "reconcile now" sync-job path ({@code GithubIntegrationSyncRunner}): cooperative
+     * cancellation is checked between repositories (and inside the rate-limit wait, in bounded
+     * slices — see {@link #waitForRateLimitReset(Long, BooleanSupplier)}), and coarse
+     * repos-done/repos-total progress is reported after each repository.
+     *
+     * @param scopeId the scope ID
+     * @param handle  the live job handle, or {@code null} for the untracked scheduled/lifecycle paths
+     *                (unchanged behavior — no cancellation checks, no progress reporting)
+     */
+    public void syncAllRepositories(Long scopeId, @Nullable SyncJobHandle handle) {
         // Fail-fast for suspended installations - don't spawn ANY threads
         Long installationId = tokenProvider.getInstallationId(scopeId).orElse(null);
         if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
@@ -565,6 +584,17 @@ public class GithubDataSyncService {
             // Sync each repository (creates repository records, issues, PRs)
             int reposProcessed = 0;
             for (SyncTarget target : syncTargets) {
+                // Cooperative cancel for the manual "reconcile now" sync-job path — best-effort,
+                // checked between repositories only (see class-level SyncJobHandle javadoc).
+                if (handle != null && handle.isCancellationRequested()) {
+                    log.info(
+                        "Aborting remaining syncs: reason=cancellationRequested, scopeId={}, reposProcessed={}, reposRemaining={}",
+                        scopeId,
+                        reposProcessed,
+                        syncTargets.size() - reposProcessed
+                    );
+                    break;
+                }
                 // Check if installation became suspended mid-sync - abort remaining syncs
                 if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
                     log.info("Aborting remaining syncs: reason=installationSuspended, scopeId={}", scopeId);
@@ -585,11 +615,20 @@ public class GithubDataSyncService {
                         syncTargets.size() - reposProcessed
                     );
                     try {
-                        waitForRateLimitReset(scopeId);
+                        waitForRateLimitReset(scopeId, handle == null ? null : handle::isCancellationRequested);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         log.info(
                             "Startup sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
+                            scopeId,
+                            reposProcessed,
+                            syncTargets.size() - reposProcessed
+                        );
+                        break;
+                    }
+                    if (handle != null && handle.isCancellationRequested()) {
+                        log.info(
+                            "Aborting remaining syncs: reason=cancellationRequestedDuringRateLimitWait, scopeId={}, reposProcessed={}, reposRemaining={}",
                             scopeId,
                             reposProcessed,
                             syncTargets.size() - reposProcessed
@@ -601,6 +640,13 @@ public class GithubDataSyncService {
                     syncSyncTarget(target);
                 }
                 reposProcessed++;
+                if (handle != null) {
+                    handle.progress(
+                        reposProcessed,
+                        syncTargets.size(),
+                        Map.of("currentRepository", sanitizeForLog(target.repositoryNameWithOwner()))
+                    );
+                }
             }
 
             // Sync teams AFTER repositories exist (team repo permissions need repos to exist)
@@ -1306,32 +1352,94 @@ public class GithubDataSyncService {
      * @throws InterruptedException if the thread is interrupted while waiting
      */
     void waitForRateLimitReset(Long scopeId) throws InterruptedException {
-        for (int cycle = 0; cycle < MAX_RATE_LIMIT_WAIT_CYCLES; cycle++) {
-            rateLimitTracker.waitIfNeeded(scopeId);
-            if (!rateLimitTracker.isCritical(scopeId)) {
-                log.info(
-                    "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
+        waitForRateLimitReset(scopeId, null);
+    }
+
+    /**
+     * Maximum single sleep slice when a cancellation source is supplied, so a manual "Stop" request
+     * is observed within seconds instead of after {@link RateLimitTracker}'s own up-to-5-minute
+     * blocking wait.
+     */
+    private static final Duration MAX_CANCELLABLE_WAIT_SLICE = Duration.ofSeconds(30);
+
+    /**
+     * Same as {@link #waitForRateLimitReset(Long)}, additionally polling {@code cancelRequested}
+     * between sleep slices of at most {@link #MAX_CANCELLABLE_WAIT_SLICE} instead of delegating the
+     * whole wait to {@link RateLimitTracker#waitIfNeeded}, whose single call can block up to 5
+     * minutes. Behavior for {@code cancelRequested == null} is unchanged (existing scheduler/startup
+     * callers).
+     *
+     * @param scopeId         the scope to wait for
+     * @param cancelRequested polled between slices; {@code null} preserves the original
+     *                        non-cancellable behavior
+     * @throws InterruptedException if the thread is interrupted while waiting
+     */
+    void waitForRateLimitReset(Long scopeId, @Nullable BooleanSupplier cancelRequested) throws InterruptedException {
+        if (cancelRequested == null) {
+            for (int cycle = 0; cycle < MAX_RATE_LIMIT_WAIT_CYCLES; cycle++) {
+                rateLimitTracker.waitIfNeeded(scopeId);
+                if (!rateLimitTracker.isCritical(scopeId)) {
+                    log.info(
+                        "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
+                        scopeId,
+                        rateLimitTracker.getRemaining(scopeId),
+                        cycle + 1
+                    );
+                    return;
+                }
+                // Still critical — wait a bit and retry (handles edge cases like
+                // clock skew or API returning lower-than-expected remaining)
+                log.debug(
+                    "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
                     scopeId,
                     rateLimitTracker.getRemaining(scopeId),
-                    cycle + 1
+                    cycle + 1,
+                    MAX_RATE_LIMIT_WAIT_CYCLES
+                );
+            }
+            log.warn(
+                "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
+                scopeId,
+                rateLimitTracker.getRemaining(scopeId),
+                MAX_RATE_LIMIT_WAIT_CYCLES
+            );
+            return;
+        }
+
+        // Cancellable path: mirror the same total budget (cycles * tracker's max wait) as the
+        // non-cancellable path, but in bounded slices so a cancel request lands within seconds.
+        Instant deadline = Instant.now().plus(Duration.ofMinutes(5).multipliedBy(MAX_RATE_LIMIT_WAIT_CYCLES));
+        while (Instant.now().isBefore(deadline)) {
+            if (cancelRequested.getAsBoolean()) {
+                log.info(
+                    "Rate limit wait cancelled: scopeId={}, remaining={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId)
                 );
                 return;
             }
-            // Still critical — wait a bit and retry (handles edge cases like
-            // clock skew or API returning lower-than-expected remaining)
-            log.debug(
-                "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
-                scopeId,
-                rateLimitTracker.getRemaining(scopeId),
-                cycle + 1,
-                MAX_RATE_LIMIT_WAIT_CYCLES
-            );
+            if (!rateLimitTracker.isCritical(scopeId)) {
+                log.info(
+                    "Rate limit recovered, resuming sync: scopeId={}, remaining={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId)
+                );
+                return;
+            }
+            Instant resetAt = rateLimitTracker.getResetAt(scopeId);
+            Duration untilReset =
+                resetAt == null ? MAX_CANCELLABLE_WAIT_SLICE : Duration.between(Instant.now(), resetAt);
+            Duration sleepFor =
+                untilReset.compareTo(MAX_CANCELLABLE_WAIT_SLICE) > 0 ? MAX_CANCELLABLE_WAIT_SLICE : untilReset;
+            if (sleepFor.isNegative() || sleepFor.isZero()) {
+                sleepFor = Duration.ofSeconds(1);
+            }
+            Thread.sleep(sleepFor.toMillis());
         }
         log.warn(
-            "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
+            "Rate limit wait deadline exhausted, proceeding anyway: scopeId={}, remaining={}",
             scopeId,
-            rateLimitTracker.getRemaining(scopeId),
-            MAX_RATE_LIMIT_WAIT_CYCLES
+            rateLimitTracker.getRemaining(scopeId)
         );
     }
 }

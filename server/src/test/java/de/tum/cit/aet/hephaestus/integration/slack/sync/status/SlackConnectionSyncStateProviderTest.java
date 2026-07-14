@@ -1,0 +1,169 @@
+package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
+import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackSyncProperties;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+
+/** Mapping from persisted Slack sync state into the unified {@code ConnectionSyncStateProvider} read model. */
+@Tag("unit")
+class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
+
+    private static final long WS = 11L;
+    private static final long CONNECTION_ID = 3L;
+    private static final IntegrationRef REF = new IntegrationRef(IntegrationKind.SLACK, WS, "T123");
+
+    @Mock
+    private ConnectionRepository connectionRepository;
+
+    @Mock
+    private SlackMonitoredChannelRepository monitoredChannelRepository;
+
+    @Mock
+    private SlackMessageRepository messageRepository;
+
+    private SlackConnectionSyncStateProvider provider;
+
+    private SlackConnectionSyncStateProvider providerWith(String cron) {
+        return new SlackConnectionSyncStateProvider(
+            connectionRepository,
+            monitoredChannelRepository,
+            messageRepository,
+            new SlackSyncProperties(cron, 10, 15, Duration.ZERO, true, 5, true)
+        );
+    }
+
+    private void setUpDefault() {
+        provider = providerWith("0 0 4 * * *");
+    }
+
+    @Test
+    void kind_isSlack() {
+        setUpDefault();
+        assertThat(provider.kind()).isEqualTo(IntegrationKind.SLACK);
+    }
+
+    @Test
+    void describe_activeConnection_reportsWebhookRegisteredTrue() {
+        setUpDefault();
+        Connection connection = mock(Connection.class);
+        when(connection.getState()).thenReturn(IntegrationState.ACTIVE);
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.of(connection));
+
+        ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
+
+        assertThat(details.webhookRegistered()).isTrue();
+        assertThat(details.rateLimit()).isNull();
+        assertThat(details.backfill()).isNull();
+        assertThat(details.vendorHealthDegraded()).isFalse();
+    }
+
+    @Test
+    void describe_nonActiveConnection_webhookRegisteredIsNull() {
+        setUpDefault();
+        Connection connection = mock(Connection.class);
+        when(connection.getState()).thenReturn(IntegrationState.SUSPENDED);
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.of(connection));
+
+        ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
+
+        assertThat(details.webhookRegistered()).isNull();
+    }
+
+    @Test
+    void describe_missingConnectionRow_webhookRegisteredIsNull() {
+        setUpDefault();
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+
+        ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
+
+        assertThat(details.webhookRegistered()).isNull();
+    }
+
+    @Test
+    void describe_nextScheduledSyncAt_isComputedFromTheCronExpression() {
+        provider = providerWith("0 0 4 * * *");
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+
+        ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
+
+        assertThat(details.nextScheduledSyncAt()).isNotNull().isAfter(Instant.now());
+    }
+
+    @Test
+    void resources_mapsEachMonitoredChannelAndConvertsTheSlackTsWatermark() {
+        setUpDefault();
+        Instant syncedAt = Instant.now().minus(Duration.ofHours(2)).truncatedTo(ChronoUnit.SECONDS);
+        SlackMonitoredChannel channel = new SlackMonitoredChannel();
+        channel.setId(101L);
+        channel.setWorkspaceId(WS);
+        channel.setSlackTeamId("T123");
+        channel.setSlackChannelId("C1");
+        channel.setChannelName("general");
+        channel.setConsentState(ConsentState.ACTIVE);
+        channel.setLastHistorySyncedTs(SlackTs.ofInstant(syncedAt));
+
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
+            List.of(channel)
+        );
+        when(messageRepository.countByWorkspaceIdAndSlackChannelId(WS, "C1")).thenReturn(42L);
+
+        List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);
+
+        assertThat(resources).hasSize(1);
+        SyncResourceState resource = resources.get(0);
+        assertThat(resource.id()).isEqualTo(101L);
+        assertThat(resource.externalId()).isEqualTo("C1");
+        assertThat(resource.name()).isEqualTo("general");
+        assertThat(resource.type()).isEqualTo(SyncResourceState.Type.CHANNEL);
+        assertThat(resource.state()).isEqualTo("ACTIVE");
+        assertThat(resource.lastSyncedAt()).isEqualTo(syncedAt);
+        assertThat(resource.itemCount()).isEqualTo(42L);
+        assertThat(resource.upstreamCount()).isNull();
+        assertThat(resource.lastError()).isNull();
+    }
+
+    @Test
+    void resources_channelWithoutADisplayName_fallsBackToTheSlackChannelId() {
+        setUpDefault();
+        SlackMonitoredChannel channel = new SlackMonitoredChannel();
+        channel.setId(102L);
+        channel.setWorkspaceId(WS);
+        channel.setSlackTeamId("T123");
+        channel.setSlackChannelId("C2");
+        channel.setConsentState(ConsentState.PENDING);
+
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
+            List.of(channel)
+        );
+        when(messageRepository.countByWorkspaceIdAndSlackChannelId(WS, "C2")).thenReturn(0L);
+
+        List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);
+
+        assertThat(resources.get(0).name()).isEqualTo("C2");
+        assertThat(resources.get(0).state()).isEqualTo("PENDING");
+        assertThat(resources.get(0).lastSyncedAt()).isNull();
+    }
+}

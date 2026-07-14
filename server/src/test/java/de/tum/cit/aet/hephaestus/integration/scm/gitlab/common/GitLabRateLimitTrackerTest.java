@@ -286,6 +286,45 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
     }
 
+    @Nested
+    class Snapshot {
+
+        @Test
+        void shouldReturnNullForUnknownScope() {
+            assertThat(tracker.snapshot(999L)).isNull();
+        }
+
+        @Test
+        void shouldReturnNullForNullScope() {
+            assertThat(tracker.snapshot(null)).isNull();
+        }
+
+        @Test
+        void shouldReturnNullBeforeAnyHeaderObserved() {
+            // getRemaining/getLimit optimistically report the default budget for throttling
+            // decisions even for a never-seen scope; snapshot() must not conflate that default
+            // with a real observation.
+            assertThat(tracker.getRemaining(5L)).isEqualTo(100);
+            assertThat(tracker.snapshot(5L)).isNull();
+        }
+
+        @Test
+        void shouldReturnPopulatedSnapshotAfterHeadersObserved() {
+            Long scopeId = 1L;
+            // The RateLimit-Reset header is Unix-epoch-seconds, so the tracker's parsed Instant is
+            // truncated to second precision — round the expectation the same way.
+            Instant resetTime = Instant.now().plusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            tracker.updateFromHeaders(scopeId, createHeaders(80, 100, resetTime, 5));
+
+            var snapshot = tracker.snapshot(scopeId);
+
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.limit()).isEqualTo(100);
+            assertThat(snapshot.remaining()).isEqualTo(80);
+            assertThat(snapshot.resetAt()).isEqualTo(resetTime);
+        }
+    }
+
     // Helper Methods
 
     private HttpHeaders createHeaders(int remaining, int limit, Instant resetAt, int observed) {

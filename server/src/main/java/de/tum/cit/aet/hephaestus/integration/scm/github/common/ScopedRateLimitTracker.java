@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
 import io.micrometer.core.instrument.Gauge;
@@ -269,6 +270,30 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
         delayMillis = Math.min(MAX_WAIT_DURATION.toMillis(), delayMillis);
 
         return Duration.ofMillis(delayMillis);
+    }
+
+    /**
+     * Point-in-time rate-limit snapshot for a scope, for the sync-observability
+     * {@code ConnectionSyncStateProvider#describe} read model.
+     *
+     * <p>Deliberately does NOT fall back to the in-memory defaults that {@link #getRemaining}/
+     * {@link #getLimit} return for an untracked scope: those defaults exist so sync code has a safe
+     * "assume full budget" value to throttle against, but surfacing them to an admin as a real budget
+     * would misrepresent "no GraphQL call observed since the last restart" as "5000/5000 remaining".
+     *
+     * @param scopeId the scope to check
+     * @return the snapshot, or {@code null} if no response has been tracked for this scope yet
+     */
+    @Nullable
+    public RateLimitSnapshot snapshot(Long scopeId) {
+        if (scopeId == null) {
+            return null;
+        }
+        ScopeRateLimitState state = stateByScope.get(scopeId);
+        if (state == null) {
+            return null;
+        }
+        return new RateLimitSnapshot(state.limit.get(), state.remaining.get(), state.resetAt.get());
     }
 
     /**

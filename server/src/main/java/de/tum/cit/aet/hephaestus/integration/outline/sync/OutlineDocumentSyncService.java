@@ -110,6 +110,16 @@ public class OutlineDocumentSyncService {
      * no ACTIVE Outline Connection, no server URL, no resolvable token — or no registered collections.
      */
     public void syncWorkspace(long workspaceId) {
+        syncWorkspace(workspaceId, null);
+    }
+
+    /**
+     * Same full reconcile as {@link #syncWorkspace(long)}, additionally reporting per-collection progress
+     * and checking cooperative cancellation between collections through {@code progressListener} — the hook
+     * the unified sync-job runner threads a {@code SyncJobHandle} through (via {@link OutlineSyncProgress}).
+     * {@code null} behaves exactly like {@link #syncWorkspace(long)}.
+     */
+    public void syncWorkspace(long workspaceId, @Nullable OutlineSyncProgressListener progressListener) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
             return;
@@ -125,14 +135,27 @@ public class OutlineDocumentSyncService {
             ExportBudget budget = new ExportBudget(properties.sync().exportBudget());
             Map<String, OutlineDocumentSnapshot> existing = loadExisting(ctx);
             int synced = 0;
+            int total = collections.size();
+            int done = 0;
             for (OutlineCollection collection : collections) {
+                if (progressListener != null && progressListener.isCancelled()) {
+                    break;
+                }
                 if (!live.containsKey(collection.getCollectionId())) {
                     // Visibility loss ≠ deletion: never tombstone documents we merely cannot see.
                     recordCollectionError(ctx, collection, "Collection is no longer visible to the integration token");
+                    done++;
+                    if (progressListener != null) {
+                        progressListener.onCollectionDone(done, total, collection.getName());
+                    }
                     continue;
                 }
                 if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
                     synced++;
+                }
+                done++;
+                if (progressListener != null) {
+                    progressListener.onCollectionDone(done, total, collection.getName());
                 }
             }
             // Self-heal the change-notification subscription each reconcile (Outline auto-disables a

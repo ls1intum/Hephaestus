@@ -297,6 +297,34 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
+    class Snapshot {
+
+        @Test
+        void shouldReturnNullForNeverObservedScope() {
+            assertThat(tracker.snapshot(999L)).isNull();
+        }
+
+        @Test
+        void shouldReturnNullForNullScope() {
+            assertThat(tracker.snapshot(null)).isNull();
+        }
+
+        @Test
+        void shouldReturnSnapshotAfterObservedResponse() {
+            Long scopeId = 1L;
+            OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+
+            var snapshot = tracker.snapshot(scopeId);
+
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.limit()).isEqualTo(5000);
+            assertThat(snapshot.remaining()).isEqualTo(4200);
+            assertThat(snapshot.resetAt()).isEqualTo(resetTime.toInstant());
+        }
+    }
+
+    @Nested
     class Metrics {
 
         @Test

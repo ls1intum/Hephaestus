@@ -607,6 +607,44 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             assertThat(summary).startsWith("Backfill in progress for org/repo-a (last run: ");
         }
+
+        @Test
+        void percentComplete_notStarted_isNull() {
+            SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
+
+            assertThat(progress.percentComplete()).isNull();
+        }
+
+        @Test
+        void percentComplete_complete_isFullHundred() {
+            SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
+
+            assertThat(progress.percentComplete()).isEqualTo(100);
+        }
+
+        @Test
+        void percentComplete_inProgress_reflectsRemainingAgainstHighWaterMarkTotal() {
+            // issueHWM=100, issueCheckpoint(remaining)=42, prHWM=50, prCheckpoint(remaining)=25
+            // total=150, remaining=67 -> done=83 -> 83/150 = 55.33% rounds to 55
+            SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
+
+            BackfillProgress progress = BackfillProgress.fromSyncTarget(target);
+
+            assertThat(progress.itemsTotal()).isEqualTo(150);
+            assertThat(progress.itemsRemaining()).isEqualTo(67);
+            assertThat(progress.percentComplete()).isEqualTo(55);
+        }
+
+        @Test
+        void percentComplete_staticOverload_matchesInstanceMethod() {
+            assertThat(BackfillProgress.percentComplete(true, 25, 100)).isEqualTo(75);
+            assertThat(BackfillProgress.percentComplete(false, 0, 0)).isNull();
+            assertThat(BackfillProgress.percentComplete(true, 0, 0)).isEqualTo(100);
+        }
     }
 
     // SyncTarget convenience methods
@@ -751,6 +789,48 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             Optional<BackfillProgress> progress = service.getProgress(999L);
 
             assertThat(progress).isEmpty();
+        }
+    }
+
+    // runBackfillBatch — the manual backfill sync-job runner's per-repository step
+
+    @Nested
+    class RunBackfillBatch {
+
+        @Test
+        void alreadyComplete_returnsFalseWithoutCheckingRateLimit() {
+            service = createService(enabledSchedulerProperties);
+            SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            boolean didWork = service.runBackfillBatch(target, 50);
+
+            assertThat(didWork).isFalse();
+            verify(graphQlClientProvider, never()).getRateLimitRemaining(any());
+        }
+
+        @Test
+        void rateLimitBelowThreshold_returnsFalseWithoutAttemptingBackfill() {
+            service = createService(enabledSchedulerProperties); // rateLimitThreshold = 100
+            SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
+            when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
+
+            boolean didWork = service.runBackfillBatch(target, 50);
+
+            assertThat(didWork).isFalse();
+        }
+
+        @Test
+        @DisplayName(
+            "gates apply even when isEnabled()=false — a manual trigger is the point when the scheduled cycle is off"
+        )
+        void backfillDisabledGlobally_completeGateStillShortCircuits() {
+            service = createService(disabledSchedulerProperties);
+            SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
+
+            boolean didWork = service.runBackfillBatch(target, 50);
+
+            assertThat(service.isEnabled()).isFalse();
+            assertThat(didWork).isFalse();
         }
     }
 

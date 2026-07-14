@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -69,6 +70,27 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     /** Slice (rather than Page) so batching needs no count query. */
     Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
+
+    /**
+     * Combined issue + pull/merge request count per repository, in one grouped query. Deliberately
+     * omits {@code TYPE(i) = Issue} so {@code PullRequest} subclass rows (single-table inheritance)
+     * are included — backs the sync-observability resource list's per-repository {@code itemCount}
+     * without an N+1 query per repo.
+     *
+     * @param repositoryIds the repository IDs to count for
+     * @return one projection row per repository that has at least one issue/PR
+     */
+    @Query(
+        "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
+            "WHERE i.repository.id IN :repositoryIds GROUP BY i.repository.id"
+    )
+    List<RepositoryItemCount> countGroupedByRepositoryIds(@Param("repositoryIds") Collection<Long> repositoryIds);
+
+    /** Projection for {@link #countGroupedByRepositoryIds}. */
+    interface RepositoryItemCount {
+        Long getRepositoryId();
+        Long getItemCount();
+    }
 
     /**
      * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered

@@ -2,10 +2,18 @@ package de.tum.cit.aet.hephaestus.integration.slack.sync;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +44,7 @@ public class SlackDataSyncScheduler {
     private final SlackChannelMetadataRefresher metadataRefresher;
     private final SlackChannelHistorySyncService historySyncService;
     private final ConnectionService connectionService;
+    private final SyncJobService syncJobService;
     private final SlackSyncProperties properties;
 
     public SlackDataSyncScheduler(
@@ -43,12 +52,14 @@ public class SlackDataSyncScheduler {
         SlackChannelMetadataRefresher metadataRefresher,
         SlackChannelHistorySyncService historySyncService,
         ConnectionService connectionService,
+        SyncJobService syncJobService,
         SlackSyncProperties properties
     ) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.metadataRefresher = metadataRefresher;
         this.historySyncService = historySyncService;
         this.connectionService = connectionService;
+        this.syncJobService = syncJobService;
         this.properties = properties;
     }
 
@@ -63,13 +74,67 @@ public class SlackDataSyncScheduler {
         int failed = 0;
         for (Long workspaceId : workspaceIds) {
             try {
-                syncWorkspaceNow(workspaceId);
+                syncWorkspaceRecordingJob(workspaceId);
+            } catch (SyncJobConflictException e) {
+                // Another sync (manual trigger, or a previous tick that hasn't finished) already holds the
+                // one-active-job slot for this connection — skip this tick rather than treat it as a failure.
+                log.info("slack.sync: workspace {} already has an active sync job, skipping tick", workspaceId);
             } catch (RuntimeException e) {
                 failed++;
                 log.warn("slack.sync: workspace {} failed: {}", workspaceId, e.toString());
             }
         }
         log.info("slack.sync: nightly reconciliation done: workspaces={}, failed={}", workspaceIds.size(), failed);
+    }
+
+    /**
+     * Wraps one workspace's nightly reconciliation in the shared {@link SyncJobService} template
+     * (design doc §3.4) so it shows up in job history — but only when the workspace has an ACTIVE Slack
+     * {@link Connection} to record it against. A workspace whose channels are still {@code ACTIVE} in the
+     * allow-list table but whose Connection already left ACTIVE (uninstall race — the normal window
+     * {@link #syncWorkspaceNow}'s own guard covers) is skipped here without ever touching Slack,
+     * unrecorded, since there is no Connection row to attach a {@code SyncJob} to.
+     */
+    private void syncWorkspaceRecordingJob(long workspaceId) {
+        Optional<Connection> connection = connectionService.findActive(workspaceId, IntegrationKind.SLACK);
+        if (connection.isEmpty()) {
+            log.debug(
+                "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping tick (unrecorded)",
+                workspaceId
+            );
+            return;
+        }
+        syncJobService.run(
+            new SyncJobRequest(
+                workspaceId,
+                connection.get().getId(),
+                IntegrationKind.SLACK,
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.SCHEDULED,
+                null
+            ),
+            handle -> {
+                SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId);
+                handle.progress(
+                    summary.synced() + summary.skipped(),
+                    summary.channels(),
+                    Map.of(
+                        "channels",
+                        summary.channels(),
+                        "synced",
+                        summary.synced(),
+                        "skipped",
+                        summary.skipped(),
+                        "ingested",
+                        summary.ingested(),
+                        "requestsUsed",
+                        summary.requestsUsed(),
+                        "budgetExhausted",
+                        summary.budgetExhausted()
+                    )
+                );
+            }
+        );
     }
 
     /**

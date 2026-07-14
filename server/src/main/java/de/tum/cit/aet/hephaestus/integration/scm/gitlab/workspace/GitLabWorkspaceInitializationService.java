@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -437,6 +438,18 @@ public class GitLabWorkspaceInitializationService {
      * startup (from {@link WorkspaceActivationService#activateWorkspace}).
      */
     public void syncFullData(Workspace workspace) {
+        syncFullData(workspace, () -> false);
+    }
+
+    /**
+     * Same as {@link #syncFullData(Workspace)}, but cooperatively cancellable — used by
+     * {@code GitlabIntegrationSyncRunner} so a {@code SyncJob} cancel request can stop the pass
+     * between repositories rather than running to completion. {@code cancelled} is polled at the
+     * top of the per-repository loop in {@link #syncGitLabRepositories}, which dominates the
+     * runtime of a full sync; the membership/issue-type/teams phases that bookend the loop are
+     * comparatively cheap and are not individually cancellable.
+     */
+    public void syncFullData(Workspace workspace, BooleanSupplier cancelled) {
         var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
         if (gitLabServices == null) {
             log.debug(
@@ -524,7 +537,7 @@ public class GitLabWorkspaceInitializationService {
             // commit whose SHA appears on an MR in a sibling repo can still be linked after
             // all repos have finished syncing (Gap #1: cross-repo MR/commit relationships).
             List<Repository> commitLinkTargets = new ArrayList<>();
-            syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets);
+            syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets, cancelled);
 
             // Second pass: link commits to MRs now that every repo has populated its commits
             // and every MR-targeted repo has populated its MRs.
@@ -575,12 +588,16 @@ public class GitLabWorkspaceInitializationService {
      * if a repository was synced within {@code syncSchedulerProperties.cooldownMinutes()},
      * these entities are skipped. Issues and MRs always sync incrementally via
      * {@code updatedAfter}.
+     *
+     * <p>{@code cancelled} is polled at the top of every iteration — cooperative cancellation,
+     * best-effort: a repository already in progress always finishes its own phases.
      */
     private void syncGitLabRepositories(
         Workspace workspace,
         GitLabSyncServiceHolder gitLabServices,
         List<Repository> repos,
-        List<Repository> commitLinkTargets
+        List<Repository> commitLinkTargets,
+        BooleanSupplier cancelled
     ) {
         var labelSyncService = gitLabServices.getLabelSyncService();
         var milestoneSyncService = gitLabServices.getMilestoneSyncService();
@@ -610,6 +627,16 @@ public class GitLabWorkspaceInitializationService {
         int skippedCooldown = 0;
 
         for (Repository repo : repos) {
+            if (cancelled.getAsBoolean()) {
+                log.info(
+                    "GitLab repo sync cancelled: workspaceId={}, reposDone={}, reposTotal={}",
+                    workspace.getId(),
+                    commitLinkTargets.size(),
+                    repos.size()
+                );
+                break;
+            }
+
             // Rate limit gate: block if remaining budget is critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(workspace.getId())) {
                 log.info(

@@ -2,15 +2,23 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -36,6 +44,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -88,6 +97,8 @@ public class GitlabDataSyncScheduler {
     private final ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final Executor monitoringExecutor;
+    private final ConnectionRepository connectionRepository;
+    private final SyncJobService syncJobService;
 
     public GitlabDataSyncScheduler(
         SyncTargetProvider syncTargetProvider,
@@ -97,7 +108,9 @@ public class GitlabDataSyncScheduler {
         ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
         SyncSchedulerProperties syncSchedulerProperties,
-        @Qualifier("monitoringExecutor") Executor monitoringExecutor
+        @Qualifier("monitoringExecutor") Executor monitoringExecutor,
+        ConnectionRepository connectionRepository,
+        SyncJobService syncJobService
     ) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
@@ -107,6 +120,8 @@ public class GitlabDataSyncScheduler {
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.monitoringExecutor = monitoringExecutor;
+        this.connectionRepository = connectionRepository;
+        this.syncJobService = syncJobService;
     }
 
     @PostConstruct
@@ -139,7 +154,7 @@ public class GitlabDataSyncScheduler {
         CompletableFuture<?>[] futures = sessions
             .stream()
             .map(session ->
-                CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor).whenComplete(
+                CompletableFuture.runAsync(() -> syncScopeWithJobRecording(session), monitoringExecutor).whenComplete(
                     (result, error) -> {
                         if (error != null) {
                             failureCount.incrementAndGet();
@@ -169,6 +184,52 @@ public class GitlabDataSyncScheduler {
             );
         } catch (ExecutionException e) {
             log.error("Unexpected error during scheduled GitLab sync", e);
+        }
+    }
+
+    /**
+     * Wraps {@link #syncScope} in the {@code SyncJobService} template when the scope has an ACTIVE
+     * GitLab {@link Connection} — the cron's per-scope fan-out is the {@code SCHEDULED}/
+     * {@code RECONCILIATION} trigger path from the design doc (§3.4). A scope without an ACTIVE
+     * connection (e.g. a stale sync target left over from a disconnected workspace) still syncs,
+     * just without a job row — the sync-target enumeration and the connection registry aren't
+     * perfectly aligned today, and skipping the sync entirely would be a regression versus current
+     * behavior.
+     *
+     * <p>A {@link SyncJobConflictException} (this connection already has an active job — most
+     * plausibly a manual "Sync now" the admin triggered) skips this scope's cron run entirely rather
+     * than racing it; the manual job's own completion will bring watermarks current.
+     */
+    private void syncScopeWithJobRecording(SyncSession session) {
+        Optional<Connection> connection =
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                session.scopeId(),
+                IntegrationKind.GITLAB,
+                IntegrationState.ACTIVE
+            );
+        if (connection.isEmpty()) {
+            syncScope(session);
+            return;
+        }
+
+        try {
+            syncJobService.run(
+                new SyncJobRequest(
+                    session.scopeId(),
+                    connection.get().getId(),
+                    IntegrationKind.GITLAB,
+                    SyncJobType.RECONCILIATION,
+                    SyncJobTrigger.SCHEDULED,
+                    null
+                ),
+                handle -> syncScope(session)
+            );
+        } catch (SyncJobConflictException e) {
+            log.info(
+                "Skipped scheduled GitLab sync, already an active sync job: scopeId={}, connectionId={}",
+                session.scopeId(),
+                connection.get().getId()
+            );
         }
     }
 
