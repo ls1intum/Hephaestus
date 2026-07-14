@@ -1,40 +1,22 @@
-# =============================================================================
-# SHARED INFRASTRUCTURE FOR PREVIEW DEPLOYMENTS (Coolify)
-# =============================================================================
+# Shared infrastructure for Coolify preview deployments: NATS JetStream and the inbound webhook
+# receiver. Deploy ONCE as a Docker Compose application with "Connect to Predefined Network"
+# enabled; the base stack and every PR preview reach these services over the `coolify` network.
 #
-# Deploy ONCE as a Docker Compose service in Coolify.
-# All PR preview stacks will connect to these shared services.
+# Give webhook-server its OWN host with no path (https://webhooks.<base-domain>), so delivery URLs
+# are https://webhooks.<base-domain>/webhooks/{github,gitlab,slack}. The receiver owns the full
+# /webhooks/** path — controller, payload-size filter and security chain all bind to it — and
+# Coolify appends a strip-prefix middleware to any service domain that carries a path, which would
+# 404 every delivery. Hand-written Traefik labels are not an alternative: Coolify does not
+# interpolate ${VARS} inside `labels:`.
 #
-# Services:
-#   - nats-server: Message queue for webhook + sync events
-#   - webhook-server: Java inbound webhook receiver (application-server image with
-#     SPRING_PROFILES_ACTIVE=prod,webhook so only integration.core.webhook beans load — see ADR 0008)
-#   (Authentication is Hephaestus-native — no Keycloak; ADR 0017. The app server federates
-#    to GitHub / gitlab.lrz.de directly and issues its own cookie-session JWT.)
+# Webhooks are delivered to this single host, so webhook-server is bound to the BASE stack's
+# database. Previews receive no deliveries of their own; they consume the events from NATS.
 #
-# Coolify Setup:
-#   1. Create new Service → Docker Compose
-#   2. Point to this file in the repo: docker/preview/compose.shared-infra.yaml
-#   3. Enable "Connect to Predefined Network"
-#   4. Configure environment variables (see .env.example)
-#   5. In Coolify UI, set domains for each service (with Strip Prefix ENABLED):
-#      - webhook-server: https://example.com:8080/webhooks
-#
-# IMPORTANT: This shared preview infrastructure does not, by itself, prove that
-# GitLab workspace creation or GitLab practice review will work in production.
-# If you want preview to validate that rollout, add the GitLab IdP and the same
-# application-server practice-review wiring used in the production stack.
-#
-# Domain format: https://domain.com:PORT/path
-# The :PORT tells Coolify which container port to proxy to.
-# Strip Prefix removes /webhooks before forwarding.
-#
-# =============================================================================
+# Never use `${VAR:?message}` here: Coolify's compose parser seeds its environment store from
+# these placeholders and keeps the *message* as the value, so `:?Required` becomes the literal
+# string "Required". Leave required vars bare and let the app's own fail-fast report them.
 
 services:
-  # ---------------------------------------------------------------------------
-  # NATS Server - Message queue for webhook events (internal only)
-  # ---------------------------------------------------------------------------
   nats-server:
     image: nats:2.10-alpine
     restart: unless-stopped
@@ -56,13 +38,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ---------------------------------------------------------------------------
-  # Webhook Server - Java inbound webhook receiver. Same image as application-server
-  # but with SPRING_PROFILES_ACTIVE=prod,webhook so only integration.core.webhook beans load.
-  # Restart-independent from application-server (push events on GitHub/GitLab are
-  # not manually redeliverable). See ADR 0008.
-  # Configure domain in Coolify UI: https://example.com/webhooks:8080
-  # ---------------------------------------------------------------------------
+  # The application-server image with SPRING_PROFILES_ACTIVE=prod,webhook, so only the
+  # integration.core.webhook beans load. Deliberately restart-independent from application-server:
+  # push events are not redeliverable (ADR 0008).
   webhook-server:
     image: ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -76,26 +54,37 @@ services:
       SPRING_LIQUIBASE_ENABLED: "false"
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
-      # EncryptedStringConverter / CredentialBundleConverter are eager prod-fail-fast @Component
-      # converters that load on this server-off pod too; they need the key at construction.
-      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Required}
-      # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; :?Required pins it.
-      APPLICATION_HOST_URL: ${APPLICATION_HOST_URL:?Required}
-      # prod runs forward-headers=native → ProxyTrustGuard aborts the boot unless set (Coolify ingress regex).
-      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
+      # JPA stays active on this pod (application-webhook.yml, ddl-auto: none) and the HMAC path
+      # reads per-connection credentials through it, so the datasource is real. application-prod.yml
+      # binds spring.datasource.url to jdbc:${DATABASE_URL} with no default — unset, the pod cannot
+      # start. `postgres` is the BASE stack's alias on the `coolify` network (previews are
+      # `postgres-pr-<id>`), so this cannot bind to a preview database.
+      DATABASE_URL: ${WEBHOOK_DATABASE_URL:-postgresql://postgres:5432/hephaestus?sslmode=disable}
+      DATABASE_USERNAME: ${WEBHOOK_DATABASE_USERNAME:-hephaestus}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      # The encrypted-field converters are eager prod-fail-fast components and load on this pod too,
+      # so the key must be present even with the server role off.
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      APPLICATION_HOST_URL: ${APPLICATION_HOST_URL}
+      # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES}
+      # Slack Events API and interactivity arrive here under /webhooks/slack* and are verified with
+      # the signing secret; OAuth/admin and mentor replies stay on application-server.
+      HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET:-}
       # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
-      # thc healthcheck target: actuator readiness on the management port.
       THC_PORT: "8080"
       THC_PATH: /actuator/health/readiness
     depends_on:
       nats-server:
         condition: service_healthy
-    # Spring drains HTTP (20s) THEN WebhookGracefulShutdown drains NATS (up to 15s).
-    # Docker must allow ≥35s before SIGKILL, or the JVM is cut mid-drain.
+    # Spring drains HTTP (20s), then WebhookGracefulShutdown drains NATS (up to 15s). Docker must
+    # allow ≥35s before SIGKILL, or the JVM is cut mid-drain.
     stop_grace_period: 40s
-    # thc healthcheck (see docker/compose.app.yaml).
+    # The distroless image has no shell; the probe is the static thc binary the health-checker
+    # buildpack adds at /workspace/health-check.
     healthcheck:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s
@@ -111,18 +100,14 @@ services:
 volumes:
   nats-data:
 
-# =============================================================================
-# CONFIGS
-# =============================================================================
 configs:
   nats-config:
     content: |
       listen: "0.0.0.0:4222"
       http_port: 8222
-      
+
       jetstream {
         store_dir: "/data"
         max_mem: 1G
         max_file: 10G
       }
-
