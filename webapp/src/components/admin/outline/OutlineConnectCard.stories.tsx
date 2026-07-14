@@ -89,6 +89,25 @@ export const ConnectError: Story = {
 	},
 };
 
+/**
+ * The instance has no Outline integration enabled — the initiate 400 (no ConnectionStrategy for the
+ * kind) is turned into a clear "not available here" hint so the admin does not keep retrying a
+ * connect that can never succeed. The raw ProblemDetail stays visible above it.
+ */
+export const ConnectUnavailable: Story = {
+	args: {
+		connected: false,
+		errorMessage: "No ConnectionStrategy registered for kind=OUTLINE",
+		connectUnavailable: true,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/no connectionstrategy registered/i)).toBeVisible();
+		await expect(canvas.getByText(/outline may not be enabled on this instance/i)).toBeVisible();
+		await expect(canvas.getByText(/ask your server administrator/i)).toBeVisible();
+	},
+};
+
 /** Connected and healthy — webhook live, document count, relative last sync, healthy token. */
 export const Connected: Story = {
 	args: {

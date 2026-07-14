@@ -9,8 +9,8 @@ import {
 	listOutlineCollectionsOptions,
 	registerOutlineCollectionMutation,
 	syncOutlineConnectionMutation,
+	updateConnectionStatusMutation,
 	updateOutlineCollectionStateMutation,
-	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
 import { problemDetailOf } from "@/lib/problem-detail";
 import {
@@ -37,6 +37,16 @@ const TOKEN_STATUS_STALE_MS = 5 * 60_000;
  * (register / pause / resume / remove + erase) through the generated hooks. Every mutation
  * invalidates both the collection list and the status line so the UI reflects server truth.
  * The components below are pure presentation.
+ *
+ * <p><b>Why this self-fetches (deliberate divergence from the route-level Slack pattern in
+ * CLAUDE.md §6):</b> the Outline reads are consumer-coupled and must stay lazy, so hoisting them
+ * to the admin route would be wrong, not merely inconsistent. The status/token queries only exist
+ * while a connection is ACTIVE and poll based on live sync state, and the candidates probe (in
+ * {@link AddCollectionDialog}) is a live proxy into Outline that doubles as the connectivity check —
+ * firing it eagerly at route level would hit Outline on every settings visit whether or not the
+ * admin ever opens the picker. Colocating each query with the state that gates it (`connected`,
+ * dialog `open`) keeps the fetch lazy and self-healing; the Slack sibling has no such lazy-probe, so
+ * route-level prop passing suits it. Keep the fetching here.
  */
 export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProps) {
 	const queryClient = useQueryClient();
@@ -115,7 +125,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	});
 
 	const disconnect = useMutation({
-		...updateStatus1Mutation(),
+		...updateConnectionStatusMutation(),
 		onSuccess: () => {
 			toast.success("Outline disconnected");
 			invalidateConnections();
@@ -172,6 +182,16 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 			toast.error("Failed to remove collection", { description: problemDetailOf(e) });
 		},
 	});
+
+	// No server capability signal tells the SPA up front whether this deployment has the Outline
+	// integration enabled (the connections list only enumerates existing connections). When it is
+	// disabled the server has no ConnectionStrategy for the kind, so POST /connections rejects the
+	// initiate with a 400 whose detail is exactly this. Match it to turn the otherwise-cryptic error
+	// into a clear "not available here" hint instead of a dead-end connect form. A dedicated
+	// capability field on the workspace/connections response would be the cleaner gate.
+	const connectErrorMessage = connect.error != null ? problemDetailOf(connect.error) : undefined;
+	const connectUnavailable =
+		connectErrorMessage != null && /no connectionstrategy registered/i.test(connectErrorMessage);
 
 	const handleConnect = (input: OutlineConnectInput) => {
 		connect.mutate({
@@ -234,7 +254,8 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 				isConnecting={connect.isPending}
 				isDisconnecting={disconnect.isPending}
 				isSyncing={syncNow.isPending}
-				errorMessage={connect.error != null ? problemDetailOf(connect.error) : undefined}
+				errorMessage={connectErrorMessage}
+				connectUnavailable={connectUnavailable}
 				onConnect={handleConnect}
 				onDisconnect={handleDisconnect}
 				onSyncNow={() => syncNow.mutate({ path: { workspaceSlug } })}

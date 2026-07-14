@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
@@ -1015,11 +1016,16 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenThrow(new ObjectOptimisticLockingFailureException(OutlineDocument.class, 99L))
             .thenAnswer(inv -> inv.getArgument(0));
 
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
-            service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1")
-        );
+        service(10).refreshDocument(WORKSPACE, "documents.update", "doc-1");
 
-        verify(documentRepository, times(2)).saveAndFlush(any());
+        // The retry re-created the vanished row: the second, successful save carries the freshly
+        // exported body and is not a tombstone — proving it rebuilt from the export rather than
+        // re-persisting the stale pre-conflict entity.
+        ArgumentCaptor<OutlineDocument> saved = ArgumentCaptor.forClass(OutlineDocument.class);
+        verify(documentRepository, times(2)).saveAndFlush(saved.capture());
+        OutlineDocument recreated = saved.getAllValues().get(1);
+        assertThat(recreated.getBodyMarkdown()).isEqualTo("# fresh");
+        assertThat(recreated.isDeleted()).isFalse();
     }
 
     @Test

@@ -2693,8 +2693,16 @@ export type ConnectionSummary = {
  * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
  * sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
  * <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
- * client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
- * and is not exposed by this DTO.
+ * client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
+ * entity, and every secret-bearing key of the config itself is stripped by
+ * {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO#redactSensitive #redactSensitive} before serialization.
+ *
+ * <p><b>Why redact here and not with <code>@JsonIgnore</code> on the record component?</b> The very
+ * same {@link ObjectMapper ObjectMapper} bean serializes {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO  de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+ * <code>connection.config</code> column (Hibernate's <code>json_format_mapper</code> is wired to it in
+ * <code>HibernateJacksonFormatMapperConfig</code>). Annotating the component would therefore drop the
+ * secret on write and destroy the stored value — the API-boundary filter below is the only place
+ * the two concerns can be separated.
  *
  * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
  * the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
@@ -4259,7 +4267,7 @@ export type AuditResponses = {
 
 export type AuditResponse = AuditResponses[keyof AuditResponses];
 
-export type UpdateStatus1Data = {
+export type UpdateConnectionStatusData = {
     body: UpdateConnectionStatusRequest;
     path: {
         /**
@@ -4272,14 +4280,14 @@ export type UpdateStatus1Data = {
     url: '/workspaces/{workspaceSlug}/connections/{id}/status';
 };
 
-export type UpdateStatus1Responses = {
+export type UpdateConnectionStatusResponses = {
     /**
      * OK
      */
     200: ConnectionSummary;
 };
 
-export type UpdateStatus1Response = UpdateStatus1Responses[keyof UpdateStatus1Responses];
+export type UpdateConnectionStatusResponse = UpdateConnectionStatusResponses[keyof UpdateConnectionStatusResponses];
 
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;

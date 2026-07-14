@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SlackUserWorkspacePreferences } from "@/api/types.gen";
 import { SlackPreferencesSection } from "./SlackPreferencesSection";
@@ -15,6 +15,36 @@ const workspace: SlackUserWorkspacePreferences = {
 };
 
 describe("SlackPreferencesSection", () => {
+	// The irreversible-deletion guard is safety-critical, so it is asserted here in the fast jsdom
+	// lane in addition to the `ConfirmTurningOff` Storybook story (browser lane). Flipping the switch
+	// OFF must NOT fire the mutation on its own — only confirming the dialog may, and only with
+	// (workspaceSlug, false). A regression that dropped the confirm gate, or passed the wrong args,
+	// would fail these assertions.
+	it("confirms before turning message use OFF — the switch alone would silently delete collected data", () => {
+		const onToggleChannelMessages = vi.fn();
+		render(
+			<SlackPreferencesSection
+				workspaces={[workspace]}
+				isSlackLinked
+				canConnectSlack
+				onConnectSlack={vi.fn()}
+				onToggleChannelMessages={onToggleChannelMessages}
+			/>,
+		);
+
+		const row = screen.getByRole("group", { name: "Hephaestus Test Slack preferences" });
+		expect(within(row).getByText("2 active monitored channels")).toBeTruthy();
+
+		fireEvent.click(within(row).getByRole("switch", { name: /use my new channel messages/i }));
+
+		// The flip alone must NOT delete anything — an irreversible deletion is gated by a confirmation.
+		expect(onToggleChannelMessages).not.toHaveBeenCalled();
+
+		fireEvent.click(screen.getByRole("button", { name: /turn off & delete/i }));
+
+		expect(onToggleChannelMessages).toHaveBeenCalledWith("hephaestustest", false);
+	});
+
 	it("cancelling the confirmation leaves message use ON", () => {
 		const onToggleChannelMessages = vi.fn();
 		render(

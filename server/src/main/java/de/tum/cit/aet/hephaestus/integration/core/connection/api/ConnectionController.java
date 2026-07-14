@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -162,6 +163,7 @@ public class ConnectionController {
      * transitions surface as 400 via the state machine.
      */
     @PatchMapping("/{id}/status")
+    @Operation(operationId = "updateConnectionStatus")
     public ResponseEntity<ConnectionSummaryDTO> updateStatus(
         WorkspaceContext workspace,
         @PathVariable Long id,

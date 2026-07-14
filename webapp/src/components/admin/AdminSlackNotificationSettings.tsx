@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import {
 	initiateMutation,
 	sendSlackTestMessageMutation,
+	updateConnectionStatusMutation,
 	updateLeaderboardDigestMutation,
-	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { SlackChannelCandidate } from "@/api/types.gen";
 import { SlackIcon } from "@/components/icons/brand";
@@ -193,7 +193,7 @@ export function AdminSlackNotificationSettings({
 	});
 
 	const disconnect = useMutation({
-		...updateStatus1Mutation(),
+		...updateConnectionStatusMutation(),
 		onSuccess: () => {
 			setDisconnectOpen(false);
 			toast.success("Slack disconnected");

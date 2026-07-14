@@ -377,6 +377,41 @@ describe("AdminOutlineSettings — a running sync is polled, not left as dead pi
 	}, 10000);
 });
 
+describe("AdminOutlineSettings — Outline not enabled on this instance", () => {
+	it("turns the initiate 400 (no strategy for the kind) into a clear 'not available here' hint", async () => {
+		// A deployment with HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED off has no OutlineConnectionStrategy
+		// bean, so ConnectionController.initiate rejects the kind with exactly this 400. The card must
+		// explain that instead of only echoing the developer-facing message, so an admin does not keep
+		// retrying a connect that can never succeed.
+		server.use(
+			http.get("*/workspaces/demo/connections", () => HttpResponse.json([])),
+			http.post("*/workspaces/demo/connections", () =>
+				HttpResponse.json(
+					{
+						type: "about:blank",
+						title: "Invalid request",
+						status: 400,
+						detail: "No ConnectionStrategy registered for kind=OUTLINE",
+					},
+					{ status: 400 },
+				),
+			),
+		);
+
+		renderContainer();
+
+		fireEvent.change(await screen.findByLabelText(/server url/i), {
+			target: { value: "https://wiki.acme.dev" },
+		});
+		fireEvent.change(screen.getByLabelText(/api token/i), { target: { value: "ol_api_secret" } });
+		fireEvent.click(screen.getByRole("button", { name: /connect outline/i }));
+
+		// The raw ProblemDetail is still shown; the hint is derived from it and added below.
+		expect(await screen.findByText(/outline may not be enabled on this instance/i)).toBeTruthy();
+		expect(screen.getByText(/no connectionstrategy registered for kind=outline/i)).toBeTruthy();
+	});
+});
+
 describe("AdminOutlineSettings — collections plane is gated on the connection", () => {
 	it("does not render the collections section while disconnected", async () => {
 		server.use(http.get("*/workspaces/demo/connections", () => HttpResponse.json([])));

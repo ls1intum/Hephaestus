@@ -52,6 +52,13 @@ export interface OutlineConnectCardProps {
 	isSyncing?: boolean;
 	/** Connect error surfaced inline under the form. */
 	errorMessage?: string;
+	/**
+	 * The connect attempt failed because this instance has no Outline integration (the server has no
+	 * ConnectionStrategy for the kind). The connect form is a dead end here, so the card explains that
+	 * instead of inviting another doomed attempt. Derived reactively from the connect error — see the
+	 * container — because no server capability signal is exposed to gate it up front.
+	 */
+	connectUnavailable?: boolean;
 	onConnect: (input: OutlineConnectInput) => void;
 	onDisconnect: () => void;
 	/** Trigger the full reconcile (202 fire-and-forget). */
@@ -96,6 +103,7 @@ export function OutlineConnectCard({
 	isDisconnecting = false,
 	isSyncing = false,
 	errorMessage,
+	connectUnavailable = false,
 	onConnect,
 	onDisconnect,
 	onSyncNow,
@@ -168,6 +176,18 @@ export function OutlineConnectCard({
 							</Field>
 
 							{errorMessage && <FieldError>{errorMessage}</FieldError>}
+
+							{connectUnavailable && (
+								<Alert variant="warning">
+									<TriangleAlertIcon />
+									<AlertTitle>Outline may not be enabled on this instance</AlertTitle>
+									<AlertDescription>
+										The server has no Outline integration configured, so connecting cannot succeed
+										here. If your URL and token are correct, ask your server administrator to enable
+										the Outline integration for this deployment.
+									</AlertDescription>
+								</Alert>
+							)}
 
 							<Button
 								onClick={() => onConnect({ serverUrl: serverUrl.trim(), token: token.trim() })}
