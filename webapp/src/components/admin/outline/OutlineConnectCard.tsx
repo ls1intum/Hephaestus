@@ -1,6 +1,5 @@
 import { differenceInCalendarDays, format, formatDistanceToNow } from "date-fns";
 import {
-	BookTextIcon,
 	CheckIcon,
 	FileTextIcon,
 	KeyRoundIcon,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { OutlineConnectionStatus, OutlineTokenStatus } from "@/api/types.gen";
+import { OutlineIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -23,14 +23,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -118,10 +111,15 @@ export function OutlineConnectCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle className="flex items-center gap-2 text-lg">
-						<BookTextIcon className="size-5 text-muted-foreground" aria-hidden />
+					{/* CardTitle renders a div; the settings page is navigated by heading, so the
+					    section title has to be a real h2 — matching the Slack integration card. */}
+					<h2
+						data-slot="card-title"
+						className="flex items-center gap-2 text-base leading-snug font-medium"
+					>
+						<OutlineIcon className="size-4" aria-hidden />
 						Outline documentation
-					</CardTitle>
+					</h2>
 					<CardDescription>
 						Mirror Outline collections so their design docs and decision records reach practice
 						detection as context. Use a dedicated bot-user API token; after connecting you choose

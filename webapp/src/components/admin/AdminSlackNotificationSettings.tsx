@@ -212,7 +212,11 @@ export function AdminSlackNotificationSettings({
 				<CardHeader>
 					{/* CardTitle renders a div; the settings page is navigated by heading, so the
 					    section title has to be a real h2. */}
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
+					<h2
+						data-slot="card-title"
+						className="flex items-center gap-2 text-base leading-snug font-medium"
+					>
+						<SlackIcon className="size-4" aria-hidden />
 						Slack integration
 					</h2>
 					<CardDescription>

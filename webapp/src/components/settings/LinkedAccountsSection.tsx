@@ -1,8 +1,8 @@
-import { BookOpen, LinkIcon, type LucideIcon, Unlink } from "lucide-react";
+import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { GithubIcon, GitlabIcon, SlackIcon } from "@/components/icons/brand";
+import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -39,11 +39,20 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,
 	SLACK: SlackIcon,
-	OUTLINE: BookOpen,
+	OUTLINE: OutlineIcon,
 };
 
 /** Providers that can only be *linked* from Settings — they are never a sign-in method. */
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
+
+/**
+ * Why each link-only account is worth connecting. Both are linked, never signed in with, so the copy
+ * has to earn the click on its own — the account it links to is not a way into Hephaestus.
+ */
+const LINK_ONLY_RATIONALE: Record<string, string> = {
+	SLACK: "Connect Slack to manage your channel-message preference and reach the mentor in a DM.",
+	OUTLINE: "Connect Outline so the documents you write there are recognised as your work.",
+};
 
 /**
  * Resolve a brand icon from a provider type (e.g. "GITHUB", "GITLAB"). Falls back
@@ -124,14 +133,17 @@ export function LinkedAccountsSection({
 		return !type || !linkedProviderTypes.has(type);
 	});
 
-	// Outline is content-linking, not sign-in, and an instance can have SEVERAL Outline providers
-	// (one per Outline deployment, unique on (type, base_url)) — so this is a list, never a single
-	// `find(...)` match. Each unconnected one gets its own CTA, named by its display name.
-	const outlineProviders = linkableProviders.filter(
-		(provider) => provider.providerType?.toUpperCase() === "OUTLINE" && provider.registrationId,
+	// Slack and Outline link an identity but are never a way in, so they cannot be offered among the
+	// sign-in providers — they get their own explained CTA instead. An instance can run SEVERAL of
+	// either (Outline is unique on (type, base_url), one row per deployment), so this is a list and
+	// never a single `find(...)` match; each unconnected one is named by its display name.
+	const linkOnlyProviders = linkableProviders.filter(
+		(provider) =>
+			LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
+			provider.registrationId,
 	);
 	const signInProviders = linkableProviders.filter(
-		(provider) => provider.providerType?.toUpperCase() !== "OUTLINE",
+		(provider) => !LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
 	);
 
 	// Lockout guard: the account's only remaining sign-in method cannot be removed.
@@ -242,22 +254,21 @@ export function LinkedAccountsSection({
 						</ItemGroup>
 					)}
 
-					{outlineProviders.length > 0 && (
+					{linkOnlyProviders.length > 0 && (
 						<ItemGroup>
-							{outlineProviders.map((provider) => {
-								const label = provider.displayName || provider.registrationId || "Outline";
+							{linkOnlyProviders.map((provider) => {
+								const type = provider.providerType?.toUpperCase() ?? "";
+								const Icon = getProviderIcon(type);
+								const label = provider.displayName || getProviderLabel(type, "this account");
 								const registrationId = provider.registrationId as string;
 								return (
-									<Item key={registrationId} variant="muted" role="listitem">
+									<Item key={registrationId} variant="outline" role="listitem">
 										<ItemMedia variant="icon">
-											<BookOpen aria-hidden="true" />
+											<Icon aria-hidden="true" />
 										</ItemMedia>
 										<ItemContent>
-											<ItemTitle>Connect {label}</ItemTitle>
-											<ItemDescription>
-												Link your {label} account so the documents you write there count as your
-												work. Link-only — you can't sign in to Hephaestus with Outline.
-											</ItemDescription>
+											<ItemTitle>{label} is not connected</ItemTitle>
+											<ItemDescription>{LINK_ONLY_RATIONALE[type]}</ItemDescription>
 										</ItemContent>
 										<ItemActions>
 											<Button
@@ -266,7 +277,7 @@ export function LinkedAccountsSection({
 												onClick={() => onLink(registrationId)}
 												aria-label={`Connect ${label}`}
 											>
-												<BookOpen className="size-3.5 mr-1.5" aria-hidden="true" />
+												<Icon className="size-3.5 mr-1.5" aria-hidden="true" />
 												Connect
 											</Button>
 										</ItemActions>

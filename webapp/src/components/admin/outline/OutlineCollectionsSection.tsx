@@ -3,14 +3,7 @@ import { useState } from "react";
 import type { OutlineCollection } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
 	Empty,
 	EmptyContent,
@@ -81,7 +74,11 @@ export function OutlineCollectionsSection({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-lg">Mirrored collections</CardTitle>
+					{/* CardTitle renders a div; the settings page is navigated by heading, so the
+					    section title has to be a real h2. */}
+					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
+						Mirrored collections
+					</h2>
 					<CardDescription>
 						Documents in mirrored collections are kept in sync and reach practice detection as
 						context. Pausing a collection <strong>freezes syncing but keeps its documents</strong>
