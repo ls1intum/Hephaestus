@@ -152,8 +152,9 @@ export const OutlineConnectCTA: Story = {
 	},
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Connect ACME Outline")).toBeInTheDocument();
-		await expect(canvas.getByText("Connect Research Outline")).toBeInTheDocument();
+		// Every unconnected Outline instance gets its own CTA, named by its display name.
+		await expect(canvas.getByText("ACME Outline is not connected")).toBeInTheDocument();
+		await expect(canvas.getByText("Research Outline is not connected")).toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: "Connect Research Outline" }));
 		await expect(args.onLink).toHaveBeenCalledWith("outline-research");
