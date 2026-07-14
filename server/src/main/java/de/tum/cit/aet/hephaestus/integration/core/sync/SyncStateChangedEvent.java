@@ -17,5 +17,7 @@ public record SyncStateChangedEvent(long workspaceId, long connectionId, Integra
         JOB,
         RESOURCES,
         CONNECTION,
+        /** Webhook-liveness ("last event processed") update — see {@code ConnectionActivityRecorder}. */
+        ACTIVITY,
     }
 }

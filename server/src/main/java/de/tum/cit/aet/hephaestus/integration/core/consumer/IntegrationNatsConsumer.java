@@ -6,10 +6,12 @@ import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionException;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
+import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRecorder;
 import io.nats.client.Connection;
 import io.nats.client.ConsumerContext;
 import io.nats.client.JetStreamApiException;
@@ -131,6 +133,7 @@ public class IntegrationNatsConsumer {
     private final IntegrationMessageDispatcher dispatcher;
     private final IntegrationPoisonHandler poisonHandler;
     private final IntegrationConsumerStats stats;
+    private final ConnectionActivityRecorder activityRecorder;
 
     public IntegrationNatsConsumer(
         NatsConnectionProperties connectionProperties,
@@ -138,7 +141,8 @@ public class IntegrationNatsConsumer {
         NatsSubscriptionProvider subscriptionProvider,
         IntegrationMessageDispatcher dispatcher,
         IntegrationPoisonHandler poisonHandler,
-        IntegrationConsumerStats stats
+        IntegrationConsumerStats stats,
+        ConnectionActivityRecorder activityRecorder
     ) {
         this.connectionProperties = connectionProperties;
         this.consumerProperties = consumerProperties;
@@ -146,6 +150,7 @@ public class IntegrationNatsConsumer {
         this.dispatcher = dispatcher;
         this.poisonHandler = poisonHandler;
         this.stats = stats;
+        this.activityRecorder = activityRecorder;
     }
 
     // Lifecycle
@@ -519,7 +524,7 @@ public class IntegrationNatsConsumer {
                 consumerContext,
                 streamContext,
                 subjects,
-                this::handleMessage
+                msg -> handleMessage(scopeId, msg)
             );
             scope.start();
             log.info(
@@ -577,7 +582,7 @@ public class IntegrationNatsConsumer {
                 consumerContext,
                 streamContext,
                 subjects,
-                this::handleMessage
+                msg -> handleMessage(null, msg)
             );
             installation.start();
             installationConsumer = installation;
@@ -677,8 +682,13 @@ public class IntegrationNatsConsumer {
      * the only resolution path; empty resolutions ACK as no-op (unknown events are not
      * errors). Exceptions land in {@link IntegrationPoisonHandler#nakWithBackoff} which
      * NAKs with exponential backoff and ACKs once the redelivery budget is exhausted.
+     *
+     * @param scopeId the workspace scope that owns the {@link ScopeConsumer} which delivered this
+     *                message, or {@code null} for the installation-wide consumer (org-level GitHub
+     *                events aren't tied to a single workspace). Used only to record webhook-liveness
+     *                via {@link ConnectionActivityRecorder} — never affects dispatch/ACK/NAK.
      */
-    void handleMessage(Message msg) {
+    void handleMessage(Long scopeId, Message msg) {
         if (shuttingDown.get()) {
             safeNak(msg);
             return;
@@ -691,9 +701,14 @@ public class IntegrationNatsConsumer {
                 msg.ack();
                 return;
             }
-            handler.get().onMessage(msg);
+            IntegrationMessageHandler resolvedHandler = handler.get();
+            resolvedHandler.onMessage(msg);
             msg.ack();
             stats.recordDispatch(Instant.now());
+            if (scopeId != null) {
+                EventTypeKey key = resolvedHandler.key();
+                activityRecorder.recordEventProcessed(scopeId, key.kind(), key.eventType());
+            }
         } catch (Exception e) {
             if (!shuttingDown.get()) {
                 log.error("Handler failed for subject={}: {}", sanitizeForLog(subject), e.getMessage(), e);

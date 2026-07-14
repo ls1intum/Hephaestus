@@ -252,6 +252,9 @@ const connectionSyncStatusSchemaResponseTransformer = (data: any) => {
     if (data.backfill) {
         data.backfill = backfillSummarySchemaResponseTransformer(data.backfill);
     }
+    if (data.lastEventProcessedAt) {
+        data.lastEventProcessedAt = new Date(data.lastEventProcessedAt);
+    }
     if (data.lastJob) {
         data.lastJob = syncJobSchemaResponseTransformer(data.lastJob);
     }

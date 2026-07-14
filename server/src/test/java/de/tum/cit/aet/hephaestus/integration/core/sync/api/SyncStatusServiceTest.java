@@ -30,6 +30,8 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivity;
+import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
@@ -59,6 +61,9 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
     @Mock
     private SyncJobRepository syncJobRepository;
+
+    @Mock
+    private ConnectionActivityRepository connectionActivityRepository;
 
     @Mock
     private AsyncTaskExecutor taskExecutor;
@@ -102,11 +107,13 @@ class SyncStatusServiceTest extends BaseUnitTest {
         lenient()
             .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(anyLong(), any()))
             .thenReturn(Optional.empty());
+        lenient().when(connectionActivityRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         service = new SyncStatusService(
             connectionAdminService,
             syncJobService,
             syncJobRepository,
+            connectionActivityRepository,
             taskExecutor,
             List.of(githubProvider),
             List.of(githubRunner)
@@ -202,6 +209,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
             connectionAdminService,
             syncJobService,
             syncJobRepository,
+            connectionActivityRepository,
             taskExecutor,
             List.of(),
             List.of()
@@ -213,6 +221,27 @@ class SyncStatusServiceTest extends BaseUnitTest {
         assertThat(status.webhookRegistered()).isNull();
         assertThat(status.rateLimit()).isNull();
         assertThat(status.resourceCounts().total()).isZero();
+    }
+
+    @Test
+    void getStatus_activityRecorded_includesLastEventFieldsFromActivityRepository_notProvider() {
+        Instant lastEventAt = Instant.parse("2026-07-14T10:00:00Z");
+        when(connectionActivityRepository.findById(CONNECTION_ID)).thenReturn(
+            Optional.of(new ConnectionActivity(CONNECTION_ID, WORKSPACE_ID, lastEventAt, "push"))
+        );
+
+        var status = service.getStatus(WORKSPACE_ID, CONNECTION_ID);
+
+        assertThat(status.lastEventProcessedAt()).isEqualTo(lastEventAt);
+        assertThat(status.lastEventType()).isEqualTo("push");
+    }
+
+    @Test
+    void getStatus_noActivityRecorded_lastEventFieldsAreNull() {
+        var status = service.getStatus(WORKSPACE_ID, CONNECTION_ID);
+
+        assertThat(status.lastEventProcessedAt()).isNull();
+        assertThat(status.lastEventType()).isNull();
     }
 
     // --- trigger ---
@@ -233,6 +262,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
             connectionAdminService,
             syncJobService,
             syncJobRepository,
+            connectionActivityRepository,
             taskExecutor,
             List.of(githubProvider),
             List.of()

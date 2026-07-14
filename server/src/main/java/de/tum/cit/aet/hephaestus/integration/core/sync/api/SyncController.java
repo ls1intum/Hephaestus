@@ -55,7 +55,10 @@ public class SyncController {
 
     @GetMapping("/{connectionId}/sync")
     @Operation(summary = "Unified sync status for one connection")
-    public ResponseEntity<ConnectionSyncStatusDTO> getConnectionSyncStatus(WorkspaceContext workspace, @PathVariable Long connectionId) {
+    public ResponseEntity<ConnectionSyncStatusDTO> getConnectionSyncStatus(
+        WorkspaceContext workspace,
+        @PathVariable Long connectionId
+    ) {
         return ResponseEntity.ok(syncStatusService.getStatus(workspace.id(), connectionId));
     }
 

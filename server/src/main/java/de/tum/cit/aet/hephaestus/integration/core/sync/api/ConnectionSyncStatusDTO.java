@@ -18,6 +18,9 @@ public record ConnectionSyncStatusDTO(
     @Schema(description = "When the next periodic reconciliation is expected") Instant nextScheduledSyncAt,
     @Schema(description = "Whether the vendor webhook registration is present; null if not applicable/unknown")
     Boolean webhookRegistered,
+    @Schema(description = "When the last inbound webhook/event was processed for this connection, if any")
+    Instant lastEventProcessedAt,
+    @Schema(description = "The most recently processed event's type, if any") String lastEventType,
     @Schema(description = "Current rate-limit budget, if known") RateLimitSnapshotDTO rateLimit,
     @Schema(description = "Connection-level backfill rollup, if applicable") BackfillSummaryDTO backfill,
     @NonNull @Schema(description = "Resource-level rollup") ResourceCountsDTO resourceCounts

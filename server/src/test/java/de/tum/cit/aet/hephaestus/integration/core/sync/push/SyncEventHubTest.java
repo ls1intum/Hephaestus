@@ -1,0 +1,251 @@
+package de.tum.cit.aet.hephaestus.integration.core.sync.push;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * Focused coverage for the SSE fan-out hub: subscribe/publish/deregister-on-error, the
+ * trailing-edge coalescer, and the heartbeat. Follows {@code MentorSseChannelTest}'s pattern of a
+ * subclassed {@link SseEmitter} that records wire frames instead of writing to a real socket.
+ */
+class SyncEventHubTest extends BaseUnitTest {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final long WORKSPACE_ID = 1L;
+    private static final long CONNECTION_ID = 10L;
+
+    private final List<RecordingEmitter> createdEmitters = new ArrayList<>();
+    private SyncEventHub hub;
+
+    private SyncEventHub newHub(Duration coalesceWindow) {
+        return new SyncEventHub(MAPPER, coalesceWindow, () -> {
+            RecordingEmitter emitter = new RecordingEmitter();
+            createdEmitters.add(emitter);
+            return emitter;
+        });
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (hub != null) {
+            hub.shutdown();
+        }
+    }
+
+    @Test
+    void subscribe_publish_deliversHintAsNamedSseEvent() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
+        assertThat(emitter.eventNames()).containsExactly("sync");
+        assertThat(emitter.dataFrames().get(0))
+            .contains("\"scope\":\"job\"")
+            .contains("\"connectionId\":10")
+            .contains("\"kind\":\"GITHUB\"");
+    }
+
+    @Test
+    void publish_toWorkspaceWithNoSubscribers_isNoop() {
+        hub = newHub(Duration.ofMillis(10));
+        // No subscribe() call for this workspace.
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+
+        // Nothing to assert on directly; the important thing is this doesn't throw. Give the
+        // coalesce window time to elapse so a latent NPE on an absent-subscriber path would surface.
+        await()
+            .during(Duration.ofMillis(100))
+            .atMost(Duration.ofSeconds(1))
+            .until(() -> true);
+        assertThat(createdEmitters).isEmpty();
+    }
+
+    @Test
+    void sendFailure_deregistersAndCompletesEmitter() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+        emitter.failOnNextSend();
+
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(emitter.completed()).isTrue());
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isZero();
+    }
+
+    @Test
+    void completion_deregistersSubscriber() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(1);
+
+        emitter.fireCompletion();
+
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isZero();
+    }
+
+    @Test
+    void trailingEdgeCoalescer_deliversOnlyTheLastHintInTheWindow() {
+        hub = newHub(Duration.ofMillis(150));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITLAB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "SLACK"));
+
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
+        // Only the LAST hint in the window must land — never the first (leading-edge would lose it).
+        assertThat(emitter.dataFrames().get(0)).contains("\"kind\":\"SLACK\"");
+    }
+
+    @Test
+    void trailingEdgeCoalescer_differentScopesAreNotCoalescedTogether() {
+        hub = newHub(Duration.ofMillis(150));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("resources", CONNECTION_ID, "GITHUB"));
+
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(2));
+        assertThat(emitter.dataFrames())
+            .anySatisfy(frame -> assertThat(frame).contains("\"scope\":\"job\""))
+            .anySatisfy(frame -> assertThat(frame).contains("\"scope\":\"resources\""));
+    }
+
+    @Test
+    void heartbeat_sendsPingToAllActiveSubscribers() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter first = createdEmitters.get(0);
+        RecordingEmitter second = createdEmitters.get(1);
+
+        hub.sendHeartbeats();
+
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(first.comments()).contains("ping"));
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(second.comments()).contains("ping"));
+    }
+
+    @Test
+    void heartbeat_afterDeregistration_isNoop() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+        emitter.fireCompletion();
+
+        hub.sendHeartbeats();
+
+        await()
+            .during(Duration.ofMillis(200))
+            .atMost(Duration.ofSeconds(1))
+            .until(() -> true);
+        assertThat(emitter.comments()).isEmpty();
+    }
+
+    /** Test-only emitter that records data/comment frames + can simulate a socket failure. */
+    private static final class RecordingEmitter extends SseEmitter {
+
+        private final List<String> dataFrames = new ArrayList<>();
+        private final List<String> eventNames = new ArrayList<>();
+        private final List<String> comments = new ArrayList<>();
+        private final AtomicReference<Runnable> completionCallback = new AtomicReference<>();
+        private volatile boolean completed;
+        private volatile boolean failOnNextSend;
+
+        @Override
+        public synchronized void send(SseEventBuilder builder) throws IOException {
+            if (failOnNextSend) {
+                failOnNextSend = false;
+                throw new IOException("simulated socket close");
+            }
+            StringBuilder wire = new StringBuilder();
+            for (var entry : builder.build()) {
+                wire.append(entry.getData().toString());
+            }
+            for (String line : wire.toString().split("\n")) {
+                if (line.startsWith("data:")) {
+                    dataFrames.add(line.substring("data:".length()));
+                } else if (line.startsWith("event:")) {
+                    eventNames.add(line.substring("event:".length()));
+                } else if (line.startsWith(":")) {
+                    comments.add(line.substring(1));
+                }
+            }
+        }
+
+        @Override
+        public void complete() {
+            completed = true;
+        }
+
+        @Override
+        public void onCompletion(Runnable callback) {
+            completionCallback.set(callback);
+        }
+
+        @Override
+        public void onTimeout(Runnable callback) {
+            // Not exercised by these tests.
+        }
+
+        @Override
+        public void onError(Consumer<Throwable> callback) {
+            // Not exercised by these tests.
+        }
+
+        void fireCompletion() {
+            Runnable callback = completionCallback.get();
+            if (callback != null) callback.run();
+        }
+
+        void failOnNextSend() {
+            this.failOnNextSend = true;
+        }
+
+        synchronized List<String> dataFrames() {
+            return List.copyOf(dataFrames);
+        }
+
+        synchronized List<String> eventNames() {
+            return List.copyOf(eventNames);
+        }
+
+        synchronized List<String> comments() {
+            return List.copyOf(comments);
+        }
+
+        boolean completed() {
+            return completed;
+        }
+    }
+}

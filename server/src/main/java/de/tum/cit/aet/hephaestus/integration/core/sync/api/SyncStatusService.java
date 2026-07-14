@@ -22,6 +22,8 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivity;
+import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRepository;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +51,7 @@ public class SyncStatusService {
     private final ConnectionAdminService connectionAdminService;
     private final SyncJobService syncJobService;
     private final SyncJobRepository syncJobRepository;
+    private final ConnectionActivityRepository connectionActivityRepository;
     private final AsyncTaskExecutor taskExecutor;
     private final Map<IntegrationKind, ConnectionSyncStateProvider> providers;
     private final Map<IntegrationKind, IntegrationSyncRunner> runners;
@@ -57,6 +60,7 @@ public class SyncStatusService {
         ConnectionAdminService connectionAdminService,
         SyncJobService syncJobService,
         SyncJobRepository syncJobRepository,
+        ConnectionActivityRepository connectionActivityRepository,
         @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
         List<ConnectionSyncStateProvider> providerBeans,
         List<IntegrationSyncRunner> runnerBeans
@@ -64,6 +68,7 @@ public class SyncStatusService {
         this.connectionAdminService = connectionAdminService;
         this.syncJobService = syncJobService;
         this.syncJobRepository = syncJobRepository;
+        this.connectionActivityRepository = connectionActivityRepository;
         this.taskExecutor = taskExecutor;
         this.providers = providerBeans
             .stream()
@@ -85,8 +90,15 @@ public class SyncStatusService {
         Connection connection = connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
         ConnectionSyncStateProvider provider = providers.get(connection.getKind());
         IntegrationRef ref = connection.toRef();
-        ConnectionSyncDetails details =
+        ConnectionSyncDetails providerDetails =
             provider == null ? ConnectionSyncDetails.empty() : provider.describe(ref, connectionId);
+        // Webhook-liveness is core-owned (ConnectionActivityRecorder writes it from the NATS consumer
+        // hook), never populated by the per-vendor provider — merged in here, not inside describe().
+        Optional<ConnectionActivity> activity = connectionActivityRepository.findById(connectionId);
+        ConnectionSyncDetails details = providerDetails.withActivity(
+            activity.map(ConnectionActivity::getLastEventAt).orElse(null),
+            activity.map(ConnectionActivity::getLastEventType).orElse(null)
+        );
         List<SyncResourceState> resources = provider == null ? List.of() : provider.resources(ref, connectionId);
 
         Optional<SyncJob> activeJob = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
@@ -124,6 +136,8 @@ public class SyncStatusService {
             lastFinishedJob.map(SyncJobDTO::from).orElse(null),
             details.nextScheduledSyncAt(),
             details.webhookRegistered(),
+            details.lastEventProcessedAt(),
+            details.lastEventType(),
             details.rateLimit() == null ? null : RateLimitSnapshotDTO.from(details.rateLimit()),
             details.backfill() == null ? null : BackfillSummaryDTO.from(details.backfill()),
             new ResourceCountsDTO((long) resources.size(), erroredResources)

@@ -4,10 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.cit.aet.hephaestus.integration.core.spi.NatsSubscriptionProvider.StreamSubscription;
+import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRecorder;
 import io.nats.client.ConsumerContext;
+import io.nats.client.Message;
 import io.nats.client.StreamContext;
 import io.nats.client.api.DeliverPolicy;
 import java.io.IOException;
@@ -103,6 +112,86 @@ class IntegrationNatsConsumerTest {
                 long delay = IntegrationNatsConsumer.reconnectBackoffMs(100);
                 assertThat(delay).isLessThanOrEqualTo(30_000L);
             }
+        }
+    }
+
+    /**
+     * {@code handleMessage}'s post-dispatch hook into {@link ConnectionActivityRecorder}: it must fire
+     * exactly when a handler actually handled the message and a workspace scope is known, and must never
+     * touch the recorder otherwise (unmatched subject, or the installation-wide consumer's {@code null}
+     * scope).
+     */
+    @Nested
+    class ActivityRecorderHook {
+
+        private static final Long SCOPE_ID = 7L;
+
+        private IntegrationMessageDispatcher dispatcher;
+        private ConnectionActivityRecorder activityRecorder;
+        private IntegrationNatsConsumer consumer;
+        private Message message;
+
+        private IntegrationNatsConsumer newConsumer() {
+            dispatcher = mock(IntegrationMessageDispatcher.class);
+            activityRecorder = mock(ConnectionActivityRecorder.class);
+            message = mock(Message.class);
+            when(message.getSubject()).thenReturn("github.acme.repo.issues");
+            return new IntegrationNatsConsumer(
+                new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+                new NatsConsumerProperties(
+                    Duration.ofMinutes(5),
+                    500,
+                    Duration.ofSeconds(2),
+                    new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
+                ),
+                scopeId -> Optional.empty(),
+                dispatcher,
+                mock(IntegrationPoisonHandler.class),
+                new IntegrationConsumerStats(),
+                activityRecorder
+            );
+        }
+
+        @Test
+        @DisplayName("records activity when a handler handles the message and a workspace scope is known")
+        void recordsActivityOnHandledMessageWithScope() {
+            consumer = newConsumer();
+            IntegrationMessageHandler handler = mock(IntegrationMessageHandler.class);
+            EventTypeKey key = new EventTypeKey(IntegrationKind.GITHUB, "repository.issues");
+            when(handler.key()).thenReturn(key);
+            when(dispatcher.dispatch("github.acme.repo.issues")).thenReturn(Optional.of(handler));
+
+            consumer.handleMessage(SCOPE_ID, message);
+
+            verify(handler).onMessage(message);
+            verify(message).ack();
+            verify(activityRecorder).recordEventProcessed(SCOPE_ID, IntegrationKind.GITHUB, "repository.issues");
+        }
+
+        @Test
+        @DisplayName("skips the recorder when the subject has no matching handler (ACK-as-no-op)")
+        void skipsRecorderWhenUnmatched() {
+            consumer = newConsumer();
+            when(dispatcher.dispatch("github.acme.repo.issues")).thenReturn(Optional.empty());
+
+            consumer.handleMessage(SCOPE_ID, message);
+
+            verify(message).ack();
+            verifyNoInteractions(activityRecorder);
+        }
+
+        @Test
+        @DisplayName("skips the recorder for the installation-wide consumer (null scope)")
+        void skipsRecorderWhenScopeIsNull() {
+            consumer = newConsumer();
+            IntegrationMessageHandler handler = mock(IntegrationMessageHandler.class);
+            when(handler.key()).thenReturn(new EventTypeKey(IntegrationKind.GITHUB, "installation.created"));
+            when(dispatcher.dispatch("github.acme.repo.issues")).thenReturn(Optional.of(handler));
+
+            consumer.handleMessage(null, message);
+
+            verify(handler).onMessage(message);
+            verifyNoInteractions(activityRecorder);
         }
     }
 
@@ -211,7 +300,8 @@ class IntegrationNatsConsumerTest {
                         ),
                     mock(IntegrationMessageDispatcher.class),
                     mock(IntegrationPoisonHandler.class),
-                    new IntegrationConsumerStats()
+                    new IntegrationConsumerStats(),
+                    mock(ConnectionActivityRecorder.class)
                 );
                 this.failingStreams = new ConcurrentSkipListSet<>(failingStreams);
             }

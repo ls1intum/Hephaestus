@@ -107,4 +107,33 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="FelixTJDietrich" id="1784058330088-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection_activity table already present">
+            <not><tableExists tableName="connection_activity"/></not>
+        </preConditions>
+        <comment>
+            Webhook-liveness ("last event processed") watermark, one row per connection — no
+            counters, no history. Written by ConnectionActivityRecorder from the NATS consumer's
+            post-dispatch hook, throttled to at most one write per connection per 15s. Read side
+            feeds SyncStatusService (core-owned data, never populated by per-vendor providers).
+        </comment>
+        <createTable tableName="connection_activity">
+            <column name="connection_id" type="bigint">
+                <constraints primaryKey="true" primaryKeyName="pk_connection_activity" nullable="false"
+                             foreignKeyName="fk_connection_activity_connection"
+                             referencedTableName="connection" referencedColumnNames="id"
+                             deleteCascade="true"/>
+            </column>
+            <column name="workspace_id" type="bigint">
+                <constraints nullable="false" referencedTableName="workspace" referencedColumnNames="id"
+                             foreignKeyName="fk_connection_activity_workspace"/>
+            </column>
+            <column name="last_event_at" type="timestamp with time zone"/>
+            <column name="last_event_type" type="varchar(128)"/>
+        </createTable>
+        <rollback>
+            <dropTable tableName="connection_activity"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

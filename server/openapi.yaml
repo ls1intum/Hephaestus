@@ -4989,6 +4989,14 @@ components:
           - GITLAB
           - SLACK
           - OUTLINE
+        lastEventProcessedAt:
+          type: string
+          format: date-time
+          description: "When the last inbound webhook/event was processed for this\
+            \ connection, if any"
+        lastEventType:
+          type: string
+          description: "The most recently processed event's type, if any"
         lastJob:
           $ref: "#/components/schemas/SyncJob"
           description: "Most recently finished job, if any"

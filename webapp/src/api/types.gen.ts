@@ -2861,6 +2861,14 @@ export type ConnectionSyncStatus = {
      */
     kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     /**
+     * When the last inbound webhook/event was processed for this connection, if any
+     */
+    lastEventProcessedAt?: Date;
+    /**
+     * The most recently processed event's type, if any
+     */
+    lastEventType?: string;
+    /**
      * Most recently finished job, if any
      */
     lastJob?: SyncJob;

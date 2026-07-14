@@ -1,0 +1,144 @@
+package de.tum.cit.aet.hephaestus.integration.core.sync.activity;
+
+import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
+
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Records the webhook-liveness ("last event processed") watermark for a connection, from the NATS
+ * consumer's hot post-dispatch path ({@code IntegrationNatsConsumer#handleMessage}).
+ *
+ * <p>Two in-memory caches keep the hot path cheap:
+ * <ul>
+ *   <li>{@code (workspaceId, kind) -> connectionId} — resolved once via {@link ConnectionRepository},
+ *       re-resolved only after {@link #invalidate(long, IntegrationKind)} is called (e.g. on
+ *       reconnect) or on first use.</li>
+ *   <li>{@code connectionId -> lastWriteAt} — throttles the DB write itself to at most once per
+ *       {@link #WRITE_THROTTLE} per connection, independent of message volume.</li>
+ * </ul>
+ *
+ * <p><b>Must never throw into the caller</b> — this runs after the consumer already ACKed the
+ * message; any failure here is swallowed and logged, never allowed to affect ACK/NAK semantics.
+ */
+@Service
+public class ConnectionActivityRecorder {
+
+    private static final Logger log = LoggerFactory.getLogger(ConnectionActivityRecorder.class);
+
+    /** At most one DB write per connection per this window, regardless of message volume. */
+    static final Duration WRITE_THROTTLE = Duration.ofSeconds(15);
+
+    private final ConnectionRepository connectionRepository;
+    private final ConnectionActivityRepository activityRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
+
+    private final ConcurrentHashMap<ScopeKindKey, Long> connectionIdCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Instant> lastWriteAtByConnection = new ConcurrentHashMap<>();
+
+    public ConnectionActivityRecorder(
+        ConnectionRepository connectionRepository,
+        ConnectionActivityRepository activityRepository,
+        ApplicationEventPublisher eventPublisher,
+        Clock clock
+    ) {
+        this.connectionRepository = connectionRepository;
+        this.activityRepository = activityRepository;
+        this.eventPublisher = eventPublisher;
+        this.clock = clock;
+    }
+
+    /**
+     * Record that an event was processed for {@code (workspaceId, kind)}. No-ops if there is no
+     * ACTIVE connection for that pair, or if the last write for the resolved connection is still
+     * within {@link #WRITE_THROTTLE}. Never throws.
+     */
+    @Transactional
+    public void recordEventProcessed(long workspaceId, IntegrationKind kind, String eventType) {
+        try {
+            doRecord(workspaceId, kind, eventType);
+        } catch (Exception e) {
+            log.warn(
+                "Failed to record connection activity: workspaceId={}, kind={}, eventType={}",
+                workspaceId,
+                kind,
+                sanitizeForLog(eventType),
+                e
+            );
+        }
+    }
+
+    /**
+     * Evicts the {@code (workspaceId, kind) -> connectionId} cache entry, forcing the next {@link
+     * #recordEventProcessed} call to re-resolve via {@link ConnectionRepository}. Callers should
+     * invoke this whenever a workspace's connection of this kind changes (reconnect, deactivation).
+     */
+    public void invalidate(long workspaceId, IntegrationKind kind) {
+        connectionIdCache.remove(new ScopeKindKey(workspaceId, kind));
+    }
+
+    private void doRecord(long workspaceId, IntegrationKind kind, String eventType) {
+        Long connectionId = resolveConnectionId(workspaceId, kind);
+        if (connectionId == null) {
+            return;
+        }
+        Instant now = clock.instant();
+        if (!claimWriteSlot(connectionId, now)) {
+            return;
+        }
+        activityRepository.upsertActivity(connectionId, workspaceId, now, eventType);
+        eventPublisher.publishEvent(
+            new SyncStateChangedEvent(workspaceId, connectionId, kind, SyncStateChangedEvent.Scope.ACTIVITY)
+        );
+    }
+
+    private Long resolveConnectionId(long workspaceId, IntegrationKind kind) {
+        ScopeKindKey key = new ScopeKindKey(workspaceId, kind);
+        Long cached = connectionIdCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        return connectionRepository
+            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE)
+            .map(Connection::getId)
+            .map(id -> {
+                connectionIdCache.put(key, id);
+                return id;
+            })
+            .orElse(null);
+    }
+
+    /**
+     * Atomically claims the write slot for {@code connectionId} if the last write is outside {@link
+     * #WRITE_THROTTLE} (or there was none). Uses {@link ConcurrentHashMap#compute} so two concurrent
+     * callers for the same connection can't both observe a stale timestamp and both write.
+     */
+    private boolean claimWriteSlot(Long connectionId, Instant now) {
+        AtomicReference<Boolean> claimed = new AtomicReference<>(Boolean.FALSE);
+        lastWriteAtByConnection.compute(connectionId, (id, lastWriteAt) -> {
+            if (lastWriteAt != null && Duration.between(lastWriteAt, now).compareTo(WRITE_THROTTLE) < 0) {
+                claimed.set(Boolean.FALSE);
+                return lastWriteAt;
+            }
+            claimed.set(Boolean.TRUE);
+            return now;
+        });
+        return claimed.get();
+    }
+
+    private record ScopeKindKey(long workspaceId, IntegrationKind kind) {}
+}
