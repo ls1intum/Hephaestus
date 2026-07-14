@@ -84,7 +84,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
     private OutlineDocumentSyncService service() {
         OutlineProperties properties = new OutlineProperties(
-            new OutlineProperties.Sync("0 0 */6 * * *", 100, Duration.ofMinutes(5)),
+            new OutlineProperties.Sync(100),
             new OutlineProperties.Cache(200),
             Duration.ofDays(30)
         );

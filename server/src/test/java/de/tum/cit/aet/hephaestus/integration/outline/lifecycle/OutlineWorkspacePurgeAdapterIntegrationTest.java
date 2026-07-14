@@ -52,7 +52,16 @@ class OutlineWorkspacePurgeAdapterIntegrationTest extends BaseIntegrationTest {
         // workspaceLifecycleService.purgeWorkspace); mirror that boundary so the bulk delete has an active tx.
         transactionTemplate.executeWithoutResult(status -> adapter.deleteWorkspaceData(wsA));
 
-        assertThat(repository.countByWorkspaceId(wsA)).isZero();
-        assertThat(repository.countByWorkspaceId(wsB)).isEqualTo(1L);
+        assertThat(rowsFor(wsA)).isZero();
+        assertThat(rowsFor(wsB)).isEqualTo(1L);
+    }
+
+    /** Total mirrored rows (tombstoned or not) for a workspace — the erase target the purge must zero out. */
+    private long rowsFor(long workspaceId) {
+        return repository
+            .findAll()
+            .stream()
+            .filter(d -> d.getWorkspaceId() == workspaceId)
+            .count();
     }
 }

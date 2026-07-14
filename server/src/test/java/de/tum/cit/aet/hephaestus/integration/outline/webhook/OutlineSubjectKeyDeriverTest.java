@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -11,7 +10,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The deriver builds {@code outline.<sub>.<event>} subjects (event lowercased, dots → {@code ~}) and a
+ * The deriver builds {@code outline.<sub>.<event>} subjects (dots → {@code ~}, no case-folding) and a
  * stable, precise dedup key from subscription + event + document id, falling back to a body hash when
  * that triple is incomplete.
  */
@@ -22,11 +21,6 @@ class OutlineSubjectKeyDeriverTest extends BaseUnitTest {
 
     private JsonNode json(String body) {
         return mapper.readTree(body);
-    }
-
-    @Test
-    void kind_isOutline() {
-        assertThat(deriver.kind()).isEqualTo(IntegrationKind.OUTLINE);
     }
 
     @Test

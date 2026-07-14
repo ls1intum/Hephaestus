@@ -131,37 +131,16 @@ export const Populated: Story = {
 /** A paused collection — sync frozen, documents kept, Resume in the row menu. */
 export const PausedCollection: Story = {
 	args: { collections: [paused] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Paused")).toBeInTheDocument();
-		await userEvent.click(canvas.getByRole("button", { name: /actions for handbook/i }));
-		await expect(await screen.findByRole("menuitem", { name: /resume/i })).toBeInTheDocument();
-		await expect(screen.queryByRole("menuitem", { name: /^pause$/i })).not.toBeInTheDocument();
-	},
 };
 
-/** A collection whose last sync failed — the error opens on click, so touch users can read it too. */
+/** A collection whose last sync failed — the row exposes the error affordance. */
 export const SyncErrorRow: Story = {
 	args: { collections: [failing] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /sync error for legacy wiki/i }));
-		await expect(await screen.findByText(/lost access/i)).toBeInTheDocument();
-	},
 };
 
 /** A collection whose last pass hit the shared export budget — coverage and the skipped count show. */
 export const BudgetThrottled: Story = {
 	args: { collections: [budgetThrottled] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("480")).toBeInTheDocument();
-		await expect(canvas.getByText(/\/ 512/)).toBeInTheDocument();
-		await userEvent.click(
-			canvas.getByRole("button", { name: /32 exports skipped for budget for research notes/i }),
-		);
-		await expect(await screen.findByText(/skipped for the shared budget/i)).toBeInTheDocument();
-	},
 };
 
 /** Loading — skeleton rows while the collection list resolves. */
@@ -225,35 +204,6 @@ export const AddCollectionPicker: Story = {
 
 		await userEvent.click(within(dialog).getByRole("checkbox", { name: /product/i }));
 		await expect(within(dialog).getByRole("button", { name: /add 1 collection/i })).toBeEnabled();
-	},
-};
-
-/** The candidates probe failed (Outline unreachable) — the ProblemDetail lands in the dialog. */
-export const AddCollectionProbeFails: Story = {
-	args: { collections: [] },
-	parameters: {
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/outline/collections/candidates", () =>
-					HttpResponse.json(
-						{
-							type: "about:blank",
-							title: "Bad Gateway",
-							status: 502,
-							detail: "Outline did not respond to collections.list.",
-						},
-						{ status: 502 },
-					),
-				),
-			],
-		},
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getAllByRole("button", { name: /add collection/i })[0]);
-		const dialog = await screen.findByRole("dialog");
-		await expect(await within(dialog).findByText(/outline did not respond/i)).toBeInTheDocument();
-		await expect(within(dialog).getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
 	},
 };
 

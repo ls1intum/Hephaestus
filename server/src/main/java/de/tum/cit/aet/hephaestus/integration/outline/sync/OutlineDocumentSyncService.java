@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -61,7 +62,7 @@ import org.springframework.stereotype.Service;
  * {@code OutlineCollectionAdminService} keeps its live Outline calls out of a transaction.
  *
  * <p>The corollary is that progress commits incrementally: a pass that dies mid-way keeps every document
- * it had already written. That is the behaviour the rate-limit path already relied on, now made structural.
+ * it had already written.
  *
  * <h2>Memory shape</h2>
  * <p>The diff runs against {@link OutlineDocumentSnapshot}s, never entities: the mirror's Markdown bodies
@@ -70,8 +71,8 @@ import org.springframework.stereotype.Service;
  * full entities, one at a time, inside their own write transaction.
  *
  * <h2>Correctness invariants</h2>
- * <p>A collection's watermark ({@code documentsSyncedThrough}) and its tombstone-by-absence sweep advance
- * only on a CLEAN pass — full enumeration succeeded and no export was skipped for budget. Visibility loss
+ * <p>A collection's tombstone-by-absence sweep runs only on a CLEAN pass — full enumeration succeeded and
+ * no export was skipped for budget. Visibility loss
  * (collection absent from {@code collections.list}) records an error and skips the collection but never
  * tombstones its documents: forbidden/gone is not "documents removed". A truncated enumeration is an error,
  * not an empty tail — {@link OutlineApiClient} throws rather than returning a short list, so the sweep is
@@ -444,9 +445,8 @@ public class OutlineDocumentSyncService {
 
     /**
      * Enumerate + upsert one collection under the shared export budget. A CLEAN pass (full enumeration,
-     * no export skipped for budget) tombstones this collection's vanished rows, advances the watermark,
-     * and marks the row COMPLETE; a budget-exhausted pass leaves the row PENDING with watermarks
-     * untouched so nothing is ever skipped silently.
+     * no export skipped for budget) tombstones this collection's vanished rows and marks the row COMPLETE;
+     * a budget-exhausted pass leaves the row PENDING so nothing is ever skipped silently.
      */
     private void syncOneCollection(
         SyncContext ctx,
@@ -476,15 +476,11 @@ public class OutlineDocumentSyncService {
 
         Set<String> seen = new HashSet<>();
         int skippedForBudget = 0;
-        Instant maxUpdatedAt = null;
         for (OutlineDocumentListResponse.Meta meta : metas) {
             if (meta.id() == null) {
                 continue;
             }
             seen.add(meta.id());
-            if (meta.updatedAt() != null && (maxUpdatedAt == null || meta.updatedAt().isAfter(maxUpdatedAt))) {
-                maxUpdatedAt = meta.updatedAt();
-            }
             if (
                 upsert(ctx, collection, nodeById.get(meta.id()), meta, existing, budget, now) ==
                 UpsertOutcome.SKIPPED_FOR_BUDGET
@@ -526,13 +522,9 @@ public class OutlineDocumentSyncService {
                 ctx.workspaceId()
             );
         }
-        Instant watermark = maxUpdatedAt;
         writeCollection(ctx, collection, target -> {
             target.setDocumentsUpstream(documentsUpstream);
             target.setExportsSkippedForBudget(skipped);
-            if (watermark != null) {
-                target.setDocumentsSyncedThrough(watermark);
-            }
             target.setDocumentsSyncedAt(now);
             target.setSyncStatus(SyncStatus.COMPLETE);
             target.setLastSyncError(null);
@@ -540,9 +532,12 @@ public class OutlineDocumentSyncService {
     }
 
     /**
-     * Upsert one document. The unchanged-{@code updatedAt} fast path refreshes metadata without an
-     * export; an export consumes one budget unit — with the budget exhausted the document is left
-     * entirely untouched (a partially-written row would masquerade as an eviction placeholder).
+     * Upsert one document. A present-and-unchanged document — body current (hash + {@code updatedAt} match)
+     * and every denormalized field already equal to what this pass would write — returns UNCHANGED without
+     * touching the row at all, so a stable wiki does zero writes and zero body loads per reconcile. If the
+     * body is current but metadata shifted (renamed/moved), the row is rewritten without a re-export. An
+     * export consumes one budget unit — with the budget exhausted the document is left entirely untouched
+     * (a partially-written row would masquerade as an eviction placeholder).
      *
      * <p>The export happens <em>before</em> the write transaction opens: the body crosses the wire with
      * no JDBC connection held, and only then is the row read, mutated and committed.
@@ -563,18 +558,44 @@ public class OutlineDocumentSyncService {
         Instant upstreamUpdatedAt = meta == null ? null : meta.updatedAt();
         OutlineDocumentSnapshot existingRow = existing.get(documentId);
 
-        boolean unchanged =
+        // The denormalized metadata this pass would persist, computed once so the skip decision compares
+        // against exactly what the mutator would write.
+        String desiredCollectionId = collection.getCollectionId();
+        String desiredCollectionSlug = OutlineSyncMapping.collectionSlug(collection);
+        String desiredParentDocumentId =
+            node != null && node.parentId() != null ? node.parentId() : (meta == null ? null : meta.parentDocumentId());
+        String desiredTitle =
+            node != null && node.title() != null ? node.title() : (meta == null ? null : meta.title());
+        String desiredSlug = OutlineSyncMapping.resolveSlug(node, meta);
+        Instant desiredArchivedAt = meta == null ? null : meta.archivedAt();
+
+        boolean bodyUnchanged =
             existingRow != null &&
             !existingRow.isDeleted() &&
             existingRow.contentHash() != null &&
             existingRow.outlineUpdatedAt() != null &&
             upstreamUpdatedAt != null &&
             existingRow.outlineUpdatedAt().equals(upstreamUpdatedAt);
-        if (!unchanged && budget != null && !budget.tryConsume()) {
+
+        // Present, body current, and every denormalized field already matches: nothing to persist. Skip
+        // the whole write transaction and the full-entity load it would incur.
+        if (
+            bodyUnchanged &&
+            Objects.equals(existingRow.collectionId(), desiredCollectionId) &&
+            Objects.equals(existingRow.collectionSlug(), desiredCollectionSlug) &&
+            Objects.equals(existingRow.parentDocumentId(), desiredParentDocumentId) &&
+            Objects.equals(existingRow.title(), desiredTitle) &&
+            Objects.equals(existingRow.slug(), desiredSlug) &&
+            Objects.equals(existingRow.archivedAt(), desiredArchivedAt)
+        ) {
+            return UpsertOutcome.UNCHANGED;
+        }
+
+        if (!bodyUnchanged && budget != null && !budget.tryConsume()) {
             return UpsertOutcome.SKIPPED_FOR_BUDGET;
         }
 
-        String body = unchanged ? null : outlineApiClient.exportDocument(ctx.serverUrl(), ctx.token(), documentId);
+        String body = bodyUnchanged ? null : outlineApiClient.exportDocument(ctx.serverUrl(), ctx.token(), documentId);
         String contentHash = body == null ? null : OutlineSyncMapping.sha256Hex(body);
 
         OutlineDocumentSnapshot written = mirrorWriter.upsertDocument(
@@ -582,24 +603,18 @@ public class OutlineDocumentSyncService {
             ctx.connectionId(),
             documentId,
             doc -> {
-                doc.setCollectionId(collection.getCollectionId());
-                doc.setCollectionSlug(OutlineSyncMapping.collectionSlug(collection));
-                doc.setParentDocumentId(
-                    node != null && node.parentId() != null
-                        ? node.parentId()
-                        : (meta == null ? null : meta.parentDocumentId())
-                );
-                doc.setTitle(
-                    node != null && node.title() != null ? node.title() : (meta == null ? null : meta.title())
-                );
-                doc.setSlug(OutlineSyncMapping.resolveSlug(node, meta));
+                doc.setCollectionId(desiredCollectionId);
+                doc.setCollectionSlug(desiredCollectionSlug);
+                doc.setParentDocumentId(desiredParentDocumentId);
+                doc.setTitle(desiredTitle);
+                doc.setSlug(desiredSlug);
                 // meta comes from listings that exclude archived documents, so a document reaching this path is
                 // unambiguously live — clear a stale archivedAt. A null meta (tree-only node) leaves it untouched.
                 if (meta != null) {
-                    doc.setArchivedAt(meta.archivedAt());
+                    doc.setArchivedAt(desiredArchivedAt);
                 }
-                if (unchanged) {
-                    // Metadata may have shifted (renamed/moved) but the body is current — do not re-export.
+                if (bodyUnchanged) {
+                    // Metadata shifted (renamed/moved) but the body is current — do not re-export.
                     return;
                 }
                 doc.setBodyMarkdown(body);
@@ -616,17 +631,15 @@ public class OutlineDocumentSyncService {
         if (written != null) {
             existing.put(documentId, written);
         }
-        return unchanged ? UpsertOutcome.UNCHANGED : UpsertOutcome.EXPORTED;
+        return bodyUnchanged ? UpsertOutcome.UNCHANGED : UpsertOutcome.EXPORTED;
     }
 
     /**
      * Enumerates a collection's ARCHIVED documents (a second, separate {@code documents.list} call —
      * Outline's default listing excludes them) and upserts each via {@link #upsertArchived}, adding every
      * one to {@code seen} so the caller's tombstone-by-absence sweep never touches them: an archived
-     * document is soft/recoverable, not deleted.
-     *
-     * <p>Deliberately excluded from the freshness watermark ({@code documentsSyncedThrough} tracks the
-     * actively-edited corpus), but counted in {@code documentsUpstream} via the shared {@code seen} set.
+     * document is soft/recoverable, not deleted. Counted in {@code documentsUpstream} via the shared
+     * {@code seen} set.
      *
      * @return exports skipped for budget among the archived documents enumerated this pass
      */
@@ -763,8 +776,8 @@ public class OutlineDocumentSyncService {
 
     /**
      * Enforce the per-workspace body-size cap by nulling the least-recently-materialized bodies until the
-     * mirror is back under the cap. Size is measured in characters against the byte cap — an approximation
-     * that treats one character as one byte, which is exact for ASCII Markdown and conservative otherwise.
+     * mirror is back under the cap. Size is measured in bytes ({@code octet_length}) against the byte cap,
+     * so multibyte content counts at its true on-disk weight rather than its character count.
      *
      * <p>Candidates are paged and evicted in batches of {@link #EVICTION_BATCH_SIZE}: an evicted row drops
      * out of the candidate query, so each round makes progress. One unbounded {@code IN (:ids)} over a

@@ -37,19 +37,15 @@ public record OutlineProperties(
     @DurationUnit(HOURS) @DefaultValue("720h") Duration staleness
 ) {
     /**
-     * @param cron         full-reconcile schedule (default every six hours)
+     * The {@code cron} and {@code catch-up-delay} yml keys are read straight off the Environment by the
+     * {@code @Scheduled} SpEL in {@code OutlineDocumentSyncScheduler} (matching the Slack sibling), so they
+     * are deliberately not bound here — a record component would be dead config.
+     *
      * @param exportBudget max document exports one workspace pass may spend (default 500). Bounds the
      *                     cost of a huge corpus's first sync; a collection whose pass ran out of budget
-     *                     stays {@code PENDING} — no watermark, no tombstones — and the catch-up tick
-     *                     resumes it
-     * @param catchUpDelay how often the catch-up tick sweeps collections still awaiting a clean pass
-     *                     (default 5 minutes; a fully caught-up fleet makes zero API calls per tick)
+     *                     stays {@code PENDING} and the catch-up tick resumes it next cycle
      */
-    public record Sync(
-        @DefaultValue("0 0 */6 * * *") String cron,
-        @DefaultValue("500") int exportBudget,
-        @DefaultValue("PT5M") Duration catchUpDelay
-    ) {}
+    public record Sync(@DefaultValue("500") int exportBudget) {}
 
     /**
      * @param maxSizeMb per-workspace cap on the total size of mirrored Markdown bodies; when exceeded, the

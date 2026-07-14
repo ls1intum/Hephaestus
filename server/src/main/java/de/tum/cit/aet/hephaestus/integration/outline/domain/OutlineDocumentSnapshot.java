@@ -14,9 +14,11 @@ import org.jspecify.annotations.Nullable;
  * six-hourly reconcile, next to the mentor.
  *
  * <p>The diff never needs a body: it decides on {@code outlineUpdatedAt} + {@code contentHash} (the
- * unchanged fast path), {@code deletedAt} (revive vs. tombstone), and mere body <em>presence</em> (the
- * archived-document backfill). Only rows that are actually written are re-read as full entities, inside
- * the short write transaction that mutates them.
+ * unchanged fast path), {@code deletedAt} (revive vs. tombstone), mere body <em>presence</em> (the
+ * archived-document backfill), and the denormalized metadata columns (collection, parent, title, slug,
+ * archive stamp) so a present-and-unchanged document can be recognised and left untouched without loading
+ * the row at all. Only rows that are actually written are re-read as full entities, inside the short write
+ * transaction that mutates them.
  *
  * @param bodyLength length of the mirrored body in characters, or {@code null} when there is no body
  *                   (never exported, size-cap evicted, or tombstoned) — see {@link #hasBody()}
@@ -25,6 +27,11 @@ public record OutlineDocumentSnapshot(
     Long id,
     String documentId,
     String collectionId,
+    @Nullable String collectionSlug,
+    @Nullable String parentDocumentId,
+    @Nullable String title,
+    @Nullable String slug,
+    @Nullable Instant archivedAt,
     @Nullable Instant outlineUpdatedAt,
     @Nullable String contentHash,
     @Nullable Instant deletedAt,
@@ -47,6 +54,11 @@ public record OutlineDocumentSnapshot(
             doc.getId(),
             doc.getDocumentId(),
             doc.getCollectionId(),
+            doc.getCollectionSlug(),
+            doc.getParentDocumentId(),
+            doc.getTitle(),
+            doc.getSlug(),
+            doc.getArchivedAt(),
             doc.getOutlineUpdatedAt(),
             doc.getContentHash(),
             doc.getDeletedAt(),

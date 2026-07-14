@@ -22,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument, Long> {
     long deleteByWorkspaceId(Long workspaceId);
 
-    long countByWorkspaceId(Long workspaceId);
-
     /** Live (non-tombstoned) mirrored documents in the workspace — the admin status figure. */
     long countByWorkspaceIdAndDeletedAtIsNull(Long workspaceId);
 
@@ -53,14 +51,6 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      */
     long deleteByWorkspaceIdAndConnectionIdAndCollectionId(Long workspaceId, Long connectionId, String collectionId);
 
-    /**
-     * The workspace's mirrored documents for one Outline install, as full entities — <strong>bodies
-     * included</strong>. Not for the reconcile: a workspace mirror is capped at hundreds of megabytes of
-     * Markdown, and this materializes all of it. The sync path diffs against
-     * {@link #findSnapshotsByWorkspaceIdAndConnectionId} instead and re-reads only the rows it writes.
-     */
-    List<OutlineDocument> findByWorkspaceIdAndConnectionId(Long workspaceId, Long connectionId);
-
     /** One mirrored document by its Outline id — the row a write transaction re-reads before mutating it. */
     Optional<OutlineDocument> findByWorkspaceIdAndConnectionIdAndDocumentId(
         Long workspaceId,
@@ -75,8 +65,9 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      */
     @Query(
         "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
-            "d.id, d.documentId, d.collectionId, d.outlineUpdatedAt, d.contentHash, d.deletedAt, " +
-            "LENGTH(d.bodyMarkdown), d.version) FROM OutlineDocument d " +
+            "d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, " +
+            "d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version) " +
+            "FROM OutlineDocument d " +
             "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId"
     )
     List<OutlineDocumentSnapshot> findSnapshotsByWorkspaceIdAndConnectionId(
@@ -87,8 +78,9 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     /** One collection's mirrored rows, body-free — the scope of a collection-delete tombstone sweep. */
     @Query(
         "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
-            "d.id, d.documentId, d.collectionId, d.outlineUpdatedAt, d.contentHash, d.deletedAt, " +
-            "LENGTH(d.bodyMarkdown), d.version) FROM OutlineDocument d " +
+            "d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, " +
+            "d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version) " +
+            "FROM OutlineDocument d " +
             "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId " +
             "AND d.collectionId = :collectionId"
     )
@@ -101,8 +93,9 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     /** One mirrored document's snapshot — the webhook targeted-refresh routing lookup (no body loaded). */
     @Query(
         "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(" +
-            "d.id, d.documentId, d.collectionId, d.outlineUpdatedAt, d.contentHash, d.deletedAt, " +
-            "LENGTH(d.bodyMarkdown), d.version) FROM OutlineDocument d " +
+            "d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, " +
+            "d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version) " +
+            "FROM OutlineDocument d " +
             "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId " +
             "AND d.documentId = :documentId"
     )
@@ -186,29 +179,33 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     long deleteByWorkspaceIdAndDeletedAtBefore(Long workspaceId, Instant cutoff);
 
     /**
-     * Total size (in characters) of the workspace's mirrored Markdown bodies — the figure the size cap is
-     * enforced against. Native for the {@code SUM(LENGTH(...))} aggregate; coalesces an all-null/empty
-     * workspace to 0.
+     * Total size (in bytes) of the workspace's mirrored Markdown bodies — the figure the size cap is
+     * enforced against. {@code octet_length} counts UTF-8 bytes, not characters, so the cap holds exactly
+     * for multibyte content instead of under-counting it. Native for the {@code SUM(octet_length(...))}
+     * aggregate; coalesces an all-null/empty workspace to 0.
      */
     @Query(
-        value = "SELECT COALESCE(SUM(LENGTH(body_markdown)), 0) FROM outline_document WHERE workspace_id = :workspaceId",
+        value = "SELECT COALESCE(SUM(octet_length(body_markdown)), 0) FROM outline_document " +
+            "WHERE workspace_id = :workspaceId",
         nativeQuery = true
     )
     long sumBodySizeByWorkspaceId(@Param("workspaceId") long workspaceId);
 
     /**
-     * Eviction candidates: {@code [id, body length]} for the {@code limit} rows that still hold a body and
-     * were exported longest ago (a never-exported row evicts before a recently-refreshed one). The service
-     * walks this page, nulling bodies until the workspace is back under the cap, and re-queries for the next
-     * page if it is not — an evicted row drops out of this result set, so the pages advance on their own.
+     * Eviction candidates: {@code [id, body byte size]} for the {@code limit} rows that still hold a body and
+     * were exported longest ago (a never-exported row evicts before a recently-refreshed one). The byte size
+     * ({@code octet_length}) matches the unit {@link #sumBodySizeByWorkspaceId} enforces the cap in, so the
+     * caller's running subtraction stays byte-accurate. The service walks this page, nulling bodies until the
+     * workspace is back under the cap, and re-queries for the next page if it is not — an evicted row drops
+     * out of this result set, so the pages advance on their own.
      *
      * <p>The {@code LIMIT} is load-bearing: {@link #evictBodies} binds one parameter per id, and Postgres
      * caps a statement at 65 535 bind parameters (with the planner degrading long before that). An unbounded
      * candidate list on a large over-cap mirror produced exactly that statement. Native for the
-     * {@code LENGTH(...)} projection.
+     * {@code octet_length(...)} projection.
      */
     @Query(
-        value = "SELECT id, LENGTH(body_markdown) FROM outline_document " +
+        value = "SELECT id, octet_length(body_markdown) FROM outline_document " +
             "WHERE workspace_id = :workspaceId AND body_markdown IS NOT NULL " +
             "ORDER BY last_materialized_at ASC NULLS FIRST, id ASC LIMIT :limit",
         nativeQuery = true

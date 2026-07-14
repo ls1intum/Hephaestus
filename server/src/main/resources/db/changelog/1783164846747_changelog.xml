@@ -75,8 +75,8 @@
             One row per Outline collection an admin chose to mirror (the Outline analog of
             slack_monitored_channel). Carries the human-facing catalog fields for the admin UI,
             the mirror lifecycle (ENABLED/PAUSED), and the per-collection sync bookkeeping:
-            sync_status PENDING until a clean full pass completes, documents_synced_through as the
-            upstream-clock watermark, documents_synced_at for stalest-first ordering.
+            sync_status PENDING until a clean full pass completes, documents_synced_at for
+            stalest-first ordering.
         </comment>
         <createTable tableName="outline_collection">
             <column autoIncrement="true" name="id" type="BIGINT">
@@ -101,7 +101,6 @@
             <column name="sync_status" type="VARCHAR(16)">
                 <constraints nullable="false"/>
             </column>
-            <column name="documents_synced_through" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="documents_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="last_sync_error" type="VARCHAR(2048)"/>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">

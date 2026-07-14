@@ -78,11 +78,6 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
     }
 
     @Test
-    void kind_isOutline() {
-        assertThat(strategy().kind()).isEqualTo(IntegrationKind.OUTLINE);
-    }
-
-    @Test
     void revoke_deregistersTheSubscriptionAndErasesMirroredDocuments() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, 5L, "team-9");
 

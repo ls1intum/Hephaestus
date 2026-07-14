@@ -23,7 +23,10 @@ import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -102,16 +105,13 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void key_isTheCollapsedDocumentKey() {
-        assertThat(handler().key().kind()).isEqualTo(IntegrationKind.OUTLINE);
-        assertThat(handler().key().eventType()).isEqualTo(OutlineWebhookMessageHandler.EVENT_TYPE);
-    }
-
-    @Test
     void documentEventWithPayloadId_refreshesThatDocument() {
         resolves("sub-1", 42L);
+        OutlineWebhookMessageHandler handler = handler();
+        // The handler registers under the single collapsed document key the parser folds every event onto.
+        assertThat(handler.key().eventType()).isEqualTo(OutlineWebhookMessageHandler.EVENT_TYPE);
 
-        handler().onMessage(message("sub-1", "documents.update", "doc-9"));
+        handler.onMessage(message("sub-1", "documents.update", "doc-9"));
 
         verify(syncScheduler).refreshDocumentNow(42L, "documents.update", "doc-9", null);
         verify(syncScheduler, never()).syncWorkspaceNow(Mockito.anyLong());
@@ -250,32 +250,15 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
     // --- tolerant parsing: malformed input is acked, never crashes the consumer ---
 
-    @Test
-    void garbageBytes_isAcknowledgedWithoutCrashOrDispatch() {
-        Message msg = Mockito.mock(Message.class);
-        when(msg.getData()).thenReturn("not json at all {{{".getBytes(StandardCharsets.UTF_8));
-
-        handler().onMessage(msg);
-
-        verifyNoInteractions(syncScheduler);
-        verifyNoInteractions(documentEventRepository);
+    static Stream<byte[]> malformedBodies() {
+        return Stream.of("not json at all {{{".getBytes(StandardCharsets.UTF_8), new byte[0], (byte[]) null);
     }
 
-    @Test
-    void emptyBody_isAcknowledgedWithoutCrashOrDispatch() {
+    @ParameterizedTest(name = "malformed body [{index}] is acked without crash or dispatch")
+    @MethodSource("malformedBodies")
+    void malformedBody_isAcknowledgedWithoutCrashOrDispatch(byte[] body) {
         Message msg = Mockito.mock(Message.class);
-        when(msg.getData()).thenReturn(new byte[0]);
-
-        handler().onMessage(msg);
-
-        verifyNoInteractions(syncScheduler);
-        verifyNoInteractions(documentEventRepository);
-    }
-
-    @Test
-    void nullBody_isAcknowledgedWithoutCrashOrDispatch() {
-        Message msg = Mockito.mock(Message.class);
-        when(msg.getData()).thenReturn(null);
+        when(msg.getData()).thenReturn(body);
 
         handler().onMessage(msg);
 

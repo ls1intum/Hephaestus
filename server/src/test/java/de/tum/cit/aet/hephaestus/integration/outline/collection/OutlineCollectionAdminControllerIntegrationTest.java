@@ -300,7 +300,9 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             )
         ).isEmpty();
         // Erase is the point: the mirrored bodies left the database, no tombstones remain.
-        assertThat(documentRepository.findByWorkspaceIdAndConnectionId(workspace.getId(), connectionId)).isEmpty();
+        assertThat(
+            documentRepository.findSnapshotsByWorkspaceIdAndConnectionId(workspace.getId(), connectionId)
+        ).isEmpty();
     }
 
     @Test

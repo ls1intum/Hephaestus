@@ -91,8 +91,8 @@ class OutlineApiClientPagingTest extends BaseUnitTest {
 
     @Test
     void listDocuments_pageWithoutADataArray_throwsRatherThanTruncatingTheListing() {
-        // The old behaviour was `break`: the enumeration silently ended at whatever it had, the reconcile
-        // called that a clean pass, and every document past the break was tombstoned.
+        // A page with no data array must fail: treating it as the end of the listing would let the reconcile
+        // count a truncated enumeration as clean and tombstone every document past the short read.
         AtomicInteger calls = new AtomicInteger();
         OutlineApiClient client = clientAnswering(call -> (call == 0 ? fullPage(0) : "{}"), calls);
 

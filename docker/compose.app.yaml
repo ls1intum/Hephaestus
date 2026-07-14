@@ -330,6 +330,11 @@ services:
       # mirrored rows from Postgres, so it needs no Outline URL, key or OAuth client of its own.
       # Keep in lockstep with application-server's value.
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      # Slack, like Outline, ships role-agnostic slack.enabled-gated beans (mentor, ingest, credential
+      # provider, NATS subscription provider) that the worker's shared JPA/context layer instantiates.
+      # Wire it to the worker exactly like Outline so both integrations load identically here.
+      # Keep in lockstep with application-server's value.
+      HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
       # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
       # supplies it so the agent context builds links from a real origin (an unset var fails the boot).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}

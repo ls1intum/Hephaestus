@@ -262,6 +262,26 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void tokenStatus_acceptedButMetadataProbeFails_isAcceptedWithoutMetadata_notAnError() {
+        // auth.info passed, so the token is live. A flaky apiKeys.list (HTTP 500, not a 403 scope
+        // decline) must degrade to "accepted, metadata unavailable" — never bubble a 502 for an
+        // otherwise-healthy token.
+        OutlineConnectionAdminService service = deferredService();
+        storedToken("ol_live_key");
+        when(apiClient.describeToken(SERVER_URL, "ol_live_key")).thenThrow(
+            new OutlineApiException("Outline /api/apiKeys.list failed (HTTP 500)")
+        );
+
+        OutlineTokenStatusDTO status = service.tokenStatus(WS);
+
+        assertThat(status.accepted()).isTrue();
+        assertThat(status.name()).isNull();
+        assertThat(status.last4()).isNull();
+        assertThat(status.expiresAt()).isNull();
+        assertThat(status.lastActiveAt()).isNull();
+    }
+
+    @Test
     void tokenStatus_withoutAStoredToken_isNotAccepted() {
         OutlineConnectionAdminService service = deferredService();
         when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());

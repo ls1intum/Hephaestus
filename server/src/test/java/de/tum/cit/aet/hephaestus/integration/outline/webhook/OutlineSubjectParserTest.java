@@ -22,11 +22,6 @@ class OutlineSubjectParserTest extends BaseUnitTest {
     private final OutlineSubjectParser parser = new OutlineSubjectParser();
 
     @Test
-    void kind_isOutline() {
-        assertThat(parser.kind()).isEqualTo(IntegrationKind.OUTLINE);
-    }
-
-    @Test
     void parse_collapsesEveryDocumentEventToTheHandlerKey() {
         assertThat(parser.parse("outline.sub-1.documents~update")).isEqualTo(
             new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE)

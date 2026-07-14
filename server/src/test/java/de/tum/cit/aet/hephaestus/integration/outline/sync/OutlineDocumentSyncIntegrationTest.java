@@ -176,7 +176,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         scheduler.syncAllNow();
 
-        List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(workspaceId, connectionId);
+        List<OutlineDocument> rows = mirroredRows();
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> {
             assertThat(r.getBodyMarkdown()).isNotBlank();
@@ -195,7 +195,6 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         OutlineCollection collection = onlyCollection();
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
-        assertThat(collection.getDocumentsSyncedThrough()).isEqualTo(T2);
         assertThat(collection.getDocumentsSyncedAt()).isNotNull();
         assertThat(collection.getLastSyncError()).isNull();
         assertThat(collection.getName()).isEqualTo("Design");
@@ -339,7 +338,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         OutlineCollection collection = onlyCollection();
         assertThat(collection.getLastSyncError()).contains("no longer visible");
-        List<OutlineDocument> rows = documentRepository.findByWorkspaceIdAndConnectionId(workspaceId, connectionId);
+        List<OutlineDocument> rows = mirroredRows();
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> assertThat(r.isDeleted()).isFalse());
     }
@@ -391,11 +390,19 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
     }
 
     private OutlineDocument documentById(String documentId) {
-        return documentRepository
-            .findByWorkspaceIdAndConnectionId(workspaceId, connectionId)
+        return mirroredRows()
             .stream()
             .filter(d -> d.getDocumentId().equals(documentId))
             .findFirst()
             .orElseThrow(() -> new AssertionError("No mirrored row for " + documentId));
+    }
+
+    /** This install's mirrored rows, bodies included — the full-entity read the assertions need. */
+    private List<OutlineDocument> mirroredRows() {
+        return documentRepository
+            .findAll()
+            .stream()
+            .filter(d -> d.getWorkspaceId() == workspaceId && d.getConnectionId() == connectionId)
+            .toList();
     }
 }

@@ -70,11 +70,6 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     }
 
     @Test
-    void kind_isOutline() {
-        assertThat(verifier(Optional.of(SECRET)).kind()).isEqualTo(IntegrationKind.OUTLINE);
-    }
-
-    @Test
     void verify_acceptsAWellFormedSignature() {
         byte[] body = "{\"event\":\"documents.update\"}".getBytes(StandardCharsets.UTF_8);
         long ts = NOW.toEpochMilli();

@@ -362,11 +362,10 @@ public class OutlineApiClient {
      * The page's rows, or an {@link OutlineApiException} when Outline answered without a {@code data} array
      * at all.
      *
-     * <p>This is a data-loss guard, not defensive noise. A document enumeration that quietly stops short
-     * becomes the reconcile's {@code seen} set, and the tombstone-by-absence sweep then <em>deletes</em>
-     * every mirrored document that fell off the truncated tail — irreversibly, while advancing the
-     * watermark as if the pass had been clean. Failing the call instead records the error on the collection
-     * and skips the sweep entirely; the mirror simply stays as it was until Outline answers properly again.
+     * <p>This is a data-loss guard: a short read treated as the end of the listing becomes the reconcile's
+     * {@code seen} set, and the tombstone-by-absence sweep then irreversibly deletes every mirrored document
+     * that fell off the truncated tail. Failing the call skips the sweep instead, leaving the mirror intact
+     * until Outline answers properly.
      */
     private static List<OutlineDocumentListResponse.Meta> requirePage(
         OutlineDocumentListResponse body,

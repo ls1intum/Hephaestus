@@ -26,10 +26,9 @@ import org.jspecify.annotations.Nullable;
  * <p>Carries the human-facing catalog fields (name, urlId, color, icon) captured server-side
  * at registration so the admin table renders real names, the mirror lifecycle
  * ({@link MirrorState}), and the per-collection sync bookkeeping: {@link SyncStatus#PENDING}
- * until one clean full pass finishes, {@code documentsSyncedThrough} as upstream-clock freshness
- * telemetry (max {@code updatedAt} seen in a clean pass — immune to local clock skew; not a sync
- * cursor), and {@code documentsSyncedAt} for stalest-first scheduling. Both advance only on a clean
- * pass; a budget-exhausted or failed pass leaves them untouched so nothing is skipped.
+ * until one clean full pass finishes, and {@code documentsSyncedAt} for stalest-first scheduling.
+ * {@code documentsSyncedAt} advances only on a clean pass; a budget-exhausted or failed pass leaves it
+ * untouched so nothing is skipped.
  */
 @Entity
 @Table(
@@ -61,13 +60,10 @@ public class OutlineCollection {
     private Long id;
 
     /**
-     * Optimistic-lock guard. This row has two concurrent writers: the admin PATCH (state ENABLED/PAUSED)
-     * and the sync passes (catalog refresh, per-collection bookkeeping — {@code lastSyncError},
-     * {@code documentsSyncedThrough}/{@code documentsSyncedAt}, coverage counters). A registration or a
-     * PAUSED→ENABLED resume kicks a sync off the request thread, so the admin write and the kicked sync's
-     * write can land close enough in time to race the SAME row; a full-column save from the loser would
-     * otherwise silently clobber the winner's field. {@code OutlineDocumentSyncService} logs and skips a
-     * lost race on the sync side — the next pass reconciles the row regardless.
+     * Optimistic-lock guard. The admin PATCH (state ENABLED/PAUSED) and a sync pass's bookkeeping write can
+     * race the SAME row — a registration or PAUSED→ENABLED resume kicks a sync off the request thread — and
+     * a full-column save from the loser would otherwise clobber the winner's field. The sync side logs and
+     * skips a lost race; the next pass reconciles the row regardless.
      */
     @Version
     @ColumnDefault("0")
@@ -109,15 +105,6 @@ public class OutlineCollection {
     @Enumerated(EnumType.STRING)
     @Column(name = "sync_status", nullable = false, length = 16)
     private SyncStatus syncStatus = SyncStatus.PENDING;
-
-    /**
-     * Admin telemetry, NOT a sync cursor: the max document {@code updatedAt} observed in the last
-     * clean full pass — the "mirrored through" freshness figure the admin surface displays. Advances
-     * only on a clean pass; no sync decision reads it (the incremental diff runs per document
-     * against {@code outline_document.outline_updated_at}).
-     */
-    @Column(name = "documents_synced_through")
-    private @Nullable Instant documentsSyncedThrough;
 
     /** When the last clean pass finished; {@code NULLS FIRST} ordering makes never-synced collections go first. */
     @Column(name = "documents_synced_at")

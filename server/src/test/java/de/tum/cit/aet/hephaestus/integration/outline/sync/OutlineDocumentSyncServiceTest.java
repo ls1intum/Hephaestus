@@ -46,7 +46,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Unit coverage for the sync paths the real-Postgres integration test cannot cheaply pin: the export
- * budget (exhaustion keeps a collection PENDING with no watermark and no tombstones), the webhook
+ * budget (exhaustion keeps a collection PENDING with no completion timestamp and no tombstones), the webhook
  * targeted-refresh routing (delete tombstones without an API call; an update outside the mirrored
  * collections is ignored; a vanished document tombstones), the optimistic-lock retry, and — the
  * load-bearing one — the <em>no-wipe</em> invariant: a pass that dies mid-way (429, revoked token) must
@@ -94,7 +94,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
     private OutlineDocumentSyncService service(int exportBudget, int cacheMaxSizeMb) {
         OutlineProperties properties = new OutlineProperties(
-            new OutlineProperties.Sync("0 0 */6 * * *", exportBudget, Duration.ofMinutes(5)),
+            new OutlineProperties.Sync(exportBudget),
             new OutlineProperties.Cache(cacheMaxSizeMb),
             Duration.ofDays(30)
         );
@@ -267,7 +267,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(1).syncWorkspace(WORKSPACE);
 
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
-        assertThat(collection.getDocumentsSyncedThrough()).isNull();
         assertThat(collection.getDocumentsSyncedAt()).isNull();
         assertThat(staleRow.isDeleted()).isFalse();
         // Coverage counters are written even on a budget-exhausted pass — the enumeration completed
@@ -280,7 +279,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void cleanPass_advancesWatermarkAndTombstonesVanishedRows() {
+    void cleanPass_marksCompleteAndTombstonesVanishedRows() {
         OutlineDocument staleRow = mirrored("doc-stale");
         staleRow.setBodyMarkdown("# old");
         staleRow.setCreatedBySubject("user-1");
@@ -291,7 +290,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).syncWorkspace(WORKSPACE);
 
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
-        assertThat(collection.getDocumentsSyncedThrough()).isEqualTo(T2);
         assertThat(collection.getDocumentsSyncedAt()).isNotNull();
         // Clean-pass counters: full coverage, nothing skipped.
         assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
@@ -299,6 +297,59 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(staleRow.isDeleted()).isTrue();
         assertThat(staleRow.getBodyMarkdown()).isNull();
         assertThat(staleRow.getCreatedBySubject()).isNull();
+    }
+
+    @Test
+    void cleanPass_unchangedDocumentWithMatchingMetadata_touchesNoDocumentRowAtAll() {
+        // Steady state: a stable wiki must not re-read or re-write a document whose body is current AND whose
+        // denormalized metadata already matches. The reconcile decides this off the body-free snapshot alone —
+        // no full-entity load (findByWorkspaceIdAndConnectionIdAndDocumentId) and no saveAndFlush.
+        OutlineDocument settled = mirrored("doc-1");
+        settled.setContentHash("hash-1");
+        settled.setOutlineUpdatedAt(T1);
+        settled.setBodyMarkdown("# body");
+        settled.setTitle("doc-1"); // meta("doc-1", ...) carries title == id
+        settled.setSlug("doc-1"); // no url on meta → slug falls back to urlId == id
+        settled.setCollectionSlug("col1"); // catalog refresh sets the collection urlId to "col1"
+        inMirror(settled);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T1)));
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        // Not exported, not loaded as an entity, not written — the whole per-document write transaction is skipped.
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
+        verify(documentRepository, never()).findByWorkspaceIdAndConnectionIdAndDocumentId(
+            anyLong(),
+            anyLong(),
+            eq("doc-1")
+        );
+        verify(documentRepository, never()).saveAndFlush(any());
+        // The pass still completes cleanly and does not tombstone the settled row.
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(settled.isDeleted()).isFalse();
+    }
+
+    @Test
+    void cleanPass_unchangedBodyButRenamedTitle_rewritesMetadataWithoutReExporting() {
+        // Body current (hash + updatedAt match) but the title drifted upstream: the row must be rewritten to
+        // pick up the new metadata, yet never re-exported — the export budget is for changed bodies only.
+        OutlineDocument renamed = mirrored("doc-1");
+        renamed.setContentHash("hash-1");
+        renamed.setOutlineUpdatedAt(T1);
+        renamed.setBodyMarkdown("# body");
+        renamed.setTitle("stale title");
+        renamed.setSlug("doc-1");
+        renamed.setCollectionSlug("col1");
+        inMirror(renamed);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T1)));
+
+        service(10).syncWorkspace(WORKSPACE);
+
+        verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
+        // The metadata-only refresh landed: the title now matches upstream, the body is untouched.
+        assertThat(renamed.getTitle()).isEqualTo("doc-1");
+        assertThat(renamed.getBodyMarkdown()).isEqualTo("# body");
+        verify(documentRepository).saveAndFlush(argThat(d -> "doc-1".equals(d.getDocumentId())));
     }
 
     // --- the no-wipe invariant: a pass that dies mid-way must never take the mirror with it ---
@@ -548,9 +599,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void syncWorkspace_archivedDocumentUpsert_neverAdvancesTheLiveWatermark() {
-        // Only the archived doc is seen (no live docs); the watermark stays untouched — archived content
-        // is deliberately excluded from the freshness signal (see the sync service's javadoc).
+    void syncWorkspace_archivedOnlyPass_stillCompletesCleanly() {
+        // Only the archived doc is seen (no live docs); the pass is still clean — archived documents are
+        // counted into the seen set, so completion is not blocked by their separate enumeration.
         when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of());
         when(outlineApiClient.listArchivedDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
             List.of(archivedMeta("doc-archived", T1, T2))
@@ -559,7 +610,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         service(10).syncWorkspace(WORKSPACE);
 
-        assertThat(collection.getDocumentsSyncedThrough()).isNull();
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getDocumentsSyncedAt()).isNotNull();
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
     }
 
     @Test

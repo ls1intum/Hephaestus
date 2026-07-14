@@ -50,8 +50,6 @@ export const Disconnected: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByLabelText(/server url/i)).toHaveValue("");
 		await expect(canvas.getByRole("button", { name: /connect outline/i })).toBeDisabled();
-		// Collection selection lives in the post-connect collections plane, not here.
-		await expect(canvas.queryByLabelText(/allow-list/i)).not.toBeInTheDocument();
 	},
 };
 

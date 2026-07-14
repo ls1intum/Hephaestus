@@ -24,12 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@link GitProviderRegistry#resolveProviderId} → the {@code identity_provider} row id for
  *       {@code (OUTLINE, serverUrl)}. The registry canonicalizes the URL to its origin
  *       (scheme://host[:port]), so the Connection's {@code serverUrl} and a login provider's
- *       {@code base_url} land on the SAME provider row even when one carries a path or trailing slash —
- *       the two write paths cannot silently split providers,</li>
+ *       {@code base_url} land on the SAME provider row even when one carries a path or trailing slash,</li>
  *   <li>{@link AccountIdentityQuery#resolveAccountId} → the Hephaestus {@code Account} keyed by the
- *       nOAuth-safe {@code (OUTLINE, uuid, team)} triple (an Outline user UUID is scoped to its team;
- *       {@code teamId} — the Connection's {@code instance_key} — keeps a shared self-hosted instance from
- *       aliasing users across tenants),</li>
+ *       {@code (OUTLINE, uuid, team)} triple ({@code teamId} — the Connection's {@code instance_key} —
+ *       keeps a shared self-hosted instance from aliasing users across tenants),</li>
  *   <li>the account's active identity links → their SCM logins, narrowed to the one that is actually a
  *       member of {@code workspaceId} via {@link AccountWorkspaceMembershipQuery} — whose membership view
  *       carries the member's SCM {@code User} id, so no SCM repository read is needed here. The Outline
@@ -63,7 +61,7 @@ public class OutlineIdentityResolver {
      * The workspace {@code User} (member) id the Outline author resolves to — what the document
      * projection exposes so the mentor/review context can attribute a mirrored document to a developer.
      * The member id comes straight off the membership view, so the chain never needs the intermediate
-     * login as an output (a {@code resolveDeveloperLogin} sibling existed and had no caller — deleted).
+     * login as an output.
      *
      * @param workspaceId    the workspace the projection is scoped to
      * @param serverUrl      the Outline instance URL (from the ACTIVE connection's config; canonicalized

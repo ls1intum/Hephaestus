@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource.SecretLookup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -20,8 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The subscription-scoped secret source parses the body-carried subscription id (an untrusted routing
  * key) and delegates resolution to {@link ConnectionService#findOutlineSubscription}. The matching
- * logic itself is covered in {@code ConnectionServiceTest}; here we pin the SPI contract: kind, scope,
- * body parsing, and empty-on-miss.
+ * logic itself is covered in {@code ConnectionServiceTest}; here we pin the SPI contract: scope, body
+ * parsing, and empty-on-miss.
  */
 class OutlineWebhookSecretSourceTest extends BaseUnitTest {
 
@@ -46,8 +45,7 @@ class OutlineWebhookSecretSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void kindAndScope() {
-        assertThat(secretSource().kind()).isEqualTo(IntegrationKind.OUTLINE);
+    void scope_isSubscription() {
         assertThat(secretSource().scope()).isEqualTo(WebhookSecretSource.Scope.SUBSCRIPTION);
     }
 

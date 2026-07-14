@@ -34,8 +34,8 @@ import org.springframework.stereotype.Component;
  * type: a type-level bypass would also blanket the single-workspace {@code *Now} pass-throughs, disabling
  * {@code WorkspaceStatementInspector} on precisely the paths that take vendor-supplied ids straight off a
  * webhook. Those paths are already workspace-scoped (every query takes the {@code workspaceId}), so they keep
- * the safety net on. The {@code *Now} methods still exist as a bean hop for webhook consumers and async
- * listeners; they simply no longer buy a tenancy bypass.
+ * the safety net on. The {@code *Now} methods are a bean hop for webhook consumers and async listeners;
+ * they carry no tenancy bypass.
  */
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

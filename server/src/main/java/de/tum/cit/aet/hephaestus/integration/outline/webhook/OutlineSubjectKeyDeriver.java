@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.Locale;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -19,8 +18,11 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Subject format: {@code outline.<subscriptionId>.<event>}. The subscription id is a UUID (no
  * dots) and scopes the delivery to a single workspace's registered subscription; the event
- * ({@code documents.update}, …) is lowercased via {@link Locale#ROOT} with dots replaced by
- * {@code ~} so it never collides with the NATS token boundary ({@code documents~update}).
+ * ({@code documents.update}, …) has its dots replaced by {@code ~} so it never collides with the
+ * NATS token boundary ({@code documents~update}). Neither token is case-folded: the subscription id
+ * is passed through byte-for-byte so the derived subject matches the consumer's subscription filter
+ * ({@link de.tum.cit.aet.hephaestus.integration.core.consumer.ConsumerSubjectMath#subscriptionFilter}),
+ * mirroring the Slack sibling deriver.
  *
  * <p>Dedup key: {@code "outline-" + <delivery id>} — the top-level {@code id} of the delivery
  * envelope, a UUID unique per event that Outline reuses across retries of the same delivery.
@@ -82,7 +84,7 @@ public class OutlineSubjectKeyDeriver implements SubjectKeyDeriver {
         if (value == null || value.isEmpty()) {
             return "";
         }
-        return value.toLowerCase(Locale.ROOT).replace('.', '~');
+        return value.replace('.', '~');
     }
 
     private JsonNode tryParse(byte[] body) {
