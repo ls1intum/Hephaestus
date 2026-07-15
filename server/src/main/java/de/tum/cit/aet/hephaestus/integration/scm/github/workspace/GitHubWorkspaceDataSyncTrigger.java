@@ -159,6 +159,12 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                     SyncJobTrigger.LIFECYCLE,
                     null
                 ),
+                // By design the job handle is NOT threaded into syncSyncTarget: a single sync-target
+                // refresh is a short, indivisible GraphQL unit, so cooperative cancel/progress (which
+                // only make sense across the multi-repo loop of a full sync) add nothing here. And when
+                // a broader sync is already running on this connection, the SyncJobConflictException
+                // below intentionally absorbs this single-target resync — the in-flight full sync
+                // already covers this target, so dropping the redundant one is correct, not a bug.
                 handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target)
             );
         } catch (SyncJobConflictException e) {

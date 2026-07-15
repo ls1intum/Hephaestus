@@ -1,9 +1,19 @@
+import { formatDistanceToNow } from "date-fns";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 
 export function asDate(value: Date | string | undefined | null): Date | undefined {
 	if (value == null) return undefined;
 	const date = value instanceof Date ? value : new Date(value);
 	return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+/**
+ * Human "5 minutes ago" phrasing for a timestamp. A missing/invalid value renders the {@link fallback}
+ * dash — never "now" — so an absent timestamp can't masquerade as a fresh one.
+ */
+export function relativeTime(value: Date | string | undefined | null, fallback = "–"): string {
+	const date = asDate(value);
+	return date ? formatDistanceToNow(date, { addSuffix: true }) : fallback;
 }
 
 export type ConnectionHealth = ConnectionSyncStatus["health"];

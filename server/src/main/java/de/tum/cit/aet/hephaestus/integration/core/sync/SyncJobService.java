@@ -265,19 +265,12 @@ public class SyncJobService implements SmartLifecycle {
         }
         int reaped = 0;
         for (SyncJob job : stale) {
-            ActiveExecution localExecution = activeExecutions.get(job.getId());
-            if (localExecution != null) {
-                // The lease is stale, but this JVM still owns a live runner. Keep the row active so
-                // connection teardown remains fenced until that runner actually exits; request durable
-                // cancellation and interrupt it instead of manufacturing a terminal row around live work.
-                syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE);
-                localExecution.cancel();
-                publish(
-                    job.getWorkspace().getId(),
-                    job.getConnection().getId(),
-                    job.getKind(),
-                    SyncStateChangedEvent.Scope.JOB
-                );
+            if (activeExecutions.containsKey(job.getId())) {
+                // A live runner in THIS JVM still owns the job, so it is not abandoned — a stale lease
+                // here only means the heartbeat scheduler was briefly starved, never that the work died.
+                // Leave the row ACTIVE: the runner finishes on its own and connection teardown stays
+                // fenced on it (ConnectionService's lifecycle lock, not this sweep). Reaping it here would
+                // kill a healthy sync — e.g. a "Sync now" click running the inline reap first.
                 continue;
             }
             int updated = syncJobRepository.markAbandoned(

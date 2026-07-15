@@ -706,6 +706,10 @@ public class IntegrationNatsConsumer {
             msg.ack();
             stats.recordDispatch(Instant.now());
             if (scopeId != null) {
+                // Liveness watermark = "last event received and dispatched", NOT "content was ingested". A handler
+                // may legitimately no-op (dedup, a Slack message dropped by the per-channel consent gate, a filtered
+                // event) and still return normally; that event genuinely arrived, so stamping it is correct. Health
+                // derivation does not read this field, so the coarse-freshness semantics carry no correctness risk.
                 EventTypeKey key = resolvedHandler.key();
                 activityRecorder.recordEventProcessed(scopeId, key.kind(), key.eventType());
             }

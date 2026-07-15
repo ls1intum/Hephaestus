@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.status;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
@@ -17,26 +18,18 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspac
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 /** Read-only GitLab sync state built without vendor API calls. */
 @Component
 @ConditionalOnBean(GitLabWorkspaceInitializationService.class)
 public class GitlabConnectionSyncStateProvider implements ConnectionSyncStateProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(GitlabConnectionSyncStateProvider.class);
 
     private final ConnectionService connectionService;
     private final ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
@@ -75,7 +68,14 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         GitLabRateLimitTracker tracker = rateLimitTrackerProvider.getIfAvailable();
         RateLimitSnapshot rateLimit = tracker == null ? null : tracker.snapshot(workspaceId);
 
-        return new ConnectionSyncDetails(webhookRegistered, nextScheduledSyncAt(), rateLimit, null, false, null);
+        return new ConnectionSyncDetails(
+            webhookRegistered,
+            CronSchedules.nextRun(syncSchedulerProperties.cron()),
+            rateLimit,
+            null,
+            false,
+            null
+        );
     }
 
     @Override
@@ -133,17 +133,5 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             null,
             null
         );
-    }
-
-    @Nullable
-    private Instant nextScheduledSyncAt() {
-        try {
-            CronExpression cron = CronExpression.parse(syncSchedulerProperties.cron());
-            LocalDateTime next = cron.next(LocalDateTime.now());
-            return next == null ? null : next.atZone(ZoneId.systemDefault()).toInstant();
-        } catch (IllegalArgumentException e) {
-            log.debug("Could not parse GitLab sync cron for nextScheduledSyncAt: {}", e.getMessage());
-            return null;
-        }
     }
 }

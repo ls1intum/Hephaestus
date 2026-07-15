@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, formatDistanceToNow } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import {
 	CheckIcon,
 	FileTextIcon,
@@ -28,7 +28,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { asDate } from "../sync-format";
+import { asDate, relativeTime } from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
@@ -229,7 +229,7 @@ export function OutlineConnectCard({
 											</span>
 											<span>
 												{status.lastSyncedAt
-													? `Last synced ${formatDistanceToNow(asDate(status.lastSyncedAt) ?? new Date(), { addSuffix: true })}`
+													? `Last synced ${relativeTime(status.lastSyncedAt)}`
 													: "Not synced yet"}
 											</span>
 											{status.syncRunning && (
@@ -376,9 +376,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 						{tokenStatus.last4 ? ` (…${tokenStatus.last4})` : ""}
 					</span>
 				)}
-				{lastActiveAt && (
-					<span>Last used {formatDistanceToNow(lastActiveAt, { addSuffix: true })}</span>
-				)}
+				{lastActiveAt && <span>Last used {relativeTime(lastActiveAt)}</span>}
 				{hasMetadata && !expiresAt && <span>Never expires</span>}
 				{expiresAt && !expiringSoon && (
 					<span>

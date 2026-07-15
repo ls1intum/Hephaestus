@@ -1,4 +1,3 @@
-import { formatDistanceToNow } from "date-fns";
 import { AlertCircleIcon, DatabaseIcon } from "lucide-react";
 import type { SyncResourceState } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -22,7 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { asDate, resourceStateLabel } from "./sync-format";
+import { relativeTime, resourceStateLabel } from "./sync-format";
 
 export interface SyncResourcesTableProps {
 	resources: SyncResourceState[];
@@ -31,6 +30,7 @@ export interface SyncResourcesTableProps {
 	error?: unknown;
 	onRetry?: () => void;
 	resourceNoun?: string;
+	resourceNounPlural?: string;
 }
 
 export function SyncResourcesTable({
@@ -40,6 +40,7 @@ export function SyncResourcesTable({
 	error,
 	onRetry,
 	resourceNoun = "resource",
+	resourceNounPlural = `${resourceNoun}s`,
 }: SyncResourcesTableProps) {
 	if (isError) {
 		return (
@@ -68,9 +69,9 @@ export function SyncResourcesTable({
 					<EmptyMedia variant="icon">
 						<DatabaseIcon />
 					</EmptyMedia>
-					<EmptyTitle>No {resourceNoun}s synced yet</EmptyTitle>
+					<EmptyTitle>No {resourceNounPlural} synced yet</EmptyTitle>
 					<EmptyDescription>
-						Synced {resourceNoun}s and their state appear here once a sync job runs.
+						Synced {resourceNounPlural} and their state appear here once a sync job runs.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -93,7 +94,6 @@ export function SyncResourcesTable({
 			</TableHeader>
 			<TableBody>
 				{resources.map((resource) => {
-					const lastSyncedAt = asDate(resource.lastSyncedAt);
 					return (
 						<TableRow key={resource.id}>
 							<TableCell>
@@ -104,7 +104,7 @@ export function SyncResourcesTable({
 								<Badge variant="outline">{resourceStateLabel(resource.state)}</Badge>
 							</TableCell>
 							<TableCell className="text-muted-foreground">
-								{lastSyncedAt ? formatDistanceToNow(lastSyncedAt, { addSuffix: true }) : "–"}
+								{relativeTime(resource.lastSyncedAt)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums text-muted-foreground">
 								{resource.itemCount != null

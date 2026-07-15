@@ -1,4 +1,3 @@
-import { formatDistanceToNow } from "date-fns";
 import {
 	HistoryIcon,
 	MoreHorizontalIcon,
@@ -18,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { asDate } from "../sync-format";
+import { relativeTime } from "../sync-format";
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface SlackChannelRowProps {
@@ -84,7 +83,7 @@ export function SlackChannelRow({
 
 			<TableCell className="text-muted-foreground text-sm">
 				{channel.consentAnnouncedAt ? (
-					formatDistanceToNow(asDate(channel.consentAnnouncedAt) ?? new Date(), { addSuffix: true })
+					relativeTime(channel.consentAnnouncedAt)
 				) : (
 					<span aria-hidden>—</span>
 				)}

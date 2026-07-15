@@ -92,7 +92,7 @@ public class SyncPushService {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSyncStateChanged(SyncStateChangedEvent event) {
-        SyncEventHint hint = new SyncEventHint(wireScope(event.scope()), event.connectionId());
+        SyncEventHint hint = new SyncEventHint(event.scope().wireValue(), event.connectionId());
         deliver(event.workspaceId(), hint);
     }
 
@@ -101,7 +101,7 @@ public class SyncPushService {
     public void onConnectionActivated(ConnectionLifecycleEvent.Activated event) {
         deliver(
             event.workspaceId(),
-            new SyncEventHint(SyncEventHint.Scope.CONNECTION.wireValue(), event.connectionId())
+            new SyncEventHint(SyncStateChangedEvent.Scope.CONNECTION.wireValue(), event.connectionId())
         );
     }
 
@@ -110,7 +110,7 @@ public class SyncPushService {
     public void onConnectionDeactivated(ConnectionLifecycleEvent.Deactivated event) {
         deliver(
             event.workspaceId(),
-            new SyncEventHint(SyncEventHint.Scope.CONNECTION.wireValue(), event.connectionId())
+            new SyncEventHint(SyncStateChangedEvent.Scope.CONNECTION.wireValue(), event.connectionId())
         );
     }
 
@@ -169,15 +169,6 @@ public class SyncPushService {
             throw new IllegalArgumentException("Unexpected subject: " + subject);
         }
         return Long.parseLong(subject.substring(SUBJECT_PREFIX.length()));
-    }
-
-    private static String wireScope(SyncStateChangedEvent.Scope scope) {
-        return switch (scope) {
-            case JOB -> SyncEventHint.Scope.JOB.wireValue();
-            case RESOURCES -> SyncEventHint.Scope.RESOURCES.wireValue();
-            case CONNECTION -> SyncEventHint.Scope.CONNECTION.wireValue();
-            case ACTIVITY -> SyncEventHint.Scope.ACTIVITY.wireValue();
-        };
     }
 
     @PreDestroy

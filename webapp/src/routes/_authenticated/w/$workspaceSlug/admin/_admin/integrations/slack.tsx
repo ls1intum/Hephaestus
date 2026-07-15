@@ -199,7 +199,11 @@ function SlackIntegrationPage() {
 				icon={<SlackIcon className="size-6" />}
 				title="Slack"
 				description="Connection, weekly digest, monitored channels and sync activity for this workspace's Slack app."
-				actions={status && <ConnectionHealthBadge health={status.health} />}
+				actions={
+					status && (
+						<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
+					)
+				}
 			/>
 
 			{routeLoading && <Skeleton className="h-48 w-full" />}

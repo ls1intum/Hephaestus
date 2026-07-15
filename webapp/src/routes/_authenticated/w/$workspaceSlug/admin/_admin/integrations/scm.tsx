@@ -188,7 +188,11 @@ function ScmIntegrationPage() {
 				}
 				title={label}
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
-				actions={status && <ConnectionHealthBadge health={status.health} />}
+				actions={
+					status && (
+						<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
+					)
+				}
 			/>
 
 			<ScmConnectionCard
@@ -261,6 +265,7 @@ function ScmIntegrationPage() {
 							error={resourcesError}
 							onRetry={() => refetchResources()}
 							resourceNoun="repository"
+							resourceNounPlural="repositories"
 						/>
 					</CardContent>
 				</Card>

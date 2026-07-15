@@ -2,7 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import { useSyncEvents } from "@/hooks/useSyncEvents";
+import { useSyncEvents } from "@/hooks/use-sync-events";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/integrations")({
 	component: IntegrationsLayout,

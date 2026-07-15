@@ -1,4 +1,3 @@
-import { formatDistanceToNow } from "date-fns";
 import { ExternalLinkIcon, WebhookIcon, ZapOffIcon } from "lucide-react";
 import type { ConnectionSyncStatus } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -9,7 +8,7 @@ import { ActiveJobProgress } from "./ActiveJobProgress";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { RateLimitGauge } from "./RateLimitGauge";
 import { SyncNowButton } from "./SyncNowButton";
-import { asDate } from "./sync-format";
+import { relativeTime } from "./sync-format";
 
 export interface ScmConnectionCardProps {
 	provider: "GITHUB" | "GITLAB" | undefined;
@@ -73,9 +72,7 @@ export function ScmConnectionCard({
 								</p>
 								<p className="text-sm">
 									{status.lastSuccessfulSyncAt
-										? formatDistanceToNow(asDate(status.lastSuccessfulSyncAt) ?? new Date(), {
-												addSuffix: true,
-											})
+										? relativeTime(status.lastSuccessfulSyncAt)
 										: "Never synced"}
 								</p>
 							</div>

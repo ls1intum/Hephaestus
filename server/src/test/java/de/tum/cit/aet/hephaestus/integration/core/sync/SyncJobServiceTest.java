@@ -510,7 +510,10 @@ class SyncJobServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void reapAbandonedJobs_localExecutionCancelsWithoutReleasingActiveFence() throws Exception {
+    void reapAbandonedJobs_skipsLocallyOwnedJobEvenWithStaleLease() throws Exception {
+        // A job owned by a live runner in THIS JVM is not abandoned — a stale lease only means the
+        // heartbeat was briefly starved. The sweep must leave it alone (no cancel, no interrupt, no
+        // terminal write); killing it would abort a healthy sync, e.g. behind a concurrent "Sync now".
         SyncJobService.Started started = beginTestJob();
         CountDownLatch bodyEntered = new CountDownLatch(1);
         CountDownLatch releaseBody = new CountDownLatch(1);
@@ -524,9 +527,9 @@ class SyncJobServiceTest extends BaseUnitTest {
                     try {
                         releaseBody.await();
                     } catch (InterruptedException e) {
-                        interrupted.set(handle.isCancellationRequested());
+                        interrupted.set(true);
                         Thread.currentThread().interrupt();
-                        throw new IllegalStateException("stale local execution interrupted", e);
+                        throw new IllegalStateException("locally-owned job was wrongly interrupted", e);
                     }
                 })
             );
@@ -534,16 +537,17 @@ class SyncJobServiceTest extends BaseUnitTest {
 
             try {
                 assertThat(service.reapAbandonedJobs()).isZero();
-                assertThat(interrupted).isTrue();
                 verify(syncJobRepository, never()).markAbandoned(anyLong(), any(), anyLong());
-                verify(syncJobRepository).markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE);
+                verify(syncJobRepository, never()).markCancelRequested(anyLong(), any());
+                assertThat(interrupted).isFalse();
             } finally {
                 releaseBody.countDown();
                 running.get(2, TimeUnit.SECONDS);
             }
         }
 
-        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+        // The runner finished on its own terms, uncancelled.
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
     }
 
     @Test

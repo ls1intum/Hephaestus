@@ -1,4 +1,3 @@
-import { formatDistanceToNow } from "date-fns";
 import {
 	CheckIcon,
 	MoreHorizontalIcon,
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { asDate } from "../sync-format";
+import { relativeTime } from "../sync-format";
 
 /** The mirror lifecycle states, sourced from the generated DTO so they never drift. */
 export type OutlineMirrorState = OutlineCollection["state"];
@@ -167,7 +166,7 @@ export function OutlineCollectionRow({
 
 			<TableCell className="text-muted-foreground text-sm">
 				{collection.lastSyncedAt ? (
-					formatDistanceToNow(asDate(collection.lastSyncedAt) ?? new Date(), { addSuffix: true })
+					relativeTime(collection.lastSyncedAt)
 				) : (
 					<span aria-hidden>—</span>
 				)}

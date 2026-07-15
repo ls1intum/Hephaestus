@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { formatDistanceToNow } from "date-fns";
 import { AlertCircleIcon, ArrowRightIcon, PlugZapIcon } from "lucide-react";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
@@ -10,7 +9,7 @@ import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { SyncNowButton } from "./SyncNowButton";
-import { asDate } from "./sync-format";
+import { relativeTime } from "./sync-format";
 
 const DETAIL_ROUTE: Record<
 	IntegrationCatalogEntry["kind"],
@@ -63,7 +62,9 @@ export function IntegrationOverviewCard({
 						{entry.displayName}
 					</h2>
 				</div>
-				{entry.connected && status && <ConnectionHealthBadge health={status.health} />}
+				{entry.connected && status && (
+					<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
+				)}
 			</CardHeader>
 			<CardContent className="space-y-3">
 				{!entry.connected ? (
@@ -105,7 +106,7 @@ export function IntegrationOverviewCard({
 							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
 								<span>
 									{status.lastSuccessfulSyncAt
-										? `Last synced ${formatDistanceToNow(asDate(status.lastSuccessfulSyncAt) ?? new Date(), { addSuffix: true })}`
+										? `Last synced ${relativeTime(status.lastSuccessfulSyncAt)}`
 										: "Never synced"}
 								</span>
 								<LastProcessedEvent lastEventAt={status.lastEventProcessedAt} />

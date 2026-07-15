@@ -83,7 +83,14 @@ public class OutlineConnectionStateListener {
                     SyncJobTrigger.LIFECYCLE,
                     null
                 ),
-                handle -> syncScheduler.syncWorkspaceNow(event.workspaceId(), OutlineSyncProgress.adapt(handle))
+                handle -> {
+                    syncScheduler.syncWorkspaceNow(event.workspaceId(), OutlineSyncProgress.adapt(handle));
+                    // Cancelling the initial connect-time sync must record CANCELLED, not SUCCEEDED — mirror the
+                    // reportCancelled tail every other Outline entry point (catchUp/syncAllNow/runner) already has.
+                    if (handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
+                }
             );
         } catch (SyncJobConflictException e) {
             log.debug(

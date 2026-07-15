@@ -9,7 +9,7 @@ import {
 	listOutlineCollectionsQueryKey,
 	listSlackChannelsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import { useSyncEvents } from "./useSyncEvents";
+import { useSyncEvents } from "./use-sync-events";
 
 const WORKSPACE = "test-workspace";
 const CONNECTION_ID = 42;

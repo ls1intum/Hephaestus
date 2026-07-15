@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.sync.status;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
@@ -20,15 +21,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstalla
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 /**
@@ -40,8 +36,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class GithubConnectionSyncStateProvider implements ConnectionSyncStateProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(GithubConnectionSyncStateProvider.class);
 
     private final ConnectionRepository connectionRepository;
     private final ScopedRateLimitTracker rateLimitTracker;
@@ -98,7 +92,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
 
         return new ConnectionSyncDetails(
             webhookRegistered,
-            nextScheduledSyncAt(),
+            CronSchedules.nextRun(syncSchedulerProperties.cron()),
             rateLimitTracker.snapshot(workspaceId),
             aggregateBackfill(workspaceId),
             vendorHealthDegraded,
@@ -135,41 +129,41 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
 
         return monitors
             .stream()
-            .map(rtm -> toResourceState(rtm, repositoryIdByName, itemCountByRepositoryId))
+            .map(monitor -> toResourceState(monitor, repositoryIdByName, itemCountByRepositoryId))
             .toList();
     }
 
     private SyncResourceState toResourceState(
-        RepositoryToMonitor rtm,
+        RepositoryToMonitor monitor,
         Map<String, Long> repositoryIdByName,
         Map<Long, Long> itemCountByRepositoryId
     ) {
-        Long repositoryId = repositoryIdByName.get(rtm.getNameWithOwner());
+        Long repositoryId = repositoryIdByName.get(monitor.getNameWithOwner());
         Long itemCount = repositoryId == null ? null : itemCountByRepositoryId.get(repositoryId);
 
         Instant lastSyncedAt = latestNonNull(
-            rtm.getIssuesSyncedAt(),
-            rtm.getPullRequestsSyncedAt(),
-            rtm.getRepositorySyncedAt()
+            monitor.getIssuesSyncedAt(),
+            monitor.getPullRequestsSyncedAt(),
+            monitor.getRepositorySyncedAt()
         );
         String state =
-            rtm.getIssuesSyncedAt() == null || rtm.getPullRequestsSyncedAt() == null
+            monitor.getIssuesSyncedAt() == null || monitor.getPullRequestsSyncedAt() == null
                 ? SyncResourceState.STATE_PENDING
                 : SyncResourceState.STATE_SYNCED;
 
         int backfillTotal =
-            (rtm.getIssueBackfillHighWaterMark() != null ? rtm.getIssueBackfillHighWaterMark() : 0) +
-            (rtm.getPullRequestBackfillHighWaterMark() != null ? rtm.getPullRequestBackfillHighWaterMark() : 0);
+            (monitor.getIssueBackfillHighWaterMark() != null ? monitor.getIssueBackfillHighWaterMark() : 0) +
+            (monitor.getPullRequestBackfillHighWaterMark() != null ? monitor.getPullRequestBackfillHighWaterMark() : 0);
         Integer backfillPercent = BackfillProgress.percentComplete(
-            rtm.isBackfillInitialized(),
-            rtm.getBackfillRemaining(),
+            monitor.isBackfillInitialized(),
+            monitor.getBackfillRemaining(),
             backfillTotal
         );
 
         return new SyncResourceState(
-            rtm.getId(),
-            rtm.getNameWithOwner(),
-            rtm.getNameWithOwner(),
+            monitor.getId(),
+            monitor.getNameWithOwner(),
+            monitor.getNameWithOwner(),
             SyncResourceState.Type.REPOSITORY,
             state,
             lastSyncedAt,
@@ -224,26 +218,6 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
 
         // See toResourceState: no per-item timestamp exists for a number-based backfill horizon.
         return new BackfillSummary(state, null, percent);
-    }
-
-    /**
-     * Computes the next daily-cron reconciliation run from {@code hephaestus.sync.cron}, in the
-     * server's default zone (matching {@code @Scheduled(cron=...)}'s un-zoned behavior).
-     */
-    @Nullable
-    private Instant nextScheduledSyncAt() {
-        try {
-            CronExpression cronExpression = CronExpression.parse(syncSchedulerProperties.cron());
-            LocalDateTime next = cronExpression.next(LocalDateTime.now());
-            return next == null ? null : next.atZone(ZoneId.systemDefault()).toInstant();
-        } catch (IllegalArgumentException e) {
-            log.warn(
-                "Failed to parse sync cron expression for nextScheduledSyncAt: cron={}, error={}",
-                syncSchedulerProperties.cron(),
-                e.getMessage()
-            );
-            return null;
-        }
     }
 
     @Nullable

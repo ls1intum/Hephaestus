@@ -1,5 +1,5 @@
 import type { VariantProps } from "class-variance-authority";
-import { formatDistanceStrict, formatDistanceToNow } from "date-fns";
+import { formatDistanceStrict } from "date-fns";
 import { AlertCircleIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon } from "lucide-react";
 import type { SyncJob } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -22,7 +22,13 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { asDate, JOB_STATUS_LABEL, JOB_TRIGGER_LABEL, JOB_TYPE_LABEL } from "./sync-format";
+import {
+	asDate,
+	JOB_STATUS_LABEL,
+	JOB_TRIGGER_LABEL,
+	JOB_TYPE_LABEL,
+	relativeTime,
+} from "./sync-format";
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
@@ -140,9 +146,7 @@ export function SyncJobsTable({
 								<TableCell className="text-muted-foreground">
 									{JOB_TRIGGER_LABEL[job.trigger]}
 								</TableCell>
-								<TableCell className="text-muted-foreground">
-									{started ? formatDistanceToNow(started, { addSuffix: true }) : "–"}
-								</TableCell>
+								<TableCell className="text-muted-foreground">{relativeTime(started)}</TableCell>
 								<TableCell className="text-muted-foreground">{formatDuration(job)}</TableCell>
 								<TableCell className="text-right tabular-nums text-muted-foreground">
 									{formatItems(job)}

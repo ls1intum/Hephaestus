@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -13,15 +14,11 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
-import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 /** Read-only Outline sync state built from persisted connection, collection, and document data. */
@@ -62,16 +59,7 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
             .map(config -> config.webhookSubscriptionId() != null && !config.webhookSubscriptionId().isBlank())
             .orElse(null);
 
-        return new ConnectionSyncDetails(webhookRegistered, nextScheduledSyncAt(), null, null, false, null);
-    }
-
-    @Nullable
-    private Instant nextScheduledSyncAt() {
-        if (!CronExpression.isValidExpression(syncCron)) {
-            return null;
-        }
-        ZonedDateTime next = CronExpression.parse(syncCron).next(ZonedDateTime.now());
-        return next == null ? null : next.toInstant();
+        return new ConnectionSyncDetails(webhookRegistered, CronSchedules.nextRun(syncCron), null, null, false, null);
     }
 
     @Override

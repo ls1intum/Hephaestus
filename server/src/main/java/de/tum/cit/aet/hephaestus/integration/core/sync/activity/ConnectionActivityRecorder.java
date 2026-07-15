@@ -115,7 +115,14 @@ public class ConnectionActivityRecorder {
         if (!claimWriteSlot(connectionId, now)) {
             return;
         }
-        activityRepository.upsertActivity(connectionId, workspaceId, now, eventType);
+        try {
+            activityRepository.upsertActivity(connectionId, workspaceId, now, eventType);
+        } catch (RuntimeException e) {
+            // Release the slot we just claimed so a failed write doesn't throttle the retry for the full
+            // window — otherwise a transient DB blip would blank liveness until the next event 15s later.
+            releaseWriteSlot(connectionId, now);
+            throw e;
+        }
         eventPublisher.publishEvent(
             new SyncStateChangedEvent(workspaceId, connectionId, kind, SyncStateChangedEvent.Scope.ACTIVITY)
         );
@@ -153,6 +160,11 @@ public class ConnectionActivityRecorder {
             return now;
         });
         return claimed.get();
+    }
+
+    /** Undo a claim whose write failed — only if no later write already moved the slot past {@code claimedAt}. */
+    private void releaseWriteSlot(Long connectionId, Instant claimedAt) {
+        lastWriteAtByConnection.compute(connectionId, (id, current) -> claimedAt.equals(current) ? null : current);
     }
 
     private record ScopeKindKey(long workspaceId, IntegrationKind kind) {}

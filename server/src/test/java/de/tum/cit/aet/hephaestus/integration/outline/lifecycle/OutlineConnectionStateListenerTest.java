@@ -47,11 +47,11 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
     private OutlineConnectionStateListener listener;
 
     @SuppressWarnings("unchecked")
-    private void runJobsSynchronously() {
-        // The mocked scheduler never invokes the listener, so the package-private handle can be null here.
+    private void runJobsSynchronously(SyncJobHandle handle) {
+        // SyncJobService always passes a non-null handle (started.handle()); the body now reads it to honor cancel.
         doAnswer(invocation -> {
             Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(null);
+            body.accept(handle);
             return null;
         })
             .when(syncJobService)
@@ -60,7 +60,9 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
 
     @Test
     void outlineActivation_registersSubscriptionAndRecordsInitialLifecycleJob() {
-        runJobsSynchronously();
+        SyncJobHandle handle = mock(SyncJobHandle.class);
+        when(handle.isCancellationRequested()).thenReturn(false);
+        runJobsSynchronously(handle);
 
         listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE));
 
@@ -74,6 +76,20 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThat(request.type()).isEqualTo(SyncJobType.INITIAL);
         assertThat(request.trigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
         verify(syncScheduler).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
+        // Not cancelled → the job records its natural outcome, never CANCELLED.
+        verify(handle, never()).reportCancelled();
+    }
+
+    @Test
+    void outlineInitialSync_cancelled_reportsCancelledSoJobIsNotMislabeledSucceeded() {
+        SyncJobHandle handle = mock(SyncJobHandle.class);
+        when(handle.isCancellationRequested()).thenReturn(true);
+        runJobsSynchronously(handle);
+
+        listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE));
+
+        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
+        verify(handle).reportCancelled();
     }
 
     @Test

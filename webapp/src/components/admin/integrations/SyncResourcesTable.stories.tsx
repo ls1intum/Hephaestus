@@ -38,7 +38,7 @@ const meta = {
 	component: SyncResourcesTable,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	args: { resourceNoun: "repository" },
+	args: { resourceNoun: "repository", resourceNounPlural: "repositories" },
 } satisfies Meta<typeof SyncResourcesTable>;
 
 export default meta;

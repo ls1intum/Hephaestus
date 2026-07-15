@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Cred
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWebhookService;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,10 +27,12 @@ import org.springframework.stereotype.Component;
  * there is no vendor redirect. {@link #finalizeConnect} is therefore a no-op (the
  * UI never invokes it for GitLab).
  *
- * <p>{@link #revoke} is best-effort and currently a no-op log: GitLab PATs can only
- * be revoked from the user's profile page — there is no admin-side revoke API for
- * tokens the user issued themselves. Local state transitions are handled by the
- * caller via {@code ConnectionService.transition()}.
+ * <p>{@link #revoke} cannot revoke the PAT itself (GitLab PATs are revocable only from the
+ * user's profile page — there is no third-party revoke API), but it DOES tear down the group
+ * webhook we registered on connect. It runs from the disconnect flow while the Connection is
+ * still ACTIVE and the PAT still live — the only window in which GitLab will hand out a token to
+ * delete the hook — mirroring {@code OutlineConnectionStrategy.revoke}. Local state transitions
+ * are handled by the caller via {@code ConnectionService.disconnect()}.
  */
 @ConditionalOnServerRole
 @Component
@@ -39,6 +42,12 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
 
     static final String INPUT_PAT = "pat";
     static final String INPUT_GROUP_ID = "group_id";
+
+    private final GitLabWebhookService webhookService;
+
+    public GitlabConnectionStrategy(GitLabWebhookService webhookService) {
+        this.webhookService = webhookService;
+    }
 
     @Override
     public IntegrationKind kind() {
@@ -77,14 +86,21 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public void revoke(IntegrationRef ref) {
-        // No-op: GitLab PATs are user-scoped and revoke endpoints are unavailable to
-        // third parties. The Connection state transition to UNINSTALLED is performed
-        // by the orchestrator via ConnectionService — we just log here so audit
-        // trails can correlate the call.
+        if (ref == null) {
+            return;
+        }
+        // The PAT itself is user-scoped and cannot be revoked by a third party, but the group
+        // webhook we registered on connect MUST be removed vendor-side or it keeps POSTing to us
+        // after disconnect (deliveries no longer resolve an ACTIVE connection and are dropped — a
+        // stale hook + live webhook secret leak). This runs while the Connection is still ACTIVE
+        // (before ConnectionService purges the PAT), which is the only window GitLab will authorize
+        // the delete. Best-effort — never throws. The Connection state change to UNINSTALLED is
+        // performed by the caller via ConnectionService.disconnect().
         log.info(
-            "GitLab revoke called for workspace={} instanceKey={} (no vendor-side revoke API; state change handled by caller)",
-            ref == null ? null : ref.workspaceId(),
-            ref == null ? null : ref.instanceKey()
+            "GitLab revoke called for workspace={} instanceKey={} (deregistering group webhook; PAT revoke is user-side)",
+            ref.workspaceId(),
+            ref.instanceKey()
         );
+        webhookService.deregisterActiveWebhook(ref.workspaceId());
     }
 }

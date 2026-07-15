@@ -517,4 +517,116 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             verify(webhookClientProvider, never()).getIfAvailable();
         }
     }
+
+    @Nested
+    class DeregisterActiveWebhook {
+
+        @Test
+        void deletesUpstreamButDoesNotRewriteConfig() {
+            bindGitLabConfig(
+                1L,
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+
+            webhookService.deregisterActiveWebhook(1L);
+
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            // Critical: config is NOT cleared here — the disconnect txn holds the same row and
+            // saves it moments later; a rewrite would optimistic-lock-fail that save.
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
+            assertThat(currentConfig(1L).gitlabGroupId()).isEqualTo(42L);
+            verify(connectionService, never()).updateConfig(anyLong(), any(), any());
+        }
+
+        @Test
+        void skipsWhenNoWebhookStored() {
+            // Default config from setUp has null webhook/group ids.
+            webhookService.deregisterActiveWebhook(1L);
+
+            verify(webhookClientProvider, never()).getIfAvailable();
+        }
+
+        @Test
+        void bestEffortSwallowsClientError() {
+            bindGitLabConfig(
+                1L,
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            Mockito.doThrow(new IllegalStateException("scope not active"))
+                .when(webhookClient)
+                .deregisterGroupWebhook(1L, 42L, 99L);
+
+            // Never throws.
+            webhookService.deregisterActiveWebhook(1L);
+        }
+    }
+
+    @Nested
+    class DeregisterWebhookForConnection {
+
+        @Test
+        void deletesByConnectionIdRegardlessOfState() {
+            var connection = Mockito.mock(de.tum.cit.aet.hephaestus.integration.core.connection.Connection.class);
+            when(connection.getConfig()).thenReturn(
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.of(connection));
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+
+            webhookService.deregisterWebhookForConnection(1L, 7L);
+
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+        }
+
+        @Test
+        void bestEffortSwallowsAuthFailurePostPurge() {
+            var connection = Mockito.mock(de.tum.cit.aet.hephaestus.integration.core.connection.Connection.class);
+            when(connection.getConfig()).thenReturn(
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.of(connection));
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            Mockito.doThrow(new IllegalStateException("Scope 1 is not active"))
+                .when(webhookClient)
+                .deregisterGroupWebhook(1L, 42L, 99L);
+
+            // Never throws — the orphaned hook auto-disables upstream.
+            webhookService.deregisterWebhookForConnection(1L, 7L);
+        }
+
+        @Test
+        void skipsWhenConnectionMissing() {
+            when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.empty());
+
+            webhookService.deregisterWebhookForConnection(1L, 7L);
+
+            verify(webhookClientProvider, never()).getIfAvailable();
+        }
+    }
 }

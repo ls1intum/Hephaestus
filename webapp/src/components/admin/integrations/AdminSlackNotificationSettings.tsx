@@ -452,8 +452,10 @@ export function AdminSlackNotificationSettings({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Disconnect Slack?</AlertDialogTitle>
 						<AlertDialogDescription>
-							The weekly digest will stop posting and the bot will be uninstalled from this
-							workspace. You can reconnect later, but you will need to re-authorize via OAuth.
+							The weekly digest stops posting, the bot is uninstalled from this workspace, and every
+							ingested Slack message, thread, and per-channel consent record for this workspace is
+							erased. Messages in Slack itself are not affected. You can reconnect later, but you
+							will need to re-authorize via OAuth and re-activate channels from scratch.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

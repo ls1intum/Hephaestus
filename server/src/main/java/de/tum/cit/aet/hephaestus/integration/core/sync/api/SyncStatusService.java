@@ -25,7 +25,6 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivity;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRepository;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -277,15 +276,14 @@ public class SyncStatusService {
             byKind.merge(c.getKind(), c, SyncStatusService::preferred);
         }
 
-        IntegrationKind workspaceScm = connections
+        // A workspace runs at most one SCM at a time, so once one is LIVE we hide the sibling SCM kind.
+        // But an UNINSTALLED SCM must NOT keep hiding the alternative — otherwise the admin can never
+        // switch vendors after disconnecting one. Only an active (non-UNINSTALLED) SCM narrows the list.
+        IntegrationKind activeScm = connections
             .stream()
-            .filter(c -> c.getKind().family() == IntegrationFamily.SCM)
-            .max(
-                Comparator.comparing((Connection c) -> c.getState() != IntegrationState.UNINSTALLED).thenComparing(
-                    Connection::getCreatedAt
-                )
-            )
+            .filter(c -> c.getKind().family() == IntegrationFamily.SCM && c.getState() != IntegrationState.UNINSTALLED)
             .map(Connection::getKind)
+            .findFirst()
             .orElse(null);
 
         IntegrationManifestRegistry manifests = connectionAdminService.manifests();
@@ -293,7 +291,7 @@ public class SyncStatusService {
             .registeredKinds()
             .stream()
             .sorted()
-            .filter(kind -> workspaceScm == null || kind.family() != IntegrationFamily.SCM || kind == workspaceScm)
+            .filter(kind -> activeScm == null || kind.family() != IntegrationFamily.SCM || kind == activeScm)
             .map(kind -> {
                 Connection c = byKind.get(kind);
                 boolean connected = c != null && c.getState() != IntegrationState.UNINSTALLED;
@@ -357,7 +355,7 @@ public class SyncStatusService {
         };
     }
 
-    private static <T> T rejectDuplicate(T a, T b) {
+    private static void rejectDuplicate(Object a, Object b) {
         throw new IllegalStateException("Duplicate registration for the same IntegrationKind: " + a + " vs " + b);
     }
 }

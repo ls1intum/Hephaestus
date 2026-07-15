@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
-import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -39,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,14 +130,6 @@ public class GitLabWorkspaceInitializationService {
         this.dataSyncTriggerProvider = dataSyncTriggerProvider;
         this.connectionService = connectionService;
         this.monitoringExecutor = monitoringExecutor;
-    }
-
-    /** Subscribes to workspace-creation events and dispatches GitLab-side init for GITLAB rows. */
-    @EventListener
-    public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
-        if (event.kind() == IntegrationKind.GITLAB) {
-            initializeAsync(event.workspaceId());
-        }
     }
 
     /**

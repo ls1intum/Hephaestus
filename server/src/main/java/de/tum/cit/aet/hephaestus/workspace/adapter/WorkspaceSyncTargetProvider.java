@@ -79,10 +79,24 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     private boolean hasActiveProvider(Workspace workspace, IntegrationKind kind) {
-        return connectionService
-            .findActiveProviderKind(workspace.getId())
-            .map(k -> k == kind)
-            .orElse(false);
+        try {
+            return connectionService
+                .findActiveProviderKind(workspace.getId())
+                .map(k -> k == kind)
+                .orElse(false);
+        } catch (IllegalStateException e) {
+            // A single corrupt workspace with ACTIVE Connections for BOTH GitHub and GitLab makes
+            // findActiveProviderKind fail loud. This filter runs while streaming EVERY workspace at
+            // the top of the daily sync cron (getSyncSessions/getSyncStatistics/getActiveSyncTargets);
+            // letting the throw escape would abort the whole enumeration and silently skip the sync
+            // for every other tenant until the bad row is fixed out-of-band. Drop just this workspace.
+            log.error(
+                "Skipping workspace from sync enumeration: reason=dualActiveProvider, workspaceId={}, error={}",
+                workspace.getId(),
+                e.getMessage()
+            );
+            return false;
+        }
     }
 
     @Override

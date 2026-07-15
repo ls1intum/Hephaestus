@@ -1,10 +1,9 @@
-import { formatDistanceToNow } from "date-fns";
 import type { ConnectionSyncStatus } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { SyncNowButton } from "./SyncNowButton";
-import { asDate } from "./sync-format";
+import { relativeTime } from "./sync-format";
 
 export interface SlackSyncStatusCardProps {
 	status: ConnectionSyncStatus;
@@ -34,8 +33,10 @@ export function SlackSyncStatusCard({
 				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
 					<span>
 						{status.lastSuccessfulSyncAt
-							? `Last synced ${formatDistanceToNow(asDate(status.lastSuccessfulSyncAt) ?? new Date(), { addSuffix: true })}`
-							: "Never synced"}
+							? `Last synced ${relativeTime(status.lastSuccessfulSyncAt)}`
+							: isConnectionActive && !status.activeJob
+								? "No channels activated yet"
+								: "Never synced"}
 					</span>
 					<LastProcessedEvent lastEventAt={status.lastEventProcessedAt} />
 				</div>

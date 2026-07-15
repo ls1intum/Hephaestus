@@ -1,6 +1,5 @@
-import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { asDate } from "./sync-format";
+import { asDate, relativeTime } from "./sync-format";
 
 export interface LastProcessedEventProps {
 	lastEventAt?: Date | string;
@@ -16,7 +15,7 @@ export function LastProcessedEvent({ lastEventAt, className }: LastProcessedEven
 
 	return (
 		<span className={cn("text-muted-foreground text-sm", className)}>
-			Last event processed {formatDistanceToNow(date, { addSuffix: true })}
+			Last event processed {relativeTime(date)}
 		</span>
 	);
 }

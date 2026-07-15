@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
@@ -17,14 +18,11 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelR
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackSyncProperties;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
 /** Read-only Slack sync state built without vendor API calls. */
@@ -62,7 +60,14 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             .map(state -> state == IntegrationState.ACTIVE ? Boolean.TRUE : null)
             .orElse(null);
 
-        return new ConnectionSyncDetails(webhookRegistered, nextScheduledSyncAt(), null, null, false, null);
+        return new ConnectionSyncDetails(
+            webhookRegistered,
+            CronSchedules.nextRun(properties.cron()),
+            null,
+            null,
+            false,
+            null
+        );
     }
 
     @Override
@@ -101,16 +106,6 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             null,
             null
         );
-    }
-
-    private @Nullable Instant nextScheduledSyncAt() {
-        String cron = properties.cron();
-        if (!CronExpression.isValidExpression(cron)) {
-            return null;
-        }
-        ZoneId zone = ZoneId.systemDefault();
-        LocalDateTime next = CronExpression.parse(cron).next(LocalDateTime.now(zone));
-        return next == null ? null : next.atZone(zone).toInstant();
     }
 
     private static @Nullable Instant toInstant(@Nullable String slackTs) {
