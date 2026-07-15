@@ -1,6 +1,15 @@
 import { formatDistanceToNow } from "date-fns";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 
+/**
+ * Adaptive poll cadence for sync status/resources/jobs queries: refetch every 5s while a job is
+ * running (live progress) and back off to 60s when idle. SSE hint invalidation is the primary live
+ * channel; this polling is the fallback when SSE is unavailable.
+ */
+export function syncPollInterval(hasActiveJob: boolean): number {
+	return hasActiveJob ? 5_000 : 60_000;
+}
+
 export function asDate(value: Date | string | undefined | null): Date | undefined {
 	if (value == null) return undefined;
 	const date = value instanceof Date ? value : new Date(value);

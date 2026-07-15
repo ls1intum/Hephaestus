@@ -9,6 +9,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { IntegrationOverviewCard } from "@/components/admin/integrations/IntegrationOverviewCard";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -73,7 +74,7 @@ function IntegrationOverviewCardContainer({
 			path: { workspaceSlug, connectionId: connectionId ?? -1 },
 		}),
 		enabled: entry.connected && connectionId != null,
-		refetchInterval: (query) => (query.state.data?.activeJob ? 5_000 : 60_000),
+		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
 		refetchOnWindowFocus: true,
 	});
 

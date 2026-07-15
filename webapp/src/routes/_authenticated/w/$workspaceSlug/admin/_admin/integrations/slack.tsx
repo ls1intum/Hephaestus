@@ -23,6 +23,7 @@ import { ConnectionHealthBadge } from "@/components/admin/integrations/Connectio
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { SlackSyncStatusCard } from "@/components/admin/integrations/SlackSyncStatusCard";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,7 +68,7 @@ function SlackIntegrationPage() {
 			path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
 		}),
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: (query) => (query.state.data?.activeJob ? 5_000 : 60_000),
+		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
 		refetchOnWindowFocus: true,
 	});
 	const status = statusQuery.data;
@@ -85,7 +86,7 @@ function SlackIntegrationPage() {
 	} = useQuery({
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: status?.activeJob ? 5_000 : 60_000,
+		refetchInterval: syncPollInterval(status?.activeJob != null),
 	});
 
 	const slackChannelsQueryOptions = listSlackChannelsOptions({ path: { workspaceSlug: slug } });
@@ -97,7 +98,7 @@ function SlackIntegrationPage() {
 	} = useQuery({
 		...slackChannelsQueryOptions,
 		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
-		refetchInterval: status?.activeJob ? 5_000 : 60_000,
+		refetchInterval: syncPollInterval(status?.activeJob != null),
 	});
 
 	const slackChannelCandidatesQueryOptions = listSlackChannelCandidatesOptions({

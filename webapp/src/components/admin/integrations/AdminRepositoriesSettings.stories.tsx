@@ -34,11 +34,6 @@ const meta = {
 			control: "boolean",
 			description: "Whether a repository is currently being removed",
 		},
-		isReadOnly: {
-			control: "boolean",
-			description:
-				"Whether repository management is disabled (for GitHub App Installation workspaces)",
-		},
 	},
 	args: {
 		repositories: [
@@ -51,7 +46,6 @@ const meta = {
 		addRepositoryError: null,
 		isAddingRepository: false,
 		isRemovingRepository: false,
-		isReadOnly: false,
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 	},
@@ -177,24 +171,5 @@ export const AddValidationError: Story = {
 export const AddingRepository: Story = {
 	args: {
 		isAddingRepository: true,
-	},
-};
-
-/**
- * GitHub App Installation managed workspace — the list is read-only, the managed-by alert shows, and
- * the manual add/remove controls are withheld.
- */
-export const GitHubAppManaged: Story = {
-	args: {
-		isReadOnly: true,
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/managed by a github app installation/i)).toBeInTheDocument();
-		// No manual controls in read-only mode.
-		await expect(canvas.queryByLabelText("Add a repository")).not.toBeInTheDocument();
-		await expect(
-			canvas.queryByRole("button", { name: /remove octocat\/Hello-World/i }),
-		).not.toBeInTheDocument();
 	},
 };

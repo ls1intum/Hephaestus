@@ -25,6 +25,7 @@ import { IntegrationPageHeader } from "@/components/admin/integrations/Integrati
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { ScmConnectionCard } from "@/components/admin/integrations/ScmConnectionCard";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -71,7 +72,7 @@ function ScmIntegrationPage() {
 	const statusQuery = useQuery({
 		...statusQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: (query) => (query.state.data?.activeJob ? 5_000 : 60_000),
+		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
 		refetchOnWindowFocus: true,
 	});
 	const status = statusQuery.data;
@@ -88,7 +89,7 @@ function ScmIntegrationPage() {
 	} = useQuery({
 		...resourcesQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: pollInterval(status?.activeJob != null),
+		refetchInterval: syncPollInterval(status?.activeJob != null),
 	});
 
 	const jobsQueryOptions = listConnectionSyncJobsOptions({
@@ -104,7 +105,7 @@ function ScmIntegrationPage() {
 	} = useQuery({
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: pollInterval(status?.activeJob != null),
+		refetchInterval: syncPollInterval(status?.activeJob != null),
 	});
 
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
@@ -284,8 +285,4 @@ function ScmIntegrationPage() {
 			)}
 		</div>
 	);
-}
-
-function pollInterval(hasActiveJob: boolean): number {
-	return hasActiveJob ? 5_000 : 60_000;
 }

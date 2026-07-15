@@ -1,7 +1,6 @@
-import { FolderGitIcon, InfoIcon, Trash2Icon } from "lucide-react";
+import { FolderGitIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -47,17 +46,15 @@ interface AdminRepositoriesSettingsProps {
 	addRepositoryError: Error | null;
 	isAddingRepository: boolean;
 	isRemovingRepository: boolean;
-	/** Whether repository management is disabled (for GitHub App Installation workspaces) */
-	isReadOnly?: boolean;
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
 }
 
 /**
  * Admin surface for the monitored-repositories plane: which repositories Hephaestus watches for
- * practice detection, plus adding and removing them. GitHub App Installation workspaces are managed
- * upstream by the installation, so for those (`isReadOnly`) the list is read-only and the manual
- * add/remove controls are withheld. Pure presentation — data and mutations live in the container.
+ * practice detection, plus adding and removing them. Rendered only for PAT-managed workspaces —
+ * GitHub App Installation workspaces manage their repos upstream and surface them read-only through
+ * the sync-state table instead. Pure presentation — data and mutations live in the container.
  */
 export function AdminRepositoriesSettings({
 	repositories = [],
@@ -66,7 +63,6 @@ export function AdminRepositoriesSettings({
 	addRepositoryError,
 	isAddingRepository,
 	isRemovingRepository,
-	isReadOnly = false,
 	onAddRepository,
 	onRemoveRepository,
 }: AdminRepositoriesSettingsProps) {
@@ -93,17 +89,6 @@ export function AdminRepositoriesSettings({
 				</CardHeader>
 
 				<CardContent className="space-y-4">
-					{isReadOnly && (
-						<Alert>
-							<InfoIcon />
-							<AlertTitle>Managed by a GitHub App Installation</AlertTitle>
-							<AlertDescription>
-								Repositories are synced automatically from the installation&apos;s configuration, so
-								they cannot be added or removed here.
-							</AlertDescription>
-						</Alert>
-					)}
-
 					{isLoading ? (
 						<div className="space-y-2">
 							<Skeleton className="h-10 w-full" />
@@ -119,45 +104,41 @@ export function AdminRepositoriesSettings({
 									<ItemContent>
 										<ItemTitle className="font-mono">{repo.nameWithOwner}</ItemTitle>
 									</ItemContent>
-									{!isReadOnly && (
-										<ItemActions>
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															variant="outline"
-															size="icon"
-															aria-label={`Remove ${repo.nameWithOwner}`}
-														>
-															<Trash2Icon className="size-4" />
-														</Button>
-													}
-												/>
-												<AlertDialogContent>
-													<AlertDialogHeader>
-														<AlertDialogTitle>
-															Stop monitoring {repo.nameWithOwner}?
-														</AlertDialogTitle>
-														<AlertDialogDescription>
-															Are you sure you want to stop monitoring this repository? This action
-															cannot be undone and will remove all data associated with this
-															repository.
-														</AlertDialogDescription>
-													</AlertDialogHeader>
-													<AlertDialogFooter>
-														<AlertDialogCancel>Cancel</AlertDialogCancel>
-														<AlertDialogAction
-															variant="destructive"
-															onClick={() => onRemoveRepository(repo.nameWithOwner)}
-															disabled={isRemovingRepository}
-														>
-															Stop monitoring
-														</AlertDialogAction>
-													</AlertDialogFooter>
-												</AlertDialogContent>
-											</AlertDialog>
-										</ItemActions>
-									)}
+									<ItemActions>
+										<AlertDialog>
+											<AlertDialogTrigger
+												render={
+													<Button
+														variant="outline"
+														size="icon"
+														aria-label={`Remove ${repo.nameWithOwner}`}
+													>
+														<Trash2Icon className="size-4" />
+													</Button>
+												}
+											/>
+											<AlertDialogContent>
+												<AlertDialogHeader>
+													<AlertDialogTitle>Stop monitoring {repo.nameWithOwner}?</AlertDialogTitle>
+													<AlertDialogDescription>
+														Are you sure you want to stop monitoring this repository? This action
+														cannot be undone and will remove all data associated with this
+														repository.
+													</AlertDialogDescription>
+												</AlertDialogHeader>
+												<AlertDialogFooter>
+													<AlertDialogCancel>Cancel</AlertDialogCancel>
+													<AlertDialogAction
+														variant="destructive"
+														onClick={() => onRemoveRepository(repo.nameWithOwner)}
+														disabled={isRemovingRepository}
+													>
+														Stop monitoring
+													</AlertDialogAction>
+												</AlertDialogFooter>
+											</AlertDialogContent>
+										</AlertDialog>
+									</ItemActions>
 								</Item>
 							))}
 						</ItemGroup>
@@ -167,49 +148,43 @@ export function AdminRepositoriesSettings({
 								<EmptyMedia variant="icon">
 									<FolderGitIcon />
 								</EmptyMedia>
-								<EmptyTitle>
-									{isReadOnly ? "No repositories synced yet" : "No repositories monitored yet"}
-								</EmptyTitle>
+								<EmptyTitle>No repositories monitored yet</EmptyTitle>
 								<EmptyDescription>
-									{isReadOnly
-										? "Repositories will appear here once the GitHub App Installation syncs them."
-										: "Add a repository below to start monitoring it for practice detection."}
+									Add a repository below to start monitoring it for practice detection.
 								</EmptyDescription>
 							</EmptyHeader>
 						</Empty>
 					)}
 
-					{!isReadOnly && (
-						<Field data-invalid={!!addRepositoryError}>
-							<FieldLabel htmlFor="add-repository">Add a repository</FieldLabel>
-							<InputGroup>
-								<InputGroupInput
-									id="add-repository"
-									value={repositoryInput}
-									onChange={(e) => setRepositoryInput(e.target.value)}
-									placeholder="owner/name"
-									disabled={isAddingRepository}
-									autoComplete="off"
-									aria-invalid={!!addRepositoryError}
-								/>
-								<InputGroupAddon align="inline-end">
-									<InputGroupButton
-										variant="default"
-										onClick={handleAddRepository}
-										disabled={!isValidInput || isAddingRepository}
-									>
-										Add
-									</InputGroupButton>
-								</InputGroupAddon>
-							</InputGroup>
-							<FieldDescription>
-								Enter the repository as <code>owner/name</code>.
-							</FieldDescription>
-							{addRepositoryError && (
-								<FieldError>An error occurred while adding the repository.</FieldError>
-							)}
-						</Field>
-					)}
+					<Field data-invalid={!!addRepositoryError}>
+						<FieldLabel htmlFor="add-repository">Add a repository</FieldLabel>
+						<InputGroup>
+							<InputGroupInput
+								id="add-repository"
+								value={repositoryInput}
+								onChange={(e) => setRepositoryInput(e.target.value)}
+								placeholder="owner/name"
+								disabled={isAddingRepository}
+								autoComplete="off"
+								aria-invalid={!!addRepositoryError}
+							/>
+							<InputGroupAddon align="inline-end">
+								<InputGroupButton
+									variant="default"
+									onClick={handleAddRepository}
+									disabled={!isValidInput || isAddingRepository}
+								>
+									Add
+								</InputGroupButton>
+							</InputGroupAddon>
+						</InputGroup>
+						<FieldDescription>
+							Enter the repository as <code>owner/name</code>.
+						</FieldDescription>
+						{addRepositoryError && (
+							<FieldError>An error occurred while adding the repository.</FieldError>
+						)}
+					</Field>
 				</CardContent>
 			</Card>
 		</div>

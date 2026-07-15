@@ -19,6 +19,7 @@ import type {
 	OutlineConnectInput,
 	OutlineSyncSummary,
 } from "@/components/admin/integrations/outline/OutlineConnectCard";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 const TOKEN_STATUS_STALE_MS = 5 * 60_000;
@@ -51,7 +52,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	} = useQuery({
 		...statusQueryOptions,
 		enabled: hasConnection && connectionId != null,
-		refetchInterval: (query) => (query.state.data?.activeJob ? 3_000 : 60_000),
+		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
 	});
 
 	const collectionsQueryOptions = listOutlineCollectionsOptions({ path: { workspaceSlug } });
