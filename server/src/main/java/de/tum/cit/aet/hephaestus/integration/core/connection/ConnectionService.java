@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
@@ -388,14 +389,41 @@ public class ConnectionService {
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
-        if (req.next() != IntegrationState.ACTIVE && connection.getId() != null) {
+        return applyTransition(connection, req, null);
+    }
+
+    /**
+     * Disconnect after acquiring the same lifecycle fence used by sync-job creation. The callback may
+     * revoke vendor access or erase provider-specific data, so it runs only after the active-job check
+     * and state-machine validation have succeeded, while the connection row lock is still held.
+     */
+    @Transactional
+    public Connection disconnect(Connection connection, TransitionRequest req, Runnable revoke) {
+        if (req.next() != IntegrationState.UNINSTALLED) {
+            throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
+        }
+        return applyTransition(connection, req, revoke);
+    }
+
+    private Connection applyTransition(
+        Connection connection,
+        TransitionRequest req,
+        @Nullable Runnable beforeLocalTransition
+    ) {
+        if (connection.getId() != null) {
+            long connectionId = connection.getId();
             long workspaceId = connection.getWorkspace().getId();
-            connectionRepository.acquireLifecycleLock(connection.getId(), workspaceId);
-            syncJobRepository
-                .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connection.getId(), SyncJobStatus.ACTIVE)
-                .ifPresent(active -> {
-                    throw new ConnectionBusyException(connection.getId(), active.getId());
-                });
+            connectionRepository.acquireLifecycleLock(connectionId, workspaceId);
+            connection = connectionRepository
+                .findByIdAndWorkspaceId(connectionId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Connection", connectionId));
+            if (req.next() != IntegrationState.ACTIVE) {
+                syncJobRepository
+                    .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
+                    .ifPresent(active -> {
+                        throw new ConnectionBusyException(connectionId, active.getId());
+                    });
+            }
         }
         IntegrationState current = connection.getState();
         if (current == req.next()) {
@@ -406,6 +434,9 @@ public class ConnectionService {
             throw new IllegalStateException(
                 "Illegal transition for connection " + connection.getId() + ": " + current + " → " + req.next()
             );
+        }
+        if (beforeLocalTransition != null) {
+            beforeLocalTransition.run();
         }
         ConnectionAudit audit = new ConnectionAudit(
             connection,

@@ -180,17 +180,20 @@ public class ConnectionController {
             case PENDING -> throw new IllegalArgumentException("PENDING is not an admin-settable connection state");
         };
 
-        // Entering the terminal state additionally revokes the vendor-side grant.
-        if (target == IntegrationState.UNINSTALLED) {
-            revokeBestEffort(connection);
-        }
-
         String correlationId = eventType.toLowerCase(Locale.ROOT) + "-" + connection.getId() + "-" + UUID.randomUUID();
-        connection = connectionService.transition(
-            connection,
-            new TransitionRequest(target, eventType, "ADMIN", actorRef(authentication), correlationId, body.reason())
+        TransitionRequest request = new TransitionRequest(
+            target,
+            eventType,
+            "ADMIN",
+            actorRef(authentication),
+            correlationId,
+            body.reason()
         );
-        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
+        Connection updated =
+            target == IntegrationState.UNINSTALLED
+                ? connectionService.disconnect(connection, request, () -> revokeBestEffort(connection))
+                : connectionService.transition(connection, request);
+        return ResponseEntity.ok(ConnectionSummaryDTO.from(updated, admin.manifests()));
     }
 
     /**

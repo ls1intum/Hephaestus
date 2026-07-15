@@ -121,20 +121,30 @@
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1784058330088-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="connection ownership lookup constraint already present">
+            <not><uniqueConstraintExists tableName="connection"
+                                         constraintName="ux_connection_id_workspace"/></not>
+        </preConditions>
+        <comment>Provide the composite connection key used by the sync-job ownership constraint.</comment>
+        <addUniqueConstraint tableName="connection" columnNames="id, workspace_id"
+                             constraintName="ux_connection_id_workspace"/>
+        <rollback>
+            <dropUniqueConstraint tableName="connection" constraintName="ux_connection_id_workspace"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1784058330088-6">
         <preConditions onFail="MARK_RAN" onFailMessage="sync-job connection ownership constraint already present">
             <not><foreignKeyConstraintExists foreignKeyName="fk_sync_job_connection_workspace"/></not>
         </preConditions>
         <comment>Ensure a sync job's connection belongs to the same workspace.</comment>
         <sql>
-            ALTER TABLE connection ADD CONSTRAINT ux_connection_id_workspace UNIQUE (id, workspace_id);
             ALTER TABLE sync_job ADD CONSTRAINT fk_sync_job_connection_workspace
                 FOREIGN KEY (connection_id, workspace_id) REFERENCES connection (id, workspace_id);
         </sql>
         <rollback>
-            <sql>
-                ALTER TABLE sync_job DROP CONSTRAINT fk_sync_job_connection_workspace;
-                ALTER TABLE connection DROP CONSTRAINT ux_connection_id_workspace;
-            </sql>
+            <dropForeignKeyConstraint baseTableName="sync_job"
+                                      constraintName="fk_sync_job_connection_workspace"/>
         </rollback>
     </changeSet>
 

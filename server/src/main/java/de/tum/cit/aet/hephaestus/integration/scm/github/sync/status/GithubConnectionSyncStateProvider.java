@@ -215,8 +215,12 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         }
 
         String state = allComplete ? "COMPLETE" : (anyInitialized ? "IN_PROGRESS" : "NOT_STARTED");
-        Integer percent =
-            totalItems > 0 ? (int) Math.round((100.0 * doneItems) / totalItems) : (anyInitialized ? 100 : null);
+        Integer percent = null;
+        if (totalItems > 0) {
+            percent = (int) Math.round((100.0 * doneItems) / totalItems);
+        } else if (anyInitialized) {
+            percent = 100;
+        }
 
         // See toResourceState: no per-item timestamp exists for a number-based backfill horizon.
         return new BackfillSummary(state, null, percent);

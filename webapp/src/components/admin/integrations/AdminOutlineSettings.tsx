@@ -305,7 +305,7 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 			<OutlineConnectCard
 				connected={connected}
 				connectionState={outlineConnection?.state}
-				connectionLabel={outlineConnection?.displayName ?? outlineConnection?.instanceKey}
+				connectionLabel={outlineConnection?.displayName}
 				status={syncSummary}
 				isStatusLoading={connected && isStatusLoading}
 				tokenStatus={tokenStatus}

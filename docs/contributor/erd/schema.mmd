@@ -188,7 +188,7 @@ erDiagram
     }
 
     Connection {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(48) kind UK "NOT NULL"
         VARCHAR(128) instance_key UK
@@ -201,6 +201,13 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
+    }
+
+    ConnectionActivity {
+        BIGINT connection_id PK,FK
+        BIGINT workspace_id FK "NOT NULL"
+        TIMESTAMPTZ last_event_at
+        VARCHAR(128) last_event_type
     }
 
     ConnectionAudit {
@@ -1265,7 +1272,9 @@ erDiagram
     User ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackMessage : authored_by
     Workspace ||--o{ SyncJob : has
-    Connection ||--o{ SyncJob : has
+    Connection ||--o{ SyncJob : references
+    Connection ||--o{ SyncJob : connection_id
+    Connection ||--o{ SyncJob : connection_id
     AgentConfig ||--o{ Workspace : practice_config_id
     AgentConfig ||--o{ Workspace : mentor_config_id
     Workspace ||--o{ WorkspaceSlugHistory : has
@@ -1273,6 +1282,8 @@ erDiagram
     %% Many-to-Many relationships
     GitCommit }o--o{ CommitPullRequest : has
     Issue }o--o{ CommitPullRequest : references
+    Connection }o--o{ ConnectionActivity : has
+    Workspace }o--o{ ConnectionActivity : has
     Discussion }o--o{ DiscussionLabel : labeled
     Label }o--o{ DiscussionLabel : labeled
     Feedback }o--o{ FeedbackObservation : has

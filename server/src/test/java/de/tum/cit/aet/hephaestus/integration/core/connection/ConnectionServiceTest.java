@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -137,6 +138,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         );
         setId(connection, 55L);
         connection.setState(IntegrationState.UNINSTALLED);
+        when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId())).thenReturn(
+            java.util.Optional.of(connection)
+        );
 
         Connection result = service.transition(
             connection,
@@ -193,6 +197,37 @@ class ConnectionServiceTest extends BaseUnitTest {
         assertThat(result).isSameAs(connection);
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(result.getStateReason()).isNull();
+        verify(auditRepository, never()).save(any());
+        verify(connectionRepository, never()).save(any());
+    }
+
+    @Test
+    void transition_staleSnapshotCannotOverwriteStateReadUnderLifecycleLock() {
+        Connection stale = connectionInState(IntegrationState.ACTIVE);
+        Connection authoritative = connectionInState(IntegrationState.UNINSTALLED);
+        when(connectionRepository.findByIdAndWorkspaceId(stale.getId(), workspace.getId())).thenReturn(
+            java.util.Optional.of(authoritative)
+        );
+
+        assertThatThrownBy(() ->
+            service.transition(
+                stale,
+                new TransitionRequest(
+                    IntegrationState.SUSPENDED,
+                    "SUSPEND",
+                    "ADMIN",
+                    "actor-1",
+                    "corr-stale",
+                    "stale request"
+                )
+            )
+        )
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("UNINSTALLED")
+            .hasMessageContaining("SUSPENDED");
+
+        assertThat(stale.getState()).isEqualTo(IntegrationState.ACTIVE);
+        assertThat(authoritative.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         verify(auditRepository, never()).save(any());
         verify(connectionRepository, never()).save(any());
     }
@@ -256,6 +291,67 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
         assertThat(connection.getCredentialsEncrypted()).isNotNull();
+        verify(auditRepository, never()).save(any());
+        verify(connectionRepository, never()).save(any());
+    }
+
+    @Test
+    void disconnect_checksLifecycleFenceBeforeRevokingVendorAccess() {
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+        Runnable revoke = Mockito.mock(Runnable.class);
+        InOrder order = Mockito.inOrder(connectionRepository, syncJobRepository, revoke);
+
+        service.disconnect(
+            connection,
+            new TransitionRequest(
+                IntegrationState.UNINSTALLED,
+                "DISCONNECT",
+                "ADMIN",
+                "actor-1",
+                "corr-disconnect",
+                "removed"
+            ),
+            revoke
+        );
+
+        order.verify(connectionRepository).acquireLifecycleLock(connection.getId(), workspace.getId());
+        order
+            .verify(syncJobRepository)
+            .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connection.getId(), SyncJobStatus.ACTIVE);
+        order.verify(revoke).run();
+        assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
+    }
+
+    @Test
+    void disconnect_withActiveSyncRejectsBeforeRevokingVendorAccess() {
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+        SyncJob active = Mockito.mock(SyncJob.class);
+        when(active.getId()).thenReturn(99L);
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                connection.getId(),
+                SyncJobStatus.ACTIVE
+            )
+        ).thenReturn(java.util.Optional.of(active));
+        Runnable revoke = Mockito.mock(Runnable.class);
+
+        assertThatThrownBy(() ->
+            service.disconnect(
+                connection,
+                new TransitionRequest(
+                    IntegrationState.UNINSTALLED,
+                    "DISCONNECT",
+                    "ADMIN",
+                    "actor-1",
+                    "corr-disconnect",
+                    "removed"
+                ),
+                revoke
+            )
+        ).isInstanceOf(ConnectionBusyException.class);
+
+        verify(revoke, never()).run();
+        assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
         verify(auditRepository, never()).save(any());
         verify(connectionRepository, never()).save(any());
     }
@@ -486,6 +582,9 @@ class ConnectionServiceTest extends BaseUnitTest {
         // Lifecycle events carry the connection id; persisted rows always have one.
         setId(connection, 55L);
         connection.setState(state);
+        Mockito.lenient()
+            .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
+            .thenReturn(java.util.Optional.of(connection));
         return connection;
     }
 

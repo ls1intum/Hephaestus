@@ -338,6 +338,21 @@ describe("AdminOutlineSettings — sync now", () => {
 });
 
 describe("AdminOutlineSettings — token lifecycle", () => {
+	it("does not expose an opaque connection identifier when no display name is available", async () => {
+		const collectionsRef = { current: [engineering] as unknown[] };
+		useConnectedHandlers(collectionsRef);
+		server.use(
+			http.get("*/workspaces/demo/connections", () =>
+				HttpResponse.json([{ ...activeOutlineConnection, displayName: undefined }]),
+			),
+		);
+
+		renderContainer();
+
+		expect(await screen.findByText(/^outline active$/i)).toBeTruthy();
+		expect(screen.queryByText(activeOutlineConnection.instanceKey)).toBeNull();
+	});
+
 	it("surfaces token status failures and offers a retry", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		useConnectedHandlers(collectionsRef);

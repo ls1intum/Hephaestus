@@ -1,8 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.activity;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
@@ -25,8 +31,26 @@ public class ConnectionActivity {
     @Column(name = "connection_id")
     private Long connectionId;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "connection_id",
+        insertable = false,
+        updatable = false,
+        foreignKey = @ForeignKey(name = "fk_connection_activity_connection")
+    )
+    private Connection connection;
+
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "workspace_id",
+        insertable = false,
+        updatable = false,
+        foreignKey = @ForeignKey(name = "fk_connection_activity_workspace")
+    )
+    private Workspace workspace;
 
     @Column(name = "last_event_at")
     @Nullable

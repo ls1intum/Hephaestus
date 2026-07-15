@@ -94,6 +94,7 @@ public class GitLabWorkspaceInitializationService {
     private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
     private final ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider;
     private final ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
+    private final ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider;
 
     // Authoritative source for per-workspace integration config (server URL, PAT presence).
     private final ConnectionService connectionService;
@@ -113,6 +114,7 @@ public class GitLabWorkspaceInitializationService {
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
+        ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider,
         ConnectionService connectionService,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
@@ -127,6 +129,7 @@ public class GitLabWorkspaceInitializationService {
         this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
         this.gitLabWebhookServiceProvider = gitLabWebhookServiceProvider;
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
+        this.dataSyncTriggerProvider = dataSyncTriggerProvider;
         this.connectionService = connectionService;
         this.monitoringExecutor = monitoringExecutor;
     }
@@ -166,8 +169,7 @@ public class GitLabWorkspaceInitializationService {
                 );
                 WorkspaceContextHolder.setContext(context);
                 try {
-                    initialize(workspace);
-                    syncFullData(workspace);
+                    dataSyncTriggerProvider.getObject().syncAllRepositories(workspaceId);
                     startNatsConsumer(workspace);
                 } finally {
                     WorkspaceContextHolder.clearContext();

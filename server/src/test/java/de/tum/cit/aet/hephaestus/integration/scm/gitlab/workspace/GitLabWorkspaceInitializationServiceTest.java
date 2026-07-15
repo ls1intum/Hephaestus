@@ -88,6 +88,12 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     private ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
 
     @Mock
+    private ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider;
+
+    @Mock
+    private GitLabWorkspaceDataSyncTrigger dataSyncTrigger;
+
+    @Mock
     private AsyncTaskExecutor monitoringExecutor;
 
     @Mock
@@ -133,6 +139,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             })
             .when(natsConsumerServiceProvider)
             .ifAvailable(any());
+        lenient().when(dataSyncTriggerProvider.getObject()).thenReturn(dataSyncTrigger);
 
         initService = new GitLabWorkspaceInitializationService(
             workspaceRepository,
@@ -146,6 +153,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
             rateLimitTrackerProvider,
+            dataSyncTriggerProvider,
             connectionService,
             monitoringExecutor
         );
@@ -207,6 +215,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             gitLabSyncServiceHolderProvider,
             gitLabWebhookServiceProvider,
             rateLimitTrackerProvider,
+            dataSyncTriggerProvider,
             connectionService,
             monitoringExecutor
         );
@@ -503,11 +512,10 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         void shouldStartNatsConsumerAfterInit() {
             executeSubmittedTasksSynchronously();
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
-            when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(null);
 
             initService.initializeAsync(1L);
 
+            verify(dataSyncTrigger).syncAllRepositories(1L);
             verify(natsConsumerService).startConsumingScope(1L);
         }
 
@@ -521,8 +529,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
                 return null;
             });
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
-            when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(null);
 
             disabledService.initializeAsync(1L);
 

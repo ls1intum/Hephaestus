@@ -65,7 +65,9 @@ public final class SyncJobHandle {
 
     /** Called by {@link SyncJobService}: the heartbeat sweep (DB-sourced) or an immediate local cancel. */
     void refreshCancellation(boolean requested) {
-        this.cancellationRequested = requested;
+        if (requested) {
+            this.cancellationRequested = true;
+        }
     }
 
     /**

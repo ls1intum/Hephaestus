@@ -16,6 +16,8 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,8 +31,8 @@ import org.springframework.stereotype.Component;
  * which in turn lives in the workspace module). Lazy lookup breaks the cycle without forcing the
  * workspace caller to know about the cycle. {@link ConnectionRepository} and {@link SyncJobService}
  * have no such documented cycle, but are looked up the same defensive way for consistency with the
- * rest of this class — a missing bean degrades to the untracked/unrecorded sync path rather than a
- * startup failure.
+ * rest of this class. Active-connection writes never bypass {@link SyncJobService}; if the control
+ * plane is unavailable, the sync is skipped rather than run unfenced.
  */
 @Component
 public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger {
@@ -41,17 +43,20 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     private final ObjectProvider<SyncTargetProvider> syncTargetProvider;
     private final ObjectProvider<ConnectionRepository> connectionRepositoryProvider;
     private final ObjectProvider<SyncJobService> syncJobServiceProvider;
+    private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubWorkspaceDataSyncTrigger(
         ObjectProvider<GithubDataSyncService> dataSyncServiceProvider,
         ObjectProvider<SyncTargetProvider> syncTargetProvider,
         ObjectProvider<ConnectionRepository> connectionRepositoryProvider,
-        ObjectProvider<SyncJobService> syncJobServiceProvider
+        ObjectProvider<SyncJobService> syncJobServiceProvider,
+        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.dataSyncServiceProvider = dataSyncServiceProvider;
         this.syncTargetProvider = syncTargetProvider;
         this.connectionRepositoryProvider = connectionRepositoryProvider;
         this.syncJobServiceProvider = syncJobServiceProvider;
+        this.monitoringExecutor = monitoringExecutor;
     }
 
     @Override
@@ -62,10 +67,8 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     /**
      * Resolves the workspace's ACTIVE GitHub {@link Connection} and, when both it and {@link
      * SyncJobService} are available, records the lifecycle sync as an {@code INITIAL}/{@code
-     * LIFECYCLE} job. Falls back to the untracked sync when either is missing
-     * (e.g. no Connection yet at the point this fires, or the bean genuinely isn't wired), and skips
-     * the run — same as a manual "Sync now" would — when a job is already active for this
-     * connection.
+     * LIFECYCLE} job. A workspace without an active Connection still uses the bootstrap fallback;
+     * an active Connection never runs untracked. An already-active job skips this run.
      */
     @Override
     public void syncAllRepositories(long workspaceId) {
@@ -80,8 +83,12 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                       IntegrationState.ACTIVE
                   );
 
-        if (syncJobService == null || connection.isEmpty()) {
+        if (connection.isEmpty()) {
             dataSyncServiceProvider.getObject().syncAllRepositories(workspaceId);
+            return;
+        }
+        if (syncJobService == null) {
+            log.warn("Skipped lifecycle sync: reason=syncJobServiceUnavailable, workspaceId={}", workspaceId);
             return;
         }
 
@@ -108,12 +115,59 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
 
     @Override
     public void syncSingleSyncTarget(long syncTargetId) {
-        var providerOpt = syncTargetProvider.getIfAvailable();
-        if (providerOpt == null) {
+        SyncTargetProvider provider = syncTargetProvider.getIfAvailable();
+        if (provider == null) {
             return;
         }
-        providerOpt
+        provider
             .findSyncTargetById(syncTargetId)
-            .ifPresent(target -> dataSyncServiceProvider.getObject().syncSyncTargetAsync(target));
+            .ifPresent(target -> monitoringExecutor.execute(() -> syncTarget(target)));
+    }
+
+    private void syncTarget(SyncTargetProvider.SyncTarget target) {
+        ConnectionRepository connectionRepository = connectionRepositoryProvider.getIfAvailable();
+        SyncJobService syncJobService = syncJobServiceProvider.getIfAvailable();
+        if (connectionRepository == null || syncJobService == null) {
+            log.warn(
+                "Skipped single-target sync: reason=controlPlaneUnavailable, workspaceId={}, syncTargetId={}",
+                target.scopeId(),
+                target.id()
+            );
+            return;
+        }
+        Optional<Connection> connection =
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                target.scopeId(),
+                IntegrationKind.GITHUB,
+                IntegrationState.ACTIVE
+            );
+        if (connection.isEmpty()) {
+            log.debug(
+                "Skipped single-target sync: reason=noActiveConnection, workspaceId={}, syncTargetId={}",
+                target.scopeId(),
+                target.id()
+            );
+            return;
+        }
+        try {
+            syncJobService.run(
+                new SyncJobRequest(
+                    target.scopeId(),
+                    connection.get().getId(),
+                    IntegrationKind.GITHUB,
+                    SyncJobType.INITIAL,
+                    SyncJobTrigger.LIFECYCLE,
+                    null
+                ),
+                handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target)
+            );
+        } catch (SyncJobConflictException e) {
+            log.info(
+                "Skipped single-target sync: reason=activeJobAlready, workspaceId={}, syncTargetId={}, activeJobId={}",
+                target.scopeId(),
+                target.id(),
+                e.activeJob().getId()
+            );
+        }
     }
 }

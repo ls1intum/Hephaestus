@@ -14,13 +14,16 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinColumns;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Map;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -68,6 +71,23 @@ public class SyncJob {
     @JoinColumn(name = "connection_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sync_job_connection"))
     private Connection connection;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumns(
+        value = {
+            @JoinColumn(name = "connection_id", referencedColumnName = "id", insertable = false, updatable = false),
+            @JoinColumn(
+                name = "workspace_id",
+                referencedColumnName = "workspace_id",
+                insertable = false,
+                updatable = false
+            ),
+        },
+        foreignKey = @ForeignKey(name = "fk_sync_job_connection_workspace")
+    )
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private Connection tenantOwnedConnection;
+
     /**
      * Denormalized from {@link #connection} so job-history queries and DTO mapping never need to
      * join/fetch the Connection row just to render a kind badge.
@@ -88,9 +108,11 @@ public class SyncJob {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
+    @ColumnDefault("'PENDING'")
     private SyncJobStatus status = SyncJobStatus.PENDING;
 
     @Column(name = "cancel_requested", nullable = false)
+    @ColumnDefault("false")
     private boolean cancelRequested = false;
 
     @Column(name = "started_at")

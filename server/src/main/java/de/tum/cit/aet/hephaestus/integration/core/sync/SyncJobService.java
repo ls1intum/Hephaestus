@@ -324,6 +324,21 @@ public class SyncJobService implements SmartLifecycle {
         }
         int reaped = 0;
         for (SyncJob job : stale) {
+            ActiveExecution localExecution = activeExecutions.get(job.getId());
+            if (localExecution != null) {
+                // The lease is stale, but this JVM still owns a live runner. Keep the row active so
+                // connection teardown remains fenced until that runner actually exits; request durable
+                // cancellation and interrupt it instead of manufacturing a terminal row around live work.
+                syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE);
+                localExecution.cancel();
+                publish(
+                    job.getWorkspace().getId(),
+                    job.getConnection().getId(),
+                    job.getKind(),
+                    SyncStateChangedEvent.Scope.JOB
+                );
+                continue;
+            }
             int updated = syncJobRepository.markAbandoned(
                 job.getId(),
                 "Abandoned: no heartbeat (likely pod restart)",
@@ -333,7 +348,6 @@ public class SyncJobService implements SmartLifecycle {
                 continue;
             }
             reaped++;
-            activeExecutions.remove(job.getId());
             publish(
                 job.getWorkspace().getId(),
                 job.getConnection().getId(),

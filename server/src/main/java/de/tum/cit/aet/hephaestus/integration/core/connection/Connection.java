@@ -40,10 +40,10 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
     name = "connection",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_connection",
-        columnNames = { "workspace_id", "kind", "instance_key" }
-    )
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_connection", columnNames = { "workspace_id", "kind", "instance_key" }),
+        @UniqueConstraint(name = "ux_connection_id_workspace", columnNames = { "id", "workspace_id" }),
+    }
 )
 public class Connection {
 

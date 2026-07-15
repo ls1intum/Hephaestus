@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.workspace;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -12,7 +11,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
@@ -29,8 +27,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final WorkspaceRepository workspaceRepository;
 
-    // Lazy-loaded to break circular reference with GithubDataSyncService
-    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
+    private final GitHubWorkspaceDataSyncTrigger dataSyncTrigger;
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubWorkspaceProvisioningAdapter(
@@ -38,20 +35,15 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         WorkspaceRepositoryMonitorService repositoryMonitorService,
         WorkspaceScopeFilter workspaceScopeFilter,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
+        GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.githubLifecycleListener = githubLifecycleListener;
         this.repositoryMonitorService = repositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.workspaceRepository = workspaceRepository;
-        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.dataSyncTrigger = dataSyncTrigger;
         this.monitoringExecutor = monitoringExecutor;
-    }
-
-    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
-    private GithubDataSyncService getGitHubDataSyncService() {
-        return gitHubDataSyncServiceProvider.getObject();
     }
 
     @Override
@@ -287,7 +279,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
 
         monitoringExecutor.execute(() -> {
             try {
-                getGitHubDataSyncService().syncAllRepositories(workspaceId);
+                dataSyncTrigger.syncAllRepositories(workspaceId);
                 log.info(
                     "Completed initial sync for activated installation: installationId={}, workspaceId={}",
                     installationId,

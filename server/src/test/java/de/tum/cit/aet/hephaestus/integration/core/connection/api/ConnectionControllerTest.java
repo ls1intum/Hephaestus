@@ -294,7 +294,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+        when(
+            connectionService.disconnect(any(Connection.class), any(TransitionRequest.class), any(Runnable.class))
+        ).thenAnswer(inv -> {
+            inv.<Runnable>getArgument(2).run();
             Connection conn = inv.getArgument(0);
             conn.setState(IntegrationState.UNINSTALLED);
             return conn;
@@ -313,7 +316,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
-        verify(connectionService).transition(any(Connection.class), req.capture());
+        verify(connectionService).disconnect(any(Connection.class), req.capture(), any(Runnable.class));
+        verify(connectionService, never()).transition(any(Connection.class), any(TransitionRequest.class));
         assertThat(req.getValue().next()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(req.getValue().eventType()).isEqualTo("DISCONNECT");
     }
@@ -324,7 +328,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
         githubStrategy.revokeThrows = true;
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+        when(
+            connectionService.disconnect(any(Connection.class), any(TransitionRequest.class), any(Runnable.class))
+        ).thenAnswer(inv -> {
+            inv.<Runnable>getArgument(2).run();
             Connection conn = inv.getArgument(0);
             conn.setState(IntegrationState.UNINSTALLED);
             return conn;
@@ -339,7 +346,11 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        verify(connectionService, times(1)).transition(any(Connection.class), any(TransitionRequest.class));
+        verify(connectionService, times(1)).disconnect(
+            any(Connection.class),
+            any(TransitionRequest.class),
+            any(Runnable.class)
+        );
     }
 
     @Test

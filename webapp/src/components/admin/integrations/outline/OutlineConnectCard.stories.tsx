@@ -120,7 +120,7 @@ export const Connected: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/outline connected/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/acme wiki/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/live updates via webhook/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/webhook registered/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/128 documents mirrored/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/outline accepts this token/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/hephaestus mirror/i)).toBeInTheDocument();

@@ -529,6 +529,43 @@ class SyncJobServiceTest extends BaseUnitTest {
         verify(eventPublisher, never()).publishEvent(any(SyncStateChangedEvent.class));
     }
 
+    @Test
+    void reapAbandonedJobs_localExecutionCancelsWithoutReleasingActiveFence() throws Exception {
+        SyncJobService.Started started = beginTestJob();
+        CountDownLatch bodyEntered = new CountDownLatch(1);
+        CountDownLatch releaseBody = new CountDownLatch(1);
+        AtomicBoolean interrupted = new AtomicBoolean();
+        when(syncJobRepository.findAbandoned(900)).thenReturn(List.of(started.job()));
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var running = executor.submit(() ->
+                service.executeBody(started, handle -> {
+                    bodyEntered.countDown();
+                    try {
+                        releaseBody.await();
+                    } catch (InterruptedException e) {
+                        interrupted.set(handle.isCancellationRequested());
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("stale local execution interrupted", e);
+                    }
+                })
+            );
+            assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
+
+            try {
+                assertThat(service.reapAbandonedJobs()).isZero();
+                assertThat(interrupted).isTrue();
+                verify(syncJobRepository, never()).markAbandoned(anyLong(), any(), anyLong());
+                verify(syncJobRepository).markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE);
+            } finally {
+                releaseBody.countDown();
+                running.get(2, TimeUnit.SECONDS);
+            }
+        }
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+    }
+
     // --- lease heartbeat / cancel-flag refresh ---
 
     @Test
@@ -546,6 +583,24 @@ class SyncJobServiceTest extends BaseUnitTest {
 
         verify(syncJobRepository).touchHeartbeat(List.of(jobId));
         assertThat(started.handle().isCancellationRequested()).isTrue();
+    }
+
+    @Test
+    void refreshLeases_staleFalseNeverClearsCancellation() {
+        SyncJobService.Started started = beginTestJob();
+        long jobId = started.job().getId();
+        SyncJobRepository.CancelFlagProjection projection = mock(SyncJobRepository.CancelFlagProjection.class);
+        when(projection.getId()).thenReturn(jobId);
+        when(projection.isCancelRequested()).thenReturn(false);
+        when(syncJobRepository.findCancelFlags(List.of(jobId))).thenReturn(List.of(projection));
+
+        service.executeBody(started, handle -> {
+            handle.refreshCancellation(true);
+
+            service.refreshLeases();
+
+            assertThat(handle.isCancellationRequested()).isTrue();
+        });
     }
 
     @Test
