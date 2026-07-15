@@ -39,6 +39,18 @@ public record SyncResourceState(
     @Nullable Instant backfillCompletedThrough,
     @Nullable Integer backfillPercent
 ) {
+    /**
+     * Shared {@code state} literal for a resource that has completed at least one full sync. Held here
+     * (rather than hand-written per provider) so integrations reporting the same "synced" semantic —
+     * the two SCM providers, and any other whose resource means literally "synced" — render as one
+     * status in the unified UI. Integrations with a genuinely different vocabulary (Slack consent
+     * states, Outline mirror states) keep their own strings.
+     */
+    public static final String STATE_SYNCED = "SYNCED";
+
+    /** Shared {@code state} literal for a resource that has not yet completed its initial full sync. */
+    public static final String STATE_PENDING = "PENDING";
+
     public enum Type {
         REPOSITORY,
         CHANNEL,

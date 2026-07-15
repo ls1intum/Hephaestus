@@ -53,5 +53,11 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
     @Override
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
         trigger.syncAllRepositories(ref.workspaceId(), handle::isCancellationRequested);
+        // syncFullData stops its per-repository loop early only when the cancel supplier is true, so a
+        // still-set flag on return means it aborted — declare it so the job finalizes CANCELLED, not
+        // a false SUCCEEDED.
+        if (handle.isCancellationRequested()) {
+            handle.reportCancelled();
+        }
     }
 }

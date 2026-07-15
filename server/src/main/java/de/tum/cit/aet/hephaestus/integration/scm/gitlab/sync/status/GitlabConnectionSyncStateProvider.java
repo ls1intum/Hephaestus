@@ -151,7 +151,7 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         Repository repo = reposByNameWithOwner.get(monitor.getNameWithOwner());
         Instant lastSyncedAt = repo == null ? null : repo.getLastSyncAt();
         Long itemCount = repo == null ? null : itemCountsByRepositoryId.getOrDefault(repo.getId(), 0L);
-        String state = lastSyncedAt != null ? "SYNCED" : "PENDING";
+        String state = lastSyncedAt != null ? SyncResourceState.STATE_SYNCED : SyncResourceState.STATE_PENDING;
 
         return new SyncResourceState(
             monitor.getId(),

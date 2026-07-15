@@ -8,6 +8,10 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -91,6 +95,35 @@ public class SyncController {
      */
     @PostMapping("/{connectionId}/sync/jobs")
     @Operation(summary = "Trigger a manual sync or backfill", operationId = "triggerSyncJob")
+    @ApiResponses(
+        {
+            @ApiResponse(
+                responseCode = "202",
+                description = "A new sync job was created and dispatched",
+                content = @Content(schema = @Schema(implementation = SyncJobDTO.class))
+            ),
+            @ApiResponse(
+                responseCode = "200",
+                description = "Idempotent-absorb: a same-type job was already running and is returned unchanged",
+                content = @Content(schema = @Schema(implementation = SyncJobDTO.class))
+            ),
+            @ApiResponse(
+                responseCode = "400",
+                description = "Missing or invalid request body (e.g. absent sync type)",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
+            ),
+            @ApiResponse(
+                responseCode = "404",
+                description = "Connection not found in this workspace",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
+            ),
+            @ApiResponse(
+                responseCode = "409",
+                description = "Connection is not ACTIVE, a different sync type is already running, or manual sync is unsupported for the kind",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
+            ),
+        }
+    )
     public ResponseEntity<SyncJobDTO> triggerConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
@@ -110,6 +143,25 @@ public class SyncController {
 
     @PostMapping("/{connectionId}/sync/jobs/{jobId}/cancel")
     @Operation(summary = "Request cooperative cancellation of a running sync job")
+    @ApiResponses(
+        {
+            @ApiResponse(
+                responseCode = "202",
+                description = "Cancellation requested; the running job stops cooperatively",
+                content = @Content(schema = @Schema(implementation = SyncJobDTO.class))
+            ),
+            @ApiResponse(
+                responseCode = "404",
+                description = "Job not found in this workspace, or not owned by this connection",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
+            ),
+            @ApiResponse(
+                responseCode = "409",
+                description = "Job is already in a terminal status",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
+            ),
+        }
+    )
     public ResponseEntity<SyncJobDTO> cancelConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
@@ -151,6 +203,9 @@ public class SyncController {
         log.info("Sync state conflict: {}", e.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
         problem.setTitle("Invalid state");
+        // Machine-readable extension members (RFC 9457): the conflicting connection state or in-flight
+        // job id/type/status, so the client can react without a follow-up refetch.
+        e.properties().forEach(problem::setProperty);
         return problem;
     }
 
@@ -159,6 +214,7 @@ public class SyncController {
         log.info("Sync not supported: {}", e.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
         problem.setTitle("Manual sync not supported");
+        problem.setProperty("kind", e.kind());
         return problem;
     }
 }

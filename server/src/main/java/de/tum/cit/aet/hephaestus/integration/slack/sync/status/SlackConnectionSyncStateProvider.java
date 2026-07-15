@@ -20,6 +20,8 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.support.CronExpression;
@@ -85,18 +87,27 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
 
     @Override
     public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
-        return monitoredChannelRepository
-            .findByWorkspaceIdAndConsentStateNot(ref.workspaceId(), ConsentState.REVOKED)
+        long workspaceId = ref.workspaceId();
+        // Single grouped count for the workspace's channels (one query) instead of one count per channel.
+        Map<String, Long> itemCountByChannelId = messageRepository
+            .countGroupedByChannelId(workspaceId)
             .stream()
-            .map(this::toResourceState)
+            .collect(
+                Collectors.toMap(
+                    SlackMessageRepository.ChannelItemCount::getSlackChannelId,
+                    SlackMessageRepository.ChannelItemCount::getItemCount
+                )
+            );
+
+        return monitoredChannelRepository
+            .findByWorkspaceIdAndConsentStateNot(workspaceId, ConsentState.REVOKED)
+            .stream()
+            .map(channel -> toResourceState(channel, itemCountByChannelId))
             .toList();
     }
 
-    private SyncResourceState toResourceState(SlackMonitoredChannel channel) {
-        Long itemCount = messageRepository.countByWorkspaceIdAndSlackChannelId(
-            channel.getWorkspaceId(),
-            channel.getSlackChannelId()
-        );
+    private SyncResourceState toResourceState(SlackMonitoredChannel channel, Map<String, Long> itemCountByChannelId) {
+        Long itemCount = itemCountByChannelId.getOrDefault(channel.getSlackChannelId(), 0L);
         String name = channel.getChannelName() != null ? channel.getChannelName() : channel.getSlackChannelId();
         return new SyncResourceState(
             channel.getId(),

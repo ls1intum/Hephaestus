@@ -23,6 +23,7 @@ import { ConnectionHealthBadge } from "@/components/admin/integrations/Connectio
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
 import { SyncNowButton } from "@/components/admin/integrations/SyncNowButton";
+import { asDate } from "@/components/admin/integrations/sync-format";
 import { WebhookLivenessIndicator } from "@/components/admin/integrations/WebhookLivenessIndicator";
 import { SlackIcon } from "@/components/icons/brand";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -177,7 +178,7 @@ function SlackIntegrationPage() {
 						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
 							<span>
 								{status.lastSuccessfulSyncAt
-									? `Last synced ${formatDistanceToNow(new Date(status.lastSuccessfulSyncAt), { addSuffix: true })}`
+									? `Last synced ${formatDistanceToNow(asDate(status.lastSuccessfulSyncAt) ?? new Date(), { addSuffix: true })}`
 									: "Never synced"}
 							</span>
 							<WebhookLivenessIndicator lastEventAt={status.lastEventProcessedAt} />

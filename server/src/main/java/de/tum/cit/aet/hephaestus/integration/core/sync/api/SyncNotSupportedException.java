@@ -18,7 +18,15 @@ public class SyncNotSupportedException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private final transient IntegrationKind kind;
+
     public SyncNotSupportedException(IntegrationKind kind) {
         super("Manual sync is not supported for kind=" + kind);
+        this.kind = kind;
+    }
+
+    /** The unsupported integration kind — surfaced as a machine-readable 409 extension member. */
+    public IntegrationKind kind() {
+        return kind;
     }
 }

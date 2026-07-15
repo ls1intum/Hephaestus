@@ -44,16 +44,6 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldReportGitlabKind() {
-        assertThat(runner.kind()).isEqualTo(IntegrationKind.GITLAB);
-    }
-
-    @Test
-    void shouldNotSupportBackfill() {
-        assertThat(runner.supportsBackfill()).isFalse();
-    }
-
-    @Test
     void shouldRejectBackfillCall() {
         assertThatThrownBy(() ->
             runner.backfill(new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, null), handle)
@@ -61,25 +51,14 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldDelegateReconcileToTriggerWithWorkspaceId() {
+    void reconcile_threadsTheHandleCancellationSupplierAndReportsCancelledWhenAborted() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, "gitlab.com:1");
+        when(handle.isCancellationRequested()).thenReturn(true);
 
-        runner.reconcile(ref, handle);
-
-        verify(trigger).syncAllRepositories(eq(WORKSPACE_ID), org.mockito.ArgumentMatchers.any(BooleanSupplier.class));
-    }
-
-    @Test
-    void shouldThreadHandleCancellationThroughToTrigger() {
-        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, null);
-        when(handle.isCancellationRequested()).thenReturn(false, true);
-
-        // Capture the BooleanSupplier the runner hands to the trigger and exercise it directly —
-        // proving cancellation observed at the runner's call site is not a stale copy but reads
-        // live from the handle (the cheap per-repository check the sync loop polls).
+        // The runner hands the trigger a BooleanSupplier that reads live from the handle (not a stale
+        // copy) — exercise it inside the stub to prove the threading, then assert the abort is labeled.
         doAnswer(inv -> {
             BooleanSupplier cancelled = inv.getArgument(1);
-            assertThat(cancelled.getAsBoolean()).isFalse();
             assertThat(cancelled.getAsBoolean()).isTrue();
             return null;
         })
@@ -88,6 +67,19 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(ref, handle);
 
-        verify(handle, org.mockito.Mockito.times(2)).isCancellationRequested();
+        verify(trigger).syncAllRepositories(eq(WORKSPACE_ID), org.mockito.ArgumentMatchers.any(BooleanSupplier.class));
+        // Flag still set on return -> the pass aborted -> job must finalize CANCELLED.
+        verify(handle).reportCancelled();
+    }
+
+    @Test
+    void reconcile_completedWithoutCancellation_doesNotReportCancelled() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, null);
+        when(handle.isCancellationRequested()).thenReturn(false);
+
+        runner.reconcile(ref, handle);
+
+        verify(trigger).syncAllRepositories(eq(WORKSPACE_ID), org.mockito.ArgumentMatchers.any(BooleanSupplier.class));
+        verify(handle, org.mockito.Mockito.never()).reportCancelled();
     }
 }

@@ -26,7 +26,14 @@ export function RateLimitGauge({ rateLimit, className }: RateLimitGaugeProps) {
 				<span className="tabular-nums font-medium">{rateLimit.remaining.toLocaleString()}</span>
 				<span className="text-muted-foreground">/ {rateLimit.limit.toLocaleString()}</span>
 			</div>
-			<Progress value={percent} className="mt-1 w-32" />
+			<Progress
+				value={percent}
+				className="mt-1 w-32"
+				aria-label="API rate limit remaining"
+				getAriaValueText={() =>
+					`${rateLimit.remaining.toLocaleString()} of ${rateLimit.limit.toLocaleString()} requests remaining`
+				}
+			/>
 			{resetAt && (
 				<p className="mt-1 text-muted-foreground text-xs">
 					Resets {formatDistanceToNow(resetAt, { addSuffix: true })}

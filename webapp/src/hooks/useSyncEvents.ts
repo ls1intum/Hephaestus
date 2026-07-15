@@ -23,9 +23,12 @@ interface SyncEventHint {
  * (see `.ai/notes/integration-sync-observability-design.md` §3.5).
  *
  * The endpoint may not exist yet in every environment (server not running the sync feature
- * locally, or an older deployment) — `EventSource` retries on its own, so failures must stay
- * silent; the overview/detail queries' own `refetchInterval` polling keeps the UI correct
- * without this hook regardless. Mount once, in the Integrations layout route.
+ * locally, or an older deployment). Note the EventSource contract (WHATWG SSE spec): a non-200
+ * response — 404 (missing endpoint), 401 (expired auth), 500 — *fails the connection permanently*;
+ * the UA fires `onerror` once with `readyState === CLOSED` and does NOT auto-reconnect. Only a
+ * transient drop after a successful connect is retried by the UA. Either way the overview/detail
+ * queries' own `refetchInterval` polling keeps the UI correct without this hook, so we degrade to
+ * polling rather than hammering a reconnect loop. Mount once, in the Integrations layout route.
  */
 export function useSyncEvents(workspaceSlug: string | undefined): void {
 	const queryClient = useQueryClient();
@@ -95,9 +98,18 @@ export function useSyncEvents(workspaceSlug: string | undefined): void {
 		};
 
 		source.addEventListener("sync", handleHint);
-		// EventSource retries the connection on its own; swallowing here just prevents a missing or
-		// unavailable endpoint from spamming the console on every reconnect attempt.
-		source.onerror = () => {};
+		let closedLogged = false;
+		source.onerror = () => {
+			// A permanent failure (non-200: missing endpoint, expired auth, server error) leaves the
+			// stream CLOSED and the UA will not reconnect. Log it once and rely on the queries'
+			// refetchInterval polling — do NOT re-create the source here (that would hammer a dead
+			// endpoint). A transient drop after a live connect keeps readyState === CONNECTING and is
+			// retried by the UA on its own, so we stay silent for that case.
+			if (source.readyState === EventSource.CLOSED && !closedLogged) {
+				closedLogged = true;
+				console.info("Sync live-push unavailable; falling back to polling for this session.");
+			}
+		};
 
 		return () => {
 			source.removeEventListener("sync", handleHint);

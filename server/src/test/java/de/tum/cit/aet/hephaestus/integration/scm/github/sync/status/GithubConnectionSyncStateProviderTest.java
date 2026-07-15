@@ -20,8 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ScopedRateLimitTracker;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService.BackfillProgress;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationSuspensionTracker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -67,9 +65,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
     @Mock
     private IssueRepository issueRepository;
 
-    @Mock
-    private GitHubHistoricalBackfillService backfillService;
-
     private Workspace workspace;
     private IntegrationRef ref;
 
@@ -88,8 +83,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             properties,
             repositoryToMonitorRepository,
             repositoryRepository,
-            issueRepository,
-            backfillService
+            issueRepository
         );
     }
 
@@ -126,11 +120,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         );
         ReflectionTestUtils.setField(connection, "id", CONNECTION_ID);
         return connection;
-    }
-
-    @Test
-    void kind_returnsGithub() {
-        assertThat(provider(schedulerProperties(false)).kind()).isEqualTo(IntegrationKind.GITHUB);
     }
 
     @Nested
@@ -223,10 +212,12 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
             RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-a");
             rtm.setId(500L);
+            // Issue backfill done (checkpoint 0 against a 100 high-water-mark); no PRs to backfill.
+            rtm.setIssueBackfillHighWaterMark(100);
+            rtm.setIssueBackfillCheckpoint(0);
+            rtm.setPullRequestBackfillHighWaterMark(0);
+            rtm.setPullRequestBackfillCheckpoint(0);
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
-            when(backfillService.getProgress(500L)).thenReturn(
-                Optional.of(new BackfillProgress("acme/repo-a", true, true, Instant.now(), null, null, 0, 100))
-            );
 
             ConnectionSyncDetails details = provider(schedulerProperties(true)).describe(ref, CONNECTION_ID);
 
@@ -239,10 +230,12 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
             RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-a");
             rtm.setId(500L);
+            // 25 of 100 issues remaining -> 75% done; PR dimension empty (already complete).
+            rtm.setIssueBackfillHighWaterMark(100);
+            rtm.setIssueBackfillCheckpoint(25);
+            rtm.setPullRequestBackfillHighWaterMark(0);
+            rtm.setPullRequestBackfillCheckpoint(0);
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
-            when(backfillService.getProgress(500L)).thenReturn(
-                Optional.of(new BackfillProgress("acme/repo-a", true, false, Instant.now(), "cursor", null, 25, 100))
-            );
 
             ConnectionSyncDetails details = provider(schedulerProperties(true)).describe(ref, CONNECTION_ID);
 
@@ -316,7 +309,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             assertThat(resources).hasSize(1);
-            assertThat(resources.get(0).state()).isEqualTo("PENDING_INITIAL_SYNC");
+            assertThat(resources.get(0).state()).isEqualTo("PENDING");
             assertThat(resources.get(0).itemCount()).isNull();
             assertThat(resources.get(0).lastSyncedAt()).isNull();
         }

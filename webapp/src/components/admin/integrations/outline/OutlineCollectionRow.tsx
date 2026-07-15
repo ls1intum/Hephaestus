@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { asDate } from "../sync-format";
 
 /** The mirror lifecycle states, sourced from the generated DTO so they never drift. */
 export type OutlineMirrorState = OutlineCollection["state"];
@@ -166,7 +167,7 @@ export function OutlineCollectionRow({
 
 			<TableCell className="text-muted-foreground text-sm">
 				{collection.lastSyncedAt ? (
-					formatDistanceToNow(new Date(collection.lastSyncedAt), { addSuffix: true })
+					formatDistanceToNow(asDate(collection.lastSyncedAt) ?? new Date(), { addSuffix: true })
 				) : (
 					<span aria-hidden>—</span>
 				)}

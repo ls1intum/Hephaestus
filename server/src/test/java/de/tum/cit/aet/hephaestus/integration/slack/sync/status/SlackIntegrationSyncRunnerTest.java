@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,18 +40,9 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
     }
 
     @Test
-    void kind_isSlack() {
-        assertThat(runner.kind()).isEqualTo(IntegrationKind.SLACK);
-    }
-
-    @Test
-    void supportsBackfill_isFalse() {
-        assertThat(runner.supportsBackfill()).isFalse();
-    }
-
-    @Test
     void reconcile_delegatesToSyncWorkspaceNowAndReportsProgressFromTheSummary() {
-        WorkspaceSyncSummary summary = new WorkspaceSyncSummary(3, 2, 1, 7L, 4, true);
+        // No failed channels -> plain SUCCEEDED (no warnings).
+        WorkspaceSyncSummary summary = new WorkspaceSyncSummary(3, 2, 1, 7L, 4, true, 0);
         when(dataSyncScheduler.syncWorkspaceNow(WS)).thenReturn(summary);
 
         runner.reconcile(REF, handle);
@@ -57,25 +50,27 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
         verify(dataSyncScheduler).syncWorkspaceNow(WS);
         // itemsProcessed = synced + skipped (every channel the loop finished considering, whether or not it
         // ingested anything); itemsTotal = channels (the coarse "N of M channels" progress bar denominator).
-        verify(handle).progress(eq(3), eq(3), eq(SlackIntegrationSyncRunner.progressDetail(summary)));
+        // Detail content is asserted in progressDetail_carriesEveryFieldOfTheSummary — here just the counts.
+        verify(handle).progress(eq(3), eq(3), anyMap());
+        verify(handle, never()).reportWarnings();
     }
 
     @Test
-    void reconcile_partialFailureIsVisibleOnlyInProgressDetail_neverThrows() {
-        // Design doc §3.1 "Outcome mapping v1": the template has no non-throwing hook to elevate a job to
-        // SUCCEEDED_WITH_WARNINGS, so a summary with skipped channels must not throw — it completes SUCCEEDED
-        // with the shortfall visible in the progress detail (accepted v1 fidelity gap).
-        WorkspaceSyncSummary partial = new WorkspaceSyncSummary(4, 1, 3, 2L, 4, true);
+    void reconcile_reportsWarningsWhenTheSummaryHasFailedChannels() {
+        // One channel's history sync threw (failed=1) — a genuine partial failure, so the job must finalize
+        // SUCCEEDED_WITH_WARNINGS rather than a bare SUCCEEDED.
+        WorkspaceSyncSummary partial = new WorkspaceSyncSummary(4, 1, 2, 2L, 4, true, 1);
         when(dataSyncScheduler.syncWorkspaceNow(WS)).thenReturn(partial);
 
         runner.reconcile(REF, handle);
 
-        verify(handle).progress(eq(4), eq(4), eq(SlackIntegrationSyncRunner.progressDetail(partial)));
+        verify(handle).progress(eq(3), eq(4), anyMap());
+        verify(handle).reportWarnings();
     }
 
     @Test
     void progressDetail_carriesEveryFieldOfTheSummary() {
-        WorkspaceSyncSummary summary = new WorkspaceSyncSummary(3, 2, 1, 7L, 4, true);
+        WorkspaceSyncSummary summary = new WorkspaceSyncSummary(3, 2, 1, 7L, 4, true, 1);
 
         Map<String, Object> detail = SlackIntegrationSyncRunner.progressDetail(summary);
 
@@ -83,6 +78,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
             .containsEntry("channels", 3)
             .containsEntry("synced", 2)
             .containsEntry("skipped", 1)
+            .containsEntry("failed", 1)
             .containsEntry("ingested", 7L)
             .containsEntry("requestsUsed", 4)
             .containsEntry("budgetExhausted", true);

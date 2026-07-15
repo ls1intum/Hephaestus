@@ -55,6 +55,11 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
     @Override
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
         dataSyncService.syncAllRepositories(ref.workspaceId(), handle);
+        // syncAllRepositories only breaks its repo loop early when the flag is set, so a still-set flag on
+        // return means it aborted — declare it so the job finalizes CANCELLED rather than a false SUCCEEDED.
+        if (handle.isCancellationRequested()) {
+            handle.reportCancelled();
+        }
     }
 
     @Override
@@ -115,6 +120,12 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 );
                 break;
             }
+        }
+
+        // The loop exits with the flag still set only when it aborted on a cancel checkpoint (the
+        // empty-pending and no-progress breaks leave it clear); declare it so the job finalizes CANCELLED.
+        if (handle.isCancellationRequested()) {
+            handle.reportCancelled();
         }
     }
 }

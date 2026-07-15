@@ -7,6 +7,4 @@ import org.jspecify.annotations.NonNull;
 public record ResourceCountsDTO(
     @NonNull @Schema(description = "Total resources known to this connection") Long total,
     @NonNull @Schema(description = "Resources currently reporting a sync error") Long errored
-) {
-    public static final ResourceCountsDTO ZERO = new ResourceCountsDTO(0L, 0L);
-}
+) {}

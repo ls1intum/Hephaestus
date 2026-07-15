@@ -21,7 +21,15 @@ export interface ConnectionHealthBadgeProps {
  * pending=secondary, suspended=outline. The one place this mapping lives. */
 export function ConnectionHealthBadge({ health, className }: ConnectionHealthBadgeProps) {
 	return (
-		<Badge variant={HEALTH_VARIANT[health]} className={className}>
+		<Badge
+			variant={HEALTH_VARIANT[health]}
+			className={className}
+			// Live region so screen readers hear health transitions (e.g. Healthy -> Degraded)
+			// as they arrive over the live-push stream, not only on a manual re-read.
+			role="status"
+			aria-live="polite"
+			aria-label={`Connection health: ${HEALTH_LABEL[health]}`}
+		>
 			{HEALTH_LABEL[health]}
 		</Badge>
 	);

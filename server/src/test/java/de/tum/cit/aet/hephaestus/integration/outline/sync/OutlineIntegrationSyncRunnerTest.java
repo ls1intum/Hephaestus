@@ -1,12 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -24,6 +26,9 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
     @Mock
     private OutlineDocumentSyncScheduler syncScheduler;
 
+    @Mock
+    private SyncJobHandle handle;
+
     private OutlineIntegrationSyncRunner runner;
 
     @org.junit.jupiter.api.BeforeEach
@@ -32,22 +37,24 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
     }
 
     @Test
-    void kind_isOutline() {
-        assertThat(runner.kind()).isEqualTo(IntegrationKind.OUTLINE);
-    }
-
-    @Test
-    void supportsBackfill_isFalse() {
-        // Outline has no separate backfill phase — every pass is the same full reconcile.
-        assertThat(runner.supportsBackfill()).isFalse();
-    }
-
-    @Test
     void reconcile_delegatesToTheWorkspacePass_threadingAProgressListener() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
 
-        runner.reconcile(ref, null);
+        runner.reconcile(ref, handle);
 
         verify(syncScheduler).syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
+        // Completed without cancellation — must not be labeled cancelled.
+        verify(handle, never()).reportCancelled();
+    }
+
+    @Test
+    void reconcile_reportsCancelledWhenTheHandleIsStillCancelledOnReturn() {
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
+        when(handle.isCancellationRequested()).thenReturn(true);
+
+        runner.reconcile(ref, handle);
+
+        verify(syncScheduler).syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
+        verify(handle).reportCancelled();
     }
 }

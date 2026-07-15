@@ -38,6 +38,8 @@ public final class SyncJobHandle {
     private final ProgressWriter writer;
 
     private volatile boolean cancellationRequested;
+    private volatile boolean cancelledReported;
+    private volatile boolean warningsReported;
     private volatile Instant lastWriteAt = Instant.EPOCH;
 
     @Nullable
@@ -64,6 +66,31 @@ public final class SyncJobHandle {
     /** Called by {@link SyncJobService}: the heartbeat sweep (DB-sourced) or an immediate local cancel. */
     void refreshCancellation(boolean requested) {
         this.cancellationRequested = requested;
+    }
+
+    /**
+     * A runner calls this when it actually stops early in response to {@link #isCancellationRequested()}.
+     * Only then does the job finalize as {@code CANCELLED} — a runner that ignores the flag or finishes
+     * its work before honoring it is recorded {@code SUCCEEDED}, not falsely cancelled.
+     */
+    public void reportCancelled() {
+        this.cancelledReported = true;
+    }
+
+    boolean cancelledReported() {
+        return cancelledReported;
+    }
+
+    /**
+     * A runner calls this when it completed but some units failed (e.g. a partial Slack history replay),
+     * finalizing the job as {@code SUCCEEDED_WITH_WARNINGS} rather than a bare success.
+     */
+    public void reportWarnings() {
+        this.warningsReported = true;
+    }
+
+    boolean warningsReported() {
+        return warningsReported;
     }
 
     /**

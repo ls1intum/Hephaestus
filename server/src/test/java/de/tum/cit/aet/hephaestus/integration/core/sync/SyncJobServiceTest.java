@@ -194,6 +194,9 @@ class SyncJobServiceTest extends BaseUnitTest {
         when(
             syncJobRepository.findAbandonedForConnection(eq(CONNECTION_ID), eq(SyncJobStatus.ACTIVE), any())
         ).thenReturn(List.of(abandoned));
+        // The inline reap is now a status-guarded bulk UPDATE returning the flipped-row count; it does
+        // NOT mutate the in-memory `abandoned` object the way the old per-entity save did.
+        when(syncJobRepository.markAbandoned(eq(List.of(7L)), any(), any(), eq(SyncJobStatus.ACTIVE))).thenReturn(1);
         // After the reap, the guard-check query sees no more active jobs.
         when(
             syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
@@ -204,10 +207,28 @@ class SyncJobServiceTest extends BaseUnitTest {
 
         SyncJobService.Started started = service.beginJob(defaultRequest());
 
-        assertThat(abandoned.getStatus()).isEqualTo(SyncJobStatus.FAILED);
-        assertThat(abandoned.getErrorSummary()).contains("Abandoned");
+        verify(syncJobRepository).markAbandoned(eq(List.of(7L)), any(), any(), eq(SyncJobStatus.ACTIVE));
         assertThat(started.job()).isNotNull();
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.PENDING);
+    }
+
+    @Test
+    void beginJob_partialIndexRace_reQueriesInFreshTxAndRethrowsWhenNoWinnerVisible() {
+        // A DataIntegrityViolation whose fresh-tx re-read still shows NO active row is a genuine
+        // integrity error, not a lost race — it must propagate rather than be masked as a 409-absorb.
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                CONNECTION_ID,
+                SyncJobStatus.ACTIVE
+            )
+        )
+            .thenReturn(Optional.empty())
+            .thenReturn(Optional.empty());
+        doThrow(new DataIntegrityViolationException("ux_sync_job_active")).when(syncJobRepository).saveAndFlush(any());
+
+        assertThatThrownBy(() -> service.beginJob(defaultRequest())).isInstanceOf(
+            DataIntegrityViolationException.class
+        );
     }
 
     // --- outcome mapping ---
@@ -230,10 +251,34 @@ class SyncJobServiceTest extends BaseUnitTest {
         service.executeBody(started, handle -> {
             started.handle().refreshCancellation(true);
             assertThat(handle.isCancellationRequested()).isTrue();
-            // Runner exits early once it observes cancellation.
+            // A runner that actually stops in response to the flag reports it — only then is the job CANCELLED.
+            handle.reportCancelled();
         });
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+    }
+
+    @Test
+    void executeBody_cancellationSeenButBodyReturnsWithoutReporting_marksSucceeded() {
+        SyncJobService.Started started = beginTestJob();
+
+        // The flag is set and observed, but the body finishes its work normally without reportCancelled():
+        // the job is SUCCEEDED, not falsely CANCELLED (the mislabel fix).
+        service.executeBody(started, handle -> {
+            started.handle().refreshCancellation(true);
+            assertThat(handle.isCancellationRequested()).isTrue();
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+    }
+
+    @Test
+    void executeBody_runnerReportsWarnings_marksSucceededWithWarnings() {
+        SyncJobService.Started started = beginTestJob();
+
+        service.executeBody(started, SyncJobHandle::reportWarnings);
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
     }
 
     @Test
@@ -269,13 +314,16 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJob stale = newJob(8L, SyncJobStatus.RUNNING);
         stale.setHeartbeatAt(Instant.now().minus(java.time.Duration.ofMinutes(30)));
         when(syncJobRepository.findAbandoned(eq(SyncJobStatus.ACTIVE), any())).thenReturn(List.of(stale));
+        // Reaping is now a status-guarded bulk UPDATE returning the flipped-row count, not a per-entity
+        // save — the in-memory `stale` object is intentionally left untouched.
+        when(syncJobRepository.markAbandoned(eq(List.of(8L)), any(), any(), eq(SyncJobStatus.ACTIVE))).thenReturn(1);
 
         int reaped = service.reapAbandonedJobs();
 
         assertThat(reaped).isEqualTo(1);
-        assertThat(stale.getStatus()).isEqualTo(SyncJobStatus.FAILED);
-        assertThat(stale.getErrorSummary()).contains("Abandoned: no heartbeat");
-        verify(syncJobRepository).save(stale);
+        verify(syncJobRepository).markAbandoned(eq(List.of(8L)), any(), any(), eq(SyncJobStatus.ACTIVE));
+        verify(eventPublisher).publishEvent(any(SyncStateChangedEvent.class));
+        verify(syncJobRepository, never()).save(any());
     }
 
     @Test
@@ -290,14 +338,17 @@ class SyncJobServiceTest extends BaseUnitTest {
     @Test
     void refreshLeases_touchesHeartbeatAndRefreshesRegisteredHandlesCancelFlag() {
         SyncJobService.Started started = beginTestJob();
+        long jobId = started.job().getId();
         SyncJobRepository.CancelFlagProjection projection = mock(SyncJobRepository.CancelFlagProjection.class);
-        when(projection.getId()).thenReturn(started.job().getId());
+        when(projection.getId()).thenReturn(jobId);
         when(projection.isCancelRequested()).thenReturn(true);
-        when(syncJobRepository.findCancelFlags(List.of(started.job().getId()))).thenReturn(List.of(projection));
+        when(syncJobRepository.findCancelFlags(List.of(jobId))).thenReturn(List.of(projection));
 
-        service.refreshLeases();
+        // A handle is registered in the in-JVM registry only while executeBody is running, so drive the
+        // heartbeat pass from inside the body — the one moment a genuinely-RUNNING job's lease exists.
+        service.executeBody(started, handle -> service.refreshLeases());
 
-        verify(syncJobRepository).touchHeartbeat(eq(List.of(started.job().getId())), any(Instant.class));
+        verify(syncJobRepository).touchHeartbeat(eq(List.of(jobId)), any(Instant.class));
         assertThat(started.handle().isCancellationRequested()).isTrue();
     }
 
@@ -311,16 +362,32 @@ class SyncJobServiceTest extends BaseUnitTest {
     // --- cooperative cancel request ---
 
     @Test
-    void requestCancel_pendingJob_flipsFlagAndRefreshesLocalHandleImmediately() {
+    void requestCancel_pendingJob_flipsFlagViaTargetedUpdateWithoutTouchingAnyHandle() {
+        SyncJobService.Started started = beginTestJob(); // PENDING: no in-JVM handle registered yet
+        long jobId = started.job().getId();
+        when(syncJobRepository.findByIdAndWorkspace_Id(jobId, WORKSPACE_ID)).thenReturn(Optional.of(started.job()));
+        when(syncJobRepository.markCancelRequested(jobId, SyncJobStatus.ACTIVE)).thenReturn(1);
+
+        service.requestCancel(WORKSPACE_ID, jobId);
+
+        // Targeted flag-only UPDATE; a PENDING job has no registered handle, so nothing local is refreshed.
+        verify(syncJobRepository).markCancelRequested(jobId, SyncJobStatus.ACTIVE);
+        assertThat(started.handle().isCancellationRequested()).isFalse();
+    }
+
+    @Test
+    void requestCancel_runningJob_refreshesRegisteredLocalHandleImmediately() {
         SyncJobService.Started started = beginTestJob();
-        when(syncJobRepository.findByIdAndWorkspace_Id(started.job().getId(), WORKSPACE_ID)).thenReturn(
-            Optional.of(started.job())
-        );
+        long jobId = started.job().getId();
+        when(syncJobRepository.findByIdAndWorkspace_Id(jobId, WORKSPACE_ID)).thenReturn(Optional.of(started.job()));
+        when(syncJobRepository.markCancelRequested(jobId, SyncJobStatus.ACTIVE)).thenReturn(1);
 
-        service.requestCancel(WORKSPACE_ID, started.job().getId());
-
-        assertThat(started.job().isCancelRequested()).isTrue();
-        assertThat(started.handle().isCancellationRequested()).isTrue();
+        // The handle is registered only while executeBody runs; issue the cancel from inside the body so it
+        // lands on the same JVM that's executing the job and the local handle refreshes without the sweep.
+        service.executeBody(started, handle -> {
+            service.requestCancel(WORKSPACE_ID, jobId);
+            assertThat(handle.isCancellationRequested()).isTrue();
+        });
     }
 
     @Test

@@ -96,6 +96,7 @@ public class SlackChannelHistorySyncService {
         int synced = 0;
         int skipped = 0;
         long ingested = 0;
+        int failed = 0;
         for (SlackMonitoredChannel channel : channels) {
             if (!historyBudget.available()) {
                 skipped = channels.size() - synced - skipped;
@@ -110,7 +111,11 @@ public class SlackChannelHistorySyncService {
                     ingested += count;
                 }
             } catch (RuntimeException e) {
+                // A channel that threw is both "not synced" (counted in skipped, preserving the progress
+                // total) and a genuine partial failure (counted in failed) — the latter is the distinct
+                // signal the runner elevates to SUCCEEDED_WITH_WARNINGS, unlike a benign nothing-to-sync skip.
                 skipped++;
+                failed++;
                 log.warn(
                     "slack.sync: history sync failed for workspaceId={} channelId={} (watermark not advanced): {}",
                     workspaceId,
@@ -125,7 +130,8 @@ public class SlackChannelHistorySyncService {
             skipped,
             ingested,
             historyBudget.used() + repliesBudget.used(),
-            !historyBudget.available()
+            !historyBudget.available(),
+            failed
         );
     }
 
@@ -296,18 +302,23 @@ public class SlackChannelHistorySyncService {
         return Math.min(configured, SlackRetentionSweeper.MAX_RETENTION_DAYS);
     }
 
-    /** One workspace's sync outcome, for the scheduler's summary log. */
+    /**
+     * One workspace's sync outcome, for the scheduler's summary log. {@code failed} counts channels whose
+     * history sync threw (a genuine partial failure, a subset of {@code skipped}); {@code failed > 0} is the
+     * signal {@code SlackIntegrationSyncRunner} maps to {@code SUCCEEDED_WITH_WARNINGS}.
+     */
     public record WorkspaceSyncSummary(
         int channels,
         int synced,
         int skipped,
         long ingested,
         int requestsUsed,
-        boolean budgetExhausted
+        boolean budgetExhausted,
+        int failed
     ) {
         /** The workspace has no ACTIVE Slack connection, so nothing was attempted and no budget was spent. */
         public static WorkspaceSyncSummary notConnected() {
-            return new WorkspaceSyncSummary(0, 0, 0, 0L, 0, false);
+            return new WorkspaceSyncSummary(0, 0, 0, 0L, 0, false, 0);
         }
     }
 }

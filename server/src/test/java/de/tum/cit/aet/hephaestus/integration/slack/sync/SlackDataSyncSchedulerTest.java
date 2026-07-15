@@ -87,7 +87,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
     void connectedWorkspace_refreshesMetadataThenReconcilesHistory() {
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
         when(historySyncService.syncWorkspace(WS)).thenReturn(
-            new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 5L, 3, false)
+            new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 5L, 3, false, 0)
         );
 
         var summary = scheduler.syncWorkspaceNow(WS);
@@ -128,7 +128,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(List.of(WS));
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
         when(historySyncService.syncWorkspace(WS)).thenReturn(
-            new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 4L, 2, false)
+            new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 4L, 2, false, 0)
         );
 
         scheduler.syncDataCron();

@@ -339,6 +339,20 @@ class SyncStatusServiceTest extends BaseUnitTest {
         verify(taskExecutor, never()).execute(any());
     }
 
+    @Test
+    void triggerSync_differentTypeAlreadyRunning_throwsStateConflictNotAbsorb() {
+        // A RECONCILIATION is already in flight; the caller asks for a BACKFILL. Absorbing (silently
+        // returning the reconciliation) would drop the caller's request — it must be a 409, not a 200.
+        when(githubRunner.supportsBackfill()).thenReturn(true);
+        SyncJob reconciling = pendingJob(); // type == RECONCILIATION
+        when(syncJobService.beginJob(any())).thenThrow(new SyncJobConflictException(reconciling));
+
+        assertThatThrownBy(() ->
+            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.BACKFILL, null)
+        ).isInstanceOf(SyncStateConflictException.class);
+        verify(taskExecutor, never()).execute(any());
+    }
+
     // --- catalog ---
 
     @Test

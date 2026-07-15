@@ -6,14 +6,15 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.push;
  * intentionally thin and vendor/DTO-shape agnostic.
  *
  * @param scope one of {@link Scope#wireValue()} — {@code job}, {@code resources}, {@code connection},
- *              {@code activity} ({@code activity} is reserved for a future publisher; {@link
- *              SyncPushService} only ever emits the first three today)
+ *              {@code activity}. All four are emitted today: {@code ConnectionActivityRecorder}
+ *              publishes {@code activity} on every processed webhook event, the others on job and
+ *              resource state changes.
  * @param connectionId the connection this hint concerns
  * @param kind the {@code IntegrationKind} name (e.g. {@code "GITHUB"}) as a plain string so this
  *             record never depends on the SPI enum directly
  */
 public record SyncEventHint(String scope, Long connectionId, String kind) {
-    /** Mirrors {@code SyncStateChangedEvent.Scope} plus the reserved {@code ACTIVITY} value. */
+    /** Mirrors {@code SyncStateChangedEvent.Scope}; all four values are published today. */
     public enum Scope {
         JOB,
         RESOURCES,

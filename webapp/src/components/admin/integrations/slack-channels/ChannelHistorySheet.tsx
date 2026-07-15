@@ -29,6 +29,7 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { asDate } from "../sync-format";
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface ChannelHistorySheetProps {
@@ -131,7 +132,7 @@ function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
 					)}
 					<ConsentStateBadge state={event.toState} />
 				</ItemTitle>
-				<ItemDescription>{format(new Date(event.createdAt), "PPpp")}</ItemDescription>
+				<ItemDescription>{format(asDate(event.createdAt) ?? new Date(), "PPpp")}</ItemDescription>
 				{event.reason && (
 					<ItemDescription className="text-foreground">{event.reason}</ItemDescription>
 				)}

@@ -31,6 +31,36 @@ export const JOB_STATUS_LABEL: Record<SyncJob["status"], string> = {
 	CANCELLED: "Cancelled",
 };
 
+/**
+ * Humanizes the provider-defined {@link SyncResourceState.state}. That field is an open string
+ * (providers are being unified toward `"SYNCED"`/`"PENDING"`), so this maps the known values and
+ * title-cases anything unmapped rather than leaking raw ALL_CAPS enum casing or crashing on a new
+ * provider string.
+ */
+const RESOURCE_STATE_LABEL: Record<string, string> = {
+	PENDING: "Pending",
+	SYNCED: "Synced",
+	SYNCING: "Syncing",
+	BACKFILLING: "Backfilling",
+	ACTIVE: "Active",
+	ERROR: "Error",
+	FAILED: "Failed",
+	PAUSED: "Paused",
+	SUSPENDED: "Suspended",
+	DISABLED: "Disabled",
+};
+
+export function resourceStateLabel(state: string): string {
+	const known = RESOURCE_STATE_LABEL[state];
+	if (known) return known;
+	return state
+		.toLowerCase()
+		.split(/[\s_]+/)
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
+}
+
 export const JOB_TYPE_LABEL: Record<SyncJob["type"], string> = {
 	INITIAL: "Initial sync",
 	RECONCILIATION: "Reconciliation",

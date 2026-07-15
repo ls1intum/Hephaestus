@@ -219,7 +219,7 @@ export function OutlineConnectCard({
 											</span>
 											<span>
 												{status.lastSyncedAt
-													? `Last synced ${formatDistanceToNow(new Date(status.lastSyncedAt), { addSuffix: true })}`
+													? `Last synced ${formatDistanceToNow(asDate(status.lastSyncedAt) ?? new Date(), { addSuffix: true })}`
 													: "Not synced yet"}
 											</span>
 											{status.syncRunning && (

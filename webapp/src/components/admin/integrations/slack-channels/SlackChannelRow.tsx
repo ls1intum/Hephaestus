@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { asDate } from "../sync-format";
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface SlackChannelRowProps {
@@ -83,7 +84,7 @@ export function SlackChannelRow({
 
 			<TableCell className="text-muted-foreground text-sm">
 				{channel.consentAnnouncedAt ? (
-					formatDistanceToNow(new Date(channel.consentAnnouncedAt), { addSuffix: true })
+					formatDistanceToNow(asDate(channel.consentAnnouncedAt) ?? new Date(), { addSuffix: true })
 				) : (
 					<span aria-hidden>—</span>
 				)}

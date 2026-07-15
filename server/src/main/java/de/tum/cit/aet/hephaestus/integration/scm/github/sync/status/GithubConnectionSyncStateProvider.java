@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ScopedRateLimitTracker;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService.BackfillProgress;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationSuspensionTracker;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -25,7 +24,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -52,7 +50,6 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
     private final IssueRepository issueRepository;
-    private final GitHubHistoricalBackfillService backfillService;
 
     public GithubConnectionSyncStateProvider(
         ConnectionRepository connectionRepository,
@@ -61,8 +58,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         SyncSchedulerProperties syncSchedulerProperties,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
-        IssueRepository issueRepository,
-        GitHubHistoricalBackfillService backfillService
+        IssueRepository issueRepository
     ) {
         this.connectionRepository = connectionRepository;
         this.rateLimitTracker = rateLimitTracker;
@@ -71,7 +67,6 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
         this.issueRepository = issueRepository;
-        this.backfillService = backfillService;
     }
 
     @Override
@@ -84,8 +79,9 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         long workspaceId = ref.workspaceId();
         Connection connection = connectionRepository.findById(connectionId).orElse(null);
 
-        // App-installation workspaces have a vendor-managed webhook (registered at install time);
-        // PAT connections have no webhook at all — "unknown" would be wrong, this IS known: absent.
+        // App-installation workspaces have a vendor-managed webhook (registered at install time), so we
+        // report TRUE. PAT connections have no webhook signal we track, so webhookRegistered stays null
+        // (the @Nullable "not applicable / unknown" value) rather than a claimed FALSE.
         Boolean webhookRegistered = null;
         Long installationId = null;
         if (connection != null && connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig appConfig) {
@@ -158,8 +154,8 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         );
         String state =
             rtm.getIssuesSyncedAt() == null || rtm.getPullRequestsSyncedAt() == null
-                ? "PENDING_INITIAL_SYNC"
-                : "SYNCED";
+                ? SyncResourceState.STATE_PENDING
+                : SyncResourceState.STATE_SYNCED;
 
         int backfillTotal =
             (rtm.getIssueBackfillHighWaterMark() != null ? rtm.getIssueBackfillHighWaterMark() : 0) +
@@ -191,39 +187,34 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
     }
 
     /**
-     * Connection-level backfill rollup (design doc §3.2/§3.4): wires {@link
-     * GitHubHistoricalBackfillService#getProgress}, previously dead code, across every monitored
-     * repository in the workspace.
+     * Connection-level backfill rollup (design doc §3.2/§3.4), computed from a single {@code findByWorkspaceId}
+     * load using the same high-water-mark / remaining / initialized fields {@code toResourceState} reads per
+     * resource — so no per-target {@code getProgress} re-fetch (an N+1 over the monitor set) is needed.
      */
     private BackfillSummary aggregateBackfill(long workspaceId) {
         if (!syncSchedulerProperties.backfill().enabled()) {
             return new BackfillSummary("DISABLED", null, null);
         }
-
-        List<Long> syncTargetIds = repositoryToMonitorRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .map(RepositoryToMonitor::getId)
-            .toList();
-        if (syncTargetIds.isEmpty()) {
+        List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspaceId);
+        if (monitors.isEmpty()) {
             return new BackfillSummary("NOT_STARTED", null, null);
         }
 
-        List<BackfillProgress> progressList = syncTargetIds
-            .stream()
-            .map(backfillService::getProgress)
-            .flatMap(Optional::stream)
-            .toList();
+        boolean anyInitialized = false;
+        boolean allComplete = true;
+        long totalItems = 0;
+        long doneItems = 0;
+        for (RepositoryToMonitor rtm : monitors) {
+            anyInitialized = anyInitialized || rtm.isBackfillInitialized();
+            allComplete = allComplete && rtm.isBackfillComplete();
+            int highWaterMark =
+                (rtm.getIssueBackfillHighWaterMark() != null ? rtm.getIssueBackfillHighWaterMark() : 0) +
+                (rtm.getPullRequestBackfillHighWaterMark() != null ? rtm.getPullRequestBackfillHighWaterMark() : 0);
+            totalItems += highWaterMark;
+            doneItems += Math.max(0, highWaterMark - rtm.getBackfillRemaining());
+        }
 
-        boolean anyInitialized = progressList.stream().anyMatch(BackfillProgress::isInitialized);
-        boolean allComplete = !progressList.isEmpty() && progressList.stream().allMatch(BackfillProgress::isComplete);
         String state = allComplete ? "COMPLETE" : (anyInitialized ? "IN_PROGRESS" : "NOT_STARTED");
-
-        long totalItems = progressList.stream().mapToLong(BackfillProgress::itemsTotal).sum();
-        long doneItems = progressList
-            .stream()
-            .mapToLong(p -> Math.max(0, p.itemsTotal() - p.itemsRemaining()))
-            .sum();
         Integer percent =
             totalItems > 0 ? (int) Math.round((100.0 * doneItems) / totalItems) : (anyInitialized ? 100 : null);
 

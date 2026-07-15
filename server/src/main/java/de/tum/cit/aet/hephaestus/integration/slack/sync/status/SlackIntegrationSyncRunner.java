@@ -16,18 +16,15 @@ import org.springframework.stereotype.Component;
  * consent-gated-per-page entry point the scheduler already uses (design doc §3.4: "no extraction
  * needed").
  *
- * <p><strong>Outcome mapping (design doc §3.1, "Outcome mapping v1"):</strong> {@link SyncJobHandle}
- * exposes no way for a runner body to elevate a job to {@code SUCCEEDED_WITH_WARNINGS} short of throwing
- * (which the template maps to {@code FAILED}) — {@link de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService#executeBody}
- * only distinguishes "body returned" (SUCCEEDED) from "body threw" (FAILED). Per-channel failures inside
- * {@link WorkspaceSyncSummary} (a channel skipped due to a transient API error, a budget cutoff, etc.)
- * are therefore surfaced only through {@link SyncJobHandle#progress} — visible in the job row's progress
- * detail — and do NOT throw; the job still completes SUCCEEDED. This is an accepted v1 fidelity gap (full
- * warning fidelity deferred, same as the design doc's GitHub/GitLab summaries). A synthetic throw is
- * reserved for total failures, which already propagate naturally: an exception thrown before
- * {@code syncWorkspaceNow} produces a summary at all (e.g. channel-metadata refresh, or the monitored-channel
- * query itself) is not caught here and is left to fail the job — {@link SyncJobService#executeBody} maps it
- * to {@code FAILED} with the exception's message as the error summary.
+ * <p><strong>Outcome mapping (design doc §3.1, "Outcome mapping v1"):</strong> when the
+ * {@link WorkspaceSyncSummary} reports at least one genuinely failed channel
+ * ({@link WorkspaceSyncSummary#failed()} &gt; 0 — a channel whose history sync threw, distinct from a
+ * benign nothing-to-sync/budget skip), the runner calls {@link SyncJobHandle#reportWarnings()} so the
+ * job finalizes {@code SUCCEEDED_WITH_WARNINGS}; the per-channel shortfall is also surfaced in the
+ * job row's progress detail. A summary with only benign skips completes plain {@code SUCCEEDED}. Total
+ * failures propagate naturally: an exception thrown before {@code syncWorkspaceNow} produces a summary
+ * (e.g. channel-metadata refresh, or the monitored-channel query itself) is not caught here and is left
+ * to fail the job as {@code FAILED} with the exception's message as the error summary.
  *
  * <p><strong>Cancellation is coarse-grained.</strong> {@code syncWorkspaceNow} delegates to
  * {@code SlackChannelHistorySyncService.syncWorkspace}, whose per-channel loop is private and not threaded
@@ -56,6 +53,10 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
         WorkspaceSyncSummary summary = dataSyncScheduler.syncWorkspaceNow(ref.workspaceId());
         handle.progress(summary.synced() + summary.skipped(), summary.channels(), progressDetail(summary));
+        if (summary.failed() > 0) {
+            // At least one channel's history sync threw — a genuine partial failure, not a benign skip.
+            handle.reportWarnings();
+        }
     }
 
     @Override
@@ -71,6 +72,8 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
             summary.synced(),
             "skipped",
             summary.skipped(),
+            "failed",
+            summary.failed(),
             "ingested",
             summary.ingested(),
             "requestsUsed",

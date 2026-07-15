@@ -89,36 +89,46 @@ public class SyncJobService {
         long connectionId = request.connectionId();
         reapAbandonedForConnection(connectionId);
 
-        SyncJob job = transactionTemplate.execute(status -> {
-            Optional<SyncJob> active = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                connectionId,
-                SyncJobStatus.ACTIVE
-            );
-            if (active.isPresent()) {
-                throw new SyncJobConflictException(active.get());
-            }
-
-            SyncJob created = new SyncJob(
-                workspaceRepository.getReferenceById(request.workspaceId()),
-                connectionRepository.getReferenceById(connectionId),
-                request.kind(),
-                request.type(),
-                request.trigger(),
-                request.triggeredByUserId()
-            );
-            try {
-                return syncJobRepository.saveAndFlush(created);
-            } catch (DataIntegrityViolationException e) {
-                // Partial unique index race (ux_sync_job_active): another concurrent trigger won.
-                SyncJob raced = syncJobRepository
+        SyncJob job;
+        try {
+            job = transactionTemplate.execute(status -> {
+                Optional<SyncJob> active = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                    connectionId,
+                    SyncJobStatus.ACTIVE
+                );
+                if (active.isPresent()) {
+                    throw new SyncJobConflictException(active.get());
+                }
+                return syncJobRepository.saveAndFlush(
+                    new SyncJob(
+                        workspaceRepository.getReferenceById(request.workspaceId()),
+                        connectionRepository.getReferenceById(connectionId),
+                        request.kind(),
+                        request.type(),
+                        request.trigger(),
+                        request.triggeredByUserId()
+                    )
+                );
+            });
+        } catch (DataIntegrityViolationException e) {
+            // Partial unique index race (ux_sync_job_active): another concurrent trigger inserted first.
+            // The insert transaction above is now aborted, so the winning row must be re-read in a FRESH
+            // transaction — querying the aborted one would itself throw and mask the conflict as a 500.
+            SyncJob raced = transactionTemplate.execute(status ->
+                syncJobRepository
                     .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
-                    .orElseThrow(() -> e);
+                    .orElse(null)
+            );
+            if (raced != null) {
                 throw new SyncJobConflictException(raced);
             }
-        });
+            throw e;
+        }
 
+        // The handle is registered in executeBody once the job is RUNNING — not here — so a rejected
+        // async dispatch (executeBody never runs) can't leak a handle that the lease heartbeat would
+        // keep alive forever, wedging the connection's one-active-job slot.
         SyncJobHandle handle = new SyncJobHandle(job.getId(), this::persistProgress);
-        activeHandles.put(job.getId(), handle);
         publish(request.workspaceId(), connectionId, request.kind(), SyncStateChangedEvent.Scope.JOB);
         return new Started(job, handle);
     }
@@ -136,20 +146,34 @@ public class SyncJobService {
      */
     public void executeBody(Started started, Consumer<SyncJobHandle> body) {
         long jobId = started.job().getId();
-        markRunning(jobId);
+        SyncJobHandle handle = started.handle();
+        activeHandles.put(jobId, handle);
+        // Seed the local cancel flag from the row: a cancel may have landed while the job was still
+        // PENDING (before this handle was registered), setting cancel_requested in the DB only.
+        handle.refreshCancellation(markRunning(jobId));
         try {
-            body.accept(started.handle());
-            SyncJobStatus finalStatus = started.handle().isCancellationRequested()
+            body.accept(handle);
+            SyncJobStatus finalStatus = handle.cancelledReported()
                 ? SyncJobStatus.CANCELLED
-                : SyncJobStatus.SUCCEEDED;
-            completeJob(jobId, finalStatus, null, started.handle());
+                : handle.warningsReported()
+                    ? SyncJobStatus.SUCCEEDED_WITH_WARNINGS
+                    : SyncJobStatus.SUCCEEDED;
+            completeJob(jobId, finalStatus, null, handle);
         } catch (Exception e) {
             log.warn("Sync job {} failed: {}", jobId, e.toString(), e);
-            completeJob(jobId, SyncJobStatus.FAILED, truncate(summarize(e)), started.handle());
+            completeJob(jobId, SyncJobStatus.FAILED, truncate(summarize(e)), handle);
         } finally {
             activeHandles.remove(jobId);
             pruneRetention(started.job().getConnection().getId());
         }
+    }
+
+    /**
+     * Finalize a job that was created but never dispatched (e.g. the async executor rejected the body).
+     * Without this the PENDING row would hold the connection's one-active slot until the zombie sweep.
+     */
+    public void failStarted(Started started, String reason) {
+        completeJob(started.job().getId(), SyncJobStatus.FAILED, truncate(reason), started.handle());
     }
 
     /**
@@ -177,11 +201,13 @@ public class SyncJobService {
                 .orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
             if (!SyncJobStatus.ACTIVE.contains(job.getStatus())) {
                 throw new SyncStateConflictException(
-                    "Cannot cancel sync job " + jobId + " — already in terminal status " + job.getStatus()
+                    "Cannot cancel sync job " + jobId + " — already in terminal status " + job.getStatus(),
+                    Map.of("jobId", jobId, "jobStatus", job.getStatus())
                 );
             }
-            job.setCancelRequested(true);
-            syncJobRepository.save(job);
+            // Targeted flag-only UPDATE (not a full-row save): a full save would write back this stale
+            // snapshot's status column and could resurrect a job that the executor just completed.
+            syncJobRepository.markCancelRequested(jobId, SyncJobStatus.ACTIVE);
         });
 
         SyncJobHandle handle = activeHandles.get(jobId);
@@ -189,8 +215,6 @@ public class SyncJobService {
             handle.refreshCancellation(true);
         }
     }
-
-    // --- lease heartbeat ---
 
     /**
      * Touches {@code heartbeat_at} for every job currently executing in this JVM, and refreshes each
@@ -219,8 +243,6 @@ public class SyncJobService {
         }
     }
 
-    // --- zombie reaping ---
-
     /**
      * Full cross-workspace sweep, called by {@link SyncJobZombieSweeper} on startup and hourly.
      *
@@ -247,12 +269,16 @@ public class SyncJobService {
         if (stale.isEmpty()) {
             return 0;
         }
-        Instant now = Instant.now();
+        // Status-guarded bulk write: a job whose heartbeat looked stale but which committed a terminal
+        // status between the find and here is excluded by the WHERE clause, so it can't be resurrected.
+        List<Long> ids = stale.stream().map(SyncJob::getId).toList();
+        int reaped = syncJobRepository.markAbandoned(
+            ids,
+            Instant.now(),
+            "Abandoned: no heartbeat (likely pod restart)",
+            SyncJobStatus.ACTIVE
+        );
         for (SyncJob job : stale) {
-            job.setStatus(SyncJobStatus.FAILED);
-            job.setFinishedAt(now);
-            job.setErrorSummary("Abandoned: no heartbeat (likely pod restart)");
-            syncJobRepository.save(job);
             activeHandles.remove(job.getId());
             publish(
                 job.getWorkspace().getId(),
@@ -261,23 +287,27 @@ public class SyncJobService {
                 SyncStateChangedEvent.Scope.JOB
             );
         }
-        log.warn("Reaped {} abandoned sync job(s)", stale.size());
-        return stale.size();
+        log.warn("Reaped {} abandoned sync job(s)", reaped);
+        return reaped;
     }
 
     // --- bookkeeping writes (self-invoked; TransactionTemplate, never @Transactional — see class doc) ---
 
-    private void markRunning(long jobId) {
-        transactionTemplate.executeWithoutResult(status ->
+    /** PENDING → RUNNING; returns whether a cancel was already requested while the job was PENDING. */
+    private boolean markRunning(long jobId) {
+        Boolean cancelRequested = transactionTemplate.execute(status ->
             syncJobRepository
                 .findById(jobId)
-                .ifPresent(job -> {
+                .map(job -> {
                     job.setStatus(SyncJobStatus.RUNNING);
                     job.setStartedAt(Instant.now());
                     job.setHeartbeatAt(Instant.now());
                     syncJobRepository.save(job);
+                    return job.isCancelRequested();
                 })
+                .orElse(false)
         );
+        return Boolean.TRUE.equals(cancelRequested);
     }
 
     private void completeJob(long jobId, SyncJobStatus status, @Nullable String errorSummary, SyncJobHandle handle) {

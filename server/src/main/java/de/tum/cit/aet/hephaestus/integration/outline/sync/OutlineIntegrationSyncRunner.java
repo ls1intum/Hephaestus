@@ -38,6 +38,11 @@ public class OutlineIntegrationSyncRunner implements IntegrationSyncRunner {
     @Override
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
         syncScheduler.syncWorkspaceNow(ref.workspaceId(), OutlineSyncProgress.adapt(handle));
+        // The progress listener stops the reconcile between collections when the handle is cancelled, so
+        // a still-set flag on return means it aborted early — declare it so the job finalizes CANCELLED.
+        if (handle.isCancellationRequested()) {
+            handle.reportCancelled();
+        }
     }
 
     // supportsBackfill() stays the interface default (false) — Outline has no separate backfill phase;

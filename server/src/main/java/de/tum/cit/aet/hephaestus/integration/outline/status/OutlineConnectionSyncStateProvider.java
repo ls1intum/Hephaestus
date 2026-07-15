@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepos
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -84,24 +86,29 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
         if (!CronExpression.isValidExpression(syncCron)) {
             return null;
         }
-        return CronExpression.parse(syncCron).next(ZonedDateTime.now()).toInstant();
+        // CronExpression.next(...) is @Nullable (no future match) — guard it like the other three providers.
+        ZonedDateTime next = CronExpression.parse(syncCron).next(ZonedDateTime.now());
+        return next == null ? null : next.toInstant();
     }
 
     @Override
     public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
-        return collectionRepository
-            .findByWorkspaceIdAndConnectionId(ref.workspaceId(), connectionId)
+        long workspaceId = ref.workspaceId();
+        // Single grouped count for the whole connection (one query), instead of one count per collection.
+        Map<String, Long> itemCountByCollectionId = documentRepository
+            .countLiveByCollection(workspaceId, connectionId)
             .stream()
-            .map(collection -> toResourceState(ref.workspaceId(), collection))
+            .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+
+        return collectionRepository
+            .findByWorkspaceIdAndConnectionId(workspaceId, connectionId)
+            .stream()
+            .map(collection -> toResourceState(collection, itemCountByCollectionId))
             .toList();
     }
 
-    private SyncResourceState toResourceState(long workspaceId, OutlineCollection collection) {
-        long itemCount = documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
-            workspaceId,
-            collection.getConnectionId(),
-            collection.getCollectionId()
-        );
+    private SyncResourceState toResourceState(OutlineCollection collection, Map<String, Long> itemCountByCollectionId) {
+        long itemCount = itemCountByCollectionId.getOrDefault(collection.getCollectionId(), 0L);
         String name =
             collection.getName() != null && !collection.getName().isBlank()
                 ? collection.getName()

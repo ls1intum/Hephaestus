@@ -5,6 +5,7 @@ import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,6 +45,16 @@ public class SyncEventHub {
 
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
     private static final int QUEUE_CAPACITY = 64;
+
+    /**
+     * Ceiling on concurrent emitters per workspace. The endpoint is a credentialed GET that any
+     * origin can <em>open</em> against a logged-in admin (CORS blocks reading the body, not opening
+     * the connection), and each emitter lives up to {@link #EMITTER_TIMEOUT_MS}. Without a cap an
+     * abusive page reusing the admin's cookie could hold unbounded 30-minute connections. Beyond the
+     * cap we evict an existing subscriber so a legitimate new tab always connects while the aggregate
+     * stays bounded.
+     */
+    private static final int MAX_EMITTERS_PER_WORKSPACE = 20;
     private static final String EVENT_NAME = "sync";
     private static final long HEARTBEAT_INTERVAL_MS = 20_000L;
     private static final Duration DEFAULT_COALESCE_WINDOW = Duration.ofSeconds(1);
@@ -51,6 +62,9 @@ public class SyncEventHub {
     private final ObjectMapper objectMapper;
     private final Duration coalesceWindow;
     private final Supplier<SseEmitter> emitterFactory;
+
+    /** Latches true the first time the per-workspace cap is hit, so eviction logs once, not per-open. */
+    private final AtomicBoolean capWarned = new AtomicBoolean(false);
 
     /** Live subscribers, per workspace. Set is identity-based (no equals/hashCode override on {@link Subscriber}). */
     private final Map<Long, Set<Subscriber>> subscribersByWorkspace = new ConcurrentHashMap<>();
@@ -96,7 +110,6 @@ public class SyncEventHub {
     public SseEmitter subscribe(long workspaceId) {
         SseEmitter emitter = emitterFactory.get();
         Subscriber subscriber = new Subscriber(workspaceId, emitter);
-        subscribersByWorkspace.computeIfAbsent(workspaceId, key -> ConcurrentHashMap.newKeySet()).add(subscriber);
 
         emitter.onCompletion(() -> deregister(subscriber));
         emitter.onTimeout(() -> {
@@ -104,7 +117,54 @@ public class SyncEventHub {
             safeComplete(emitter);
         });
         emitter.onError(throwable -> deregister(subscriber));
+
+        // Initial flush before registering: commits the HTTP response immediately so the browser's
+        // EventSource.onopen fires now rather than only after the first heartbeat (up to 20s), and a
+        // socket that is already dead deregisters on this first write instead of lingering. Mirrors
+        // MentorSseChannel, which likewise sends immediately. Sending before adding to the registry
+        // keeps this write off the single-writer fan-out path (no concurrent send to serialise yet).
+        try {
+            emitter.send(SseEmitter.event().comment("connected"));
+        } catch (Exception e) {
+            log.debug("Sync SSE initial flush failed; not registering: {}", e.toString());
+            safeComplete(emitter);
+            return emitter;
+        }
+
+        evictIfOverCapacity(workspaceId);
+        // Re-fetch (computeIfAbsent) rather than reuse a pre-eviction reference: if eviction had
+        // emptied the set, deregister may have removed the now-orphaned map entry, and adding to that
+        // stale set would make the subscriber invisible to fanOut. Always add to the live mapping.
+        subscribersByWorkspace.computeIfAbsent(workspaceId, key -> ConcurrentHashMap.newKeySet()).add(subscriber);
         return emitter;
+    }
+
+    /**
+     * Bound the aggregate emitter count per workspace. The subscriber set is identity-based and
+     * unordered, so this evicts an arbitrary existing subscriber rather than a strictly-oldest one —
+     * enough to keep the count bounded and close the unbounded-connection vector while letting a
+     * legitimate new tab always connect.
+     */
+    private void evictIfOverCapacity(long workspaceId) {
+        Set<Subscriber> subscribers = subscribersByWorkspace.get(workspaceId);
+        if (subscribers == null) {
+            return;
+        }
+        while (subscribers.size() >= MAX_EMITTERS_PER_WORKSPACE) {
+            Iterator<Subscriber> it = subscribers.iterator();
+            if (!it.hasNext()) {
+                return;
+            }
+            Subscriber victim = it.next();
+            if (capWarned.compareAndSet(false, true)) {
+                log.warn(
+                    "Sync SSE emitter cap ({}) reached for a workspace; evicting existing subscribers",
+                    MAX_EMITTERS_PER_WORKSPACE
+                );
+            }
+            deregister(victim);
+            safeComplete(victim.emitter);
+        }
     }
 
     /**

@@ -125,6 +125,8 @@ public class SlackDataSyncScheduler {
                         summary.synced(),
                         "skipped",
                         summary.skipped(),
+                        "failed",
+                        summary.failed(),
                         "ingested",
                         summary.ingested(),
                         "requestsUsed",
@@ -158,11 +160,12 @@ public class SlackDataSyncScheduler {
         }
         SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncWorkspace(workspaceId);
         log.info(
-            "slack.sync: workspaceId={} channels={} synced={} skipped={} ingested={} requests={} budgetExhausted={}",
+            "slack.sync: workspaceId={} channels={} synced={} skipped={} failed={} ingested={} requests={} budgetExhausted={}",
             workspaceId,
             summary.channels(),
             summary.synced(),
             summary.skipped(),
+            summary.failed(),
             summary.ingested(),
             summary.requestsUsed(),
             summary.budgetExhausted()

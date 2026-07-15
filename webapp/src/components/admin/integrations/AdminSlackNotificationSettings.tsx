@@ -116,7 +116,7 @@ export function AdminSlackNotificationSettings({
 
 	// The OAuth landing route hands the outcome over through sessionStorage. The keys are cleared
 	// before the toast fires, so a remount (the parent re-keys this form on every server refetch)
-	// cannot replay it. This belongs on the landing route, not here — see the note in the PR.
+	// cannot replay it.
 	useEffect(() => {
 		const result = window.sessionStorage.getItem("slack-connect-result");
 		if (!result) return;

@@ -169,7 +169,31 @@ class SyncEventHubTest extends BaseUnitTest {
             .during(Duration.ofMillis(200))
             .atMost(Duration.ofSeconds(1))
             .until(() -> true);
-        assertThat(emitter.comments()).isEmpty();
+        // The initial ":connected" flush is expected; the point is that no heartbeat ping is sent
+        // to a deregistered subscriber.
+        assertThat(emitter.comments()).doesNotContain("ping");
+    }
+
+    @Test
+    void subscribe_sendsInitialConnectedCommentImmediately() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+
+        // Synchronous on subscribe — no await needed; fires EventSource.onopen right away.
+        assertThat(emitter.comments()).containsExactly("connected");
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(1);
+    }
+
+    @Test
+    void subscribe_beyondPerWorkspaceCap_evictsExistingSubscribers() {
+        hub = newHub(Duration.ofMillis(10));
+        for (int i = 0; i < 25; i++) {
+            hub.subscribe(WORKSPACE_ID);
+        }
+
+        // Aggregate stays bounded by the cap (20); a legitimate new tab still connected.
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(20);
     }
 
     /** Test-only emitter that records data/comment frames + can simulate a socket failure. */

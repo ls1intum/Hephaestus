@@ -61,6 +61,26 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
         @Param("cutoff") Instant cutoff
     );
 
+    /** Flag-only cancel write, guarded so it never touches a job that already reached a terminal status. */
+    @WorkspaceAgnostic("ID-based cancel flag; jobId is validated against the workspace by the caller first")
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE SyncJob j SET j.cancelRequested = true WHERE j.id = :id AND j.status IN :statuses")
+    int markCancelRequested(@Param("id") long id, @Param("statuses") Collection<SyncJobStatus> statuses);
+
+    /** Status-guarded bulk reap for the zombie sweep — only rows still in a non-terminal status flip. */
+    @WorkspaceAgnostic("ID-based reap; ids come from the cross-workspace zombie sweep")
+    @Modifying(clearAutomatically = true)
+    @Query(
+        "UPDATE SyncJob j SET j.status = de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus.FAILED, " +
+            "j.finishedAt = :now, j.errorSummary = :reason WHERE j.id IN :ids AND j.status IN :statuses"
+    )
+    int markAbandoned(
+        @Param("ids") Collection<Long> ids,
+        @Param("now") Instant now,
+        @Param("reason") String reason,
+        @Param("statuses") Collection<SyncJobStatus> statuses
+    );
+
     /** Bulk lease touch for every currently-registered in-JVM handle (the 60s heartbeat scheduler). */
     @WorkspaceAgnostic("ID-based bulk heartbeat; ids come from the in-process job handle registry")
     @Modifying(flushAutomatically = true, clearAutomatically = true)

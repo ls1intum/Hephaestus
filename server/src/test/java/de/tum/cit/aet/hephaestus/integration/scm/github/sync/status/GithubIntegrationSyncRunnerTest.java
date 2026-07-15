@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync.status;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -96,16 +95,6 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
         );
     }
 
-    @Test
-    void kind_returnsGithub() {
-        assertThat(runner.kind()).isEqualTo(IntegrationKind.GITHUB);
-    }
-
-    @Test
-    void supportsBackfill_isTrue() {
-        assertThat(runner.supportsBackfill()).isTrue();
-    }
-
     @Nested
     class Reconcile {
 
@@ -114,6 +103,18 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             runner.reconcile(ref, handle);
 
             verify(dataSyncService).syncAllRepositories(WORKSPACE_ID, handle);
+            // Ran to completion (flag never set) — must NOT be labeled cancelled.
+            verify(handle, never()).reportCancelled();
+        }
+
+        @Test
+        void reportsCancelledWhenTheHandleIsStillCancelledOnReturn() {
+            when(handle.isCancellationRequested()).thenReturn(true);
+
+            runner.reconcile(ref, handle);
+
+            verify(dataSyncService).syncAllRepositories(WORKSPACE_ID, handle);
+            verify(handle).reportCancelled();
         }
     }
 
@@ -136,6 +137,8 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             verify(backfillService).runBackfillBatch(eq(targetA), eq(50));
             verify(backfillService).runBackfillBatch(eq(targetB), eq(50));
             verify(handle, times(2)).progress(any(), isNull(), any());
+            // Completed naturally (no pending repos left) — not a cancellation.
+            verify(handle, never()).reportCancelled();
         }
 
         @Test
@@ -156,6 +159,8 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             verify(backfillService).runBackfillBatch(eq(targetA), anyInt());
             verify(backfillService, never()).runBackfillBatch(eq(targetB), anyInt());
             verify(backfillService, never()).runBackfillBatch(eq(targetC), anyInt());
+            // Aborted on a cancel checkpoint — the job must finalize CANCELLED, not SUCCEEDED.
+            verify(handle).reportCancelled();
         }
 
         @Test
@@ -166,6 +171,7 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
             verify(backfillService, never()).runBackfillBatch(any(), anyInt());
             verify(syncTargetProvider, never()).getSyncTargetsForScope(any());
+            verify(handle).reportCancelled();
         }
 
         @Test

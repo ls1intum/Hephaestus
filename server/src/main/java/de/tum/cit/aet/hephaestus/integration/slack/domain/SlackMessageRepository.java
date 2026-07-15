@@ -80,6 +80,27 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     long countByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
 
     /**
+     * Grouped local message count per channel for one workspace, in a single query — backs the
+     * sync-observability resource list's per-channel {@code itemCount} without an N+1 count per
+     * monitored channel (mirrors {@code IssueRepository.RepositoryItemCount}). Includes tombstoned rows,
+     * matching {@link #countByWorkspaceIdAndSlackChannelId} (a storage count, not a content count).
+     *
+     * @param workspaceId the workspace to count within
+     * @return one projection row per channel that has at least one stored message
+     */
+    @Query(
+        "SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m " +
+            "WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId"
+    )
+    List<ChannelItemCount> countGroupedByChannelId(@Param("workspaceId") long workspaceId);
+
+    /** Projection for {@link #countGroupedByChannelId}. */
+    interface ChannelItemCount {
+        String getSlackChannelId();
+        Long getItemCount();
+    }
+
+    /**
      * Retention-sweep fan-out: every workspace that currently has at least one ingested message. Native +
      * unscoped by design (the {@link de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper}
      * runs {@code @WorkspaceAgnostic}, so the tenancy {@code StatementInspector} treats this as exempt). Callers

@@ -32,6 +32,7 @@ import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -204,7 +205,8 @@ public class SyncStatusService {
                     connectionId +
                     " is not ACTIVE (state=" +
                     connection.getState() +
-                    ")"
+                    ")",
+                Map.of("connectionId", connectionId, "connectionState", connection.getState())
             );
         }
         IntegrationSyncRunner runner = runnerFor(connection.getKind());
@@ -224,17 +226,44 @@ public class SyncStatusService {
                     triggeredByUserId
                 )
             );
-            taskExecutor.execute(() ->
-                syncJobService.executeBody(started, handle -> {
-                    if (type == SyncJobType.BACKFILL) {
-                        runner.backfill(ref, handle);
-                    } else {
-                        runner.reconcile(ref, handle);
-                    }
-                })
-            );
+            try {
+                taskExecutor.execute(() ->
+                    syncJobService.executeBody(started, handle -> {
+                        if (type == SyncJobType.BACKFILL) {
+                            runner.backfill(ref, handle);
+                        } else {
+                            runner.reconcile(ref, handle);
+                        }
+                    })
+                );
+            } catch (TaskRejectedException e) {
+                // The row was created but no body will run — finalize it so it doesn't hold the slot.
+                syncJobService.failStarted(started, "Sync dispatch rejected (executor saturated)");
+                throw e;
+            }
             return new TriggerOutcome(SyncJobDTO.from(started.job()), true);
         } catch (SyncJobConflictException e) {
+            // Absorb only a same-type duplicate (idempotent double-click). A different type in flight is a
+            // genuine conflict — silently returning the running job would drop the caller's request.
+            if (e.activeJob().getType() != type) {
+                SyncJob active = e.activeJob();
+                throw new SyncStateConflictException(
+                    "Cannot start " +
+                        type +
+                        " sync: a " +
+                        active.getType() +
+                        " sync is already running for connection " +
+                        connectionId,
+                    Map.of(
+                        "conflictingJobId",
+                        active.getId(),
+                        "conflictingJobType",
+                        active.getType(),
+                        "conflictingJobStatus",
+                        active.getStatus()
+                    )
+                );
+            }
             return new TriggerOutcome(SyncJobDTO.from(e.activeJob()), false);
         }
     }

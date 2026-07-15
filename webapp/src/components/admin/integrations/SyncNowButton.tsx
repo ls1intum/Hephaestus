@@ -33,13 +33,20 @@ export function SyncNowButton({
 	const text = activeJob != null ? "Syncing…" : isTriggering ? "Starting…" : label;
 
 	return (
-		<Button variant={variant} size={size} onClick={onClick} disabled={disabled}>
-			{isTriggering || activeJob != null ? (
-				<Spinner className="size-4" />
-			) : (
-				<RefreshCwIcon className="size-4" />
-			)}
-			{text}
-		</Button>
+		<>
+			<Button variant={variant} size={size} onClick={onClick} disabled={disabled}>
+				{isTriggering || activeJob != null ? (
+					<Spinner className="size-4" />
+				) : (
+					<RefreshCwIcon className="size-4" />
+				)}
+				{text}
+			</Button>
+			{/* Announce sync start/progress to assistive tech; a plain button-label swap is not
+			reliably announced. Empty when idle, so nothing is spoken until a run begins. */}
+			<span role="status" aria-live="polite" className="sr-only">
+				{activeJob != null ? "Sync in progress" : isTriggering ? "Starting sync" : ""}
+			</span>
+		</>
 	);
 }

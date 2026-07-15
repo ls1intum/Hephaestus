@@ -61,11 +61,6 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     }
 
     @Test
-    void kind_isOutline() {
-        assertThat(provider().kind()).isEqualTo(IntegrationKind.OUTLINE);
-    }
-
-    @Test
     void describe_webhookSubscriptionIdPresent_isRegistered() {
         lenient()
             .when(connection.getConfig())
@@ -135,13 +130,9 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
             List.of(collection)
         );
-        when(
-            documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
-                WORKSPACE,
-                CONNECTION_ID,
-                "col-1"
-            )
-        ).thenReturn(9L);
+        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(
+            List.<Object[]>of(new Object[] { "col-1", 9L })
+        );
 
         List<SyncResourceState> resources = provider().resources(REF, CONNECTION_ID);
 
@@ -175,6 +166,7 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
             List.of(paused)
         );
+        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID).get(0).state()).isEqualTo("PAUSED");
     }
@@ -192,6 +184,7 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
             List.of(unnamed)
         );
+        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID).get(0).name()).isEqualTo("col-3");
     }
@@ -211,6 +204,7 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(
             List.of(errored)
         );
+        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID).get(0).lastError()).isEqualTo(
             "Outline /api/documents.export failed (HTTP 500)"
@@ -220,6 +214,7 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void resources_noCollections_isEmpty() {
         when(collectionRepository.findByWorkspaceIdAndConnectionId(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
+        when(documentRepository.countLiveByCollection(WORKSPACE, CONNECTION_ID)).thenReturn(List.of());
 
         assertThat(provider().resources(REF, CONNECTION_ID)).isEmpty();
     }

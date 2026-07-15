@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -122,7 +121,6 @@ public class GitLabRateLimitTracker {
             if (observedStr != null) {
                 state.lastQueryCost.set(Integer.parseInt(observedStr));
             }
-            state.observed.set(true);
 
             // Calculate used points
             int currentLimit = state.limit.get();
@@ -315,7 +313,10 @@ public class GitLabRateLimitTracker {
      * Point-in-time snapshot for the sync-observability provider — {@code null} if this scope has
      * never had a real rate-limit header observed since the last restart (as opposed to the
      * optimistic {@link #getRemaining}/{@link #getLimit} defaults, which exist to drive throttling
-     * decisions and would otherwise misrepresent "unknown" as "100/100 available").
+     * decisions and would otherwise misrepresent "unknown" as "100/100 available"). State is created
+     * only from {@link #updateFromHeaders} after real headers are present, so {@code state == null}
+     * already means "never observed" — no separate flag needed (mirrors GitHub's {@code
+     * ScopedRateLimitTracker#snapshot}).
      */
     @Nullable
     public RateLimitSnapshot snapshot(Long scopeId) {
@@ -323,7 +324,7 @@ public class GitLabRateLimitTracker {
             return null;
         }
         ScopeRateLimitState state = stateByScope.get(scopeId);
-        if (state == null || !state.observed.get()) {
+        if (state == null) {
             return null;
         }
         return new RateLimitSnapshot(state.limit.get(), state.remaining.get(), state.resetAt.get());
@@ -443,6 +444,5 @@ public class GitLabRateLimitTracker {
             Instant.now().plusSeconds(DEFAULT_RESET_SECONDS)
         );
         final AtomicReference<Instant> lastUpdated = new AtomicReference<>(Instant.now());
-        final AtomicBoolean observed = new AtomicBoolean(false);
     }
 }

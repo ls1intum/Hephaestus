@@ -60,12 +60,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     }
 
     @Test
-    void kind_isSlack() {
-        setUpDefault();
-        assertThat(provider.kind()).isEqualTo(IntegrationKind.SLACK);
-    }
-
-    @Test
     void describe_activeConnection_reportsWebhookRegisteredTrue() {
         setUpDefault();
         Connection connection = mock(Connection.class);
@@ -128,7 +122,7 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
             List.of(channel)
         );
-        when(messageRepository.countByWorkspaceIdAndSlackChannelId(WS, "C1")).thenReturn(42L);
+        when(messageRepository.countGroupedByChannelId(WS)).thenReturn(List.of(channelCount("C1", 42L)));
 
         List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);
 
@@ -158,12 +152,28 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
             List.of(channel)
         );
-        when(messageRepository.countByWorkspaceIdAndSlackChannelId(WS, "C2")).thenReturn(0L);
+        // No stored messages for this channel -> absent from the grouped count -> itemCount defaults to 0.
+        when(messageRepository.countGroupedByChannelId(WS)).thenReturn(List.of());
 
         List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);
 
         assertThat(resources.get(0).name()).isEqualTo("C2");
         assertThat(resources.get(0).state()).isEqualTo("PENDING");
         assertThat(resources.get(0).lastSyncedAt()).isNull();
+        assertThat(resources.get(0).itemCount()).isEqualTo(0L);
+    }
+
+    private SlackMessageRepository.ChannelItemCount channelCount(String channelId, long count) {
+        return new SlackMessageRepository.ChannelItemCount() {
+            @Override
+            public String getSlackChannelId() {
+                return channelId;
+            }
+
+            @Override
+            public Long getItemCount() {
+                return count;
+            }
+        };
     }
 }

@@ -22,7 +22,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { asDate } from "./sync-format";
+import { asDate, resourceStateLabel } from "./sync-format";
 
 export interface SyncResourcesTableProps {
 	resources: SyncResourceState[];
@@ -108,7 +108,7 @@ export function SyncResourcesTable({
 								<div className="text-muted-foreground font-mono text-xs">{resource.externalId}</div>
 							</TableCell>
 							<TableCell>
-								<Badge variant="outline">{resource.state}</Badge>
+								<Badge variant="outline">{resourceStateLabel(resource.state)}</Badge>
 							</TableCell>
 							<TableCell className="text-muted-foreground">
 								{lastSyncedAt ? formatDistanceToNow(lastSyncedAt, { addSuffix: true }) : "–"}

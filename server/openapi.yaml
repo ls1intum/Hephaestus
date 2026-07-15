@@ -1539,7 +1539,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SyncJob"
-          description: OK
+          description: "Idempotent-absorb: a same-type job was already running and\
+            \ is returned unchanged"
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJob"
+          description: A new sync job was created and dispatched
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Missing or invalid request body (e.g. absent sync type)
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Connection not found in this workspace
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Connection is not ACTIVE, a different sync type is already\
+            \ running, or manual sync is unsupported for the kind"
       summary: Trigger a manual sync or backfill
       tags:
       - Sync
@@ -1567,12 +1593,24 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
+        "202":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SyncJob"
-          description: OK
+          description: Cancellation requested; the running job stops cooperatively
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Job not found in this workspace, or not owned by this connection"
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Job is already in a terminal status
       summary: Request cooperative cancellation of a running sync job
       tags:
       - Sync
@@ -6446,6 +6484,25 @@ components:
       - id
       - name
       - slug
+    ProblemDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
+        status:
+          type: integer
+          format: int32
+        title:
+          type: string
+        type:
+          type: string
+          format: uri
     Profile:
       type: object
       description: "User profile header: identity, league standing, contribution surface,\

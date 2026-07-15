@@ -28,6 +28,7 @@ import { RateLimitGauge } from "@/components/admin/integrations/RateLimitGauge";
 import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
 import { SyncNowButton } from "@/components/admin/integrations/SyncNowButton";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
+import { asDate } from "@/components/admin/integrations/sync-format";
 import { WebhookLivenessIndicator } from "@/components/admin/integrations/WebhookLivenessIndicator";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import {
@@ -233,7 +234,7 @@ function ScmIntegrationPage() {
 									</p>
 									<p className="text-sm">
 										{status.lastSuccessfulSyncAt
-											? formatDistanceToNow(new Date(status.lastSuccessfulSyncAt), {
+											? formatDistanceToNow(asDate(status.lastSuccessfulSyncAt) ?? new Date(), {
 													addSuffix: true,
 												})
 											: "Never synced"}

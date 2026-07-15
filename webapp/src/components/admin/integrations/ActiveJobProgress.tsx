@@ -26,7 +26,14 @@ export function ActiveJobProgress({ job, className }: ActiveJobProgressProps) {
 		const percent = Math.min(100, Math.round((processed / total) * 100));
 		return (
 			<div className={cn("flex items-center gap-2 text-sm text-muted-foreground", className)}>
-				<Progress value={percent} className="w-32" />
+				<Progress
+					value={percent}
+					className="w-32"
+					aria-label="Sync progress"
+					getAriaValueText={() =>
+						`${processed} of ${total} items${currentStep ? `, ${currentStep}` : ""}`
+					}
+				/>
 				<span className="tabular-nums">
 					{processed}/{total}
 				</span>

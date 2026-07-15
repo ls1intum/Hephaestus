@@ -1644,6 +1644,17 @@ export type Profile = {
     xpRecord: ProfileXpRecord;
 };
 
+export type ProblemDetail = {
+    detail?: string;
+    instance?: string;
+    properties?: {
+        [key: string]: unknown;
+    };
+    status?: number;
+    title?: string;
+    type?: string;
+};
+
 /**
  * A practice area grouping related practices into a learning objective
  */
@@ -4492,11 +4503,32 @@ export type TriggerSyncJobData = {
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs';
 };
 
+export type TriggerSyncJobErrors = {
+    /**
+     * Missing or invalid request body (e.g. absent sync type)
+     */
+    400: ProblemDetail;
+    /**
+     * Connection not found in this workspace
+     */
+    404: ProblemDetail;
+    /**
+     * Connection is not ACTIVE, a different sync type is already running, or manual sync is unsupported for the kind
+     */
+    409: ProblemDetail;
+};
+
+export type TriggerSyncJobError = TriggerSyncJobErrors[keyof TriggerSyncJobErrors];
+
 export type TriggerSyncJobResponses = {
     /**
-     * OK
+     * Idempotent-absorb: a same-type job was already running and is returned unchanged
      */
     200: SyncJob;
+    /**
+     * A new sync job was created and dispatched
+     */
+    202: SyncJob;
 };
 
 export type TriggerSyncJobResponse = TriggerSyncJobResponses[keyof TriggerSyncJobResponses];
@@ -4515,11 +4547,24 @@ export type CancelConnectionSyncJobData = {
     url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}/cancel';
 };
 
+export type CancelConnectionSyncJobErrors = {
+    /**
+     * Job not found in this workspace, or not owned by this connection
+     */
+    404: ProblemDetail;
+    /**
+     * Job is already in a terminal status
+     */
+    409: ProblemDetail;
+};
+
+export type CancelConnectionSyncJobError = CancelConnectionSyncJobErrors[keyof CancelConnectionSyncJobErrors];
+
 export type CancelConnectionSyncJobResponses = {
     /**
-     * OK
+     * Cancellation requested; the running job stops cooperatively
      */
-    200: SyncJob;
+    202: SyncJob;
 };
 
 export type CancelConnectionSyncJobResponse = CancelConnectionSyncJobResponses[keyof CancelConnectionSyncJobResponses];

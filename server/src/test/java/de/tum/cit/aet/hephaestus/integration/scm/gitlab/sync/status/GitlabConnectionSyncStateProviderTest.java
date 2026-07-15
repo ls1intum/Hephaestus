@@ -86,11 +86,6 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         lenient().when(rateLimitTrackerProvider.getIfAvailable()).thenReturn(rateLimitTracker);
     }
 
-    @Test
-    void shouldReportGitlabKind() {
-        assertThat(provider.kind()).isEqualTo(IntegrationKind.GITLAB);
-    }
-
     @Nested
     class Describe {
 

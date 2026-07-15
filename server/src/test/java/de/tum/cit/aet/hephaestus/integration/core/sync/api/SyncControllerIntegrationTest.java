@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -205,6 +206,55 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
+    @DisplayName("a BACKFILL requested while a RECONCILIATION is running is a type conflict → 409, not a 200-absorb")
+    void trigger_backfillWhileReconciliationRunning_returns409NotAbsorb() throws InterruptedException {
+        ensureAdminMembership(workspace);
+        Mockito.when(githubSyncRunner.supportsBackfill()).thenReturn(true);
+        String adminToken = TestAuthUtils.getCurrentUserToken();
+        CountDownLatch runnerStarted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Mockito.doAnswer(invocation -> {
+            runnerStarted.countDown();
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return null;
+        })
+            .when(githubSyncRunner)
+            .reconcile(any(), any());
+
+        AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
+        Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken))); // RECONCILIATION
+        firstCaller.start();
+        assertThat(runnerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Different-type request while the reconciliation holds the one-active slot: genuine conflict, not absorb.
+        triggerRequest(adminToken, SyncJobType.BACKFILL).expectStatus().isEqualTo(HttpStatus.CONFLICT);
+
+        release.countDown();
+        firstCaller.join(5000);
+    }
+
+    @Test
+    @WithAdminUser
+    @DisplayName("an empty body (missing sync type) is a 400, not a misleading 409 from the NOT-NULL column")
+    void trigger_missingType_returns400() {
+        ensureAdminMembership(workspace);
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connection.getId())
+            .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{}")
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
     void trigger_notActiveConnection_returns409() {
         ensureAdminMembership(workspace);
         connection.setState(IntegrationState.SUSPENDED);
@@ -230,6 +280,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     Thread.currentThread().interrupt();
                     return null;
                 }
+            }
+            // A real cooperative runner reports that it stopped early so the engine finalizes CANCELLED;
+            // a body that merely returns after seeing the flag is (correctly) recorded SUCCEEDED.
+            if (handle.isCancellationRequested()) {
+                handle.reportCancelled();
             }
             return null;
         })
@@ -331,11 +386,15 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
      * authentication unless the token is captured on the test thread and passed in explicitly.
      */
     private WebTestClient.ResponseSpec triggerRequest(String bearerToken) {
+        return triggerRequest(bearerToken, SyncJobType.RECONCILIATION);
+    }
+
+    private WebTestClient.ResponseSpec triggerRequest(String bearerToken, SyncJobType type) {
         return webTestClient
             .post()
             .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connection.getId())
             .headers(h -> h.setBearerAuth(bearerToken))
-            .bodyValue(new TriggerSyncJobRequestDTO(SyncJobType.RECONCILIATION))
+            .bodyValue(new TriggerSyncJobRequestDTO(type))
             .exchange();
     }
 
