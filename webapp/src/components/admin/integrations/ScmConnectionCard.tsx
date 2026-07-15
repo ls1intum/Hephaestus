@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActiveJobProgress } from "./ActiveJobProgress";
+import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { RateLimitGauge } from "./RateLimitGauge";
 import { SyncNowButton } from "./SyncNowButton";
@@ -46,9 +47,7 @@ export function ScmConnectionCard({
 	return (
 		<Card>
 			<CardHeader>
-				<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-					Connection
-				</h2>
+				<IntegrationCardHeading>Connection</IntegrationCardHeading>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				{error ? (

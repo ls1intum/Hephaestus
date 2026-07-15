@@ -21,11 +21,10 @@ import { AdminSlackChannelsSettings } from "@/components/admin/integrations/Admi
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
 import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
+import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { SlackSyncStatusCard } from "@/components/admin/integrations/SlackSyncStatusCard";
-import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -335,25 +334,16 @@ function SlackIntegrationPage() {
 			)}
 
 			{hasConnection && (
-				<Card>
-					<CardHeader>
-						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-							Job history
-						</h2>
-					</CardHeader>
-					<CardContent>
-						<SyncJobsTable
-							jobs={jobsPageData?.content ?? []}
-							isLoading={isJobsLoading}
-							isError={isJobsError}
-							error={jobsError}
-							onRetry={() => refetchJobs()}
-							page={jobsPage}
-							totalPages={jobsPageData?.totalPages ?? 1}
-							onPageChange={setJobsPage}
-						/>
-					</CardContent>
-				</Card>
+				<JobHistoryCard
+					jobs={jobsPageData?.content ?? []}
+					isLoading={isJobsLoading}
+					isError={isJobsError}
+					error={jobsError}
+					onRetry={() => refetchJobs()}
+					page={jobsPage}
+					totalPages={jobsPageData?.totalPages ?? 1}
+					onPageChange={setJobsPage}
+				/>
 			)}
 		</div>
 	);

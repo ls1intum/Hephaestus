@@ -8,6 +8,7 @@ import {
 	triggerSyncJobMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { IntegrationOverviewCard } from "@/components/admin/integrations/IntegrationOverviewCard";
+import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -30,13 +31,10 @@ function IntegrationsOverview() {
 
 	return (
 		<div className="container mx-auto max-w-5xl space-y-6 py-6">
-			<header>
-				<h1 className="text-3xl font-bold tracking-tight">Integrations</h1>
-				<p className="text-muted-foreground">
-					Connection health, sync activity and quick actions for every integration this workspace
-					can use. Open one for its full detail — resources, controls and job history.
-				</p>
-			</header>
+			<IntegrationPageHeader
+				title="Integrations"
+				description="Connection health, sync activity and quick actions for every integration this workspace can use. Open one for its full detail — resources, controls and job history."
+			/>
 
 			{catalogQuery.isLoading ? (
 				<div className="grid gap-4 sm:grid-cols-2">

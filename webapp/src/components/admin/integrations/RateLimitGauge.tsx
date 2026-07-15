@@ -1,7 +1,6 @@
-import { formatDistanceToNow } from "date-fns";
 import type { RateLimitSnapshot } from "@/api/types.gen";
 import { Progress } from "@/components/ui/progress";
-import { asDate } from "./sync-format";
+import { asDate, relativeTime } from "./sync-format";
 
 export interface RateLimitGaugeProps {
 	rateLimit?: RateLimitSnapshot;
@@ -32,9 +31,7 @@ export function RateLimitGauge({ rateLimit, className }: RateLimitGaugeProps) {
 				}
 			/>
 			{resetAt && (
-				<p className="mt-1 text-muted-foreground text-xs">
-					Resets {formatDistanceToNow(resetAt, { addSuffix: true })}
-				</p>
+				<p className="mt-1 text-muted-foreground text-xs">Resets {relativeTime(resetAt)}</p>
 			)}
 		</div>
 	);

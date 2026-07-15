@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { ExternalLinkIcon, LoaderIcon, SendIcon } from "lucide-react";
+import { ExternalLinkIcon, SendIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -48,8 +48,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
+import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { SlackChannelCombobox } from "./slack-channels/SlackChannelCombobox";
 import { SlackChannelPasteField } from "./slack-channels/SlackChannelPasteField";
 import { slackErrorMessage } from "./slack-channels/slack-error-copy";
@@ -210,15 +212,10 @@ export function AdminSlackNotificationSettings({
 		<>
 			<Card>
 				<CardHeader>
-					{/* CardTitle renders a div; the settings page is navigated by heading, so the
-					    section title has to be a real h2. */}
-					<h2
-						data-slot="card-title"
-						className="flex items-center gap-2 text-base leading-snug font-medium"
-					>
+					<IntegrationCardHeading className="flex items-center gap-2">
 						<SlackIcon className="size-4" aria-hidden />
 						Slack integration
-					</h2>
+					</IntegrationCardHeading>
 					<CardDescription>
 						Install Hephaestus in Slack for weekly digests, the DM mentor, App Home privacy
 						controls, and optional monitored channels. Channel messages are not stored until an
@@ -402,15 +399,14 @@ export function AdminSlackNotificationSettings({
 									}
 									disabled={test.isPending || selectedChannelId.length === 0}
 								>
-									<SendIcon className="mr-2 size-3.5" />
+									<SendIcon className="size-3.5" />
 									{test.isPending ? "Sending…" : "Send test message"}
 								</Button>
 							</ButtonGroup>
 
 							{slackConnectionId != null && (
 								<Button
-									variant="outline"
-									className="text-destructive"
+									variant="destructive-outline"
 									onClick={() => setDisconnectOpen(true)}
 									disabled={disconnect.isPending}
 								>
@@ -433,13 +429,13 @@ export function AdminSlackNotificationSettings({
 						>
 							{connect.isPending ? (
 								<>
-									<LoaderIcon className="mr-2 size-4 animate-spin" />
+									<Spinner />
 									Redirecting to Slack…
 								</>
 							) : (
 								<>
 									Connect Slack workspace
-									<ExternalLinkIcon className="ml-2 size-3.5" />
+									<ExternalLinkIcon className="size-3.5" />
 								</>
 							)}
 						</Button>

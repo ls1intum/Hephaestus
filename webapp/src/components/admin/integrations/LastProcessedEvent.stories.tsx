@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 
+/**
+ * A "Last event processed N ago" line for a connection's most recent inbound webhook. An absent or
+ * invalid timestamp renders a dash — never "just now" — so a missing event can't masquerade as a
+ * fresh one.
+ */
 const meta = {
 	component: LastProcessedEvent,
 	parameters: { layout: "centered" },

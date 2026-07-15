@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { ActivateChannelDialog } from "./slack-channels/ActivateChannelDialog";
 import { AddChannelDialog } from "./slack-channels/AddChannelDialog";
 import { ChannelHistorySheet } from "./slack-channels/ChannelHistorySheet";
@@ -96,11 +97,7 @@ export function AdminSlackChannelsSettings({
 		<>
 			<Card>
 				<CardHeader>
-					{/* CardTitle renders a div; the settings page is navigated by heading, so the
-					    section title has to be a real h2. */}
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-						Slack channel monitoring
-					</h2>
+					<IntegrationCardHeading>Slack channel monitoring</IntegrationCardHeading>
 					<CardDescription>
 						Monitored channels have their <strong>new</strong> messages read to generate AI practice
 						feedback. Reading is <strong>forward-only</strong> (never past history), each monitored

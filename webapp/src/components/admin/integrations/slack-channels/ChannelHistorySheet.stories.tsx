@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { delay, HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";

@@ -212,7 +212,7 @@ export const ConnectedWithDisconnect: Story = {
 		const dialog = await screen.findByRole("alertdialog", { name: /disconnect slack\?/i });
 		await expect(dialog).toBeInTheDocument();
 		// Confirm copy + the destructive confirm action are present.
-		await expect(within(dialog).getByText(/the bot will be uninstalled/i)).toBeInTheDocument();
+		await expect(within(dialog).getByText(/the bot is uninstalled/i)).toBeInTheDocument();
 		await expect(within(dialog).getByRole("button", { name: /^disconnect$/i })).toBeInTheDocument();
 	},
 };

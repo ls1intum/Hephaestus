@@ -20,9 +20,10 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { AdminRepositoriesSettings } from "@/components/admin/integrations/AdminRepositoriesSettings";
 import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
+import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
+import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { ScmConnectionCard } from "@/components/admin/integrations/ScmConnectionCard";
-import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -253,9 +254,7 @@ function ScmIntegrationPage() {
 			{hasConnection && (
 				<Card>
 					<CardHeader>
-						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-							Repository sync state
-						</h2>
+						<IntegrationCardHeading>Repository sync state</IntegrationCardHeading>
 					</CardHeader>
 					<CardContent>
 						<SyncResourcesTable
@@ -272,25 +271,16 @@ function ScmIntegrationPage() {
 			)}
 
 			{hasConnection && (
-				<Card>
-					<CardHeader>
-						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-							Job history
-						</h2>
-					</CardHeader>
-					<CardContent>
-						<SyncJobsTable
-							jobs={jobsPageData?.content ?? []}
-							isLoading={isJobsLoading}
-							isError={isJobsError}
-							error={jobsError}
-							onRetry={() => refetchJobs()}
-							page={jobsPage}
-							totalPages={jobsPageData?.totalPages ?? 1}
-							onPageChange={setJobsPage}
-						/>
-					</CardContent>
-				</Card>
+				<JobHistoryCard
+					jobs={jobsPageData?.content ?? []}
+					isLoading={isJobsLoading}
+					isError={isJobsError}
+					error={jobsError}
+					onRetry={() => refetchJobs()}
+					page={jobsPage}
+					totalPages={jobsPageData?.totalPages ?? 1}
+					onPageChange={setJobsPage}
+				/>
 			)}
 		</div>
 	);

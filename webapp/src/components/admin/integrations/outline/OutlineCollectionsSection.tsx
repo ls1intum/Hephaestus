@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { IntegrationCardHeading } from "../IntegrationCardHeading";
 import { AddCollectionDialog } from "./AddCollectionDialog";
 import { OutlineCollectionRow, type OutlineMirrorState } from "./OutlineCollectionRow";
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";
@@ -74,11 +75,7 @@ export function OutlineCollectionsSection({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					{/* CardTitle renders a div; the settings page is navigated by heading, so the
-					    section title has to be a real h2. */}
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-						Mirrored collections
-					</h2>
+					<IntegrationCardHeading>Mirrored collections</IntegrationCardHeading>
 					<CardDescription>
 						Documents in mirrored collections are kept in sync and reach practice detection as
 						context. Pausing a collection <strong>freezes syncing but keeps its documents</strong>

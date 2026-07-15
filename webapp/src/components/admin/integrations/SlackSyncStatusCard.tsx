@@ -1,6 +1,7 @@
 import type { ConnectionSyncStatus } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { SyncNowButton } from "./SyncNowButton";
 import { relativeTime } from "./sync-format";
@@ -25,9 +26,7 @@ export function SlackSyncStatusCard({
 	return (
 		<Card>
 			<CardHeader>
-				<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-					Sync status
-				</h2>
+				<IntegrationCardHeading>Sync status</IntegrationCardHeading>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">

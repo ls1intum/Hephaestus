@@ -3,10 +3,11 @@ import { AlertCircleIcon, ArrowRightIcon, PlugZapIcon } from "lucide-react";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
+import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { SyncNowButton } from "./SyncNowButton";
 import { relativeTime } from "./sync-format";
@@ -55,15 +56,15 @@ export function IntegrationOverviewCard({
 
 	return (
 		<Card>
-			<CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-				<div className="flex items-center gap-2">
+			<CardHeader>
+				<IntegrationCardHeading className="flex items-center gap-2">
 					{KIND_ICON[entry.kind]}
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-						{entry.displayName}
-					</h2>
-				</div>
+					{entry.displayName}
+				</IntegrationCardHeading>
 				{entry.connected && status && (
-					<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
+					<CardAction>
+						<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
+					</CardAction>
 				)}
 			</CardHeader>
 			<CardContent className="space-y-3">
@@ -123,7 +124,7 @@ export function IntegrationOverviewCard({
 				)}
 			</CardContent>
 			{isConnectionActive && (
-				<div className="flex items-center justify-between gap-2 px-6 pb-6">
+				<CardFooter className="justify-between gap-2">
 					<SyncNowButton
 						onClick={onSync}
 						isTriggering={isTriggering}
@@ -138,7 +139,7 @@ export function IntegrationOverviewCard({
 						View details
 						<ArrowRightIcon className="size-3.5" />
 					</Button>
-				</div>
+				</CardFooter>
 			)}
 		</Card>
 	);

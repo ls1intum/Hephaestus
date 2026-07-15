@@ -3,11 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { listConnectionSyncJobsOptions } from "@/api/@tanstack/react-query.gen";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
+import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { OutlineIntegrationContent } from "@/components/admin/integrations/OutlineIntegrationContent";
-import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { OutlineIcon } from "@/components/icons/brand";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
@@ -84,25 +83,16 @@ function OutlineIntegrationPage() {
 			)}
 
 			{connectionId != null && (
-				<Card>
-					<CardHeader>
-						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-							Job history
-						</h2>
-					</CardHeader>
-					<CardContent>
-						<SyncJobsTable
-							jobs={jobsPageData?.content ?? []}
-							isLoading={isJobsLoading}
-							isError={isJobsError}
-							error={jobsError}
-							onRetry={() => refetchJobs()}
-							page={jobsPage}
-							totalPages={jobsPageData?.totalPages ?? 1}
-							onPageChange={setJobsPage}
-						/>
-					</CardContent>
-				</Card>
+				<JobHistoryCard
+					jobs={jobsPageData?.content ?? []}
+					isLoading={isJobsLoading}
+					isError={isJobsError}
+					error={jobsError}
+					onRetry={() => refetchJobs()}
+					page={jobsPage}
+					totalPages={jobsPageData?.totalPages ?? 1}
+					onPageChange={setJobsPage}
+				/>
 			)}
 		</div>
 	);

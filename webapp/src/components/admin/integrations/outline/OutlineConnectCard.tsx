@@ -28,6 +28,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { IntegrationCardHeading } from "../IntegrationCardHeading";
 import { asDate, relativeTime } from "../sync-format";
 
 export interface OutlineConnectInput {
@@ -116,15 +117,10 @@ export function OutlineConnectCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					{/* CardTitle renders a div; the settings page is navigated by heading, so the
-					    section title has to be a real h2 — matching the Slack integration card. */}
-					<h2
-						data-slot="card-title"
-						className="flex items-center gap-2 text-base leading-snug font-medium"
-					>
+					<IntegrationCardHeading className="flex items-center gap-2">
 						<OutlineIcon className="size-4" aria-hidden />
 						Outline documentation
-					</h2>
+					</IntegrationCardHeading>
 					<CardDescription>
 						Mirror Outline collections so their design docs and decision records reach practice
 						detection as context. Use a dedicated bot-user API token; after connecting you choose

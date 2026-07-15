@@ -1,5 +1,7 @@
-import { Trash2 } from "lucide-react";
+import { FolderGitIcon, InfoIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -12,9 +14,24 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupInput,
+} from "@/components/ui/input-group";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { IntegrationCardHeading } from "./IntegrationCardHeading";
 
 /**
  * Interface for repository item
@@ -37,7 +54,10 @@ interface AdminRepositoriesSettingsProps {
 }
 
 /**
- * Component for managing monitored repositories in admin settings
+ * Admin surface for the monitored-repositories plane: which repositories Hephaestus watches for
+ * practice detection, plus adding and removing them. GitHub App Installation workspaces are managed
+ * upstream by the installation, so for those (`isReadOnly`) the list is read-only and the manual
+ * add/remove controls are withheld. Pure presentation — data and mutations live in the container.
  */
 export function AdminRepositoriesSettings({
 	repositories = [],
@@ -60,26 +80,47 @@ export function AdminRepositoriesSettings({
 		}
 	};
 
+	const hasRepositories = repositories.length > 0;
+
 	return (
 		<div className="space-y-6">
-			<div>
-				<h2 className="text-lg font-semibold mb-4">Monitored Repositories</h2>
-				{isReadOnly && (
-					<div className="mb-4 p-4 bg-muted/50 border border-muted rounded-lg">
-						<p className="text-sm text-muted-foreground">
-							This workspace is managed by a GitHub App Installation. Repositories are automatically
-							synced based on the installation&apos;s configuration.
-						</p>
-					</div>
-				)}
-				<Card>
-					<CardContent>
-						<div className="space-y-4">
-							{/* Repository List */}
-							<div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-								{repositories.map((repo) => (
-									<div key={repo.nameWithOwner} className="flex items-center gap-2">
-										{!isReadOnly && (
+			<Card>
+				<CardHeader>
+					<IntegrationCardHeading>Monitored repositories</IntegrationCardHeading>
+					<CardDescription>
+						Repositories Hephaestus watches for practice detection and mentoring.
+					</CardDescription>
+				</CardHeader>
+
+				<CardContent className="space-y-4">
+					{isReadOnly && (
+						<Alert>
+							<InfoIcon />
+							<AlertTitle>Managed by a GitHub App Installation</AlertTitle>
+							<AlertDescription>
+								Repositories are synced automatically from the installation&apos;s configuration, so
+								they cannot be added or removed here.
+							</AlertDescription>
+						</Alert>
+					)}
+
+					{isLoading ? (
+						<div className="space-y-2">
+							<Skeleton className="h-10 w-full" />
+							<Skeleton className="h-10 w-full" />
+							<Skeleton className="h-10 w-full" />
+						</div>
+					) : error ? (
+						<QueryErrorAlert error={error} title="We couldn't load the monitored repositories" />
+					) : hasRepositories ? (
+						<ItemGroup className="max-h-80 overflow-y-auto pr-1">
+							{repositories.map((repo) => (
+								<Item key={repo.nameWithOwner} variant="outline" size="sm">
+									<ItemContent>
+										<ItemTitle className="font-mono">{repo.nameWithOwner}</ItemTitle>
+									</ItemContent>
+									{!isReadOnly && (
+										<ItemActions>
 											<AlertDialog>
 												<AlertDialogTrigger
 													render={
@@ -88,7 +129,7 @@ export function AdminRepositoriesSettings({
 															size="icon"
 															aria-label={`Remove ${repo.nameWithOwner}`}
 														>
-															<Trash2 className="h-4 w-4" />
+															<Trash2Icon className="size-4" />
 														</Button>
 													}
 												/>
@@ -106,59 +147,71 @@ export function AdminRepositoriesSettings({
 													<AlertDialogFooter>
 														<AlertDialogCancel>Cancel</AlertDialogCancel>
 														<AlertDialogAction
+															variant="destructive"
 															onClick={() => onRemoveRepository(repo.nameWithOwner)}
 															disabled={isRemovingRepository}
 														>
-															Stop Monitoring
+															Stop monitoring
 														</AlertDialogAction>
 													</AlertDialogFooter>
 												</AlertDialogContent>
 											</AlertDialog>
-										)}
-										<div className="bg-accent/50 p-2 px-4 rounded-md">{repo.nameWithOwner}</div>
-									</div>
-								))}{" "}
-								{isLoading && (
-									<div className="flex items-center justify-center py-4">
-										<Skeleton className="h-8 w-32" />
-									</div>
-								)}
-								{error && (
-									<div className="text-destructive text-sm">
-										Failed to load repositories. Please try again.
-									</div>
-								)}
-							</div>
-
-							{/* Add Repository Input - only show when not read-only */}
-							{!isReadOnly && (
-								<div className="space-y-2">
-									<div className="flex items-center gap-2">
-										<Input
-											aria-label="Repository name"
-											placeholder="Add a repository (owner/name)"
-											value={repositoryInput}
-											onChange={(e) => setRepositoryInput(e.target.value)}
-											className="flex-1"
-										/>
-										<Button
-											onClick={handleAddRepository}
-											disabled={!isValidInput || isAddingRepository}
-										>
-											Add
-										</Button>
-									</div>
-									{addRepositoryError && (
-										<div className="text-destructive text-sm">
-											An error occurred while adding the repository.
-										</div>
+										</ItemActions>
 									)}
-								</div>
+								</Item>
+							))}
+						</ItemGroup>
+					) : (
+						<Empty>
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<FolderGitIcon />
+								</EmptyMedia>
+								<EmptyTitle>
+									{isReadOnly ? "No repositories synced yet" : "No repositories monitored yet"}
+								</EmptyTitle>
+								<EmptyDescription>
+									{isReadOnly
+										? "Repositories will appear here once the GitHub App Installation syncs them."
+										: "Add a repository below to start monitoring it for practice detection."}
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
+					)}
+
+					{!isReadOnly && (
+						<Field data-invalid={!!addRepositoryError}>
+							<FieldLabel htmlFor="add-repository">Add a repository</FieldLabel>
+							<InputGroup>
+								<InputGroupInput
+									id="add-repository"
+									value={repositoryInput}
+									onChange={(e) => setRepositoryInput(e.target.value)}
+									placeholder="owner/name"
+									disabled={isAddingRepository}
+									autoComplete="off"
+									aria-invalid={!!addRepositoryError}
+								/>
+								<InputGroupAddon align="inline-end">
+									<InputGroupButton
+										variant="default"
+										onClick={handleAddRepository}
+										disabled={!isValidInput || isAddingRepository}
+									>
+										Add
+									</InputGroupButton>
+								</InputGroupAddon>
+							</InputGroup>
+							<FieldDescription>
+								Enter the repository as <code>owner/name</code>.
+							</FieldDescription>
+							{addRepositoryError && (
+								<FieldError>An error occurred while adding the repository.</FieldError>
 							)}
-						</div>
-					</CardContent>
-				</Card>
-			</div>
+						</Field>
+					)}
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

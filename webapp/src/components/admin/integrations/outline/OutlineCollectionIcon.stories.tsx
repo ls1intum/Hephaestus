@@ -1,9 +1,16 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryObj } from "@storybook/react";
 import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
 
+/**
+ * The resolver that turns Outline's collection `icon` string into something safe to render: a
+ * Lucide equivalent for a known registry name, the raw character for an emoji, and a bare colour
+ * dot for anything unknown (custom-emoji UUIDs, unrecognised names, or no icon at all) — a wire
+ * value never leaks into the UI as text.
+ */
 const meta = {
-	title: "Admin/Outline/OutlineCollectionIcon",
 	component: OutlineCollectionIcon,
+	parameters: { layout: "centered" },
+	tags: ["autodocs"],
 } satisfies Meta<typeof OutlineCollectionIcon>;
 
 export default meta;
