@@ -1,4 +1,4 @@
-import { CheckCheck, Trophy } from "lucide-react";
+import { CheckCheck, GitPullRequest } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,13 +9,14 @@ export function LandingFeaturesSection() {
 			<div className="container px-4 md:px-6">
 				<div className="mb-12 text-center max-w-3xl mx-auto">
 					<Badge className="mb-4" variant="outline">
-						Key Features
+						Key features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Tools for Team Growth
+						Feedback where you already work
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Features designed to elevate your engineering team's collaboration and learning
+						Hephaestus runs from the tools your team already uses, so nobody has to go looking for
+						feedback
 					</p>
 				</div>
 
@@ -23,24 +24,28 @@ export function LandingFeaturesSection() {
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<Trophy className="h-5 w-5 text-yellow-500" />
+								<GitPullRequest className="h-5 w-5 text-primary" />
 							</div>
-							<CardTitle>Code Review Gamification</CardTitle>
-							<CardDescription>Transform code reviews into learning opportunities</CardDescription>
+							<CardTitle>Practice feedback on pull requests and issues</CardTitle>
+							<CardDescription>
+								Reviews your work against real engineering practices
+							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly leaderboards with GitHub integration</span>
+									<span>Works with GitHub and GitLab repositories</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Team competitions across multiple repositories</span>
+									<span>
+										Highlights what you did well alongside what to improve, with a concrete fix
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured league system for ongoing engagement</span>
+									<span>Posts feedback as comments right on the pull request or issue</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -51,24 +56,22 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
 								<MentorIcon className="-m-2" size={32} pad={4} />
 							</div>
-							<CardTitle>Process-Aware AI Mentoring</CardTitle>
-							<CardDescription>
-								Heph provides guidance grounded in your repository activity
-							</CardDescription>
+							<CardTitle>Heph, your AI mentor</CardTitle>
+							<CardDescription>A mentor chat grounded in your repository activity</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>SRL-guided weekly reflection</span>
+									<span>Knows your recent issues, commits, reviews, and pull requests</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Repo activity context for objective feedback</span>
+									<span>Answers questions about your work and suggests next steps</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Goal setting and progress tracking</span>
+									<span>Also available in Slack, right where your team talks</span>
 								</li>
 							</ul>
 						</CardContent>

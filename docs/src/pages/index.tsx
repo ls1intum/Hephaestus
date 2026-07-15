@@ -9,7 +9,7 @@ import styles from './index.module.css';
 const guideLinks = [
   {
     title: 'User Guide',
-    description: 'Navigate weekly rituals, mentoring flows, and leaderboard insights.',
+    description: 'Get feedback on your pull requests and issues, and work with Heph, your AI mentor.',
     to: '/user/overview',
   },
   {
@@ -30,10 +30,10 @@ function HomepageHeader() {
       <div className="container">
         <div className={styles.heroCopy}>
           <Heading as="h1" className={styles.heroTitle}>
-            Process-Aware Mentoring for Agile Software Teams
+            Mentoring feedback, grounded in your work
           </Heading>
           <p className={styles.heroSubtitle}>
-            Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.
+            Hephaestus is an AI mentor for software teams. It reads the pull requests, issues, and reviews your team already writes and tells each contributor what was done well, what could be better, and a way to get there.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, gamified reviews, and actionable analytics.">
+      description="Hephaestus gives developers mentoring feedback grounded in their actual work: AI practice feedback on pull requests and issues, plus a mentor chat that knows your repository activity.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

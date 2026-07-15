@@ -15,40 +15,40 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Code Review Gamification',
-    kicker: 'Transform code reviews into learning opportunities',
+    title: 'Practice feedback on real work',
+    kicker: 'What was done well, what could be better, and a way to get there',
     description:
-      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+      'Hephaestus reviews pull requests and issues against real engineering practices and posts its feedback right where the work happens.',
     bullets: [
-      'Weekly leaderboards with GitHub integration',
-      'Team competitions across multiple repositories',
-      'Structured league system for ongoing engagement',
+      'Works with GitHub and GitLab repositories',
+      'Feedback arrives as comments on the pull request or issue',
+      'Act on it, push back with a reason, or let it pass',
     ],
-    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
+    cta: {label: 'See how reviews work', to: '/user/ai-code-review'},
   },
   {
-    title: 'Process-Aware AI Mentoring',
-    kicker: 'Heph provides guidance grounded in your repository activity',
+    title: 'Heph, your AI mentor',
+    kicker: 'A mentor chat grounded in your repository activity',
     description:
-      'Mentoring sessions blend self-regulated learning prompts with real repo events so goals, reflections, and next steps stay actionable.',
+      'Heph knows your recent issues, commits, reviews, and pull requests, so its guidance starts from what you actually did.',
     bullets: [
-      'SRL-guided weekly reflection',
-      'Repo activity context for objective feedback',
-      'Goal setting and progress tracking',
+      'Ask about your changes and get concrete next steps',
+      'Reflect on your week with real repo events at hand',
+      'Also available in Slack, right where your team talks',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Build Better Team Habits',
-    kicker: 'Creativity meets technical expertise — just like on the landing page',
+    title: 'Your workspace, your setup',
+    kicker: 'Runs from the tools the team already uses',
     description:
-      'Our approach combines craft, collaboration, and quality so teams stay aligned while the platform scales with them.',
+      'Each workspace connects its own repositories and configures what the mentor checks for, plus optional recognition features.',
     bullets: [
-      'Empower engineers with real-world feedback loops',
-      'Foster collaboration that strengthens engineering culture',
-      'Improve code quality through friendly competition',
+      'Connect GitHub and GitLab repositories per workspace',
+      'Teams and access sync from your source platform',
+      'Optional achievements and a weekly leaderboard, if your admin turns them on',
     ],
-    cta: {label: 'Dive into contributor docs', to: '/contributor/overview'},
+    cta: {label: 'Set up a workspace', to: '/user/workspace'},
   },
 ];
 

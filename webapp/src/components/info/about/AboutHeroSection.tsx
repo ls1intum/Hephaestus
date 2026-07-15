@@ -10,9 +10,9 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Process-aware mentoring for agile software teams. Heph grounds guidance in your repository
-				flow — issues, commits, reviews, and PRs — to scaffold self-regulated learning and better
-				team habits.
+				Hephaestus gives developers the mentoring feedback they would otherwise only get from a
+				mentor, so that every developer gets some. Heph, your AI mentor, grounds its guidance in
+				your actual work across issues, commits, reviews, and pull requests.
 			</p>
 		</section>
 	);

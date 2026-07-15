@@ -1,119 +1,7 @@
 import { ChevronDown } from "lucide-react";
-import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
-import aliceAvatar from "@/assets/alice_developer.jpg";
-import bobAvatar from "@/assets/bob_builder.jpg";
-import charlieAvatar from "@/assets/charlie_coder.jpg";
 import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
-import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
-
-function createMockReviewedPullRequest(amount: number) {
-	return Array.from(
-		{ length: amount },
-		() =>
-			({
-				id: 1,
-				title: "Fix bug in user authentication",
-				number: 42,
-				htmlUrl: "https://example.com/pull/42",
-				state: "CLOSED",
-				isDraft: false,
-				isMerged: true,
-				commentsCount: 5,
-				createdAt: new Date("2023-01-01T00:00:00Z"),
-				updatedAt: new Date("2023-01-02T00:00:00Z"),
-				additions: 10,
-				deletions: 2,
-				repository: {
-					id: 1,
-					name: "example/repo",
-					nameWithOwner: "example/repo",
-					htmlUrl: "https://example.com/repo",
-					hiddenFromContributions: false,
-				},
-			}) satisfies PullRequestInfo,
-	);
-}
-
-// Sample data for the leaderboard preview
-const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
-	{
-		rank: 1,
-		score: 520,
-		user: {
-			id: 0,
-			leaguePoints: 2000,
-			login: "codeMaster",
-			avatarUrl: aliceAvatar,
-			name: "Alice Developer",
-			htmlUrl: "https://example.com/alice",
-		},
-		numberOfReviewedPRs: 15,
-		numberOfApprovals: 8,
-		numberOfChangeRequests: 3,
-		numberOfComments: 4,
-		numberOfCodeComments: 6,
-		numberOfOwnReplies: 2,
-		numberOfOpenPullRequests: 1,
-		numberOfMergedPullRequests: 3,
-		numberOfClosedPullRequests: 0,
-		numberOfOpenedIssues: 2,
-		numberOfClosedIssues: 1,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(12),
-	},
-	{
-		rank: 2,
-		score: 431,
-		user: {
-			id: 1,
-			leaguePoints: 1000,
-			login: "devWizard",
-			avatarUrl: bobAvatar,
-			name: "Bob Builder",
-			htmlUrl: "https://example.com/bob",
-		},
-		numberOfReviewedPRs: 12,
-		numberOfApprovals: 5,
-		numberOfChangeRequests: 2,
-		numberOfComments: 5,
-		numberOfCodeComments: 3,
-		numberOfOwnReplies: 1,
-		numberOfOpenPullRequests: 2,
-		numberOfMergedPullRequests: 1,
-		numberOfClosedPullRequests: 1,
-		numberOfOpenedIssues: 1,
-		numberOfClosedIssues: 0,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(5),
-	},
-	{
-		rank: 3,
-		score: 302,
-		user: {
-			id: 2,
-			leaguePoints: 1500,
-			login: "codeNinja",
-			avatarUrl: charlieAvatar,
-			name: "Charlie Coder",
-			htmlUrl: "https://example.com/charlie",
-		},
-		numberOfReviewedPRs: 9,
-		numberOfApprovals: 4,
-		numberOfChangeRequests: 1,
-		numberOfComments: 4,
-		numberOfCodeComments: 2,
-		numberOfOwnReplies: 0,
-		numberOfOpenPullRequests: 1,
-		numberOfMergedPullRequests: 1,
-		numberOfClosedPullRequests: 0,
-		numberOfOpenedIssues: 0,
-		numberOfClosedIssues: 1,
-		numberOfUnknowns: 0,
-		reviewedPullRequests: createMockReviewedPullRequest(2),
-	},
-];
 
 interface LandingHeroSectionProps {
 	onSignIn: (idpHint: string) => void;
@@ -134,11 +22,11 @@ export function LandingHeroSection({
 				<div className="flex flex-col items-center space-y-8 text-center">
 					<div className="space-y-4 max-w-3xl">
 						<h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-							Process-Aware Mentoring for Agile Software Teams
+							Mentoring feedback, grounded in your work
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Onboard faster and learn better habits with an AI mentor grounded in your repo
-							workflow — from issues to pull requests and team rituals.
+							Hephaestus reads your pull requests, issues, and reviews and tells you what was done
+							well, what could be better, and a way to get there.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
@@ -150,7 +38,7 @@ export function LandingHeroSection({
 							className="w-full sm:w-auto"
 						/>
 						<Button variant="outline" size="lg" onClick={onLearnMoreClick} className="gap-2">
-							Learn More <ChevronDown className="h-4 w-4" />
+							Learn more <ChevronDown className="h-4 w-4" />
 						</Button>
 					</div>
 					<div className="flex items-center gap-2 text-muted-foreground">
@@ -162,27 +50,36 @@ export function LandingHeroSection({
 				</div>
 			</div>
 
-			{/* Leaderboard Preview */}
-			<div className="mx-auto max-w-4xl px-4 md:px-6">
+			{/* Mentor feedback preview (decorative mock conversation, hidden from assistive tech) */}
+			<div className="mx-auto max-w-2xl px-4 md:px-6">
 				<div
 					aria-hidden="true"
-					className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3"
+					className="shadow-xl border border-muted rounded-md overflow-hidden -mb-3 bg-background text-left"
 				>
+					<div className="flex items-center gap-2 border-b border-muted px-4 py-3">
+						<MentorIcon size={24} className="text-primary" />
+						<span className="text-sm font-medium">Heph</span>
+						<span className="text-xs text-muted-foreground">on your pull request</span>
+					</div>
 					<div
-						className="overflow-auto pointer-events-none"
+						className="space-y-3 px-4 py-4 text-sm pointer-events-none"
 						style={{
-							maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0))",
+							maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0))",
 						}}
 					>
-						<LeaderboardTable
-							leaderboard={SAMPLE_LEADERBOARD_ENTRIES}
-							isLoading={false}
-							variant="INDIVIDUAL"
-						/>
+						<p className="rounded-md bg-muted/50 px-3 py-2">
+							Nice work keeping this change small and splitting the schema migration into its own
+							commit. That made the review quick to get through.
+						</p>
+						<p className="rounded-md bg-muted/50 px-3 py-2">
+							One thing to tighten up: the pull request description says what changed but not why. A
+							sentence linking it to the issue would help the next reader. Want a suggestion?
+						</p>
+						<p className="rounded-md bg-primary/10 px-3 py-2 text-right">Yes, draft one for me.</p>
 					</div>
 				</div>
 				<p className="mt-3 text-center text-sm text-muted-foreground">
-					Review activity drives score. Additional badges highlight authored work and collaboration.
+					Act on the feedback, push back with a reason, or let it pass. You stay in charge.
 				</p>
 			</div>
 		</section>

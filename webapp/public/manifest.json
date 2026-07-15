@@ -1,6 +1,7 @@
 {
   "short_name": "Hephaestus",
   "name": "Hephaestus",
+  "description": "An AI mentor for growing as a software engineer. Feedback grounded in your actual work.",
   "icons": [
     {
       "src": "favicon.ico",

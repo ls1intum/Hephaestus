@@ -112,7 +112,7 @@ We use **Semantic Release** to automatically version and release our application
 **Feature scopes** (domain-specific):
 
 - `integration`: Cross-cutting integration framework (webhook, oauth, registry, SPI)
-- `scm`: Source-control management (GitHub, GitLab) — formerly `gitprovider`
+- `scm`: Source-control management (GitHub, GitLab)
 - `leaderboard`: Leaderboard and rankings
 - `mentor`: AI mentor (Heph)
 - `notifications`: Email/notification system

@@ -23,10 +23,9 @@ export function LandingCTASection({
 		>
 			<div className="container px-4 md:px-6">
 				<div className="flex flex-col items-center space-y-6 text-center max-w-3xl mx-auto">
-					<h2 className="text-3xl md:text-4xl font-bold text-primary">Ready to Get Started?</h2>
+					<h2 className="text-3xl md:text-4xl font-bold text-primary">Ready to get started?</h2>
 					<p className="text-lg text-muted-foreground">
-						Join our community and build more collaborative and effective software development
-						practices.
+						Sign in and get mentoring feedback grounded in the work you already do.
 					</p>
 					<div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
 						<LandingSignInCTA
@@ -48,7 +47,7 @@ export function LandingCTASection({
 								/>
 							}
 						>
-							<span>Read Documentation</span>
+							<span>Read documentation</span>
 						</Button>
 					</div>
 					{!isSignedIn && (

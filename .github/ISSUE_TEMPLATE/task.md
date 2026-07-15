@@ -7,7 +7,7 @@ labels: ["task"]
 
 <!--
 TASK GUIDELINES:
-- Use a verb phrase title: "Add caching to leaderboard API" not "Caching"
+- Use a verb phrase title: "Add caching to the workspace activity API" not "Caching"
 - Tasks are internal engineering work, not user-facing features
 - If there's UI involved, use the Feature template instead
 - Link to discussion/RFC if this came from a larger conversation

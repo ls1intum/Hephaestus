@@ -1,6 +1,6 @@
 Privacy Statement for Hephaestus in accordance with Art. 13 and 14 GDPR.
 
-_Last updated: 2026-05-07._
+_Last updated: 2026-07-12._
 
 The Technical University of Munich (TUM), through the Research Group for Applied Education Technologies (AET), operates Hephaestus at https://hephaestus.aet.cit.tum.de. This statement explains what personal data the platform processes, why, on what legal basis, who receives it, how long it is kept, and the rights you have. Personal data is processed under the GDPR, the Bavarian Data Protection Act (BayDSG), the Bavarian Higher Education Innovation Act (BayHIG), and the German Telecommunications Digital Services Data Protection Act (TDDDG).
 
@@ -54,7 +54,7 @@ The platform produces no automated decisions within the meaning of Art. 22 GDPR.
 
 ## 4. Cookies and browser-side storage
 
-Hephaestus uses only technically necessary browser-side storage: the session cookie (`__Host-HEPHAESTUS_AT`) and the CSRF and OAuth-state cookies that maintain your login, and a `theme` entry in local storage that remembers your light/dark mode (no personal data). Legal basis: § 25 Abs. 2 Nr. 2 TDDDG i.V.m. Art. 6(1)(e) GDPR. No analytics, advertising, or tracking cookies are used.
+Hephaestus uses technically necessary browser-side storage: the session cookie (`__Host-HEPHAESTUS_AT`) and the CSRF and OAuth-state cookies that maintain your login, and a `theme` entry in local storage that remembers your light/dark mode (no personal data). Legal basis: § 25 Abs. 2 Nr. 2 TDDDG i.V.m. Art. 6(1)(e) GDPR. Beyond these, a deployment may activate two optional integrations — PostHog product analytics and Sentry error monitoring. Where activated, they set cookies or browser-side storage **only after you opt in** through the cookie-consent banner (legal basis: § 25 Abs. 1 TDDDG i.V.m. Art. 6(1)(a) GDPR); you can change or withdraw that choice at any time via the "Cookie preferences" link. Where neither integration is activated — the default, and the state of the TUM-operated deployment unless announced otherwise — no consent banner is shown and only the technically necessary storage above is used. No advertising or cross-site tracking cookies are used in any configuration.
 
 ## 5. Recipients
 
@@ -78,7 +78,7 @@ Core platform infrastructure (application server, PostgreSQL) runs on AET-admini
 
 Under the GDPR you have the right of access (Art. 15), rectification (Art. 16), erasure (Art. 17), restriction (Art. 18), data portability (Art. 20), and to object to processing carried out on the basis of Art. 6(1)(e) (Art. 21). To exercise any of these rights, contact [ls1.admin@in.tum.de](mailto:ls1.admin@in.tum.de) or the TUM Data Protection Officer. We respond within the timeframe set out in Art. 12(3) GDPR (one month from receipt, extendable by two further months for complex or numerous requests, with notice to you).
 
-**Access and portability (Art. 15, Art. 20).** Hephaestus does not currently expose a self-service "download my data" control or API endpoint. Requests are fulfilled by AET operators on a verified request: we compile the personal data the platform holds about you — identity attributes and federated identity links from the application database; contributor profile, workspace memberships, AI-assistant conversations, practice findings, recognition signals, and account preferences from the application database; analytics identity from PostHog where that integration is activated; access-log entries within the active 14-day retention window where lawful and proportionate — into a structured, machine-readable file (JSON) and deliver it to your verified address. Source-side content (commits, pull/merge requests, issues, reviews on GitHub or gitlab.lrz.de) is exported by those source platforms, not by Hephaestus. Identity verification is the same as for erasure (below). Automating the export is a roadmap item.
+**Access and portability (Art. 15, Art. 20).** Signed-in users can export their account data themselves: the "Export my data" control in the account settings produces a structured, machine-readable JSON file containing your identity attributes and federated identity links, workspace memberships, account preferences and feature flags, and your authentication and account events of the last twelve months (sign-ins and sign-outs, session refreshes, identity links, and similar, including IP address and browser identifier). Personal data not covered by that self-service export — contributor profile records, AI-assistant conversations, practice findings, recognition signals, analytics identity from PostHog where that integration is activated, and access-log entries within the active 14-day retention window where lawful and proportionate — is compiled by AET operators on a verified request into the same structured format and delivered to your verified address. Source-side content (commits, pull/merge requests, issues, reviews on GitHub or gitlab.lrz.de) is exported by those source platforms, not by Hephaestus. Identity verification for operator-fulfilled requests is the same as for erasure (below).
 
 Three practical points about how erasure (Art. 17) works on this platform:
 

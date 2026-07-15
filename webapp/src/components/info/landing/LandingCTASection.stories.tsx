@@ -24,7 +24,7 @@ const meta = {
 			action: "signed in",
 		},
 		onGoToDashboard: {
-			description: "Callback function triggered when the 'Go to Dashboard' button is clicked",
+			description: "Callback function triggered when the 'Go to dashboard' button is clicked",
 			action: "go to dashboard",
 		},
 		isSignedIn: {
@@ -43,7 +43,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default CTA section for first-time visitors.
- * Features "Sign in with GitHub" CTA button.
+ * Features the "Sign in" CTA button.
  */
 export const Default: Story = {
 	args: {
@@ -53,7 +53,7 @@ export const Default: Story = {
 
 /**
  * CTA section for authenticated users.
- * GitHub sign-in button is replaced with "Go to Dashboard".
+ * "Sign in" is replaced with "Go to dashboard".
  */
 export const SignedIn: Story = {
 	args: {

@@ -4,8 +4,8 @@ import { LandingHeroSection } from "./LandingHeroSection";
 
 /**
  * Hero section component that introduces Hephaestus with a prominent headline,
- * description, and call-to-action buttons. Features a preview of the leaderboard
- * to showcase the platform's core functionality.
+ * description, and call-to-action buttons. Features a preview of the mentor's
+ * feedback to showcase the platform's core functionality.
  */
 const meta = {
 	component: LandingHeroSection,
@@ -25,7 +25,7 @@ const meta = {
 			action: "signed in",
 		},
 		onGoToDashboard: {
-			description: "Callback function triggered when the 'Go to Dashboard' button is clicked",
+			description: "Callback function triggered when the 'Go to dashboard' button is clicked",
 			action: "go to dashboard",
 		},
 		isSignedIn: {
@@ -49,7 +49,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default hero section for first-time visitors.
- * Features "Get Started" CTA and leaderboard preview.
+ * Features the sign-in CTA and mentor feedback preview.
  */
 export const Default: Story = {
 	args: {
@@ -59,7 +59,7 @@ export const Default: Story = {
 
 /**
  * Hero section for authenticated users.
- * "Get Started" button is replaced with "Go to Dashboard".
+ * "Sign in" button is replaced with "Go to dashboard".
  */
 export const SignedIn: Story = {
 	args: {

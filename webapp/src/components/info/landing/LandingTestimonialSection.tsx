@@ -10,7 +10,7 @@ export function LandingTestimonialSection() {
 						Testimonial
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						From Our Community
+						From our community
 					</h2>
 				</div>
 

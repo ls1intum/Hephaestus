@@ -38,7 +38,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * Default FAQ section for first-time visitors.
- * Features "Get Started" CTA and FAQ accordion.
+ * Features the FAQ accordion and the community link.
  */
 export const Default: Story = {
 	args: {
@@ -48,7 +48,7 @@ export const Default: Story = {
 
 /**
  * FAQ section for authenticated users.
- * "Get Started" button is replaced with "Go to Dashboard".
+ * The section content does not change with authentication state.
  */
 export const SignedIn: Story = {
 	args: {
