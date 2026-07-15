@@ -22,6 +22,7 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
@@ -41,6 +42,10 @@ import org.jspecify.annotations.Nullable;
  * right after insert); this is a live-operations dashboard, not an audit trail.
  */
 @Entity
+// DynamicUpdate: emit UPDATEs with only the dirtied columns so a progress/heartbeat/completion write
+// (which never touches cancel_requested) can't rewrite a stale snapshot's flag over a concurrently
+// requested cancel. The flag itself is written only by the guarded markCancelRequested query.
+@DynamicUpdate
 @Table(
     name = "sync_job",
     indexes = { @Index(name = "ix_sync_job_connection_created", columnList = "connection_id, created_at DESC") }

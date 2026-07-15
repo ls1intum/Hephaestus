@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -122,6 +123,11 @@ public class SyncController {
                 description = "Connection is not ACTIVE, a different sync type is already running, or manual sync is unsupported for the kind",
                 content = @Content(schema = @Schema(implementation = ProblemDetail.class))
             ),
+            @ApiResponse(
+                responseCode = "503",
+                description = "The server is too busy to dispatch the sync; retry later",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
+            ),
         }
     )
     public ResponseEntity<SyncJobDTO> triggerConnectionSyncJob(
@@ -215,6 +221,18 @@ public class SyncController {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
         problem.setTitle("Manual sync not supported");
         problem.setProperty("kind", e.kind());
+        return problem;
+    }
+
+    /** Executor saturated: the job row was already finalized; tell the client to retry (503, not 500). */
+    @ExceptionHandler(TaskRejectedException.class)
+    ProblemDetail handleDispatchRejected(TaskRejectedException e) {
+        log.warn("Sync dispatch rejected: {}", e.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "The server is busy and could not start the sync. Please retry."
+        );
+        problem.setTitle("Sync dispatch rejected");
         return problem;
     }
 }

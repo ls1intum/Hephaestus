@@ -1566,6 +1566,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Connection is not ACTIVE, a different sync type is already\
             \ running, or manual sync is unsupported for the kind"
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The server is too busy to dispatch the sync; retry later
       summary: Trigger a manual sync or backfill
       tags:
       - Sync

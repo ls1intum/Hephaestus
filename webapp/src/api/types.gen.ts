@@ -4516,6 +4516,10 @@ export type TriggerSyncJobErrors = {
      * Connection is not ACTIVE, a different sync type is already running, or manual sync is unsupported for the kind
      */
     409: ProblemDetail;
+    /**
+     * The server is too busy to dispatch the sync; retry later
+     */
+    503: ProblemDetail;
 };
 
 export type TriggerSyncJobError = TriggerSyncJobErrors[keyof TriggerSyncJobErrors];

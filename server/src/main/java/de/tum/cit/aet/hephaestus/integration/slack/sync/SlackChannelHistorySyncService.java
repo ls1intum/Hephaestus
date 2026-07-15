@@ -111,9 +111,8 @@ public class SlackChannelHistorySyncService {
                     ingested += count;
                 }
             } catch (RuntimeException e) {
-                // A channel that threw is both "not synced" (counted in skipped, preserving the progress
-                // total) and a genuine partial failure (counted in failed) — the latter is the distinct
-                // signal the runner elevates to SUCCEEDED_WITH_WARNINGS, unlike a benign nothing-to-sync skip.
+                // `failed` is the signal the runner elevates to SUCCEEDED_WITH_WARNINGS; `skipped` is a
+                // coarse "not synced this pass" figure that also covers benign nothing-to-sync channels.
                 skipped++;
                 failed++;
                 log.warn(

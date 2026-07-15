@@ -147,11 +147,14 @@ public class SyncJobService {
     public void executeBody(Started started, Consumer<SyncJobHandle> body) {
         long jobId = started.job().getId();
         SyncJobHandle handle = started.handle();
+        // Registration and every step live inside the try/finally so that a throw anywhere — including
+        // from markRunning itself — still removes the handle; otherwise the lease heartbeat would keep a
+        // dead job's lease fresh forever and permanently wedge the connection's one-active slot.
         activeHandles.put(jobId, handle);
-        // Seed the local cancel flag from the row: a cancel may have landed while the job was still
-        // PENDING (before this handle was registered), setting cancel_requested in the DB only.
-        handle.refreshCancellation(markRunning(jobId));
         try {
+            // Seed the local cancel flag from the row: a cancel may have landed while the job was still
+            // PENDING (before this handle was registered), setting cancel_requested in the DB only.
+            handle.refreshCancellation(markRunning(jobId));
             body.accept(handle);
             SyncJobStatus finalStatus = handle.cancelledReported()
                 ? SyncJobStatus.CANCELLED
