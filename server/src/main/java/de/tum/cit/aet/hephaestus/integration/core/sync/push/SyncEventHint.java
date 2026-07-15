@@ -9,11 +9,11 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.push;
  *              {@code activity}. All four are emitted today: {@code ConnectionActivityRecorder}
  *              publishes {@code activity} on every processed webhook event, the others on job and
  *              resource state changes.
- * @param connectionId the connection this hint concerns
- * @param kind the {@code IntegrationKind} name (e.g. {@code "GITHUB"}) as a plain string so this
- *             record never depends on the SPI enum directly
+ * @param connectionId the connection this hint concerns — the only field the client keys its
+ *                      query-invalidation off (alongside {@code scope}); no vendor/kind is carried
+ *                      because the hint is an invalidation trigger, not data.
  */
-public record SyncEventHint(String scope, Long connectionId, String kind) {
+public record SyncEventHint(String scope, Long connectionId) {
     /** Mirrors {@code SyncStateChangedEvent.Scope}; all four values are published today. */
     public enum Scope {
         JOB,

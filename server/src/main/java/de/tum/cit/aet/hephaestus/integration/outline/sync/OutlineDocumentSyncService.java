@@ -181,6 +181,16 @@ public class OutlineDocumentSyncService {
      * A fully caught-up workspace makes zero API calls.
      */
     public void syncPendingCollections(long workspaceId) {
+        syncPendingCollections(workspaceId, null);
+    }
+
+    /**
+     * Same resume pass as {@link #syncPendingCollections(long)}, additionally reporting per-collection
+     * progress and checking cooperative cancellation between collections through {@code progressListener}
+     * — the hook the catch-up sync-job runner threads a {@code SyncJobHandle} through (via
+     * {@link OutlineSyncProgress}). {@code null} behaves exactly like {@link #syncPendingCollections(long)}.
+     */
+    public void syncPendingCollections(long workspaceId, @Nullable OutlineSyncProgressListener progressListener) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
             return;
@@ -196,9 +206,18 @@ public class OutlineDocumentSyncService {
         Instant now = Instant.now();
         ExportBudget budget = new ExportBudget(properties.sync().exportBudget());
         Map<String, OutlineDocumentSnapshot> existing = loadExisting(ctx);
+        int total = pending.size();
+        int done = 0;
         try {
             for (OutlineCollection collection : pending) {
+                if (progressListener != null && progressListener.isCancelled()) {
+                    break;
+                }
                 syncOneCollectionRecordingError(ctx, collection, existing, budget, now);
+                done++;
+                if (progressListener != null) {
+                    progressListener.onCollectionDone(done, total, collection.getName());
+                }
             }
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);

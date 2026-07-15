@@ -86,7 +86,13 @@ public class SyncController {
     ) {
         int safePage = Math.max(page, 0);
         int pageSize = Math.max(1, Math.min(size, 100));
-        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("createdAt").descending());
+        // Secondary sort on id (also monotonic per row) so pagination stays deterministic when two jobs
+        // share a createdAt tick — otherwise the DB is free to return tied rows in any order across pages.
+        Pageable pageable = PageRequest.of(
+            safePage,
+            pageSize,
+            Sort.by("createdAt").descending().and(Sort.by("id").descending())
+        );
         return ResponseEntity.ok(syncStatusService.getJobs(workspace.id(), connectionId, pageable));
     }
 

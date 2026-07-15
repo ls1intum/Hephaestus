@@ -192,7 +192,7 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         assertThat(captor.getValue().connectionId()).isEqualTo(CONNECTION_1);
         assertThat(captor.getValue().type()).isEqualTo(SyncJobType.RECONCILIATION);
         assertThat(captor.getValue().trigger()).isEqualTo(SyncJobTrigger.SYSTEM);
-        verify(syncService).syncPendingCollections(WORKSPACE_1);
+        verify(syncService).syncPendingCollections(eq(WORKSPACE_1), any(OutlineSyncProgressListener.class));
     }
 
     @Test
@@ -202,7 +202,7 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         scheduler.catchUp();
 
         verify(syncJobService, never()).run(any(), any());
-        verify(syncService, never()).syncPendingCollections(org.mockito.ArgumentMatchers.anyLong());
+        verify(syncService, never()).syncPendingCollections(org.mockito.ArgumentMatchers.anyLong(), any());
     }
 
     @Test
@@ -217,6 +217,6 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         doThrow(new SyncJobConflictException(activeJob)).when(syncJobService).run(any(), any());
 
         assertThatCode(() -> scheduler.catchUp()).doesNotThrowAnyException();
-        verify(syncService, never()).syncPendingCollections(WORKSPACE_1);
+        verify(syncService, never()).syncPendingCollections(eq(WORKSPACE_1), any());
     }
 }

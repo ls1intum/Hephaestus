@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogQueryKey,
@@ -12,8 +12,7 @@ type SyncEventScope = "job" | "resources" | "connection" | "activity";
 
 interface SyncEventHint {
 	scope: SyncEventScope;
-	connectionId?: number;
-	kind?: "GITHUB" | "GITLAB" | "SLACK" | "OUTLINE";
+	connectionId: number;
 }
 
 /**
@@ -29,12 +28,20 @@ interface SyncEventHint {
  * transient drop after a successful connect is retried by the UA. Either way the overview/detail
  * queries' own `refetchInterval` polling keeps the UI correct without this hook, so we degrade to
  * polling rather than hammering a reconnect loop. Mount once, in the Integrations layout route.
+ *
+ * @returns `true` once the stream has permanently closed (live push unavailable this session); the
+ *          layout surfaces this as a subtle "falling back to periodic refresh" note.
  */
-export function useSyncEvents(workspaceSlug: string | undefined): void {
+export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 	const queryClient = useQueryClient();
+	const [livePushUnavailable, setLivePushUnavailable] = useState(false);
 
 	useEffect(() => {
 		if (!workspaceSlug) return;
+
+		// Reset for the new subscription — a previous workspace's dead stream must not linger as a
+		// stale "unavailable" note once we (re)connect for a different slug.
+		setLivePushUnavailable(false);
 
 		const source = new EventSource(
 			`${environment.serverUrl}/workspaces/${workspaceSlug}/sync/events`,
@@ -52,13 +59,6 @@ export function useSyncEvents(workspaceSlug: string | undefined): void {
 			}
 
 			const { scope, connectionId } = hint;
-
-			if (connectionId == null) {
-				queryClient.invalidateQueries({
-					queryKey: getIntegrationCatalogQueryKey({ path: { workspaceSlug } }),
-				});
-				return;
-			}
 
 			switch (scope) {
 				case "job":
@@ -98,16 +98,15 @@ export function useSyncEvents(workspaceSlug: string | undefined): void {
 		};
 
 		source.addEventListener("sync", handleHint);
-		let closedLogged = false;
 		source.onerror = () => {
 			// A permanent failure (non-200: missing endpoint, expired auth, server error) leaves the
-			// stream CLOSED and the UA will not reconnect. Log it once and rely on the queries'
-			// refetchInterval polling — do NOT re-create the source here (that would hammer a dead
-			// endpoint). A transient drop after a live connect keeps readyState === CONNECTING and is
-			// retried by the UA on its own, so we stay silent for that case.
-			if (source.readyState === EventSource.CLOSED && !closedLogged) {
-				closedLogged = true;
-				console.info("Sync live-push unavailable; falling back to polling for this session.");
+			// stream CLOSED and the UA will not reconnect. Flag it once — the layout shows a muted
+			// "falling back to periodic refresh" note — and rely on the queries' refetchInterval
+			// polling; do NOT re-create the source here (that would hammer a dead endpoint). A
+			// transient drop after a live connect keeps readyState === CONNECTING and is retried by
+			// the UA on its own, so we leave the flag untouched for that case.
+			if (source.readyState === EventSource.CLOSED) {
+				setLivePushUnavailable(true);
 			}
 		};
 
@@ -116,4 +115,6 @@ export function useSyncEvents(workspaceSlug: string | undefined): void {
 			source.close();
 		};
 	}, [workspaceSlug, queryClient]);
+
+	return livePushUnavailable;
 }

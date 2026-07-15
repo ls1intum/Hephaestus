@@ -99,7 +99,7 @@ public class SyncJobService {
                 if (active.isPresent()) {
                     throw new SyncJobConflictException(active.get());
                 }
-                return syncJobRepository.saveAndFlush(
+                SyncJob created = syncJobRepository.saveAndFlush(
                     new SyncJob(
                         workspaceRepository.getReferenceById(request.workspaceId()),
                         connectionRepository.getReferenceById(connectionId),
@@ -109,6 +109,15 @@ public class SyncJobService {
                         request.triggeredByUserId()
                     )
                 );
+                // Publish the idle→syncing "job created" hint INSIDE this transaction, exactly like
+                // every other publish site (completeJob/persistProgress/reapAbandoned). The sole listener
+                // (SyncPushService) is @TransactionalEventListener(AFTER_COMMIT); an event published after
+                // this template returns has no active transaction and would be SILENTLY DISCARDED. Emitting
+                // it here means it fires naturally on commit — and never on the conflict/rollback path
+                // above (a rejected insert must not push a spurious hint), because we only reach this line
+                // when saveAndFlush succeeded.
+                publish(request.workspaceId(), connectionId, created.getKind(), SyncStateChangedEvent.Scope.JOB);
+                return created;
             });
         } catch (DataIntegrityViolationException e) {
             // Partial unique index race (ux_sync_job_active): another concurrent trigger inserted first.
@@ -129,7 +138,6 @@ public class SyncJobService {
         // async dispatch (executeBody never runs) can't leak a handle that the lease heartbeat would
         // keep alive forever, wedging the connection's one-active-job slot.
         SyncJobHandle handle = new SyncJobHandle(job.getId(), this::persistProgress);
-        publish(request.workspaceId(), connectionId, request.kind(), SyncStateChangedEvent.Scope.JOB);
         return new Started(job, handle);
     }
 
@@ -236,6 +244,11 @@ public class SyncJobService {
                 for (SyncJobRepository.CancelFlagProjection projection : syncJobRepository.findCancelFlags(ids)) {
                     SyncJobHandle handle = activeHandles.get(projection.getId());
                     if (handle != null) {
+                        // Benign, not a bug: a same-pod requestCancel racing this pass can be transiently
+                        // reset to false in-memory if this projection was read just before that commit —
+                        // for at most one heartbeat pass (≤60s). The DB cancel_requested flag is
+                        // authoritative and stays true, so the next pass re-arms the handle. Cancel is
+                        // delayed within one heartbeat, never lost.
                         handle.refreshCancellation(projection.isCancelRequested());
                     }
                 }
@@ -302,6 +315,18 @@ public class SyncJobService {
             syncJobRepository
                 .findById(jobId)
                 .map(job -> {
+                    // CAS-lite guard: only PENDING → RUNNING. If a stale-lease reap already flipped this
+                    // row to a terminal status (or a duplicate dispatch already advanced it), a blind
+                    // write here would resurrect/clobber it. Skip the mutation but still surface any
+                    // cancel flag so the body observes it.
+                    if (job.getStatus() != SyncJobStatus.PENDING) {
+                        log.warn(
+                            "Sync job {} not PENDING at markRunning (status={}); skipping RUNNING transition",
+                            jobId,
+                            job.getStatus()
+                        );
+                        return job.isCancelRequested();
+                    }
                     job.setStatus(SyncJobStatus.RUNNING);
                     job.setStartedAt(Instant.now());
                     job.setHeartbeatAt(Instant.now());
@@ -318,6 +343,18 @@ public class SyncJobService {
             SyncJob job = syncJobRepository.findById(jobId).orElse(null);
             if (job == null) {
                 log.warn("Sync job {} vanished before completion write (status={})", jobId, status);
+                return;
+            }
+            // CAS-lite guard: only finalize a row that is still ACTIVE. If the zombie sweep already
+            // reaped this job as abandoned while the body was mid-flight, its terminal status is
+            // authoritative — a late completion write must not overwrite it (first terminal write wins).
+            if (!SyncJobStatus.ACTIVE.contains(job.getStatus())) {
+                log.warn(
+                    "Sync job {} already terminal ({}) at completion write (attempted {}); skipping",
+                    jobId,
+                    job.getStatus(),
+                    status
+                );
                 return;
             }
             job.setStatus(status);

@@ -307,6 +307,31 @@ class SyncJobServiceTest extends BaseUnitTest {
         assertThat(started.job().getProgress()).containsEntry("currentStep", "pull-requests");
     }
 
+    @Test
+    void executeBody_rowReapedTerminalBeforeDispatch_neitherResurrectsNorOverwrites() {
+        // The zombie sweep flipped this row to FAILED after beginJob but before the async body ran.
+        SyncJobService.Started started = beginTestJob();
+        started.job().setStatus(SyncJobStatus.FAILED);
+
+        service.executeBody(started, handle -> {});
+
+        // markRunning's CAS-lite guard must not flip FAILED→RUNNING, and completeJob's guard must not
+        // overwrite the terminal FAILED with SUCCEEDED — the first terminal write wins.
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
+    }
+
+    @Test
+    void executeBody_rowReapedTerminalMidBody_completionWriteIsSkipped() {
+        SyncJobService.Started started = beginTestJob();
+
+        service.executeBody(started, handle -> {
+            // Simulate the zombie sweep marking this RUNNING row abandoned (FAILED) mid-flight.
+            started.job().setStatus(SyncJobStatus.FAILED);
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
+    }
+
     // --- zombie reaping ---
 
     @Test

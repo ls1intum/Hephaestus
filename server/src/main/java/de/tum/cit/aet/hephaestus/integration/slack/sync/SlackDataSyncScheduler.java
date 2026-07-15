@@ -114,6 +114,9 @@ public class SlackDataSyncScheduler {
                 null
             ),
             handle -> {
+                // The handle is threaded for progress reporting; cancellation is intentionally coarse —
+                // the per-channel history loop is private and consent-gated, so a cancel is observed only
+                // at the next tick, never mid-run (see SlackIntegrationSyncRunner's cancellation javadoc).
                 SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId);
                 handle.progress(
                     summary.synced() + summary.skipped(),

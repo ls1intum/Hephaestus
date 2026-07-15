@@ -77,7 +77,7 @@ public class SyncPushService {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSyncStateChanged(SyncStateChangedEvent event) {
-        SyncEventHint hint = new SyncEventHint(wireScope(event.scope()), event.connectionId(), event.kind().name());
+        SyncEventHint hint = new SyncEventHint(wireScope(event.scope()), event.connectionId());
         Connection connection = natsConnectionProvider.getIfAvailable();
         if (connection == null) {
             hub.publish(event.workspaceId(), hint);

@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSes
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
@@ -52,6 +53,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -222,7 +224,7 @@ public class GitlabDataSyncScheduler {
                     SyncJobTrigger.SCHEDULED,
                     null
                 ),
-                handle -> syncScope(session)
+                handle -> syncScope(session, handle)
             );
         } catch (SyncJobConflictException e) {
             log.info(
@@ -233,7 +235,19 @@ public class GitlabDataSyncScheduler {
         }
     }
 
+    /** Unrecorded fallback (no ACTIVE connection to attach a job to): run to completion, no handle. */
     private void syncScope(SyncSession session) {
+        syncScope(session, null);
+    }
+
+    /**
+     * Runs one workspace's full GitLab reconcile. When invoked through a {@link SyncJobService} job the
+     * caller threads the live {@link SyncJobHandle} so the per-repository phase reports coarse
+     * repos-done/repos-total progress and honors a cooperative cancel between repositories — parity with
+     * the SCM manual runner. A cancel observed during the repo phase skips the remaining post-repo/team
+     * phases. The unrecorded fallback passes {@code null} and simply runs to completion.
+     */
+    private void syncScope(SyncSession session, @Nullable SyncJobHandle handle) {
         Long scopeId = session.scopeId();
         String safeLogin = sanitizeForLog(session.accountLogin());
 
@@ -266,14 +280,24 @@ public class GitlabDataSyncScheduler {
             // milestone references on issues by iid.
             syncGroupMilestones(services, session);
 
-            // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators)
-            syncRepositories(services, session);
+            // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators) —
+            // the dominant-cost phase, where cancel/progress are threaded through the handle.
+            syncRepositories(services, session, handle);
 
-            // Phase 4: Post-repo sync (sub-issues, dependencies — needs issues to exist)
-            syncPostRepo(services, session);
+            // A cancel observed during the repo phase skips the remaining phases (cooperative best-effort).
+            if (handle == null || !handle.isCancellationRequested()) {
+                // Phase 4: Post-repo sync (sub-issues, dependencies — needs issues to exist)
+                syncPostRepo(services, session);
 
-            // Phase 5: Sync teams (subgroups)
-            syncTeams(services, session);
+                // Phase 5: Sync teams (subgroups)
+                syncTeams(services, session);
+            }
+
+            // A still-set cancel flag means the repo phase aborted on a checkpoint; declare it so the job
+            // finalizes CANCELLED rather than a false SUCCEEDED.
+            if (handle != null && handle.isCancellationRequested()) {
+                handle.reportCancelled();
+            }
 
             log.info("Completed GitLab workspace sync: scopeId={}, accountLogin={}", scopeId, safeLogin);
         } catch (Exception e) {
@@ -415,7 +439,11 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    private void syncRepositories(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncRepositories(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncJobHandle handle
+    ) {
         GitLabLabelSyncService labelSync = services.getLabelSyncService();
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         GitLabIssueSyncService issueSync = services.getIssueSyncService();
@@ -448,8 +476,22 @@ public class GitlabDataSyncScheduler {
             totalMRs = 0,
             totalCollaborators = 0,
             totalCommits = 0;
+        int reposProcessed = 0;
+        int totalRepos = repos.size();
 
         for (Repository repo : repos) {
+            // Cooperative cancel checkpoint between repositories (matches the manual runner): a cancelled
+            // job stops before the next repo rather than mid-repository.
+            if (handle != null && handle.isCancellationRequested()) {
+                log.info(
+                    "GitLab scheduled sync cancelled between repositories: scopeId={}, reposProcessed={}, reposRemaining={}",
+                    session.scopeId(),
+                    reposProcessed,
+                    totalRepos - reposProcessed
+                );
+                break;
+            }
+
             // Wait for rate limit if critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(session.scopeId())) {
                 log.info(
@@ -589,13 +631,18 @@ public class GitlabDataSyncScheduler {
                     syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
                 }
             }
+
+            reposProcessed++;
+            if (handle != null) {
+                handle.progress(reposProcessed, totalRepos, Map.of("currentRepository", repo.getNameWithOwner()));
+            }
         }
 
         // Second pass: link commits to MRs. Must run after every repo has finished syncing so
         // a commit whose SHA appears on an MR in a sibling repo can still be linked. In the
         // previous single-pass version such cross-repo links were lost because the target MR
         // repo had not yet synced its MRs when the linker ran.
-        if (commitMrLinker != null) {
+        if (commitMrLinker != null && (handle == null || !handle.isCancellationRequested())) {
             for (Repository repo : repos) {
                 OffsetDateTime repoUpdatedAfter = null;
                 if (repo.getLastSyncAt() != null) {

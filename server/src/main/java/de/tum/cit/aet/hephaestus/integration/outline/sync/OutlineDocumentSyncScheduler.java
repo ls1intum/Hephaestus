@@ -77,9 +77,12 @@ public class OutlineDocumentSyncScheduler {
     public void catchUp() {
         for (Long workspaceId : collectionRepository.findDistinctWorkspaceIdsWithPendingSync()) {
             try {
-                runReconcileJob(workspaceId, SyncJobTrigger.SYSTEM, handle ->
-                    syncService.syncPendingCollections(workspaceId)
-                );
+                runReconcileJob(workspaceId, SyncJobTrigger.SYSTEM, handle -> {
+                    syncService.syncPendingCollections(workspaceId, OutlineSyncProgress.adapt(handle));
+                    if (handle != null && handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
+                });
             } catch (RuntimeException e) {
                 // Isolate a poisoned workspace — log and keep catching up the rest.
                 log.warn("outline.sync: catch-up failed for workspaceId={}: {}", workspaceId, e.toString());
@@ -98,9 +101,12 @@ public class OutlineDocumentSyncScheduler {
         List<Long> workspaceIds = connectionService.findWorkspaceIdsWithActiveConnection(IntegrationKind.OUTLINE);
         for (Long workspaceId : workspaceIds) {
             try {
-                runReconcileJob(workspaceId, SyncJobTrigger.SCHEDULED, handle ->
-                    syncService.syncWorkspace(workspaceId, OutlineSyncProgress.adapt(handle))
-                );
+                runReconcileJob(workspaceId, SyncJobTrigger.SCHEDULED, handle -> {
+                    syncService.syncWorkspace(workspaceId, OutlineSyncProgress.adapt(handle));
+                    if (handle != null && handle.isCancellationRequested()) {
+                        handle.reportCancelled();
+                    }
+                });
             } catch (RuntimeException e) {
                 // Isolate a poisoned workspace — log and keep reconciling the rest.
                 log.warn("outline.sync: reconcile failed for workspaceId={}: {}", workspaceId, e.toString());

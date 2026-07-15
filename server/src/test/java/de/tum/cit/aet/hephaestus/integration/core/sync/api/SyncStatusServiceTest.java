@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -42,6 +44,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 
 /**
  * Unit coverage for {@link SyncStatusService}: connection-health derivation across every
@@ -351,6 +354,23 @@ class SyncStatusServiceTest extends BaseUnitTest {
             service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.BACKFILL, null)
         ).isInstanceOf(SyncStateConflictException.class);
         verify(taskExecutor, never()).execute(any());
+    }
+
+    @Test
+    void triggerSync_executorRejectsDispatch_finalizesRowViaFailStartedAndRethrows() {
+        // The job row is created synchronously, but the bounded executor is saturated and rejects the
+        // async body. The row must be finalized (failStarted, so it doesn't hold the one-active slot)
+        // and the TaskRejectedException must propagate so the controller maps it to 503 — not a 500.
+        SyncJob created = pendingJob();
+        SyncJobService.Started started = new SyncJobService.Started(created, null);
+        when(syncJobService.beginJob(any())).thenReturn(started);
+        doThrow(new TaskRejectedException("executor saturated")).when(taskExecutor).execute(any());
+
+        assertThatThrownBy(() ->
+            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.RECONCILIATION, null)
+        ).isInstanceOf(TaskRejectedException.class);
+
+        verify(syncJobService).failStarted(eq(started), any());
     }
 
     // --- catalog ---

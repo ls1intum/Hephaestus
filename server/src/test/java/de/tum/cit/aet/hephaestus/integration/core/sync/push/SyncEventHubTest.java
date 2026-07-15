@@ -50,23 +50,20 @@ class SyncEventHubTest extends BaseUnitTest {
         hub.subscribe(WORKSPACE_ID);
         RecordingEmitter emitter = createdEmitters.get(0);
 
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
         assertThat(emitter.eventNames()).containsExactly("sync");
-        assertThat(emitter.dataFrames().get(0))
-            .contains("\"scope\":\"job\"")
-            .contains("\"connectionId\":10")
-            .contains("\"kind\":\"GITHUB\"");
+        assertThat(emitter.dataFrames().get(0)).contains("\"scope\":\"job\"").contains("\"connectionId\":10");
     }
 
     @Test
     void publish_toWorkspaceWithNoSubscribers_isNoop() {
         hub = newHub(Duration.ofMillis(10));
         // No subscribe() call for this workspace.
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
         // Nothing to assert on directly; the important thing is this doesn't throw. Give the
         // coalesce window time to elapse so a latent NPE on an absent-subscriber path would surface.
@@ -84,7 +81,7 @@ class SyncEventHubTest extends BaseUnitTest {
         RecordingEmitter emitter = createdEmitters.get(0);
         emitter.failOnNextSend();
 
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
         await()
             .atMost(Duration.ofSeconds(2))
@@ -110,15 +107,17 @@ class SyncEventHubTest extends BaseUnitTest {
         hub.subscribe(WORKSPACE_ID);
         RecordingEmitter emitter = createdEmitters.get(0);
 
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITLAB"));
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "SLACK"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
-        // Only the LAST hint in the window must land — never the first (leading-edge would lose it).
-        assertThat(emitter.dataFrames().get(0)).contains("\"kind\":\"SLACK\"");
+        // Three publishes on the same (workspace, connection, scope) key collapse to a single trailing
+        // delivery — hints carry no payload beyond that key, so the coalesced frames are identical and
+        // only one lands (a leading-edge coalescer would instead emit on the first and drop the rest).
+        assertThat(emitter.dataFrames().get(0)).contains("\"scope\":\"job\"");
     }
 
     @Test
@@ -127,8 +126,8 @@ class SyncEventHubTest extends BaseUnitTest {
         hub.subscribe(WORKSPACE_ID);
         RecordingEmitter emitter = createdEmitters.get(0);
 
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID, "GITHUB"));
-        hub.publish(WORKSPACE_ID, new SyncEventHint("resources", CONNECTION_ID, "GITHUB"));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
+        hub.publish(WORKSPACE_ID, new SyncEventHint("resources", CONNECTION_ID));
 
         await()
             .atMost(Duration.ofSeconds(2))

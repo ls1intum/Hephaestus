@@ -64,7 +64,6 @@ class SyncPushServiceTest extends BaseUnitTest {
         verify(hub, times(1)).publish(eq(WORKSPACE_ID), captor.capture());
         assertThat(captor.getValue().scope()).isEqualTo("job");
         assertThat(captor.getValue().connectionId()).isEqualTo(CONNECTION_ID);
-        assertThat(captor.getValue().kind()).isEqualTo("GITHUB");
         verify(connection, never()).publish(anyString(), any(byte[].class));
     }
 
@@ -99,7 +98,6 @@ class SyncPushServiceTest extends BaseUnitTest {
         SyncEventHint published = MAPPER.readValue(payloadCaptor.getValue(), SyncEventHint.class);
         assertThat(published.scope()).isEqualTo("job");
         assertThat(published.connectionId()).isEqualTo(CONNECTION_ID);
-        assertThat(published.kind()).isEqualTo("GITHUB");
 
         // The origin replica must NOT also deliver locally — only the NATS subscription does.
         verify(hub, never()).publish(any(Long.class), any(SyncEventHint.class));
@@ -111,7 +109,7 @@ class SyncPushServiceTest extends BaseUnitTest {
         ObjectProvider<Connection> provider = objectProviderReturning(connection);
         SyncPushService service = new SyncPushService(hub, MAPPER, provider);
 
-        SyncEventHint hint = new SyncEventHint("resources", CONNECTION_ID, "GITLAB");
+        SyncEventHint hint = new SyncEventHint("resources", CONNECTION_ID);
         byte[] payload = MAPPER.writeValueAsBytes(hint);
         Message message = mock(Message.class);
         when(message.getSubject()).thenReturn("hephaestus.syncstatus.42");

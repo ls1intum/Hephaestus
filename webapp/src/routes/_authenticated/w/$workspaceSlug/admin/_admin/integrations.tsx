@@ -13,7 +13,9 @@ function IntegrationsLayout() {
 
 	// One SSE subscription for the whole section — every child page's queries get invalidated
 	// through the generated query keys as hints arrive. No-ops until `workspaceSlug` resolves.
-	useSyncEvents(workspaceSlug);
+	// Returns true once the stream permanently closes, so we can tell the user we've dropped to
+	// periodic polling rather than failing silently.
+	const livePushUnavailable = useSyncEvents(workspaceSlug);
 
 	if (!workspaceSlug && !isLoading) {
 		return <NoWorkspace />;
@@ -28,5 +30,18 @@ function IntegrationsLayout() {
 
 	// Sub-navigation (Overview / SCM / Slack / Outline) lives in the sidebar's collapsible
 	// "Integrations" group; each child route owns its own header and container.
-	return <Outlet />;
+	return (
+		<>
+			{livePushUnavailable && (
+				<div
+					role="status"
+					aria-live="polite"
+					className="border-b px-6 py-2 text-muted-foreground text-xs"
+				>
+					Live updates are unavailable — this section is refreshing periodically instead.
+				</div>
+			)}
+			<Outlet />
+		</>
+	);
 }
