@@ -32,14 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
-/**
- * Job-recording wiring for {@link OutlineDocumentSyncScheduler} — the replacement for Outline's bespoke
- * {@code syncsInFlight} guard. The scheduler's fan-outs ({@code syncAllNow}, {@code catchUp}) now record
- * a {@code RECONCILIATION} {@link de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob} per workspace
- * through {@link SyncJobService}; a connection that already has an active job is skipped (the job guard
- * is the dedup), and the catch-up tick only ever records a job for a workspace the fan-out query already
- * says has pending work.
- */
 class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
 
     private static final long WORKSPACE_1 = 7L;
@@ -83,7 +75,6 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         org.mockito.Mockito.lenient().when(connection2.getId()).thenReturn(CONNECTION_2);
     }
 
-    /** Stubs {@code syncJobService.run(...)} to actually invoke the body, as the real template would. */
     private void runJobsSynchronously() {
         doAnswer(invocation -> {
             Consumer<SyncJobHandle> body = invocation.getArgument(1);

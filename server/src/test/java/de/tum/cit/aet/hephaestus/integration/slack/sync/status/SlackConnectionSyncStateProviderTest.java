@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/** Mapping from persisted Slack sync state into the unified {@code ConnectionSyncStateProvider} read model. */
 @Tag("unit")
 class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
 
@@ -152,7 +151,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
             List.of(channel)
         );
-        // No stored messages for this channel -> absent from the grouped count -> itemCount defaults to 0.
         when(messageRepository.countGroupedByChannelId(WS)).thenReturn(List.of());
 
         List<SyncResourceState> resources = provider.resources(REF, CONNECTION_ID);

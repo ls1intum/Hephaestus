@@ -1,29 +1,17 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Live handle a runner body ({@link IntegrationSyncRunner}-style {@code Consumer<SyncJobHandle>})
- * uses to report progress and observe cooperative cancellation while {@link SyncJobService#run} is
- * executing it.
- *
- * <p>{@link #isCancellationRequested()} is refreshed from the database on {@link SyncJobService}'s 60s
- * lease-heartbeat pass AND immediately on {@link SyncJobService#requestCancel} for the local case (no
- * need to wait out the sweep when the request lands on the same JVM that's running the job).
- *
- * <p>{@link #progress} is throttled to at most one DB write per {@value #MIN_WRITE_INTERVAL_SECONDS}s;
- * the latest values are always retained in memory so {@link SyncJobService#run} can flush them as part
- * of the terminal status write even if they arrived inside the throttle window.
- */
-public final class SyncJobHandle {
+/** Internal state and persistence adapter behind the runner-facing {@link SyncExecutionHandle}. */
+public final class SyncJobHandle implements SyncExecutionHandle {
 
     private static final long MIN_WRITE_INTERVAL_SECONDS = 5;
     private static final Duration MIN_WRITE_INTERVAL = Duration.ofSeconds(MIN_WRITE_INTERVAL_SECONDS);
 
-    /** Callback the owning {@link SyncJobService} supplies to actually persist a throttled write. */
     @FunctionalInterface
     interface ProgressWriter {
         void writeProgress(
@@ -55,26 +43,18 @@ public final class SyncJobHandle {
         this.writer = writer;
     }
 
-    public long jobId() {
-        return jobId;
-    }
-
+    @Override
     public boolean isCancellationRequested() {
         return cancellationRequested;
     }
 
-    /** Called by {@link SyncJobService}: the heartbeat sweep (DB-sourced) or an immediate local cancel. */
     void refreshCancellation(boolean requested) {
         if (requested) {
             this.cancellationRequested = true;
         }
     }
 
-    /**
-     * A runner calls this when it stops early in response to {@link #isCancellationRequested()}.
-     * The service also honors a committed database cancellation during its terminal compare-and-set,
-     * covering requests that arrive on another replica after the last heartbeat refresh.
-     */
+    @Override
     public void reportCancelled() {
         this.cancelledReported = true;
     }
@@ -83,10 +63,7 @@ public final class SyncJobHandle {
         return cancelledReported;
     }
 
-    /**
-     * A runner calls this when it completed but some units failed (e.g. a partial Slack history replay),
-     * finalizing the job as {@code SUCCEEDED_WITH_WARNINGS} rather than a bare success.
-     */
+    @Override
     public void reportWarnings() {
         this.warningsReported = true;
     }
@@ -95,12 +72,8 @@ public final class SyncJobHandle {
         return warningsReported;
     }
 
-    /**
-     * Report progress. Buffers the latest values in memory unconditionally, and additionally persists
-     * to the database when at least {@value #MIN_WRITE_INTERVAL_SECONDS}s elapsed since the last write —
-     * a runner is expected to call this frequently (e.g. once per page/repo), and DB writes on every
-     * call would swamp the connection pool.
-     */
+    /** Buffers every update and persists at most once per five seconds. */
+    @Override
     public void progress(
         @Nullable Integer itemsProcessed,
         @Nullable Integer itemsTotal,

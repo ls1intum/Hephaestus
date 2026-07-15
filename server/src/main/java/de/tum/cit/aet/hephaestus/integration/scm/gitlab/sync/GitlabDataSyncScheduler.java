@@ -9,13 +9,13 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
@@ -190,7 +190,7 @@ public class GitlabDataSyncScheduler {
     }
 
     /** Run the same warning-aware body used by the scheduled path for one manual job. */
-    public void syncWorkspaceNow(long workspaceId, SyncJobHandle handle) {
+    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle) {
         SyncSession session = syncTargetProvider
             .getSyncSessions(IntegrationKind.GITLAB)
             .stream()
@@ -253,12 +253,12 @@ public class GitlabDataSyncScheduler {
 
     /**
      * Runs one workspace's full GitLab reconcile. When invoked through a {@link SyncJobService} job the
-     * caller threads the live {@link SyncJobHandle} so the per-repository phase reports coarse
+     * caller threads the live {@link SyncExecutionHandle} so the per-repository phase reports coarse
      * repos-done/repos-total progress and honors a cooperative cancel between repositories — parity with
      * the SCM manual runner. A cancel observed during the repo phase skips the remaining post-repo/team
      * phases. The unrecorded fallback passes {@code null} and simply runs to completion.
      */
-    private void syncScope(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncScope(SyncSession session, @Nullable SyncExecutionHandle handle) {
         Long scopeId = session.scopeId();
         String safeLogin = sanitizeForLog(session.accountLogin());
 
@@ -326,7 +326,7 @@ public class GitlabDataSyncScheduler {
     private void syncGroupProjects(
         GitLabSyncServiceHolder services,
         SyncSession session,
-        @Nullable SyncJobHandle handle
+        @Nullable SyncExecutionHandle handle
     ) {
         GitLabGroupSyncService groupSync = services.getGroupSyncService();
         if (groupSync == null) return;
@@ -399,7 +399,7 @@ public class GitlabDataSyncScheduler {
     private void syncGroupMembers(
         GitLabSyncServiceHolder services,
         SyncSession session,
-        @Nullable SyncJobHandle handle
+        @Nullable SyncExecutionHandle handle
     ) {
         GitLabGroupMemberSyncService memberSync = services.getGroupMemberSyncService();
         if (memberSync == null) return;
@@ -417,7 +417,11 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    private void syncIssueTypes(GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncIssueTypes(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabIssueTypeSyncService issueTypeSync = services.getIssueTypeSyncService();
         if (issueTypeSync == null) return;
 
@@ -439,7 +443,7 @@ public class GitlabDataSyncScheduler {
     private void syncGroupMilestones(
         GitLabSyncServiceHolder services,
         SyncSession session,
-        @Nullable SyncJobHandle handle
+        @Nullable SyncExecutionHandle handle
     ) {
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         if (milestoneSync == null) return;
@@ -476,7 +480,7 @@ public class GitlabDataSyncScheduler {
     private void syncRepositories(
         GitLabSyncServiceHolder services,
         SyncSession session,
-        @Nullable SyncJobHandle handle
+        @Nullable SyncExecutionHandle handle
     ) {
         GitLabLabelSyncService labelSync = services.getLabelSyncService();
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
@@ -724,7 +728,11 @@ public class GitlabDataSyncScheduler {
         );
     }
 
-    private void syncPostRepo(GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncPostRepo(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabSubIssueSyncService subIssueSync = services.getSubIssueSyncService();
         GitLabIssueDependencySyncService depSync = services.getIssueDependencySyncService();
 
@@ -776,7 +784,11 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    private void syncTeams(GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncTeams(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabTeamSyncService teamSync = services.getTeamSyncService();
         if (teamSync == null) return;
 
@@ -790,7 +802,7 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    private static void reportWarning(@Nullable SyncJobHandle handle) {
+    private static void reportWarning(@Nullable SyncExecutionHandle handle) {
         if (handle != null) {
             handle.reportWarnings();
         }

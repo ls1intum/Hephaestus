@@ -24,22 +24,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
-/**
- * Outline's {@link ConnectionSyncStateProvider}: read-only, O(DB) only — no vendor API call (see the
- * interface's class-level requirement). {@code describe()}/{@code resources()} reuse exactly the persisted
- * signals the old {@code OutlineConnectionAdminService.status()} snapshot read, now surfaced through the
- * unified read model instead of Outline's own absorbed {@code GET /connections/outline/status}.
- *
- * <p><b>webhookRegistered</b> is derived from the stored {@link ConnectionConfig.OutlineConfig#webhookSubscriptionId()}
- * — existence-only, matching the absorbed endpoint's semantics: Outline auto-disables a subscription after
- * repeated delivery failures, and a stale id here self-heals on the next reconcile rather than being probed live.
- *
- * <p><b>rateLimit</b> is always {@code null} — Outline has no tracked rate-limit budget.
- *
- * <p><b>backfill</b> is always {@code null} — Outline has no separate backfill phase; every pass is a full
- * reconcile against the currently-registered collections (see {@link #resources} javadoc and
- * {@code IntegrationSyncRunner#supportsBackfill}).
- */
+/** Read-only Outline sync state built from persisted connection, collection, and document data. */
 @Component
 @ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -80,13 +65,11 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
         return new ConnectionSyncDetails(webhookRegistered, nextScheduledSyncAt(), null, null, false, null);
     }
 
-    /** Outline's "backfill" is a full reconcile every pass — nothing separate to compute a horizon from. */
     @Nullable
     private Instant nextScheduledSyncAt() {
         if (!CronExpression.isValidExpression(syncCron)) {
             return null;
         }
-        // CronExpression.next(...) is @Nullable (no future match) — guard it like the other three providers.
         ZonedDateTime next = CronExpression.parse(syncCron).next(ZonedDateTime.now());
         return next == null ? null : next.toInstant();
     }
@@ -94,7 +77,6 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
     @Override
     public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
         long workspaceId = ref.workspaceId();
-        // Single grouped count for the whole connection (one query), instead of one count per collection.
         Map<String, Long> itemCountByCollectionId = documentRepository
             .countLiveByCollection(workspaceId, connectionId)
             .stream()
@@ -123,7 +105,6 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
             itemCount,
             collection.getDocumentsUpstream() == null ? null : collection.getDocumentsUpstream().longValue(),
             collection.getLastSyncError(),
-            // No backfill concept for Outline — every pass is a full reconcile (BackfillSummary javadoc).
             null,
             null
         );

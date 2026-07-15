@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
@@ -126,13 +126,18 @@ public class OutlineDocumentSyncScheduler {
      * record a job against. A connection that already has an active job is also skipped — the running job
      * IS the record of this pass.
      */
-    private void runReconcileJob(long workspaceId, SyncJobTrigger trigger, Consumer<SyncJobHandle> body) {
+    private void runReconcileJob(long workspaceId, SyncJobTrigger trigger, Consumer<SyncExecutionHandle> body) {
         connectionService
             .findActive(workspaceId, IntegrationKind.OUTLINE)
             .ifPresent(connection -> runJob(workspaceId, connection, trigger, body));
     }
 
-    private void runJob(long workspaceId, Connection connection, SyncJobTrigger trigger, Consumer<SyncJobHandle> body) {
+    private void runJob(
+        long workspaceId,
+        Connection connection,
+        SyncJobTrigger trigger,
+        Consumer<SyncExecutionHandle> body
+    ) {
         try {
             syncJobService.run(
                 new SyncJobRequest(
@@ -166,7 +171,7 @@ public class OutlineDocumentSyncScheduler {
 
     /**
      * Same pass as {@link #syncWorkspaceNow(long)}, threading a progress/cancellation listener — the shape
-     * the manual-trigger {@code OutlineIntegrationSyncRunner} uses so a {@code SyncJobHandle} sees
+     * the manual-trigger {@code OutlineIntegrationSyncRunner} uses so a {@code SyncExecutionHandle} sees
      * per-collection progress. Workspace-scoped, no bypass — see {@link #syncWorkspaceNow(long)}.
      */
     public void syncWorkspaceNow(long workspaceId, OutlineSyncProgressListener progressListener) {

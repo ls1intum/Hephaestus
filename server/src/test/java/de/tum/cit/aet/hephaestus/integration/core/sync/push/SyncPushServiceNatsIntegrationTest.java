@@ -24,7 +24,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
-/** Proves the actual core-NATS broadcast boundary used to invalidate sibling server replicas. */
 @Tag("integration")
 class SyncPushServiceNatsIntegrationTest extends BaseIntegrationTest {
 

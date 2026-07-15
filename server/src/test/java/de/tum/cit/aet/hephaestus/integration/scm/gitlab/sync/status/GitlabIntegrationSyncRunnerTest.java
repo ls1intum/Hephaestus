@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/** Unit tests for {@link GitlabIntegrationSyncRunner}. */
 @Tag("unit")
 class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
 

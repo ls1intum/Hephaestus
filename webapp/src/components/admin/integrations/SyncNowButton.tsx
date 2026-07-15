@@ -5,22 +5,13 @@ import { Spinner } from "@/components/ui/spinner";
 
 export interface SyncNowButtonProps {
 	onClick: () => void;
-	/** The mutation is in flight (request sent, response not yet back). */
 	isTriggering?: boolean;
-	/** The connection's current active job, if any — disables the button (one-active-job guard) and
-	 * relabels it, matching the server's idempotent "200 + active job" response. */
 	activeJob?: SyncJob | null;
-	/** Defaults to "Sync now"; the Backfill entry point passes "Backfill" instead. */
 	label?: string;
 	variant?: React.ComponentProps<typeof Button>["variant"];
 	size?: React.ComponentProps<typeof Button>["size"];
 }
 
-/**
- * The one "trigger a sync job" control. Disabled while a job is already running for the
- * connection (server-side one-active-job guard mirrored client-side) and while the trigger
- * mutation itself is in flight.
- */
 export function SyncNowButton({
 	onClick,
 	isTriggering = false,

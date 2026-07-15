@@ -31,18 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Per-workspace registry of active {@link SseEmitter}s for the sync-observability live-push stream.
- * Owns everything transport-level: subscribe/deregister lifecycle, per-emitter
- * bounded queueing with drop-oldest backpressure, single-writer serialisation per emitter (mirrors
- * {@code MentorSseChannel}'s {@link ReentrantLock} discipline — a virtual thread parked on a lock
- * does not pin its carrier, unlike {@code synchronized}), the {@code :ping} heartbeat, and
- * trailing-edge coalescing per {@code (workspaceId, connectionId, scope)}.
- *
- * <p>A slow or broken client must never stall another workspace's (or another emitter's) delivery:
- * every send — heartbeat or hint — runs on its own virtual-thread task, guarded only by that one
- * emitter's lock.
- */
+/** Manages workspace-scoped SSE subscribers and coalesced sync notifications. */
 @Component
 @ConditionalOnServerRole
 public class SyncEventHub {
@@ -52,14 +41,7 @@ public class SyncEventHub {
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
     private static final int QUEUE_CAPACITY = 64;
 
-    /**
-     * Ceiling on concurrent emitters per workspace. The endpoint is a credentialed GET that any
-     * origin can <em>open</em> against a logged-in admin (CORS blocks reading the body, not opening
-     * the connection), and each emitter lives up to {@link #EMITTER_TIMEOUT_MS}. Without a cap an
-     * abusive page reusing the admin's cookie could hold unbounded 30-minute connections. Beyond the
-     * cap we reject the new stream. Evicting an established EventSource would make its automatic
-     * reconnect evict another client indefinitely.
-     */
+    /** Limits credentialed cross-origin connection exhaustion; CORS does not prevent opening SSE streams. */
     private static final int MAX_EMITTERS_PER_WORKSPACE = 20;
     private static final String EVENT_NAME = "sync";
     private static final long HEARTBEAT_INTERVAL_MS = 20_000L;
@@ -75,16 +57,12 @@ public class SyncEventHub {
     private final Counter eventsDropped;
     private final Counter eventsFailed;
 
-    /** Latches true the first time the per-workspace cap is hit, so rejection logs once, not per-open. */
     private final AtomicBoolean capWarned = new AtomicBoolean(false);
 
-    /** Live subscribers, per workspace. Set is identity-based (no equals/hashCode override on {@link Subscriber}). */
     private final Map<Long, Set<Subscriber>> subscribersByWorkspace = new ConcurrentHashMap<>();
 
-    /** Single writer per emitter; fine to share across all emitters — virtual threads are cheap. */
     private final ExecutorService writerExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    /** Trailing-edge coalescing: last hint per key, flushed once the window elapses. */
     private final Map<CoalesceKey, SyncEventHint> pendingHints = new ConcurrentHashMap<>();
     private final Set<CoalesceKey> pendingFlushes = ConcurrentHashMap.newKeySet();
     private final ScheduledExecutorService coalesceScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -93,17 +71,12 @@ public class SyncEventHub {
         return thread;
     });
 
-    /**
-     * Explicitly {@code @Autowired}: Spring only auto-selects an unannotated constructor when
-     * exactly one exists on the class, and this class also carries package-private test-seam
-     * constructors (below) for a short coalesce window / a recording emitter factory.
-     */
+    /** Selects the production constructor when the package-private test constructor is also present. */
     @Autowired
     public SyncEventHub(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
         this(objectMapper, meterRegistry, DEFAULT_COALESCE_WINDOW, () -> new SseEmitter(EMITTER_TIMEOUT_MS));
     }
 
-    /** Test seam: a custom emitter factory lets tests substitute a recording {@link SseEmitter}. */
     SyncEventHub(
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry,
@@ -124,10 +97,6 @@ public class SyncEventHub {
             .register(meterRegistry);
     }
 
-    /**
-     * Register a fresh emitter for this workspace. Deregisters itself on completion, timeout, or
-     * transport error — callers just return the emitter to Spring MVC.
-     */
     public SseEmitter subscribe(long workspaceId) {
         SseEmitter emitter = emitterFactory.get();
         Subscriber subscriber = new Subscriber(workspaceId, emitter);
@@ -171,12 +140,7 @@ public class SyncEventHub {
         return emitter;
     }
 
-    /**
-     * Publish a hint for a workspace. Coalesced: within {@link #coalesceWindow}, only the last hint
-     * per {@code (workspaceId, connectionId, scope)} is actually delivered (trailing edge — the
-     * window is scheduled once and re-armed hints replace the pending payload in place, so a
-     * terminal transition is never swallowed by a leading-edge drop).
-     */
+    /** Coalesces the latest hint per workspace, connection, and scope. */
     public void publish(long workspaceId, SyncEventHint hint) {
         CoalesceKey key = new CoalesceKey(workspaceId, hint.connectionId(), hint.scope());
         pendingHints.put(key, hint);
@@ -189,7 +153,6 @@ public class SyncEventHub {
         try {
             coalesceScheduler.schedule(() -> flush(key), coalesceWindow.toMillis(), TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException e) {
-            // Shutting down: flush immediately in-line rather than losing the hint entirely.
             flush(key);
         }
     }
@@ -264,7 +227,6 @@ public class SyncEventHub {
         }
     }
 
-    /** Must be called while holding {@code subscriber.writeLock}. */
     private boolean sendHint(Subscriber subscriber, SyncEventHint hint) {
         try {
             String json = objectMapper.writeValueAsString(hint);
@@ -280,10 +242,7 @@ public class SyncEventHub {
         }
     }
 
-    /**
-     * Comment-only keep-alive so proxies (Traefik idles at 300s) never kill an otherwise-quiet
-     * stream. Package-private so unit tests can drive it directly without a live scheduler.
-     */
+    /** Keeps quiet streams alive through the proxy's idle timeout. */
     @Scheduled(fixedRate = HEARTBEAT_INTERVAL_MS, initialDelay = HEARTBEAT_INTERVAL_MS)
     @WorkspaceAgnostic("Writes transport heartbeats to already-authorized in-memory subscribers")
     void sendHeartbeats() {
@@ -299,7 +258,6 @@ public class SyncEventHub {
                     writerExecutor.execute(() -> sendPing(subscriber));
                 } catch (RejectedExecutionException ignored) {
                     subscriber.heartbeatPending.set(false);
-                    // Shutting down.
                 }
             }
         }
@@ -343,9 +301,7 @@ public class SyncEventHub {
     private static void safeComplete(SseEmitter emitter) {
         try {
             emitter.complete();
-        } catch (RuntimeException ignored) {
-            // Already completing/completed.
-        }
+        } catch (RuntimeException ignored) {}
     }
 
     @PreDestroy
@@ -367,8 +323,6 @@ public class SyncEventHub {
             Thread.currentThread().interrupt();
         }
     }
-
-    // Test seams (package-private — used by unit tests in the same package).
 
     int subscriberCount(long workspaceId) {
         Set<Subscriber> subscribers = subscribersByWorkspace.get(workspaceId);

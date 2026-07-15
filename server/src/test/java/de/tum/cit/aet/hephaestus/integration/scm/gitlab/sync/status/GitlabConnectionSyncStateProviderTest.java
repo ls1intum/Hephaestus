@@ -31,10 +31,6 @@ import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Unit tests for {@link GitlabConnectionSyncStateProvider}: the {@code describe}/{@code resources}
- * mapping from existing DB rows and in-memory trackers into the sync-observability read model.
- */
 @Tag("unit")
 class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
 
@@ -210,7 +206,6 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         void shouldMapUnsyncedRepositoryAsPendingWithNullItemCount() {
             RepositoryToMonitor monitor = monitor(2L, "group/new-repo");
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(monitor));
-            // No matching Repository row yet — group project discovery hasn't synced it in.
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
@@ -232,7 +227,6 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             repo.setNameWithOwner("group/empty-repo");
             repo.setLastSyncAt(Instant.now());
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
-            // Grouped COUNT query returns no row for repos with zero issues/MRs.
             when(issueRepository.countGroupedByRepositoryIds(List.of(501L))).thenReturn(List.of());
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);

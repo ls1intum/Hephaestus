@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionAdmin
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -38,14 +39,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-/**
- * Application-layer facade behind {@link SyncController}. Owns provider/runner dispatch by
- * {@link IntegrationKind}, the connection-health derivation, and the async hand-off for manually
- * triggered jobs — the controller stays a thin HTTP adapter (repository access rule).
- *
- * <p>Missing provider/runner for a kind degrades gracefully on reads (empty details / empty resource
- * list) and 409s only the write path ({@link #triggerSync}) via {@link SyncNotSupportedException}.
- */
+/** Application service for sync status, catalog, and manual job control. */
 @ConditionalOnServerRole
 @Service
 public class SyncStatusService {
@@ -55,8 +49,8 @@ public class SyncStatusService {
     private final SyncJobRepository syncJobRepository;
     private final ConnectionActivityRepository connectionActivityRepository;
     private final AsyncTaskExecutor taskExecutor;
-    private final List<ConnectionSyncStateProvider> providerBeans;
-    private final List<IntegrationSyncRunner> runnerBeans;
+    private final List<ConnectionSyncStateProvider> providers;
+    private final List<IntegrationSyncRunner> runners;
 
     public SyncStatusService(
         ConnectionAdminService connectionAdminService,
@@ -64,32 +58,26 @@ public class SyncStatusService {
         SyncJobRepository syncJobRepository,
         ConnectionActivityRepository connectionActivityRepository,
         @Qualifier("syncJobExecutor") AsyncTaskExecutor taskExecutor,
-        List<ConnectionSyncStateProvider> providerBeans,
-        List<IntegrationSyncRunner> runnerBeans
+        List<ConnectionSyncStateProvider> providers,
+        List<IntegrationSyncRunner> runners
     ) {
         this.connectionAdminService = connectionAdminService;
         this.syncJobService = syncJobService;
         this.syncJobRepository = syncJobRepository;
         this.connectionActivityRepository = connectionActivityRepository;
         this.taskExecutor = taskExecutor;
-        // Resolved lazily per-lookup (see #providerFor/#runnerFor) rather than built into a map at
-        // construction time: eagerly collecting into a Map<IntegrationKind, ...> forces every bean of
-        // every kind to be present and duplicate-free at CONTEXT BOOT, which couples this service's
-        // startup to whichever test doubles happen to be on the classpath. Lookup-time duplicate
-        // detection preserves the "one impl per kind" invariant without that coupling.
-        this.providerBeans = List.copyOf(providerBeans);
-        this.runnerBeans = List.copyOf(runnerBeans);
+        this.providers = List.copyOf(providers);
+        this.runners = List.copyOf(runners);
     }
 
     private @Nullable ConnectionSyncStateProvider providerFor(IntegrationKind kind) {
-        return resolveSingle(providerBeans, ConnectionSyncStateProvider::kind, kind);
+        return resolveSingle(providers, ConnectionSyncStateProvider::kind, kind);
     }
 
     private @Nullable IntegrationSyncRunner runnerFor(IntegrationKind kind) {
-        return resolveSingle(runnerBeans, IntegrationSyncRunner::kind, kind);
+        return resolveSingle(runners, IntegrationSyncRunner::kind, kind);
     }
 
-    /** Linear scan over the (small, fixed-size) per-kind bean list — same duplicate-detection as before, deferred to lookup time. */
     private static <T> @Nullable T resolveSingle(
         List<T> beans,
         Function<T, IntegrationKind> kindOf,
@@ -113,13 +101,7 @@ public class SyncStatusService {
         IntegrationRef ref = connection.toRef();
         ConnectionSyncDetails providerDetails =
             provider == null ? ConnectionSyncDetails.empty() : provider.describe(ref, connectionId);
-        // Webhook-liveness is core-owned (ConnectionActivityRecorder writes it from the NATS consumer
-        // hook), never populated by the per-vendor provider — merged in here, not inside describe().
         Optional<ConnectionActivity> activity = connectionActivityRepository.findById(connectionId);
-        ConnectionSyncDetails details = providerDetails.withActivity(
-            activity.map(ConnectionActivity::getLastEventAt).orElse(null),
-            activity.map(ConnectionActivity::getLastEventType).orElse(null)
-        );
         List<SyncResourceState> resources = provider == null ? List.of() : provider.resources(ref, connectionId);
 
         Optional<SyncJob> activeJob = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
@@ -144,7 +126,7 @@ public class SyncStatusService {
             connection,
             lastFinishedJob,
             erroredResources,
-            details.vendorHealthDegraded()
+            providerDetails.vendorHealthDegraded()
         );
 
         return new ConnectionSyncStatusDTO(
@@ -155,12 +137,12 @@ public class SyncStatusService {
             lastSuccessfulJob.map(SyncJob::getFinishedAt).orElse(null),
             activeJob.map(SyncJobDTO::from).orElse(null),
             lastFinishedJob.map(SyncJobDTO::from).orElse(null),
-            details.nextScheduledSyncAt(),
-            details.webhookRegistered(),
-            details.lastEventProcessedAt(),
-            details.lastEventType(),
-            details.rateLimit() == null ? null : RateLimitSnapshotDTO.from(details.rateLimit()),
-            details.backfill() == null ? null : BackfillSummaryDTO.from(details.backfill()),
+            providerDetails.nextScheduledSyncAt(),
+            providerDetails.webhookRegistered(),
+            activity.map(ConnectionActivity::getLastEventAt).orElse(null),
+            activity.map(ConnectionActivity::getLastEventType).orElse(null),
+            providerDetails.rateLimit() == null ? null : RateLimitSnapshotDTO.from(providerDetails.rateLimit()),
+            providerDetails.backfill() == null ? null : BackfillSummaryDTO.from(providerDetails.backfill()),
             new ResourceCountsDTO((long) resources.size(), erroredResources)
         );
     }
@@ -175,14 +157,12 @@ public class SyncStatusService {
     }
 
     public Page<SyncJobDTO> getJobs(Long workspaceId, long connectionId, Pageable pageable) {
-        // 404s cleanly if the connection isn't in this workspace, before touching job history.
         connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
         return syncJobRepository
             .findByConnection_IdAndWorkspace_Id(connectionId, workspaceId, pageable)
             .map(SyncJobDTO::from);
     }
 
-    /** Outcome of a trigger call: {@code created=false} means an already-active job was returned (idempotent-absorb). */
     public record TriggerOutcome(SyncJobDTO job, boolean created) {}
 
     /**
@@ -290,7 +270,6 @@ public class SyncStatusService {
         return SyncJobDTO.from(job);
     }
 
-    /** Every kind the manifest registry knows about, joined against this workspace's connections. */
     public List<IntegrationCatalogEntryDTO> catalog(long workspaceId) {
         Map<IntegrationKind, Connection> byKind = new EnumMap<>(IntegrationKind.class);
         List<Connection> connections = connectionAdminService.listForWorkspace(workspaceId);
@@ -300,7 +279,7 @@ public class SyncStatusService {
 
         IntegrationKind workspaceScm = connections
             .stream()
-            .filter(c -> c.getKind() == IntegrationKind.GITHUB || c.getKind() == IntegrationKind.GITLAB)
+            .filter(c -> c.getKind().family() == IntegrationFamily.SCM)
             .max(
                 Comparator.comparing((Connection c) -> c.getState() != IntegrationState.UNINSTALLED).thenComparing(
                     Connection::getCreatedAt
@@ -314,12 +293,7 @@ public class SyncStatusService {
             .registeredKinds()
             .stream()
             .sorted()
-            .filter(
-                kind ->
-                    workspaceScm == null ||
-                    (kind != IntegrationKind.GITHUB && kind != IntegrationKind.GITLAB) ||
-                    kind == workspaceScm
-            )
+            .filter(kind -> workspaceScm == null || kind.family() != IntegrationFamily.SCM || kind == workspaceScm)
             .map(kind -> {
                 Connection c = byKind.get(kind);
                 boolean connected = c != null && c.getState() != IntegrationState.UNINSTALLED;
@@ -338,7 +312,6 @@ public class SyncStatusService {
             .toList();
     }
 
-    /** When a workspace has multiple rows of the same kind (reconnect history), prefer the live one. */
     private static Connection preferred(Connection current, Connection candidate) {
         boolean currentLive = current.getState() != IntegrationState.UNINSTALLED;
         boolean candidateLive = candidate.getState() != IntegrationState.UNINSTALLED;

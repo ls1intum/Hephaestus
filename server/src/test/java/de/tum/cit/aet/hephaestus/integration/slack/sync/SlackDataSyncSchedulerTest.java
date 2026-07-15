@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
-/** The scheduler's fan-out, its disconnected-workspace short circuit, and its job-recording wrapper. */
 @Tag("unit")
 class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
@@ -72,8 +71,6 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
     @Test
     void workspaceWithoutAnActiveSlackConnection_spendsNoBudgetAndTouchesNothing() {
-        // Every Slack call would fail on token resolution anyway; attempting them would burn a rate-limit slot
-        // (and its pacing sleep) and log one warning per channel for a workspace that simply is not connected.
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.empty());
 
         var summary = scheduler.syncWorkspaceNow(WS);
@@ -106,7 +103,6 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
         scheduler.syncDataCron();
 
-        // Workspace 1 blew up; workspace 2 was still evaluated.
         verify(connectionService).findActive(2L, IntegrationKind.SLACK);
     }
 
@@ -145,8 +141,6 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         assertThat(request.type()).isEqualTo(SyncJobType.RECONCILIATION);
         assertThat(request.trigger()).isEqualTo(SyncJobTrigger.SCHEDULED);
 
-        // The job template only ever creates the row; the body itself isn't invoked until SyncJobService
-        // dispatches it. Drive it here with a stub handle to prove it delegates to the same history sync path.
         SyncJobHandle handle = mock(SyncJobHandle.class);
         bodyCaptor.getValue().accept(handle);
 

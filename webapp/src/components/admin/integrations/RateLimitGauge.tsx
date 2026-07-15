@@ -4,13 +4,10 @@ import { Progress } from "@/components/ui/progress";
 import { asDate } from "./sync-format";
 
 export interface RateLimitGaugeProps {
-	/** Absent when the vendor tracks no budget for this integration (Outline), or nothing has been
-	 * observed yet (post-restart, before the first API call). Renders "–" either way. */
 	rateLimit?: RateLimitSnapshot;
 	className?: string;
 }
 
-/** Vendor API rate-limit budget: remaining/limit plus a bar and a relative reset time. */
 export function RateLimitGauge({ rateLimit, className }: RateLimitGaugeProps) {
 	if (!rateLimit) {
 		return <span className="text-muted-foreground text-sm">–</span>;

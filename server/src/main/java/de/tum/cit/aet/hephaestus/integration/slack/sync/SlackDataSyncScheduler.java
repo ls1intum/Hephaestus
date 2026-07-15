@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
@@ -161,7 +161,7 @@ public class SlackDataSyncScheduler {
 
     public SlackChannelHistorySyncService.WorkspaceSyncSummary syncWorkspaceNow(
         long workspaceId,
-        @Nullable SyncJobHandle handle
+        @Nullable SyncExecutionHandle handle
     ) {
         if (connectionService.findActive(workspaceId, IntegrationKind.SLACK).isEmpty()) {
             log.debug(

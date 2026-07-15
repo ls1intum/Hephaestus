@@ -23,13 +23,6 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Unit tests for {@link OutlineConnectionAdminService} — now scoped to the token health probe, the one
- * surface that stayed here after the health snapshot ({@code status()}) and the manual reconcile trigger
- * ({@code syncNow()}/{@code isSyncRunning()}) were absorbed into the unified sync-observability API (see
- * {@code de.tum.cit.aet.hephaestus.integration.outline.status.OutlineConnectionSyncStateProviderTest} and
- * {@code OutlineIntegrationSyncRunnerTest} for that coverage now).
- */
 class OutlineConnectionAdminServiceTest extends BaseUnitTest {
 
     private static final long WS = 7L;
@@ -54,7 +47,6 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
         return new OutlineConnectionAdminService(connectionService, apiClient);
     }
 
-    /** The stored token, as the connection's credential bundle hands it to the probe. */
     private void storedToken(String token) {
         when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE)).thenReturn(
             Optional.of(new BearerToken(token, null))
@@ -63,7 +55,6 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
 
     @Test
     void tokenStatus_rejectedToken_isNotAccepted_ratherThanAnError() {
-        // "Your token no longer works" is the answer the admin card came to ask — not a 5xx.
         OutlineConnectionAdminService service = service();
         storedToken("ol_dead_key");
         org.mockito.Mockito.doThrow(new OutlineApiException("Outline /api/auth.info failed (HTTP 401)"))
@@ -75,7 +66,6 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
         assertThat(status.accepted()).isFalse();
         assertThat(status.name()).isNull();
         assertThat(status.expiresAt()).isNull();
-        // A dead token is never described — the metadata probe is not even attempted.
         org.mockito.Mockito.verify(apiClient, never()).describeToken(any(), any());
     }
 
@@ -100,8 +90,6 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
 
     @Test
     void tokenStatus_acceptedButUndescribable_isAcceptedWithoutMetadata() {
-        // apiKeys.list answered 403 (an out-of-scope key, or an owner who cannot see it) — the token
-        // still syncs content, so the absence of metadata must not read as "token broken".
         OutlineConnectionAdminService service = service();
         storedToken("ol_scoped_key");
         when(apiClient.describeToken(SERVER_URL, "ol_scoped_key")).thenReturn(Optional.empty());
@@ -117,9 +105,6 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
 
     @Test
     void tokenStatus_acceptedButMetadataProbeFails_isAcceptedWithoutMetadata_notAnError() {
-        // auth.info passed, so the token is live. A flaky apiKeys.list (HTTP 500, not a 403 scope
-        // decline) must degrade to "accepted, metadata unavailable" — never bubble a 502 for an
-        // otherwise-healthy token.
         OutlineConnectionAdminService service = service();
         storedToken("ol_live_key");
         when(apiClient.describeToken(SERVER_URL, "ol_live_key")).thenThrow(

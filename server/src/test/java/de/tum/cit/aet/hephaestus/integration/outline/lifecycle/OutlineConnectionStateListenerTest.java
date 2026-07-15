@@ -32,14 +32,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-/**
- * Connect-time reactions: an Outline activation registers the change-notification subscription and
- * kicks the initial recency sync immediately, recorded as an {@code INITIAL}/{@code LIFECYCLE} job
- * through {@link SyncJobService} (replacing the plain {@code syncScheduler.syncWorkspaceNow} call this
- * listener used before the sync-observability wiring); a deactivation tears the subscription down by
- * connection id. Events for other kinds are ignored, and the async listener never rethrows — the
- * periodic reconcile is the safety net.
- */
 class OutlineConnectionStateListenerTest extends BaseUnitTest {
 
     @Mock
@@ -54,16 +46,9 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
     @InjectMocks
     private OutlineConnectionStateListener listener;
 
-    /**
-     * Stubs {@code syncJobService.run(...)} to actually invoke the body, as the real template would.
-     * {@link SyncJobHandle} is a {@code final} class with a package-private constructor (by design — only
-     * {@code SyncJobService} builds one), so it cannot be mocked or instantiated here; {@code null} is
-     * safe because {@link de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineSyncProgress#adapt}
-     * only closes over the handle — nothing in this test path dereferences it (the mocked
-     * {@code syncScheduler} never calls the listener it was handed).
-     */
     @SuppressWarnings("unchecked")
     private void runJobsSynchronously() {
+        // The mocked scheduler never invokes the listener, so the package-private handle can be null here.
         doAnswer(invocation -> {
             Consumer<SyncJobHandle> body = invocation.getArgument(1);
             body.accept(null);
@@ -88,7 +73,6 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThat(request.kind()).isEqualTo(IntegrationKind.OUTLINE);
         assertThat(request.type()).isEqualTo(SyncJobType.INITIAL);
         assertThat(request.trigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
-        // The job body is exactly the workspace sync, threaded with a progress listener.
         verify(syncScheduler).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
     }
 
@@ -111,7 +95,6 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThatCode(() ->
             listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE))
         ).doesNotThrowAnyException();
-        // The conflict is absorbed before the body ever runs — no direct scheduler call either.
         verify(syncScheduler, never()).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
     }
 

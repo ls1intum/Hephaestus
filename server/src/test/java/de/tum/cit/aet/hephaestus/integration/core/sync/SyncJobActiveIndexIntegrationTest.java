@@ -31,7 +31,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Real-Postgres coverage for sync-job transition and uniqueness invariants. */
 class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String CREATE_PARTIAL_INDEX =
@@ -93,7 +92,6 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
             new SyncJob(workspace, connection, IntegrationKind.GITHUB, SyncJobType.INITIAL, SyncJobTrigger.MANUAL, null)
         );
 
-        // A second PENDING row for the same connection violates the partial UNIQUE index.
         assertThatThrownBy(() ->
             syncJobRepository.saveAndFlush(
                 new SyncJob(
@@ -136,9 +134,6 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
                             );
                             successes.incrementAndGet();
                         } catch (SyncJobConflictException e) {
-                            // The one-active guard denied the loser — either the service-level pre-check
-                            // saw the winner's committed row, or the partial-index DataIntegrityViolation
-                            // was translated here. Both are the correct 409-absorb outcome, never a 500.
                             conflicts.incrementAndGet();
                         } catch (Throwable t) {
                             unexpected.add(t);
@@ -159,7 +154,6 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(successes.get()).as("exactly one concurrent trigger created a job").isEqualTo(1);
         assertThat(conflicts.get()).as("the other concurrent trigger was absorbed as a conflict").isEqualTo(1);
 
-        // And the invariant the index protects actually holds: exactly one active row for the connection.
         long activeRows = syncJobRepository
             .findByConnection_IdAndWorkspace_Id(
                 connection.getId(),

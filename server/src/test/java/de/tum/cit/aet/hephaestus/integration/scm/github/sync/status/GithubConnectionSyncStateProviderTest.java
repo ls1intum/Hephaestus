@@ -36,11 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Unit tests for {@link GithubConnectionSyncStateProvider}: connection-level {@code describe()}
- * mapping (webhook/vendor-health/rate-limit/backfill) and per-repository {@code resources()}
- * mapping.
- */
 class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
@@ -212,7 +207,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
             RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-a");
             rtm.setId(500L);
-            // Issue backfill done (checkpoint 0 against a 100 high-water-mark); no PRs to backfill.
             rtm.setIssueBackfillHighWaterMark(100);
             rtm.setIssueBackfillCheckpoint(0);
             rtm.setPullRequestBackfillHighWaterMark(0);
@@ -230,7 +224,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
             RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-a");
             rtm.setId(500L);
-            // 25 of 100 issues remaining -> 75% done; PR dimension empty (already complete).
             rtm.setIssueBackfillHighWaterMark(100);
             rtm.setIssueBackfillCheckpoint(25);
             rtm.setPullRequestBackfillHighWaterMark(0);
@@ -302,7 +295,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         void repositoryPendingInitialSync_stateReflectsPending() {
             RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-b");
             rtm.setId(501L);
-            // lastIssuesSyncedAt / lastPullRequestsSyncedAt left null — never synced yet.
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
 
@@ -330,7 +322,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
             assertThat(resources).hasSize(1);
-            // total=100, remaining=25 -> 75% done
             assertThat(resources.get(0).backfillPercent()).isEqualTo(75);
             assertThat(resources.get(0).backfillCompletedThrough()).isNull();
         }

@@ -13,11 +13,6 @@ export interface AdminSettingsPageProps {
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 }
 
-/**
- * Workspace settings: feature toggles and the league reset control. Repositories, Slack and
- * Outline moved to their own admin surfaces under Administration → Integrations (see
- * `/admin/integrations`) — this page is deliberately non-integration content only.
- */
 export function AdminSettingsPage({
 	isResettingLeagues,
 	onResetLeagues,

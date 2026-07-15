@@ -1,16 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage, type AdminSettingsPageProps } from "./AdminSettingsPage";
-
-function renderWithClient(node: ReactNode) {
-	const queryClient = new QueryClient({
-		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-	});
-	return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
-}
 
 const features: FeatureValues = {
 	practicesEnabled: false,
@@ -32,7 +23,7 @@ function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 		onToggleFeature: vi.fn(),
 		...overrides,
 	};
-	renderWithClient(<AdminSettingsPage {...props} />);
+	render(<AdminSettingsPage {...props} />);
 	return { props };
 }
 

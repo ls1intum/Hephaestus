@@ -41,12 +41,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Unit coverage for the job-execution template: the one-active-job guard, outcome mapping
- * (success/cancel/failure), zombie reaping (both the full sweep and the inline per-connection reap),
- * retention pruning, and the lease-heartbeat cancel-flag refresh. Follows {@code AgentJobServiceTest}'s
- * pattern of making the mocked {@link TransactionTemplate} actually invoke its callback.
- */
 class SyncJobServiceTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
@@ -88,7 +82,6 @@ class SyncJobServiceTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
-        // Workspace is a guarded owned-entity (NoMockingOwnedEntitiesTest) — build the real object.
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         connection = mock(Connection.class);
@@ -100,7 +93,6 @@ class SyncJobServiceTest extends BaseUnitTest {
             .when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WORKSPACE_ID))
             .thenReturn(Optional.of(connection));
 
-        // No abandoned jobs by default; individual tests override as needed.
         lenient().when(syncJobRepository.findAbandonedForConnection(anyLong(), anyLong())).thenReturn(List.of());
         lenient().when(syncJobRepository.findAbandoned(anyLong())).thenReturn(List.of());
         lenient()
@@ -201,8 +193,6 @@ class SyncJobServiceTest extends BaseUnitTest {
         return job;
     }
 
-    // --- one-active-job guard ---
-
     @Test
     void beginJob_connectionAlreadyHasActiveJob_throwsConflictCarryingThatJob() {
         SyncJob active = newJob(5L, SyncJobStatus.RUNNING);
@@ -259,7 +249,6 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJob abandoned = newJob(7L, SyncJobStatus.RUNNING);
         when(syncJobRepository.findAbandonedForConnection(CONNECTION_ID, 900)).thenReturn(List.of(abandoned));
         when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
-        // After the reap, the guard-check query sees no more active jobs.
         when(
             syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
                 CONNECTION_ID,
@@ -292,8 +281,6 @@ class SyncJobServiceTest extends BaseUnitTest {
             DataIntegrityViolationException.class
         );
     }
-
-    // --- outcome mapping ---
 
     @Test
     void executeBody_normalReturn_marksSucceeded() {
@@ -394,7 +381,6 @@ class SyncJobServiceTest extends BaseUnitTest {
         service.executeBody(started, handle -> {
             started.handle().refreshCancellation(true);
             assertThat(handle.isCancellationRequested()).isTrue();
-            // A runner that actually stops in response to the flag reports it — only then is the job CANCELLED.
             handle.reportCancelled();
         });
 
@@ -405,8 +391,6 @@ class SyncJobServiceTest extends BaseUnitTest {
     void executeBody_cancellationSeenButBodyReturnsWithoutReporting_marksSucceeded() {
         SyncJobService.Started started = beginTestJob();
 
-        // The flag is set and observed, but the body finishes its work normally without reportCancelled():
-        // the job is SUCCEEDED, not falsely CANCELLED (the mislabel fix).
         service.executeBody(started, handle -> {
             started.handle().refreshCancellation(true);
             assertThat(handle.isCancellationRequested()).isTrue();
@@ -471,7 +455,6 @@ class SyncJobServiceTest extends BaseUnitTest {
 
     @Test
     void executeBody_rowReapedTerminalBeforeDispatch_neitherResurrectsNorOverwrites() {
-        // The zombie sweep flipped this row to FAILED after beginJob but before the async body ran.
         SyncJobService.Started started = beginTestJob();
         started.job().setStatus(SyncJobStatus.FAILED);
         java.util.concurrent.atomic.AtomicBoolean bodyInvoked = new java.util.concurrent.atomic.AtomicBoolean();
@@ -487,14 +470,11 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJobService.Started started = beginTestJob();
 
         service.executeBody(started, handle -> {
-            // Simulate the zombie sweep marking this RUNNING row abandoned (FAILED) mid-flight.
             started.job().setStatus(SyncJobStatus.FAILED);
         });
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
     }
-
-    // --- zombie reaping ---
 
     @Test
     void reapAbandonedJobs_findsAndFailsStaleRunningJobs() {
@@ -566,8 +546,6 @@ class SyncJobServiceTest extends BaseUnitTest {
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
     }
 
-    // --- lease heartbeat / cancel-flag refresh ---
-
     @Test
     void refreshLeases_touchesHeartbeatAndRefreshesRegisteredHandlesCancelFlag() {
         SyncJobService.Started started = beginTestJob();
@@ -610,8 +588,6 @@ class SyncJobServiceTest extends BaseUnitTest {
         verify(syncJobRepository, never()).touchHeartbeat(any());
     }
 
-    // --- cooperative cancel request ---
-
     @Test
     void requestCancel_pendingJob_flipsFlagViaTargetedUpdateWithoutTouchingAnyHandle() {
         SyncJobService.Started started = beginTestJob(); // PENDING: no in-JVM handle registered yet
@@ -621,7 +597,6 @@ class SyncJobServiceTest extends BaseUnitTest {
 
         service.requestCancel(WORKSPACE_ID, jobId);
 
-        // Targeted flag-only UPDATE; a PENDING job has no registered handle, so nothing local is refreshed.
         verify(syncJobRepository).markCancelRequested(jobId, SyncJobStatus.ACTIVE);
         assertThat(started.handle().isCancellationRequested()).isFalse();
     }

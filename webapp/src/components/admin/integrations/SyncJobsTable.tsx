@@ -41,7 +41,6 @@ export interface SyncJobsTableProps {
 	isError?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
-	/** Zero-based current page, total page count, and a setter — omit to render without a footer. */
 	page?: number;
 	totalPages?: number;
 	onPageChange?: (page: number) => void;
@@ -69,11 +68,6 @@ function formatItems(job: SyncJob): string {
 	return "–";
 }
 
-/**
- * Paged job-history table shared across every integration detail page (GitHub/GitLab, Slack,
- * Outline). Status/type/trigger are integration-agnostic enums, so this table needs no per-kind
- * variant — only the data feeding it differs.
- */
 export function SyncJobsTable({
 	jobs,
 	isLoading = false,

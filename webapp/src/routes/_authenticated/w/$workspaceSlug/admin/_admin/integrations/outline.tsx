@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { listConnectionSyncJobsOptions, listOptions } from "@/api/@tanstack/react-query.gen";
-import { AdminOutlineSettings } from "@/components/admin/integrations/AdminOutlineSettings";
+import { listConnectionSyncJobsOptions } from "@/api/@tanstack/react-query.gen";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
+import { OutlineIntegrationContent } from "@/components/admin/integrations/OutlineIntegrationContent";
 import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { OutlineIcon } from "@/components/icons/brand";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/integrations/outline",
@@ -21,16 +24,8 @@ function OutlineIntegrationPage() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const [jobsPage, setJobsPage] = useState(0);
-
-	// Shares the cache key with `AdminOutlineSettings`' own `listOptions` fetch — no duplicate
-	// network call — just to resolve the connection id for the job-history table below.
-	const { data: connections } = useQuery({
-		...listOptions({ path: { workspaceSlug: slug } }),
-		enabled: Boolean(workspaceSlug),
-	});
-	const connectionId = connections?.find(
-		(connection) => connection.kind === "OUTLINE" && connection.state === "ACTIVE",
-	)?.id;
+	const outline = useOutlineIntegration(slug);
+	const connectionId = outline.connectionId;
 
 	const {
 		data: jobsPageData,
@@ -55,7 +50,38 @@ function OutlineIntegrationPage() {
 				description="Mirror Outline collections so their documents reach practice detection as context."
 			/>
 
-			{workspaceSlug != null && <AdminOutlineSettings workspaceSlug={slug} />}
+			{workspaceSlug != null && outline.isLoading && <Skeleton className="h-48 w-full" />}
+
+			{workspaceSlug != null && outline.connectionsError && (
+				<QueryErrorAlert
+					error={outline.connectionsError}
+					title="We couldn't load the Outline connection"
+					onRetry={outline.retryConnections}
+				/>
+			)}
+
+			{workspaceSlug != null && !outline.isLoading && !outline.connectionsError && (
+				<>
+					{outline.statusError && (
+						<QueryErrorAlert
+							error={outline.statusError}
+							title="We couldn't load Outline sync status"
+							onRetry={outline.retryStatus}
+						/>
+					)}
+					{outline.tokenStatusError && (
+						<QueryErrorAlert
+							error={outline.tokenStatusError}
+							title="We couldn't verify the Outline token"
+							onRetry={outline.retryTokenStatus}
+						/>
+					)}
+					<OutlineIntegrationContent
+						connectCardProps={outline.connectCardProps}
+						collectionsProps={outline.collectionsProps}
+					/>
+				</>
+			)}
 
 			{connectionId != null && (
 				<Card>

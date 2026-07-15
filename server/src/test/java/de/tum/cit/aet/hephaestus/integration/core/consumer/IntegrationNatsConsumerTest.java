@@ -115,12 +115,6 @@ class IntegrationNatsConsumerTest {
         }
     }
 
-    /**
-     * {@code handleMessage}'s post-dispatch hook into {@link ConnectionActivityRecorder}: it must fire
-     * exactly when a handler actually handled the message and a workspace scope is known, and must never
-     * touch the recorder otherwise (unmatched subject, or the installation-wide consumer's {@code null}
-     * scope).
-     */
     @Nested
     class ActivityRecorderHook {
 
@@ -153,7 +147,6 @@ class IntegrationNatsConsumerTest {
         }
 
         @Test
-        @DisplayName("records activity when a handler handles the message and a workspace scope is known")
         void recordsActivityOnHandledMessageWithScope() {
             consumer = newConsumer();
             IntegrationMessageHandler handler = mock(IntegrationMessageHandler.class);
@@ -169,7 +162,6 @@ class IntegrationNatsConsumerTest {
         }
 
         @Test
-        @DisplayName("skips the recorder when the subject has no matching handler (ACK-as-no-op)")
         void skipsRecorderWhenUnmatched() {
             consumer = newConsumer();
             when(dispatcher.dispatch("github.acme.repo.issues")).thenReturn(Optional.empty());
@@ -181,7 +173,6 @@ class IntegrationNatsConsumerTest {
         }
 
         @Test
-        @DisplayName("skips the recorder for the installation-wide consumer (null scope)")
         void skipsRecorderWhenScopeIsNull() {
             consumer = newConsumer();
             IntegrationMessageHandler handler = mock(IntegrationMessageHandler.class);

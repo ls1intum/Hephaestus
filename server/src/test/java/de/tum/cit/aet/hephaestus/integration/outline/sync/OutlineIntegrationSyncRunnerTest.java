@@ -14,12 +14,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * {@link OutlineIntegrationSyncRunner} is the manual-trigger body {@code SyncStatusService} dispatches by
- * {@link IntegrationKind} — it must delegate to the exact same workspace pass the old (now-absorbed)
- * {@code POST /connections/outline/sync} ran, and must NOT itself create another sync job (the job that
- * invoked it already exists and is RUNNING).
- */
 class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
 
     private static final long WORKSPACE = 7L;
@@ -44,7 +38,6 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
         runner.reconcile(ref, handle);
 
         verify(syncScheduler).syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
-        // Completed without cancellation — must not be labeled cancelled.
         verify(handle, never()).reportCancelled();
     }
 

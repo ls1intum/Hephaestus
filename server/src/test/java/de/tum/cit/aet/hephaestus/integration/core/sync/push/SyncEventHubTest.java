@@ -23,11 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Focused coverage for the SSE fan-out hub: subscribe/publish/deregister-on-error, the
- * trailing-edge coalescer, and the heartbeat. Follows {@code MentorSseChannelTest}'s pattern of a
- * subclassed {@link SseEmitter} that records wire frames instead of writing to a real socket.
- */
 class SyncEventHubTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -71,11 +66,8 @@ class SyncEventHubTest extends BaseUnitTest {
     @Test
     void publish_toWorkspaceWithNoSubscribers_isNoop() {
         hub = newHub(Duration.ofMillis(10));
-        // No subscribe() call for this workspace.
         hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
 
-        // Nothing to assert on directly; the important thing is this doesn't throw. Give the
-        // coalesce window time to elapse so a latent NPE on an absent-subscriber path would surface.
         await()
             .during(Duration.ofMillis(100))
             .atMost(Duration.ofSeconds(1))
@@ -124,9 +116,6 @@ class SyncEventHubTest extends BaseUnitTest {
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(emitter.dataFrames()).hasSize(1));
-        // Three publishes on the same (workspace, connection, scope) key collapse to a single trailing
-        // delivery — hints carry no payload beyond that key, so the coalesced frames are identical and
-        // only one lands (a leading-edge coalescer would instead emit on the first and drop the rest).
         assertThat(emitter.dataFrames().get(0)).contains("\"scope\":\"job\"");
     }
 
@@ -178,8 +167,6 @@ class SyncEventHubTest extends BaseUnitTest {
             .during(Duration.ofMillis(200))
             .atMost(Duration.ofSeconds(1))
             .until(() -> true);
-        // The initial ":connected" flush is expected; the point is that no heartbeat ping is sent
-        // to a deregistered subscriber.
         assertThat(emitter.comments()).doesNotContain("ping");
     }
 
@@ -202,7 +189,6 @@ class SyncEventHubTest extends BaseUnitTest {
         hub.subscribe(WORKSPACE_ID);
         RecordingEmitter emitter = createdEmitters.get(0);
 
-        // Synchronous on subscribe — no await needed; fires EventSource.onopen right away.
         assertThat(emitter.comments()).containsExactly("connected");
         assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(1);
     }
@@ -275,7 +261,6 @@ class SyncEventHubTest extends BaseUnitTest {
         return meters.get(name).tag(tag, value).counter().count();
     }
 
-    /** Test-only emitter that records data/comment frames + can simulate a socket failure. */
     private static final class RecordingEmitter extends SseEmitter {
 
         private final List<String> dataFrames = new ArrayList<>();
@@ -329,14 +314,10 @@ class SyncEventHubTest extends BaseUnitTest {
         }
 
         @Override
-        public void onTimeout(Runnable callback) {
-            // Not exercised by these tests.
-        }
+        public void onTimeout(Runnable callback) {}
 
         @Override
-        public void onError(Consumer<Throwable> callback) {
-            // Not exercised by these tests.
-        }
+        public void onError(Consumer<Throwable> callback) {}
 
         void fireCompletion() {
             Runnable callback = completionCallback.get();

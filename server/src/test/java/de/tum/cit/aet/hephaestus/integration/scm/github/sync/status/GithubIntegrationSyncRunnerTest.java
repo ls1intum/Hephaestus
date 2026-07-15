@@ -29,9 +29,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Unit tests for {@link GithubIntegrationSyncRunner} reconciliation and backfill behavior.
- */
 class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
@@ -156,7 +153,6 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             verify(backfillService).runBackfillBatch(eq(targetA), eq(50));
             verify(backfillService).runBackfillBatch(eq(targetB), eq(50));
             verify(handle, times(2)).progress(any(), isNull(), any());
-            // Completed naturally (no pending repos left) — not a cancellation.
             verify(handle, never()).reportCancelled();
         }
 
@@ -178,7 +174,6 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             verify(backfillService).runBackfillBatch(eq(targetA), anyInt());
             verify(backfillService, never()).runBackfillBatch(eq(targetB), anyInt());
             verify(backfillService, never()).runBackfillBatch(eq(targetC), anyInt());
-            // Aborted on a cancel checkpoint — the job must finalize CANCELLED, not SUCCEEDED.
             verify(handle).reportCancelled();
         }
 
@@ -199,7 +194,6 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             SyncTarget targetB = pendingTarget(2L, "acme/repo-b");
             when(syncTargetProvider.getSyncTargetsForScope(WORKSPACE_ID)).thenReturn(List.of(targetA, targetB));
             when(handle.isCancellationRequested()).thenReturn(false);
-            // Every repo skipped this pass (cooldown / rate limit) — no work performed anywhere.
             when(backfillService.runBackfillBatch(any(), anyInt())).thenReturn(false);
 
             runner.backfill(ref, handle);

@@ -27,20 +27,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
-/**
- * Slack's {@link ConnectionSyncStateProvider}: read-only, {@code O(DB + in-memory)} projection over
- * already-persisted state — never a live Slack API call.
- *
- * <p>Rate limit is always {@code null}: unlike GitHub/GitLab, Slack does not surface per-call
- * remaining/reset headers we track — the budget is a static, configured request ceiling
- * ({@link SlackSyncProperties#historyRequestBudget()}) the sync self-paces against, not a live
- * vendor-reported number. There is nothing to snapshot.
- *
- * <p>Backfill is always {@code null}: Slack's history sync is forward-only by design (the consent
- * floor is {@code max(consent_announced_at, retention cutoff, last watermark)} — see
- * {@code SlackChannelHistorySyncService}) and deliberately never replays pre-consent history. A
- * connection-level "how far back have we gone" rollup does not apply.
- */
+/** Read-only Slack sync state built without vendor API calls. */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProvider {
@@ -75,20 +62,12 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             .map(state -> state == IntegrationState.ACTIVE ? Boolean.TRUE : null)
             .orElse(null);
 
-        return new ConnectionSyncDetails(
-            webhookRegistered,
-            nextScheduledSyncAt(),
-            null, // rateLimit — see class javadoc
-            null, // backfill — see class javadoc
-            false,
-            null
-        );
+        return new ConnectionSyncDetails(webhookRegistered, nextScheduledSyncAt(), null, null, false, null);
     }
 
     @Override
     public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
         long workspaceId = ref.workspaceId();
-        // Single grouped count for the workspace's channels (one query) instead of one count per channel.
         Map<String, Long> itemCountByChannelId = messageRepository
             .countGroupedByChannelId(workspaceId)
             .stream()
@@ -117,17 +96,13 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             channel.getConsentState().name(),
             toInstant(channel.getLastHistorySyncedTs()),
             itemCount,
-            null, // upstreamCount — no cheap vendor count available without a live API call
-            null, // lastError — per-resource error tracking not modeled for Slack in v1
+            null,
+            null,
             null,
             null
         );
     }
 
-    /**
-     * Next fire time of {@code hephaestus.sync.slack.cron}, computed in the server's default zone — the
-     * same zone {@code @Scheduled(cron = ...)} uses when no explicit zone is configured.
-     */
     private @Nullable Instant nextScheduledSyncAt() {
         String cron = properties.cron();
         if (!CronExpression.isValidExpression(cron)) {

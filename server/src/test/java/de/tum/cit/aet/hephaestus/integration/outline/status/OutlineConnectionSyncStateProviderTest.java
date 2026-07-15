@@ -24,11 +24,6 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Mapping coverage for {@link OutlineConnectionSyncStateProvider} — the read model that replaced
- * {@code OutlineConnectionAdminService.status()} in the unified sync-observability API. Both methods must
- * stay O(DB + in-memory): nothing here talks to {@code OutlineApiClient}.
- */
 class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private static final long WORKSPACE = 7L;
@@ -72,7 +67,6 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         ConnectionSyncDetails details = provider().describe(REF, CONNECTION_ID);
 
         assertThat(details.webhookRegistered()).isTrue();
-        // Outline is a full-reconcile model — no separate backfill or rate-limit tracking.
         assertThat(details.backfill()).isNull();
         assertThat(details.rateLimit()).isNull();
         assertThat(details.vendorHealthDegraded()).isFalse();
@@ -90,7 +84,6 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
 
     @Test
     void describe_connectionMissing_webhookRegisteredIsNullNotFalse() {
-        // Unknown, not "confirmed absent" — the connection row vanished between calls.
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.empty());
 
         assertThat(provider().describe(REF, CONNECTION_ID).webhookRegistered()).isNull();
@@ -147,7 +140,6 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         assertThat(resource.itemCount()).isEqualTo(9L);
         assertThat(resource.upstreamCount()).isEqualTo(12L);
         assertThat(resource.lastError()).isNull();
-        // No backfill concept for Outline.
         assertThat(resource.backfillCompletedThrough()).isNull();
         assertThat(resource.backfillPercent()).isNull();
     }

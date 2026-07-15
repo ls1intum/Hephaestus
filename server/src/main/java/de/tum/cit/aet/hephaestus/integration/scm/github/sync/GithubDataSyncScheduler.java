@@ -9,13 +9,13 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncStatistics;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
@@ -278,7 +278,7 @@ public class GithubDataSyncScheduler {
     }
 
     /** Run the same warning-aware body used by the scheduled path for one manual job. */
-    public void syncWorkspaceNow(long workspaceId, SyncJobHandle handle) {
+    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle) {
         SyncSession session = syncTargetProvider
             .getSyncSessions(IntegrationKind.GITHUB)
             .stream()
@@ -335,11 +335,11 @@ public class GithubDataSyncScheduler {
 
     /**
      * Runs one scope's full sync. When invoked through a {@link SyncJobService} job the caller passes the
-     * live {@link SyncJobHandle} so this body reports coarse repos-done/repos-total progress and honors a
+     * live {@link SyncExecutionHandle} so this body reports coarse repos-done/repos-total progress and honors a
      * cooperative cancel between repositories — parity with the manual "Sync now" runner. The unrecorded
      * fallback (no ACTIVE connection) passes {@code null} and simply runs to completion.
      */
-    private void runScopeSyncBody(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void runScopeSyncBody(SyncSession session, @Nullable SyncExecutionHandle handle) {
         try {
             // Set context for logging and isolation
             syncContextProvider.setContext(session.syncContext());
@@ -488,7 +488,7 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    private void syncSubIssues(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncSubIssues(SyncSession session, @Nullable SyncExecutionHandle handle) {
         try {
             log.debug("Starting sub-issues sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             subIssueSyncService.syncSubIssuesForScope(session.scopeId());
@@ -500,7 +500,7 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    private void syncTeams(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncTeams(SyncSession session, @Nullable SyncExecutionHandle handle) {
         String accountLogin = session.accountLogin();
         if (accountLogin == null || accountLogin.isBlank()) {
             log.debug("Skipped team sync: reason=noAccountLogin, scopeId={}", session.scopeId());
@@ -547,7 +547,7 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    private void syncIssueTypes(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncIssueTypes(SyncSession session, @Nullable SyncExecutionHandle handle) {
         try {
             log.debug("Starting issue types sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             issueTypeSyncService.syncIssueTypesForScope(session.scopeId());
@@ -559,7 +559,7 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    private void syncIssueDependencies(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncIssueDependencies(SyncSession session, @Nullable SyncExecutionHandle handle) {
         // NOTE (Dec 2025): issue_dependencies webhook is STILL NOT AVAILABLE
         // (GitHub shipped UI without API/webhook - see Discussion #165749)
         // GraphQL bulk sync is currently the ONLY way to get dependency data
@@ -579,7 +579,7 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    private void syncProjects(SyncSession session, @Nullable SyncJobHandle handle) {
+    private void syncProjects(SyncSession session, @Nullable SyncExecutionHandle handle) {
         String safeAccountLogin = sanitizeForLog(session.accountLogin());
         try {
             log.debug(
@@ -669,7 +669,7 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    private static void reportWarning(@Nullable SyncJobHandle handle) {
+    private static void reportWarning(@Nullable SyncExecutionHandle handle) {
         if (handle != null) {
             handle.reportWarnings();
         }

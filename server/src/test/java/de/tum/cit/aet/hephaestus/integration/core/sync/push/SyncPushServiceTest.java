@@ -25,12 +25,6 @@ import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Unit coverage for the {@code SyncStateChangedEvent} → {@link SyncEventHub} bridge: the
- * NATS-absent in-process fallback, the NATS-present publish path, and the inbound-message handler
- * that is the ONLY path allowed to deliver locally when NATS is available (never double-delivered
- * from the publish side — see class javadoc on {@link SyncPushService}).
- */
 class SyncPushServiceTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 42L;
@@ -76,7 +70,6 @@ class SyncPushServiceTest extends BaseUnitTest {
     void withoutNats_neverTouchesNatsConnection() {
         ObjectProvider<Connection> provider = objectProviderReturning(null);
         new SyncPushService(hub, MAPPER, provider, meters);
-        // Constructor must not attempt to create a dispatcher when the connection is absent/null.
         verify(connection, never()).createDispatcher(any(MessageHandler.class));
     }
 
@@ -115,7 +108,6 @@ class SyncPushServiceTest extends BaseUnitTest {
         assertThat(published.scope()).isEqualTo("job");
         assertThat(published.connectionId()).isEqualTo(CONNECTION_ID);
 
-        // The origin replica must NOT also deliver locally — only the NATS subscription does.
         verify(hub, never()).publish(any(Long.class), any(SyncEventHint.class));
         assertThat(pushCounter("nats_publish", "success")).isEqualTo(1.0);
     }

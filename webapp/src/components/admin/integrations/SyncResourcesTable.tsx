@@ -30,16 +30,9 @@ export interface SyncResourcesTableProps {
 	isError?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
-	/** What one row represents, for the empty-state copy ("repository", "channel", "collection"). */
 	resourceNoun?: string;
 }
 
-/**
- * Generic read-model table for the unified sync resources endpoint (repos / channels /
- * collections). Used as-is by the SCM detail page; Slack and Outline keep their own bespoke,
- * richer tables (consent lifecycle, collection actions) per the design's "resource tables stay
- * bespoke, share cells" call.
- */
 export function SyncResourcesTable({
 	resources,
 	isLoading = false,

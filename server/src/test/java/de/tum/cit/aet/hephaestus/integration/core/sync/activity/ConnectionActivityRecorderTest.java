@@ -34,11 +34,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Unit coverage for {@link ConnectionActivityRecorder}: the write-throttle window, the
- * no-active-connection no-op, and the {@code (workspaceId, kind) -> connectionId} cache
- * invalidation path.
- */
 class ConnectionActivityRecorderTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
@@ -150,7 +145,6 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
             IntegrationState.ACTIVE
         );
 
-        // Reconnect: the workspace's GitHub connection changed to a new row.
         recorder.invalidate(WORKSPACE_ID, IntegrationKind.GITHUB);
         stubActiveConnection(WORKSPACE_ID, IntegrationKind.GITHUB, OTHER_CONNECTION_ID);
         clock.advance(Duration.ofSeconds(16)); // past the throttle window so the write isn't swallowed
@@ -174,7 +168,6 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
 
     @Test
     void invalidate_withoutPriorResolution_isANoOp() {
-        // Must not throw even though nothing was ever cached for this key.
         recorder.invalidate(WORKSPACE_ID, IntegrationKind.SLACK);
     }
 

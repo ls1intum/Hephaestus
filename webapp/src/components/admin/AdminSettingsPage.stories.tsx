@@ -36,7 +36,6 @@ export const ResettingLeagues: Story = {
 	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },
 };
 
-/** Practice Review on with auto-trigger only — exercises the nested sub-toggle layout. */
 export const PracticeReviewWithSubToggles: Story = {
 	args: {
 		features: {
@@ -48,7 +47,6 @@ export const PracticeReviewWithSubToggles: Story = {
 	},
 };
 
-/** Leagues enabled — pins that the reset-leagues card renders within the page. */
 export const LeaguesEnabled: Story = {
 	args: { features: { ...allOff, leaguesEnabled: true } },
 };

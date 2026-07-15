@@ -69,14 +69,6 @@ public class ConnectionActivity {
         this.lastEventType = lastEventType;
     }
 
-    public Long getConnectionId() {
-        return connectionId;
-    }
-
-    public Long getWorkspaceId() {
-        return workspaceId;
-    }
-
     @Nullable
     public Instant getLastEventAt() {
         return lastEventAt;

@@ -299,14 +299,16 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         SyncJobDTO created = duplicateJobDuringRun(adminToken);
 
         webTestClient
-            .post()
+            .patch()
             .uri(
-                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}/cancel",
+                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
                 workspace.getWorkspaceSlug(),
                 connection.getId(),
                 created.id()
             )
             .headers(h -> h.setBearerAuth(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"cancelRequested\":true}")
             .exchange()
             .expectStatus()
             .isEqualTo(HttpStatus.ACCEPTED);
@@ -323,6 +325,27 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(status.activeJob()).isNull();
         assertThat(status.lastJob()).isNotNull();
         assertThat(status.lastJob().status()).isEqualTo(SyncJobStatus.CANCELLED);
+    }
+
+    @Test
+    @WithAdminUser
+    void updateJob_withoutCancellationRequest_returns400() {
+        ensureAdminMembership(workspace);
+
+        webTestClient
+            .patch()
+            .uri(
+                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                workspace.getWorkspaceSlug(),
+                connection.getId(),
+                1L
+            )
+            .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"cancelRequested\":false}")
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
     }
 
     @Test

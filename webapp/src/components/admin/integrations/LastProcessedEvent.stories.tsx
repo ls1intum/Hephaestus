@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { WebhookLivenessIndicator } from "./WebhookLivenessIndicator";
+import { LastProcessedEvent } from "./LastProcessedEvent";
 
 const meta = {
-	component: WebhookLivenessIndicator,
+	component: LastProcessedEvent,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
-} satisfies Meta<typeof WebhookLivenessIndicator>;
+} satisfies Meta<typeof LastProcessedEvent>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

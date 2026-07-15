@@ -51,14 +51,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-/**
- * Unit tests for {@link GithubDataSyncScheduler}'s job-recording wrapper around the daily cron's
- * per-scope sync: a scope with an ACTIVE GitHub connection records a
- * {@code RECONCILIATION}/{@code SCHEDULED} {@link SyncJobService} job and actually runs the sync
- * body through it; a {@link SyncJobConflictException} (manual sync already active) skips the scope
- * for this tick instead of propagating; a scope with no ACTIVE connection falls back to the
- * unrecorded sync.
- */
 class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
@@ -199,7 +191,6 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
                 ),
                 any()
             );
-            // Proves the body actually ran through the job template, not just that run() was called.
             verify(issueTypeSyncService).syncIssueTypesForScope(WORKSPACE_ID);
         }
     }

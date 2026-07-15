@@ -2,12 +2,16 @@ import { expect, loginAsDevAdmin, test } from "./fixtures";
 
 const LIVE_ENABLED = process.env.LIVE_INTEGRATION_E2E === "true";
 const MUTATIONS_ENABLED = process.env.E2E_MUTATE_LIVE_INTEGRATIONS === "true";
-const USERNAME = process.env.E2E_LIVE_USERNAME ?? "felix-e2e";
-const GITHUB_WORKSPACE = process.env.E2E_GITHUB_WORKSPACE ?? "hephaestustest";
-const GITLAB_WORKSPACE = process.env.E2E_GITLAB_WORKSPACE ?? "heph-gitlab";
+const USERNAME = process.env.E2E_LIVE_USERNAME ?? "";
+const GITHUB_WORKSPACE = process.env.E2E_GITHUB_WORKSPACE ?? "";
+const GITLAB_WORKSPACE = process.env.E2E_GITLAB_WORKSPACE ?? "";
+const LIVE_CONFIGURED = Boolean(USERNAME && GITHUB_WORKSPACE && GITLAB_WORKSPACE);
 
 test.describe("live integration operations", () => {
-	test.skip(!LIVE_ENABLED, "set LIVE_INTEGRATION_E2E=true to test configured provider accounts");
+	test.skip(
+		!LIVE_ENABLED || !LIVE_CONFIGURED,
+		"set LIVE_INTEGRATION_E2E, E2E_LIVE_USERNAME, E2E_GITHUB_WORKSPACE, and E2E_GITLAB_WORKSPACE",
+	);
 
 	test("GitHub catalog is workspace-specific and opens the live event stream", async ({ page }) => {
 		await loginAsDevAdmin(page, USERNAME);

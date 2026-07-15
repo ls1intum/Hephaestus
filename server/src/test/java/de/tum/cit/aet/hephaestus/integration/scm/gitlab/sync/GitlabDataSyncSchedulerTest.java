@@ -46,12 +46,6 @@ import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Unit tests for {@link GitlabDataSyncScheduler}'s sync-observability job recording
- * ({@code syncScopeWithJobRecording}): a scope with an ACTIVE GitLab connection wraps its sync in
- * {@link SyncJobService#run}; a scope without one falls back to running unrecorded; a
- * {@link SyncJobConflictException} (already an active job) skips the scope without failing the cron.
- */
 @Tag("unit")
 class GitlabDataSyncSchedulerTest extends BaseUnitTest {
 
@@ -197,8 +191,6 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
 
         scheduler.syncDataCron();
 
-        // The body ran syncScope, which called out to the (null) sync service holder — proving the
-        // actual sync body executed inside the job template rather than being skipped.
         verify(syncServiceHolderProvider).getIfAvailable();
         verify(syncContextProvider).setContext(any());
         verify(syncContextProvider).clearContext();
@@ -234,7 +226,6 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
 
         assertThatCode(() -> scheduler.syncDataCron()).doesNotThrowAnyException();
 
-        // The conflict short-circuits before the body runs — the sync pipeline was never touched.
         verify(syncServiceHolderProvider, never()).getIfAvailable();
     }
 

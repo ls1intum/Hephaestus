@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import java.util.List;
@@ -48,7 +48,7 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
 
     /** The same warning-aware body the daily scheduler uses, threaded with the job handle. */
     @Override
-    public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
+    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle) {
         dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
@@ -68,7 +68,7 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
      * cancellation instead of the scheduler's fire-and-forget cadence.
      */
     @Override
-    public void backfill(IntegrationRef ref, SyncJobHandle handle) {
+    public void backfill(IntegrationRef ref, SyncExecutionHandle handle) {
         long workspaceId = ref.workspaceId();
         int batchSize = syncSchedulerProperties.backfill().batchSize();
         int batchesRun = 0;

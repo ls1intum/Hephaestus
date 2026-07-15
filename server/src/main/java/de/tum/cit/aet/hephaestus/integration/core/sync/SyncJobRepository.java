@@ -19,7 +19,6 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
     /** Job history page. Callers supply the sort (see {@code SyncStatusService}, {@code createdAt} desc). */
     Page<SyncJob> findByConnection_IdAndWorkspace_Id(long connectionId, long workspaceId, Pageable pageable);
 
-    /** Every sync job across a workspace's connections — the workspace-wide alternative to the per-connection page above. */
     Page<SyncJob> findByWorkspace_Id(long workspaceId, Pageable pageable);
 
     /** The one-active-job guard's read: present result means the connection already has a job in flight. */

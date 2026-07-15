@@ -9,12 +9,12 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -522,7 +522,7 @@ public class GithubDataSyncService {
     }
 
     /**
-     * Same as {@link #syncAllRepositories(Long)}, additionally threading a {@link SyncJobHandle} for
+     * Same as {@link #syncAllRepositories(Long)}, additionally threading a {@link SyncExecutionHandle} for
      * the manual "reconcile now" sync-job path ({@code GithubIntegrationSyncRunner}): cooperative
      * cancellation is checked between repositories (and inside the rate-limit wait, in bounded
      * slices — see {@link #waitForRateLimitReset(Long, BooleanSupplier)}), and coarse
@@ -532,7 +532,7 @@ public class GithubDataSyncService {
      * @param handle  the live job handle, or {@code null} for the untracked scheduled/lifecycle paths
      *                (unchanged behavior — no cancellation checks, no progress reporting)
      */
-    public void syncAllRepositories(Long scopeId, @Nullable SyncJobHandle handle) {
+    public void syncAllRepositories(Long scopeId, @Nullable SyncExecutionHandle handle) {
         // Fail-fast for suspended installations - don't spawn ANY threads
         Long installationId = tokenProvider.getInstallationId(scopeId).orElse(null);
         if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
@@ -589,7 +589,7 @@ public class GithubDataSyncService {
             int reposProcessed = 0;
             for (SyncTarget target : syncTargets) {
                 // Cooperative cancel for the manual "reconcile now" sync-job path — best-effort,
-                // checked between repositories only (see class-level SyncJobHandle javadoc).
+                // checked between repositories only (see class-level SyncExecutionHandle javadoc).
                 if (handle != null && handle.isCancellationRequested()) {
                     log.info(
                         "Aborting remaining syncs: reason=cancellationRequested, scopeId={}, reposProcessed={}, reposRemaining={}",

@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-	cancelConnectionSyncJobMutation,
 	getConnectionSyncStatusOptions,
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogOptions,
@@ -15,6 +13,7 @@ import {
 	listSlackChannelsOptions,
 	registerSlackChannelMutation,
 	triggerSyncJobMutation,
+	updateConnectionSyncJobMutation,
 	updateSlackChannelConsentMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { SlackConsentState } from "@/components/admin/integrations/AdminSlackChannelsSettings";
@@ -22,13 +21,10 @@ import { AdminSlackChannelsSettings } from "@/components/admin/integrations/Admi
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
 import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
+import { SlackSyncStatusCard } from "@/components/admin/integrations/SlackSyncStatusCard";
 import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
-import { SyncNowButton } from "@/components/admin/integrations/SyncNowButton";
-import { asDate } from "@/components/admin/integrations/sync-format";
-import { WebhookLivenessIndicator } from "@/components/admin/integrations/WebhookLivenessIndicator";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -63,7 +59,8 @@ function SlackIntegrationPage() {
 	const catalog = catalogQuery.data;
 	const entry = catalog?.find((e) => e.kind === "SLACK");
 	const hasConnection = entry?.connected === true;
-	const connected = entry?.connectionState === "ACTIVE" && workspaceData?.hasSlackToken === true;
+	const isConnectionActive =
+		entry?.connectionState === "ACTIVE" && workspaceData?.hasSlackToken === true;
 	const connectionId = hasConnection ? entry.connectionId : undefined;
 
 	const statusQuery = useQuery({
@@ -174,7 +171,7 @@ function SlackIntegrationPage() {
 	});
 
 	const cancelJob = useMutation({
-		...cancelConnectionSyncJobMutation(),
+		...updateConnectionSyncJobMutation(),
 		onSuccess: () => {
 			if (connectionId == null) return;
 			queryClient.invalidateQueries({
@@ -227,7 +224,7 @@ function SlackIntegrationPage() {
 				/>
 			)}
 
-			{!routeLoading && !routeError && hasConnection && !connected && (
+			{!routeLoading && !routeError && hasConnection && !isConnectionActive && (
 				<p className="text-muted-foreground text-sm">
 					Slack is {entry?.connectionState?.toLowerCase()}. Sync controls are available only while
 					it is active.
@@ -235,58 +232,34 @@ function SlackIntegrationPage() {
 			)}
 
 			{!routeLoading && !routeError && status && (
-				<Card>
-					<CardHeader>
-						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-							Sync status
-						</h2>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-							<span>
-								{status.lastSuccessfulSyncAt
-									? `Last synced ${formatDistanceToNow(asDate(status.lastSuccessfulSyncAt) ?? new Date(), { addSuffix: true })}`
-									: "Never synced"}
-							</span>
-							<WebhookLivenessIndicator lastEventAt={status.lastEventProcessedAt} />
-						</div>
-						{connected && (
-							<SyncNowButton
-								onClick={() => {
-									if (connectionId == null) return;
-									triggerSync.mutate({
-										path: { workspaceSlug: slug, connectionId },
-										body: { type: "RECONCILIATION" },
-									});
-								}}
-								isTriggering={triggerSync.isPending}
-								activeJob={status.activeJob}
-							/>
-						)}
-						{connected && status.activeJob && (
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={cancelJob.isPending || status.activeJob.cancelRequested}
-								onClick={() => {
-									if (connectionId == null) return;
-									cancelJob.mutate({
-										path: { workspaceSlug: slug, connectionId, jobId: status.activeJob?.id ?? -1 },
-									});
-								}}
-							>
-								{status.activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
-							</Button>
-						)}
-					</CardContent>
-				</Card>
+				<SlackSyncStatusCard
+					status={status}
+					isConnectionActive={isConnectionActive}
+					isTriggering={triggerSync.isPending}
+					isCancelling={cancelJob.isPending}
+					onSync={() => {
+						if (connectionId == null) return;
+						triggerSync.mutate({
+							path: { workspaceSlug: slug, connectionId },
+							body: { type: "RECONCILIATION" },
+						});
+					}}
+					onCancel={() => {
+						const jobId = status.activeJob?.id;
+						if (connectionId == null || jobId == null) return;
+						cancelJob.mutate({
+							path: { workspaceSlug: slug, connectionId, jobId },
+							body: { cancelRequested: true },
+						});
+					}}
+				/>
 			)}
 
 			{workspaceSlug != null && !routeLoading && !routeError && (
 				<AdminSlackNotificationSettings
 					key={`slack:${workspaceData?.slackConnectionId ?? "none"}:${workspaceData?.leaderboardNotificationChannelId ?? ""}:${workspaceData?.leaderboardNotificationEnabled ?? false}:${workspaceData?.leaderboardScheduleDay ?? ""}:${workspaceData?.leaderboardScheduleTime ?? ""}:${workspaceData?.leaderboardNotificationTeam ?? ""}`}
 					workspaceSlug={slug}
-					hasSlackConnection={connected}
+					hasSlackConnection={isConnectionActive}
 					slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
 					channelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
 					teamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
@@ -305,11 +278,13 @@ function SlackIntegrationPage() {
 			{workspaceSlug != null && !routeLoading && !routeError && (
 				<AdminSlackChannelsSettings
 					workspaceSlug={slug}
-					hasSlackConnection={connected}
-					channels={connected ? (slackChannels ?? []) : []}
+					hasSlackConnection={isConnectionActive}
+					channels={isConnectionActive ? (slackChannels ?? []) : []}
 					channelCandidates={slackChannelCandidates ?? []}
-					isLoading={connected && (isLoadingSlackChannels || isLoadingSlackChannelCandidates)}
-					isError={connected && (isSlackChannelsError || isSlackChannelCandidatesError)}
+					isLoading={
+						isConnectionActive && (isLoadingSlackChannels || isLoadingSlackChannelCandidates)
+					}
+					isError={isConnectionActive && (isSlackChannelsError || isSlackChannelCandidatesError)}
 					onRetry={() => {
 						refetchSlackChannels();
 						refetchSlackChannelCandidates();

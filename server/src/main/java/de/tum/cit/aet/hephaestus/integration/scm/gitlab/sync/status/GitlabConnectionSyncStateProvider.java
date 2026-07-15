@@ -31,40 +31,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Component;
 
-/**
- * GitLab's {@link ConnectionSyncStateProvider}. Both methods are O(DB + in-memory) only — no
- * vendor API calls — per the SPI contract (the overview page renders every connected integration
- * on one load).
- *
- * <p><b>{@code describe()}:</b>
- * <ul>
- *   <li>{@code webhookRegistered} — "stored group webhook id present" (existence-only, mirrors
- *       {@code GitLabWebhookService}'s own health-check semantics: it re-registers when the id
- *       goes missing, so "present" is the closest cheap proxy for "should be receiving events").
- *       {@code null} when there is no active GitLab config for this workspace at all.</li>
- *   <li>{@code rateLimit} — from {@link GitLabRateLimitTracker#snapshot}; {@code null} until the
- *       first real API call since the last restart.</li>
- *   <li>{@code nextScheduledSyncAt} — derived from {@code hephaestus.sync.cron} via
- *       {@link CronExpression}, the same property {@code GitlabDataSyncScheduler} runs on.</li>
- *   <li>{@code backfill} — {@code null} in v1. GitLab has a commit backfill
- *       ({@code GitLabHistoricalBackfillService}), but it runs on its own always-on schedule and
- *       isn't rolled into a connection-level "how far back have we gone" summary yet; wiring it is
- *       out of scope for this pass.</li>
- *   <li>{@code vendorHealthDegraded} — {@code false} in v1: GitLab has no independent
- *       vendor-suspension signal analogous to GitHub's {@code InstallationSuspensionTracker}.</li>
- * </ul>
- *
- * <p><b>{@code resources()}:</b> one row per {@link RepositoryToMonitor} (GitLab sync is
- * workspace-scoped, so every monitor in the workspace belongs to this connection — there is at
- * most one ACTIVE GitLab connection per workspace). {@code state} is derived from whether the
- * repository has completed at least one full sync ({@code Repository.lastSyncAt} set); there is no
- * richer per-repo status enum today. {@code lastSyncedAt} is {@code Repository.lastSyncAt} — the
- * freshest "full repo sync done" timestamp already stamped by
- * {@code GitLabWorkspaceInitializationService}/{@code GitlabDataSyncScheduler}. {@code itemCount}
- * is the combined issue+MR count from a single grouped query
- * ({@link IssueRepository#countGroupedByRepositoryIds}) — cheap even for a connection with many
- * repositories. {@code lastError} is always {@code null}: no per-repo error tracking exists yet.
- */
+/** Read-only GitLab sync state built without vendor API calls. */
 @Component
 @ConditionalOnBean(GitLabWorkspaceInitializationService.class)
 public class GitlabConnectionSyncStateProvider implements ConnectionSyncStateProvider {

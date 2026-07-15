@@ -4,11 +4,9 @@ export interface IntegrationPageHeaderProps {
 	icon?: ReactNode;
 	title: string;
 	description?: ReactNode;
-	/** Right-aligned action slot — typically a SyncNowButton and/or a health badge. */
 	actions?: ReactNode;
 }
 
-/** Shared header for every Integrations detail page: icon + title + description, actions right-aligned. */
 export function IntegrationPageHeader({
 	icon,
 	title,

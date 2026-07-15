@@ -1,17 +1,13 @@
-// Container tests for the Outline admin surface. The container drives real generated-client
-// requests, so these tests run against MSW (see src/test/setup-msw.ts) with mutable per-test
-// state: a mutation handler flips the state the follow-up GET returns, which is exactly how
-// the container's invalidate-after-mutate contract becomes observable in the DOM.
-// jest-dom matchers and user-event are NOT set up in this repo's vitest, so assertions use
-// plain DOM (`.disabled`, `queryByRole`) and `fireEvent`.
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { server } from "@/mocks/server";
-import { AdminOutlineSettings } from "./AdminOutlineSettings";
+import { OutlineIntegrationContent } from "./OutlineIntegrationContent";
 
 vi.mock("sonner", () => ({
 	toast: { success: vi.fn(), error: vi.fn() },
@@ -23,8 +19,44 @@ function renderContainer() {
 	});
 	return render(
 		<QueryClientProvider client={queryClient}>
-			<AdminOutlineSettings workspaceSlug="demo" />
+			<OutlineIntegrationTestContainer />
 		</QueryClientProvider>,
+	);
+}
+
+function OutlineIntegrationTestContainer() {
+	const outline = useOutlineIntegration("demo");
+	if (outline.isLoading) return <Skeleton className="h-48 w-full" />;
+	if (outline.connectionsError) {
+		return (
+			<QueryErrorAlert
+				error={outline.connectionsError}
+				title="We couldn't load the Outline connection"
+				onRetry={outline.retryConnections}
+			/>
+		);
+	}
+	return (
+		<>
+			{outline.statusError && (
+				<QueryErrorAlert
+					error={outline.statusError}
+					title="We couldn't load Outline sync status"
+					onRetry={outline.retryStatus}
+				/>
+			)}
+			{outline.tokenStatusError && (
+				<QueryErrorAlert
+					error={outline.tokenStatusError}
+					title="We couldn't verify the Outline token"
+					onRetry={outline.retryTokenStatus}
+				/>
+			)}
+			<OutlineIntegrationContent
+				connectCardProps={outline.connectCardProps}
+				collectionsProps={outline.collectionsProps}
+			/>
+		</>
 	);
 }
 
@@ -50,7 +82,6 @@ const engineering = {
 	createdAt: "2026-06-01T00:00:00Z",
 };
 
-/** Unified `ConnectionSyncStatus` for the connected Outline connection (id 7). */
 const healthyStatus = {
 	connectionId: 7,
 	connectionState: "ACTIVE",
@@ -77,7 +108,6 @@ const healthyToken = {
 	lastActiveAt: "2026-07-01T00:00:00Z",
 };
 
-/** Baseline handlers for an already-connected workspace with a mutable collection list. */
 function useConnectedHandlers(collectionsRef: { current: unknown[] }) {
 	server.use(
 		http.get("*/workspaces/demo/connections", () => HttpResponse.json([activeOutlineConnection])),
@@ -93,7 +123,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-describe("AdminOutlineSettings — connect happy path", () => {
+describe("Outline integration — connect happy path", () => {
 	it("connects with server URL + token only (no allow-list field) and flips to the connected state", async () => {
 		let connections: unknown[] = [];
 		let connectBody: unknown;
@@ -157,7 +187,7 @@ describe("AdminOutlineSettings — connect happy path", () => {
 	});
 });
 
-describe("AdminOutlineSettings — add-collection round trip", () => {
+describe("Outline integration — add-collection round trip", () => {
 	it("registers a picked candidate, disables already-mirrored entries, and shows the new row", async () => {
 		const architecture = {
 			...engineering,
@@ -237,7 +267,7 @@ describe("AdminOutlineSettings — add-collection round trip", () => {
 	});
 });
 
-describe("AdminOutlineSettings — pause / resume", () => {
+describe("Outline integration — pause / resume", () => {
 	it("pauses via the row menu and reflects the refetched PAUSED state, then resumes", async () => {
 		const pausedRow = { ...engineering, state: "PAUSED" };
 		const collectionsRef = { current: [engineering] as unknown[] };
@@ -278,7 +308,7 @@ describe("AdminOutlineSettings — pause / resume", () => {
 	});
 });
 
-describe("AdminOutlineSettings — remove with confirm", () => {
+describe("Outline integration — remove with confirm", () => {
 	it("states the erase in the confirm copy, deletes, and refetches to the empty state", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let deletedId: string | undefined;
@@ -315,7 +345,7 @@ describe("AdminOutlineSettings — remove with confirm", () => {
 	});
 });
 
-describe("AdminOutlineSettings — sync now", () => {
+describe("Outline integration — sync now", () => {
 	it("fires the reconcile trigger and confirms with a toast", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let syncRequestBody: unknown;
@@ -337,7 +367,7 @@ describe("AdminOutlineSettings — sync now", () => {
 	});
 });
 
-describe("AdminOutlineSettings — token lifecycle", () => {
+describe("Outline integration — token lifecycle", () => {
 	it("does not expose an opaque connection identifier when no display name is available", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		useConnectedHandlers(collectionsRef);
@@ -398,7 +428,7 @@ describe("AdminOutlineSettings — token lifecycle", () => {
 	});
 });
 
-describe("AdminOutlineSettings — a running sync is polled, not left as dead pixels", () => {
+describe("Outline integration — a running sync is polled, not left as dead pixels", () => {
 	it("keeps refetching the status while a job is active, and stops once it settles", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
@@ -425,7 +455,7 @@ describe("AdminOutlineSettings — a running sync is polled, not left as dead pi
 	}, 10000);
 });
 
-describe("AdminOutlineSettings — Outline not enabled on this instance", () => {
+describe("Outline integration — Outline not enabled on this instance", () => {
 	it("turns the initiate 400 (no strategy for the kind) into a clear 'not available here' hint", async () => {
 		// A deployment with HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED off has no OutlineConnectionStrategy
 		// bean, so ConnectionController.initiate rejects the kind with exactly this 400. The card must
@@ -460,7 +490,7 @@ describe("AdminOutlineSettings — Outline not enabled on this instance", () => 
 	});
 });
 
-describe("AdminOutlineSettings — collections plane is gated on the connection", () => {
+describe("Outline integration — collections plane is gated on the connection", () => {
 	it("does not render the collections section while disconnected", async () => {
 		server.use(http.get("*/workspaces/demo/connections", () => HttpResponse.json([])));
 

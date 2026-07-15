@@ -5,16 +5,10 @@ import { cn } from "@/lib/utils";
 import { JOB_TYPE_LABEL, jobCurrentStep } from "./sync-format";
 
 export interface ActiveJobProgressProps {
-	/** The connection's currently PENDING/RUNNING job, if any. Renders nothing when absent. */
 	job?: SyncJob | null;
 	className?: string;
 }
 
-/**
- * Inline progress for the connection's active job: a determinate bar when `itemsTotal` is known
- * (coarse per-phase counters), otherwise a spinner with whatever `currentStep` hint the
- * integration-specific `progress` JSON carries.
- */
 export function ActiveJobProgress({ job, className }: ActiveJobProgressProps) {
 	if (!job) return null;
 

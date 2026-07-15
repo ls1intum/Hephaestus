@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.api;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -16,10 +15,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
-import java.util.NoSuchElementException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,20 +23,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * Unified sync-observability + control surface — one status/resources/jobs/trigger/cancel API for
- * every connected integration, plus the workspace's integration catalog. Thin HTTP adapter; all
- * business logic (provider/runner dispatch, health derivation, async hand-off) lives in
- * {@link SyncStatusService}.
- */
+/** HTTP API for integration sync status and administration. */
 @ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/connections")
@@ -49,8 +39,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Tag(name = "Sync", description = "Integration sync observability and manual controls")
 @Validated
 public class SyncController {
-
-    private static final Logger log = LoggerFactory.getLogger(SyncController.class);
 
     private final SyncStatusService syncStatusService;
 
@@ -86,8 +74,6 @@ public class SyncController {
     ) {
         int safePage = Math.max(page, 0);
         int pageSize = Math.max(1, Math.min(size, 100));
-        // Secondary sort on id (also monotonic per row) so pagination stays deterministic when two jobs
-        // share a createdAt tick — otherwise the DB is free to return tied rows in any order across pages.
         Pageable pageable = PageRequest.of(
             safePage,
             pageSize,
@@ -153,14 +139,19 @@ public class SyncController {
             : ResponseEntity.ok(outcome.job());
     }
 
-    @PostMapping("/{connectionId}/sync/jobs/{jobId}/cancel")
-    @Operation(summary = "Request cooperative cancellation of a running sync job")
+    @PatchMapping("/{connectionId}/sync/jobs/{jobId}")
+    @Operation(summary = "Update a running sync job")
     @ApiResponses(
         {
             @ApiResponse(
                 responseCode = "202",
                 description = "Cancellation requested; the running job stops cooperatively",
                 content = @Content(schema = @Schema(implementation = SyncJobDTO.class))
+            ),
+            @ApiResponse(
+                responseCode = "400",
+                description = "The update does not request cancellation",
+                content = @Content(schema = @Schema(implementation = ProblemDetail.class))
             ),
             @ApiResponse(
                 responseCode = "404",
@@ -174,10 +165,11 @@ public class SyncController {
             ),
         }
     )
-    public ResponseEntity<SyncJobDTO> cancelConnectionSyncJob(
+    public ResponseEntity<SyncJobDTO> updateConnectionSyncJob(
         WorkspaceContext workspace,
         @PathVariable Long connectionId,
-        @PathVariable Long jobId
+        @PathVariable Long jobId,
+        @RequestBody @Valid @NotNull UpdateSyncJobRequestDTO body
     ) {
         SyncJobDTO job = syncStatusService.cancelJob(workspace.id(), connectionId, jobId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(job);
@@ -187,58 +179,5 @@ public class SyncController {
     @Operation(summary = "Every integration kind this workspace could connect, joined against existing connections")
     public ResponseEntity<List<IntegrationCatalogEntryDTO>> getIntegrationCatalog(WorkspaceContext workspace) {
         return ResponseEntity.ok(syncStatusService.catalog(workspace.id()));
-    }
-
-    /**
-     * Not-found is signalled as {@link NoSuchElementException} by {@code ConnectionAdminService}
-     * (deliberately undistinguished from cross-workspace reads — see its javadoc). Handled locally
-     * — rather than globally — so a stray {@code Optional.get()} elsewhere still surfaces as a 500,
-     * matching {@code ConnectionController}'s precedent.
-     */
-    @ExceptionHandler(NoSuchElementException.class)
-    ProblemDetail handleNotFound(NoSuchElementException e) {
-        log.info("Sync lookup 404: {}", e.getMessage());
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
-        problem.setTitle("Resource not found");
-        return problem;
-    }
-
-    /**
-     * Handled locally rather than relying on {@code @ResponseStatus} or
-     * {@code GlobalControllerAdvice}: {@code WorkspaceControllerAdvice} installs an unscoped,
-     * {@code HIGHEST_PRECEDENCE} handler for the plain {@link IllegalStateException} family (mapping
-     * to 500 for its own domain), so a distinct exception type + a local handler is the only reliable
-     * way to get 409 here. See {@link SyncStateConflictException}'s javadoc.
-     */
-    @ExceptionHandler(SyncStateConflictException.class)
-    ProblemDetail handleStateConflict(SyncStateConflictException e) {
-        log.info("Sync state conflict: {}", e.getMessage());
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
-        problem.setTitle("Invalid state");
-        // Machine-readable extension members (RFC 9457): the conflicting connection state or in-flight
-        // job id/type/status, so the client can react without a follow-up refetch.
-        e.properties().forEach(problem::setProperty);
-        return problem;
-    }
-
-    @ExceptionHandler(SyncNotSupportedException.class)
-    ProblemDetail handleNotSupported(SyncNotSupportedException e) {
-        log.info("Sync not supported: {}", e.getMessage());
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
-        problem.setTitle("Manual sync not supported");
-        problem.setProperty("kind", e.kind());
-        return problem;
-    }
-
-    /** Executor saturated: the job row was already finalized; tell the client to retry (503, not 500). */
-    @ExceptionHandler(TaskRejectedException.class)
-    ProblemDetail handleDispatchRejected(TaskRejectedException e) {
-        log.warn("Sync dispatch rejected: {}", e.getMessage());
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "The server is busy and could not start the sync. Please retry."
-        );
-        problem.setTitle("Sync dispatch rejected");
-        return problem;
     }
 }

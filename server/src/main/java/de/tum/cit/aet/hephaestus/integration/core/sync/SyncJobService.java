@@ -25,29 +25,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Job execution template shared by manual, scheduled, and lifecycle sync trigger paths. Owns
- * {@link SyncJob} creation, the one-active-job-per-connection guard, the in-JVM lease
- * heartbeat, zombie reaping, outcome mapping, and retention pruning.
- *
- * <p><strong>Transaction discipline:</strong> every DB-writing step here uses an explicit
- * {@link TransactionTemplate} block rather than {@code @Transactional}. Several of these methods call
- * each other on {@code this} (e.g. {@link #run} → {@link #beginJob}/{@link #executeBody}, the progress
- * writer captured as {@code this::persistProgress}), and a self-invocation through the bean's own
- * reference bypasses the Spring AOP proxy that {@code @Transactional} relies on — silently running
- * without a transaction. {@link TransactionTemplate} has no such caveat.
- *
- * <p>The runner body itself ({@code Consumer<SyncJobHandle>}, can run for minutes to hours) is
- * deliberately NOT wrapped in any single transaction — only the bookkeeping writes around it are.
+ * Shared sync-job execution template. Bookkeeping uses {@link TransactionTemplate} because methods
+ * self-invoke; long-running runner bodies execute outside a transaction.
  */
 @Service
 public class SyncJobService implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(SyncJobService.class);
 
-    /** A PENDING/RUNNING job whose lease is older than this is presumed abandoned (pod restart, crash). */
     private static final Duration ABANDON_THRESHOLD = Duration.ofMinutes(15);
 
-    /** Keep only the newest N job rows per connection (live-ops view, not an audit trail). */
     private static final int RETENTION_LIMIT = 50;
 
     private static final int ERROR_SUMMARY_MAX_LENGTH = 2000;
@@ -57,7 +44,6 @@ public class SyncJobService implements SmartLifecycle {
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
-    /** Live jobs currently executing in THIS JVM, keyed by job id. Per-pod on purpose (see class doc). */
     private final Map<Long, ActiveExecution> activeExecutions = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
 
@@ -81,18 +67,9 @@ public class SyncJobService implements SmartLifecycle {
         this.transactionTemplate = transactionTemplate;
     }
 
-    /** A created job row plus its live handle, ready for {@link #executeBody}. */
     public record Started(SyncJob job, SyncJobHandle handle) {}
 
-    /**
-     * Create the job row and register its handle, enforcing the one-active-job-per-connection
-     * invariant. Runs an inline abandoned-job reap for this connection FIRST, so a prior crashed run
-     * never blocks a fresh "Sync now" for the full sweep interval.
-     *
-     * @throws SyncJobConflictException if the connection already has a PENDING/RUNNING job — carries
-     *                                   that job so the caller can answer with it (idempotent-absorb)
-     *                                   instead of erroring
-     */
+    /** Creates a PENDING job after reaping a stale predecessor and enforcing the active-job guard. */
     public Started beginJob(SyncJobRequest request) {
         long connectionId = request.connectionId();
         reapAbandonedForConnection(connectionId);
@@ -127,20 +104,12 @@ public class SyncJobService implements SmartLifecycle {
                         request.triggeredByUserId()
                     )
                 );
-                // Publish the idle→syncing "job created" hint INSIDE this transaction, exactly like
-                // every other publish site (completeJob/persistProgress/reapAbandoned). The sole listener
-                // (SyncPushService) is @TransactionalEventListener(AFTER_COMMIT); an event published after
-                // this template returns has no active transaction and would be SILENTLY DISCARDED. Emitting
-                // it here means it fires naturally on commit — and never on the conflict/rollback path
-                // above (a rejected insert must not push a spurious hint), because we only reach this line
-                // when saveAndFlush succeeded.
+                // Must be published in-transaction for the AFTER_COMMIT listener.
                 publish(request.workspaceId(), connectionId, created.getKind(), SyncStateChangedEvent.Scope.JOB);
                 return created;
             });
         } catch (DataIntegrityViolationException e) {
-            // Partial unique index race (ux_sync_job_active): another concurrent trigger inserted first.
-            // The insert transaction above is now aborted, so the winning row must be re-read in a FRESH
-            // transaction — querying the aborted one would itself throw and mask the conflict as a 500.
+            // Re-read the partial-index race winner in a fresh transaction; the insert transaction aborted.
             SyncJob raced = transactionTemplate.execute(status ->
                 syncJobRepository
                     .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
@@ -152,25 +121,13 @@ public class SyncJobService implements SmartLifecycle {
             throw e;
         }
 
-        // The handle is registered in executeBody once the job is RUNNING — not here — so a rejected
-        // async dispatch (executeBody never runs) can't leak a handle that the lease heartbeat would
-        // keep alive forever, wedging the connection's one-active-job slot.
+        // Register only after the body starts so a rejected dispatch cannot keep a PENDING lease alive.
         SyncJobHandle handle = new SyncJobHandle(job.getId(), this::persistProgress);
         return new Started(job, handle);
     }
 
-    /**
-     * Run the body for an already-created job: PENDING → RUNNING, invoke, map the outcome, always
-     * unregister the handle and prune retention. Callers that dispatch the body asynchronously (the
-     * manual-trigger REST endpoint, on the dedicated sync executor) call
-     * {@link #beginJob} synchronously first (so a duplicate-active conflict surfaces immediately) and
-     * this method afterward, off-thread.
-     *
-     * <p>Never rethrows the body's exception — a job runner records failure in the row rather than
-     * propagating to whatever dispatched it (e.g. an async executor, which would otherwise just log an
-     * uncaught-exception warning with no job-row context).
-     */
-    public void executeBody(Started started, Consumer<SyncJobHandle> body) {
+    /** Runs a prepared job body and records its terminal outcome instead of propagating runner failures. */
+    public void executeBody(Started started, Consumer<? super SyncJobHandle> body) {
         long jobId = started.job().getId();
         SyncJobHandle handle = started.handle();
         boolean registered = false;
@@ -211,20 +168,11 @@ public class SyncJobService implements SmartLifecycle {
         }
     }
 
-    /**
-     * Finalize a job that was created but never dispatched (e.g. the async executor rejected the body).
-     * Without this the PENDING row would hold the connection's one-active slot until the zombie sweep.
-     */
     public void failStarted(Started started, String reason) {
         completeJob(started.job().getId(), SyncJobStatus.FAILED, truncate(reason), started.handle());
     }
 
-    /**
-     * Convenience for synchronous callers (unit tests; future SCHEDULED/LIFECYCLE trigger paths that
-     * don't need to answer an HTTP request before the body finishes) — {@link #beginJob} then
-     * {@link #executeBody} on the calling thread.
-     */
-    public void run(SyncJobRequest request, Consumer<SyncJobHandle> body) {
+    public void run(SyncJobRequest request, Consumer<? super SyncJobHandle> body) {
         Started started = beginJob(request);
         executeBody(started, body);
     }
@@ -283,11 +231,6 @@ public class SyncJobService implements SmartLifecycle {
                 for (SyncJobRepository.CancelFlagProjection projection : syncJobRepository.findCancelFlags(ids)) {
                     ActiveExecution execution = activeExecutions.get(projection.getId());
                     if (execution != null) {
-                        // Benign, not a bug: a same-pod requestCancel racing this pass can be transiently
-                        // reset to false in-memory if this projection was read just before that commit —
-                        // for at most one heartbeat pass (≤60s). The DB cancel_requested flag is
-                        // authoritative and stays true, so the next pass re-arms the handle. Cancel is
-                        // delayed within one heartbeat, never lost.
                         execution.handle().refreshCancellation(projection.isCancelRequested());
                     }
                 }
@@ -310,14 +253,12 @@ public class SyncJobService implements SmartLifecycle {
         return reaped == null ? 0 : reaped;
     }
 
-    /** Scoped inline reap run before the one-active-job guard, in its own committed transaction. */
     private void reapAbandonedForConnection(long connectionId) {
         transactionTemplate.executeWithoutResult(status ->
             reapAbandoned(syncJobRepository.findAbandonedForConnection(connectionId, leaseTtlSeconds()))
         );
     }
 
-    /** Must run inside an already-open transaction (both callers wrap it in one). */
     private int reapAbandoned(List<SyncJob> stale) {
         if (stale.isEmpty()) {
             return 0;
@@ -411,11 +352,8 @@ public class SyncJobService implements SmartLifecycle {
         return ExecutorConfigurationSupport.DEFAULT_PHASE + 1;
     }
 
-    // --- bookkeeping writes (self-invoked; TransactionTemplate, never @Transactional — see class doc) ---
-
     private record MarkRunningResult(boolean started, boolean cancelRequested) {}
 
-    /** PENDING → RUNNING, unless another actor already made the row terminal. */
     private MarkRunningResult markRunning(long jobId) {
         MarkRunningResult result = transactionTemplate.execute(status -> {
             if (syncJobRepository.markRunning(jobId) == 0) {
@@ -478,7 +416,6 @@ public class SyncJobService implements SmartLifecycle {
         });
     }
 
-    /** {@link SyncJobHandle.ProgressWriter} callback — the throttled DB write behind {@code handle.progress(...)}. */
     private void persistProgress(
         long jobId,
         @Nullable Integer itemsProcessed,

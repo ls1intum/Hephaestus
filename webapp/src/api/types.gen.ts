@@ -506,6 +506,10 @@ export type UpdateTeamSettingsRequest = {
     hidden: boolean;
 };
 
+export type UpdateSyncJobRequest = {
+    cancelRequested: boolean;
+};
+
 export type UpdateSlackUserPreferencesRequest = {
     channelMessagesAllowed: boolean;
 };
@@ -4537,8 +4541,8 @@ export type TriggerSyncJobResponses = {
 
 export type TriggerSyncJobResponse = TriggerSyncJobResponses[keyof TriggerSyncJobResponses];
 
-export type CancelConnectionSyncJobData = {
-    body?: never;
+export type UpdateConnectionSyncJobData = {
+    body: UpdateSyncJobRequest;
     path: {
         /**
          * Workspace slug
@@ -4548,10 +4552,14 @@ export type CancelConnectionSyncJobData = {
         jobId: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}/cancel';
+    url: '/workspaces/{workspaceSlug}/connections/{connectionId}/sync/jobs/{jobId}';
 };
 
-export type CancelConnectionSyncJobErrors = {
+export type UpdateConnectionSyncJobErrors = {
+    /**
+     * The update does not request cancellation
+     */
+    400: ProblemDetail;
     /**
      * Job not found in this workspace, or not owned by this connection
      */
@@ -4562,16 +4570,16 @@ export type CancelConnectionSyncJobErrors = {
     409: ProblemDetail;
 };
 
-export type CancelConnectionSyncJobError = CancelConnectionSyncJobErrors[keyof CancelConnectionSyncJobErrors];
+export type UpdateConnectionSyncJobError = UpdateConnectionSyncJobErrors[keyof UpdateConnectionSyncJobErrors];
 
-export type CancelConnectionSyncJobResponses = {
+export type UpdateConnectionSyncJobResponses = {
     /**
      * Cancellation requested; the running job stops cooperatively
      */
     202: SyncJob;
 };
 
-export type CancelConnectionSyncJobResponse = CancelConnectionSyncJobResponses[keyof CancelConnectionSyncJobResponses];
+export type UpdateConnectionSyncJobResponse = UpdateConnectionSyncJobResponses[keyof UpdateConnectionSyncJobResponses];
 
 export type ListConnectionSyncResourcesData = {
     body?: never;
