@@ -1,13 +1,21 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
@@ -26,11 +34,12 @@ class SyncEventHubTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 1L;
     private static final long CONNECTION_ID = 10L;
 
-    private final List<RecordingEmitter> createdEmitters = new ArrayList<>();
+    private final List<RecordingEmitter> createdEmitters = Collections.synchronizedList(new ArrayList<>());
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private SyncEventHub hub;
 
     private SyncEventHub newHub(Duration coalesceWindow) {
-        return new SyncEventHub(MAPPER, coalesceWindow, () -> {
+        return new SyncEventHub(MAPPER, meters, coalesceWindow, () -> {
             RecordingEmitter emitter = new RecordingEmitter();
             createdEmitters.add(emitter);
             return emitter;
@@ -87,6 +96,7 @@ class SyncEventHubTest extends BaseUnitTest {
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(emitter.completed()).isTrue());
         assertThat(hub.subscriberCount(WORKSPACE_ID)).isZero();
+        assertThat(counter("integration.sync.sse.events", "outcome", "error")).isEqualTo(1.0);
     }
 
     @Test
@@ -174,6 +184,19 @@ class SyncEventHubTest extends BaseUnitTest {
     }
 
     @Test
+    void shutdown_completesAndDeregistersActiveSubscribers() {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        hub.subscribe(WORKSPACE_ID);
+
+        hub.shutdown();
+
+        assertThat(createdEmitters).allSatisfy(emitter -> assertThat(emitter.completed()).isTrue());
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isZero();
+        assertThat(meters.get("integration.sync.sse.subscribers").gauge().value()).isZero();
+    }
+
+    @Test
     void subscribe_sendsInitialConnectedCommentImmediately() {
         hub = newHub(Duration.ofMillis(10));
         hub.subscribe(WORKSPACE_ID);
@@ -185,14 +208,71 @@ class SyncEventHubTest extends BaseUnitTest {
     }
 
     @Test
-    void subscribe_beyondPerWorkspaceCap_evictsExistingSubscribers() {
+    void subscribe_beyondPerWorkspaceCap_rejectsNewSubscriber() {
         hub = newHub(Duration.ofMillis(10));
-        for (int i = 0; i < 25; i++) {
+        for (int i = 0; i < 20; i++) {
             hub.subscribe(WORKSPACE_ID);
         }
 
-        // Aggregate stays bounded by the cap (20); a legitimate new tab still connected.
+        assertThatThrownBy(() -> hub.subscribe(WORKSPACE_ID)).isInstanceOf(
+            org.springframework.web.server.ResponseStatusException.class
+        );
         assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(20);
+        assertThat(counter("integration.sync.sse.subscriptions", "outcome", "accepted")).isEqualTo(20.0);
+        assertThat(counter("integration.sync.sse.subscriptions", "outcome", "rejected")).isEqualTo(1.0);
+        assertThat(meters.get("integration.sync.sse.subscribers").gauge().value()).isEqualTo(20.0);
+    }
+
+    @Test
+    void concurrentSubscriptions_neverExceedPerWorkspaceCap() throws Exception {
+        hub = newHub(Duration.ofMillis(10));
+        AtomicInteger rejected = new AtomicInteger();
+        List<Future<?>> futures = new ArrayList<>();
+        try (var executor = Executors.newFixedThreadPool(16)) {
+            for (int i = 0; i < 100; i++) {
+                futures.add(
+                    executor.submit(() -> {
+                        try {
+                            hub.subscribe(WORKSPACE_ID);
+                        } catch (org.springframework.web.server.ResponseStatusException expected) {
+                            rejected.incrementAndGet();
+                        }
+                    })
+                );
+            }
+            executor.shutdown();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+        for (Future<?> future : futures) {
+            future.get();
+        }
+
+        assertThat(hub.subscriberCount(WORKSPACE_ID)).isEqualTo(20);
+        assertThat(rejected).hasValue(80);
+    }
+
+    @Test
+    void blockedHeartbeat_doesNotQueueAdditionalHeartbeatTasks() throws Exception {
+        hub = newHub(Duration.ofMillis(10));
+        hub.subscribe(WORKSPACE_ID);
+        RecordingEmitter emitter = createdEmitters.get(0);
+        emitter.blockHeartbeat();
+
+        hub.sendHeartbeats();
+        assertThat(emitter.awaitBlockedHeartbeat()).isTrue();
+        for (int i = 0; i < 20; i++) {
+            hub.sendHeartbeats();
+        }
+        emitter.releaseHeartbeat();
+
+        await()
+            .atMost(Duration.ofSeconds(2))
+            .untilAsserted(() -> assertThat(emitter.comments()).contains("ping"));
+        assertThat(emitter.comments().stream().filter("ping"::equals)).hasSize(1);
+    }
+
+    private double counter(String name, String tag, String value) {
+        return meters.get(name).tag(tag, value).counter().count();
     }
 
     /** Test-only emitter that records data/comment frames + can simulate a socket failure. */
@@ -202,8 +282,11 @@ class SyncEventHubTest extends BaseUnitTest {
         private final List<String> eventNames = new ArrayList<>();
         private final List<String> comments = new ArrayList<>();
         private final AtomicReference<Runnable> completionCallback = new AtomicReference<>();
+        private final CountDownLatch heartbeatBlocked = new CountDownLatch(1);
+        private final CountDownLatch releaseHeartbeat = new CountDownLatch(1);
         private volatile boolean completed;
         private volatile boolean failOnNextSend;
+        private volatile boolean blockHeartbeat;
 
         @Override
         public synchronized void send(SseEventBuilder builder) throws IOException {
@@ -214,6 +297,15 @@ class SyncEventHubTest extends BaseUnitTest {
             StringBuilder wire = new StringBuilder();
             for (var entry : builder.build()) {
                 wire.append(entry.getData().toString());
+            }
+            if (blockHeartbeat && wire.toString().contains(":ping")) {
+                heartbeatBlocked.countDown();
+                try {
+                    releaseHeartbeat.await(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                }
             }
             for (String line : wire.toString().split("\n")) {
                 if (line.startsWith("data:")) {
@@ -253,6 +345,18 @@ class SyncEventHubTest extends BaseUnitTest {
 
         void failOnNextSend() {
             this.failOnNextSend = true;
+        }
+
+        void blockHeartbeat() {
+            blockHeartbeat = true;
+        }
+
+        boolean awaitBlockedHeartbeat() throws InterruptedException {
+            return heartbeatBlocked.await(2, TimeUnit.SECONDS);
+        }
+
+        void releaseHeartbeat() {
+            releaseHeartbeat.countDown();
         }
 
         synchronized List<String> dataFrames() {

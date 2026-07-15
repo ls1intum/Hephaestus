@@ -197,7 +197,7 @@ public class GithubDataSyncService {
      *
      * @param syncTarget the sync target to sync
      */
-    public void syncSyncTarget(SyncTarget syncTarget) {
+    public boolean syncSyncTarget(SyncTarget syncTarget) {
         Long scopeId = syncTarget.scopeId();
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
@@ -205,7 +205,7 @@ public class GithubDataSyncService {
         // Check if scope is active before attempting sync
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped sync: reason=scopeNotActive, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
-            return;
+            return false;
         }
 
         // Resolve the GitHub provider entity
@@ -240,7 +240,7 @@ public class GithubDataSyncService {
                     safeNameWithOwner
                 );
                 syncTargetProvider.removeSyncTarget(syncTarget.id());
-                return;
+                return true;
             }
             if (syncedRepository.isEmpty()) {
                 // Transient failure (auth, transport, rate limit, classification). Leave the
@@ -250,7 +250,7 @@ public class GithubDataSyncService {
                     scopeId,
                     safeNameWithOwner
                 );
-                return;
+                return false;
             }
             repository = syncedRepository.get();
             repositoryCreatedDuringSync = true;
@@ -317,7 +317,7 @@ public class GithubDataSyncService {
                     safeNameWithOwner,
                     repository.getUpdatedAt()
                 );
-                return;
+                return true;
             }
 
             // Sync collaborators (with cooldown)
@@ -429,6 +429,7 @@ public class GithubDataSyncService {
                 issueResult.status(),
                 prResult.status()
             );
+            return issueResult.isCompleted() && prResult.isCompleted() && discussionResult.isCompleted();
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
             throw e;
@@ -436,6 +437,7 @@ public class GithubDataSyncService {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             Category category = classification.category();
 
+            boolean removed = false;
             switch (category) {
                 case NOT_FOUND -> {
                     log.warn(
@@ -450,6 +452,7 @@ public class GithubDataSyncService {
                     cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
                     // Also remove the sync target to stop perpetual retries
                     syncTargetProvider.removeSyncTarget(syncTarget.id());
+                    removed = true;
                 }
                 case AUTH_ERROR -> log.error(
                     "Repository sync failed - authentication error: scopeId={}, repoId={}, error={}",
@@ -494,6 +497,7 @@ public class GithubDataSyncService {
                     e
                 );
             }
+            return removed;
         }
     }
 

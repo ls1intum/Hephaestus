@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -89,7 +91,7 @@ public class SlackDataSyncScheduler {
 
     /**
      * Wraps one workspace's nightly reconciliation in the shared {@link SyncJobService} template
-     * (design doc §3.4) so it shows up in job history — but only when the workspace has an ACTIVE Slack
+     * so it shows up in job history — but only when the workspace has an ACTIVE Slack
      * {@link Connection} to record it against. A workspace whose channels are still {@code ACTIVE} in the
      * allow-list table but whose Connection already left ACTIVE (uninstall race — the normal window
      * {@link #syncWorkspaceNow}'s own guard covers) is skipped here without ever touching Slack,
@@ -114,10 +116,7 @@ public class SlackDataSyncScheduler {
                 null
             ),
             handle -> {
-                // The handle is threaded for progress reporting; cancellation is intentionally coarse —
-                // the per-channel history loop is private and consent-gated, so a cancel is observed only
-                // at the next tick, never mid-run (see SlackIntegrationSyncRunner's cancellation javadoc).
-                SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId);
+                SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId, handle);
                 handle.progress(
                     summary.synced() + summary.skipped(),
                     summary.channels(),
@@ -138,6 +137,12 @@ public class SlackDataSyncScheduler {
                         summary.budgetExhausted()
                     )
                 );
+                if (summary.failed() > 0 || summary.budgetExhausted()) {
+                    handle.reportWarnings();
+                }
+                if (handle.isCancellationRequested()) {
+                    handle.reportCancelled();
+                }
             }
         );
     }
@@ -151,6 +156,13 @@ public class SlackDataSyncScheduler {
      * channels normally disappear with the connection on uninstall; this covers the window in between.
      */
     public SlackChannelHistorySyncService.WorkspaceSyncSummary syncWorkspaceNow(long workspaceId) {
+        return syncWorkspaceNow(workspaceId, null);
+    }
+
+    public SlackChannelHistorySyncService.WorkspaceSyncSummary syncWorkspaceNow(
+        long workspaceId,
+        @Nullable SyncJobHandle handle
+    ) {
         if (connectionService.findActive(workspaceId, IntegrationKind.SLACK).isEmpty()) {
             log.debug(
                 "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping reconciliation",
@@ -161,7 +173,10 @@ public class SlackDataSyncScheduler {
         if (properties.metadataEnabled()) {
             metadataRefresher.refreshWorkspace(workspaceId);
         }
-        SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncWorkspace(workspaceId);
+        SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncWorkspace(
+            workspaceId,
+            handle == null ? () -> false : handle::isCancellationRequested
+        );
         log.info(
             "slack.sync: workspaceId={} channels={} synced={} skipped={} failed={} ingested={} requests={} budgetExhausted={}",
             workspaceId,

@@ -14,6 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEven
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.lang.reflect.Field;
@@ -48,6 +51,9 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private SyncJobRepository syncJobRepository;
+
     private CredentialBundleConverter credentialConverter;
     private ConnectionService service;
     private Workspace workspace;
@@ -58,7 +64,13 @@ class ConnectionServiceTest extends BaseUnitTest {
         // Real converter so the credential-purge case operates on a genuine AES-GCM blob,
         // not a mock stand-in.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
-        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter, eventPublisher);
+        service = new ConnectionService(
+            connectionRepository,
+            auditRepository,
+            credentialConverter,
+            eventPublisher,
+            syncJobRepository
+        );
         workspace = new Workspace();
         workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
@@ -211,6 +223,41 @@ class ConnectionServiceTest extends BaseUnitTest {
         ArgumentCaptor<ConnectionAudit> audit = ArgumentCaptor.forClass(ConnectionAudit.class);
         verify(auditRepository).save(audit.capture());
         assertThat(audit.getValue().getToState()).isEqualTo(IntegrationState.UNINSTALLED);
+    }
+
+    @Test
+    void transition_toUninstalledWhileSyncActive_rejectsWithoutPurging() {
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+        connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
+        SyncJob active = Mockito.mock(SyncJob.class);
+        when(active.getId()).thenReturn(99L);
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                connection.getId(),
+                SyncJobStatus.ACTIVE
+            )
+        ).thenReturn(java.util.Optional.of(active));
+
+        assertThatThrownBy(() ->
+            service.transition(
+                connection,
+                new TransitionRequest(
+                    IntegrationState.UNINSTALLED,
+                    "UNINSTALL",
+                    "ADMIN",
+                    "actor-1",
+                    "corr-busy",
+                    "removed"
+                )
+            )
+        )
+            .isInstanceOf(ConnectionBusyException.class)
+            .hasMessageContaining("active sync job 99");
+
+        assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
+        assertThat(connection.getCredentialsEncrypted()).isNotNull();
+        verify(auditRepository, never()).save(any());
+        verify(connectionRepository, never()).save(any());
     }
 
     @Test

@@ -1,11 +1,15 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,14 +24,16 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Per-workspace registry of active {@link SseEmitter}s for the sync-observability live-push stream
- * (design doc §3.5). Owns everything transport-level: subscribe/deregister lifecycle, per-emitter
+ * Per-workspace registry of active {@link SseEmitter}s for the sync-observability live-push stream.
+ * Owns everything transport-level: subscribe/deregister lifecycle, per-emitter
  * bounded queueing with drop-oldest backpressure, single-writer serialisation per emitter (mirrors
  * {@code MentorSseChannel}'s {@link ReentrantLock} discipline — a virtual thread parked on a lock
  * does not pin its carrier, unlike {@code synchronized}), the {@code :ping} heartbeat, and
@@ -51,8 +57,8 @@ public class SyncEventHub {
      * origin can <em>open</em> against a logged-in admin (CORS blocks reading the body, not opening
      * the connection), and each emitter lives up to {@link #EMITTER_TIMEOUT_MS}. Without a cap an
      * abusive page reusing the admin's cookie could hold unbounded 30-minute connections. Beyond the
-     * cap we evict an existing subscriber so a legitimate new tab always connects while the aggregate
-     * stays bounded.
+     * cap we reject the new stream. Evicting an established EventSource would make its automatic
+     * reconnect evict another client indefinitely.
      */
     private static final int MAX_EMITTERS_PER_WORKSPACE = 20;
     private static final String EVENT_NAME = "sync";
@@ -62,8 +68,14 @@ public class SyncEventHub {
     private final ObjectMapper objectMapper;
     private final Duration coalesceWindow;
     private final Supplier<SseEmitter> emitterFactory;
+    private final Counter subscriptionsAccepted;
+    private final Counter subscriptionsRejected;
+    private final Counter subscriptionsFailed;
+    private final Counter eventsDelivered;
+    private final Counter eventsDropped;
+    private final Counter eventsFailed;
 
-    /** Latches true the first time the per-workspace cap is hit, so eviction logs once, not per-open. */
+    /** Latches true the first time the per-workspace cap is hit, so rejection logs once, not per-open. */
     private final AtomicBoolean capWarned = new AtomicBoolean(false);
 
     /** Live subscribers, per workspace. Set is identity-based (no equals/hashCode override on {@link Subscriber}). */
@@ -87,20 +99,29 @@ public class SyncEventHub {
      * constructors (below) for a short coalesce window / a recording emitter factory.
      */
     @Autowired
-    public SyncEventHub(ObjectMapper objectMapper) {
-        this(objectMapper, DEFAULT_COALESCE_WINDOW, () -> new SseEmitter(EMITTER_TIMEOUT_MS));
-    }
-
-    /** Test seam: a short coalesce window keeps unit tests fast. */
-    SyncEventHub(ObjectMapper objectMapper, Duration coalesceWindow) {
-        this(objectMapper, coalesceWindow, () -> new SseEmitter(EMITTER_TIMEOUT_MS));
+    public SyncEventHub(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
+        this(objectMapper, meterRegistry, DEFAULT_COALESCE_WINDOW, () -> new SseEmitter(EMITTER_TIMEOUT_MS));
     }
 
     /** Test seam: a custom emitter factory lets tests substitute a recording {@link SseEmitter}. */
-    SyncEventHub(ObjectMapper objectMapper, Duration coalesceWindow, Supplier<SseEmitter> emitterFactory) {
+    SyncEventHub(
+        ObjectMapper objectMapper,
+        MeterRegistry meterRegistry,
+        Duration coalesceWindow,
+        Supplier<SseEmitter> emitterFactory
+    ) {
         this.objectMapper = objectMapper;
         this.coalesceWindow = coalesceWindow;
         this.emitterFactory = emitterFactory;
+        this.subscriptionsAccepted = counter(meterRegistry, "integration.sync.sse.subscriptions", "accepted");
+        this.subscriptionsRejected = counter(meterRegistry, "integration.sync.sse.subscriptions", "rejected");
+        this.subscriptionsFailed = counter(meterRegistry, "integration.sync.sse.subscriptions", "failed");
+        this.eventsDelivered = counter(meterRegistry, "integration.sync.sse.events", "delivered");
+        this.eventsDropped = counter(meterRegistry, "integration.sync.sse.events", "dropped");
+        this.eventsFailed = counter(meterRegistry, "integration.sync.sse.events", "error");
+        Gauge.builder("integration.sync.sse.subscribers", this, SyncEventHub::totalSubscriberCount)
+            .description("Currently active sync-observability SSE subscribers on this server replica")
+            .register(meterRegistry);
     }
 
     /**
@@ -118,53 +139,36 @@ public class SyncEventHub {
         });
         emitter.onError(throwable -> deregister(subscriber));
 
-        // Initial flush before registering: commits the HTTP response immediately so the browser's
-        // EventSource.onopen fires now rather than only after the first heartbeat (up to 20s), and a
-        // socket that is already dead deregisters on this first write instead of lingering. Mirrors
-        // MentorSseChannel, which likewise sends immediately. Sending before adding to the registry
-        // keeps this write off the single-writer fan-out path (no concurrent send to serialise yet).
+        synchronized (subscribersByWorkspace) {
+            Set<Subscriber> subscribers = subscribersByWorkspace.computeIfAbsent(workspaceId, key ->
+                ConcurrentHashMap.newKeySet()
+            );
+            if (subscribers.size() >= MAX_EMITTERS_PER_WORKSPACE) {
+                if (capWarned.compareAndSet(false, true)) {
+                    log.warn(
+                        "Sync SSE emitter cap ({}) reached for a workspace; rejecting new stream",
+                        MAX_EMITTERS_PER_WORKSPACE
+                    );
+                }
+                subscriptionsRejected.increment();
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many live sync streams");
+            }
+            subscribers.add(subscriber);
+        }
+
+        subscriber.writeLock.lock();
         try {
             emitter.send(SseEmitter.event().comment("connected"));
+            subscriptionsAccepted.increment();
         } catch (Exception e) {
             log.debug("Sync SSE initial flush failed; not registering: {}", e.toString());
+            subscriptionsFailed.increment();
+            deregister(subscriber);
             safeComplete(emitter);
-            return emitter;
+        } finally {
+            subscriber.writeLock.unlock();
         }
-
-        evictIfOverCapacity(workspaceId);
-        // Re-fetch (computeIfAbsent) rather than reuse a pre-eviction reference: if eviction had
-        // emptied the set, deregister may have removed the now-orphaned map entry, and adding to that
-        // stale set would make the subscriber invisible to fanOut. Always add to the live mapping.
-        subscribersByWorkspace.computeIfAbsent(workspaceId, key -> ConcurrentHashMap.newKeySet()).add(subscriber);
         return emitter;
-    }
-
-    /**
-     * Bound the aggregate emitter count per workspace. The subscriber set is identity-based and
-     * unordered, so this evicts an arbitrary existing subscriber rather than a strictly-oldest one —
-     * enough to keep the count bounded and close the unbounded-connection vector while letting a
-     * legitimate new tab always connect.
-     */
-    private void evictIfOverCapacity(long workspaceId) {
-        Set<Subscriber> subscribers = subscribersByWorkspace.get(workspaceId);
-        if (subscribers == null) {
-            return;
-        }
-        while (subscribers.size() >= MAX_EMITTERS_PER_WORKSPACE) {
-            Iterator<Subscriber> it = subscribers.iterator();
-            if (!it.hasNext()) {
-                return;
-            }
-            Subscriber victim = it.next();
-            if (capWarned.compareAndSet(false, true)) {
-                log.warn(
-                    "Sync SSE emitter cap ({}) reached for a workspace; evicting existing subscribers",
-                    MAX_EMITTERS_PER_WORKSPACE
-                );
-            }
-            deregister(victim);
-            safeComplete(victim.emitter);
-        }
     }
 
     /**
@@ -215,6 +219,7 @@ public class SyncEventHub {
         synchronized (subscriber.queue) {
             if (subscriber.queue.size() >= QUEUE_CAPACITY) {
                 subscriber.queue.pollFirst(); // drop-oldest
+                eventsDropped.increment();
             }
             subscriber.queue.addLast(hint);
         }
@@ -264,9 +269,11 @@ public class SyncEventHub {
         try {
             String json = objectMapper.writeValueAsString(hint);
             subscriber.emitter.send(SseEmitter.event().name(EVENT_NAME).data(json));
+            eventsDelivered.increment();
             return true;
         } catch (Exception e) {
             log.debug("Sync SSE send failed; deregistering: {}", e.toString());
+            eventsFailed.increment();
             deregister(subscriber);
             safeComplete(subscriber.emitter);
             return false;
@@ -278,15 +285,20 @@ public class SyncEventHub {
      * stream. Package-private so unit tests can drive it directly without a live scheduler.
      */
     @Scheduled(fixedRate = HEARTBEAT_INTERVAL_MS, initialDelay = HEARTBEAT_INTERVAL_MS)
+    @WorkspaceAgnostic("Writes transport heartbeats to already-authorized in-memory subscribers")
     void sendHeartbeats() {
         for (Set<Subscriber> subscribers : subscribersByWorkspace.values()) {
             for (Subscriber subscriber : subscribers) {
                 if (subscriber.closed.get()) {
                     continue;
                 }
+                if (!subscriber.heartbeatPending.compareAndSet(false, true)) {
+                    continue;
+                }
                 try {
                     writerExecutor.execute(() -> sendPing(subscriber));
                 } catch (RejectedExecutionException ignored) {
+                    subscriber.heartbeatPending.set(false);
                     // Shutting down.
                 }
             }
@@ -309,6 +321,7 @@ public class SyncEventHub {
             safeComplete(subscriber.emitter);
         } finally {
             subscriber.writeLock.unlock();
+            subscriber.heartbeatPending.set(false);
         }
     }
 
@@ -316,13 +329,13 @@ public class SyncEventHub {
         if (!subscriber.closed.compareAndSet(false, true)) {
             return;
         }
-        Set<Subscriber> subscribers = subscribersByWorkspace.get(subscriber.workspaceId);
-        if (subscribers != null) {
-            subscribers.remove(subscriber);
-            // Reference-identity conditional remove: only drop the map entry if nothing else
-            // (a concurrent subscribe) repopulated this exact set between the two lines above.
-            if (subscribers.isEmpty()) {
-                subscribersByWorkspace.remove(subscriber.workspaceId, subscribers);
+        synchronized (subscribersByWorkspace) {
+            Set<Subscriber> subscribers = subscribersByWorkspace.get(subscriber.workspaceId);
+            if (subscribers != null) {
+                subscribers.remove(subscriber);
+                if (subscribers.isEmpty()) {
+                    subscribersByWorkspace.remove(subscriber.workspaceId, subscribers);
+                }
             }
         }
     }
@@ -337,6 +350,12 @@ public class SyncEventHub {
 
     @PreDestroy
     void shutdown() {
+        for (Set<Subscriber> subscribers : new ArrayList<>(subscribersByWorkspace.values())) {
+            for (Subscriber subscriber : new ArrayList<>(subscribers)) {
+                deregister(subscriber);
+                safeComplete(subscriber.emitter);
+            }
+        }
         coalesceScheduler.shutdownNow();
         writerExecutor.shutdown();
         try {
@@ -356,6 +375,17 @@ public class SyncEventHub {
         return subscribers == null ? 0 : subscribers.size();
     }
 
+    private double totalSubscriberCount() {
+        return subscribersByWorkspace.values().stream().mapToInt(Set::size).sum();
+    }
+
+    private static Counter counter(MeterRegistry meterRegistry, String name, String outcome) {
+        return Counter.builder(name)
+            .description("Sync-observability SSE transport outcomes")
+            .tag("outcome", outcome)
+            .register(meterRegistry);
+    }
+
     private record CoalesceKey(long workspaceId, Long connectionId, String scope) {}
 
     private static final class Subscriber {
@@ -365,6 +395,7 @@ public class SyncEventHub {
         final Deque<SyncEventHint> queue = new ArrayDeque<>();
         final ReentrantLock writeLock = new ReentrantLock();
         final AtomicBoolean draining = new AtomicBoolean(false);
+        final AtomicBoolean heartbeatPending = new AtomicBoolean(false);
         final AtomicBoolean closed = new AtomicBoolean(false);
 
         Subscriber(long workspaceId, SseEmitter emitter) {

@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -41,9 +40,11 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
      */
     @WorkspaceAgnostic("Cross-workspace zombie sweep; caller is the @ConditionalOnServerRole sweeper")
     @Query(
-        "SELECT j FROM SyncJob j WHERE j.status IN :statuses " + "AND COALESCE(j.heartbeatAt, j.createdAt) < :cutoff"
+        value = "SELECT * FROM sync_job WHERE status IN ('PENDING', 'RUNNING') " +
+            "AND COALESCE(heartbeat_at, created_at) < now() - make_interval(secs => :leaseTtlSeconds)",
+        nativeQuery = true
     )
-    List<SyncJob> findAbandoned(@Param("statuses") Collection<SyncJobStatus> statuses, @Param("cutoff") Instant cutoff);
+    List<SyncJob> findAbandoned(@Param("leaseTtlSeconds") long leaseTtlSeconds);
 
     /**
      * Same as {@link #findAbandoned} but scoped to one connection — run inline before the
@@ -52,13 +53,14 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
      */
     @WorkspaceAgnostic("ID-based inline reap; connectionId comes from a workspace-scoped caller")
     @Query(
-        "SELECT j FROM SyncJob j WHERE j.connection.id = :connectionId AND j.status IN :statuses " +
-            "AND COALESCE(j.heartbeatAt, j.createdAt) < :cutoff"
+        value = "SELECT * FROM sync_job WHERE connection_id = :connectionId " +
+            "AND status IN ('PENDING', 'RUNNING') " +
+            "AND COALESCE(heartbeat_at, created_at) < now() - make_interval(secs => :leaseTtlSeconds)",
+        nativeQuery = true
     )
     List<SyncJob> findAbandonedForConnection(
         @Param("connectionId") long connectionId,
-        @Param("statuses") Collection<SyncJobStatus> statuses,
-        @Param("cutoff") Instant cutoff
+        @Param("leaseTtlSeconds") long leaseTtlSeconds
     );
 
     /** Flag-only cancel write, guarded so it never touches a job that already reached a terminal status. */
@@ -71,21 +73,69 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
     @WorkspaceAgnostic("ID-based reap; ids come from the cross-workspace zombie sweep")
     @Modifying(clearAutomatically = true)
     @Query(
-        "UPDATE SyncJob j SET j.status = de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus.FAILED, " +
-            "j.finishedAt = :now, j.errorSummary = :reason WHERE j.id IN :ids AND j.status IN :statuses"
+        value = "UPDATE sync_job SET status = 'FAILED', finished_at = now(), error_summary = :reason " +
+            "WHERE id = :id AND status IN ('PENDING', 'RUNNING') " +
+            "AND COALESCE(heartbeat_at, created_at) < now() - make_interval(secs => :leaseTtlSeconds)",
+        nativeQuery = true
     )
     int markAbandoned(
-        @Param("ids") Collection<Long> ids,
-        @Param("now") Instant now,
+        @Param("id") long id,
         @Param("reason") String reason,
-        @Param("statuses") Collection<SyncJobStatus> statuses
+        @Param("leaseTtlSeconds") long leaseTtlSeconds
+    );
+
+    @WorkspaceAgnostic("ID-based PENDING claim; jobId comes from the job created by the caller")
+    @Modifying(clearAutomatically = true)
+    @Query(
+        value = "UPDATE sync_job SET status = 'RUNNING', started_at = now(), heartbeat_at = now() " +
+            "WHERE id = :id AND status = 'PENDING'",
+        nativeQuery = true
+    )
+    int markRunning(@Param("id") long id);
+
+    @WorkspaceAgnostic("ID-based terminal transition; jobId comes from the active in-process handle")
+    @Modifying(clearAutomatically = true)
+    @Query(
+        "UPDATE SyncJob j SET j.status = :status, j.finishedAt = instant, j.errorSummary = :errorSummary, " +
+            "j.itemsProcessed = :itemsProcessed, j.itemsTotal = :itemsTotal, j.progress = :progress " +
+            "WHERE j.id = :id AND j.status IN :activeStatuses " +
+            "AND (:honorCancellation = false OR j.cancelRequested = false)"
+    )
+    int completeActiveJob(
+        @Param("id") long id,
+        @Param("status") SyncJobStatus status,
+        @Param("errorSummary") String errorSummary,
+        @Param("itemsProcessed") Integer itemsProcessed,
+        @Param("itemsTotal") Integer itemsTotal,
+        @Param("progress") java.util.Map<String, Object> progress,
+        @Param("activeStatuses") Collection<SyncJobStatus> activeStatuses,
+        @Param("honorCancellation") boolean honorCancellation
+    );
+
+    @WorkspaceAgnostic("ID-based cancellation completion; jobId comes from the active in-process handle")
+    @Modifying(clearAutomatically = true)
+    @Query(
+        "UPDATE SyncJob j SET j.status = de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus.CANCELLED, " +
+            "j.finishedAt = instant, j.errorSummary = null, j.itemsProcessed = :itemsProcessed, " +
+            "j.itemsTotal = :itemsTotal, j.progress = :progress " +
+            "WHERE j.id = :id AND j.status IN :activeStatuses AND j.cancelRequested = true"
+    )
+    int completeCancelRequestedJob(
+        @Param("id") long id,
+        @Param("itemsProcessed") Integer itemsProcessed,
+        @Param("itemsTotal") Integer itemsTotal,
+        @Param("progress") java.util.Map<String, Object> progress,
+        @Param("activeStatuses") Collection<SyncJobStatus> activeStatuses
     );
 
     /** Bulk lease touch for every currently-registered in-JVM handle (the 60s heartbeat scheduler). */
     @WorkspaceAgnostic("ID-based bulk heartbeat; ids come from the in-process job handle registry")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE SyncJob j SET j.heartbeatAt = :now WHERE j.id IN :ids")
-    int touchHeartbeat(@Param("ids") Collection<Long> ids, @Param("now") Instant now);
+    @Query(
+        value = "UPDATE sync_job SET heartbeat_at = now() WHERE id IN (:ids) AND status = 'RUNNING'",
+        nativeQuery = true
+    )
+    int touchHeartbeat(@Param("ids") Collection<Long> ids);
 
     /** Cancel-flag projection, read back on the same heartbeat pass so a cancel request reaches the runner. */
     interface CancelFlagProjection {

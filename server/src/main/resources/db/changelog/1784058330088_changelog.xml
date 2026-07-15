@@ -5,23 +5,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <!--
-        Integration sync observability & control (core substrate) — one shared sync_job table across
-        every integration (GitHub/GitLab/Slack/Outline), replacing per-kind ad-hoc "syncing" flags with
-        a single job-execution record. See design doc
-        .ai/notes/integration-sync-observability-design.md §3.1-3.3.
-
-        - sync_job:               one row per INITIAL/RECONCILIATION/BACKFILL pass.
-        - ix_sync_job_connection_created: job-history pagination (connection_id, created_at DESC).
-        - ux_sync_job_active:     partial UNIQUE over (connection_id) WHERE status IN
-                                  ('PENDING','RUNNING') — the race-proof backstop for the one-active-
-                                  job-per-connection guard; service-level existence check is the fast
-                                  path, this index is what makes it correct under concurrency.
-                                  NOTE: `ddl-auto: create` (test profile) cannot emit a partial index,
-                                  so this specific invariant is exercised only against real Postgres
-                                  (`mvn liquibase:update` / live E2E), matching agent_job's precedent
-                                  (1780067945030_changelog.xml / 1780825201546_changelog.xml).
-    -->
+    <!-- Shared sync execution records and connection activity for all integration kinds. -->
 
     <changeSet author="FelixTJDietrich" id="1784058330088-1">
         <preConditions onFail="MARK_RAN" onFailMessage="sync_job table already present">
@@ -133,6 +117,24 @@
         </createTable>
         <rollback>
             <dropTable tableName="connection_activity"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1784058330088-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="sync-job connection ownership constraint already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_sync_job_connection_workspace"/></not>
+        </preConditions>
+        <comment>Ensure a sync job's connection belongs to the same workspace.</comment>
+        <sql>
+            ALTER TABLE connection ADD CONSTRAINT ux_connection_id_workspace UNIQUE (id, workspace_id);
+            ALTER TABLE sync_job ADD CONSTRAINT fk_sync_job_connection_workspace
+                FOREIGN KEY (connection_id, workspace_id) REFERENCES connection (id, workspace_id);
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE sync_job DROP CONSTRAINT fk_sync_job_connection_workspace;
+                ALTER TABLE connection DROP CONSTRAINT ux_connection_id_workspace;
+            </sql>
         </rollback>
     </changeSet>
 

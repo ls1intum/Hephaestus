@@ -621,6 +621,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Activated",
                                 "Deactivated",
                                 "WorkspaceScheduleChangedEvent", // Carries workspaceId for leaderboard reschedule
+                                "SyncStateChangedEvent", // Carries workspaceId directly
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed

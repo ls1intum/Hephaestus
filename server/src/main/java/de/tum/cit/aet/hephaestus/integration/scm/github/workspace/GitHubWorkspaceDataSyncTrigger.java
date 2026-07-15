@@ -62,7 +62,7 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     /**
      * Resolves the workspace's ACTIVE GitHub {@link Connection} and, when both it and {@link
      * SyncJobService} are available, records the lifecycle sync as an {@code INITIAL}/{@code
-     * LIFECYCLE} job (design doc §3.4). Falls back to the untracked sync when either is missing
+     * LIFECYCLE} job. Falls back to the untracked sync when either is missing
      * (e.g. no Connection yet at the point this fires, or the bean genuinely isn't wired), and skips
      * the run — same as a manual "Sync now" would — when a job is already active for this
      * connection.

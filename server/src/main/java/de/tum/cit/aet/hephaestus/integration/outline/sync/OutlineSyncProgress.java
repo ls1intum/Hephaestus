@@ -29,6 +29,11 @@ public final class OutlineSyncProgress {
                     collectionName == null ? Map.of() : Map.of("currentCollection", collectionName)
                 );
             }
+
+            @Override
+            public void onWarning() {
+                handle.reportWarnings();
+            }
         };
     }
 }

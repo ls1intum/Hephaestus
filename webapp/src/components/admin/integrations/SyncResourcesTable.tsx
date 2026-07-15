@@ -123,7 +123,11 @@ export function SyncResourcesTable({
 							<TableCell>
 								{resource.backfillPercent != null ? (
 									<div className="flex items-center gap-2">
-										<Progress value={resource.backfillPercent} className="w-20" />
+										<Progress
+											value={resource.backfillPercent}
+											className="w-20"
+											aria-label={`Backfill progress for ${resource.name}`}
+										/>
 										<span className="text-muted-foreground text-xs tabular-nums">
 											{resource.backfillPercent}%
 										</span>

@@ -44,6 +44,7 @@ function OutlineIntegrationPage() {
 			query: { page: jobsPage, size: JOBS_PAGE_SIZE },
 		}),
 		enabled: Boolean(workspaceSlug) && connectionId != null,
+		refetchInterval: 60_000,
 	});
 
 	return (

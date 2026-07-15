@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * SSE entry point for the sync-observability live-push stream (design doc §3.5). Mirrors {@code
+ * SSE entry point for the sync-observability live-push stream. Mirrors {@code
  * SyncController}'s workspace scoping and authorization but is {@link Hidden} — like {@code
  * MentorChatController} — because it carries invalidation hints only, not a documented DTO
  * contract, so it must not appear in the generated OpenAPI spec.

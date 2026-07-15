@@ -151,8 +151,8 @@ describe("AdminOutlineSettings — connect happy path", () => {
 		});
 
 		// The invalidated connections query refetches → the card flips to connected with status.
-		expect(await screen.findByText(/outline connected/i)).toBeTruthy();
-		expect(await screen.findByText(/live updates via webhook/i)).toBeTruthy();
+		expect(await screen.findByText(/outline active/i)).toBeTruthy();
+		expect(await screen.findByText(/webhook registered/i)).toBeTruthy();
 		expect(toast.success).toHaveBeenCalledWith("Outline connected");
 	});
 });
@@ -328,7 +328,9 @@ describe("AdminOutlineSettings — sync now", () => {
 		);
 
 		renderContainer();
-		fireEvent.click(await screen.findByRole("button", { name: /sync now/i }));
+		const syncButton = await screen.findByRole("button", { name: /sync now/i });
+		await waitFor(() => expect((syncButton as HTMLButtonElement).disabled).toBe(false));
+		fireEvent.click(syncButton);
 
 		await waitFor(() => expect(syncRequestBody).toEqual({ type: "RECONCILIATION" }));
 		await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Sync started"));
@@ -336,6 +338,24 @@ describe("AdminOutlineSettings — sync now", () => {
 });
 
 describe("AdminOutlineSettings — token lifecycle", () => {
+	it("surfaces token status failures and offers a retry", async () => {
+		const collectionsRef = { current: [engineering] as unknown[] };
+		useConnectedHandlers(collectionsRef);
+		server.use(
+			http.get("*/workspaces/demo/connections/outline/token", () =>
+				HttpResponse.json(
+					{ title: "Bad Gateway", status: 502, detail: "Outline did not respond" },
+					{ status: 502 },
+				),
+			),
+		);
+
+		renderContainer();
+
+		expect(await screen.findByText(/we couldn't verify the outline token/i)).toBeTruthy();
+		expect(screen.getByRole("button", { name: /retry/i })).toBeTruthy();
+	});
+
 	it("surfaces a rejected token as a destructive alert instead of a healthy-looking card", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		useConnectedHandlers(collectionsRef);

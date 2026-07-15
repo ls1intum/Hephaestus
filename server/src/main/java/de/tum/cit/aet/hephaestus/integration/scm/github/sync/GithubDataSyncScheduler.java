@@ -277,10 +277,21 @@ public class GithubDataSyncScheduler {
         }
     }
 
+    /** Run the same warning-aware body used by the scheduled path for one manual job. */
+    public void syncWorkspaceNow(long workspaceId, SyncJobHandle handle) {
+        SyncSession session = syncTargetProvider
+            .getSyncSessions(IntegrationKind.GITHUB)
+            .stream()
+            .filter(candidate -> candidate.scopeId().equals(workspaceId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No active GitHub sync scope for workspace " + workspaceId));
+        runScopeSyncBody(session, handle);
+    }
+
     /**
      * Resolves the workspace's ACTIVE GitHub {@link Connection} (if any) and wraps the scope sync in
      * {@link SyncJobService#run} as a {@code RECONCILIATION}/{@code SCHEDULED} job row, so the daily
-     * cron shows up in the connection's job history (design doc §3.4). Workspaces without an ACTIVE
+     * cron shows up in the connection's job history. Workspaces without an ACTIVE
      * GitHub connection (shouldn't normally reach here, since {@code getSyncSessions} already filters
      * by active provider — defensive) run the sync unrecorded rather than skipping it outright.
      *
@@ -345,12 +356,12 @@ public class GithubDataSyncScheduler {
                 // Sync issue types FIRST (before repository syncs) because they are
                 // organization-level entities that issues reference. This ensures
                 // issue types exist when issues are processed during repository sync.
-                syncIssueTypes(session);
+                syncIssueTypes(session, handle);
 
                 // Sync projects BEFORE repositories so embedded project items can be linked.
                 // Ensure the organization exists before attempting project sync.
                 if (syncSchedulerProperties.projects().enabled()) {
-                    syncProjects(session);
+                    syncProjects(session, handle);
                 } else {
                     log.debug("Skipped project sync: reason=projectsSyncDisabled, scopeId={}", session.scopeId());
                 }
@@ -385,7 +396,10 @@ public class GithubDataSyncScheduler {
                             session.syncTargets().size() - reposProcessed
                         );
                         try {
-                            dataSyncService.waitForRateLimitReset(session.scopeId());
+                            dataSyncService.waitForRateLimitReset(
+                                session.scopeId(),
+                                handle == null ? null : handle::isCancellationRequested
+                            );
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             log.info(
@@ -394,10 +408,13 @@ public class GithubDataSyncScheduler {
                                 reposProcessed,
                                 session.syncTargets().size() - reposProcessed
                             );
+                            reportWarning(handle);
                             break;
                         }
                     }
-                    dataSyncService.syncSyncTarget(target);
+                    if (!dataSyncService.syncSyncTarget(target)) {
+                        reportWarning(handle);
+                    }
                     reposProcessed++;
                     if (handle != null) {
                         handle.progress(
@@ -425,20 +442,21 @@ public class GithubDataSyncScheduler {
 
                 // Sync teams AFTER repositories exist (team repo permissions need repos).
                 // This mirrors the startup sync order in GithubDataSyncService.
-                syncTeams(session);
+                syncTeams(session, handle);
 
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
                 // Skip if rate limit is critically low to avoid wasting API calls
                 if (!rateLimitTracker.isCritical(session.scopeId())) {
-                    syncSubIssues(session);
-                    syncIssueDependencies(session);
+                    syncSubIssues(session, handle);
+                    syncIssueDependencies(session, handle);
                 } else {
                     log.warn(
                         "Skipped sub-issue and dependency sync: reason=rateLimitCritical, scopeId={}, remaining={}",
                         session.scopeId(),
                         rateLimitTracker.getRemaining(session.scopeId())
                     );
+                    reportWarning(handle);
                 }
             });
 
@@ -457,14 +475,20 @@ public class GithubDataSyncScheduler {
                 session.slug(),
                 e.getInstallationId()
             );
+            if (handle != null) {
+                throw e;
+            }
         } catch (Exception e) {
             log.error("Failed to sync scope: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
+            if (handle != null) {
+                throw new IllegalStateException("Failed to sync GitHub scope " + session.scopeId(), e);
+            }
         } finally {
             syncContextProvider.clearContext();
         }
     }
 
-    private void syncSubIssues(SyncSession session) {
+    private void syncSubIssues(SyncSession session, @Nullable SyncJobHandle handle) {
         try {
             log.debug("Starting sub-issues sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             subIssueSyncService.syncSubIssuesForScope(session.scopeId());
@@ -472,10 +496,11 @@ public class GithubDataSyncScheduler {
             throw e;
         } catch (Exception e) {
             log.error("Failed to sync sub-issues: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
+            reportWarning(handle);
         }
     }
 
-    private void syncTeams(SyncSession session) {
+    private void syncTeams(SyncSession session, @Nullable SyncJobHandle handle) {
         String accountLogin = session.accountLogin();
         if (accountLogin == null || accountLogin.isBlank()) {
             log.debug("Skipped team sync: reason=noAccountLogin, scopeId={}", session.scopeId());
@@ -489,6 +514,7 @@ public class GithubDataSyncScheduler {
                 session.scopeId(),
                 rateLimitTracker.getRemaining(session.scopeId())
             );
+            reportWarning(handle);
             return;
         }
 
@@ -517,10 +543,11 @@ public class GithubDataSyncScheduler {
                 sanitizeForLog(accountLogin),
                 e
             );
+            reportWarning(handle);
         }
     }
 
-    private void syncIssueTypes(SyncSession session) {
+    private void syncIssueTypes(SyncSession session, @Nullable SyncJobHandle handle) {
         try {
             log.debug("Starting issue types sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             issueTypeSyncService.syncIssueTypesForScope(session.scopeId());
@@ -528,10 +555,11 @@ public class GithubDataSyncScheduler {
             throw e;
         } catch (Exception e) {
             log.error("Failed to sync issue types: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
+            reportWarning(handle);
         }
     }
 
-    private void syncIssueDependencies(SyncSession session) {
+    private void syncIssueDependencies(SyncSession session, @Nullable SyncJobHandle handle) {
         // NOTE (Dec 2025): issue_dependencies webhook is STILL NOT AVAILABLE
         // (GitHub shipped UI without API/webhook - see Discussion #165749)
         // GraphQL bulk sync is currently the ONLY way to get dependency data
@@ -547,10 +575,11 @@ public class GithubDataSyncScheduler {
                 session.slug(),
                 e
             );
+            reportWarning(handle);
         }
     }
 
-    private void syncProjects(SyncSession session) {
+    private void syncProjects(SyncSession session, @Nullable SyncJobHandle handle) {
         String safeAccountLogin = sanitizeForLog(session.accountLogin());
         try {
             log.debug(
@@ -608,6 +637,7 @@ public class GithubDataSyncScheduler {
                             session.scopeId(),
                             projectsWithItems
                         );
+                        reportWarning(handle);
                         break;
                     }
                 } catch (InstallationNotFoundException e) {
@@ -619,6 +649,7 @@ public class GithubDataSyncScheduler {
                         session.scopeId(),
                         e.getMessage()
                     );
+                    reportWarning(handle);
                     // Continue with next project on error
                 }
             }
@@ -634,6 +665,13 @@ public class GithubDataSyncScheduler {
             throw e;
         } catch (Exception e) {
             log.error("Failed to sync projects: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
+            reportWarning(handle);
+        }
+    }
+
+    private static void reportWarning(@Nullable SyncJobHandle handle) {
+        if (handle != null) {
+            handle.reportWarnings();
         }
     }
 }

@@ -11,12 +11,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Slack's {@link IntegrationSyncRunner}: the manual-trigger and (via {@link SlackDataSyncScheduler}) the
- * nightly-cron body, both funneled through {@link SlackDataSyncScheduler#syncWorkspaceNow} — the same
- * consent-gated-per-page entry point the scheduler already uses (design doc §3.4: "no extraction
- * needed").
+ * Runs manual and scheduled Slack sync through the same consent-gated implementation.
  *
- * <p><strong>Outcome mapping (design doc §3.1, "Outcome mapping v1"):</strong> when the
+ * <p><strong>Outcome mapping:</strong> when the
  * {@link WorkspaceSyncSummary} reports at least one genuinely failed channel
  * ({@link WorkspaceSyncSummary#failed()} &gt; 0 — a channel whose history sync threw, distinct from a
  * benign nothing-to-sync/budget skip), the runner calls {@link SyncJobHandle#reportWarnings()} so the
@@ -26,13 +23,7 @@ import org.springframework.stereotype.Component;
  * (e.g. channel-metadata refresh, or the monitored-channel query itself) is not caught here and is left
  * to fail the job as {@code FAILED} with the exception's message as the error summary.
  *
- * <p><strong>Cancellation is coarse-grained.</strong> {@code syncWorkspaceNow} delegates to
- * {@code SlackChannelHistorySyncService.syncWorkspace}, whose per-channel loop is private and not threaded
- * with a cancellation check (design doc §3.4 deliberately avoids extracting/refactoring that method — it
- * already carries consent-gating invariants that must not be disturbed). A cooperative cancel request is
- * therefore only observed at the NEXT manual trigger or nightly tick, never mid-run; the whole reconcile
- * pass (metadata refresh + the full per-channel history/replies loop, paced at Slack's ~1 request/minute
- * budget) runs to completion once started.
+ * <p>Cancellation is cooperative between channels and while waiting for request budget.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
@@ -51,11 +42,13 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
 
     @Override
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
-        WorkspaceSyncSummary summary = dataSyncScheduler.syncWorkspaceNow(ref.workspaceId());
+        WorkspaceSyncSummary summary = dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         handle.progress(summary.synced() + summary.skipped(), summary.channels(), progressDetail(summary));
-        if (summary.failed() > 0) {
-            // At least one channel's history sync threw — a genuine partial failure, not a benign skip.
+        if (summary.failed() > 0 || summary.budgetExhausted()) {
             handle.reportWarnings();
+        }
+        if (handle.isCancellationRequested()) {
+            handle.reportCancelled();
         }
     }
 

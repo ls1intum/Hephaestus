@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
  * webhook-only runtime role the GitLab stack is gated off, so the trigger simply doesn't
  * exist.
  *
- * <p><b>Sync-observability job recording (design doc §3.4):</b> {@link #syncAllRepositories(long)}
+ * <p><b>Sync-observability job recording:</b> {@link #syncAllRepositories(long)}
  * is the {@code LIFECYCLE} trigger entry point (called on Connection activation). When the
  * workspace has an ACTIVE GitLab {@link Connection}, the sync body runs inside
  * {@link SyncJobService}'s {@code INITIAL}/{@code LIFECYCLE} job template; otherwise it runs

@@ -1,5 +1,5 @@
 /**
- * Server-side SSE live-push layer for sync observability (design doc §3.5). Purely additive on top
+ * Server-side SSE live-push layer for sync observability. Purely additive on top
  * of {@link de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent}: the REST surface
  * in {@code sync.api} remains the source of truth, this layer only tells connected clients "something
  * changed, go refetch" — it never carries the DTO payload itself.

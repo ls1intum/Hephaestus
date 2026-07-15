@@ -129,6 +129,8 @@ function IntegrationOverviewCard({
 
 	const detailTo = DETAIL_ROUTE[entry.kind];
 	const status = statusQuery.data;
+	const active = entry.connectionState === "ACTIVE";
+	const scm = entry.kind === "GITHUB" || entry.kind === "GITLAB";
 
 	return (
 		<Card>
@@ -148,11 +150,26 @@ function IntegrationOverviewCard({
 							<PlugZapIcon className="size-4" />
 							Not connected
 						</p>
-						<Button size="sm" render={<Link to={detailTo} params={{ workspaceSlug }} />}>
-							Connect
-							<ArrowRightIcon className="size-3.5" />
-						</Button>
+						{scm ? (
+							<p className="text-muted-foreground text-sm">
+								Source control is selected when the workspace is created.
+							</p>
+						) : (
+							<Button
+								size="sm"
+								nativeButton={false}
+								render={<Link to={detailTo} params={{ workspaceSlug }} />}
+							>
+								Connect
+								<ArrowRightIcon className="size-3.5" />
+							</Button>
+						)}
 					</div>
+				) : !active ? (
+					<p className="text-muted-foreground text-sm">
+						Connection is {entry.connectionState?.toLowerCase()}. Sync controls are available only
+						while it is active.
+					</p>
 				) : statusQuery.isLoading ? (
 					<Skeleton className="h-16 w-full" />
 				) : statusQuery.isError ? (
@@ -182,7 +199,7 @@ function IntegrationOverviewCard({
 					)
 				)}
 			</CardContent>
-			{entry.connected && (
+			{active && (
 				<div className="flex items-center justify-between gap-2 px-6 pb-6">
 					<SyncNowButton
 						onClick={() => {
@@ -198,6 +215,7 @@ function IntegrationOverviewCard({
 					<Button
 						size="sm"
 						variant="ghost"
+						nativeButton={false}
 						render={<Link to={detailTo} params={{ workspaceSlug }} />}
 					>
 						View details

@@ -171,7 +171,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "SlackMessageRepository.tombstone",
                 // JPQL admin-audit query: each nullable filter needs its own @Param for the
                 // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
-                "AuthEventRepository.findForAdmin"
+                "AuthEventRepository.findForAdmin",
+                // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
+                "SyncJobRepository.completeActiveJob"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -505,7 +507,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "MentorChatService", // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
                 "OutlineWorkspacePurgeAdapter", // OutlineWebhookRegistrar is optional (gated by @ConditionalOnProperty(hephaestus.integration.outline.enabled)); the always-on purge contributor resolves it lazily so it still drops leftover documents when Outline is disabled
                 "OutlineWebhookRegistrar", // IntegrationNatsConsumer is optional (gated on hephaestus.sync.nats.enabled and the server runtime role); the registrar reconciles the scope consumer after every subscription-id change and must not require the bean
-                "SlackScopeConsumerReconciler" // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
+                "SlackScopeConsumerReconciler", // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
+                "SyncPushService", // Qualified NATS connection is optional when sync push is disabled or under specs
+                "GitlabConnectionSyncStateProvider" // Rate-limit tracker is conditional with the GitLab runtime beans
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {

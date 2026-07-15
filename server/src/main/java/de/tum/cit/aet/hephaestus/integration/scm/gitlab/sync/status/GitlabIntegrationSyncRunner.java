@@ -4,18 +4,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceDataSyncTrigger;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.GitlabDataSyncScheduler;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab's {@link IntegrationSyncRunner}: the {@code SyncJob} execution body for both
- * {@code INITIAL} and {@code RECONCILIATION} jobs.
- *
- * <p>{@link #reconcile} reuses {@link GitLabWorkspaceDataSyncTrigger}'s cancellable overload
- * verbatim — the same {@code initialize()} + {@code syncFullData()} sequence the workspace
- * lifecycle path already runs — rather than duplicating it (design doc §3.4: "already implements
- * the SPI — reuse as sync body, no refactor needed").
+ * Runs initial and reconciliation GitLab jobs through the existing cancellable sync path.
  *
  * <p>Cancellation is cooperative and best-effort: {@link GitLabWorkspaceDataSyncTrigger} threads
  * {@link SyncJobHandle#isCancellationRequested()} down into the per-repository loop in
@@ -36,13 +30,13 @@ import org.springframework.stereotype.Component;
  * role the GitLab stack is gated off, matching {@link GitLabWorkspaceDataSyncTrigger}'s own gating.
  */
 @Component
-@ConditionalOnBean(GitLabWorkspaceDataSyncTrigger.class)
+@ConditionalOnBean(GitlabDataSyncScheduler.class)
 public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
 
-    private final GitLabWorkspaceDataSyncTrigger trigger;
+    private final GitlabDataSyncScheduler dataSyncScheduler;
 
-    public GitlabIntegrationSyncRunner(GitLabWorkspaceDataSyncTrigger trigger) {
-        this.trigger = trigger;
+    public GitlabIntegrationSyncRunner(GitlabDataSyncScheduler dataSyncScheduler) {
+        this.dataSyncScheduler = dataSyncScheduler;
     }
 
     @Override
@@ -52,10 +46,7 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
 
     @Override
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
-        trigger.syncAllRepositories(ref.workspaceId(), handle::isCancellationRequested);
-        // syncFullData stops its per-repository loop early only when the cancel supplier is true, so a
-        // still-set flag on return means it aborted — declare it so the job finalizes CANCELLED, not
-        // a false SUCCEEDED.
+        dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }

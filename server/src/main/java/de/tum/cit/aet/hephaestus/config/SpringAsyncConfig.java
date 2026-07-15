@@ -46,6 +46,22 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         return executor;
     }
 
+    /** Long-running provider reconciliations must not queue behind or starve ordinary async work. */
+    @Bean(name = "syncJobExecutor")
+    public AsyncTaskExecutor syncJobExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(0);
+        executor.setThreadNamePrefix("sync-job-");
+        // SyncJobService first records cooperative cancellation and interrupts each owning thread.
+        // shutdownNow then reinforces that interrupt instead of merely logging after the termination
+        // budget and leaking this non-daemon pool past context close.
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.setAwaitTerminationSeconds(30);
+        return executor;
+    }
+
     @Override
     public Executor getAsyncExecutor() {
         return applicationTaskExecutor();

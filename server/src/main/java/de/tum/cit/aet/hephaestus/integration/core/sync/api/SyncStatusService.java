@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivity;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRepository;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +63,7 @@ public class SyncStatusService {
         SyncJobService syncJobService,
         SyncJobRepository syncJobRepository,
         ConnectionActivityRepository connectionActivityRepository,
-        @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
+        @Qualifier("syncJobExecutor") AsyncTaskExecutor taskExecutor,
         List<ConnectionSyncStateProvider> providerBeans,
         List<IntegrationSyncRunner> runnerBeans
     ) {
@@ -186,7 +187,7 @@ public class SyncStatusService {
 
     /**
      * Trigger a manual sync. Creates the job row synchronously (so a duplicate-active conflict can be
-     * answered immediately) and dispatches the runner body on the bounded {@code applicationTaskExecutor}.
+     * answered immediately) and dispatches the runner body on the dedicated no-queue sync executor.
      *
      * @throws SyncStateConflictException if the connection is not ACTIVE (409)
      * @throws SyncNotSupportedException  if no runner is registered for this kind, or the kind's runner
@@ -292,15 +293,33 @@ public class SyncStatusService {
     /** Every kind the manifest registry knows about, joined against this workspace's connections. */
     public List<IntegrationCatalogEntryDTO> catalog(long workspaceId) {
         Map<IntegrationKind, Connection> byKind = new EnumMap<>(IntegrationKind.class);
-        for (Connection c : connectionAdminService.listForWorkspace(workspaceId)) {
+        List<Connection> connections = connectionAdminService.listForWorkspace(workspaceId);
+        for (Connection c : connections) {
             byKind.merge(c.getKind(), c, SyncStatusService::preferred);
         }
+
+        IntegrationKind workspaceScm = connections
+            .stream()
+            .filter(c -> c.getKind() == IntegrationKind.GITHUB || c.getKind() == IntegrationKind.GITLAB)
+            .max(
+                Comparator.comparing((Connection c) -> c.getState() != IntegrationState.UNINSTALLED).thenComparing(
+                    Connection::getCreatedAt
+                )
+            )
+            .map(Connection::getKind)
+            .orElse(null);
 
         IntegrationManifestRegistry manifests = connectionAdminService.manifests();
         return manifests
             .registeredKinds()
             .stream()
             .sorted()
+            .filter(
+                kind ->
+                    workspaceScm == null ||
+                    (kind != IntegrationKind.GITHUB && kind != IntegrationKind.GITLAB) ||
+                    kind == workspaceScm
+            )
             .map(kind -> {
                 Connection c = byKind.get(kind);
                 boolean connected = c != null && c.getState() != IntegrationState.UNINSTALLED;
@@ -330,7 +349,7 @@ public class SyncStatusService {
     }
 
     /**
-     * Connection health derivation (design doc §3.3): PENDING/SUSPENDED/UNINSTALLED map directly;
+     * Connection health derivation: PENDING/SUSPENDED/UNINSTALLED map directly;
      * ACTIVE folds in the last finished job's outcome, errored resources, and vendor-reported degradation.
      */
     private static ConnectionHealth deriveHealth(

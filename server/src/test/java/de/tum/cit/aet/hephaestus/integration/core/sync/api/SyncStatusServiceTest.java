@@ -402,6 +402,20 @@ class SyncStatusServiceTest extends BaseUnitTest {
         assertThat(slackEntry.connectionId()).isNull();
     }
 
+    @Test
+    void catalog_exposesOnlyTheWorkspaceScmProvider() {
+        when(connectionAdminService.manifests()).thenReturn(manifests);
+        when(manifests.registeredKinds()).thenReturn(
+            Set.of(IntegrationKind.GITHUB, IntegrationKind.GITLAB, IntegrationKind.SLACK)
+        );
+        when(manifests.manifestFor(any())).thenReturn(Optional.empty());
+        when(connectionAdminService.listForWorkspace(WORKSPACE_ID)).thenReturn(List.of(connection));
+
+        assertThat(service.catalog(WORKSPACE_ID))
+            .extracting(IntegrationCatalogEntryDTO::kind)
+            .containsExactly(IntegrationKind.GITHUB, IntegrationKind.SLACK);
+    }
+
     // --- helpers ---
 
     private SyncJob terminalJob(SyncJobStatus status) {

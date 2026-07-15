@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
@@ -32,17 +34,20 @@ public class ConnectionService {
     private final ConnectionAuditRepository auditRepository;
     private final CredentialBundleConverter credentialConverter;
     private final ApplicationEventPublisher eventPublisher;
+    private final SyncJobRepository syncJobRepository;
 
     public ConnectionService(
         ConnectionRepository connectionRepository,
         ConnectionAuditRepository auditRepository,
         CredentialBundleConverter credentialConverter,
-        ApplicationEventPublisher eventPublisher
+        ApplicationEventPublisher eventPublisher,
+        SyncJobRepository syncJobRepository
     ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
+        this.syncJobRepository = syncJobRepository;
     }
 
     @Transactional(readOnly = true)
@@ -383,6 +388,15 @@ public class ConnectionService {
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
+        if (req.next() != IntegrationState.ACTIVE && connection.getId() != null) {
+            long workspaceId = connection.getWorkspace().getId();
+            connectionRepository.acquireLifecycleLock(connection.getId(), workspaceId);
+            syncJobRepository
+                .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connection.getId(), SyncJobStatus.ACTIVE)
+                .ifPresent(active -> {
+                    throw new ConnectionBusyException(connection.getId(), active.getId());
+                });
+        }
         IntegrationState current = connection.getState();
         if (current == req.next()) {
             log.debug("Connection {} already in state {}, no-op", connection.getId(), req.next());

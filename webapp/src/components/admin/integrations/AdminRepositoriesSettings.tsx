@@ -76,7 +76,7 @@ export function AdminRepositoriesSettings({
 					<CardContent>
 						<div className="space-y-4">
 							{/* Repository List */}
-							<div className="space-y-2">
+							<div className="max-h-80 space-y-2 overflow-y-auto pr-1">
 								{repositories.map((repo) => (
 									<div key={repo.nameWithOwner} className="flex items-center gap-2">
 										{!isReadOnly && (
@@ -135,6 +135,7 @@ export function AdminRepositoriesSettings({
 								<div className="space-y-2">
 									<div className="flex items-center gap-2">
 										<Input
+											aria-label="Repository name"
 											placeholder="Add a repository (owner/name)"
 											value={repositoryInput}
 											onChange={(e) => setRepositoryInput(e.target.value)}

@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionBusyException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
@@ -339,6 +340,14 @@ class ConnectionControllerTest extends BaseUnitTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         verify(connectionService, times(1)).transition(any(Connection.class), any(TransitionRequest.class));
+    }
+
+    @Test
+    void busyConnection_isMappedToConflictWithActiveJobId() {
+        ProblemDetail problem = controller.handleBusyConnection(new ConnectionBusyException(7L, 99L));
+
+        assertThat(problem.getStatus()).isEqualTo(409);
+        assertThat(problem.getProperties()).containsEntry("connectionId", 7L).containsEntry("jobId", 99L);
     }
 
     @Test

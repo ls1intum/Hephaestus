@@ -138,7 +138,7 @@ export function SyncJobsTable({
 					{jobs.map((job) => {
 						const started = asDate(job.startedAt) ?? asDate(job.createdAt);
 						return (
-							<TableRow key={job.id}>
+							<TableRow key={job.id} data-job-id={job.id}>
 								<TableCell>
 									<Badge variant={STATUS_VARIANT[job.status]}>{JOB_STATUS_LABEL[job.status]}</Badge>
 								</TableCell>

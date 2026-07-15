@@ -69,9 +69,9 @@ public final class SyncJobHandle {
     }
 
     /**
-     * A runner calls this when it actually stops early in response to {@link #isCancellationRequested()}.
-     * Only then does the job finalize as {@code CANCELLED} — a runner that ignores the flag or finishes
-     * its work before honoring it is recorded {@code SUCCEEDED}, not falsely cancelled.
+     * A runner calls this when it stops early in response to {@link #isCancellationRequested()}.
+     * The service also honors a committed database cancellation during its terminal compare-and-set,
+     * covering requests that arrive on another replica after the last heartbeat refresh.
      */
     public void reportCancelled() {
         this.cancelledReported = true;

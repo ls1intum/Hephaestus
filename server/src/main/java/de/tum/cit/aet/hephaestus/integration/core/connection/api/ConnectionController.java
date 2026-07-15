@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionBusyException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
@@ -250,6 +251,15 @@ public class ConnectionController {
         log.info("Connection lookup 404: {}", e.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         problem.setTitle("Resource not found");
+        return problem;
+    }
+
+    @ExceptionHandler(ConnectionBusyException.class)
+    ProblemDetail handleBusyConnection(ConnectionBusyException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        problem.setTitle("Connection has an active sync job");
+        problem.setProperty("connectionId", e.connectionId());
+        problem.setProperty("jobId", e.jobId());
         return problem;
     }
 }

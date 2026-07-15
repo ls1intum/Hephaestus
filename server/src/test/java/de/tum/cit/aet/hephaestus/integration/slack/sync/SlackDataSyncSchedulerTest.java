@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -80,20 +81,20 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         assertThat(summary.requestsUsed()).isZero();
         assertThat(summary.channels()).isZero();
         verify(metadataRefresher, never()).refreshWorkspace(anyLong());
-        verify(historySyncService, never()).syncWorkspace(anyLong());
+        verify(historySyncService, never()).syncWorkspace(anyLong(), any());
     }
 
     @Test
     void connectedWorkspace_refreshesMetadataThenReconcilesHistory() {
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
-        when(historySyncService.syncWorkspace(WS)).thenReturn(
+        when(historySyncService.syncWorkspace(eq(WS), any(BooleanSupplier.class))).thenReturn(
             new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 5L, 3, false, 0)
         );
 
         var summary = scheduler.syncWorkspaceNow(WS);
 
         verify(metadataRefresher).refreshWorkspace(WS);
-        verify(historySyncService).syncWorkspace(WS);
+        verify(historySyncService).syncWorkspace(eq(WS), any(BooleanSupplier.class));
         assertThat(summary.ingested()).isEqualTo(5L);
     }
 
@@ -117,7 +118,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         scheduler.syncDataCron();
 
         verify(syncJobService, never()).run(any(), any());
-        verify(historySyncService, never()).syncWorkspace(anyLong());
+        verify(historySyncService, never()).syncWorkspace(anyLong(), any());
     }
 
     @Test
@@ -127,7 +128,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         when(connection.getId()).thenReturn(CONNECTION_ID);
         when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(List.of(WS));
         when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
-        when(historySyncService.syncWorkspace(WS)).thenReturn(
+        when(historySyncService.syncWorkspace(eq(WS), any(BooleanSupplier.class))).thenReturn(
             new SlackChannelHistorySyncService.WorkspaceSyncSummary(2, 2, 0, 4L, 2, false, 0)
         );
 
@@ -149,7 +150,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         SyncJobHandle handle = mock(SyncJobHandle.class);
         bodyCaptor.getValue().accept(handle);
 
-        verify(historySyncService).syncWorkspace(WS);
+        verify(historySyncService).syncWorkspace(eq(WS), any(BooleanSupplier.class));
         verify(handle).progress(eq(2), eq(2), any());
     }
 

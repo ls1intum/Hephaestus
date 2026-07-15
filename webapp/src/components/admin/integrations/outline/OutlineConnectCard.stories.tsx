@@ -16,6 +16,7 @@ const meta = {
 		onConnect: fn(),
 		onDisconnect: fn(),
 		onSyncNow: fn(),
+		onCancel: fn(),
 	},
 } satisfies Meta<typeof OutlineConnectCard>;
 

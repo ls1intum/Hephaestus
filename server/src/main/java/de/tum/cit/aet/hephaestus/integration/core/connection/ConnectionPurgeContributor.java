@@ -3,8 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,8 +19,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
 
-    private static final Logger log = LoggerFactory.getLogger(ConnectionPurgeContributor.class);
-
     private final ConnectionRepository connectionRepository;
     private final ConnectionService connectionService;
 
@@ -38,22 +34,17 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
             if (c.getState() == IntegrationState.UNINSTALLED) {
                 continue;
             }
-            try {
-                connectionService.transition(
-                    c,
-                    new ConnectionService.TransitionRequest(
-                        IntegrationState.UNINSTALLED,
-                        "WORKSPACE_PURGED",
-                        "SYSTEM",
-                        "workspace-purge",
-                        "workspace-" + workspaceId + "-purge",
-                        "Cascade from workspace PURGE"
-                    )
-                );
-            } catch (RuntimeException e) {
-                // Don't let one connection block the rest — log + continue.
-                log.warn("Failed to cascade PURGE → UNINSTALLED for connection={}: {}", c.getId(), e.toString());
-            }
+            connectionService.transition(
+                c,
+                new ConnectionService.TransitionRequest(
+                    IntegrationState.UNINSTALLED,
+                    "WORKSPACE_PURGED",
+                    "SYSTEM",
+                    "workspace-purge",
+                    "workspace-" + workspaceId + "-purge-" + c.getId(),
+                    "Cascade from workspace PURGE"
+                )
+            );
         }
     }
 

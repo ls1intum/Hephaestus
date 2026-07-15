@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * GitHub {@link ConnectionSyncStateProvider}: connection-level sync snapshot and per-repository
- * resource rows for the sync-observability read model (design doc §3.2, §3.4).
+ * resource rows for the sync-observability read model.
  *
  * <p>Both {@link #describe} and {@link #resources} are O(DB + in-memory) only — no live GitHub API
  * call — per the SPI contract: the overview page renders every connected integration on one load.
@@ -176,7 +176,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             itemCount,
             // upstreamCount: would require a live vendor call — the SPI forbids that in resources().
             null,
-            // lastError: v1 — no per-resource error surface stored yet (design doc §3.2).
+            // Per-resource errors are not persisted yet.
             null,
             // backfillCompletedThrough: GitHub's backfill horizon is issue/PR-NUMBER based
             // (highWaterMark/checkpoint), not date-based — no per-item timestamp to report here
@@ -187,7 +187,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
     }
 
     /**
-     * Connection-level backfill rollup (design doc §3.2/§3.4), computed from a single {@code findByWorkspaceId}
+     * Connection-level backfill rollup, computed from a single {@code findByWorkspaceId}
      * load using the same high-water-mark / remaining / initialized fields {@code toResourceState} reads per
      * resource — so no per-target {@code getProgress} re-fetch (an N+1 over the monitor set) is needed.
      */

@@ -15,15 +15,16 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Map;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SourceType;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
@@ -101,6 +102,7 @@ public class SyncJob {
     private Instant finishedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
+    @CreationTimestamp(source = SourceType.DB)
     private Instant createdAt;
 
     /**
@@ -150,12 +152,5 @@ public class SyncJob {
         this.type = type;
         this.trigger = trigger;
         this.triggeredByUserId = triggeredByUserId;
-    }
-
-    @PrePersist
-    void prePersist() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
     }
 }

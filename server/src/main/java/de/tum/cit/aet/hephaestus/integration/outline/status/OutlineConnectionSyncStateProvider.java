@@ -34,7 +34,7 @@ import org.springframework.stereotype.Component;
  * — existence-only, matching the absorbed endpoint's semantics: Outline auto-disables a subscription after
  * repeated delivery failures, and a stale id here self-heals on the next reconcile rather than being probed live.
  *
- * <p><b>rateLimit</b> is always {@code null} — Outline has no tracked rate-limit budget (see design doc §3.2).
+ * <p><b>rateLimit</b> is always {@code null} — Outline has no tracked rate-limit budget.
  *
  * <p><b>backfill</b> is always {@code null} — Outline has no separate backfill phase; every pass is a full
  * reconcile against the currently-registered collections (see {@link #resources} javadoc and

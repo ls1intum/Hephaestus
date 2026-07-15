@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Slack's {@link ConnectionSyncStateProvider}: read-only, {@code O(DB + in-memory)} projection over
- * already-persisted state (design doc §3.2/§3.4) — never a live Slack API call.
+ * already-persisted state — never a live Slack API call.
  *
  * <p>Rate limit is always {@code null}: unlike GitHub/GitLab, Slack does not surface per-call
  * remaining/reset headers we track — the budget is a static, configured request ceiling

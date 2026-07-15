@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+	cancelConnectionSyncJobMutation,
 	deleteOutlineCollectionMutation,
 	getConnectionSyncStatusOptions,
 	getOutlineTokenStatusOptions,
@@ -13,6 +14,8 @@ import {
 	updateConnectionStatusMutation,
 	updateOutlineCollectionStateMutation,
 } from "@/api/@tanstack/react-query.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { problemDetailOf } from "@/lib/problem-detail";
 import {
 	OutlineCollectionsSection,
@@ -49,15 +52,17 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	const queryClient = useQueryClient();
 
 	const connectionsQueryOptions = listOptions({ path: { workspaceSlug } });
-	const { data: connections } = useQuery({
+	const connectionsQuery = useQuery({
 		...connectionsQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
+	const connections = connectionsQuery.data;
 
 	const outlineConnection = (connections ?? []).find(
-		(connection) => connection.kind === "OUTLINE" && connection.state === "ACTIVE",
+		(connection) => connection.kind === "OUTLINE" && connection.state !== "UNINSTALLED",
 	);
 	const connected = outlineConnection != null;
+	const active = outlineConnection?.state === "ACTIVE";
 	const connectionId = outlineConnection?.id;
 
 	// Gated on `connected` — the sync status endpoint is state-aware but there is nothing to show
@@ -65,10 +70,15 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 	const statusQueryOptions = getConnectionSyncStatusOptions({
 		path: { workspaceSlug, connectionId: connectionId ?? -1 },
 	});
-	const { data: connectionStatus, isLoading: isStatusLoading } = useQuery({
+	const {
+		data: connectionStatus,
+		isLoading: isStatusLoading,
+		error: statusError,
+		refetch: refetchStatus,
+	} = useQuery({
 		...statusQueryOptions,
 		enabled: connected && connectionId != null,
-		refetchInterval: (query) => (query.state.data?.activeJob ? 3_000 : false),
+		refetchInterval: (query) => (query.state.data?.activeJob ? 3_000 : 60_000),
 	});
 
 	const collectionsQueryOptions = listOutlineCollectionsOptions({ path: { workspaceSlug } });
@@ -79,16 +89,21 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 		refetch: refetchCollections,
 	} = useQuery({
 		...collectionsQueryOptions,
-		enabled: connected,
+		enabled: active,
 		refetchInterval: (query) =>
-			query.state.data?.some((collection) => collection.syncStatus === "PENDING") ? 3_000 : false,
+			query.state.data?.some((collection) => collection.syncStatus === "PENDING") ? 3_000 : 60_000,
 	});
 
 	// A live call into Outline that an admin reads rather than watches: cache hard, never poll.
 	const tokenStatusQueryOptions = getOutlineTokenStatusOptions({ path: { workspaceSlug } });
-	const { data: tokenStatus, isLoading: isTokenStatusLoading } = useQuery({
+	const {
+		data: tokenStatus,
+		isLoading: isTokenStatusLoading,
+		error: tokenStatusError,
+		refetch: refetchTokenStatus,
+	} = useQuery({
 		...tokenStatusQueryOptions,
-		enabled: connected,
+		enabled: active,
 		staleTime: TOKEN_STATUS_STALE_MS,
 		retry: false,
 	});
@@ -142,6 +157,17 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 		},
 		onError: (e) => {
 			toast.error("Failed to start sync", { description: problemDetailOf(e) });
+		},
+	});
+
+	const cancelJob = useMutation({
+		...cancelConnectionSyncJobMutation(),
+		onSuccess: () => {
+			toast.success("Cancelling — stopping after current collection…");
+			invalidateOutline();
+		},
+		onError: (e) => {
+			toast.error("Failed to cancel sync", { description: problemDetailOf(e) });
 		},
 	});
 
@@ -246,10 +272,39 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 		erroredCollections: connectionStatus.resourceCounts.errored,
 	};
 
+	if (connectionsQuery.isLoading) {
+		return <Skeleton className="h-48 w-full" />;
+	}
+
+	if (connectionsQuery.isError) {
+		return (
+			<QueryErrorAlert
+				error={connectionsQuery.error}
+				title="We couldn't load the Outline connection"
+				onRetry={() => connectionsQuery.refetch()}
+			/>
+		);
+	}
+
 	return (
 		<div className="space-y-10">
+			{statusError && (
+				<QueryErrorAlert
+					error={statusError}
+					title="We couldn't load Outline sync status"
+					onRetry={() => refetchStatus()}
+				/>
+			)}
+			{tokenStatusError && (
+				<QueryErrorAlert
+					error={tokenStatusError}
+					title="We couldn't verify the Outline token"
+					onRetry={() => refetchTokenStatus()}
+				/>
+			)}
 			<OutlineConnectCard
 				connected={connected}
+				connectionState={outlineConnection?.state}
 				connectionLabel={outlineConnection?.displayName ?? outlineConnection?.instanceKey}
 				status={syncSummary}
 				isStatusLoading={connected && isStatusLoading}
@@ -258,6 +313,9 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 				isConnecting={connect.isPending}
 				isDisconnecting={disconnect.isPending}
 				isSyncing={syncNow.isPending}
+				syncDisabled={!active || statusError != null || connectionStatus == null}
+				isCancelling={cancelJob.isPending}
+				cancelRequested={connectionStatus?.activeJob?.cancelRequested}
 				errorMessage={connectErrorMessage}
 				connectUnavailable={connectUnavailable}
 				onConnect={handleConnect}
@@ -269,9 +327,14 @@ export function AdminOutlineSettings({ workspaceSlug }: AdminOutlineSettingsProp
 						body: { type: "RECONCILIATION" },
 					});
 				}}
+				onCancel={() => {
+					const jobId = connectionStatus?.activeJob?.id;
+					if (connectionId == null || jobId == null) return;
+					cancelJob.mutate({ path: { workspaceSlug, connectionId, jobId } });
+				}}
 			/>
 
-			{connected && (
+			{active && (
 				<OutlineCollectionsSection
 					workspaceSlug={workspaceSlug}
 					collections={collections ?? []}

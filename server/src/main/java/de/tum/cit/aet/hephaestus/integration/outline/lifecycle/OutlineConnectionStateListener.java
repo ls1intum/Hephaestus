@@ -29,7 +29,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * never rethrown. Sync work is routed through {@link OutlineDocumentSyncScheduler} because the async
  * event thread carries no tenancy-bypass scope of its own. The initial sync is recorded as an
  * {@code INITIAL}/{@code LIFECYCLE} job through {@link SyncJobService} — the same job-tracking template
- * every other trigger path uses (design doc §3.4).
+ * every other trigger path uses.
  */
 @Component
 @ConditionalOnServerRole

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
 /**
  * Wire payload for one {@code sync} SSE event — an invalidation hint, not data. Clients refetch the
- * relevant REST resource (design doc §3.5) rather than trusting a carried DTO, so this record stays
+ * relevant REST resource rather than trusting a carried DTO, so this record stays
  * intentionally thin and vendor/DTO-shape agnostic.
  *
  * @param scope one of {@link Scope#wireValue()} — {@code job}, {@code resources}, {@code connection},

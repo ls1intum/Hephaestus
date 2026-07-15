@@ -51,6 +51,7 @@ export interface OutlineSyncSummary {
 
 export interface OutlineConnectCardProps {
 	connected: boolean;
+	connectionState?: string;
 	connectionLabel?: string;
 	status?: OutlineSyncSummary;
 	isStatusLoading?: boolean;
@@ -59,12 +60,16 @@ export interface OutlineConnectCardProps {
 	isConnecting?: boolean;
 	isDisconnecting?: boolean;
 	isSyncing?: boolean;
+	syncDisabled?: boolean;
+	isCancelling?: boolean;
+	cancelRequested?: boolean;
 	errorMessage?: string;
 	/** This instance has no Outline integration, so the connect form is a dead end and the card says so. */
 	connectUnavailable?: boolean;
 	onConnect: (input: OutlineConnectInput) => void;
 	onDisconnect: () => void;
 	onSyncNow: () => void;
+	onCancel: () => void;
 }
 
 // Client-side format hint only — the server re-validates the URL through the SSRF guard on connect.
@@ -81,6 +86,7 @@ const EXPIRY_WARNING_DAYS = 14;
  */
 export function OutlineConnectCard({
 	connected,
+	connectionState,
 	connectionLabel,
 	status,
 	isStatusLoading = false,
@@ -89,11 +95,15 @@ export function OutlineConnectCard({
 	isConnecting = false,
 	isDisconnecting = false,
 	isSyncing = false,
+	syncDisabled = false,
+	isCancelling = false,
+	cancelRequested = false,
 	errorMessage,
 	connectUnavailable = false,
 	onConnect,
 	onDisconnect,
 	onSyncNow,
+	onCancel,
 }: OutlineConnectCardProps) {
 	const [serverUrl, setServerUrl] = useState("");
 	const [token, setToken] = useState("");
@@ -190,7 +200,7 @@ export function OutlineConnectCard({
 							<div className="flex items-center gap-2 text-sm">
 								<CheckIcon className="size-4 text-success" aria-hidden />
 								<span>
-									Outline connected
+									Outline {connectionState?.toLowerCase() ?? "connected"}
 									{connectionLabel ? ` — ${connectionLabel}` : ""}
 								</span>
 							</div>
@@ -204,7 +214,7 @@ export function OutlineConnectCard({
 											{status.webhookRegistered ? (
 												<span className="flex items-center gap-1.5">
 													<WebhookIcon className="size-4 text-success" aria-hidden />
-													Live updates via webhook
+													Webhook registered
 												</span>
 											) : (
 												<span className="flex items-center gap-1.5">
@@ -248,10 +258,27 @@ export function OutlineConnectCard({
 
 				{connected && (
 					<CardFooter className="justify-between gap-2">
-						<Button variant="outline" size="sm" onClick={onSyncNow} disabled={isSyncing}>
-							{isSyncing ? <Spinner /> : <RefreshCwIcon className="size-4" />}
-							{isSyncing ? "Starting sync…" : "Sync now"}
-						</Button>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={onSyncNow}
+								disabled={syncDisabled || isSyncing || status?.syncRunning === true}
+							>
+								{isSyncing ? <Spinner /> : <RefreshCwIcon className="size-4" />}
+								{isSyncing ? "Starting sync…" : "Sync now"}
+							</Button>
+							{status?.syncRunning && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={onCancel}
+									disabled={isCancelling || cancelRequested}
+								>
+									{cancelRequested ? "Stopping after current collection…" : "Cancel"}
+								</Button>
+							)}
+						</div>
 						<Button
 							variant="destructive-outline"
 							size="sm"

@@ -32,6 +32,17 @@ pnpm --filter webapp run test:e2e          # starts vite (reused if running) + r
 E2E_SERVER_URL=http://localhost:38080 pnpm --filter webapp run test:e2e   # override backend origin
 ```
 
+Provider-backed integration checks are opt-in because they require configured live workspaces:
+
+```bash
+LIVE_INTEGRATION_E2E=true pnpm --filter webapp run test:e2e -- sync-observability.live.spec.ts
+E2E_MUTATE_LIVE_INTEGRATIONS=true LIVE_INTEGRATION_E2E=true \
+  pnpm --filter webapp run test:e2e -- sync-observability.live.spec.ts
+```
+
+Override the defaults with `E2E_GITHUB_WORKSPACE`, `E2E_GITLAB_WORKSPACE`, and
+`E2E_LIVE_USERNAME`. The mutation flag starts a real provider sync.
+
 ## How it works
 
 - `fixtures.ts` replaces the dev `/env-config.js` stub so the SPA points at `E2E_SERVER_URL` and reads

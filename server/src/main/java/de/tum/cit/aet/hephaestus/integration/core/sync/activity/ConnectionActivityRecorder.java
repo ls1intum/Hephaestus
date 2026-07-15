@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent;
@@ -16,7 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Records the webhook-liveness ("last event processed") watermark for a connection, from the NATS
@@ -46,6 +49,7 @@ public class ConnectionActivityRecorder {
     private final ConnectionActivityRepository activityRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
+    private final TransactionTemplate transactionTemplate;
 
     private final ConcurrentHashMap<ScopeKindKey, Long> connectionIdCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Instant> lastWriteAtByConnection = new ConcurrentHashMap<>();
@@ -54,12 +58,14 @@ public class ConnectionActivityRecorder {
         ConnectionRepository connectionRepository,
         ConnectionActivityRepository activityRepository,
         ApplicationEventPublisher eventPublisher,
-        Clock clock
+        Clock clock,
+        TransactionTemplate transactionTemplate
     ) {
         this.connectionRepository = connectionRepository;
         this.activityRepository = activityRepository;
         this.eventPublisher = eventPublisher;
         this.clock = clock;
+        this.transactionTemplate = transactionTemplate;
     }
 
     /**
@@ -67,10 +73,9 @@ public class ConnectionActivityRecorder {
      * ACTIVE connection for that pair, or if the last write for the resolved connection is still
      * within {@link #WRITE_THROTTLE}. Never throws.
      */
-    @Transactional
     public void recordEventProcessed(long workspaceId, IntegrationKind kind, String eventType) {
         try {
-            doRecord(workspaceId, kind, eventType);
+            transactionTemplate.executeWithoutResult(status -> doRecord(workspaceId, kind, eventType));
         } catch (Exception e) {
             log.warn(
                 "Failed to record connection activity: workspaceId={}, kind={}, eventType={}",
@@ -89,6 +94,16 @@ public class ConnectionActivityRecorder {
      */
     public void invalidate(long workspaceId, IntegrationKind kind) {
         connectionIdCache.remove(new ScopeKindKey(workspaceId, kind));
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onActivated(ConnectionLifecycleEvent.Activated event) {
+        invalidate(event.workspaceId(), event.kind());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDeactivated(ConnectionLifecycleEvent.Deactivated event) {
+        invalidate(event.workspaceId(), event.kind());
     }
 
     private void doRecord(long workspaceId, IntegrationKind kind, String eventType) {

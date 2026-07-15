@@ -10,9 +10,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -35,6 +37,8 @@ class SyncPushServiceTest extends BaseUnitTest {
     private static final long CONNECTION_ID = 7L;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
     @Mock
     private SyncEventHub hub;
 
@@ -56,7 +60,7 @@ class SyncPushServiceTest extends BaseUnitTest {
     @Test
     void withoutNats_onSyncStateChanged_deliversDirectlyInProcess() {
         ObjectProvider<Connection> provider = objectProviderReturning(null);
-        SyncPushService service = new SyncPushService(hub, MAPPER, provider);
+        SyncPushService service = new SyncPushService(hub, MAPPER, provider, meters);
 
         service.onSyncStateChanged(someEvent());
 
@@ -65,14 +69,26 @@ class SyncPushServiceTest extends BaseUnitTest {
         assertThat(captor.getValue().scope()).isEqualTo("job");
         assertThat(captor.getValue().connectionId()).isEqualTo(CONNECTION_ID);
         verify(connection, never()).publish(anyString(), any(byte[].class));
+        assertThat(pushCounter("local", "success")).isEqualTo(1.0);
     }
 
     @Test
     void withoutNats_neverTouchesNatsConnection() {
         ObjectProvider<Connection> provider = objectProviderReturning(null);
-        new SyncPushService(hub, MAPPER, provider);
+        new SyncPushService(hub, MAPPER, provider, meters);
         // Constructor must not attempt to create a dispatcher when the connection is absent/null.
         verify(connection, never()).createDispatcher(any(MessageHandler.class));
+    }
+
+    @Test
+    void connectionLifecycle_deliversConnectionInvalidation() {
+        SyncPushService service = new SyncPushService(hub, MAPPER, objectProviderReturning(null), meters);
+
+        service.onConnectionActivated(
+            new ConnectionLifecycleEvent.Activated(CONNECTION_ID, WORKSPACE_ID, IntegrationKind.GITHUB)
+        );
+
+        verify(hub).publish(WORKSPACE_ID, new SyncEventHint("connection", CONNECTION_ID));
     }
 
     @Test
@@ -80,7 +96,7 @@ class SyncPushServiceTest extends BaseUnitTest {
         when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
         ObjectProvider<Connection> provider = objectProviderReturning(connection);
 
-        new SyncPushService(hub, MAPPER, provider);
+        new SyncPushService(hub, MAPPER, provider, meters);
 
         verify(dispatcher).subscribe("hephaestus.syncstatus.>");
     }
@@ -89,7 +105,7 @@ class SyncPushServiceTest extends BaseUnitTest {
     void withNats_onSyncStateChanged_publishesToNatsAndDoesNotDeliverLocally() {
         when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
         ObjectProvider<Connection> provider = objectProviderReturning(connection);
-        SyncPushService service = new SyncPushService(hub, MAPPER, provider);
+        SyncPushService service = new SyncPushService(hub, MAPPER, provider, meters);
 
         service.onSyncStateChanged(someEvent());
 
@@ -101,13 +117,29 @@ class SyncPushServiceTest extends BaseUnitTest {
 
         // The origin replica must NOT also deliver locally — only the NATS subscription does.
         verify(hub, never()).publish(any(Long.class), any(SyncEventHint.class));
+        assertThat(pushCounter("nats_publish", "success")).isEqualTo(1.0);
+    }
+
+    @Test
+    void withNats_publishFailure_deliversLocallyAndRecordsBothOutcomes() {
+        when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
+        org.mockito.Mockito.doThrow(new IllegalStateException("broker unavailable"))
+            .when(connection)
+            .publish(anyString(), any(byte[].class));
+        SyncPushService service = new SyncPushService(hub, MAPPER, objectProviderReturning(connection), meters);
+
+        service.onSyncStateChanged(someEvent());
+
+        verify(hub).publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
+        assertThat(pushCounter("nats_publish", "failure")).isEqualTo(1.0);
+        assertThat(pushCounter("local", "success")).isEqualTo(1.0);
     }
 
     @Test
     void onMessage_deliversToHubExactlyOnce() {
         when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
         ObjectProvider<Connection> provider = objectProviderReturning(connection);
-        SyncPushService service = new SyncPushService(hub, MAPPER, provider);
+        SyncPushService service = new SyncPushService(hub, MAPPER, provider, meters);
 
         SyncEventHint hint = new SyncEventHint("resources", CONNECTION_ID);
         byte[] payload = MAPPER.writeValueAsBytes(hint);
@@ -118,12 +150,13 @@ class SyncPushServiceTest extends BaseUnitTest {
         service.onMessage(message);
 
         verify(hub, times(1)).publish(eq(WORKSPACE_ID), eq(hint));
+        assertThat(pushCounter("nats_receive", "success")).isEqualTo(1.0);
     }
 
     @Test
     void onMessage_malformedSubject_isLoggedNotThrown() {
         ObjectProvider<Connection> provider = objectProviderReturning(null);
-        SyncPushService service = new SyncPushService(hub, MAPPER, provider);
+        SyncPushService service = new SyncPushService(hub, MAPPER, provider, meters);
 
         Message message = mock(Message.class);
         when(message.getSubject()).thenReturn("not.the.right.prefix");
@@ -131,6 +164,7 @@ class SyncPushServiceTest extends BaseUnitTest {
         service.onMessage(message); // must not throw — malformed subject is caught + logged
 
         verify(hub, never()).publish(any(Long.class), any(SyncEventHint.class));
+        assertThat(pushCounter("nats_receive", "failure")).isEqualTo(1.0);
     }
 
     @SuppressWarnings("unchecked")
@@ -138,5 +172,14 @@ class SyncPushServiceTest extends BaseUnitTest {
         ObjectProvider<Connection> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(connection);
         return provider;
+    }
+
+    private double pushCounter(String transport, String outcome) {
+        return meters
+            .get("integration.sync.push.messages")
+            .tag("transport", transport)
+            .tag("outcome", outcome)
+            .counter()
+            .count();
     }
 }

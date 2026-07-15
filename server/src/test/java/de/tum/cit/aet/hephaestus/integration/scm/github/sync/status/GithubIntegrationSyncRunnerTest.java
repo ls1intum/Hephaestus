@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync.status;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -18,7 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -29,17 +30,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Unit tests for {@link GithubIntegrationSyncRunner}: {@code reconcile} delegation to the
- * handle-aware {@link GithubDataSyncService} entry point, and {@code backfill}'s
- * repository-by-repository loop — cancellation observed between repositories, and the
- * no-progress escape hatch that prevents a tight spin when every pending repo is skipped.
+ * Unit tests for {@link GithubIntegrationSyncRunner} reconciliation and backfill behavior.
  */
 class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
 
     @Mock
-    private GithubDataSyncService dataSyncService;
+    private GithubDataSyncScheduler dataSyncScheduler;
 
     @Mock
     private SyncTargetProvider syncTargetProvider;
@@ -65,7 +63,7 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             null,
             null
         );
-        runner = new GithubIntegrationSyncRunner(dataSyncService, syncTargetProvider, backfillService, properties);
+        runner = new GithubIntegrationSyncRunner(dataSyncScheduler, syncTargetProvider, backfillService, properties);
         ref = new IntegrationRef(IntegrationKind.GITHUB, WORKSPACE_ID, "100");
     }
 
@@ -102,8 +100,7 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
         void delegatesToHandleAwareDataSyncServiceEntryPoint() {
             runner.reconcile(ref, handle);
 
-            verify(dataSyncService).syncAllRepositories(WORKSPACE_ID, handle);
-            // Ran to completion (flag never set) — must NOT be labeled cancelled.
+            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
             verify(handle, never()).reportCancelled();
         }
 
@@ -113,13 +110,35 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
             runner.reconcile(ref, handle);
 
-            verify(dataSyncService).syncAllRepositories(WORKSPACE_ID, handle);
+            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
             verify(handle).reportCancelled();
         }
     }
 
     @Nested
     class Backfill {
+
+        @Test
+        void reportsUnsupportedWhenBackfillIsDisabled() {
+            SyncSchedulerProperties disabled = new SyncSchedulerProperties(
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new BackfillProperties(false, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                null,
+                null
+            );
+            GithubIntegrationSyncRunner disabledRunner = new GithubIntegrationSyncRunner(
+                dataSyncScheduler,
+                syncTargetProvider,
+                backfillService,
+                disabled
+            );
+
+            assertThat(disabledRunner.supportsBackfill()).isFalse();
+        }
 
         @Test
         void runsUntilNoRepositoriesArePending() {
@@ -187,6 +206,7 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
             verify(syncTargetProvider, times(1)).getSyncTargetsForScope(WORKSPACE_ID);
             verify(backfillService, times(2)).runBackfillBatch(any(), anyInt());
+            verify(handle).reportWarnings();
         }
     }
 }

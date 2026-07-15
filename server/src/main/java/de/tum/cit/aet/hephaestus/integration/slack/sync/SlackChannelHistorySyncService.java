@@ -17,6 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackChannelMessageHa
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -78,6 +80,10 @@ public class SlackChannelHistorySyncService {
 
     /** Reconcile one workspace's ACTIVE channels within the request budget. Returns a summary for logging. */
     public WorkspaceSyncSummary syncWorkspace(long workspaceId) {
+        return syncWorkspace(workspaceId, () -> false);
+    }
+
+    public WorkspaceSyncSummary syncWorkspace(long workspaceId, BooleanSupplier cancelled) {
         SlackSyncBudget historyBudget = new SlackSyncBudget(
             properties.historyRequestBudget(),
             properties.historyRequestInterval()
@@ -97,13 +103,23 @@ public class SlackChannelHistorySyncService {
         int skipped = 0;
         long ingested = 0;
         int failed = 0;
+        AtomicBoolean repliesBudgetExhausted = new AtomicBoolean();
         for (SlackMonitoredChannel channel : channels) {
-            if (!historyBudget.available()) {
-                skipped = channels.size() - synced - skipped;
+            if (cancelled.getAsBoolean() || !historyBudget.available()) {
+                skipped += channels.size() - synced - skipped;
                 break;
             }
             try {
-                Long count = syncChannel(workspaceId, channel, retentionFloor, historyBudget, repliesBudget, now);
+                Long count = syncChannel(
+                    workspaceId,
+                    channel,
+                    retentionFloor,
+                    historyBudget,
+                    repliesBudget,
+                    repliesBudgetExhausted,
+                    now,
+                    cancelled
+                );
                 if (count == null) {
                     skipped++;
                 } else {
@@ -129,7 +145,7 @@ public class SlackChannelHistorySyncService {
             skipped,
             ingested,
             historyBudget.used() + repliesBudget.used(),
-            !historyBudget.available(),
+            !historyBudget.available() || repliesBudgetExhausted.get(),
             failed
         );
     }
@@ -144,7 +160,9 @@ public class SlackChannelHistorySyncService {
         String retentionFloor,
         SlackSyncBudget historyBudget,
         SlackSyncBudget repliesBudget,
-        Instant windowEnd
+        AtomicBoolean repliesBudgetExhausted,
+        Instant windowEnd,
+        BooleanSupplier cancelled
     ) {
         String channelId = channel.getSlackChannelId();
         Instant announcedAt = channel.getConsentAnnouncedAt();
@@ -170,7 +188,7 @@ public class SlackChannelHistorySyncService {
             if (state != ConsentState.ACTIVE) {
                 return null;
             }
-            if (!historyBudget.acquire()) {
+            if (!historyBudget.acquire(cancelled)) {
                 return null; // budget exhausted mid-window: no watermark advance, re-fetched next night
             }
             HistoryPage page = slackMessageService.fetchHistoryPage(
@@ -184,7 +202,19 @@ public class SlackChannelHistorySyncService {
             for (Message message : page.messages()) {
                 ingested += routeThroughIngest(workspaceId, channel, message) ? 1 : 0;
                 if (properties.repliesEnabled() && hasReplyGap(workspaceId, channelId, message)) {
-                    ingested += syncReplies(workspaceId, channel, message, floor, repliesBudget);
+                    ReplySync replySync = syncReplies(
+                        workspaceId,
+                        channel,
+                        message,
+                        floor,
+                        repliesBudget,
+                        repliesBudgetExhausted,
+                        cancelled
+                    );
+                    ingested += replySync.ingested();
+                    if (!replySync.complete()) {
+                        return null;
+                    }
                 }
             }
             cursor = page.nextCursor();
@@ -255,24 +285,27 @@ public class SlackChannelHistorySyncService {
     }
 
     /** Fetch a gapped thread's replies (bounded by the replies budget) through the same ingest stack. */
-    private long syncReplies(
+    private ReplySync syncReplies(
         long workspaceId,
         SlackMonitoredChannel channel,
         Message parent,
         String floor,
-        SlackSyncBudget repliesBudget
+        SlackSyncBudget repliesBudget,
+        AtomicBoolean repliesBudgetExhausted,
+        BooleanSupplier cancelled
     ) {
         long ingested = 0;
         String cursor = null;
         do {
-            if (!repliesBudget.acquire()) {
+            if (!repliesBudget.acquire(cancelled)) {
+                repliesBudgetExhausted.set(true);
                 log.debug(
                     "slack.sync: replies budget exhausted for workspaceId={} channelId={} thread={}",
                     workspaceId,
                     channel.getSlackChannelId(),
                     parent.getTs()
                 );
-                return ingested;
+                return new ReplySync(ingested, false);
             }
             HistoryPage page = slackMessageService.fetchRepliesPage(
                 workspaceId,
@@ -290,8 +323,10 @@ public class SlackChannelHistorySyncService {
             }
             cursor = page.nextCursor();
         } while (cursor != null);
-        return ingested;
+        return new ReplySync(ingested, true);
     }
+
+    private record ReplySync(long ingested, boolean complete) {}
 
     private int retentionWindowDays(long workspaceId) {
         int configured = connectionService

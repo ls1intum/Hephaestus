@@ -15,4 +15,7 @@ public interface OutlineSyncProgressListener {
 
     /** Called once a collection's sync attempt (success or recorded error) has finished. */
     void onCollectionDone(int done, int total, @Nullable String collectionName);
+
+    /** Marks the enclosing job as partially successful without coupling this module to job types. */
+    default void onWarning() {}
 }

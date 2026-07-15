@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,6 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Unit coverage for {@link ConnectionActivityRecorder}: the write-throttle window, the
@@ -50,13 +54,30 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private MutableClock clock;
     private ConnectionActivityRecorder recorder;
 
     @BeforeEach
     void setUp() {
         clock = new MutableClock(Instant.parse("2026-07-14T10:00:00Z"), ZoneId.of("UTC"));
-        recorder = new ConnectionActivityRecorder(connectionRepository, activityRepository, eventPublisher, clock);
+        org.mockito.Mockito.lenient()
+            .doAnswer(invocation -> {
+                java.util.function.Consumer<TransactionStatus> action = invocation.getArgument(0);
+                action.accept(org.mockito.Mockito.mock(TransactionStatus.class));
+                return null;
+            })
+            .when(transactionTemplate)
+            .executeWithoutResult(any());
+        recorder = new ConnectionActivityRecorder(
+            connectionRepository,
+            activityRepository,
+            eventPublisher,
+            clock,
+            transactionTemplate
+        );
     }
 
     @Test
@@ -105,8 +126,18 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
             .when(activityRepository)
             .upsertActivity(anyLong(), anyLong(), any(), any());
 
-        recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push");
-        // no exception thrown out of the call above — that IS the assertion.
+        assertThatCode(() ->
+            recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push")
+        ).doesNotThrowAnyException();
+    }
+
+    @Test
+    void recordEventProcessed_transactionCommitFails_neverPropagates() {
+        doThrow(new UnexpectedRollbackException("commit failed")).when(transactionTemplate).executeWithoutResult(any());
+
+        assertThatCode(() ->
+            recorder.recordEventProcessed(WORKSPACE_ID, IntegrationKind.GITHUB, "push")
+        ).doesNotThrowAnyException();
     }
 
     @Test

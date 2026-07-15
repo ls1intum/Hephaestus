@@ -88,6 +88,11 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
         return syncExecutor;
     }
 
+    @Bean(name = "syncJobExecutor")
+    public AsyncTaskExecutor syncJobExecutor() {
+        return syncExecutor;
+    }
+
     /**
      * No-op monitoring executor that skips all submitted sync tasks.
      *

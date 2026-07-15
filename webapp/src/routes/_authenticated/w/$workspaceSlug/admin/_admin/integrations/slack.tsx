@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+	cancelConnectionSyncJobMutation,
 	getConnectionSyncStatusOptions,
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogOptions,
@@ -25,8 +26,11 @@ import { SyncJobsTable } from "@/components/admin/integrations/SyncJobsTable";
 import { SyncNowButton } from "@/components/admin/integrations/SyncNowButton";
 import { asDate } from "@/components/admin/integrations/sync-format";
 import { WebhookLivenessIndicator } from "@/components/admin/integrations/WebhookLivenessIndicator";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -45,20 +49,24 @@ function SlackIntegrationPage() {
 	const [jobsPage, setJobsPage] = useState(0);
 
 	const workspaceQueryOptions = getWorkspaceOptions({ path: { workspaceSlug: slug } });
-	const { data: workspaceData } = useQuery({
+	const workspaceQuery = useQuery({
 		...workspaceQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
+	const workspaceData = workspaceQuery.data;
 
 	const catalogQueryOptions = getIntegrationCatalogOptions({ path: { workspaceSlug: slug } });
-	const { data: catalog } = useQuery({
+	const catalogQuery = useQuery({
 		...catalogQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
+	const catalog = catalogQuery.data;
 	const entry = catalog?.find((e) => e.kind === "SLACK");
-	const connectionId = entry?.connectionId;
+	const hasConnection = entry?.connected === true;
+	const connected = entry?.connectionState === "ACTIVE" && workspaceData?.hasSlackToken === true;
+	const connectionId = hasConnection ? entry.connectionId : undefined;
 
-	const { data: status } = useQuery({
+	const statusQuery = useQuery({
 		...getConnectionSyncStatusOptions({
 			path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
 		}),
@@ -66,6 +74,7 @@ function SlackIntegrationPage() {
 		refetchInterval: (query) => (query.state.data?.activeJob ? 5_000 : 60_000),
 		refetchOnWindowFocus: true,
 	});
+	const status = statusQuery.data;
 
 	const jobsQueryOptions = listConnectionSyncJobsOptions({
 		path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
@@ -80,9 +89,9 @@ function SlackIntegrationPage() {
 	} = useQuery({
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
+		refetchInterval: status?.activeJob ? 5_000 : 60_000,
 	});
 
-	// Slack monitored channels — unchanged from the previous settings-page section, just moved here.
 	const slackChannelsQueryOptions = listSlackChannelsOptions({ path: { workspaceSlug: slug } });
 	const {
 		data: slackChannels,
@@ -92,12 +101,18 @@ function SlackIntegrationPage() {
 	} = useQuery({
 		...slackChannelsQueryOptions,
 		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
+		refetchInterval: status?.activeJob ? 5_000 : 60_000,
 	});
 
 	const slackChannelCandidatesQueryOptions = listSlackChannelCandidatesOptions({
 		path: { workspaceSlug: slug },
 	});
-	const { data: slackChannelCandidates, isLoading: isLoadingSlackChannelCandidates } = useQuery({
+	const {
+		data: slackChannelCandidates,
+		isLoading: isLoadingSlackChannelCandidates,
+		isError: isSlackChannelCandidatesError,
+		refetch: refetchSlackChannelCandidates,
+	} = useQuery({
 		...slackChannelCandidatesQueryOptions,
 		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
 	});
@@ -158,6 +173,29 @@ function SlackIntegrationPage() {
 		},
 	});
 
+	const cancelJob = useMutation({
+		...cancelConnectionSyncJobMutation(),
+		onSuccess: () => {
+			if (connectionId == null) return;
+			queryClient.invalidateQueries({
+				queryKey: getConnectionSyncStatusQueryKey({
+					path: { workspaceSlug: slug, connectionId },
+				}),
+			});
+			queryClient.invalidateQueries({
+				queryKey: listConnectionSyncJobsQueryKey({
+					path: { workspaceSlug: slug, connectionId },
+				}),
+			});
+		},
+		onError: (e) => {
+			toast.error("Failed to cancel sync", { description: problemDetailOf(e) });
+		},
+	});
+
+	const routeLoading = workspaceQuery.isLoading || catalogQuery.isLoading;
+	const routeError = workspaceQuery.error ?? catalogQuery.error;
+
 	return (
 		<div className="container mx-auto max-w-5xl space-y-8 py-6">
 			<IntegrationPageHeader
@@ -167,7 +205,36 @@ function SlackIntegrationPage() {
 				actions={status && <ConnectionHealthBadge health={status.health} />}
 			/>
 
-			{status && (
+			{routeLoading && <Skeleton className="h-48 w-full" />}
+
+			{routeError && (
+				<QueryErrorAlert
+					error={routeError}
+					title="We couldn't load the Slack connection"
+					onRetry={() => {
+						workspaceQuery.refetch();
+						catalogQuery.refetch();
+						statusQuery.refetch();
+					}}
+				/>
+			)}
+
+			{!routeLoading && !routeError && statusQuery.isError && (
+				<QueryErrorAlert
+					error={statusQuery.error}
+					title="We couldn't load Slack sync status"
+					onRetry={() => statusQuery.refetch()}
+				/>
+			)}
+
+			{!routeLoading && !routeError && hasConnection && !connected && (
+				<p className="text-muted-foreground text-sm">
+					Slack is {entry?.connectionState?.toLowerCase()}. Sync controls are available only while
+					it is active.
+				</p>
+			)}
+
+			{!routeLoading && !routeError && status && (
 				<Card>
 					<CardHeader>
 						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
@@ -183,26 +250,43 @@ function SlackIntegrationPage() {
 							</span>
 							<WebhookLivenessIndicator lastEventAt={status.lastEventProcessedAt} />
 						</div>
-						<SyncNowButton
-							onClick={() => {
-								if (connectionId == null) return;
-								triggerSync.mutate({
-									path: { workspaceSlug: slug, connectionId },
-									body: { type: "RECONCILIATION" },
-								});
-							}}
-							isTriggering={triggerSync.isPending}
-							activeJob={status.activeJob}
-						/>
+						{connected && (
+							<SyncNowButton
+								onClick={() => {
+									if (connectionId == null) return;
+									triggerSync.mutate({
+										path: { workspaceSlug: slug, connectionId },
+										body: { type: "RECONCILIATION" },
+									});
+								}}
+								isTriggering={triggerSync.isPending}
+								activeJob={status.activeJob}
+							/>
+						)}
+						{connected && status.activeJob && (
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={cancelJob.isPending || status.activeJob.cancelRequested}
+								onClick={() => {
+									if (connectionId == null) return;
+									cancelJob.mutate({
+										path: { workspaceSlug: slug, connectionId, jobId: status.activeJob?.id ?? -1 },
+									});
+								}}
+							>
+								{status.activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
+							</Button>
+						)}
 					</CardContent>
 				</Card>
 			)}
 
-			{workspaceSlug != null && (
+			{workspaceSlug != null && !routeLoading && !routeError && (
 				<AdminSlackNotificationSettings
 					key={`slack:${workspaceData?.slackConnectionId ?? "none"}:${workspaceData?.leaderboardNotificationChannelId ?? ""}:${workspaceData?.leaderboardNotificationEnabled ?? false}:${workspaceData?.leaderboardScheduleDay ?? ""}:${workspaceData?.leaderboardScheduleTime ?? ""}:${workspaceData?.leaderboardNotificationTeam ?? ""}`}
 					workspaceSlug={slug}
-					hasSlackConnection={workspaceData?.hasSlackToken ?? false}
+					hasSlackConnection={connected}
 					slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
 					channelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
 					teamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
@@ -218,18 +302,18 @@ function SlackIntegrationPage() {
 				/>
 			)}
 
-			{workspaceSlug != null && (
+			{workspaceSlug != null && !routeLoading && !routeError && (
 				<AdminSlackChannelsSettings
 					workspaceSlug={slug}
-					hasSlackConnection={workspaceData?.hasSlackToken ?? false}
-					channels={workspaceData?.hasSlackToken ? (slackChannels ?? []) : []}
+					hasSlackConnection={connected}
+					channels={connected ? (slackChannels ?? []) : []}
 					channelCandidates={slackChannelCandidates ?? []}
-					isLoading={
-						Boolean(workspaceData?.hasSlackToken) &&
-						(isLoadingSlackChannels || isLoadingSlackChannelCandidates)
-					}
-					isError={Boolean(workspaceData?.hasSlackToken) && isSlackChannelsError}
-					onRetry={() => refetchSlackChannels()}
+					isLoading={connected && (isLoadingSlackChannels || isLoadingSlackChannelCandidates)}
+					isError={connected && (isSlackChannelsError || isSlackChannelCandidatesError)}
+					onRetry={() => {
+						refetchSlackChannels();
+						refetchSlackChannelCandidates();
+					}}
 					onRegisterChannel={async ({
 						slackChannelId,
 						channelName,
@@ -271,25 +355,27 @@ function SlackIntegrationPage() {
 				/>
 			)}
 
-			<Card>
-				<CardHeader>
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-						Job history
-					</h2>
-				</CardHeader>
-				<CardContent>
-					<SyncJobsTable
-						jobs={jobsPageData?.content ?? []}
-						isLoading={isJobsLoading}
-						isError={isJobsError}
-						error={jobsError}
-						onRetry={() => refetchJobs()}
-						page={jobsPage}
-						totalPages={jobsPageData?.totalPages ?? 1}
-						onPageChange={setJobsPage}
-					/>
-				</CardContent>
-			</Card>
+			{hasConnection && (
+				<Card>
+					<CardHeader>
+						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
+							Job history
+						</h2>
+					</CardHeader>
+					<CardContent>
+						<SyncJobsTable
+							jobs={jobsPageData?.content ?? []}
+							isLoading={isJobsLoading}
+							isError={isJobsError}
+							error={jobsError}
+							onRetry={() => refetchJobs()}
+							page={jobsPage}
+							totalPages={jobsPageData?.totalPages ?? 1}
+							onPageChange={setJobsPage}
+						/>
+					</CardContent>
+				</Card>
+			)}
 		</div>
 	);
 }

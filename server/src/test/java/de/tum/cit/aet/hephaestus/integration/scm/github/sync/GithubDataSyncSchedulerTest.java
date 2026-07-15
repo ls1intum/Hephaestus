@@ -53,7 +53,7 @@ import org.mockito.Mock;
 
 /**
  * Unit tests for {@link GithubDataSyncScheduler}'s job-recording wrapper around the daily cron's
- * per-scope sync (design doc §3.4): a scope with an ACTIVE GitHub connection records a
+ * per-scope sync: a scope with an ACTIVE GitHub connection records a
  * {@code RECONCILIATION}/{@code SCHEDULED} {@link SyncJobService} job and actually runs the sync
  * body through it; a {@link SyncJobConflictException} (manual sync already active) skips the scope
  * for this tick instead of propagating; a scope with no ACTIVE connection falls back to the

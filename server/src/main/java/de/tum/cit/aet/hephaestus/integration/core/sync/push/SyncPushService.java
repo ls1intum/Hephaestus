@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -9,6 +12,7 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -17,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Bridges {@link SyncStateChangedEvent} to {@link SyncEventHub} — the only consumer of that event
- * today (design doc §3.5). Multi-replica fan-out uses a plain (non-JetStream) NATS subject,
+ * today. Multi-replica fan-out uses a plain (non-JetStream) NATS subject,
  * {@code hephaestus.syncstatus.<workspaceId>}: at-most-once is fine here, clients poll the REST
  * surface as a fallback if a hint is dropped.
  *
@@ -45,16 +49,27 @@ public class SyncPushService {
     private final SyncEventHub hub;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<Connection> natsConnectionProvider;
+    private final Counter localDelivery;
+    private final Counter natsPublishSuccess;
+    private final Counter natsPublishFailure;
+    private final Counter natsReceiveSuccess;
+    private final Counter natsReceiveFailure;
     private volatile Dispatcher dispatcher;
 
     public SyncPushService(
         SyncEventHub hub,
         ObjectMapper objectMapper,
-        ObjectProvider<Connection> natsConnectionProvider
+        @Qualifier("natsConnection") ObjectProvider<Connection> natsConnectionProvider,
+        MeterRegistry meterRegistry
     ) {
         this.hub = hub;
         this.objectMapper = objectMapper;
         this.natsConnectionProvider = natsConnectionProvider;
+        this.localDelivery = counter(meterRegistry, "local", "success");
+        this.natsPublishSuccess = counter(meterRegistry, "nats_publish", "success");
+        this.natsPublishFailure = counter(meterRegistry, "nats_publish", "failure");
+        this.natsReceiveSuccess = counter(meterRegistry, "nats_receive", "success");
+        this.natsReceiveFailure = counter(meterRegistry, "nats_receive", "failure");
         subscribeIfNatsAvailable();
     }
 
@@ -78,22 +93,47 @@ public class SyncPushService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSyncStateChanged(SyncStateChangedEvent event) {
         SyncEventHint hint = new SyncEventHint(wireScope(event.scope()), event.connectionId());
+        deliver(event.workspaceId(), hint);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onConnectionActivated(ConnectionLifecycleEvent.Activated event) {
+        deliver(
+            event.workspaceId(),
+            new SyncEventHint(SyncEventHint.Scope.CONNECTION.wireValue(), event.connectionId())
+        );
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onConnectionDeactivated(ConnectionLifecycleEvent.Deactivated event) {
+        deliver(
+            event.workspaceId(),
+            new SyncEventHint(SyncEventHint.Scope.CONNECTION.wireValue(), event.connectionId())
+        );
+    }
+
+    private void deliver(long workspaceId, SyncEventHint hint) {
         Connection connection = natsConnectionProvider.getIfAvailable();
         if (connection == null) {
-            hub.publish(event.workspaceId(), hint);
+            deliverLocally(workspaceId, hint);
             return;
         }
-        publishToNats(connection, event.workspaceId(), hint);
+        publishToNats(connection, workspaceId, hint);
     }
 
     private void publishToNats(Connection connection, long workspaceId, SyncEventHint hint) {
         try {
             byte[] payload = objectMapper.writeValueAsBytes(hint);
             connection.publish(SUBJECT_PREFIX + workspaceId, payload);
+            natsPublishSuccess.increment();
         } catch (Exception e) {
-            // At-most-once by design (class javadoc) — log and move on; the REST surface is the
-            // source of truth and clients poll it as a fallback.
+            natsPublishFailure.increment();
             log.warn("Sync push: NATS publish failed for workspaceId={}: {}", workspaceId, e.toString());
+            // The origin can still update immediately. Duplicate invalidations are harmless if NATS
+            // accepted the publish before throwing; polling remains the cross-replica safety net.
+            deliverLocally(workspaceId, hint);
         }
     }
 
@@ -104,9 +144,24 @@ public class SyncPushService {
             long workspaceId = parseWorkspaceId(subject);
             SyncEventHint hint = objectMapper.readValue(message.getData(), SyncEventHint.class);
             hub.publish(workspaceId, hint);
+            natsReceiveSuccess.increment();
         } catch (Exception e) {
+            natsReceiveFailure.increment();
             log.warn("Sync push: failed to handle inbound message on subject '{}': {}", subject, e.toString());
         }
+    }
+
+    private void deliverLocally(long workspaceId, SyncEventHint hint) {
+        hub.publish(workspaceId, hint);
+        localDelivery.increment();
+    }
+
+    private static Counter counter(MeterRegistry meterRegistry, String transport, String outcome) {
+        return Counter.builder("integration.sync.push.messages")
+            .description("Sync invalidation messages by transport boundary and outcome")
+            .tag("transport", transport)
+            .tag("outcome", outcome)
+            .register(meterRegistry);
     }
 
     private static long parseWorkspaceId(String subject) {

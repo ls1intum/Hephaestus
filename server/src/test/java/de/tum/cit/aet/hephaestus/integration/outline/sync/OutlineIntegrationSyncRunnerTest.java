@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,5 +57,20 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
 
         verify(syncScheduler).syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
         verify(handle).reportCancelled();
+    }
+
+    @Test
+    void reconcile_propagatesPartialFailuresAsWarnings() {
+        doAnswer(invocation -> {
+            OutlineSyncProgressListener listener = invocation.getArgument(1);
+            listener.onWarning();
+            return null;
+        })
+            .when(syncScheduler)
+            .syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
+
+        runner.reconcile(new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"), handle);
+
+        verify(handle).reportWarnings();
     }
 }

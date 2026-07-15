@@ -122,6 +122,7 @@ public class OutlineDocumentSyncService {
     public void syncWorkspace(long workspaceId, @Nullable OutlineSyncProgressListener progressListener) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
+            reportWarning(progressListener);
             return;
         }
         Instant now = Instant.now();
@@ -144,6 +145,7 @@ public class OutlineDocumentSyncService {
                 if (!live.containsKey(collection.getCollectionId())) {
                     // Visibility loss ≠ deletion: never tombstone documents we merely cannot see.
                     recordCollectionError(ctx, collection, "Collection is no longer visible to the integration token");
+                    reportWarning(progressListener);
                     done++;
                     if (progressListener != null) {
                         progressListener.onCollectionDone(done, total, collection.getName());
@@ -152,6 +154,8 @@ public class OutlineDocumentSyncService {
                 }
                 if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
                     synced++;
+                } else {
+                    reportWarning(progressListener);
                 }
                 done++;
                 if (progressListener != null) {
@@ -173,6 +177,7 @@ public class OutlineDocumentSyncService {
             );
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
+            reportWarning(progressListener);
         }
     }
 
@@ -193,6 +198,7 @@ public class OutlineDocumentSyncService {
     public void syncPendingCollections(long workspaceId, @Nullable OutlineSyncProgressListener progressListener) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
+            reportWarning(progressListener);
             return;
         }
         List<OutlineCollection> pending = collectionRepository
@@ -213,7 +219,9 @@ public class OutlineDocumentSyncService {
                 if (progressListener != null && progressListener.isCancelled()) {
                     break;
                 }
-                syncOneCollectionRecordingError(ctx, collection, existing, budget, now);
+                if (!syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
+                    reportWarning(progressListener);
+                }
                 done++;
                 if (progressListener != null) {
                     progressListener.onCollectionDone(done, total, collection.getName());
@@ -221,10 +229,17 @@ public class OutlineDocumentSyncService {
             }
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
+            reportWarning(progressListener);
         }
         // The catch-up tick exports bodies too, so it must also enforce the cap — including after a
         // rate-limited abort, since bodies exported before the pause still count against it.
         enforceSizeCap(workspaceId);
+    }
+
+    private static void reportWarning(@Nullable OutlineSyncProgressListener progressListener) {
+        if (progressListener != null) {
+            progressListener.onWarning();
+        }
     }
 
     /** Targeted sync of one registered collection (the admin-registration kick). No-op unless ENABLED. */

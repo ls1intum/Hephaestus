@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -16,14 +17,19 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,9 +54,6 @@ class SyncJobServiceTest extends BaseUnitTest {
 
     @Mock
     private SyncJobRepository syncJobRepository;
-
-    @Mock
-    private WorkspaceRepository workspaceRepository;
 
     @Mock
     private ConnectionRepository connectionRepository;
@@ -90,13 +93,16 @@ class SyncJobServiceTest extends BaseUnitTest {
         workspace.setId(WORKSPACE_ID);
         connection = mock(Connection.class);
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
-
-        lenient().when(workspaceRepository.getReferenceById(WORKSPACE_ID)).thenReturn(workspace);
-        lenient().when(connectionRepository.getReferenceById(CONNECTION_ID)).thenReturn(connection);
+        lenient().when(connection.getWorkspace()).thenReturn(workspace);
+        lenient().when(connection.getKind()).thenReturn(IntegrationKind.GITHUB);
+        lenient().when(connection.getState()).thenReturn(IntegrationState.ACTIVE);
+        lenient()
+            .when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WORKSPACE_ID))
+            .thenReturn(Optional.of(connection));
 
         // No abandoned jobs by default; individual tests override as needed.
-        lenient().when(syncJobRepository.findAbandonedForConnection(anyLong(), any(), any())).thenReturn(List.of());
-        lenient().when(syncJobRepository.findAbandoned(any(), any())).thenReturn(List.of());
+        lenient().when(syncJobRepository.findAbandonedForConnection(anyLong(), anyLong())).thenReturn(List.of());
+        lenient().when(syncJobRepository.findAbandoned(anyLong())).thenReturn(List.of());
         lenient()
             .when(syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(anyLong(), any()))
             .thenReturn(Optional.empty());
@@ -122,14 +128,63 @@ class SyncJobServiceTest extends BaseUnitTest {
         lenient()
             .when(syncJobRepository.findById(any()))
             .thenAnswer(inv -> Optional.ofNullable(store.get((Long) inv.getArgument(0))));
+        lenient()
+            .when(syncJobRepository.markRunning(anyLong()))
+            .thenAnswer(inv -> {
+                SyncJob job = store.get((Long) inv.getArgument(0));
+                if (job == null || job.getStatus() != SyncJobStatus.PENDING) {
+                    return 0;
+                }
+                job.setStatus(SyncJobStatus.RUNNING);
+                job.setStartedAt(Instant.now());
+                job.setHeartbeatAt(Instant.now());
+                return 1;
+            });
+        lenient()
+            .when(syncJobRepository.findCancelFlags(any()))
+            .thenAnswer(inv -> {
+                List<Long> ids = inv.getArgument(0);
+                return ids
+                    .stream()
+                    .map(store::get)
+                    .filter(java.util.Objects::nonNull)
+                    .map(job ->
+                        new SyncJobRepository.CancelFlagProjection() {
+                            @Override
+                            public Long getId() {
+                                return job.getId();
+                            }
 
-        service = new SyncJobService(
-            syncJobRepository,
-            workspaceRepository,
-            connectionRepository,
-            eventPublisher,
-            transactionTemplate
-        );
+                            @Override
+                            public boolean isCancelRequested() {
+                                return job.isCancelRequested();
+                            }
+                        }
+                    )
+                    .toList();
+            });
+        lenient()
+            .when(
+                syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any(), anyBoolean())
+            )
+            .thenAnswer(inv -> {
+                SyncJob job = store.get((Long) inv.getArgument(0));
+                if (job == null || !SyncJobStatus.ACTIVE.contains(job.getStatus())) {
+                    return 0;
+                }
+                job.setStatus(inv.getArgument(1));
+                job.setFinishedAt(Instant.now());
+                job.setErrorSummary(inv.getArgument(2));
+                job.setItemsProcessed(inv.getArgument(3));
+                job.setItemsTotal(inv.getArgument(4));
+                Map<String, Object> progress = inv.getArgument(5);
+                if (!progress.isEmpty()) {
+                    job.setProgress(progress);
+                }
+                return 1;
+            });
+
+        service = new SyncJobService(syncJobRepository, connectionRepository, eventPublisher, transactionTemplate);
     }
 
     private SyncJob newJob(long id, SyncJobStatus status) {
@@ -166,6 +221,17 @@ class SyncJobServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void beginJob_connectionNotActive_rejectsBeforeCreatingJob() {
+        when(connection.getState()).thenReturn(IntegrationState.UNINSTALLED);
+
+        assertThatThrownBy(() -> service.beginJob(defaultRequest()))
+            .isInstanceOf(SyncStateConflictException.class)
+            .hasMessageContaining("UNINSTALLED");
+
+        verify(syncJobRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void beginJob_partialIndexRace_translatesDataIntegrityViolationToConflict() {
         SyncJob raced = newJob(6L, SyncJobStatus.PENDING);
         // First read (before insert attempt): no active job visible yet.
@@ -191,12 +257,8 @@ class SyncJobServiceTest extends BaseUnitTest {
     @Test
     void beginJob_inlineReapClearsAbandonedJobBeforeGuardCheck_thenSucceeds() {
         SyncJob abandoned = newJob(7L, SyncJobStatus.RUNNING);
-        when(
-            syncJobRepository.findAbandonedForConnection(eq(CONNECTION_ID), eq(SyncJobStatus.ACTIVE), any())
-        ).thenReturn(List.of(abandoned));
-        // The inline reap is now a status-guarded bulk UPDATE returning the flipped-row count; it does
-        // NOT mutate the in-memory `abandoned` object the way the old per-entity save did.
-        when(syncJobRepository.markAbandoned(eq(List.of(7L)), any(), any(), eq(SyncJobStatus.ACTIVE))).thenReturn(1);
+        when(syncJobRepository.findAbandonedForConnection(CONNECTION_ID, 900)).thenReturn(List.of(abandoned));
+        when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
         // After the reap, the guard-check query sees no more active jobs.
         when(
             syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
@@ -207,7 +269,7 @@ class SyncJobServiceTest extends BaseUnitTest {
 
         SyncJobService.Started started = service.beginJob(defaultRequest());
 
-        verify(syncJobRepository).markAbandoned(eq(List.of(7L)), any(), any(), eq(SyncJobStatus.ACTIVE));
+        verify(syncJobRepository).markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900);
         assertThat(started.job()).isNotNull();
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.PENDING);
     }
@@ -242,6 +304,87 @@ class SyncJobServiceTest extends BaseUnitTest {
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
         assertThat(started.job().getFinishedAt()).isNotNull();
         verify(syncJobRepository).pruneOldJobs(CONNECTION_ID, 50);
+        verify(eventPublisher).publishEvent(
+            new SyncStateChangedEvent(
+                WORKSPACE_ID,
+                CONNECTION_ID,
+                IntegrationKind.GITHUB,
+                SyncStateChangedEvent.Scope.RESOURCES
+            )
+        );
+    }
+
+    @Test
+    void executeBody_duplicateDispatch_invokesBodyOnlyOnce() {
+        SyncJobService.Started started = beginTestJob();
+        java.util.concurrent.atomic.AtomicInteger invocations = new java.util.concurrent.atomic.AtomicInteger();
+
+        service.executeBody(started, handle -> invocations.incrementAndGet());
+        service.executeBody(started, handle -> invocations.incrementAndGet());
+
+        assertThat(invocations).hasValue(1);
+    }
+
+    @Test
+    void executeBody_concurrentDuplicate_doesNotUnregisterTheRunningHandle() throws Exception {
+        SyncJobService.Started started = beginTestJob();
+        CountDownLatch bodyEntered = new CountDownLatch(1);
+        CountDownLatch releaseBody = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var running = executor.submit(() ->
+                service.executeBody(started, handle -> {
+                    bodyEntered.countDown();
+                    try {
+                        releaseBody.await(2, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                })
+            );
+            assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
+
+            service.executeBody(started, handle -> {});
+            service.refreshLeases();
+
+            verify(syncJobRepository).touchHeartbeat(List.of(started.job().getId()));
+            releaseBody.countDown();
+            running.get(2, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void stop_cancelsAndInterruptsRunningJob() throws Exception {
+        SyncJobService.Started started = beginTestJob();
+        CountDownLatch bodyEntered = new CountDownLatch(1);
+        CountDownLatch interrupted = new CountDownLatch(1);
+        AtomicBoolean cancellationObserved = new AtomicBoolean();
+        service.start();
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var running = executor.submit(() ->
+                service.executeBody(started, handle -> {
+                    bodyEntered.countDown();
+                    try {
+                        Thread.sleep(Duration.ofMinutes(1));
+                    } catch (InterruptedException e) {
+                        cancellationObserved.set(handle.isCancellationRequested());
+                        interrupted.countDown();
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("provider call interrupted", e);
+                    }
+                })
+            );
+            assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
+
+            service.stop();
+
+            running.get(2, TimeUnit.SECONDS);
+        }
+
+        assertThat(interrupted.getCount()).isZero();
+        assertThat(cancellationObserved).isTrue();
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+        verify(syncJobRepository).markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE);
     }
 
     @Test
@@ -270,6 +413,25 @@ class SyncJobServiceTest extends BaseUnitTest {
         });
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+    }
+
+    @Test
+    void executeBody_databaseCancellationFromAnotherReplicaWinsAtCompletion() {
+        SyncJobService.Started started = beginTestJob();
+        when(
+            syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any(), eq(true))
+        ).thenReturn(0);
+        when(syncJobRepository.completeCancelRequestedJob(anyLong(), any(), any(), any(), any())).thenReturn(1);
+
+        service.executeBody(started, handle -> {});
+
+        verify(syncJobRepository).completeCancelRequestedJob(
+            eq(started.job().getId()),
+            any(),
+            any(),
+            any(),
+            eq(SyncJobStatus.ACTIVE)
+        );
     }
 
     @Test
@@ -312,11 +474,11 @@ class SyncJobServiceTest extends BaseUnitTest {
         // The zombie sweep flipped this row to FAILED after beginJob but before the async body ran.
         SyncJobService.Started started = beginTestJob();
         started.job().setStatus(SyncJobStatus.FAILED);
+        java.util.concurrent.atomic.AtomicBoolean bodyInvoked = new java.util.concurrent.atomic.AtomicBoolean();
 
-        service.executeBody(started, handle -> {});
+        service.executeBody(started, handle -> bodyInvoked.set(true));
 
-        // markRunning's CAS-lite guard must not flip FAILED→RUNNING, and completeJob's guard must not
-        // overwrite the terminal FAILED with SUCCEEDED — the first terminal write wins.
+        assertThat(bodyInvoked).isFalse();
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
     }
 
@@ -338,24 +500,33 @@ class SyncJobServiceTest extends BaseUnitTest {
     void reapAbandonedJobs_findsAndFailsStaleRunningJobs() {
         SyncJob stale = newJob(8L, SyncJobStatus.RUNNING);
         stale.setHeartbeatAt(Instant.now().minus(java.time.Duration.ofMinutes(30)));
-        when(syncJobRepository.findAbandoned(eq(SyncJobStatus.ACTIVE), any())).thenReturn(List.of(stale));
-        // Reaping is now a status-guarded bulk UPDATE returning the flipped-row count, not a per-entity
-        // save — the in-memory `stale` object is intentionally left untouched.
-        when(syncJobRepository.markAbandoned(eq(List.of(8L)), any(), any(), eq(SyncJobStatus.ACTIVE))).thenReturn(1);
+        when(syncJobRepository.findAbandoned(900)).thenReturn(List.of(stale));
+        when(syncJobRepository.markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
 
         int reaped = service.reapAbandonedJobs();
 
         assertThat(reaped).isEqualTo(1);
-        verify(syncJobRepository).markAbandoned(eq(List.of(8L)), any(), any(), eq(SyncJobStatus.ACTIVE));
+        verify(syncJobRepository).markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900);
         verify(eventPublisher).publishEvent(any(SyncStateChangedEvent.class));
         verify(syncJobRepository, never()).save(any());
     }
 
     @Test
     void reapAbandonedJobs_noStaleJobs_reapsNothing() {
-        when(syncJobRepository.findAbandoned(any(), any())).thenReturn(List.of());
+        when(syncJobRepository.findAbandoned(anyLong())).thenReturn(List.of());
 
         assertThat(service.reapAbandonedJobs()).isZero();
+    }
+
+    @Test
+    void reapAbandonedJobs_heartbeatRefreshedAfterCandidateRead_doesNotReapOrPublish() {
+        SyncJob candidate = newJob(8L, SyncJobStatus.RUNNING);
+        when(syncJobRepository.findAbandoned(900)).thenReturn(List.of(candidate));
+        when(syncJobRepository.markAbandoned(8L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(0);
+
+        assertThat(service.reapAbandonedJobs()).isZero();
+
+        verify(eventPublisher, never()).publishEvent(any(SyncStateChangedEvent.class));
     }
 
     // --- lease heartbeat / cancel-flag refresh ---
@@ -373,7 +544,7 @@ class SyncJobServiceTest extends BaseUnitTest {
         // heartbeat pass from inside the body — the one moment a genuinely-RUNNING job's lease exists.
         service.executeBody(started, handle -> service.refreshLeases());
 
-        verify(syncJobRepository).touchHeartbeat(eq(List.of(jobId)), any(Instant.class));
+        verify(syncJobRepository).touchHeartbeat(List.of(jobId));
         assertThat(started.handle().isCancellationRequested()).isTrue();
     }
 
@@ -381,7 +552,7 @@ class SyncJobServiceTest extends BaseUnitTest {
     void refreshLeases_noActiveHandles_skipsWithoutTouchingRepository() {
         service.refreshLeases();
 
-        verify(syncJobRepository, never()).touchHeartbeat(any(), any());
+        verify(syncJobRepository, never()).touchHeartbeat(any());
     }
 
     // --- cooperative cancel request ---

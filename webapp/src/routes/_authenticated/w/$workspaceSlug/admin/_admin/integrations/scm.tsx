@@ -18,7 +18,6 @@ import {
 	listConnectionSyncResourcesQueryKey,
 	removeRepositoryToMonitorMutation,
 	triggerSyncJobMutation,
-	updateConnectionStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { ActiveJobProgress } from "@/components/admin/integrations/ActiveJobProgress";
 import { AdminRepositoriesSettings } from "@/components/admin/integrations/AdminRepositoriesSettings";
@@ -30,17 +29,8 @@ import { SyncNowButton } from "@/components/admin/integrations/SyncNowButton";
 import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { asDate } from "@/components/admin/integrations/sync-format";
 import { WebhookLivenessIndicator } from "@/components/admin/integrations/WebhookLivenessIndicator";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,17 +49,17 @@ function ScmIntegrationPage() {
 	const queryClient = useQueryClient();
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
-	const [disconnectOpen, setDisconnectOpen] = useState(false);
 	const [jobsPage, setJobsPage] = useState(0);
 
 	const workspaceQueryOptions = getWorkspaceOptions({ path: { workspaceSlug: slug } });
-	const { data: workspaceData } = useQuery({
+	const workspaceQuery = useQuery({
 		...workspaceQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
+	const workspaceData = workspaceQuery.data;
 
-	const kind = workspaceData?.kind === "GITLAB" ? "GITLAB" : "GITHUB";
-	const label = kind === "GITLAB" ? "GitLab" : "GitHub";
+	const kind = workspaceData ? (workspaceData.kind === "GITLAB" ? "GITLAB" : "GITHUB") : undefined;
+	const label = kind === "GITLAB" ? "GitLab" : kind === "GITHUB" ? "GitHub" : "Source control";
 	const isAppInstallationWorkspace = kind === "GITHUB" && workspaceData?.installationId != null;
 
 	const catalogQueryOptions = getIntegrationCatalogOptions({ path: { workspaceSlug: slug } });
@@ -77,18 +67,21 @@ function ScmIntegrationPage() {
 		...catalogQueryOptions,
 		enabled: Boolean(workspaceSlug),
 	});
-	const entry = catalogQuery.data?.find((e) => e.kind === kind);
-	const connectionId = entry?.connectionId;
+	const entry = kind ? catalogQuery.data?.find((e) => e.kind === kind) : undefined;
+	const hasConnection = entry?.connected === true;
+	const active = entry?.connectionState === "ACTIVE";
+	const connectionId = hasConnection ? entry.connectionId : undefined;
 
 	const statusQueryOptions = getConnectionSyncStatusOptions({
 		path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
 	});
-	const { data: status, isLoading: isStatusLoading } = useQuery({
+	const statusQuery = useQuery({
 		...statusQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
 		refetchInterval: (query) => (query.state.data?.activeJob ? 5_000 : 60_000),
 		refetchOnWindowFocus: true,
 	});
+	const status = statusQuery.data;
 
 	const resourcesQueryOptions = listConnectionSyncResourcesOptions({
 		path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
@@ -102,6 +95,7 @@ function ScmIntegrationPage() {
 	} = useQuery({
 		...resourcesQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
+		refetchInterval: activePollInterval(status?.activeJob != null),
 	});
 
 	const jobsQueryOptions = listConnectionSyncJobsOptions({
@@ -117,9 +111,9 @@ function ScmIntegrationPage() {
 	} = useQuery({
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
+		refetchInterval: activePollInterval(status?.activeJob != null),
 	});
 
-	// Repositories query — unchanged from the previous settings-page section, just moved here.
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
 		path: { workspaceSlug: slug },
 	});
@@ -186,26 +180,19 @@ function ScmIntegrationPage() {
 		},
 	});
 
-	const disconnect = useMutation({
-		...updateConnectionStatusMutation(),
-		onSuccess: () => {
-			setDisconnectOpen(false);
-			toast.success(`${label} disconnected`);
-			queryClient.invalidateQueries({ queryKey: catalogQueryOptions.queryKey });
-			queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey });
-		},
-		onError: (e) => {
-			toast.error(`Failed to disconnect ${label}`, { description: problemDetailOf(e) });
-		},
-	});
-
 	const activeJob = status?.activeJob;
 
 	return (
 		<div className="container mx-auto max-w-5xl space-y-8 py-6">
 			<IntegrationPageHeader
 				icon={
-					kind === "GITLAB" ? <GitlabIcon className="size-6" /> : <GithubIcon className="size-6" />
+					kind === "GITLAB" ? (
+						<GitlabIcon className="size-6" />
+					) : kind === "GITHUB" ? (
+						<GithubIcon className="size-6" />
+					) : (
+						<WebhookIcon className="size-6" />
+					)
 				}
 				title={label}
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
@@ -219,7 +206,17 @@ function ScmIntegrationPage() {
 					</h2>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					{isStatusLoading ? (
+					{workspaceQuery.isError || catalogQuery.isError || statusQuery.isError ? (
+						<QueryErrorAlert
+							error={workspaceQuery.error ?? catalogQuery.error ?? statusQuery.error}
+							title={`We couldn't load the ${label} connection`}
+							onRetry={() => {
+								workspaceQuery.refetch();
+								catalogQuery.refetch();
+								statusQuery.refetch();
+							}}
+						/>
+					) : workspaceQuery.isLoading || catalogQuery.isLoading || statusQuery.isLoading ? (
 						<Skeleton className="h-20 w-full" />
 					) : !status ? (
 						<p className="text-muted-foreground text-sm">
@@ -279,164 +276,136 @@ function ScmIntegrationPage() {
 
 							<ActiveJobProgress job={activeJob} />
 
-							<div className="flex flex-wrap items-center gap-2 pt-2">
-								<SyncNowButton
-									onClick={() => {
-										if (connectionId == null) return;
-										triggerSync.mutate({
-											path: { workspaceSlug: slug, connectionId },
-											body: { type: "RECONCILIATION" },
-										});
-									}}
-									isTriggering={triggerSync.isPending}
-									activeJob={activeJob}
-								/>
-								{kind === "GITHUB" && (
+							{active && (
+								<div className="flex flex-wrap items-center gap-2 pt-2">
 									<SyncNowButton
-										label="Backfill"
 										onClick={() => {
 											if (connectionId == null) return;
 											triggerSync.mutate({
 												path: { workspaceSlug: slug, connectionId },
-												body: { type: "BACKFILL" },
+												body: { type: "RECONCILIATION" },
 											});
 										}}
 										isTriggering={triggerSync.isPending}
 										activeJob={activeJob}
 									/>
-								)}
-								{activeJob && (
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={cancelJob.isPending || activeJob.cancelRequested}
-										onClick={() => {
-											if (connectionId == null) return;
-											cancelJob.mutate({
-												path: { workspaceSlug: slug, connectionId, jobId: activeJob.id },
-											});
-										}}
-									>
-										{activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
-									</Button>
-								)}
-
-								{isAppInstallationWorkspace ? (
-									<Button
-										variant="outline"
-										size="sm"
-										className="ml-auto"
-										render={
-											<a
-												href="https://github.com/settings/installations"
-												target="_blank"
-												rel="noreferrer"
-											/>
-										}
-									>
-										Manage installation on GitHub
-										<ExternalLinkIcon className="size-3.5" />
-									</Button>
-								) : (
-									connectionId != null && (
+									{kind === "GITHUB" && status.backfill?.state !== "DISABLED" && (
+										<SyncNowButton
+											label="Backfill"
+											onClick={() => {
+												if (connectionId == null) return;
+												triggerSync.mutate({
+													path: { workspaceSlug: slug, connectionId },
+													body: { type: "BACKFILL" },
+												});
+											}}
+											isTriggering={triggerSync.isPending}
+											activeJob={activeJob}
+										/>
+									)}
+									{activeJob && (
 										<Button
-											variant="destructive-outline"
+											variant="outline"
+											size="sm"
+											disabled={cancelJob.isPending || activeJob.cancelRequested}
+											onClick={() => {
+												if (connectionId == null) return;
+												cancelJob.mutate({
+													path: { workspaceSlug: slug, connectionId, jobId: activeJob.id },
+												});
+											}}
+										>
+											{activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
+										</Button>
+									)}
+
+									{isAppInstallationWorkspace ? (
+										<Button
+											variant="outline"
 											size="sm"
 											className="ml-auto"
-											onClick={() => setDisconnectOpen(true)}
-											disabled={disconnect.isPending}
+											nativeButton={false}
+											render={
+												<a
+													href="https://github.com/settings/installations"
+													target="_blank"
+													rel="noreferrer"
+												/>
+											}
 										>
-											{disconnect.isPending ? "Disconnecting…" : `Disconnect ${label}…`}
+											Manage installation on GitHub
+											<ExternalLinkIcon className="size-3.5" />
 										</Button>
-									)
-								)}
-							</div>
+									) : null}
+								</div>
+							)}
 						</>
 					)}
 				</CardContent>
 			</Card>
 
-			<AdminRepositoriesSettings
-				repositories={(repositories ?? []).map((repo) => ({ nameWithOwner: repo }))}
-				isLoading={isLoadingRepositories}
-				error={repositoriesError as Error | null}
-				addRepositoryError={addRepository.error as Error | null}
-				isAddingRepository={addRepository.isPending}
-				isRemovingRepository={removeRepository.isPending}
-				isReadOnly={isAppInstallationWorkspace}
-				onAddRepository={(nameWithOwner) => {
-					addRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
-				}}
-				onRemoveRepository={(nameWithOwner) => {
-					removeRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
-				}}
-			/>
+			{active && !isAppInstallationWorkspace && (
+				<AdminRepositoriesSettings
+					repositories={(repositories ?? []).map((repo) => ({ nameWithOwner: repo }))}
+					isLoading={isLoadingRepositories}
+					error={repositoriesError as Error | null}
+					addRepositoryError={addRepository.error as Error | null}
+					isAddingRepository={addRepository.isPending}
+					isRemovingRepository={removeRepository.isPending}
+					onAddRepository={(nameWithOwner) => {
+						addRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
+					}}
+					onRemoveRepository={(nameWithOwner) => {
+						removeRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
+					}}
+				/>
+			)}
 
-			<Card>
-				<CardHeader>
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-						Repository sync state
-					</h2>
-				</CardHeader>
-				<CardContent>
-					<SyncResourcesTable
-						resources={resources ?? []}
-						isLoading={isResourcesLoading}
-						isError={isResourcesError}
-						error={resourcesError}
-						onRetry={() => refetchResources()}
-						resourceNoun="repository"
-					/>
-				</CardContent>
-			</Card>
+			{hasConnection && (
+				<Card>
+					<CardHeader>
+						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
+							Repository sync state
+						</h2>
+					</CardHeader>
+					<CardContent>
+						<SyncResourcesTable
+							resources={resources ?? []}
+							isLoading={isResourcesLoading}
+							isError={isResourcesError}
+							error={resourcesError}
+							onRetry={() => refetchResources()}
+							resourceNoun="repository"
+						/>
+					</CardContent>
+				</Card>
+			)}
 
-			<Card>
-				<CardHeader>
-					<h2 data-slot="card-title" className="text-base leading-snug font-medium">
-						Job history
-					</h2>
-				</CardHeader>
-				<CardContent>
-					<SyncJobsTable
-						jobs={jobsPageData?.content ?? []}
-						isLoading={isJobsLoading}
-						isError={isJobsError}
-						error={jobsError}
-						onRetry={() => refetchJobs()}
-						page={jobsPage}
-						totalPages={jobsPageData?.totalPages ?? 1}
-						onPageChange={setJobsPage}
-					/>
-				</CardContent>
-			</Card>
-
-			<AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Disconnect {label}?</AlertDialogTitle>
-						<AlertDialogDescription>
-							Hephaestus stops syncing repositories and receiving webhook events from this {label}{" "}
-							connection. You can reconnect later.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel disabled={disconnect.isPending}>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							variant="destructive"
-							disabled={disconnect.isPending || connectionId == null}
-							onClick={() => {
-								if (connectionId == null) return;
-								disconnect.mutate({
-									path: { workspaceSlug: slug, id: connectionId },
-									body: { state: "UNINSTALLED" },
-								});
-							}}
-						>
-							{disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			{hasConnection && (
+				<Card>
+					<CardHeader>
+						<h2 data-slot="card-title" className="text-base leading-snug font-medium">
+							Job history
+						</h2>
+					</CardHeader>
+					<CardContent>
+						<SyncJobsTable
+							jobs={jobsPageData?.content ?? []}
+							isLoading={isJobsLoading}
+							isError={isJobsError}
+							error={jobsError}
+							onRetry={() => refetchJobs()}
+							page={jobsPage}
+							totalPages={jobsPageData?.totalPages ?? 1}
+							onPageChange={setJobsPage}
+						/>
+					</CardContent>
+				</Card>
+			)}
 		</div>
 	);
+}
+
+function activePollInterval(active: boolean): number {
+	return active ? 5_000 : 60_000;
 }

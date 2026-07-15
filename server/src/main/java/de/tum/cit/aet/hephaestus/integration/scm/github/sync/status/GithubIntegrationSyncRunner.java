@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import java.util.List;
 import java.util.Map;
@@ -17,25 +17,25 @@ import org.springframework.stereotype.Component;
 
 /**
  * GitHub {@link IntegrationSyncRunner}: the manual "Sync now" / "Backfill now" job bodies invoked by
- * {@code SyncJobService.run} (design doc §3.2, §3.4).
+ * {@code SyncJobService.run}.
  */
 @Component
 public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
 
     private static final Logger log = LoggerFactory.getLogger(GithubIntegrationSyncRunner.class);
 
-    private final GithubDataSyncService dataSyncService;
+    private final GithubDataSyncScheduler dataSyncScheduler;
     private final SyncTargetProvider syncTargetProvider;
     private final GitHubHistoricalBackfillService backfillService;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GithubIntegrationSyncRunner(
-        GithubDataSyncService dataSyncService,
+        GithubDataSyncScheduler dataSyncScheduler,
         SyncTargetProvider syncTargetProvider,
         GitHubHistoricalBackfillService backfillService,
         SyncSchedulerProperties syncSchedulerProperties
     ) {
-        this.dataSyncService = dataSyncService;
+        this.dataSyncScheduler = dataSyncScheduler;
         this.syncTargetProvider = syncTargetProvider;
         this.backfillService = backfillService;
         this.syncSchedulerProperties = syncSchedulerProperties;
@@ -46,17 +46,10 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
         return IntegrationKind.GITHUB;
     }
 
-    /**
-     * The same per-scope full sync the daily cron runs ({@link
-     * GithubDataSyncService#syncAllRepositories}), threaded with the job handle so cancellation is
-     * observed between repositories — and inside the rate-limit wait, in bounded slices — and coarse
-     * repos-done/repos-total progress is reported after each repository.
-     */
+    /** The same warning-aware body the daily scheduler uses, threaded with the job handle. */
     @Override
     public void reconcile(IntegrationRef ref, SyncJobHandle handle) {
-        dataSyncService.syncAllRepositories(ref.workspaceId(), handle);
-        // syncAllRepositories only breaks its repo loop early when the flag is set, so a still-set flag on
-        // return means it aborted — declare it so the job finalizes CANCELLED rather than a false SUCCEEDED.
+        dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }
@@ -64,7 +57,7 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
 
     @Override
     public boolean supportsBackfill() {
-        return true;
+        return syncSchedulerProperties.backfill().enabled();
     }
 
     /**
@@ -111,6 +104,7 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
             }
 
             if (!anyWork) {
+                handle.reportWarnings();
                 // Every pending repo was skipped this pass (cooldown / rate limit) — avoid a tight
                 // spin loop; the scheduled backfill cycle keeps making progress at its own cadence.
                 log.info(

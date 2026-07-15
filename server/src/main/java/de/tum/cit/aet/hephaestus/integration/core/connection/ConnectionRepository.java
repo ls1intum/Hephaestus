@@ -13,6 +13,17 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConnectionRepository extends JpaRepository<Connection, Long> {
+    /**
+     * Serializes connection lifecycle changes with sync-job creation. Both paths acquire this row lock
+     * before checking their respective state, closing the check-then-act window in which a job could
+     * start while an uninstall was committing.
+     */
+    @Query(
+        value = "SELECT id FROM connection WHERE id = :id AND workspace_id = :workspaceId FOR UPDATE",
+        nativeQuery = true
+    )
+    Long acquireLifecycleLock(@Param("id") long id, @Param("workspaceId") long workspaceId);
+
     Optional<Connection> findByWorkspaceIdAndKindAndInstanceKey(
         long workspaceId,
         IntegrationKind kind,
