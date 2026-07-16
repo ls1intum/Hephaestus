@@ -16,6 +16,14 @@ public record ConnectionSyncStatusDTO(
     @Schema(description = "Currently PENDING/RUNNING job, if any") SyncJobDTO activeJob,
     @Schema(description = "Most recently finished job, if any") SyncJobDTO lastJob,
     @Schema(description = "When the next periodic reconciliation is expected") Instant nextScheduledSyncAt,
+    @Schema(
+        description = "The periodic reconciliation's cadence in seconds, when the schedule has a regular one. " +
+            "This is what makes a resource's lastSyncedAt judgeable: \"synced 4h ago\" is only stale if the " +
+            "cadence is hourly, and a client cannot know that without this. Null when the schedule is " +
+            "irregular or unparseable — clients must then decline to judge staleness rather than assume a " +
+            "default, exactly as the server's own stale rollup does."
+    )
+    Long syncIntervalSeconds,
     @Schema(description = "Whether the vendor webhook registration is present; null if not applicable/unknown")
     Boolean webhookRegistered,
     @Schema(description = "When the last inbound webhook/event was processed for this connection, if any")

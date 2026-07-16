@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -19,7 +20,12 @@ import org.jspecify.annotations.Nullable;
  *                                  sync status) — kept a string for the same reason as
  *                                  {@link BackfillSummary#state}
  * @param lastSyncedAt              last successful sync timestamp for this resource, if known
- * @param itemCount                 mirrored item count (issues+PRs, messages, documents), if known
+ * @param itemCount                 headline mirrored item count (issues+PRs, messages, documents), if
+ *                                  known — the rollup of {@code counts} shown in the collapsed row
+ * @param counts                    per-entity-class breakdown behind {@code itemCount}: one entry per
+ *                                  class the integration actually mirrors, never null (empty when the
+ *                                  integration reports no breakdown). See {@link SyncResourceCount} for
+ *                                  why the headline number alone hides a stalled entity class.
  * @param upstreamCount             vendor-reported count for the same items, if the integration can
  *                                  fetch it cheaply — lets the UI show "142 / 150 synced"
  * @param lastError                 last sync error for this resource, if any
@@ -34,11 +40,16 @@ public record SyncResourceState(
     @NonNull String state,
     @Nullable Instant lastSyncedAt,
     @Nullable Long itemCount,
+    @NonNull List<SyncResourceCount> counts,
     @Nullable Long upstreamCount,
     @Nullable String lastError,
     @Nullable Instant backfillCompletedThrough,
     @Nullable Integer backfillPercent
 ) {
+    public SyncResourceState {
+        counts = counts == null ? List.of() : List.copyOf(counts);
+    }
+
     /**
      * Shared {@code state} literal for a resource that has completed at least one full sync. Held here
      * (rather than hand-written per provider) so integrations reporting the same "synced" semantic —

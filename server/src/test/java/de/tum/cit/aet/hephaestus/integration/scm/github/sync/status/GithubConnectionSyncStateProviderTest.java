@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.when;
 
@@ -15,12 +16,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ScopedRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationSuspensionTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader.ScmResourceCounts;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -31,6 +34,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +65,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     @Mock
-    private IssueRepository issueRepository;
+    private ScmResourceCountReader countReader;
 
     private Workspace workspace;
     private IntegrationRef ref;
@@ -81,7 +85,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             properties,
             repositoryToMonitorRepository,
             repositoryRepository,
-            issueRepository
+            countReader
         );
     }
 
@@ -193,6 +197,18 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         }
 
         @Test
+        void syncInterval_isTheCadenceOfTheConfiguredCron() {
+            when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
+
+            ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
+
+            // Without the cadence a "last synced 4h ago" reading is unjudgeable — callers cannot tell
+            // stale from on-schedule. The configured cron fires daily, so the cadence is 24h.
+            assertThat(details.syncInterval()).isEqualTo(Duration.ofHours(24));
+            assertThat(details.nextScheduledSyncAt()).isNotNull();
+        }
+
+        @Test
         void nextScheduledSyncAt_invalidCron_isNull() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
             SyncSchedulerProperties broken = new SyncSchedulerProperties(
@@ -291,18 +307,10 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             repository.setNameWithOwner("acme/repo-a");
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repository));
 
-            IssueRepository.RepositoryItemCount countRow = new IssueRepository.RepositoryItemCount() {
-                @Override
-                public Long getRepositoryId() {
-                    return 900L;
-                }
-
-                @Override
-                public Long getItemCount() {
-                    return 42L;
-                }
-            };
-            when(issueRepository.countGroupedByRepositoryIds(anyCollection())).thenReturn(List.of(countRow));
+            // Headline itemCount is issues + pull requests: 30 + 12 = 42.
+            when(countReader.countsByRepositoryId(anyCollection())).thenReturn(
+                Map.of(900L, new ScmResourceCounts(30, 12, 0, 0, 0, 0))
+            );
 
             List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
 
@@ -331,6 +339,96 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             assertThat(resources.get(0).state()).isEqualTo("PENDING");
             assertThat(resources.get(0).itemCount()).isNull();
             assertThat(resources.get(0).lastSyncedAt()).isNull();
+        }
+
+        @Test
+        void perEntityClassBreakdown_carriesAllSixClassesAndRollsUpToItemCount() {
+            RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-a");
+            rtm.setId(500L);
+            rtm.setIssuesSyncedAt(Instant.now().minusSeconds(60));
+            rtm.setPullRequestsSyncedAt(Instant.now().minusSeconds(30));
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
+
+            Repository repository = new Repository();
+            repository.setId(900L);
+            repository.setNameWithOwner("acme/repo-a");
+            when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repository));
+            when(countReader.countsByRepositoryId(anyCollection())).thenReturn(
+                Map.of(900L, new ScmResourceCounts(30, 12, 13, 14, 15, 16))
+            );
+
+            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+
+            SyncResourceState resource = resources.get(0);
+            assertThat(resource.counts())
+                .extracting(SyncResourceCount::key, SyncResourceCount::count)
+                .containsExactly(
+                    tuple("issues", 30L),
+                    tuple("pullRequests", 12L),
+                    tuple("issueComments", 13L),
+                    tuple("reviews", 14L),
+                    tuple("reviewComments", 15L),
+                    tuple("commits", 16L)
+                );
+            // The headline must stay the rollup of only the classes the sync calls "items" — the
+            // comment/review/commit counts are much larger and would visibly inflate it if included.
+            assertThat(resource.itemCount()).isEqualTo(42L);
+        }
+
+        @Test
+        void issuesStalledWhilePullRequestsFresh_watermarksAreReportedPerClassNotCollapsed() {
+            Instant issuesSyncedAt = Instant.now().minus(Duration.ofDays(4));
+            Instant prsSyncedAt = Instant.now().minusSeconds(30);
+            RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-a");
+            rtm.setId(500L);
+            rtm.setIssuesSyncedAt(issuesSyncedAt);
+            rtm.setPullRequestsSyncedAt(prsSyncedAt);
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
+
+            Repository repository = new Repository();
+            repository.setId(900L);
+            repository.setNameWithOwner("acme/repo-a");
+            when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repository));
+            when(countReader.countsByRepositoryId(anyCollection())).thenReturn(
+                Map.of(900L, new ScmResourceCounts(30, 12, 0, 0, 0, 0))
+            );
+
+            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+
+            List<SyncResourceCount> counts = resources.get(0).counts();
+            SyncResourceCount issues = counts
+                .stream()
+                .filter(c -> c.key().equals("issues"))
+                .findFirst()
+                .orElseThrow();
+            SyncResourceCount pullRequests = counts
+                .stream()
+                .filter(c -> c.key().equals("pullRequests"))
+                .findFirst()
+                .orElseThrow();
+
+            // This is the point of the breakdown: issues stopped four days ago while PRs kept syncing.
+            // The row-level lastSyncedAt collapses both to the newest (latestNonNull) and shows green —
+            // only the per-class watermarks make the stall visible.
+            assertThat(issues.lastSyncedAt()).isEqualTo(issuesSyncedAt);
+            assertThat(issues.lastSyncedAt()).isNotEqualTo(prsSyncedAt);
+            assertThat(pullRequests.lastSyncedAt()).isEqualTo(prsSyncedAt);
+            assertThat(resources.get(0).lastSyncedAt()).isEqualTo(prsSyncedAt);
+        }
+
+        @Test
+        void monitorWithoutLocalRepositoryRow_reportsNoBreakdownRatherThanZeroes() {
+            RepositoryToMonitor rtm = WorkspaceTestFixtures.repositoryMonitor(workspace, "acme/repo-b");
+            rtm.setId(501L);
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
+            when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+
+            List<SyncResourceState> resources = provider(schedulerProperties(false)).resources(ref, CONNECTION_ID);
+
+            // Never-synced must stay distinct from synced-zero: six zero rows would assert we looked and
+            // found nothing, when in fact we never looked.
+            assertThat(resources.get(0).itemCount()).isNull();
+            assertThat(resources.get(0).counts()).isEmpty();
         }
 
         @Test

@@ -526,8 +526,46 @@ public class SyncJobService implements SmartLifecycle {
                         job.getKind(),
                         SyncStateChangedEvent.Scope.JOB
                     );
+                    // Resources too, not just at terminal. A running sync is writing rows the whole time
+                    // it runs; publishing RESOURCES only from completeJob is what made the counts pane
+                    // sit still and then teleport to its final numbers. The hub coalesces per-scope at
+                    // 1s and this write is already throttled, so the extra hint costs one refetch of a
+                    // small DTO per tick per watching admin.
+                    publish(
+                        job.getWorkspace().getId(),
+                        job.getConnection().getId(),
+                        job.getKind(),
+                        SyncStateChangedEvent.Scope.RESOURCES
+                    );
                 })
         );
+    }
+
+    /**
+     * Trailing edge of {@link SyncJobHandle}'s write throttle, for every job whose body is running in
+     * this JVM.
+     *
+     * <p>Runs on the existing handle registry rather than a per-handle timer: the registry is already
+     * the set of locally-owned jobs, already swept for lease heartbeats, and a flush is a no-op for a
+     * handle with nothing buffered. A 1s tick against the handle's 2s interval means a suppressed
+     * update lands 2–3s after it was reported instead of waiting for the runner's next call — which,
+     * once a runner goes quiet after a phase boundary, could otherwise be minutes.
+     */
+    @Scheduled(fixedDelay = 1, initialDelay = 1, timeUnit = TimeUnit.SECONDS)
+    @WorkspaceAgnostic("Flushes only progress buffered by handles registered in this JVM")
+    public void flushBufferedProgress() {
+        if (activeHandles.isEmpty()) {
+            return;
+        }
+        for (SyncJobHandle handle : List.copyOf(activeHandles.values())) {
+            try {
+                handle.flushIfDue();
+            } catch (Exception e) {
+                // A progress write is an observability nicety; it must never take down the sweep and
+                // stall every other job's flush behind it.
+                log.debug("Trailing progress flush failed: {}", e.toString());
+            }
+        }
     }
 
     private void pruneRetention(long connectionId) {

@@ -37,13 +37,16 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivi
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -176,6 +179,119 @@ class SyncStatusServiceTest extends BaseUnitTest {
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.DEGRADED);
     }
 
+    private static SyncResourceState resource(long id, @Nullable Instant lastSyncedAt, @Nullable String lastError) {
+        return new SyncResourceState(
+            id,
+            "owner/repo" + id,
+            "repo" + id,
+            SyncResourceState.Type.REPOSITORY,
+            lastSyncedAt == null ? SyncResourceState.STATE_PENDING : SyncResourceState.STATE_SYNCED,
+            lastSyncedAt,
+            0L,
+            List.of(),
+            null,
+            lastError,
+            null,
+            null
+        );
+    }
+
+    /** The overview's honest headline: "3 stale · 1 never synced · 2 errored of 42". */
+    @Nested
+    class ResourceCountsRollup {
+
+        private void withResources(List<SyncResourceState> resources, @Nullable Duration cadence) {
+            when(githubProvider.resources(any(), anyLong())).thenReturn(resources);
+            when(githubProvider.describe(any(), anyLong())).thenReturn(
+                new ConnectionSyncDetails(null, null, cadence, null, null, false)
+            );
+        }
+
+        @Test
+        void resourceNeverSynced_countsAsPending() {
+            Instant fresh = Instant.now();
+            withResources(
+                List.of(resource(1L, fresh, null), resource(2L, null, null), resource(3L, null, null)),
+                Duration.ofHours(1)
+            );
+
+            var counts = service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts();
+
+            // Defined on the absence of a timestamp, not on a provider's status vocabulary — so it means
+            // the same thing for a repository, a Slack channel and an Outline collection.
+            assertThat(counts.pending()).isEqualTo(2L);
+            assertThat(counts.total()).isEqualTo(3L);
+        }
+
+        @Test
+        void lastSyncOlderThanTwiceTheCadence_countsAsStale() {
+            Instant fresh = Instant.now().minus(Duration.ofMinutes(30));
+            Instant old = Instant.now().minus(Duration.ofHours(5));
+            withResources(List.of(resource(1L, fresh, null), resource(2L, old, null)), Duration.ofHours(1));
+
+            var counts = service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts();
+
+            assertThat(counts.stale()).isEqualTo(1L);
+        }
+
+        @Test
+        void lastSyncWithinTwiceTheCadence_isNotStale() {
+            // A resource is legitimately "one cadence old" for the whole interval between two runs, so
+            // flagging at 1x would show the entire fleet stale right before every scheduled sync.
+            Instant justOverOneCadence = Instant.now().minus(Duration.ofMinutes(90));
+            withResources(List.of(resource(1L, justOverOneCadence, null)), Duration.ofHours(1));
+
+            assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts().stale()).isZero();
+        }
+
+        @Test
+        void unknownCadence_declinesToJudgeStalenessRatherThanGuessing() {
+            Instant ancient = Instant.now().minus(Duration.ofDays(400));
+            withResources(List.of(resource(1L, ancient, null)), null);
+
+            // Without a known cron there is no yardstick; inventing a default would either flag healthy
+            // resources or hide real ones, and the UI must simply not make the claim.
+            assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts().stale()).isZero();
+        }
+
+        @Test
+        void neverSyncedResource_isPendingButNotAlsoCountedStale() {
+            withResources(List.of(resource(1L, null, null)), Duration.ofHours(1));
+
+            var counts = service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts();
+
+            // "Never synced" and "stale" are different diagnoses and the overview says both; a null
+            // timestamp must not be read as infinitely old.
+            assertThat(counts.pending()).isEqualTo(1L);
+            assertThat(counts.stale()).isZero();
+        }
+
+        @Test
+        void erroredAndStaleResource_isCountedInBothWithoutDoubleCountingTheTotal() {
+            Instant old = Instant.now().minus(Duration.ofHours(5));
+            withResources(List.of(resource(1L, old, "boom")), Duration.ofHours(1));
+
+            var counts = service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts();
+
+            // The subsets deliberately overlap — they answer different questions and must never be summed.
+            assertThat(counts.errored()).isEqualTo(1L);
+            assertThat(counts.stale()).isEqualTo(1L);
+            assertThat(counts.total()).isEqualTo(1L);
+        }
+
+        @Test
+        void noResources_reportsAllZeroRatherThanFailing() {
+            withResources(List.of(), Duration.ofHours(1));
+
+            var counts = service.getStatus(WORKSPACE_ID, CONNECTION_ID).resourceCounts();
+
+            assertThat(counts.total()).isZero();
+            assertThat(counts.pending()).isZero();
+            assertThat(counts.stale()).isZero();
+            assertThat(counts.errored()).isZero();
+        }
+    }
+
     @Test
     void getStatus_erroredResourcePresent_healthIsDegraded() {
         when(githubProvider.resources(any(), anyLong())).thenReturn(
@@ -188,6 +304,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
                     "ERROR",
                     null,
                     null,
+                    List.of(),
                     null,
                     "boom",
                     null,
@@ -206,7 +323,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_vendorHealthDegraded_healthIsDegraded() {
         when(githubProvider.describe(any(), anyLong())).thenReturn(
-            new ConnectionSyncDetails(null, null, null, null, true)
+            new ConnectionSyncDetails(null, null, null, null, null, true)
         );
 
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.DEGRADED);

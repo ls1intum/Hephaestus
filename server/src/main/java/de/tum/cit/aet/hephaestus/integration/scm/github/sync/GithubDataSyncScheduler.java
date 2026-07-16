@@ -10,6 +10,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
@@ -353,6 +355,12 @@ public class GithubDataSyncScheduler {
 
             // Wrap sync operations with context propagation for async threads
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
+                // Report every phase boundary, not just the repository loop. A reconcile spends real
+                // time in these org-level phases, and without a report the UI shows the previous phase's
+                // last tick for their whole duration — the multi-phase sync reads as a stall.
+                int totalRepos = session.syncTargets().size();
+                reportPhase(handle, SyncPhase.ORGANIZATION, "Syncing organization issue types", 0, totalRepos);
+
                 // Sync issue types FIRST (before repository syncs) because they are
                 // organization-level entities that issues reference. This ensures
                 // issue types exist when issues are processed during repository sync.
@@ -361,6 +369,7 @@ public class GithubDataSyncScheduler {
                 // Sync projects BEFORE repositories so embedded project items can be linked.
                 // Ensure the organization exists before attempting project sync.
                 if (syncSchedulerProperties.projects().enabled()) {
+                    reportPhase(handle, SyncPhase.ORGANIZATION, "Syncing organization projects", 0, totalRepos);
                     syncProjects(session, handle);
                 } else {
                     log.debug("Skipped project sync: reason=projectsSyncDisabled, scopeId={}", session.scopeId());
@@ -368,7 +377,6 @@ public class GithubDataSyncScheduler {
 
                 // Sync repositories (issues/PRs include embedded project items)
                 int reposProcessed = 0;
-                int totalRepos = session.syncTargets().size();
                 for (SyncTarget target : session.syncTargets()) {
                     // Cooperative cancel checkpoint between repositories (matches the manual runner):
                     // a job cancelled mid-run stops before the next repo rather than mid-repository.
@@ -420,7 +428,18 @@ public class GithubDataSyncScheduler {
                         handle.progress(
                             reposProcessed,
                             totalRepos,
-                            Map.of("currentRepository", target.repositoryNameWithOwner())
+                            SyncProgress.ofResource(
+                                SyncPhase.REPOSITORIES,
+                                "Syncing " +
+                                    target.repositoryNameWithOwner() +
+                                    " — repository " +
+                                    reposProcessed +
+                                    " of " +
+                                    totalRepos,
+                                target.repositoryNameWithOwner(),
+                                reposProcessed,
+                                totalRepos
+                            )
                         );
                     }
                 }
@@ -442,12 +461,20 @@ public class GithubDataSyncScheduler {
 
                 // Sync teams AFTER repositories exist (team repo permissions need repos).
                 // This mirrors the startup sync order in GithubDataSyncService.
+                reportPhase(handle, SyncPhase.TEAMS, "Syncing teams and memberships", reposProcessed, totalRepos);
                 syncTeams(session, handle);
 
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
                 // Skip if rate limit is critically low to avoid wasting API calls
                 if (!rateLimitTracker.isCritical(session.scopeId())) {
+                    reportPhase(
+                        handle,
+                        SyncPhase.ISSUES,
+                        "Linking sub-issues and issue dependencies",
+                        reposProcessed,
+                        totalRepos
+                    );
                     syncSubIssues(session, handle);
                     syncIssueDependencies(session, handle);
                 } else {
@@ -485,6 +512,27 @@ public class GithubDataSyncScheduler {
             }
         } finally {
             syncContextProvider.clearContext();
+        }
+    }
+
+    /**
+     * Reports a phase boundary.
+     *
+     * <p>{@code reposProcessed}/{@code totalRepos} stay the job-global pair even for org-level phases,
+     * which have no items of their own. Two reasons: inventing a second unit would make the bar jump
+     * between scales as the sync moves between phases, and passing null here would blank a count the
+     * repository loop already established — turning a determinate bar indeterminate mid-job. The phase
+     * itself is the narrative; the bar keeps one meaning start to finish.
+     */
+    private static void reportPhase(
+        @Nullable SyncExecutionHandle handle,
+        SyncPhase phase,
+        String currentStep,
+        int reposProcessed,
+        int totalRepos
+    ) {
+        if (handle != null) {
+            handle.progress(reposProcessed, totalRepos, SyncProgress.of(phase, currentStep));
         }
     }
 

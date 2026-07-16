@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
@@ -12,9 +13,11 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.BackfillProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillPageObserver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -32,9 +35,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHist
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -492,7 +497,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null // discussionSyncCursor
             );
 
-            boolean result = service.backfillRepository(target, 50);
+            boolean result = service.backfillRepository(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(result).isFalse();
         }
@@ -502,7 +507,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
             when(repositoryRepository.findByNameWithOwner("org/repo-a")).thenReturn(Optional.empty());
 
-            boolean result = service.backfillRepository(target, 50);
+            boolean result = service.backfillRepository(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(result).isFalse();
             verify(graphQlClientProvider, never()).forScope(anyLong());
@@ -802,7 +807,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             service = createService(enabledSchedulerProperties);
             SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            boolean didWork = service.runBackfillBatch(target, 50);
+            boolean didWork = service.runBackfillBatch(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(didWork).isFalse();
             verify(graphQlClientProvider, never()).getRateLimitRemaining(any());
@@ -814,7 +819,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget target = createTargetWithBackfillInProgress(SYNC_TARGET_ID_A, "org/repo-a");
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
 
-            boolean didWork = service.runBackfillBatch(target, 50);
+            boolean didWork = service.runBackfillBatch(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(didWork).isFalse();
         }
@@ -827,7 +832,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             service = createService(disabledSchedulerProperties);
             SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
 
-            boolean didWork = service.runBackfillBatch(target, 50);
+            boolean didWork = service.runBackfillBatch(target, 50, BackfillPageObserver.NOOP);
 
             assertThat(service.isEnabled()).isFalse();
             assertThat(didWork).isFalse();
@@ -948,6 +953,77 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             //   (not counted as processed, not counted as pending)
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
+        }
+    }
+
+    /**
+     * The per-page progress seam. The page loops that call this need a live GraphQL conversation to
+     * reach, but the two rules it enforces stand on their own.
+     */
+    @Nested
+    class NotifyPage {
+
+        @Test
+        void forwardsThePageToTheObserver() {
+            List<String> seen = new ArrayList<>();
+
+            GitHubHistoricalBackfillService.notifyPage(
+                (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) ->
+                    seen.add(
+                        syncTargetId +
+                            "|" +
+                            repositoryName +
+                            "|" +
+                            phase +
+                            "|" +
+                            lowestNumberSeen +
+                            "|" +
+                            itemsSyncedInBatch
+                    ),
+                7L,
+                "org/repo",
+                SyncPhase.ISSUES,
+                3200,
+                412
+            );
+
+            assertThat(seen).containsExactly("7|org/repo|ISSUES|3200|412");
+        }
+
+        @Test
+        void unseededMinimum_isNotReportedAsProgress() {
+            AtomicInteger calls = new AtomicInteger();
+
+            // The page loops seed their running minimum at Integer.MAX_VALUE. Reporting that verbatim
+            // would read as "remaining = 2147483647" and yank the bar back to zero.
+            GitHubHistoricalBackfillService.notifyPage(
+                (a, b, c, d, e) -> calls.incrementAndGet(),
+                7L,
+                "org/repo",
+                SyncPhase.ISSUES,
+                Integer.MAX_VALUE,
+                0
+            );
+
+            assertThat(calls.get()).isZero();
+        }
+
+        @Test
+        void observerThrows_isSwallowedSoAProgressTickCannotFailTheBatch() {
+            // A progress callback has no business aborting the batch it is only observing: losing a tick
+            // is cosmetic, losing the batch means re-fetching every page in it.
+            assertThatCode(() ->
+                GitHubHistoricalBackfillService.notifyPage(
+                    (a, b, c, d, e) -> {
+                        throw new IllegalStateException("observer blew up");
+                    },
+                    7L,
+                    "org/repo",
+                    SyncPhase.PULL_REQUESTS,
+                    100,
+                    5
+                )
+            ).doesNotThrowAnyException();
         }
     }
 }

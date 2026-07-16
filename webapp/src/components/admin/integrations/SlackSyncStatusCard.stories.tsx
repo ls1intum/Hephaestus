@@ -8,7 +8,7 @@ const baseStatus: ConnectionSyncStatus = {
 	connectionState: "ACTIVE",
 	kind: "SLACK",
 	health: "HEALTHY",
-	resourceCounts: { total: 3, errored: 0 },
+	resourceCounts: { total: 3, errored: 0, pending: 0, stale: 0 },
 	// SlackIntegrationSyncRunner does not override supportsBackfill — Slack reconciles only.
 	backfillSupported: false,
 	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),

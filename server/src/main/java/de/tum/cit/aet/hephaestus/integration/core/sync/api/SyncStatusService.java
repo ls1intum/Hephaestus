@@ -25,6 +25,8 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivity;
 import de.tum.cit.aet.hephaestus.integration.core.sync.activity.ConnectionActivityRepository;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +127,7 @@ public class SyncStatusService {
             .stream()
             .filter(r -> r.lastError() != null)
             .count();
+        ResourceCountsDTO resourceCounts = rollUp(resources, erroredResources, providerDetails.syncInterval());
         ConnectionHealth health = deriveHealth(
             connection,
             lastFinishedJob,
@@ -141,14 +144,54 @@ public class SyncStatusService {
             activeJob.map(SyncJobDTO::from).orElse(null),
             lastFinishedJob.map(SyncJobDTO::from).orElse(null),
             providerDetails.nextScheduledSyncAt(),
+            // The same cadence the stale rollup above judges against. Sent so the client can make the
+            // per-resource judgement the rollup only makes in aggregate; null stays null, so a client
+            // that can't know the cadence declines to judge rather than guessing one.
+            providerDetails.syncInterval() == null ? null : providerDetails.syncInterval().toSeconds(),
             providerDetails.webhookRegistered(),
             activity.map(ConnectionActivity::getLastEventAt).orElse(null),
             activity.map(ConnectionActivity::getLastEventType).orElse(null),
             providerDetails.rateLimit() == null ? null : RateLimitSnapshotDTO.from(providerDetails.rateLimit()),
             backfillSupported,
             providerDetails.backfill() == null ? null : BackfillSummaryDTO.from(providerDetails.backfill()),
-            new ResourceCountsDTO((long) resources.size(), erroredResources)
+            resourceCounts
         );
+    }
+
+    /**
+     * Multiplier on the scheduled cadence past which a resource counts as stale. One cadence is not
+     * enough — a resource is legitimately "one cadence old" for the entire interval between two runs,
+     * so flagging at 1x would show the whole fleet stale right before every scheduled sync. Two means a
+     * resource has to have missed a full run to be called out.
+     */
+    private static final int STALE_CADENCE_MULTIPLE = 2;
+
+    /**
+     * The overview's honest headline. Note the three subsets overlap (an errored resource is usually
+     * also stale) — they are counted independently and must not be summed into "total".
+     */
+    private static ResourceCountsDTO rollUp(
+        List<SyncResourceState> resources,
+        long erroredResources,
+        @Nullable Duration syncInterval
+    ) {
+        long pending = resources
+            .stream()
+            .filter(r -> r.lastSyncedAt() == null)
+            .count();
+
+        // No known cadence → no staleness judgement. Guessing a default would either flag healthy
+        // resources or hide real ones, and both are worse than the UI simply not making the claim.
+        long stale = 0;
+        if (syncInterval != null && !syncInterval.isZero() && !syncInterval.isNegative()) {
+            Instant staleBefore = Instant.now().minus(syncInterval.multipliedBy(STALE_CADENCE_MULTIPLE));
+            stale = resources
+                .stream()
+                .filter(r -> r.lastSyncedAt() != null && r.lastSyncedAt().isBefore(staleBefore))
+                .count();
+        }
+
+        return new ResourceCountsDTO((long) resources.size(), erroredResources, pending, stale);
     }
 
     public List<SyncResourceStateDTO> getResources(Long workspaceId, long connectionId) {

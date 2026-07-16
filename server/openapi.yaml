@@ -5076,6 +5076,16 @@ components:
         resourceCounts:
           $ref: "#/components/schemas/ResourceCounts"
           description: Resource-level rollup
+        syncIntervalSeconds:
+          type: integer
+          format: int64
+          description: "The periodic reconciliation's cadence in seconds, when the\
+            \ schedule has a regular one. This is what makes a resource's lastSyncedAt\
+            \ judgeable: \"synced 4h ago\" is only stale if the cadence is hourly,\
+            \ and a client cannot know that without this. Null when the schedule is\
+            \ irregular or unparseable — clients must then decline to judge staleness\
+            \ rather than assume a default, exactly as the server's own stale rollup\
+            \ does."
         webhookRegistered:
           type: boolean
           description: Whether the vendor webhook registration is present; null if
@@ -7180,12 +7190,28 @@ components:
           type: integer
           format: int64
           description: Resources currently reporting a sync error
+        pending:
+          type: integer
+          format: int64
+          description: "Resources that have never completed a sync (no lastSyncedAt).\
+            \ Defined on the timestamp rather than on a provider's status vocabulary\
+            \ so it means the same thing for a repository, a Slack channel and an\
+            \ Outline collection."
+        stale:
+          type: integer
+          format: int64
+          description: "Resources whose last sync is older than twice the connection's\
+            \ scheduled cadence. Always 0 when the cadence is unknown or the schedule\
+            \ is irregular — staleness is a judgement against a known cron, and without\
+            \ one this declines to guess rather than flagging healthy resources."
         total:
           type: integer
           format: int64
           description: Total resources known to this connection
       required:
       - errored
+      - pending
+      - stale
       - total
     RevokeSessionsResult:
       type: object
@@ -7469,6 +7495,41 @@ components:
       - status
       - trigger
       - type
+    SyncResourceCount:
+      type: object
+      description: "One entity class mirrored within a resource (issues, pull requests,\
+        \ comments, messages, …)"
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Mirrored row count for this class
+        key:
+          type: string
+          description: Stable machine token for this class
+          enum:
+          - issues
+          - pullRequests
+          - issueComments
+          - reviews
+          - reviewComments
+          - commits
+          - messages
+          - documents
+          example: pullRequests
+        label:
+          type: string
+          description: Display name
+          example: Pull requests
+        lastSyncedAt:
+          type: string
+          format: date-time
+          description: When this class was last synced. Null means the integration
+            does not track a per-class watermark — not that the class has never synced.
+      required:
+      - count
+      - key
+      - label
     SyncResourceState:
       type: object
       description: One synced resource (repository / channel / collection) — unified
@@ -7482,6 +7543,14 @@ components:
           type: integer
           format: int32
           description: Per-resource backfill percent
+        counts:
+          type: array
+          description: "Per-entity-class breakdown behind itemCount. One entry per\
+            \ class the integration actually mirrors — 6 for an SCM repository, 1\
+            \ for a Slack channel or Outline collection. Never null; empty when the\
+            \ resource has never synced."
+          items:
+            $ref: "#/components/schemas/SyncResourceCount"
         externalId:
           type: string
           description: Vendor-side identifier
@@ -7492,14 +7561,14 @@ components:
         itemCount:
           type: integer
           format: int64
-          description: Mirrored item count
+          description: Headline mirrored item count — the rollup of `counts`
         lastError:
           type: string
           description: "Last sync error, if any"
         lastSyncedAt:
           type: string
           format: date-time
-          description: Last successful sync timestamp
+          description: Last successful sync timestamp across all entity classes
         name:
           type: string
           description: Display name
@@ -7518,6 +7587,7 @@ components:
           format: int64
           description: "Vendor-reported upstream count, if cheaply available"
       required:
+      - counts
       - externalId
       - id
       - name

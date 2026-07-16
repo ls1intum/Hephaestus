@@ -5,12 +5,15 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.BackfillTally;
 import java.util.List;
-import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -78,11 +81,14 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
     public void backfill(IntegrationRef ref, SyncExecutionHandle handle) {
         long workspaceId = ref.workspaceId();
         int batchSize = syncSchedulerProperties.backfill().batchSize();
-        int batchesRun = 0;
 
         while (!handle.isCancellationRequested()) {
-            List<SyncTarget> pending = syncTargetProvider
-                .getSyncTargetsForScope(workspaceId)
+            // Every target in the scope, not just the pending ones: the pending set shrinks as
+            // repositories finish, and computing the denominator from it would make the bar retreat
+            // every time one completed. Completed targets contribute their full high-water mark to both
+            // sides of the fraction, so the total holds still and the bar only fills.
+            List<SyncTarget> allTargets = syncTargetProvider.getSyncTargetsForScope(workspaceId);
+            List<SyncTarget> pending = allTargets
                 .stream()
                 .filter(target -> !target.isBackfillComplete())
                 .toList();
@@ -90,21 +96,56 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 break;
             }
 
+            BackfillTally tally = new BackfillTally(allTargets);
+
             boolean anyWork = false;
+            int reposDone = 0;
             for (SyncTarget target : pending) {
                 if (handle.isCancellationRequested()) {
                     break;
                 }
-                boolean didWork = backfillService.runBackfillBatch(target, batchSize);
+                int reposDoneSoFar = reposDone;
+                int reposTotal = pending.size();
+                // Report per vendor page rather than per batch. No self-throttling here: the handle owns
+                // the write budget, and under-calling it is what made a manual backfill look frozen for
+                // minutes and then finish all at once.
+                boolean didWork = backfillService.runBackfillBatch(
+                    target,
+                    batchSize,
+                    (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) -> {
+                        tally.observe(syncTargetId, phase, lowestNumberSeen);
+                        handle.progress(
+                            tally.itemsProcessed(),
+                            tally.itemsTotal(),
+                            SyncProgress.ofResource(
+                                phase,
+                                step(
+                                    repositoryName,
+                                    phase,
+                                    lowestNumberSeen,
+                                    tally.highWaterMarkFor(syncTargetId, phase)
+                                ),
+                                repositoryName,
+                                reposDoneSoFar,
+                                reposTotal
+                            )
+                        );
+                    }
+                );
                 anyWork = anyWork || didWork;
-                batchesRun++;
+                reposDone++;
+                // Batch boundary: the checkpoint columns have just been written, so re-read them. The
+                // live tally tracked one repo's page-level minimum; this folds in whatever the batch
+                // actually persisted (including a repo that finished, or one that did no work at all).
+                tally.refresh(syncTargetProvider.getSyncTargetsForScope(workspaceId));
                 handle.progress(
-                    batchesRun,
-                    null,
-                    Map.<String, Object>of(
-                        "currentRepository",
+                    tally.itemsProcessed(),
+                    tally.itemsTotal(),
+                    SyncProgress.ofResource(
+                        SyncPhase.REPOSITORIES,
+                        "Backfilled " + target.repositoryNameWithOwner() + " — " + reposDone + " of " + pending.size(),
                         target.repositoryNameWithOwner(),
-                        "reposPending",
+                        reposDone,
                         pending.size()
                     )
                 );
@@ -128,5 +169,19 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }
+    }
+
+    /**
+     * The one human sentence the UI renders for a backfill page, e.g.
+     * {@code "Backfilling ls1intum/Artemis — issues #4812 → #3200"}.
+     *
+     * <p>Reads as a countdown because that is what backfill is: it walks numbers down toward #1, so the
+     * high-water mark on the left and the live position on the right tell the operator both how far it
+     * has come and how far is left, in the repository's own numbering rather than an abstract percent.
+     */
+    static String step(String repositoryName, SyncPhase phase, int lowestNumberSeen, @Nullable Integer highWaterMark) {
+        String entity = phase == SyncPhase.ISSUES ? "issues" : "pull requests";
+        String range = highWaterMark == null ? "#" + lowestNumberSeen : "#" + highWaterMark + " → #" + lowestNumberSeen;
+        return "Backfilling " + repositoryName + " — " + entity + " " + range;
     }
 }

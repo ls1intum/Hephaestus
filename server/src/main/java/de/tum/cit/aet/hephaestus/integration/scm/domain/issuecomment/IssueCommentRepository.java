@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.Collection;
@@ -18,6 +19,20 @@ import org.springframework.stereotype.Repository;
 @WorkspaceAgnostic("Comments scoped through issue_id -> repository.workspace_id")
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
     Optional<IssueComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
+    /**
+     * Per-repository comment count for the sync-observability breakdown, batched over every repository
+     * of a connection in one grouped join. Counts comments on pull requests as well as on pure issues —
+     * both are {@code Issue} rows under single-table inheritance, and the sync path that fetches them is
+     * the same one, so splitting them here would imply a distinction the sync doesn't make.
+     */
+    @Query(
+        "SELECT c.issue.repository.id AS repositoryId, COUNT(c) AS itemCount FROM IssueComment c " +
+            "WHERE c.issue.repository.id IN :repositoryIds GROUP BY c.issue.repository.id"
+    )
+    List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
 
     /**
      * Batch fetch comments by IDs with all related entities eagerly loaded.

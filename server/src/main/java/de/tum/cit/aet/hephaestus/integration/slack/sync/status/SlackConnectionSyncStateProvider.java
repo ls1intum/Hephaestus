@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -63,6 +64,7 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(properties.cron()),
+            CronSchedules.interval(properties.cron()),
             null,
             null,
             false
@@ -92,14 +94,21 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
     private SyncResourceState toResourceState(SlackMonitoredChannel channel, Map<String, Long> itemCountByChannelId) {
         Long itemCount = itemCountByChannelId.getOrDefault(channel.getSlackChannelId(), 0L);
         String name = channel.getChannelName() != null ? channel.getChannelName() : channel.getSlackChannelId();
+        Instant lastSyncedAt = toInstant(channel.getLastHistorySyncedTs());
         return new SyncResourceState(
             channel.getId(),
             channel.getSlackChannelId(),
             name,
             SyncResourceState.Type.CHANNEL,
             channel.getConsentState().name(),
-            toInstant(channel.getLastHistorySyncedTs()),
+            lastSyncedAt,
             itemCount,
+            // A channel mirrors exactly one entity class, so the breakdown is a single row and the UI
+            // renders it inline with no expander. Reported anyway rather than left empty: the same table
+            // serves all integrations, and "one class" is a fact about Slack worth stating once, not an
+            // absence of information. Its watermark is the channel's, because here they are the same
+            // thing — this is not a sibling's timestamp standing in for a missing one.
+            List.of(new SyncResourceCount(SyncResourceCount.KEY_MESSAGES, "Messages", itemCount, lastSyncedAt)),
             null,
             null,
             null,

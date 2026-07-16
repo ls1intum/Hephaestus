@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.commit;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +30,19 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      * Find a commit by SHA and repository ID.
      */
     Optional<Commit> findByShaAndRepositoryId(String sha, Long repositoryId);
+
+    /**
+     * Per-repository commit count for the sync-observability breakdown, batched over every repository of
+     * a connection in one grouped query. No join needed — a commit carries {@code repository_id}
+     * directly, and {@code idx_git_commit_repository_id} already covers the grouping.
+     */
+    @Query(
+        "SELECT c.repository.id AS repositoryId, COUNT(c) AS itemCount FROM Commit c " +
+            "WHERE c.repository.id IN :repositoryIds GROUP BY c.repository.id"
+    )
+    List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
 
     /**
      * Check if a commit exists by SHA and repository ID.

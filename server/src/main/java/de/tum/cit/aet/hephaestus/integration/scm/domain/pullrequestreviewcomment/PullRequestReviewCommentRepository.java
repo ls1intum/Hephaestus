@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +20,21 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
     Optional<PullRequestReviewComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     boolean existsByNativeIdAndProviderId(Long nativeId, Long providerId);
+
+    /**
+     * Per-repository review-comment count for the sync-observability breakdown, batched over every
+     * repository of a connection in one grouped join. Joins through the direct {@code pullRequest}
+     * association rather than {@code review} — a review comment always has the former, while the
+     * latter is null for comments that arrive outside a review decision.
+     */
+    @Query(
+        "SELECT c.pullRequest.repository.id AS repositoryId, COUNT(c) AS itemCount " +
+            "FROM PullRequestReviewComment c " +
+            "WHERE c.pullRequest.repository.id IN :repositoryIds GROUP BY c.pullRequest.repository.id"
+    )
+    List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
 
     /**
      * Fetch a single review comment with its pull request and PR author eagerly loaded.

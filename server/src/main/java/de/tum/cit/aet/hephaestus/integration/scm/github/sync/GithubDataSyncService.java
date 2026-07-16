@@ -10,6 +10,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
@@ -648,7 +650,18 @@ public class GithubDataSyncService {
                     handle.progress(
                         reposProcessed,
                         syncTargets.size(),
-                        Map.of("currentRepository", sanitizeForLog(target.repositoryNameWithOwner()))
+                        SyncProgress.ofResource(
+                            SyncPhase.REPOSITORIES,
+                            "Syncing " +
+                                sanitizeForLog(target.repositoryNameWithOwner()) +
+                                " — repository " +
+                                reposProcessed +
+                                " of " +
+                                syncTargets.size(),
+                            sanitizeForLog(target.repositoryNameWithOwner()),
+                            reposProcessed,
+                            syncTargets.size()
+                        )
                     );
                 }
             }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -11,11 +12,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader.ScmResourceCounts;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -24,6 +27,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +60,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     @Mock
-    private IssueRepository issueRepository;
+    private ScmResourceCountReader countReader;
 
     private GitlabConnectionSyncStateProvider provider;
     private IntegrationRef ref;
@@ -79,7 +83,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             syncProps,
             repositoryToMonitorRepository,
             repositoryRepository,
-            issueRepository
+            countReader
         );
         ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, "gitlab.com:1");
         lenient().when(rateLimitTrackerProvider.getIfAvailable()).thenReturn(rateLimitTracker);
@@ -163,10 +167,21 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
                 new SyncSchedulerProperties(true, 7, "not a cron", 15, null, null, null, null),
                 repositoryToMonitorRepository,
                 repositoryRepository,
-                issueRepository
+                countReader
             );
 
             assertThat(brokenCron.describe(ref, CONNECTION_ID).nextScheduledSyncAt()).isNull();
+        }
+
+        @Test
+        void shouldComputeSyncIntervalFromCron() {
+            when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+
+            ConnectionSyncDetails details = provider.describe(ref, CONNECTION_ID);
+
+            // Without the cadence a "last synced 4h ago" reading is unjudgeable — callers cannot tell
+            // stale from on-schedule. The configured cron fires daily, so the cadence is 24h.
+            assertThat(details.syncInterval()).isEqualTo(Duration.ofHours(24));
         }
 
         @Test
@@ -214,7 +229,10 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             repo.setLastSyncAt(syncedAt);
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
 
-            when(issueRepository.countGroupedByRepositoryIds(List.of(500L))).thenReturn(List.of(itemCount(500L, 12L)));
+            // Headline itemCount is issues + merge requests: 9 + 3 = 12.
+            when(countReader.countsByRepositoryId(List.of(500L))).thenReturn(
+                Map.of(500L, new ScmResourceCounts(9, 3, 0, 0, 0, 0))
+            );
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
 
@@ -254,11 +272,74 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             repo.setNameWithOwner("group/empty-repo");
             repo.setLastSyncAt(Instant.now());
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
-            when(issueRepository.countGroupedByRepositoryIds(List.of(501L))).thenReturn(List.of());
+            // No rows at all for the repository: it is absent from the lookup entirely.
+            when(countReader.countsByRepositoryId(List.of(501L))).thenReturn(Map.of());
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
 
             assertThat(resources.get(0).itemCount()).isEqualTo(0L);
+        }
+
+        @Test
+        void shouldReportAllSixEntityClassesWithCountsRollingUpToItemCount() {
+            RepositoryToMonitor monitor = monitor(4L, "group/full-repo");
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(monitor));
+
+            Repository repo = new Repository();
+            ReflectionTestUtils.setField(repo, "id", 502L);
+            repo.setNameWithOwner("group/full-repo");
+            repo.setLastSyncAt(Instant.now());
+            when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
+            when(countReader.countsByRepositoryId(List.of(502L))).thenReturn(
+                Map.of(502L, new ScmResourceCounts(9, 3, 13, 14, 15, 16))
+            );
+
+            List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
+
+            SyncResourceState resource = resources.get(0);
+            assertThat(resource.counts())
+                .extracting(SyncResourceCount::key, SyncResourceCount::count)
+                .containsExactly(
+                    tuple("issues", 9L),
+                    tuple("pullRequests", 3L),
+                    tuple("issueComments", 13L),
+                    tuple("reviews", 14L),
+                    tuple("reviewComments", 15L),
+                    tuple("commits", 16L)
+                );
+            // Headline is issues + merge requests only; the notes/commit counts must not leak in.
+            assertThat(resource.itemCount()).isEqualTo(12L);
+        }
+
+        @Test
+        void shouldNeverClaimAPerClassWatermarkBecauseGitlabPersistsNone() {
+            RepositoryToMonitor monitor = monitor(5L, "group/honest-repo");
+            // The GitLab sync path never writes these columns; set them anyway so the test would catch a
+            // provider that started reading them (or borrowing repo.lastSyncAt) as a per-class claim.
+            monitor.setIssuesSyncedAt(Instant.parse("2026-07-10T03:00:00Z"));
+            monitor.setPullRequestsSyncedAt(Instant.parse("2026-07-14T03:00:00Z"));
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(monitor));
+
+            Repository repo = new Repository();
+            ReflectionTestUtils.setField(repo, "id", 503L);
+            repo.setNameWithOwner("group/honest-repo");
+            Instant repoSyncedAt = Instant.parse("2026-07-15T03:00:00Z");
+            repo.setLastSyncAt(repoSyncedAt);
+            when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
+            when(countReader.countsByRepositoryId(List.of(503L))).thenReturn(
+                Map.of(503L, new ScmResourceCounts(9, 3, 13, 14, 15, 16))
+            );
+
+            List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
+            SyncResourceState resource = resources.get(0);
+
+            // The repository-wide timestamp is real and reported at row level...
+            assertThat(resource.lastSyncedAt()).isEqualTo(repoSyncedAt);
+            // ...but is deliberately NOT borrowed as a per-class claim: GitLab measures no per-class
+            // freshness, so every class reports "not tracked" rather than a freshness nobody measured.
+            assertThat(resource.counts())
+                .hasSize(6)
+                .allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
         }
 
         private RepositoryToMonitor monitor(long id, String nameWithOwner) {
@@ -266,20 +347,6 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             ReflectionTestUtils.setField(monitor, "id", id);
             monitor.setNameWithOwner(nameWithOwner);
             return monitor;
-        }
-
-        private IssueRepository.RepositoryItemCount itemCount(long repositoryId, long count) {
-            return new IssueRepository.RepositoryItemCount() {
-                @Override
-                public Long getRepositoryId() {
-                    return repositoryId;
-                }
-
-                @Override
-                public Long getItemCount() {
-                    return count;
-                }
-            };
         }
     }
 }

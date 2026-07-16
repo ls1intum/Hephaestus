@@ -4,9 +4,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackChannelHistorySyncService.WorkspaceSyncSummary;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackDataSyncScheduler;
-import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -38,22 +39,40 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
         }
     }
 
-    static Map<String, Object> progressDetail(WorkspaceSyncSummary summary) {
-        return Map.of(
-            "channels",
-            summary.channels(),
-            "synced",
-            summary.synced(),
-            "skipped",
-            summary.skipped(),
-            "failed",
-            summary.failed(),
-            "ingested",
-            summary.ingested(),
-            "requestsUsed",
-            summary.requestsUsed(),
-            "budgetExhausted",
-            summary.budgetExhausted()
+    /**
+     * The terminal summary for a Slack reconcile, in the shared progress shape.
+     *
+     * <p>The per-channel counters that used to be scattered across their own top-level keys are folded
+     * into {@code currentStep} instead. They were never rendered — the UI reads {@code currentStep} and
+     * nothing else — and every integration inventing its own key set is what made the map unrenderable
+     * in the first place.
+     */
+    public static SyncProgress progressDetail(WorkspaceSyncSummary summary) {
+        StringBuilder step = new StringBuilder();
+        step
+            .append("Synced ")
+            .append(summary.synced())
+            .append(" of ")
+            .append(summary.channels())
+            .append(summary.channels() == 1 ? " channel" : " channels");
+        if (summary.ingested() > 0) {
+            step.append(" — ").append(summary.ingested()).append(" messages");
+        }
+        if (summary.skipped() > 0) {
+            step.append(" · ").append(summary.skipped()).append(" skipped");
+        }
+        if (summary.failed() > 0) {
+            step.append(" · ").append(summary.failed()).append(" failed");
+        }
+        if (summary.budgetExhausted()) {
+            step.append(" · request budget exhausted");
+        }
+        return SyncProgress.ofResource(
+            SyncPhase.CHANNELS,
+            step.toString(),
+            null,
+            summary.synced() + summary.skipped(),
+            summary.channels()
         );
     }
 }

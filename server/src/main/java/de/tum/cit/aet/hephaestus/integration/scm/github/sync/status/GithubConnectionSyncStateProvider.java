@@ -12,12 +12,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ScopedRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService.BackfillProgress;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationSuspensionTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader.ScmResourceCounts;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.time.Instant;
@@ -43,7 +44,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
-    private final IssueRepository issueRepository;
+    private final ScmResourceCountReader countReader;
 
     public GithubConnectionSyncStateProvider(
         ConnectionRepository connectionRepository,
@@ -52,7 +53,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         SyncSchedulerProperties syncSchedulerProperties,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
-        IssueRepository issueRepository
+        ScmResourceCountReader countReader
     ) {
         this.connectionRepository = connectionRepository;
         this.rateLimitTracker = rateLimitTracker;
@@ -60,7 +61,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
-        this.issueRepository = issueRepository;
+        this.countReader = countReader;
     }
 
     @Override
@@ -89,6 +90,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(syncSchedulerProperties.cron()),
+            CronSchedules.interval(syncSchedulerProperties.cron()),
             rateLimitTracker.snapshot(workspaceId),
             aggregateBackfill(workspaceId),
             vendorHealthDegraded
@@ -103,38 +105,33 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             return List.of();
         }
 
-        // Batch-resolve nameWithOwner -> local Repository id (single query), then a single grouped
-        // issue+PR count query — avoids an N+1 per monitored repository.
+        // Batch-resolve nameWithOwner -> local Repository id (single query), then one fixed set of
+        // grouped per-entity-class count queries — avoids an N+1 per monitored repository.
         Map<String, Long> repositoryIdByName = repositoryRepository
             .findAllByWorkspaceMonitors(workspaceId)
             .stream()
             .collect(Collectors.toMap(Repository::getNameWithOwner, Repository::getId, (a, b) -> a));
 
-        Map<Long, Long> itemCountByRepositoryId = repositoryIdByName.isEmpty()
-            ? Map.of()
-            : issueRepository
-                  .countGroupedByRepositoryIds(repositoryIdByName.values())
-                  .stream()
-                  .collect(
-                      Collectors.toMap(
-                          IssueRepository.RepositoryItemCount::getRepositoryId,
-                          IssueRepository.RepositoryItemCount::getItemCount
-                      )
-                  );
+        Map<Long, ScmResourceCounts> countsByRepositoryId = countReader.countsByRepositoryId(
+            repositoryIdByName.values()
+        );
 
         return monitors
             .stream()
-            .map(monitor -> toResourceState(monitor, repositoryIdByName, itemCountByRepositoryId))
+            .map(monitor -> toResourceState(monitor, repositoryIdByName, countsByRepositoryId))
             .toList();
     }
 
     private SyncResourceState toResourceState(
         RepositoryToMonitor monitor,
         Map<String, Long> repositoryIdByName,
-        Map<Long, Long> itemCountByRepositoryId
+        Map<Long, ScmResourceCounts> countsByRepositoryId
     ) {
         Long repositoryId = repositoryIdByName.get(monitor.getNameWithOwner());
-        Long itemCount = repositoryId == null ? null : itemCountByRepositoryId.get(repositoryId);
+        // A monitor with no local Repository row has never synced anything — distinct from one that
+        // synced zero items, so the headline stays null (unknown) rather than claiming 0.
+        ScmResourceCounts counts = repositoryId == null ? null : countsByRepositoryId.get(repositoryId);
+        Long itemCount = counts == null ? null : counts.headlineItemCount();
 
         Instant lastSyncedAt = latestNonNull(
             monitor.getIssuesSyncedAt(),
@@ -163,6 +160,13 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             state,
             lastSyncedAt,
             itemCount,
+            // Per-class breakdown, each class carrying its own watermark where one is persisted. The
+            // two that are (issues, pull requests) are reported per class rather than collapsed into
+            // lastSyncedAt via latestNonNull above — collapsing is what hides "pull requests are fresh
+            // but issues stopped four days ago", since the newest sibling wins.
+            counts == null
+                ? List.of()
+                : counts.toSyncResourceCounts(monitor.getIssuesSyncedAt(), monitor.getPullRequestsSyncedAt()),
             // upstreamCount: would require a live vendor call — the SPI forbids that in resources().
             null,
             // Per-resource errors are not persisted yet.

@@ -897,6 +897,10 @@ export type SyncResourceState = {
      */
     backfillPercent?: number;
     /**
+     * Per-entity-class breakdown behind itemCount. One entry per class the integration actually mirrors — 6 for an SCM repository, 1 for a Slack channel or Outline collection. Never null; empty when the resource has never synced.
+     */
+    counts: Array<SyncResourceCount>;
+    /**
      * Vendor-side identifier
      */
     externalId: string;
@@ -905,7 +909,7 @@ export type SyncResourceState = {
      */
     id: number;
     /**
-     * Mirrored item count
+     * Headline mirrored item count — the rollup of `counts`
      */
     itemCount?: number;
     /**
@@ -913,7 +917,7 @@ export type SyncResourceState = {
      */
     lastError?: string;
     /**
-     * Last successful sync timestamp
+     * Last successful sync timestamp across all entity classes
      */
     lastSyncedAt?: Date;
     /**
@@ -932,6 +936,28 @@ export type SyncResourceState = {
      * Vendor-reported upstream count, if cheaply available
      */
     upstreamCount?: number;
+};
+
+/**
+ * One entity class mirrored within a resource (issues, pull requests, comments, messages, …)
+ */
+export type SyncResourceCount = {
+    /**
+     * Mirrored row count for this class
+     */
+    count: number;
+    /**
+     * Stable machine token for this class
+     */
+    key: 'issues' | 'pullRequests' | 'issueComments' | 'reviews' | 'reviewComments' | 'commits' | 'messages' | 'documents';
+    /**
+     * Display name
+     */
+    label: string;
+    /**
+     * When this class was last synced. Null means the integration does not track a per-class watermark — not that the class has never synced.
+     */
+    lastSyncedAt?: Date;
 };
 
 /**
@@ -1156,6 +1182,14 @@ export type ResourceCounts = {
      * Resources currently reporting a sync error
      */
     errored: number;
+    /**
+     * Resources that have never completed a sync (no lastSyncedAt). Defined on the timestamp rather than on a provider's status vocabulary so it means the same thing for a repository, a Slack channel and an Outline collection.
+     */
+    pending: number;
+    /**
+     * Resources whose last sync is older than twice the connection's scheduled cadence. Always 0 when the cadence is unknown or the schedule is irregular — staleness is a judgement against a known cron, and without one this declines to guess rather than flagging healthy resources.
+     */
+    stale: number;
     /**
      * Total resources known to this connection
      */
@@ -2907,6 +2941,10 @@ export type ConnectionSyncStatus = {
      * Resource-level rollup
      */
     resourceCounts: ResourceCounts;
+    /**
+     * The periodic reconciliation's cadence in seconds, when the schedule has a regular one. This is what makes a resource's lastSyncedAt judgeable: "synced 4h ago" is only stale if the cadence is hourly, and a client cannot know that without this. Null when the schedule is irregular or unparseable — clients must then decline to judge staleness rather than assume a default, exactly as the server's own stale rollup does.
+     */
+    syncIntervalSeconds?: number;
     /**
      * Whether the vendor webhook registration is present; null if not applicable/unknown
      */

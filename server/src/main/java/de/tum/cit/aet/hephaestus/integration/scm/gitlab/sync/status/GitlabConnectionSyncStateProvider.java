@@ -10,11 +10,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader.ScmResourceCounts;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.time.Instant;
@@ -36,7 +37,7 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
-    private final IssueRepository issueRepository;
+    private final ScmResourceCountReader countReader;
 
     public GitlabConnectionSyncStateProvider(
         ConnectionService connectionService,
@@ -44,14 +45,14 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         SyncSchedulerProperties syncSchedulerProperties,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
-        IssueRepository issueRepository
+        ScmResourceCountReader countReader
     ) {
         this.connectionService = connectionService;
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
-        this.issueRepository = issueRepository;
+        this.countReader = countReader;
     }
 
     @Override
@@ -71,6 +72,7 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(syncSchedulerProperties.cron()),
+            CronSchedules.interval(syncSchedulerProperties.cron()),
             rateLimit,
             null,
             false
@@ -91,32 +93,24 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             .collect(Collectors.toMap(Repository::getNameWithOwner, r -> r, (a, b) -> a));
 
         List<Long> repositoryIds = reposByNameWithOwner.values().stream().map(Repository::getId).toList();
-        Map<Long, Long> itemCountsByRepositoryId = repositoryIds.isEmpty()
-            ? Map.of()
-            : issueRepository
-                  .countGroupedByRepositoryIds(repositoryIds)
-                  .stream()
-                  .collect(
-                      Collectors.toMap(
-                          IssueRepository.RepositoryItemCount::getRepositoryId,
-                          IssueRepository.RepositoryItemCount::getItemCount
-                      )
-                  );
+        Map<Long, ScmResourceCounts> countsByRepositoryId = countReader.countsByRepositoryId(repositoryIds);
 
         return monitors
             .stream()
-            .map(monitor -> toResourceState(monitor, reposByNameWithOwner, itemCountsByRepositoryId))
+            .map(monitor -> toResourceState(monitor, reposByNameWithOwner, countsByRepositoryId))
             .toList();
     }
 
     private SyncResourceState toResourceState(
         RepositoryToMonitor monitor,
         Map<String, Repository> reposByNameWithOwner,
-        Map<Long, Long> itemCountsByRepositoryId
+        Map<Long, ScmResourceCounts> countsByRepositoryId
     ) {
         Repository repo = reposByNameWithOwner.get(monitor.getNameWithOwner());
         Instant lastSyncedAt = repo == null ? null : repo.getLastSyncAt();
-        Long itemCount = repo == null ? null : itemCountsByRepositoryId.getOrDefault(repo.getId(), 0L);
+        ScmResourceCounts counts =
+            repo == null ? null : countsByRepositoryId.getOrDefault(repo.getId(), ScmResourceCounts.empty());
+        Long itemCount = counts == null ? null : counts.headlineItemCount();
         String state = lastSyncedAt != null ? SyncResourceState.STATE_SYNCED : SyncResourceState.STATE_PENDING;
 
         return new SyncResourceState(
@@ -127,6 +121,12 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             state,
             lastSyncedAt,
             itemCount,
+            // Counts are read from the same shared tables GitHub mirrors into, so the breakdown is
+            // identical. The per-class watermarks are NOT: the GitLab sync path writes only
+            // repository.last_sync_at, never repository_to_monitor's per-class *_synced_at columns. Both
+            // classes therefore report a null lastSyncedAt — "not tracked" — instead of borrowing the
+            // repository-wide timestamp, which would assert a per-class freshness nobody measured.
+            counts == null ? List.of() : counts.toSyncResourceCounts(null, null),
             null,
             null,
             null,

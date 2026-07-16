@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -72,25 +73,36 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
-     * Combined issue + pull/merge request count per repository, in one grouped query. Deliberately
-     * omits {@code TYPE(i) = Issue} so {@code PullRequest} subclass rows (single-table inheritance)
-     * are included — backs the sync-observability resource list's per-repository {@code itemCount}
-     * without an N+1 query per repo.
+     * Per-repository count of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
+     * subclass rows that share this table under single-table inheritance.
+     *
+     * <p>Split from its pull-request counterpart, rather than one combined count, because the combined
+     * number is exactly what makes a stalled entity class invisible: issues and pull requests sync on
+     * separate code paths, and one of them stopping keeps the sum rising.
+     *
+     * <p>Batched over a collection of repository ids: the sync-observability read model this backs
+     * renders every repository of a connection on one page load, so a per-repository call would be an
+     * N+1 by construction.
      *
      * @param repositoryIds the repository IDs to count for
-     * @return one projection row per repository that has at least one issue/PR
+     * @return one projection row per repository that has at least one issue
      */
     @Query(
         "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
-            "WHERE i.repository.id IN :repositoryIds GROUP BY i.repository.id"
+            "WHERE TYPE(i) = Issue AND i.repository.id IN :repositoryIds GROUP BY i.repository.id"
     )
-    List<RepositoryItemCount> countGroupedByRepositoryIds(@Param("repositoryIds") Collection<Long> repositoryIds);
+    List<RepositoryItemCountProjection> countIssuesGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
 
-    /** Projection for {@link #countGroupedByRepositoryIds}. */
-    interface RepositoryItemCount {
-        Long getRepositoryId();
-        Long getItemCount();
-    }
+    /** Per-repository count of pull/merge requests only. Counterpart to {@link #countIssuesGroupedByRepositoryIds}. */
+    @Query(
+        "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
+            "WHERE TYPE(i) = PullRequest AND i.repository.id IN :repositoryIds GROUP BY i.repository.id"
+    )
+    List<RepositoryItemCountProjection> countPullRequestsGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
 
     /**
      * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered

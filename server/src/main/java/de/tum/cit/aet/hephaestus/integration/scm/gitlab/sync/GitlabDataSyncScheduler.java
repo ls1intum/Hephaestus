@@ -10,6 +10,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
@@ -686,7 +688,17 @@ public class GitlabDataSyncScheduler {
 
             reposProcessed++;
             if (handle != null) {
-                handle.progress(reposProcessed, totalRepos, Map.of("currentRepository", repo.getNameWithOwner()));
+                handle.progress(
+                    reposProcessed,
+                    totalRepos,
+                    SyncProgress.ofResource(
+                        SyncPhase.REPOSITORIES,
+                        "Syncing " + repo.getNameWithOwner() + " — repository " + reposProcessed + " of " + totalRepos,
+                        repo.getNameWithOwner(),
+                        reposProcessed,
+                        totalRepos
+                    )
+                );
             }
         }
 

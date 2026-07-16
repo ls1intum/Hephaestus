@@ -297,10 +297,18 @@ export const updateConnectionSyncJobResponseTransformer = async (data: any): Pro
     return data;
 };
 
+const syncResourceCountSchemaResponseTransformer = (data: any) => {
+    if (data.lastSyncedAt) {
+        data.lastSyncedAt = new Date(data.lastSyncedAt);
+    }
+    return data;
+};
+
 const syncResourceStateSchemaResponseTransformer = (data: any) => {
     if (data.backfillCompletedThrough) {
         data.backfillCompletedThrough = new Date(data.backfillCompletedThrough);
     }
+    data.counts = data.counts.map((item: any) => syncResourceCountSchemaResponseTransformer(item));
     if (data.lastSyncedAt) {
         data.lastSyncedAt = new Date(data.lastSyncedAt);
     }

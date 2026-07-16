@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -17,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.BackfillTally;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -122,6 +125,22 @@ public class GitLabHistoricalBackfillService {
         for (SyncSession session : sessions) {
             Long providerId = getGitLabProviderId(session.accountLogin());
 
+            // Determinate progress from the already-persisted high-water-mark / checkpoint columns —
+            // this pass used to report itemsTotal = null, which pinned the UI to an indeterminate
+            // spinner no matter how often it reported. Built over every target of the scope rather than
+            // only the pending ones, so the denominator holds still as repositories complete instead of
+            // shrinking under the bar.
+            //
+            // Scoped per session because that is the grain the refresh below can re-read cheaply. Only
+            // the handle-driven path reports at all, and it always filters to exactly one session.
+            BackfillTally tally = new BackfillTally(session.syncTargets());
+            int reposTotal = (int) session
+                .syncTargets()
+                .stream()
+                .filter(t -> !t.isBackfillComplete())
+                .count();
+            int reposDone = 0;
+
             for (SyncTarget target : session.syncTargets()) {
                 if (handle != null && handle.isCancellationRequested()) {
                     return processed.get();
@@ -150,11 +169,24 @@ public class GitLabHistoricalBackfillService {
                 if (worked) {
                     processed.incrementAndGet();
                 }
+                reposDone++;
                 if (handle != null) {
+                    // Re-read the checkpoint columns the batch just wrote, then report. A per-repository
+                    // tick is already the right grain here, unlike GitHub's per-page reporting: a GitLab
+                    // batch is bounded by ITEM count (batch-size = 25 items), not page count, so one
+                    // repository's batch is a page or two of vendor I/O — seconds, not the minutes a
+                    // 25-page GitHub batch takes.
+                    tally.refresh(syncTargetProvider.getSyncTargetsForScope(session.scopeId()));
                     handle.progress(
-                        processed.get(),
-                        null,
-                        Map.of("currentRepository", target.repositoryNameWithOwner())
+                        tally.itemsProcessed(),
+                        tally.itemsTotal(),
+                        SyncProgress.ofResource(
+                            SyncPhase.REPOSITORIES,
+                            "Backfilled " + target.repositoryNameWithOwner() + " — " + reposDone + " of " + reposTotal,
+                            target.repositoryNameWithOwner(),
+                            reposDone,
+                            reposTotal
+                        )
                     );
                 }
             }

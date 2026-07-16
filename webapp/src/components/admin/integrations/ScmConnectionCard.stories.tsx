@@ -8,7 +8,7 @@ const baseStatus: ConnectionSyncStatus = {
 	connectionState: "ACTIVE",
 	kind: "GITHUB",
 	health: "HEALTHY",
-	resourceCounts: { total: 12, errored: 0 },
+	resourceCounts: { total: 12, errored: 0, pending: 0, stale: 0 },
 	backfillSupported: true,
 	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),
 	lastEventProcessedAt: new Date("2026-07-15T09:30:00Z"),

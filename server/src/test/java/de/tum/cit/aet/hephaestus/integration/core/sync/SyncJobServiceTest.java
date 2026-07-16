@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -16,10 +17,13 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -604,7 +608,14 @@ class SyncJobServiceTest extends BaseUnitTest {
         SyncJobService.Started started = beginTestJob();
 
         service.executeBody(started, handle ->
-            handle.progress(4, 12, java.util.Map.of("currentStep", "pull-requests"))
+            handle.progress(
+                4,
+                12,
+                de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress.of(
+                    de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase.PULL_REQUESTS,
+                    "pull-requests"
+                )
+            )
         );
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
@@ -634,6 +645,84 @@ class SyncJobServiceTest extends BaseUnitTest {
         });
 
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
+    }
+
+    /**
+     * Mid-flight progress must refresh the resources pane too. Publishing RESOURCES only at terminal is
+     * what made repo/issue/PR counts sit still for the whole run and then teleport to their final
+     * numbers — the "updated all at once" the counts pane showed.
+     */
+    @Test
+    void progressWrite_publishesResourcesScopeMidFlightAndNotOnlyAtCompletion() {
+        SyncJobService.Started started = beginTestJob();
+        List<SyncStateChangedEvent> published = new ArrayList<>();
+        doAnswer(inv -> {
+            if (inv.getArgument(0) instanceof SyncStateChangedEvent e) {
+                published.add(e);
+            }
+            return null;
+        })
+            .when(eventPublisher)
+            .publishEvent(any(Object.class));
+
+        List<SyncStateChangedEvent.Scope> seenWhileTheJobWasStillRunning = new ArrayList<>();
+        service.executeBody(started, handle -> {
+            handle.progress(1, 10, SyncProgress.of(SyncPhase.ISSUES, "syncing issues"));
+            // Snapshot INSIDE the body. completeJob publishes RESOURCES too, so asserting after
+            // executeBody returns would pass even if a progress write published nothing — which is
+            // precisely the bug: counts frozen for the whole run, then teleporting at the end.
+            published.forEach(e -> seenWhileTheJobWasStillRunning.add(e.scope()));
+        });
+
+        assertThat(seenWhileTheJobWasStillRunning)
+            .contains(SyncStateChangedEvent.Scope.RESOURCES)
+            .contains(SyncStateChangedEvent.Scope.JOB);
+    }
+
+    @Test
+    void flushBufferedProgress_noActiveHandles_doesNothing() {
+        service.flushBufferedProgress();
+
+        verify(syncJobRepository, never()).save(any());
+    }
+
+    /**
+     * The trailing flush, end to end. A runner that reports a phase boundary and then goes quiet for
+     * minutes must not leave the row showing the state before it — the sweep is what lands that last
+     * suppressed update while the runner is still busy.
+     */
+    @Test
+    void flushBufferedProgress_runningJobWithSuppressedUpdate_persistsItWhileTheBodyIsStillBusy() throws Exception {
+        SyncJobService.Started started = beginTestJob();
+        CountDownLatch reported = new CountDownLatch(1);
+        CountDownLatch releaseBody = new CountDownLatch(1);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            executor.execute(() ->
+                service.executeBody(started, handle -> {
+                    handle.progress(1, 10, SyncProgress.of(SyncPhase.ISSUES, "written"));
+                    // Throttled — buffered only. The runner then goes quiet, as it would while grinding
+                    // through a slow phase.
+                    handle.progress(7, 10, SyncProgress.of(SyncPhase.ISSUES, "suppressed"));
+                    reported.countDown();
+                    try {
+                        releaseBody.await(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                })
+            );
+            assertThat(reported.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(started.job().getItemsProcessed()).isEqualTo(1);
+
+            Thread.sleep(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS * 1000 + 200);
+            service.flushBufferedProgress();
+
+            assertThat(started.job().getItemsProcessed()).isEqualTo(7);
+            assertThat(started.job().getProgress()).containsEntry(SyncProgress.KEY_CURRENT_STEP, "suppressed");
+
+            releaseBody.countDown();
+        }
     }
 
     @Test

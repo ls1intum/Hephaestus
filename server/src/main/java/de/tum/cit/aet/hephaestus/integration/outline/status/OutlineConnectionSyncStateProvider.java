@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
@@ -59,7 +60,14 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
             .map(config -> config.webhookSubscriptionId() != null && !config.webhookSubscriptionId().isBlank())
             .orElse(null);
 
-        return new ConnectionSyncDetails(webhookRegistered, CronSchedules.nextRun(syncCron), null, null, false);
+        return new ConnectionSyncDetails(
+            webhookRegistered,
+            CronSchedules.nextRun(syncCron),
+            CronSchedules.interval(syncCron),
+            null,
+            null,
+            false
+        );
     }
 
     @Override
@@ -91,6 +99,16 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
             resourceState(collection),
             collection.getDocumentsSyncedAt(),
             itemCount,
+            // One class per collection, same as Slack — and the watermark genuinely is the documents'
+            // own, not a stand-in.
+            List.of(
+                new SyncResourceCount(
+                    SyncResourceCount.KEY_DOCUMENTS,
+                    "Documents",
+                    itemCount,
+                    collection.getDocumentsSyncedAt()
+                )
+            ),
             collection.getDocumentsUpstream() == null ? null : collection.getDocumentsUpstream().longValue(),
             collection.getLastSyncError(),
             null,

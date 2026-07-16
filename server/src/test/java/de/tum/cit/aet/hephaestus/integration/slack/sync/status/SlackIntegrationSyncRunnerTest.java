@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -9,11 +9,12 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackChannelHistorySyncService.WorkspaceSyncSummary;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -46,7 +47,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
         runner.reconcile(REF, handle);
 
         verify(dataSyncScheduler).syncWorkspaceNow(WS, handle);
-        verify(handle).progress(eq(3), eq(3), anyMap());
+        verify(handle).progress(eq(3), eq(3), any(SyncProgress.class));
         verify(handle, never()).reportWarnings();
     }
 
@@ -57,7 +58,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(REF, handle);
 
-        verify(handle).progress(eq(3), eq(4), anyMap());
+        verify(handle).progress(eq(3), eq(4), any(SyncProgress.class));
         verify(handle).reportWarnings();
     }
 
@@ -86,15 +87,16 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
     void progressDetail_carriesEveryFieldOfTheSummary() {
         WorkspaceSyncSummary summary = new WorkspaceSyncSummary(3, 2, 1, 7L, 4, true, 1);
 
-        Map<String, Object> detail = SlackIntegrationSyncRunner.progressDetail(summary);
+        SyncProgress detail = SlackIntegrationSyncRunner.progressDetail(summary);
 
-        assertThat(detail)
-            .containsEntry("channels", 3)
-            .containsEntry("synced", 2)
-            .containsEntry("skipped", 1)
-            .containsEntry("failed", 1)
-            .containsEntry("ingested", 7L)
-            .containsEntry("requestsUsed", 4)
-            .containsEntry("budgetExhausted", true);
+        assertThat(detail.phase()).isEqualTo(SyncPhase.CHANNELS);
+        assertThat(detail.unitsCompleted()).isEqualTo(3);
+        assertThat(detail.unitsTotal()).isEqualTo(3);
+        assertThat(detail.currentStep())
+            .contains("2 of 3 channels")
+            .contains("7 messages")
+            .contains("1 skipped")
+            .contains("1 failed")
+            .contains("request budget exhausted");
     }
 }

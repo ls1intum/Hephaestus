@@ -8,7 +8,7 @@ const status: ConnectionSyncStatus = {
 	connectionState: "ACTIVE",
 	kind: "GITHUB",
 	health: "HEALTHY",
-	resourceCounts: { total: 12, errored: 0 },
+	resourceCounts: { total: 12, errored: 0, pending: 0, stale: 0 },
 	backfillSupported: true,
 	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),
 };
@@ -68,7 +68,11 @@ export const Syncing: Story = {
 /** Some resources are erroring — surfaced as a destructive count line. */
 export const WithErroredResources: Story = {
 	args: {
-		status: { ...status, health: "DEGRADED", resourceCounts: { total: 12, errored: 3 } },
+		status: {
+			...status,
+			health: "DEGRADED",
+			resourceCounts: { total: 12, errored: 3, pending: 0, stale: 0 },
+		},
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);

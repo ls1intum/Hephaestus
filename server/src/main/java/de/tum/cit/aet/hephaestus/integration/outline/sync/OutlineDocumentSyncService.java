@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
@@ -249,7 +251,15 @@ public class OutlineDocumentSyncService {
             handle.progress(
                 done,
                 total,
-                collectionName == null ? Map.of() : Map.of("currentCollection", collectionName)
+                SyncProgress.ofResource(
+                    SyncPhase.COLLECTIONS,
+                    collectionName == null
+                        ? "Syncing collection " + done + " of " + total
+                        : "Syncing " + collectionName + " — collection " + done + " of " + total,
+                    collectionName,
+                    done,
+                    total
+                )
             );
         }
     }

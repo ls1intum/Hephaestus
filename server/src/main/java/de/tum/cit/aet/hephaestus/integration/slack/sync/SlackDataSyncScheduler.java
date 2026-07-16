@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
+import de.tum.cit.aet.hephaestus.integration.slack.sync.status.SlackIntegrationSyncRunner;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -117,25 +118,12 @@ public class SlackDataSyncScheduler {
             ),
             handle -> {
                 SlackChannelHistorySyncService.WorkspaceSyncSummary summary = syncWorkspaceNow(workspaceId, handle);
+                // Same reporting as the manual runner — a scheduled reconcile and a hand-triggered one
+                // are the same work, so they must not tell the admin different stories about it.
                 handle.progress(
                     summary.synced() + summary.skipped(),
                     summary.channels(),
-                    Map.of(
-                        "channels",
-                        summary.channels(),
-                        "synced",
-                        summary.synced(),
-                        "skipped",
-                        summary.skipped(),
-                        "failed",
-                        summary.failed(),
-                        "ingested",
-                        summary.ingested(),
-                        "requestsUsed",
-                        summary.requestsUsed(),
-                        "budgetExhausted",
-                        summary.budgetExhausted()
-                    )
+                    SlackIntegrationSyncRunner.progressDetail(summary)
                 );
                 if (summary.failed() > 0 || summary.budgetExhausted()) {
                     handle.reportWarnings();

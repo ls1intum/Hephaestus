@@ -9,9 +9,11 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillPageObserver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -394,7 +396,8 @@ public class GitHubHistoricalBackfillService {
             }
 
             try {
-                boolean didWork = backfillRepository(target, backfillProps.batchSize());
+                // The scheduled cycle has no job handle to report to — nobody is watching a bar for it.
+                boolean didWork = backfillRepository(target, backfillProps.batchSize(), BackfillPageObserver.NOOP);
                 if (didWork) {
                     repositoriesProcessed.incrementAndGet();
                     // Reset failure counter on success
@@ -413,9 +416,11 @@ public class GitHubHistoricalBackfillService {
      *
      * @param target    the sync target to backfill
      * @param batchSize maximum pages to process in this batch
+     * @param observer  notified after every vendor page, so a driving runner can report progress at the
+     *                  grain the work happens at rather than once per whole batch
      * @return true if any work was performed
      */
-    boolean backfillRepository(SyncTarget target, int batchSize) {
+    boolean backfillRepository(SyncTarget target, int batchSize, BackfillPageObserver observer) {
         String safeRepoName = sanitizeForLog(target.repositoryNameWithOwner());
         Long syncTargetId = target.id();
         Long scopeId = target.scopeId();
@@ -482,7 +487,8 @@ public class GitHubHistoricalBackfillService {
             target.repositoryNameWithOwner(),
             syncTargetId,
             target.issueSyncCursor(),
-            batchSize
+            batchSize,
+            observer
         );
         totalIssuesSynced = issueResult.itemsSynced();
 
@@ -528,7 +534,8 @@ public class GitHubHistoricalBackfillService {
             target.repositoryNameWithOwner(),
             syncTargetId,
             target.pullRequestSyncCursor(),
-            batchSize
+            batchSize,
+            observer
         );
         totalPRsSynced = prResult.itemsSynced();
 
@@ -612,6 +619,7 @@ public class GitHubHistoricalBackfillService {
      * @param syncTargetId   the sync target ID for cursor persistence
      * @param cursor         the starting cursor (null for first page)
      * @param maxPages       maximum pages to process in this batch
+     * @param observer       notified after each page lands, so progress moves during the batch
      * @return result containing items synced and whether more pages exist
      */
     private BackfillBatchResult backfillIssues(
@@ -623,7 +631,8 @@ public class GitHubHistoricalBackfillService {
         String repoNameForLog,
         Long syncTargetId,
         String cursor,
-        int maxPages
+        int maxPages,
+        BackfillPageObserver observer
     ) {
         int totalIssuesSynced = 0;
         int totalCommentsSynced = 0;
@@ -740,6 +749,13 @@ public class GitHubHistoricalBackfillService {
                     batchMaxNumber = Math.max(batchMaxNumber, pageResult.maxNumber());
                 }
 
+                // Report the page. This is the whole point of threading the observer down here: a batch
+                // is up to maxPages of this loop, so reporting only on return leaves a watcher staring
+                // at an unchanged bar for the minutes it takes. batchMinNumber is the live checkpoint —
+                // the value that will be persisted when the batch ends — so the runner can compute a
+                // real percentage now instead of after the write.
+                notifyPage(observer, syncTargetId, repoNameForLog, SyncPhase.ISSUES, batchMinNumber, totalIssuesSynced);
+
                 cursor = nextCursor;
 
                 // Throttle between pages to avoid overwhelming the GitHub API
@@ -811,6 +827,7 @@ public class GitHubHistoricalBackfillService {
      * @param syncTargetId   the sync target ID for cursor persistence
      * @param cursor         the starting cursor (null for first page)
      * @param maxPages       maximum pages to process in this batch
+     * @param observer       notified after each page lands, so progress moves during the batch
      * @return result containing items synced and whether more pages exist
      */
     private BackfillBatchResult backfillPullRequests(
@@ -822,7 +839,8 @@ public class GitHubHistoricalBackfillService {
         String repoNameForLog,
         Long syncTargetId,
         String cursor,
-        int maxPages
+        int maxPages,
+        BackfillPageObserver observer
     ) {
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
@@ -943,6 +961,16 @@ public class GitHubHistoricalBackfillService {
 
                 // Collect PRs that need additional review pagination (more than 50 reviews)
                 allPrsNeedingReviewPagination.addAll(pageResult.prsNeedingReviewPagination());
+
+                // See backfillIssues: report every page, not once per batch.
+                notifyPage(
+                    observer,
+                    syncTargetId,
+                    repoNameForLog,
+                    SyncPhase.PULL_REQUESTS,
+                    batchMinNumber,
+                    totalPRsSynced
+                );
 
                 cursor = nextCursor;
 
@@ -1273,10 +1301,11 @@ public class GitHubHistoricalBackfillService {
      *
      * @param target    the sync target (repository) to backfill
      * @param batchSize maximum pages to process in this batch
+     * @param observer  notified after every vendor page within the batch
      * @return true if any work was performed; false if skipped (already complete, in cooldown, or
      *         rate limit below {@code hephaestus.sync.backfill.rate-limit-threshold})
      */
-    public boolean runBackfillBatch(SyncTarget target, int batchSize) {
+    public boolean runBackfillBatch(SyncTarget target, int batchSize, BackfillPageObserver observer) {
         if (target.isBackfillComplete()) {
             return false;
         }
@@ -1288,7 +1317,7 @@ public class GitHubHistoricalBackfillService {
             return false;
         }
         try {
-            boolean didWork = backfillRepository(target, batchSize);
+            boolean didWork = backfillRepository(target, batchSize, observer);
             if (didWork) {
                 clearFailureState(target.id());
             }
@@ -1296,6 +1325,37 @@ public class GitHubHistoricalBackfillService {
         } catch (Exception e) {
             handleBackfillFailure(target, e);
             return false;
+        }
+    }
+
+    /**
+     * Invokes {@code observer} for one page, swallowing anything it throws.
+     *
+     * <p>The observer is a progress callback owned by a caller in another module. It has no business
+     * failing a backfill batch that is otherwise succeeding — losing a progress tick is a cosmetic
+     * blip, losing the batch means re-fetching every page in it.
+     *
+     * <p>{@code lowestNumberSeen} is normalized: the page loops seed their running minimum at
+     * {@link Integer#MAX_VALUE}, which would read as "nothing done" if it escaped before the first page
+     * produced an item.
+     */
+    // Package-private for direct testing: the page loops it is called from need a live GraphQL
+    // conversation to reach, and these two rules are worth pinning without one.
+    static void notifyPage(
+        BackfillPageObserver observer,
+        Long syncTargetId,
+        String repositoryName,
+        SyncPhase phase,
+        int lowestNumberSeen,
+        int itemsSyncedInBatch
+    ) {
+        if (lowestNumberSeen == Integer.MAX_VALUE) {
+            return;
+        }
+        try {
+            observer.onPageComplete(syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch);
+        } catch (Exception e) {
+            log.debug("Backfill progress observer threw, ignoring: {}", e.toString());
         }
     }
 

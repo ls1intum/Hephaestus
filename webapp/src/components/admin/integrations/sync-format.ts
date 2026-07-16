@@ -1,5 +1,10 @@
 import { formatDistanceToNow } from "date-fns";
-import type { ConnectionSyncStatus, IntegrationCatalogEntry, SyncJob } from "@/api/types.gen";
+import type {
+	ConnectionSyncStatus,
+	IntegrationCatalogEntry,
+	SyncJob,
+	SyncResourceCount,
+} from "@/api/types.gen";
 
 /**
  * Poll cadence for sync status/resources/jobs queries. SSE hint invalidation is the primary live
@@ -107,7 +112,135 @@ export const JOB_TRIGGER_LABEL: Record<SyncJob["trigger"], string> = {
 	SYSTEM: "System",
 };
 
+/**
+ * The `progress` JSONB narrowed to the shape the server's `SyncProgress` record writes.
+ *
+ * On the wire this is `{ [key: string]: unknown }` — OpenAPI models the column as a free-form object,
+ * so TypeScript gives us no guarantee that any key is present or has the type we expect. Every read
+ * goes through this one narrowing rather than casting at each call site: a runner that writes a
+ * malformed value degrades to "field absent" instead of rendering `[object Object]` into the admin's
+ * status line.
+ */
+export interface SyncJobProgress {
+	phase?: string;
+	currentStep?: string;
+	currentRepository?: string;
+	unitsCompleted?: number;
+	unitsTotal?: number;
+}
+
+function asNonEmptyString(value: unknown): string | undefined {
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function asFiniteNumber(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+export function jobProgress(job: Pick<SyncJob, "progress">): SyncJobProgress {
+	const progress = job.progress;
+	if (progress == null) return {};
+	return {
+		phase: asNonEmptyString(progress.phase),
+		currentStep: asNonEmptyString(progress.currentStep),
+		currentRepository: asNonEmptyString(progress.currentRepository),
+		unitsCompleted: asFiniteNumber(progress.unitsCompleted),
+		unitsTotal: asFiniteNumber(progress.unitsTotal),
+	};
+}
+
 export function jobCurrentStep(job: Pick<SyncJob, "progress">): string | undefined {
-	const step = job.progress?.currentStep;
-	return typeof step === "string" && step.length > 0 ? step : undefined;
+	return jobProgress(job).currentStep;
+}
+
+/**
+ * Display names for the phase tokens `SyncPhase` emits. Unknown tokens are title-cased by
+ * {@link phaseLabel} rather than dropped — an integration can add a phase without the UI shipping
+ * first, and a readable guess beats hiding the chip.
+ */
+const PHASE_LABEL: Record<string, string> = {
+	organization: "Organization",
+	repositories: "Repositories",
+	issues: "Issues",
+	pullRequests: "Pull requests",
+	comments: "Comments",
+	commits: "Commits",
+	teams: "Teams",
+	channels: "Channels",
+	collections: "Collections",
+};
+
+export function phaseLabel(token: string): string {
+	return PHASE_LABEL[token] ?? stateLabel(token);
+}
+
+/**
+ * How a resource's freshness reads against the connection's cadence.
+ *
+ * - `never` — no `lastSyncedAt` at all; the mirror has never been populated.
+ * - `unknown` — there is a timestamp but no known cadence, so no judgement is possible. This mirrors
+ *   the server's own rollup, which reports `stale: 0` rather than guessing an interval.
+ * - `fresh` / `stale` / `veryStale` — judged against the cadence.
+ */
+export type FreshnessTone = "never" | "unknown" | "fresh" | "stale" | "veryStale";
+
+/**
+ * A resource is legitimately "one cadence old" for the whole gap between two runs, so 1x would flag
+ * the entire fleet right before every scheduled sync. 2x means a run was actually missed — the same
+ * multiple `SyncStatusService.rollUp` uses, so a row tinted here is exactly a row counted in
+ * `resourceCounts.stale`. 6x is a second band for "long past explaining away".
+ */
+const STALE_CADENCE_MULTIPLE = 2;
+const VERY_STALE_CADENCE_MULTIPLE = 6;
+
+export function freshnessTone(
+	lastSyncedAt: Date | string | undefined | null,
+	syncIntervalSeconds: number | undefined | null,
+	now: Date = new Date(),
+): FreshnessTone {
+	const date = asDate(lastSyncedAt);
+	if (!date) return "never";
+	if (syncIntervalSeconds == null || syncIntervalSeconds <= 0) return "unknown";
+	const ageSeconds = (now.getTime() - date.getTime()) / 1_000;
+	if (ageSeconds > syncIntervalSeconds * VERY_STALE_CADENCE_MULTIPLE) return "veryStale";
+	if (ageSeconds > syncIntervalSeconds * STALE_CADENCE_MULTIPLE) return "stale";
+	return "fresh";
+}
+
+/** Text colour per tone. `fresh`/`unknown` stay muted — only a real judgement earns a colour. */
+export const FRESHNESS_CLASS: Record<FreshnessTone, string> = {
+	never: "text-muted-foreground",
+	unknown: "text-muted-foreground",
+	fresh: "text-muted-foreground",
+	stale: "text-warning",
+	veryStale: "text-destructive",
+};
+
+/**
+ * "next run in about 4 hours" for the connection's `nextScheduledSyncAt`. A freshness reading is
+ * uninterpretable without the schedule behind it, and this field has shipped on every status response
+ * while being rendered nowhere.
+ */
+export function nextRunLabel(
+	nextScheduledSyncAt: Date | string | undefined | null,
+	now: Date = new Date(),
+): string | undefined {
+	const date = asDate(nextScheduledSyncAt);
+	if (!date) return undefined;
+	// A schedule that is already due (or overdue — the worker may be busy or down) must not render as
+	// "next run 5 minutes ago", which reads as a past event rather than a pending one.
+	if (date.getTime() <= now.getTime()) return "next run due";
+	return `next run ${formatDistanceToNow(date, { addSuffix: true })}`;
+}
+
+/**
+ * The per-class breakdown as one compact line: "1,204 pull requests · 3,410 issues · 12,882 comments".
+ *
+ * Zero-count classes are kept deliberately. "0 comments" next to "3,410 issues" is the single most
+ * diagnostic thing this table can say — it is the silent half-broken pipeline the headline item count
+ * cannot show — so it must not be tidied away.
+ */
+export function formatCountBreakdown(counts: SyncResourceCount[]): string | undefined {
+	if (counts.length === 0) return undefined;
+	return counts.map((c) => `${c.count.toLocaleString()} ${c.label.toLowerCase()}`).join(" · ");
 }
