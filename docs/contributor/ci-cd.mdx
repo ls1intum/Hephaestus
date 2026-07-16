@@ -27,8 +27,8 @@ graph TD
     T --> Pass
     D --> Pass
 
-    Pass -->|Yes| SR[semantic-release]
-    SR --> Tag[Create Tag v1.2.3]
+    Pass -->|Yes| VP[changesets action updates Version PR]
+    VP -->|Maintainer merges Version PR| Tag[Create Tag vX.Y.Z + GitHub Release]
 
     Tag --> Staging[Deploy Staging]
     Staging --> Verify{Verify OK?}
@@ -42,7 +42,7 @@ graph TD
 | Quality gates         | ~3 min                     | Parallel with tests         |
 | Tests                 | ~3 min                     | Parallel with gates         |
 | Docker builds         | ~3 min (cached)            | Registry cache, ~7 min cold |
-| semantic-release      | ~1 min                     | Creates tag + GitHub Release |
+| Release cut           | ~1 min                     | On Version PR merge: tag + GitHub Release |
 | Staging deploy        | ~2 min                     | Automatic                   |
 | **Your verification** | You decide                 | Check staging               |
 | Production deploy     | ~2 min                     | After approval              |
@@ -50,16 +50,9 @@ graph TD
 
 ## 🚀 Release Flow
 
-### Continuous Deployment
-
-Every merge to `main` with releasable changes (`feat:`, `fix:`, `perf:`, `revert:`, breaking):
-
-1. **CI runs** – tests, quality gates, Docker builds
-2. **semantic-release** – analyzes commits, creates version tag
-3. **Staging deploys** – automatic, no approval needed
-4. **You verify** – check staging.hephaestus.cit.tum.de
-5. **Approve production** – click in GitHub Actions
-6. **Production deploys** – live!
+Every merge to `main` runs CI and updates the accumulating **Version PR** (changesets). Merging that PR
+cuts the release — tag `vX.Y.Z`, GitHub Release, docker tags `X.Y.Z`/`X.Y`/`latest`, then staging
+(automatic) and production (after approval). Full flow: [Release Management](./release-management.mdx).
 
 ## 🛡️ Quality Gates
 
@@ -123,7 +116,9 @@ Coolify handles PR previews:
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
-| `release.yml`          | On CI/CD Success      | Creates tag + GitHub Release, deploys staging, gates production |
+| `verify-changesets.yml`| PRs                   | Fails shipped-code PRs that carry no changeset     |
+| `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
+| `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, deploys staging, gates production |
 | `deploy-staging.yml`   | Called by release.yml | Deploys to staging                                 |
 | `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
 

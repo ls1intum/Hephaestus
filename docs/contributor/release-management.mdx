@@ -2,170 +2,108 @@
 id: release-management
 sidebar_position: 3
 title: Release Management
-description: Trunk-based continuous deployment with staging verification.
+description: Deliberate releases with changesets — Version PR, curated changelog, docker tags.
 ---
 
 # Release Management
 
-Hephaestus uses **trunk-based development** with continuous deployment. Every merge to `main` triggers an automatic release to staging, with production deployment requiring manual approval.
+**Release ≠ deploy.** Development is trunk-based: all work merges to `main` (squash merge, no
+`develop` branch) and every merge builds deployable images. A **release** is a deliberate act:
+cutting a version of Hephaestus for self-hosters, with a tag, curated release notes, and versioned
+Docker images. Our own instances ride the release cut — staging deploys automatically, production
+after approval. Releases are managed with [changesets](https://github.com/changesets/changesets).
 
-## Workflow overview
+What a released version number promises is defined in the
+[compatibility policy](https://ls1intum.github.io/Hephaestus/admin/compatibility-policy).
 
-```mermaid
-gitGraph
-    commit id: "feat: feature A" tag: "v1.2.0"
-    commit id: "fix: bug fix" tag: "v1.2.1"
-    commit id: "feat: feature B" tag: "v1.3.0"
-    commit id: "refactor: cleanup"
-```
-
-| Branch | Purpose |
-| --- | --- |
-| `main` | The only branch. All work merges here. |
-
-:::tip No develop branch
-We use trunk-based development. There is no `develop` branch. Every merge to `main` is a potential release.
-:::
-
-## Release flow
+## The flow
 
 ```mermaid
 sequenceDiagram
-    participant PR as Pull Request
+    participant PR as Feature PR
     participant M as main
-    participant CI as CI/CD
-    participant S as Staging
-    participant P as Production
+    participant VP as Version PR
+    participant R as Release
 
-    PR->>M: Merge (squash)
-    M->>CI: Push triggers CI
-    CI->>CI: Tests & Quality Gates
-    CI->>CI: semantic-release creates tag + GitHub Release
-    CI->>S: Auto-deploy to Staging
-    Note over S: You verify staging
-    S->>P: Approve → Deploy to Production
+    PR->>PR: pnpm changeset (bump + operator-facing description)
+    PR->>M: Merge (squash) — verify-changesets enforces the changeset
+    M->>VP: changesets action folds pending changesets into the accumulating Version PR
+    Note over VP: CHANGELOG.md + version bump preview
+    VP->>M: Maintainer merges when the release is ready
+    M->>R: Tag vX.Y.Z, GitHub Release with curated notes,<br/>docker images X.Y.Z / X.Y / latest
 ```
 
-### Timeline
+1. **Every user-facing PR carries a changeset.** `pnpm changeset` asks for the bump type and an
+   operator-facing description; the file lands in `.changeset/` and merges with the PR. The
+   `verify-changesets` check fails PRs that change shipped code — anything under `server/`, `webapp/`,
+   or `docker/` except tests and in-tree docs — without one. `pnpm changeset --empty` (non-interactive)
+   is the explicit opt-out for changes with no user-facing effect; write why in the file body.
+2. **The Version PR accumulates.** On every push to `main`, the release workflow maintains a PR
+   titled `chore(release): version packages` that previews the next version and the assembled
+   `CHANGELOG.md` section. It is safe to leave open — it updates itself.
+3. **Merging the Version PR cuts the release.** The release workflow tags `vX.Y.Z` at the merge
+   commit, creates the GitHub Release from the new changelog section, retags the CI-built Docker
+   images as `X.Y.Z`, `X.Y`, and `latest`, publishes the signed release-pin asset, and starts the
+   deploy chain (staging automatically, production after approval).
 
-| Step | Duration |
-| --- | --- |
-| PR merged to `main` | – |
-| CI runs (tests, builds) | ~10 min |
-| semantic-release creates tag | ~1 min |
-| Staging deploy | ~2 min |
-| **You verify staging** | You decide |
-| Production deploy (after approval) | ~2 min |
-| **Total to production** | **~15 min + your verification** |
+## Writing changesets
 
-## How to release
+A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it in the operator/user's voice:
 
-### Normal release
+- Lead with what an operator or user can now do, or the symptom a fix removes. No class names, hook
+  names, or file paths. If operators must act, add a line: `**Operators:** …`.
+- **One changeset per user-visible change** — a PR that ships two unrelated visible changes ships two
+  changeset files. Unsure whether it's visible? Add one; a reviewer can delete a superfluous note, but a
+  missing one is invisible.
+- **Migrations are first-class:** if the PR adds a Liquibase changelog, write
+  `Includes an automatic database migration.` and bump at least `minor`. The release notes additionally
+  get an automatic "back up before upgrading" banner whenever a release touches
+  `server/src/main/resources/db/changelog/`.
+- **Bump = the operator's upgrade cost**, not code semantics:
+  - `patch` — upgrade needs no action (bug fix, internal change, additive auto-applied migration).
+  - `minor` — new capability, still zero-action; note any new *optional* env var / flag in the summary.
+  - `major` — operator must act first (required new env var, removed/renamed config, destructive/manual
+    migration, dropped API); state the action and update [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md).
 
-1. **Merge your PR** to `main` (squash merge)
-2. **Wait for CI** – tests run, then semantic-release creates a tag
-3. **Staging deploys automatically** – you get a notification
-4. **Verify staging** – check https://staging.hephaestus.cit.tum.de
-5. **Approve production** – Go to the Actions run → Click "Review deployments" → Approve
+No TTY (agents, CI)? `pnpm changeset` is interactive — write the file by hand instead: create
+`.changeset/<slug>.md` with frontmatter `"hephaestus": <bump>` and the summary as the body (see
+`.changeset/README.md`). Never hand-edit `CHANGELOG.md`.
 
-### Hotfix
+:::caution Pre-1.0
+Never pick a `major` bump while the version is `0.x` — it would cut 1.0.0, and CI rejects it. Breaking
+changes ride in `minor` instead, so a pre-1.0 `minor` is **not** guaranteed zero-action: if the operator
+must act, say so in the summary and update `MIGRATION.md` exactly as a `major` would. The 1.0.0 release
+ships deliberately with the [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378) via a
+single sanctioned major changeset.
+:::
 
-Same as normal release. There's no separate process – the fast pipeline handles everything.
+The whole app is versioned as one product: changesets target the root `hephaestus` package only;
+`webapp` and `docs` are never versioned individually.
 
-1. Create a branch from `main`
-2. Open a PR, get it reviewed
-3. Merge → Staging → Verify → Approve → Production
+## Deploys (unchanged by releases)
 
-## Pull request expectations
+| Environment | Trigger | Approval | URL |
+| --- | --- | --- | --- |
+| Staging | Release cut | None (auto) | https://staging.hephaestus.cit.tum.de |
+| Production | Release cut | Required reviewer | https://hephaestus.cit.tum.de |
+| PR previews | Coolify per PR (opt-in) | — | — |
 
-- **Title format**: Conventional commits (e.g., `feat(webapp): add leaderboard`)
-- **Breaking changes**: Add `!` suffix (e.g., `feat!: remove deprecated API`)
-- **Merge method**: Always **Squash and merge**
-- **Target branch**: Always `main`
-
-## Commit types and release impact
-
-| Type | Creates Release? | Version Bump |
-| --- | --- | --- |
-| `feat:` | ✅ | Minor |
-| `fix:` | ✅ | Patch |
-| `perf:` | ✅ | Patch |
-| `feat!:` / BREAKING | ✅ | Major |
-| `revert:` | ✅ | Patch |
-| `docs:` | ❌ | – |
-| `style:` | ❌ | – |
-| `refactor:` | ❌ | – |
-| `test:` | ❌ | – |
-| `build:` | ❌ | – |
-| `ci:` | ❌ | – |
-| `chore:` | ❌ | – |
-
-Only `feat`, `fix`, `perf`, `revert`, and breaking changes trigger new releases.
-
-## Breaking changes
-
-When introducing breaking changes:
-
-1. **PR title**: Use `!` suffix (e.g., `feat(api)!: remove deprecated endpoint`)
-2. **PR body**: Include a migration guide under `## Migration`
-3. **Description**: Clearly explain what users need to change
-
-## GitHub Environments
-
-We use GitHub Environment protection rules:
-
-| Environment | Approval | URL |
-| --- | --- | --- |
-| `staging` | None (auto) | https://staging.hephaestus.cit.tum.de |
-| `production` | Required | https://hephaestus.cit.tum.de |
-
-### Setting up environments
-
-In your repository settings:
-
-1. Go to **Settings → Environments**
-2. Create `staging` environment (no protection rules)
-3. Create `production` environment with **Required reviewers** (add yourself)
-
-## Preview deployments
-
-Coolify handles PR preview deployments:
-
-- Every PR gets an isolated preview environment
-- Built directly on the server (fast)
-- Automatically cleaned up when PR is closed
-
-## Dependency management
-
-Dependencies are automatically updated via [Renovate Bot](https://docs.renovatebot.com/):
-
-- Runs Monday mornings
-- Patches/minors automerge after 3 days
-- Majors require manual review
+Verify staging before approving production. Hotfixes have no separate process: PR → changeset →
+merge → merge the Version PR.
 
 ## Version management
 
-Version numbers in source files use `0.0.0-development` as a placeholder. The **real version** comes from git tags created by `semantic-release`. No release commits are added to `main`.
+Version numbers in source manifests stay at their placeholders (`webapp/package.json` and `server/pom.xml`
+are `0.0.0-development`) — the **release version**
+lives in the root `package.json` and is bumped only by the Version PR. At deploy time,
+`APP_VERSION` is set from the image tag via Docker Compose; the application server exposes it as
+`spring.application.version`.
 
-At deploy time, the `APP_VERSION` environment variable is set to the release version (e.g., `0.49.0`) via Docker Compose. Services read this at runtime:
+Check the current release: `git describe --tags --abbrev=0` or
+[GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).
 
-- **Application server**: `spring.application.version` resolves from `APP_VERSION`
-- **Webapp**: receives `APPLICATION_VERSION` (set to the Docker image tag)
+## Dependency management
 
-To check the current version: `git describe --tags --abbrev=0` or see [GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).
-
-## Best practices
-
-### Do
-
-- Merge small, focused PRs frequently
-- Use conventional commits consistently
-- Verify staging before approving production
-- Use preview deployments for complex changes
-
-### Don't
-
-- Push directly to `main`
-- Batch changes for releases (release small & often)
-- Skip staging verification
-- Manually edit version numbers
+Dependencies are updated via [Renovate Bot](https://docs.renovatebot.com/) (Monday mornings;
+patches/minors automerge after 3 days, majors need review). Bot PRs are exempt from the changeset
+check — when a dependency bump is user-facing, a maintainer adds the changeset.

@@ -8,43 +8,44 @@
  * @see CONTRIBUTING.md for guidelines
  */
 
-// Allowed commit types (aligned with .releaserc and semantic-release)
+// Allowed commit types. Types categorize history for readers only — versioning
+// and changelog entries come from changesets (.changeset/*.md), not commit types.
 const TYPES = [
-  "feat", // New feature (triggers minor release)
-  "fix", // Bug fix (triggers patch release)
+  "feat", // New feature
+  "fix", // Bug fix
   "docs", // Documentation only
   "style", // Code style (formatting, semicolons, etc.)
   "refactor", // Code refactoring (no feature/fix)
-  "perf", // Performance improvement (triggers patch release)
+  "perf", // Performance improvement
   "test", // Test changes
   "build", // Build system or dependencies
   "ci", // CI/CD changes
   "chore", // Maintenance tasks
-  "revert", // Revert previous commit (triggers patch release)
+  "revert", // Revert previous commit
 ];
 
 // Allowed scopes (aligned with pull-request.yml)
 const SCOPES = [
-  // === SERVICE SCOPES (where the code lives) - WILL trigger release ===
+  // === SERVICE SCOPES (where the code lives) ===
   "webapp", // React frontend, webapp Dockerfile
   "server", // Java backend (includes in-process Pi mentor agent + webhook receiver), server Dockerfile
   "docs", // Documentation site
 
-  // === INFRASTRUCTURE SCOPES that WILL trigger release (affect runtime) ===
+  // === INFRASTRUCTURE SCOPES (affect runtime) ===
   "deps", // Production dependencies (security patches, bug fixes)
   "security", // Security fixes (CRITICAL - must release)
   "db", // Database migrations (affect runtime)
   "docker", // Dockerfiles, production compose (affect deployed containers)
 
-  // === INFRASTRUCTURE SCOPES that will NOT trigger release ===
+  // === INFRASTRUCTURE SCOPES (tooling and process) ===
   "ci", // GitHub Actions, CI workflows only
   "config", // TOOLING ONLY: .prettierrc, renovate.json, eslint, vscode
   //          NOT for: application.yml (use 'server'), Dockerfiles (use service scope)
   "deps-dev", // Dev dependencies only (test libs, linters)
   "scripts", // Build/dev helper scripts
-  "no-release", // Explicit opt-out
+  "release", // Release engineering (also used by the automated Version PR)
 
-  // === FEATURE SCOPES (domain-specific) - WILL trigger release ===
+  // === FEATURE SCOPES (domain-specific) ===
   "auth", // Authentication / identity (Account, IdentityLink, JWT, oauth2Login)
   "integration", // Cross-cutting integration framework (webhook, oauth, registry, SPI)
   "scm", // Source-control management (GitHub, GitLab) — formerly 'gitprovider'
@@ -84,10 +85,9 @@ const helpfulErrorsPlugin = {
           ? ""
           : `scope "${scope}" is not allowed.\n\n` +
             `Allowed scopes:\n` +
-            `  Services (release):    webapp, server, docs\n` +
-            `  Infra (release):       deps, security, db, docker\n` +
-            `  Infra (NO release):    ci, config, deps-dev, scripts, no-release\n` +
-            `  Features (release):    auth, integration, scm, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
+            `  Services:  webapp, server, docs\n` +
+            `  Infra:     deps, security, db, docker, ci, config, deps-dev, scripts, release\n` +
+            `  Features:  auth, integration, scm, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
             `⚠️  'config' is for TOOLING only (.prettierrc, renovate.json)\n` +
             `    For runtime config use 'server', for Dockerfiles use service scope\n\n` +
             `Format: <type>(<scope>): <description>\n` +

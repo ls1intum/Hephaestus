@@ -1,0 +1,121 @@
+name: Verify Changesets
+
+# Every user-facing PR must carry a .changeset/*.md file with an
+# operator-facing description (cf. vercel/ai's verify-changesets model).
+# Opt out explicitly with an empty changeset: `pnpm changeset --empty`.
+# See docs/contributor/release-management.mdx.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-changesets:
+    name: "Verify changesets"
+    runs-on: ubuntu-latest
+    # Bots (renovate, dependabot) can't author changesets; maintainers add one
+    # when a dependency bump is user-facing.
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for a changeset
+        id: check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Everything under these dirs ships in an image (webapp/ is COPY'd
+          # wholesale, so public/, index.html and the nginx conf ship too), minus
+          # tests and in-tree docs — forcing `--empty` on those would train people
+          # to reflex-skip the gate. Keep in sync with the wording in AGENTS.md
+          # §10, .changeset/README.md, CONTRIBUTING.md and release-management.mdx.
+          SHIPPED_PATHS=(
+            "server" "webapp" "docker"
+            ":!**/*.md" ":!server/src/test" ":!webapp/e2e"
+            ":!**/*.test.ts" ":!**/*.test.tsx" ":!**/*.stories.tsx"
+          )
+
+          # `...` (merge-base vs head) = this PR's own changes, fork-safe.
+          # `--diff-filter=A` on .changeset/*.md answers "did THIS PR add a
+          # changeset" — which `changeset status` (does one exist anywhere) can't.
+          shipped_changed=$(git diff --name-only "$BASE_SHA"...HEAD -- "${SHIPPED_PATHS[@]}")
+          changesets_added=$(git diff --diff-filter=A --name-only "$BASE_SHA"...HEAD -- '.changeset/*.md' | grep -v 'README\.md' || true)
+
+          if git diff --name-only "$BASE_SHA"...HEAD -- server/src/main/resources/db/changelog/ | grep -q .; then
+            echo "::notice::This PR contains Liquibase changesets — note the schema migration in your changeset. See the release management guide."
+          fi
+
+          # Pre-1.0 guard: a `major` changeset on 0.x would cut 1.0.0. The 1.0
+          # release is a deliberate milestone decision (#1378), not a PR-level
+          # one. This guard disarms itself once the version reaches 1.x.
+          if [ "$(jq -r '.version | split(".")[0]' package.json)" = "0" ] && [ -n "$changesets_added" ]; then
+            for f in $changesets_added; do
+              if grep -qE '^["'"'"']?hephaestus["'"'"']?:[[:space:]]*major' "$f"; then
+                echo "::error file=$f::Pre-1.0: a major changeset would cut 1.0.0. Use minor for breaking changes; 1.0.0 ships deliberately with the 1.0 milestone (#1378)."
+                exit 1
+              fi
+            done
+          fi
+
+          if [ -n "$shipped_changed" ] && [ -z "$changesets_added" ]; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+            # Echo the actual triggering files rather than restating the pathspec —
+            # a hardcoded list here would drift from SHIPPED_PATHS above.
+            {
+              echo 'shipped<<EOF'
+              echo "$shipped_changed"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+            echo "::error::This PR changes shipped code but carries no changeset:"
+            echo "$shipped_changed"
+            exit 1
+          fi
+
+          echo "missing=false" >> "$GITHUB_OUTPUT"
+          echo "Changeset check passed."
+
+      - name: Comment on PR
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        if: failure() && steps.check.outputs.missing == 'true'
+        continue-on-error: true
+        with:
+          header: verify-changesets
+          message: |
+            ## 📦 Changeset required
+
+            This PR changes code that ships to operators, but carries no changeset:
+
+            ```
+            ${{ steps.check.outputs.shipped }}
+            ```
+
+            Changesets become the release notes operators read — write yours for them:
+
+            ```bash
+            pnpm changeset          # user-facing change: pick the bump, describe it
+            pnpm changeset --empty  # no user-facing effect — then write why in the file body
+            ```
+
+            Write the summary in the operator/user's voice (it becomes the changelog verbatim). If the PR
+            adds a Liquibase migration, say `Includes an automatic database migration.` and bump ≥ minor.
+
+            > 📖 See the [release management guide](https://ls1intum.github.io/Hephaestus/contributor/release-management).
+
+      - name: Remove comment on success
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+        if: success()
+        continue-on-error: true
+        with:
+          header: verify-changesets
+          delete: true

@@ -1,5 +1,6 @@
 {
 	"name": "hephaestus",
+	"version": "0.73.1",
 	"private": true,
 	"packageManager": "pnpm@11.1.2",
 	"scripts": {
@@ -58,6 +59,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",
+		"@changesets/cli": "^2.31.1",
 		"@commitlint/cli": "21.0.1",
 		"@commitlint/config-conventional": "21.0.1",
 		"@nats-io/jetstream": "3.4.0",
