@@ -38,6 +38,8 @@ jobs:
             display-name: "OpenAPI"
           - check: database-validation
             display-name: "Database"
+          - check: database-migrations
+            display-name: "Migrations"
     steps:
       - name: Determine if check should run
         id: should_run
@@ -46,7 +48,7 @@ jobs:
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-quality"|"openapi-validation"|"database-validation")
+            "application-server-quality"|"openapi-validation"|"database-validation"|"database-migrations")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
@@ -68,14 +70,15 @@ jobs:
         with:
           # Database checks need full history for git diff on schema/migrations
           # Other quality checks only need HEAD for faster checkout
-          fetch-depth: ${{ matrix.check == 'database-validation' && 0 || 1 }}
+          fetch-depth: ${{ contains(fromJSON('["database-validation", "database-migrations"]'), matrix.check) && 0 || 1 }}
 
       - name: Setup pnpm + Node.js
-        if: steps.should_run.outputs.run == 'true'
+        # database-migrations is a pure git check — no Node/pnpm/JDK/Maven needed.
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'database-migrations'
         uses: ./.github/actions/setup-pnpm-node
 
       - name: Setup caches
-        if: steps.should_run.outputs.run == 'true'
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'database-migrations'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: ${{ matrix.check }}
@@ -184,8 +187,10 @@ jobs:
 
           ISSUES_FOUND=()
 
-          # Check 1: Schema drift
-          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check script failed. Run: pnpm run db:draft-changelog")
+          # Check 1: Schema drift. draft-changelog first applies the full master.xml chain to the
+          # empty DB via liquibase:update — so this step is ALSO the empty→head migration-chain
+          # replay gate (a changelog that doesn't apply fails here). Keep that apply intact.
+          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
           if [ -f "server/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
             cat server/src/main/resources/db/changelog_new.xml
@@ -215,6 +220,79 @@ jobs:
             done
             exit 1
           fi
+
+      # database-migrations: git-level guard that released changelog files never change. The
+      # empty→head chain replay already lives in the database-validation leg; this leg adds the
+      # one thing replay can't — immutability. Why git, not Liquibase checksums:
+      # docs/contributor/database-migration.mdx.
+      - name: Resolve released-chain baseline
+        id: baseline
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-migrations'
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          # Baseline = the released state this branch descends from. For a PR that is the base
+          # commit (an ancestor of the checked-out merge ref, so `git diff BASE HEAD` is exactly
+          # the PR's net change); for a main push it is the previous tip. checkout does NOT expose
+          # origin/<base> as a ref, so use the SHA the event gives us directly.
+          BASE=""
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE_SHA"
+          elif [ -n "$PUSH_BEFORE" ]; then
+            BASE="$PUSH_BEFORE"
+          fi
+          # Skip (don't fail) if the baseline commit isn't in local history — branch creation,
+          # force push, or a shallow fetch. There is nothing released to enforce against.
+          if [ -n "$BASE" ] && ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "Baseline $BASE is not in local history; skipping immutability guard."
+            BASE=""
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "Baseline: ${BASE:-<none — nothing released to enforce against>}"
+
+      - name: Changelog immutability guard
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-migrations' && steps.baseline.outputs.base != ''
+        env:
+          BASE: ${{ steps.baseline.outputs.base }}
+          RELEASED_REF: ${{ github.event_name == 'pull_request' && github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          CHANGELOG_DIR="server/src/main/resources/db/changelog"
+          MASTER="server/src/main/resources/db/master.xml"
+          FAILED=false
+
+          # 1. No released changelog file may be modified, deleted, or renamed.
+          VIOLATIONS=$(git diff --name-only --diff-filter=MDR "$BASE" HEAD -- "$CHANGELOG_DIR")
+          if [ -n "$VIOLATIONS" ]; then
+            FAILED=true
+            echo "::error::Released Liquibase changesets were modified, renamed, or deleted. Ship a new follow-up changelog instead:"
+            echo "$VIOLATIONS"
+          fi
+
+          # 2. master.xml is append-only: every <include> line the baseline had must survive
+          #    unchanged, in order, as a prefix of the current list. Comparing whole lines (not
+          #    just paths) also catches edits to a released include's attributes. Order is NOT
+          #    asserted beyond the prefix — the historical list is not monotonic by timestamp.
+          #    `|| true` keeps the `-s` guard live: an include-less baseline (never happens today)
+          #    skips the check instead of aborting under pipefail.
+          git show "$BASE:$MASTER" 2>/dev/null | grep '<include ' > /tmp/includes-base || true
+          grep '<include ' "$MASTER" > /tmp/includes-head || true
+          if [ -s /tmp/includes-base ] && ! diff /tmp/includes-base <(head -n "$(wc -l < /tmp/includes-base)" /tmp/includes-head) >/dev/null; then
+            FAILED=true
+            echo "::error::master.xml is append-only: an existing <include> was removed, reordered, or edited. New changelogs go at the end of the list."
+          fi
+
+          if [ "$FAILED" = "true" ]; then
+            {
+              echo "### Changelog immutability"
+              echo "Changesets that reached \`$RELEASED_REF\` may already be applied to production databases — editing or removing them breaks the upgrade path (checksum errors or silently orphaned changesets)."
+              echo "Fix forward with a **new** changelog appended to \`master.xml\`. See \`docs/contributor/database-migration.mdx\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "No released changeset was touched; master.xml stays append-only."
 
   # Needle built at runtime so this guard file doesn't self-match.
   legacy-cleanup-guard:
