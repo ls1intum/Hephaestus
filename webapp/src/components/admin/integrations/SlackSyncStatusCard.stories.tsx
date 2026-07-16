@@ -31,6 +31,10 @@ const runningJob: SyncJob = {
  * and — when a job is running — a cooperative Cancel that flips to "Stopping after current step…"
  * once requested. Distinguishes "No channels activated yet" (active, nothing to sync) from a plain
  * "Never synced" (inactive/suspended) so the empty state reads truthfully.
+ *
+ * A running job shows determinate progress whenever the server knows the total. Slack was previously
+ * the one integration without it — a run rendered a progress bar on the *overview* card and nothing on
+ * the Slack detail page, which is the page an admin opens precisely to watch the run.
  */
 const meta = {
 	component: SlackSyncStatusCard,
@@ -61,17 +65,44 @@ export const NoChannelsActivatedYet: Story = {
 	},
 };
 
-/** A job is running — Sync is disabled and a Cancel control appears. */
+/** A job is running — Sync is disabled, progress is shown, and a Cancel control appears. */
 export const ActiveJobWithCancel: Story = {
 	args: { status: { ...baseStatus, activeJob: runningJob } },
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /syncing/i })).toBeDisabled();
 
+		// The detail page must show the run it exists to show.
+		await expect(canvas.getByRole("progressbar")).toBeInTheDocument();
+
 		const cancel = canvas.getByRole("button", { name: /^cancel$/i });
 		await expect(cancel).toBeEnabled();
 		await userEvent.click(cancel);
 		await expect(args.onCancel).toHaveBeenCalledTimes(1);
+	},
+};
+
+/**
+ * A run whose total the server doesn't know yet. Per the NN/g 10s rule a multi-second job still owes
+ * the reader feedback, so it degrades to an indeterminate spinner plus the current step rather than
+ * faking a percentage.
+ */
+export const ActiveJobIndeterminate: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			activeJob: {
+				...runningJob,
+				itemsProcessed: undefined,
+				itemsTotal: undefined,
+				progress: { currentStep: "Listing channels" },
+			},
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/listing channels/i)).toBeInTheDocument();
+		await expect(canvas.queryByRole("progressbar")).not.toBeInTheDocument();
 	},
 };
 

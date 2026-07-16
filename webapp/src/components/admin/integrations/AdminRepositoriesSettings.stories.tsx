@@ -96,7 +96,12 @@ export const RemoveConfirm: Story = {
 };
 
 /**
- * A remove is in flight — the confirm's destructive action is disabled until the mutation settles.
+ * A remove is in flight.
+ *
+ * This state was previously unreachable: `AlertDialogAction` closes the dialog on click, so the node
+ * carrying `disabled={isRemovingRepository}` unmounted before the flag could ever flip. The dialog is
+ * now controlled and held open across the mutation, which is what gives the confirm somewhere to show
+ * "Stopping…" and gives a second click something to bounce off.
  */
 export const RemoveInProgress: Story = {
 	args: {
@@ -107,12 +112,33 @@ export const RemoveInProgress: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /remove microsoft\/vscode/i }));
 
 		const dialog = await screen.findByRole("alertdialog");
-		await expect(within(dialog).getByRole("button", { name: /stop monitoring/i })).toBeDisabled();
+		const confirm = within(dialog).getByRole("button", { name: /stopping/i });
+		await expect(confirm).toBeDisabled();
+		// Cancel is held too: dismissing mid-flight would strand a mutation the admin can't see.
+		await expect(within(dialog).getByRole("button", { name: /cancel/i })).toBeDisabled();
 	},
 };
 
 /**
- * Loading state — three skeleton rows while the repository list resolves.
+ * The confirm survives the click and stays open while the mutation runs, so the pending state has
+ * somewhere to live. Pressing it once fires exactly one remove.
+ */
+export const RemoveHoldsDialogOpen: Story = {
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: /remove facebook\/react/i }));
+
+		const dialog = await screen.findByRole("alertdialog");
+		await userEvent.click(within(dialog).getByRole("button", { name: /stop monitoring/i }));
+
+		await expect(args.onRemoveRepository).toHaveBeenCalledWith("facebook/react");
+		await expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+	},
+};
+
+/**
+ * Loading state. The placeholders carry the same `Item` chrome as the rows they become — border,
+ * height, trailing action slot — rather than bare grey bars that resize the card on resolve.
  */
 export const Loading: Story = {
 	args: {
@@ -142,26 +168,38 @@ export const LoadError: Story = {
 		repositories: [],
 		isLoading: false,
 		error: new Error("The repositories service is unavailable."),
+		onRetry: fn(),
 	},
-	play: async ({ canvasElement }) => {
+	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/couldn't load the monitored repositories/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/repositories service is unavailable/i)).toBeInTheDocument();
+		// Every sibling section offers a retry; this one used to be the dead end.
+		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
+		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},
 };
 
 /**
- * The add mutation failed — the field surfaces the error under the input.
+ * The add mutation failed — the field surfaces the server's own reason under the input. The fixed
+ * string this replaced ("An error occurred while adding the repository.") threw away the one piece of
+ * information the admin could act on.
  */
 export const AddValidationError: Story = {
 	args: {
-		addRepositoryError: new Error("Failed to add repository"),
+		addRepositoryError: Object.assign(new Error("request failed"), {
+			status: 404,
+			detail: "Repository owner/name was not found, or the token cannot see it.",
+		}),
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(
-			canvas.getByText(/an error occurred while adding the repository/i),
+			canvas.getByText(/was not found, or the token cannot see it/i),
 		).toBeInTheDocument();
+		await expect(
+			canvas.queryByText(/an error occurred while adding the repository/i),
+		).not.toBeInTheDocument();
 	},
 };
 

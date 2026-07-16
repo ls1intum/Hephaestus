@@ -15,7 +15,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { ActivateChannelDialog } from "./slack-channels/ActivateChannelDialog";
@@ -24,10 +23,28 @@ import { ChannelHistorySheet } from "./slack-channels/ChannelHistorySheet";
 import type { SlackConsentState } from "./slack-channels/consent-terms";
 import { RemoveChannelAlertDialog } from "./slack-channels/RemoveChannelAlertDialog";
 import { SlackChannelRow } from "./slack-channels/SlackChannelRow";
+import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 export type { SlackConsentState };
 
 export type SlackChannelCandidate = ApiSlackChannelCandidate;
+
+/** Shared by the loading and loaded states so the header doesn't materialise on resolve. */
+function ChannelsTableHeader() {
+	return (
+		<TableHeader>
+			<TableRow>
+				<TableHead>Channel</TableHead>
+				<TableHead>Status</TableHead>
+				<TableHead>Opted out</TableHead>
+				<TableHead>Announced</TableHead>
+				<TableHead className="w-0 text-right">
+					<span className="sr-only">Actions</span>
+				</TableHead>
+			</TableRow>
+		</TableHeader>
+	);
+}
 
 export interface AdminSlackChannelsSettingsProps {
 	workspaceSlug: string;
@@ -138,11 +155,10 @@ export function AdminSlackChannelsSettings({
 							</EmptyHeader>
 						</Empty>
 					) : isLoading ? (
-						<div className="space-y-2">
-							<Skeleton className="h-10 w-full" />
-							<Skeleton className="h-10 w-full" />
-							<Skeleton className="h-10 w-full" />
-						</div>
+						<Table>
+							<ChannelsTableHeader />
+							<TableRowsSkeleton columns={["w-32", "w-16", "w-12", "w-20", null]} rows={3} />
+						</Table>
 					) : isError ? (
 						<QueryErrorAlert
 							error={error}
@@ -151,17 +167,7 @@ export function AdminSlackChannelsSettings({
 						/>
 					) : hasChannels ? (
 						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Channel</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Opted out</TableHead>
-									<TableHead>Announced</TableHead>
-									<TableHead className="w-0 text-right">
-										<span className="sr-only">Actions</span>
-									</TableHead>
-								</TableRow>
-							</TableHeader>
+							<ChannelsTableHeader />
 							<TableBody>
 								{channels.map((channel) => (
 									<SlackChannelRow

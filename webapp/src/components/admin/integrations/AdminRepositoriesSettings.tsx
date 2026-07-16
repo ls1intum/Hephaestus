@@ -30,10 +30,84 @@ import {
 } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 
 interface RepositoryItem {
 	nameWithOwner: string;
+}
+
+/**
+ * One repository row and its removal confirm.
+ *
+ * The dialog is controlled so the pending state can exist at all: `AlertDialogAction` closes on
+ * click, so a `disabled={isRemoving}` on an uncontrolled action unmounts before the flag ever flips —
+ * the state was in the code but could never be reached, let alone seen. Holding the dialog open across
+ * the mutation gives the confirm somewhere to say "Removing…", and gives the second click something to
+ * bounce off.
+ */
+function RepositoryRow({
+	repo,
+	isRemoving,
+	onRemove,
+}: {
+	repo: RepositoryItem;
+	isRemoving: boolean;
+	onRemove: (nameWithOwner: string) => void;
+}) {
+	const [open, setOpen] = useState(false);
+
+	// The row unmounts on success, so nothing here needs to close the dialog on the happy path. A
+	// failure leaves the row — and this dialog — mounted, which is what lets the flag fall back to
+	// false and the confirm become pressable again.
+	const handleRemove = (event: React.MouseEvent) => {
+		event.preventDefault();
+		onRemove(repo.nameWithOwner);
+	};
+
+	return (
+		<Item variant="outline" size="sm">
+			<ItemContent>
+				<ItemTitle className="truncate font-mono" title={repo.nameWithOwner}>
+					{repo.nameWithOwner}
+				</ItemTitle>
+			</ItemContent>
+			<ItemActions>
+				<AlertDialog open={open} onOpenChange={setOpen}>
+					<AlertDialogTrigger
+						render={
+							<Button variant="outline" size="icon" aria-label={`Remove ${repo.nameWithOwner}`}>
+								<Trash2Icon className="size-4" />
+							</Button>
+						}
+					/>
+					<AlertDialogContent>
+						<AlertDialogHeader>
+							<AlertDialogTitle>Stop monitoring {repo.nameWithOwner}?</AlertDialogTitle>
+							<AlertDialogDescription>
+								Are you sure you want to stop monitoring this repository? This action cannot be
+								undone and will remove all data associated with this repository.
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
+							<AlertDialogAction variant="destructive" disabled={isRemoving} onClick={handleRemove}>
+								{isRemoving ? (
+									<>
+										<Spinner className="size-4" aria-hidden />
+										Stopping…
+									</>
+								) : (
+									"Stop monitoring"
+								)}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
+			</ItemActions>
+		</Item>
+	);
 }
 
 interface AdminRepositoriesSettingsProps {
@@ -45,6 +119,8 @@ interface AdminRepositoriesSettingsProps {
 	isRemovingRepository: boolean;
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
+	/** Refetches the repository list. Without it a load failure is a dead end, unlike every sibling. */
+	onRetry?: () => void;
 }
 
 /**
@@ -62,6 +138,7 @@ export function AdminRepositoriesSettings({
 	isRemovingRepository,
 	onAddRepository,
 	onRemoveRepository,
+	onRetry,
 }: AdminRepositoriesSettingsProps) {
 	const [repositoryInput, setRepositoryInput] = useState("");
 	const isValidInput = repositoryInput.includes("/");
@@ -87,56 +164,35 @@ export function AdminRepositoriesSettings({
 
 				<CardContent className="space-y-4">
 					{isLoading ? (
-						<div className="space-y-2">
-							<Skeleton className="h-10 w-full" />
-							<Skeleton className="h-10 w-full" />
-							<Skeleton className="h-10 w-full" />
-						</div>
+						/* Placeholder rows carry the same `Item` chrome — border, height, trailing action slot —
+						   as the rows they become, so resolving swaps content into the same boxes. */
+						<ItemGroup>
+							{Array.from({ length: 3 }, (_, index) => (
+								<Item key={index} variant="outline" size="sm">
+									<ItemContent>
+										<Skeleton className="h-5 w-48" />
+									</ItemContent>
+									<ItemActions>
+										<Skeleton className="size-8 rounded-lg" />
+									</ItemActions>
+								</Item>
+							))}
+						</ItemGroup>
 					) : error ? (
-						<QueryErrorAlert error={error} title="We couldn't load the monitored repositories" />
+						<QueryErrorAlert
+							error={error}
+							title="We couldn't load the monitored repositories"
+							onRetry={onRetry}
+						/>
 					) : hasRepositories ? (
 						<ItemGroup className="max-h-80 overflow-y-auto pr-1">
 							{repositories.map((repo) => (
-								<Item key={repo.nameWithOwner} variant="outline" size="sm">
-									<ItemContent>
-										<ItemTitle className="font-mono">{repo.nameWithOwner}</ItemTitle>
-									</ItemContent>
-									<ItemActions>
-										<AlertDialog>
-											<AlertDialogTrigger
-												render={
-													<Button
-														variant="outline"
-														size="icon"
-														aria-label={`Remove ${repo.nameWithOwner}`}
-													>
-														<Trash2Icon className="size-4" />
-													</Button>
-												}
-											/>
-											<AlertDialogContent>
-												<AlertDialogHeader>
-													<AlertDialogTitle>Stop monitoring {repo.nameWithOwner}?</AlertDialogTitle>
-													<AlertDialogDescription>
-														Are you sure you want to stop monitoring this repository? This action
-														cannot be undone and will remove all data associated with this
-														repository.
-													</AlertDialogDescription>
-												</AlertDialogHeader>
-												<AlertDialogFooter>
-													<AlertDialogCancel>Cancel</AlertDialogCancel>
-													<AlertDialogAction
-														variant="destructive"
-														onClick={() => onRemoveRepository(repo.nameWithOwner)}
-														disabled={isRemovingRepository}
-													>
-														Stop monitoring
-													</AlertDialogAction>
-												</AlertDialogFooter>
-											</AlertDialogContent>
-										</AlertDialog>
-									</ItemActions>
-								</Item>
+								<RepositoryRow
+									key={repo.nameWithOwner}
+									repo={repo}
+									isRemoving={isRemovingRepository}
+									onRemove={onRemoveRepository}
+								/>
 							))}
 						</ItemGroup>
 					) : (
@@ -178,9 +234,9 @@ export function AdminRepositoriesSettings({
 						<FieldDescription>
 							Enter the repository as <code>owner/name</code>.
 						</FieldDescription>
-						{addRepositoryError && (
-							<FieldError>An error occurred while adding the repository.</FieldError>
-						)}
+						{/* The server says why — "Repository not found", "Already monitored" — and that is the
+						    only thing the admin can act on, so surface it instead of a fixed string. */}
+						{addRepositoryError && <FieldError>{problemDetailOf(addRepositoryError)}</FieldError>}
 					</Field>
 				</CardContent>
 			</Card>

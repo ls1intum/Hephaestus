@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { IntegrationOverviewCard } from "./IntegrationOverviewCard";
 
@@ -76,16 +76,50 @@ export const WithErroredResources: Story = {
 	},
 };
 
-/** The status query failed — an inline error replaces the metrics, controls stay put. */
+/**
+ * The status query failed. The overview page is the entry point, so this used to be the *one* error on
+ * the surface with no way out — bare red text, no detail, no retry. It now renders the same
+ * `QueryErrorAlert` as its nine siblings, and a 503 is retryable, so the button is offered.
+ */
 export const StatusError: Story = {
-	args: { status: undefined, isStatusError: true },
-	play: async ({ canvasElement }) => {
+	args: {
+		status: undefined,
+		isStatusError: true,
+		statusError: { status: 503, detail: "The GitHub API is unavailable." },
+		onRetryStatus: fn(),
+	},
+	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/couldn't load sync status/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/github api is unavailable/i)).toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
+		await expect(args.onRetryStatus).toHaveBeenCalledTimes(1);
 	},
 };
 
-/** Connection exists but is suspended — controls are hidden and the copy says why. */
+/**
+ * A 403 on the status query. Retrying an authorization failure cannot succeed, so no Retry button is
+ * offered — the alert says what to do instead. Same component, same call site, different way out.
+ */
+export const StatusErrorForbidden: Story = {
+	args: {
+		status: undefined,
+		isStatusError: true,
+		statusError: { status: 403, detail: "You are not an admin of this workspace." },
+		onRetryStatus: fn(),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/not an admin of this workspace/i)).toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Connection exists but is suspended — controls are hidden and the copy says why. Previously this
+ * lowercased the wire enum into "Connection is suspended."; it now says what stopped and what to do,
+ * and reads identically to the suspended state on every other integration.
+ */
 export const ConnectionSuspended: Story = {
 	args: {
 		entry: {
@@ -99,7 +133,53 @@ export const ConnectionSuspended: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/connection is suspended/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/suspended by the provider/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/connection is suspended/i)).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Setup hasn't finished. PENDING resolves on its own and costs the admin nothing, so unlike
+ * SUSPENDED/UNINSTALLED it is stated plainly rather than as a warning.
+ */
+export const ConnectionPending: Story = {
+	args: {
+		entry: {
+			kind: "SLACK",
+			displayName: "Slack",
+			connected: true,
+			connectionId: 9,
+			connectionState: "PENDING",
+		},
+		status: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/finishing setup/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/slack is pending/i)).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The app was removed upstream. "Slack is uninstalled." was the wire enum in a sentence; this names
+ * the consequence (nothing is syncing) and the fix (reconnect).
+ */
+export const ConnectionUninstalled: Story = {
+	args: {
+		entry: {
+			kind: "SLACK",
+			displayName: "Slack",
+			connected: true,
+			connectionId: 9,
+			connectionState: "UNINSTALLED",
+		},
+		status: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/the app was removed/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/slack is uninstalled/i)).not.toBeInTheDocument();
 	},
 };
 

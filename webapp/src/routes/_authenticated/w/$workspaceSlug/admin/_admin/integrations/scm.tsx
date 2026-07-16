@@ -29,6 +29,7 @@ import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute(
@@ -44,6 +45,7 @@ function ScmIntegrationPage() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const [jobsPage, setJobsPage] = useState(0);
+	const livePushUnavailable = useLivePushUnavailable();
 
 	const workspaceQueryOptions = getWorkspaceOptions({ path: { workspaceSlug: slug } });
 	const workspaceQuery = useQuery({
@@ -72,10 +74,11 @@ function ScmIntegrationPage() {
 	const statusQuery = useQuery({
 		...statusQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
-		refetchOnWindowFocus: true,
+		refetchInterval: (query) =>
+			syncPollInterval(query.state.data?.activeJob != null, livePushUnavailable),
 	});
 	const status = statusQuery.data;
+	const hasActiveJob = status?.activeJob != null;
 
 	const resourcesQueryOptions = listConnectionSyncResourcesOptions({
 		path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
@@ -89,7 +92,7 @@ function ScmIntegrationPage() {
 	} = useQuery({
 		...resourcesQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: syncPollInterval(status?.activeJob != null),
+		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
 	});
 
 	const jobsQueryOptions = listConnectionSyncJobsOptions({
@@ -105,7 +108,10 @@ function ScmIntegrationPage() {
 	} = useQuery({
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: syncPollInterval(status?.activeJob != null),
+		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
+		// Every page is a new query key, so without this a page turn re-enters `pending` and collapses
+		// the table into skeletons. Keep the previous page on screen while the next one loads.
+		placeholderData: (previousData) => previousData,
 	});
 
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
@@ -115,22 +121,10 @@ function ScmIntegrationPage() {
 		data: repositories,
 		isLoading: isLoadingRepositories,
 		error: repositoriesError,
+		refetch: refetchRepositories,
 	} = useQuery({
 		...repositoriesQueryOptions,
 		enabled: Boolean(workspaceSlug),
-	});
-
-	const addRepository = useMutation({
-		...addRepositoryToMonitorMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
-		},
-	});
-	const removeRepository = useMutation({
-		...removeRepositoryToMonitorMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
-		},
 	});
 
 	const invalidateSyncState = () => {
@@ -151,6 +145,32 @@ function ScmIntegrationPage() {
 			}),
 		});
 	};
+
+	// Monitoring a repository does not just change the list — it changes what this connection syncs,
+	// and normally enqueues a lifecycle job. Refresh the sync state here rather than hoping the SSE
+	// hint beats the toast.
+	const onRepositorySetChanged = () => {
+		queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
+		invalidateSyncState();
+	};
+
+	const addRepository = useMutation({
+		...addRepositoryToMonitorMutation(),
+		onSuccess: onRepositorySetChanged,
+		// The inline FieldError says "invalid"; the toast says WHY (403 not an owner, 409 already
+		// monitored). Both siblings below toast on failure — a mutation that fails silently is the
+		// outlier, not the norm.
+		onError: (e) => {
+			toast.error("Failed to add repository", { description: problemDetailOf(e) });
+		},
+	});
+	const removeRepository = useMutation({
+		...removeRepositoryToMonitorMutation(),
+		onSuccess: onRepositorySetChanged,
+		onError: (e) => {
+			toast.error("Failed to stop monitoring repository", { description: problemDetailOf(e) });
+		},
+	});
 
 	const triggerSync = useMutation({
 		...triggerSyncJobMutation(),
@@ -175,6 +195,15 @@ function ScmIntegrationPage() {
 	});
 
 	const activeJob = status?.activeJob;
+
+	// Sync and Backfill share one mutation, so `isPending` alone cannot say which button the admin
+	// pressed — spinning both is a lie about what is happening. The in-flight variables already carry
+	// the answer, so no extra state is needed to tell them apart.
+	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables?.body?.type : undefined;
+	const triggeringType =
+		pendingTriggerType === "RECONCILIATION" || pendingTriggerType === "BACKFILL"
+			? pendingTriggerType
+			: null;
 
 	return (
 		<div className="container mx-auto max-w-5xl space-y-8 py-6">
@@ -204,7 +233,7 @@ function ScmIntegrationPage() {
 				error={workspaceQuery.error ?? catalogQuery.error ?? statusQuery.error}
 				isConnectionActive={isConnectionActive}
 				isAppInstallationWorkspace={isAppInstallationWorkspace}
-				isTriggering={triggerSync.isPending}
+				triggeringType={triggeringType}
 				isCancelling={cancelJob.isPending}
 				onRetry={() => {
 					workspaceQuery.refetch();
@@ -248,6 +277,7 @@ function ScmIntegrationPage() {
 					onRemoveRepository={(nameWithOwner) => {
 						removeRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
 					}}
+					onRetry={() => refetchRepositories()}
 				/>
 			)}
 

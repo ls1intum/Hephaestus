@@ -13,6 +13,7 @@ import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/integrations/")(
@@ -68,14 +69,15 @@ function IntegrationOverviewCardContainer({
 }) {
 	const queryClient = useQueryClient();
 	const connectionId = entry.connectionId;
+	const livePushUnavailable = useLivePushUnavailable();
 
 	const statusQuery = useQuery({
 		...getConnectionSyncStatusOptions({
 			path: { workspaceSlug, connectionId: connectionId ?? -1 },
 		}),
 		enabled: entry.connected && connectionId != null,
-		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
-		refetchOnWindowFocus: true,
+		refetchInterval: (query) =>
+			syncPollInterval(query.state.data?.activeJob != null, livePushUnavailable),
 	});
 
 	const triggerSync = useMutation({

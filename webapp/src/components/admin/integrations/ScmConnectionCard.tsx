@@ -2,6 +2,7 @@ import { ExternalLinkIcon, WebhookIcon, ZapOffIcon } from "lucide-react";
 import type { ConnectionSyncStatus } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActiveJobProgress } from "./ActiveJobProgress";
@@ -9,7 +10,7 @@ import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { RateLimitGauge } from "./RateLimitGauge";
 import { SyncNowButton } from "./SyncNowButton";
-import { relativeTime, stateLabel } from "./sync-format";
+import { relativeTime, type SyncTriggerType, stateLabel } from "./sync-format";
 
 export interface ScmConnectionCardProps {
 	label: string;
@@ -18,7 +19,13 @@ export interface ScmConnectionCardProps {
 	error?: unknown;
 	isConnectionActive: boolean;
 	isAppInstallationWorkspace: boolean;
-	isTriggering: boolean;
+	/**
+	 * Which trigger the admin just pressed, or `null` when none is in flight. Sync and Backfill are
+	 * served by one mutation, so a bare `isPending` cannot say which button is starting — spinning both
+	 * misreports what the server is doing. The caller discriminates on the in-flight variables and
+	 * passes the answer here; each button then keys its pending state off its own type.
+	 */
+	triggeringType?: SyncTriggerType | null;
 	isCancelling: boolean;
 	onRetry: () => void;
 	onSync: () => void;
@@ -33,7 +40,7 @@ export function ScmConnectionCard({
 	error,
 	isConnectionActive,
 	isAppInstallationWorkspace,
-	isTriggering,
+	triggeringType = null,
 	isCancelling,
 	onRetry,
 	onSync,
@@ -55,7 +62,19 @@ export function ScmConnectionCard({
 						onRetry={onRetry}
 					/>
 				) : isLoading ? (
-					<Skeleton className="h-20 w-full" />
+					/* Mirrors the loaded layout — the same 2-col metric grid and a button-row block — so
+					   resolving swaps text into boxes already the right size instead of shifting the page. */
+					<div className="space-y-4">
+						<div className="grid gap-4 sm:grid-cols-2">
+							{Array.from({ length: 4 }, (_, index) => (
+								<div key={index} className="space-y-1">
+									<Skeleton className="h-3 w-28" />
+									<Skeleton className="h-5 w-40" />
+								</div>
+							))}
+						</div>
+						<Skeleton className="h-8 w-56" />
+					</div>
 				) : !status ? (
 					<p className="text-muted-foreground text-sm">
 						No {label} connection found for this workspace.
@@ -86,7 +105,7 @@ export function ScmConnectionCard({
 									) : (
 										<span className="flex items-center gap-1.5">
 											<WebhookIcon className="size-4" />
-											<LastProcessedEvent lastEventAt={status.lastEventProcessedAt} />
+											<LastProcessedEvent lastEventAt={status.lastEventProcessedAt} hasFieldLabel />
 										</span>
 									)}
 								</div>
@@ -114,25 +133,35 @@ export function ScmConnectionCard({
 
 						{isConnectionActive && (
 							<div className="flex flex-wrap items-center gap-2 pt-2">
-								<SyncNowButton onClick={onSync} isTriggering={isTriggering} activeJob={activeJob} />
-								{status.backfillSupported && (
+								{/* Sync / Backfill / Cancel act on one connection, so they read as one control. */}
+								<ButtonGroup>
 									<SyncNowButton
-										label="Backfill"
-										onClick={onBackfill}
-										isTriggering={isTriggering}
+										onClick={onSync}
+										isTriggering={triggeringType === "RECONCILIATION"}
+										isBusy={triggeringType === "BACKFILL"}
 										activeJob={activeJob}
 									/>
-								)}
-								{activeJob && (
-									<Button
-										variant="outline"
-										size="sm"
-										disabled={isCancelling || activeJob.cancelRequested}
-										onClick={onCancel}
-									>
-										{activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
-									</Button>
-								)}
+									{status.backfillSupported && (
+										<SyncNowButton
+											label="Backfill"
+											operationLabel="backfill"
+											onClick={onBackfill}
+											isTriggering={triggeringType === "BACKFILL"}
+											isBusy={triggeringType === "RECONCILIATION"}
+											activeJob={activeJob}
+										/>
+									)}
+									{activeJob && (
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={isCancelling || activeJob.cancelRequested}
+											onClick={onCancel}
+										>
+											{activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
+										</Button>
+									)}
+								</ButtonGroup>
 								{isAppInstallationWorkspace && (
 									<Button
 										variant="outline"

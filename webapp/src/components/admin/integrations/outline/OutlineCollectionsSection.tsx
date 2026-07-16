@@ -12,14 +12,32 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
+import { TableRowsSkeleton } from "../TableRowsSkeleton";
 import { AddCollectionDialog } from "./AddCollectionDialog";
 import { OutlineCollectionRow, type OutlineMirrorState } from "./OutlineCollectionRow";
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";
 
 export type { OutlineMirrorState };
+
+/** Shared by the loading and loaded states so the header doesn't materialise on resolve. */
+function CollectionsTableHeader() {
+	return (
+		<TableHeader>
+			<TableRow>
+				<TableHead>Collection</TableHead>
+				<TableHead>State</TableHead>
+				<TableHead>Sync</TableHead>
+				<TableHead>Documents</TableHead>
+				<TableHead>Last synced</TableHead>
+				<TableHead className="w-0 text-right">
+					<span className="sr-only">Actions</span>
+				</TableHead>
+			</TableRow>
+		</TableHeader>
+	);
+}
 
 export interface OutlineCollectionsSectionProps {
 	workspaceSlug: string;
@@ -91,11 +109,13 @@ export function OutlineCollectionsSection({
 
 				<CardContent className="space-y-4">
 					{isLoading ? (
-						<div className="space-y-2">
-							<Skeleton className="h-10 w-full" />
-							<Skeleton className="h-10 w-full" />
-							<Skeleton className="h-10 w-full" />
-						</div>
+						<Table>
+							<CollectionsTableHeader />
+							<TableRowsSkeleton
+								columns={["w-36", "w-16", "w-14", "w-12", "w-24", null]}
+								rows={3}
+							/>
+						</Table>
 					) : error ? (
 						<QueryErrorAlert
 							error={error}
@@ -104,18 +124,7 @@ export function OutlineCollectionsSection({
 						/>
 					) : hasCollections ? (
 						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Collection</TableHead>
-									<TableHead>State</TableHead>
-									<TableHead>Sync</TableHead>
-									<TableHead>Documents</TableHead>
-									<TableHead>Last synced</TableHead>
-									<TableHead className="w-0 text-right">
-										<span className="sr-only">Actions</span>
-									</TableHead>
-								</TableRow>
-							</TableHeader>
+							<CollectionsTableHeader />
 							<TableBody>
 								{collections.map((collection) => (
 									<OutlineCollectionRow

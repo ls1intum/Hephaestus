@@ -1,6 +1,6 @@
 import type { VariantProps } from "class-variance-authority";
 import { formatDistanceStrict } from "date-fns";
-import { AlertCircleIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon } from "lucide-react";
+import { AlertCircleIcon, HistoryIcon } from "lucide-react";
 import type { SyncJob } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
@@ -12,8 +12,14 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import {
+	Pagination,
+	PaginationContent,
+	PaginationItem,
+	PaginationNext,
+	PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
@@ -29,6 +35,7 @@ import {
 	JOB_TYPE_LABEL,
 	relativeTime,
 } from "./sync-format";
+import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
@@ -65,14 +72,41 @@ function formatDuration(job: SyncJob): string {
 }
 
 function formatItems(job: SyncJob): string {
+	// Grouped, because a backfill's counts run to seven digits and "1234567/2000000" is a number the
+	// reader has to decode rather than read.
 	if (job.itemsTotal != null) {
-		return `${job.itemsProcessed ?? 0}/${job.itemsTotal}`;
+		return `${(job.itemsProcessed ?? 0).toLocaleString()}/${job.itemsTotal.toLocaleString()}`;
 	}
 	if (job.itemsProcessed != null) {
-		return String(job.itemsProcessed);
+		return job.itemsProcessed.toLocaleString();
 	}
 	return "–";
 }
+
+/**
+ * The header, shared verbatim by the loading and loaded states. Keeping the real `<thead>` mounted
+ * while rows load is what stops the table from growing a header row on resolve.
+ */
+function JobsTableHeader() {
+	return (
+		<TableHeader>
+			<TableRow>
+				<TableHead>Status</TableHead>
+				<TableHead>Type</TableHead>
+				<TableHead>Trigger</TableHead>
+				<TableHead>Started</TableHead>
+				<TableHead>Duration</TableHead>
+				<TableHead className="text-right">Items</TableHead>
+				<TableHead className="w-0 text-right">
+					<span className="sr-only">Error</span>
+				</TableHead>
+			</TableRow>
+		</TableHeader>
+	);
+}
+
+/** Placeholder widths sized to the copy each column actually holds; the error slot promises nothing. */
+const SKELETON_COLUMNS = ["w-16", "w-24", "w-16", "w-20", "w-12", "w-14", null];
 
 export function SyncJobsTable({
 	jobs,
@@ -92,11 +126,10 @@ export function SyncJobsTable({
 
 	if (isLoading) {
 		return (
-			<div className="space-y-2">
-				<Skeleton className="h-10 w-full" />
-				<Skeleton className="h-10 w-full" />
-				<Skeleton className="h-10 w-full" />
-			</div>
+			<Table>
+				<JobsTableHeader />
+				<TableRowsSkeleton columns={SKELETON_COLUMNS} rows={5} />
+			</Table>
 		);
 	}
 
@@ -117,23 +150,13 @@ export function SyncJobsTable({
 	}
 
 	const showFooter = page != null && totalPages != null && onPageChange != null && totalPages > 1;
+	const isFirstPage = page === 0;
+	const isLastPage = totalPages != null && page != null && page >= totalPages - 1;
 
 	return (
 		<div className="space-y-3">
 			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Status</TableHead>
-						<TableHead>Type</TableHead>
-						<TableHead>Trigger</TableHead>
-						<TableHead>Started</TableHead>
-						<TableHead>Duration</TableHead>
-						<TableHead className="text-right">Items</TableHead>
-						<TableHead className="w-0 text-right">
-							<span className="sr-only">Error</span>
-						</TableHead>
-					</TableRow>
-				</TableHeader>
+				<JobsTableHeader />
 				<TableBody>
 					{jobs.map((job) => {
 						const started = asDate(job.startedAt) ?? asDate(job.createdAt);
@@ -176,29 +199,35 @@ export function SyncJobsTable({
 			</Table>
 
 			{showFooter && (
-				<div className="flex items-center justify-end gap-2">
-					<span className="text-muted-foreground text-sm">
-						Page {page + 1} of {totalPages}
-					</span>
-					<Button
-						variant="outline"
-						size="icon-sm"
-						aria-label="Previous page"
-						disabled={page === 0}
-						onClick={() => onPageChange(page - 1)}
-					>
-						<ChevronLeftIcon className="size-4" />
-					</Button>
-					<Button
-						variant="outline"
-						size="icon-sm"
-						aria-label="Next page"
-						disabled={page >= totalPages - 1}
-						onClick={() => onPageChange(page + 1)}
-					>
-						<ChevronRightIcon className="size-4" />
-					</Button>
-				</div>
+				<Pagination className="justify-end">
+					<PaginationContent>
+						<PaginationItem>
+							<PaginationPrevious
+								aria-disabled={isFirstPage}
+								className={isFirstPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+								onClick={() => {
+									// `pointer-events-none` is presentation, not a guard — keyboard activation still
+									// reaches the handler, so the bound is enforced here too.
+									if (!isFirstPage) onPageChange(page - 1);
+								}}
+							/>
+						</PaginationItem>
+						<PaginationItem>
+							<span className="px-2 text-muted-foreground text-sm tabular-nums">
+								Page {page + 1} of {totalPages}
+							</span>
+						</PaginationItem>
+						<PaginationItem>
+							<PaginationNext
+								aria-disabled={isLastPage}
+								className={isLastPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+								onClick={() => {
+									if (!isLastPage) onPageChange(page + 1);
+								}}
+							/>
+						</PaginationItem>
+					</PaginationContent>
+				</Pagination>
 			)}
 		</div>
 	);

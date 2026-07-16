@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, format } from "date-fns";
 import {
 	CheckIcon,
+	CircleAlertIcon,
 	FileTextIcon,
 	KeyRoundIcon,
 	RefreshCwIcon,
@@ -28,8 +29,9 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { ConnectionStateNotice } from "../ConnectionStateNotice";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
-import { asDate, relativeTime } from "../sync-format";
+import { asDate, CONNECTION_STATE_LABEL, type ConnectionState, relativeTime } from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
@@ -52,7 +54,11 @@ export interface OutlineSyncSummary {
 
 export interface OutlineConnectCardProps {
 	connected: boolean;
-	connectionState?: string;
+	/**
+	 * The connection's lifecycle state. Typed to the wire union rather than `string` so the copy for
+	 * each state is a lookup the compiler checks, instead of whatever `toLowerCase()` happens to emit.
+	 */
+	connectionState?: ConnectionState;
 	connectionLabel?: string;
 	status?: OutlineSyncSummary;
 	isStatusLoading?: boolean;
@@ -108,6 +114,8 @@ export function OutlineConnectCard({
 }: OutlineConnectCardProps) {
 	const [serverUrl, setServerUrl] = useState("");
 	const [token, setToken] = useState("");
+	// An absent state predates the catalog's state field; treat it as active rather than invent a fault.
+	const isConnectionActive = connectionState == null || connectionState === "ACTIVE";
 	const [disconnectOpen, setDisconnectOpen] = useState(false);
 
 	const serverUrlInvalid = serverUrl.length > 0 && !HTTPS_URL.test(serverUrl.trim());
@@ -193,13 +201,21 @@ export function OutlineConnectCard({
 						</FieldGroup>
 					) : (
 						<>
+							{/* The green check is a claim that syncing works, so it is spent only on ACTIVE. Any
+							    other state gets the shared notice below, which says what stopped and what to do. */}
 							<div className="flex items-center gap-2 text-sm">
-								<CheckIcon className="size-4 text-success" aria-hidden />
+								{isConnectionActive ? (
+									<CheckIcon className="size-4 text-success" aria-hidden />
+								) : (
+									<CircleAlertIcon className="size-4 text-muted-foreground" aria-hidden />
+								)}
 								<span>
-									Outline {connectionState?.toLowerCase() ?? "connected"}
+									Outline {connectionState ? CONNECTION_STATE_LABEL[connectionState] : "connected"}
 									{connectionLabel ? ` — ${connectionLabel}` : ""}
 								</span>
 							</div>
+
+							<ConnectionStateNotice connectionState={connectionState} displayName="Outline" />
 
 							{isStatusLoading ? (
 								<Skeleton className="h-5 w-full max-w-md" />

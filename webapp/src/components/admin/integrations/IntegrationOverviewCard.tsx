@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { AlertCircleIcon, ArrowRightIcon, PlugZapIcon } from "lucide-react";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
+import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { SyncNowButton } from "./SyncNowButton";
@@ -37,6 +39,10 @@ export interface IntegrationOverviewCardProps {
 	status?: ConnectionSyncStatus;
 	isStatusLoading?: boolean;
 	isStatusError?: boolean;
+	/** The thrown status error, so the alert can name what went wrong and judge whether Retry helps. */
+	statusError?: unknown;
+	/** Refetches the status query. Omit only where no refetch handle exists. */
+	onRetryStatus?: () => void;
 	isTriggering?: boolean;
 	onSync: () => void;
 }
@@ -47,6 +53,8 @@ export function IntegrationOverviewCard({
 	status,
 	isStatusLoading = false,
 	isStatusError = false,
+	statusError,
+	onRetryStatus,
 	isTriggering = false,
 	onSync,
 }: IntegrationOverviewCardProps) {
@@ -90,17 +98,23 @@ export function IntegrationOverviewCard({
 						)}
 					</div>
 				) : !isConnectionActive ? (
-					<p className="text-muted-foreground text-sm">
-						Connection is {entry.connectionState?.toLowerCase()}. Sync controls are available only
-						while it is active.
-					</p>
+					<ConnectionStateNotice
+						connectionState={entry.connectionState}
+						displayName={entry.displayName}
+					/>
 				) : isStatusLoading ? (
-					<Skeleton className="h-16 w-full" />
+					/* Two text lines, matching the status strip this resolves into, so the card keeps its
+					   height instead of growing a slab into a pair of lines. */
+					<div className="space-y-2">
+						<Skeleton className="h-4 w-56" />
+						<Skeleton className="h-4 w-32" />
+					</div>
 				) : isStatusError ? (
-					<p className="flex items-center gap-1.5 text-destructive text-sm">
-						<AlertCircleIcon className="size-4" />
-						Couldn't load sync status
-					</p>
+					<QueryErrorAlert
+						error={statusError}
+						title="We couldn't load sync status"
+						onRetry={onRetryStatus}
+					/>
 				) : (
 					status && (
 						<div className="space-y-2 text-sm">

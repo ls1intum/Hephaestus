@@ -10,6 +10,7 @@ import {
 	listConnectionSyncJobsOptions,
 	listConnectionSyncJobsQueryKey,
 	listSlackChannelCandidatesOptions,
+	listSlackChannelConsentEventsQueryKey,
 	listSlackChannelsOptions,
 	registerSlackChannelMutation,
 	triggerSyncJobMutation,
@@ -20,6 +21,7 @@ import type { SlackConsentState } from "@/components/admin/integrations/AdminSla
 import { AdminSlackChannelsSettings } from "@/components/admin/integrations/AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
 import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
+import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { SlackSyncStatusCard } from "@/components/admin/integrations/SlackSyncStatusCard";
@@ -28,6 +30,7 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute(
@@ -43,6 +46,7 @@ function SlackIntegrationPage() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const [jobsPage, setJobsPage] = useState(0);
+	const livePushUnavailable = useLivePushUnavailable();
 
 	const workspaceQueryOptions = getWorkspaceOptions({ path: { workspaceSlug: slug } });
 	const workspaceQuery = useQuery({
@@ -68,10 +72,11 @@ function SlackIntegrationPage() {
 			path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
 		}),
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
-		refetchOnWindowFocus: true,
+		refetchInterval: (query) =>
+			syncPollInterval(query.state.data?.activeJob != null, livePushUnavailable),
 	});
 	const status = statusQuery.data;
+	const hasActiveJob = status?.activeJob != null;
 
 	const jobsQueryOptions = listConnectionSyncJobsOptions({
 		path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
@@ -86,7 +91,10 @@ function SlackIntegrationPage() {
 	} = useQuery({
 		...jobsQueryOptions,
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: syncPollInterval(status?.activeJob != null),
+		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
+		// Every page is a new query key, so without this a page turn re-enters `pending` and collapses
+		// the table into skeletons. Keep the previous page on screen while the next one loads.
+		placeholderData: (previousData) => previousData,
 	});
 
 	const slackChannelsQueryOptions = listSlackChannelsOptions({ path: { workspaceSlug: slug } });
@@ -98,7 +106,7 @@ function SlackIntegrationPage() {
 	} = useQuery({
 		...slackChannelsQueryOptions,
 		enabled: Boolean(workspaceSlug && workspaceData?.hasSlackToken),
-		refetchInterval: syncPollInterval(status?.activeJob != null),
+		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
 	});
 
 	const slackChannelCandidatesQueryOptions = listSlackChannelCandidatesOptions({
@@ -139,6 +147,13 @@ function SlackIntegrationPage() {
 				toast.success("Channel updated");
 			}
 			invalidateSlackChannels();
+			// This transition *is* a new row in that channel's consent history, and the history sheet
+			// is cached across open/close — without this it would reopen still denying the change.
+			queryClient.invalidateQueries({
+				queryKey: listSlackChannelConsentEventsQueryKey({
+					path: { workspaceSlug: slug, slackChannelId: variables.path.slackChannelId },
+				}),
+			});
 		},
 		onError: (e, variables) => {
 			if (variables.body?.consentState === "REVOKED") {
@@ -229,10 +244,7 @@ function SlackIntegrationPage() {
 			)}
 
 			{!routeLoading && !routeError && hasConnection && !isConnectionActive && (
-				<p className="text-muted-foreground text-sm">
-					Slack is {entry?.connectionState?.toLowerCase()}. Sync controls are available only while
-					it is active.
-				</p>
+				<ConnectionStateNotice connectionState={entry?.connectionState} displayName="Slack" />
 			)}
 
 			{!routeLoading && !routeError && status && (

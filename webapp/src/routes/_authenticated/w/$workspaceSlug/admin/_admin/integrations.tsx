@@ -1,8 +1,10 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { SyncFreshnessBanner } from "@/components/admin/integrations/SyncFreshnessBanner";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useSyncEvents } from "@/hooks/use-sync-events";
+import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/integrations")({
 	component: IntegrationsLayout,
@@ -25,17 +27,11 @@ function IntegrationsLayout() {
 	}
 
 	return (
-		<>
-			{livePushUnavailable && (
-				<div
-					role="status"
-					aria-live="polite"
-					className="border-b px-6 py-2 text-muted-foreground text-xs"
-				>
-					Live updates are unavailable — this section is refreshing periodically instead.
-				</div>
-			)}
+		<SyncLivenessProvider livePushUnavailable={livePushUnavailable}>
+			{/* Offline outranks live-push-lost: while offline TanStack pauses queries rather than failing
+			    them, so the polling this banner would otherwise promise isn't happening either. */}
+			<SyncFreshnessBanner />
 			<Outlet />
-		</>
+		</SyncLivenessProvider>
 	);
 }

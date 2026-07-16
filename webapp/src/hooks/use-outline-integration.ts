@@ -20,12 +20,14 @@ import type {
 	OutlineSyncSummary,
 } from "@/components/admin/integrations/outline/OutlineConnectCard";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
+import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 const TOKEN_STATUS_STALE_MS = 5 * 60_000;
 
 export function useOutlineIntegration(workspaceSlug: string) {
 	const queryClient = useQueryClient();
+	const livePushUnavailable = useLivePushUnavailable();
 
 	const connectionsQueryOptions = listOptions({ path: { workspaceSlug } });
 	const connectionsQuery = useQuery({
@@ -52,7 +54,8 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	} = useQuery({
 		...statusQueryOptions,
 		enabled: hasConnection && connectionId != null,
-		refetchInterval: (query) => syncPollInterval(query.state.data?.activeJob != null),
+		refetchInterval: (query) =>
+			syncPollInterval(query.state.data?.activeJob != null, livePushUnavailable),
 	});
 
 	const collectionsQueryOptions = listOutlineCollectionsOptions({ path: { workspaceSlug } });
@@ -69,6 +72,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		refetchInterval: (query) =>
 			syncPollInterval(
 				query.state.data?.some((collection) => collection.syncStatus === "PENDING") ?? false,
+				livePushUnavailable,
 			),
 	});
 
@@ -243,7 +247,11 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	};
 
 	return {
-		connectionId: isConnectionActive ? connectionId : undefined,
+		// Not gated on ACTIVE: a SUSPENDED connection is exactly when an admin needs the job history to
+		// see what the last run did before it stopped. Sync CONTROLS stay gated (see isConnectionActive);
+		// reading history is safe and the sibling integrations already show theirs in this state.
+		connectionId,
+		health: connectionStatus?.health,
 		// Lets the route poll its job-history query on the same adaptive cadence as the rest.
 		hasActiveJob: connectionStatus?.activeJob != null,
 		isLoading: connectionsQuery.isLoading,

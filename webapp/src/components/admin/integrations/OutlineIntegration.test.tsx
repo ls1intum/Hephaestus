@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
+import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { server } from "@/mocks/server";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "./outline/OutlineConnectCard";
@@ -14,13 +15,15 @@ vi.mock("sonner", () => ({
 	toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-function renderContainer() {
+function renderContainer({ livePushUnavailable = false } = {}) {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 	});
 	return render(
 		<QueryClientProvider client={queryClient}>
-			<OutlineIntegrationTestContainer />
+			<SyncLivenessProvider livePushUnavailable={livePushUnavailable}>
+				<OutlineIntegrationTestContainer />
+			</SyncLivenessProvider>
 		</QueryClientProvider>,
 	);
 }
@@ -181,8 +184,9 @@ describe("Outline integration — connect happy path", () => {
 			},
 		});
 
-		// The invalidated connections query refetches → the card flips to connected with status.
-		expect(await screen.findByText(/outline active/i)).toBeTruthy();
+		// The invalidated connections query refetches → the card flips to connected with status. The
+		// strip reads written copy, not the lowercased `ACTIVE` token it used to render.
+		expect(await screen.findByText(/outline connected/i)).toBeTruthy();
 		expect(await screen.findByText(/webhook registered/i)).toBeTruthy();
 		expect(toast.success).toHaveBeenCalledWith("Outline connected");
 	});
@@ -352,7 +356,7 @@ describe("Outline integration — token lifecycle", () => {
 
 		renderContainer();
 
-		expect(await screen.findByText(/^outline active$/i)).toBeTruthy();
+		expect(await screen.findByText(/^outline connected$/i)).toBeTruthy();
 		expect(screen.queryByText(activeOutlineConnection.instanceKey)).toBeNull();
 	});
 
@@ -401,7 +405,11 @@ describe("Outline integration — token lifecycle", () => {
 	});
 });
 
-describe("Outline integration — a running sync is polled, not left as dead pixels", () => {
+describe("Outline integration — with live push down, polling keeps a running sync honest", () => {
+	// While the SSE stream is healthy a running job is refreshed by its hints, and the poll is only a
+	// slow 30s backstop against a dropped one. It is when the stream is *down* that polling becomes
+	// the freshness channel and has to be fast enough to be worth the banner's promise — so that is
+	// the mode this pins.
 	it("keeps refetching the status while a job is active, and stops once it settles", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
@@ -417,7 +425,7 @@ describe("Outline integration — a running sync is polled, not left as dead pix
 			}),
 		);
 
-		renderContainer();
+		renderContainer({ livePushUnavailable: true });
 
 		expect(await screen.findByText(/sync in progress/i)).toBeTruthy();
 		// No user interaction, no invalidation — only the refetchInterval can clear this.

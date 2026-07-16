@@ -270,3 +270,56 @@ export const ConnectedDisconnectDialog: Story = {
 		await expect(within(dialog).getByRole("button", { name: /^disconnect$/i })).toBeInTheDocument();
 	},
 };
+
+/**
+ * The provider suspended the connection. The status strip used to lowercase the wire enum into
+ * "Outline suspended" *next to a green check* — the token said one thing and the icon said the
+ * opposite. The check is now spent only on ACTIVE, and the shared notice explains the consequence.
+ */
+export const ConnectedButSuspended: Story = {
+	args: {
+		connected: true,
+		connectionState: "SUSPENDED",
+		connectionLabel: "Acme Wiki",
+		status: healthyStatus,
+		tokenStatus: healthyToken,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/outline suspended — acme wiki/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/reconnect to resume/i)).toBeInTheDocument();
+	},
+};
+
+/** Setup hasn't finished — stated plainly, since PENDING resolves on its own. */
+export const ConnectedButPending: Story = {
+	args: {
+		connected: true,
+		connectionState: "PENDING",
+		connectionLabel: "Acme Wiki",
+		status: healthyStatus,
+		tokenStatus: healthyToken,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/outline finishing setup — acme wiki/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/isn't live yet/i)).toBeInTheDocument();
+	},
+};
+
+/** ACTIVE keeps the green check and says nothing extra — the steady state stays quiet. */
+export const ConnectedActiveState: Story = {
+	args: {
+		connected: true,
+		connectionState: "ACTIVE",
+		connectionLabel: "Acme Wiki",
+		status: healthyStatus,
+		tokenStatus: healthyToken,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/outline connected — acme wiki/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/syncing is paused/i)).not.toBeInTheDocument();
+	},
+};

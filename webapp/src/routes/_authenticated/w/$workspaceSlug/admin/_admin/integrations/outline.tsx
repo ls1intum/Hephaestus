@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { listConnectionSyncJobsOptions } from "@/api/@tanstack/react-query.gen";
+import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { OutlineCollectionsSection } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
@@ -12,6 +13,7 @@ import { OutlineIcon } from "@/components/icons/brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
+import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/_admin/integrations/outline",
@@ -25,6 +27,7 @@ function OutlineIntegrationPage() {
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const [jobsPage, setJobsPage] = useState(0);
+	const livePushUnavailable = useLivePushUnavailable();
 	const outline = useOutlineIntegration(slug);
 	const connectionId = outline.connectionId;
 
@@ -40,7 +43,10 @@ function OutlineIntegrationPage() {
 			query: { page: jobsPage, size: JOBS_PAGE_SIZE },
 		}),
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: syncPollInterval(outline.hasActiveJob),
+		refetchInterval: syncPollInterval(outline.hasActiveJob, livePushUnavailable),
+		// Every page is a new query key, so without this a page turn re-enters `pending` and collapses
+		// the table into skeletons. Keep the previous page on screen while the next one loads.
+		placeholderData: (previousData) => previousData,
 	});
 
 	return (
@@ -49,6 +55,11 @@ function OutlineIntegrationPage() {
 				icon={<OutlineIcon className="size-6" />}
 				title="Outline"
 				description="Mirror Outline collections so their documents reach practice detection as context."
+				actions={
+					outline.health && (
+						<ConnectionHealthBadge health={outline.health} isSyncing={outline.hasActiveJob} />
+					)
+				}
 			/>
 
 			{workspaceSlug != null && outline.isLoading && <Skeleton className="h-48 w-full" />}

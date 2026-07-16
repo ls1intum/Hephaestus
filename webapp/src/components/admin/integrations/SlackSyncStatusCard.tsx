@@ -1,6 +1,8 @@
 import type { ConnectionSyncStatus } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ActiveJobProgress } from "./ActiveJobProgress";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { SyncNowButton } from "./SyncNowButton";
@@ -39,22 +41,29 @@ export function SlackSyncStatusCard({
 					</span>
 					<LastProcessedEvent lastEventAt={status.lastEventProcessedAt} />
 				</div>
+
+				{/* The detail page is where an admin comes to watch a run; showing progress on the overview
+				    card but not here inverted that. Determinate whenever the server knows the total. */}
+				<ActiveJobProgress job={status.activeJob} />
+
 				{isConnectionActive && (
-					<SyncNowButton
-						onClick={onSync}
-						isTriggering={isTriggering}
-						activeJob={status.activeJob}
-					/>
-				)}
-				{isConnectionActive && status.activeJob && (
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={isCancelling || status.activeJob.cancelRequested}
-						onClick={onCancel}
-					>
-						{status.activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
-					</Button>
+					<ButtonGroup>
+						<SyncNowButton
+							onClick={onSync}
+							isTriggering={isTriggering}
+							activeJob={status.activeJob}
+						/>
+						{status.activeJob && (
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={isCancelling || status.activeJob.cancelRequested}
+								onClick={onCancel}
+							>
+								{status.activeJob.cancelRequested ? "Stopping after current step…" : "Cancel"}
+							</Button>
+						)}
+					</ButtonGroup>
 				)}
 			</CardContent>
 		</Card>

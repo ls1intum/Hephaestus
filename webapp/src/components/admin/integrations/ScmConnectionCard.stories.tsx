@@ -46,7 +46,7 @@ const meta = {
 		isLoading: false,
 		isConnectionActive: true,
 		isAppInstallationWorkspace: false,
-		isTriggering: false,
+		triggeringType: null,
 		isCancelling: false,
 		onRetry: fn(),
 		onSync: fn(),
@@ -61,7 +61,11 @@ type Story = StoryObj<typeof meta>;
 /** Connected + healthy GitHub connection — the steady state. */
 export const Connected: Story = {};
 
-/** Status still loading — a skeleton stands in for the metrics. */
+/**
+ * Status still loading. The placeholder reproduces the loaded card's structure — a 2-column grid of
+ * four label/value metric blocks plus the action row — so the box the content lands in is already the
+ * right size and resolving does not shift the page.
+ */
 export const Loading: Story = { args: { status: undefined, isLoading: true } };
 
 /** No connection row for this workspace — a plain informational line. */
@@ -84,6 +88,38 @@ export const WebhookNotRegistered: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/not registered/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * *Sync now* was pressed and the trigger is in flight. Only that button reports it: Backfill is
+ * disabled — the server takes one job at a time — but keeps its own idle label rather than claiming
+ * to be starting work nobody asked for.
+ */
+export const SyncTriggerPending: Story = {
+	args: { triggeringType: "RECONCILIATION" },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /starting…/i })).toBeDisabled();
+		const backfill = canvas.getByRole("button", { name: /^backfill$/i });
+		await expect(backfill).toBeDisabled();
+		await expect(backfill).toHaveTextContent(/^Backfill$/);
+	},
+};
+
+/**
+ * The mirror image: *Backfill* was pressed, so Backfill reads "Starting…" and *Sync now* is the one
+ * that waits quietly. Both triggers are served by a single mutation, so this pair is what proves the
+ * card discriminates on the operation rather than on a shared `isPending`.
+ */
+export const BackfillTriggerPending: Story = {
+	args: { triggeringType: "BACKFILL" },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /starting…/i })).toBeDisabled();
+		const sync = canvas.getByRole("button", { name: /^sync now$/i });
+		await expect(sync).toBeDisabled();
+		await expect(sync).toHaveTextContent(/^Sync now$/);
 	},
 };
 
