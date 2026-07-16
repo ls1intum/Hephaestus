@@ -66,3 +66,4 @@
         <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="team_members" constraintName="FKrk1tw9123clx7w5wjx6b58qch" deferrable="false" initiallyDeferred="false" referencedColumnNames="id" referencedTableName="user" validate="true"/>
     </changeSet>
 </databaseChangeLog>
+<!-- temporary CI guard verification, revert -->
