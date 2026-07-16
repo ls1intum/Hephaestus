@@ -69,8 +69,10 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # Database checks need full history for git diff on schema/migrations
-          # Other quality checks only need HEAD for faster checkout
-          fetch-depth: ${{ contains(fromJSON('["database-validation", "database-migrations"]'), matrix.check) && 0 || 1 }}
+          # Other quality checks only need HEAD for faster checkout.
+          # NOTE: the depths are QUOTED. Unquoted, `cond && 0 || 1` always yields 1, because the
+          # number 0 is falsy in GitHub expressions; the non-empty string '0' is truthy.
+          fetch-depth: ${{ contains(fromJSON('["database-validation", "database-migrations"]'), matrix.check) && '0' || '1' }}
 
       - name: Setup pnpm + Node.js
         # database-migrations is a pure git check — no Node/pnpm/JDK/Maven needed.
@@ -239,18 +241,21 @@ jobs:
           # origin/<base> as a ref, so use the SHA the event gives us directly.
           BASE=""
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # A PR always has a base commit, and it is always an ancestor of the merge ref. If it
+            # is missing, the checkout is too shallow — fail loudly rather than let the guard
+            # silently no-op, which would report a vacuous green.
+            if ! git cat-file -e "$PR_BASE_SHA^{commit}" 2>/dev/null; then
+              echo "::error::PR base commit $PR_BASE_SHA is not in local history — this job needs fetch-depth: 0. Refusing to pass without checking."
+              exit 1
+            fi
             BASE="$PR_BASE_SHA"
-          elif [ -n "$PUSH_BEFORE" ]; then
+          elif [ -n "$PUSH_BEFORE" ] && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            # Branch creation and force pushes leave no reachable previous tip; nothing released
+            # to enforce against, so the guard is skipped.
             BASE="$PUSH_BEFORE"
           fi
-          # Skip (don't fail) if the baseline commit isn't in local history — branch creation,
-          # force push, or a shallow fetch. There is nothing released to enforce against.
-          if [ -n "$BASE" ] && ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            echo "Baseline $BASE is not in local history; skipping immutability guard."
-            BASE=""
-          fi
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
-          echo "Baseline: ${BASE:-<none — nothing released to enforce against>}"
+          echo "Baseline: ${BASE:-<none — no reachable previous tip, nothing to enforce>}"
 
       - name: Changelog immutability guard
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-migrations' && steps.baseline.outputs.base != ''
