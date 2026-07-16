@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
-import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineSyncProgress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -84,7 +83,7 @@ public class OutlineConnectionStateListener {
                     null
                 ),
                 handle -> {
-                    syncScheduler.syncWorkspaceNow(event.workspaceId(), OutlineSyncProgress.adapt(handle));
+                    syncScheduler.syncWorkspaceNow(event.workspaceId(), handle);
                     // Cancelling the initial connect-time sync must record CANCELLED, not SUCCEEDED — mirror the
                     // reportCancelled tail every other Outline entry point (catchUp/syncAllNow/runner) already has.
                     if (handle.isCancellationRequested()) {

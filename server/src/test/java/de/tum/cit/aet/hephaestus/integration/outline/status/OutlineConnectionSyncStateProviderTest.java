@@ -17,7 +17,10 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.Sy
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -92,10 +95,18 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_nextScheduledSyncAt_derivedFromTheCronExpression() {
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.empty());
+        Instant before = Instant.now();
 
         Instant next = provider("0 0 0 * * *").describe(REF, CONNECTION_ID).nextScheduledSyncAt();
 
-        assertThat(next).isNotNull().isAfter(Instant.now());
+        // The cron fires daily at midnight: assert the actual next occurrence, not merely "in the future"
+        // (which any future instant, e.g. now+1s, would satisfy).
+        assertThat(next).isNotNull();
+        ZonedDateTime fire = next.atZone(ZoneId.systemDefault());
+        assertThat(fire.getHour()).isZero();
+        assertThat(fire.getMinute()).isZero();
+        assertThat(fire.getSecond()).isZero();
+        assertThat(next).isAfter(before).isBeforeOrEqualTo(before.plus(Duration.ofDays(1)));
     }
 
     @Test

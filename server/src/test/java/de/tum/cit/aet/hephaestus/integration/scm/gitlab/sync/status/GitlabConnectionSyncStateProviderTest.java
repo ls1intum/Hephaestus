@@ -19,7 +19,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTr
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -136,10 +139,34 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void shouldComputeNextScheduledSyncAtFromCron() {
             when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+            Instant before = Instant.now();
 
             ConnectionSyncDetails details = provider.describe(ref, CONNECTION_ID);
 
-            assertThat(details.nextScheduledSyncAt()).isNotNull().isAfter(Instant.now());
+            // The configured cron fires daily at 03:00: assert the actual next occurrence, not merely
+            // "in the future" (which any future instant, e.g. now+1s, would satisfy).
+            Instant next = details.nextScheduledSyncAt();
+            assertThat(next).isNotNull();
+            ZonedDateTime fire = next.atZone(ZoneId.systemDefault());
+            assertThat(fire.getHour()).isEqualTo(3);
+            assertThat(fire.getMinute()).isZero();
+            assertThat(fire.getSecond()).isZero();
+            assertThat(next).isAfter(before).isBeforeOrEqualTo(before.plus(Duration.ofDays(1)));
+        }
+
+        @Test
+        void shouldYieldNullNextScheduledSyncAtForAnInvalidCron() {
+            when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+            GitlabConnectionSyncStateProvider brokenCron = new GitlabConnectionSyncStateProvider(
+                connectionService,
+                rateLimitTrackerProvider,
+                new SyncSchedulerProperties(true, 7, "not a cron", 15, null, null, null, null),
+                repositoryToMonitorRepository,
+                repositoryRepository,
+                issueRepository
+            );
+
+            assertThat(brokenCron.describe(ref, CONNECTION_ID).nextScheduledSyncAt()).isNull();
         }
 
         @Test

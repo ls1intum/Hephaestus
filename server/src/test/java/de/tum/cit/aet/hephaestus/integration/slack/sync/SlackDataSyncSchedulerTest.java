@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +41,8 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
     private static final long WS = 42L;
     private static final long CONNECTION_ID = 7L;
+    private static final long OTHER_WS = 43L;
+    private static final long OTHER_CONNECTION_ID = 8L;
 
     @Mock
     private SlackMonitoredChannelRepository monitoredChannelRepository;
@@ -149,18 +153,33 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
     }
 
     @Test
-    void cron_skipsWorkspaceWhoseConnectionAlreadyHasAnActiveSyncJob() {
-        Connection connection = mock(Connection.class);
-        when(connection.getId()).thenReturn(CONNECTION_ID);
-        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(List.of(WS));
-        when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
+    void cron_skipsWorkspaceWhoseConnectionAlreadyHasAnActiveSyncJob_butKeepsSyncingTheRest() {
+        Connection busyConnection = mock(Connection.class);
+        when(busyConnection.getId()).thenReturn(CONNECTION_ID);
+        Connection freeConnection = mock(Connection.class);
+        when(freeConnection.getId()).thenReturn(OTHER_CONNECTION_ID);
+
+        // Two workspaces: the conflict must be contained to the first one. With a single workspace this
+        // test would pass even if the try/catch were hoisted outside the loop, aborting the whole cron.
+        when(monitoredChannelRepository.findDistinctWorkspaceIdsByConsentState("ACTIVE")).thenReturn(
+            List.of(WS, OTHER_WS)
+        );
+        when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(busyConnection));
+        when(connectionService.findActive(OTHER_WS, IntegrationKind.SLACK)).thenReturn(Optional.of(freeConnection));
 
         SyncJob activeJob = mock(SyncJob.class);
-        when(activeJob.getConnection()).thenReturn(connection);
-        doThrow(new SyncJobConflictException(activeJob)).when(syncJobService).run(any(), any());
+        when(activeJob.getConnection()).thenReturn(busyConnection);
+        ArgumentCaptor<SyncJobRequest> requestCaptor = ArgumentCaptor.forClass(SyncJobRequest.class);
+        doThrow(new SyncJobConflictException(activeJob))
+            .when(syncJobService)
+            .run(argThat(request -> request != null && request.workspaceId() == WS), any());
 
         assertThatCode(() -> scheduler.syncDataCron()).doesNotThrowAnyException();
 
-        verify(syncJobService).run(any(), any());
+        // The un-conflicted workspace still got its job — the conflict did not abort the fan-out.
+        verify(syncJobService, times(2)).run(requestCaptor.capture(), any());
+        assertThat(requestCaptor.getAllValues())
+            .extracting(SyncJobRequest::workspaceId)
+            .containsExactlyInAnyOrder(WS, OTHER_WS);
     }
 }

@@ -14,9 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEven
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.lang.reflect.Field;
@@ -53,7 +51,7 @@ class ConnectionServiceTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
-    private SyncJobRepository syncJobRepository;
+    private SyncJobService syncJobService;
 
     private CredentialBundleConverter credentialConverter;
     private ConnectionService service;
@@ -70,8 +68,12 @@ class ConnectionServiceTest extends BaseUnitTest {
             auditRepository,
             credentialConverter,
             eventPublisher,
-            syncJobRepository
+            syncJobService
         );
+        // Default: the connection is free. Only the disconnect fence ever asks.
+        Mockito.lenient()
+            .when(syncJobService.requestCancelForTeardown(anyLong()))
+            .thenReturn(java.util.Optional.empty());
         workspace = new Workspace();
         workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
@@ -261,45 +263,28 @@ class ConnectionServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void transition_toUninstalledWhileSyncActive_rejectsWithoutPurging() {
+    void transition_toUninstalled_purgesAuthoritativelyWithoutFencing() {
+        // System/vendor-driven uninstall (workspace PURGE, Slack app_uninstalled) is a statement of
+        // fact with no one to hand a 409 to and no retry behind it. A background reconcile must never
+        // be able to keep credentials on disk, so this path does not consult the sync fence at all.
         Connection connection = connectionInState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
-        SyncJob active = Mockito.mock(SyncJob.class);
-        when(active.getId()).thenReturn(99L);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                connection.getId(),
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(java.util.Optional.of(active));
 
-        assertThatThrownBy(() ->
-            service.transition(
-                connection,
-                new TransitionRequest(
-                    IntegrationState.UNINSTALLED,
-                    "UNINSTALL",
-                    "ADMIN",
-                    "actor-1",
-                    "corr-busy",
-                    "removed"
-                )
-            )
-        )
-            .isInstanceOf(ConnectionBusyException.class)
-            .hasMessageContaining("active sync job 99");
+        service.transition(
+            connection,
+            new TransitionRequest(IntegrationState.UNINSTALLED, "WORKSPACE_PURGED", "SYSTEM", "purge", "corr-p", "gone")
+        );
 
-        assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);
-        assertThat(connection.getCredentialsEncrypted()).isNotNull();
-        verify(auditRepository, never()).save(any());
-        verify(connectionRepository, never()).save(any());
+        assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(connection.getCredentialsEncrypted()).isNull();
+        verify(syncJobService, never()).requestCancelForTeardown(anyLong());
     }
 
     @Test
     void disconnect_checksLifecycleFenceBeforeRevokingVendorAccess() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
         Runnable revoke = Mockito.mock(Runnable.class);
-        InOrder order = Mockito.inOrder(connectionRepository, syncJobRepository, revoke);
+        InOrder order = Mockito.inOrder(connectionRepository, syncJobService, revoke);
 
         service.disconnect(
             connection,
@@ -314,25 +299,34 @@ class ConnectionServiceTest extends BaseUnitTest {
             revoke
         );
 
+        // The fence must read the job state under the row lock, or a job could start in the window
+        // between the check and the state write.
         order.verify(connectionRepository).acquireLifecycleLock(connection.getId(), workspace.getId());
-        order
-            .verify(syncJobRepository)
-            .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connection.getId(), SyncJobStatus.ACTIVE);
+        order.verify(syncJobService).requestCancelForTeardown(connection.getId());
         order.verify(revoke).run();
+        assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
+    }
+
+    @Test
+    void disconnect_afterCrashedJobIsReapedInline_succeedsInsteadOf409() {
+        // requestCancelForTeardown reaps stale leases before reporting: a job stranded RUNNING by a pod
+        // crash frees the connection as soon as its lease expires, not at the next hourly sweep.
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+        when(syncJobService.requestCancelForTeardown(connection.getId())).thenReturn(java.util.Optional.empty());
+
+        service.disconnect(
+            connection,
+            new TransitionRequest(IntegrationState.UNINSTALLED, "DISCONNECT", "ADMIN", "a", "corr-d", "removed"),
+            () -> {}
+        );
+
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
     }
 
     @Test
     void disconnect_withActiveSyncRejectsBeforeRevokingVendorAccess() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
-        SyncJob active = Mockito.mock(SyncJob.class);
-        when(active.getId()).thenReturn(99L);
-        when(
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                connection.getId(),
-                SyncJobStatus.ACTIVE
-            )
-        ).thenReturn(java.util.Optional.of(active));
+        when(syncJobService.requestCancelForTeardown(connection.getId())).thenReturn(java.util.Optional.of(99L));
         Runnable revoke = Mockito.mock(Runnable.class);
 
         assertThatThrownBy(() ->
@@ -348,7 +342,11 @@ class ConnectionServiceTest extends BaseUnitTest {
                 ),
                 revoke
             )
-        ).isInstanceOf(ConnectionBusyException.class);
+        )
+            .isInstanceOf(ConnectionBusyException.class)
+            // The 409 names the job and promises a retry, because the fence already asked it to stop.
+            .hasMessageContaining("active sync job 99")
+            .hasMessageContaining("retry");
 
         verify(revoke, never()).run();
         assertThat(connection.getState()).isEqualTo(IntegrationState.ACTIVE);

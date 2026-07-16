@@ -4,7 +4,9 @@ import { useState } from "react";
 import { listConnectionSyncJobsOptions } from "@/api/@tanstack/react-query.gen";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
-import { OutlineIntegrationContent } from "@/components/admin/integrations/OutlineIntegrationContent";
+import { OutlineCollectionsSection } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
+import { OutlineConnectCard } from "@/components/admin/integrations/outline/OutlineConnectCard";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { OutlineIcon } from "@/components/icons/brand";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,7 +40,7 @@ function OutlineIntegrationPage() {
 			query: { page: jobsPage, size: JOBS_PAGE_SIZE },
 		}),
 		enabled: Boolean(workspaceSlug) && connectionId != null,
-		refetchInterval: 60_000,
+		refetchInterval: syncPollInterval(outline.hasActiveJob),
 	});
 
 	return (
@@ -75,10 +77,12 @@ function OutlineIntegrationPage() {
 							onRetry={outline.retryTokenStatus}
 						/>
 					)}
-					<OutlineIntegrationContent
-						connectCardProps={outline.connectCardProps}
-						collectionsProps={outline.collectionsProps}
-					/>
+					<div className="space-y-10">
+						<OutlineConnectCard {...outline.connectCardProps} />
+						{outline.collectionsProps && (
+							<OutlineCollectionsSection {...outline.collectionsProps} />
+						)}
+					</div>
 				</>
 			)}
 

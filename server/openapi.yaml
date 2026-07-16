@@ -5016,6 +5016,12 @@ components:
         backfill:
           $ref: "#/components/schemas/BackfillSummary"
           description: "Connection-level backfill rollup, if applicable"
+        backfillSupported:
+          type: boolean
+          description: "Whether this kind's runner offers an explicitly triggerable\
+            \ backfill pass. Reflects the vendor capability only — the scheduled-backfill\
+            \ flag does not gate it, so a manual backfill stays available while the\
+            \ automatic cycle is administratively paused."
         connectionId:
           type: integer
           format: int64
@@ -5075,6 +5081,7 @@ components:
           description: Whether the vendor webhook registration is present; null if
             not applicable/unknown
       required:
+      - backfillSupported
       - connectionId
       - connectionState
       - health

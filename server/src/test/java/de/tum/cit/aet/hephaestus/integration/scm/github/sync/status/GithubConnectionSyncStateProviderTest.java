@@ -26,7 +26,10 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -129,7 +132,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
             assertThat(details.webhookRegistered()).isTrue();
             assertThat(details.vendorHealthDegraded()).isFalse();
-            assertThat(details.degradedReason()).isNull();
         }
 
         @Test
@@ -140,7 +142,6 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
 
             assertThat(details.vendorHealthDegraded()).isTrue();
-            assertThat(details.degradedReason()).isNotBlank();
         }
 
         @Test
@@ -174,12 +175,38 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         }
 
         @Test
-        void nextScheduledSyncAt_computedFromCron_isInTheFuture() {
+        void nextScheduledSyncAt_isTheCronsNextOccurrence() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
+            Instant before = Instant.now();
 
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
 
-            assertThat(details.nextScheduledSyncAt()).isAfter(Instant.now());
+            // The configured cron fires daily at 03:00: assert the actual next occurrence, not merely
+            // "in the future" (which any future instant, e.g. now+1s, would satisfy).
+            Instant next = details.nextScheduledSyncAt();
+            assertThat(next).isNotNull();
+            ZonedDateTime fire = next.atZone(ZoneId.systemDefault());
+            assertThat(fire.getHour()).isEqualTo(3);
+            assertThat(fire.getMinute()).isZero();
+            assertThat(fire.getSecond()).isZero();
+            assertThat(next).isAfter(before).isBeforeOrEqualTo(before.plus(Duration.ofDays(1)));
+        }
+
+        @Test
+        void nextScheduledSyncAt_invalidCron_isNull() {
+            when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
+            SyncSchedulerProperties broken = new SyncSchedulerProperties(
+                true,
+                7,
+                "not a cron",
+                15,
+                new BackfillProperties(false, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                null,
+                null
+            );
+
+            assertThat(provider(broken).describe(ref, CONNECTION_ID).nextScheduledSyncAt()).isNull();
         }
 
         @Test

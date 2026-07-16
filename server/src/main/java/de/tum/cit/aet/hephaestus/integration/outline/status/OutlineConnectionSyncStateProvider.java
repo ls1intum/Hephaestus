@@ -59,7 +59,7 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
             .map(config -> config.webhookSubscriptionId() != null && !config.webhookSubscriptionId().isBlank())
             .orElse(null);
 
-        return new ConnectionSyncDetails(webhookRegistered, CronSchedules.nextRun(syncCron), null, null, false, null);
+        return new ConnectionSyncDetails(webhookRegistered, CronSchedules.nextRun(syncCron), null, null, false);
     }
 
     @Override

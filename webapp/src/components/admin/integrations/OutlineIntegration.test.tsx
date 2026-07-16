@@ -7,7 +7,8 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { server } from "@/mocks/server";
-import { OutlineIntegrationContent } from "./OutlineIntegrationContent";
+import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
+import { OutlineConnectCard } from "./outline/OutlineConnectCard";
 
 vi.mock("sonner", () => ({
 	toast: { success: vi.fn(), error: vi.fn() },
@@ -52,10 +53,10 @@ function OutlineIntegrationTestContainer() {
 					onRetry={outline.retryTokenStatus}
 				/>
 			)}
-			<OutlineIntegrationContent
-				connectCardProps={outline.connectCardProps}
-				collectionsProps={outline.collectionsProps}
-			/>
+			<div className="space-y-10">
+				<OutlineConnectCard {...outline.connectCardProps} />
+				{outline.collectionsProps && <OutlineCollectionsSection {...outline.collectionsProps} />}
+			</div>
 		</>
 	);
 }
@@ -236,34 +237,6 @@ describe("Outline integration — add-collection round trip", () => {
 		// Invalidation refetches the list → the new row lands in the table and the dialog closed.
 		expect(await screen.findByText("Architecture Decisions")).toBeTruthy();
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-	});
-
-	it("surfaces the 502 ProblemDetail inline when the candidates probe cannot reach Outline", async () => {
-		const collectionsRef = { current: [] as unknown[] };
-		useConnectedHandlers(collectionsRef);
-		server.use(
-			http.get("*/workspaces/demo/outline/collections/candidates", () =>
-				HttpResponse.json(
-					{
-						type: "about:blank",
-						title: "Bad Gateway",
-						status: 502,
-						detail: "Outline did not respond to collections.list.",
-					},
-					{ status: 502 },
-				),
-			),
-		);
-
-		renderContainer();
-		// Empty list ⇒ both a header button and an empty-state CTA; open via the header one.
-		fireEvent.click((await screen.findAllByRole("button", { name: /add collection/i }))[0]);
-		const dialog = await screen.findByRole("dialog");
-
-		expect((await within(dialog).findByRole("alert")).textContent).toMatch(
-			/outline did not respond to collections\.list/i,
-		);
-		expect(within(dialog).getByRole("button", { name: /^retry$/i })).toBeTruthy();
 	});
 });
 

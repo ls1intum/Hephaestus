@@ -62,6 +62,3 @@ export const ActiveJob: Story = {
 		await expect(canvas.getByText("Sync in progress")).toBeInTheDocument();
 	},
 };
-
-/** Reused for the GitHub backfill trigger — same behaviour, different label. */
-export const Backfill: Story = { args: { label: "Backfill" } };

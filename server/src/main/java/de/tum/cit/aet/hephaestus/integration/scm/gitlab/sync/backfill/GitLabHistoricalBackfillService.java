@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -79,6 +81,27 @@ public class GitLabHistoricalBackfillService {
      * @return number of repositories processed
      */
     public int runBackfillCycle() {
+        return runBackfillPass(null, null);
+    }
+
+    /**
+     * One backfill pass, optionally threading the job's {@link SyncExecutionHandle} so a manually
+     * triggered {@code BACKFILL} job reports per-repository progress and can be cancelled between
+     * repositories — the per-connection entry point behind {@code GitlabIntegrationSyncRunner}.
+     * Performs exactly the same per-repository step (cooldown and initial-sync gates included)
+     * regardless of caller, under the handle's progress reporting instead of the scheduler's cadence.
+     *
+     * <p>Deliberately ignores {@link SyncSchedulerProperties.BackfillProperties#enabled()} — that flag
+     * gates the scheduled cycle's tick ({@link #runBackfillCycle}'s caller), and a manually triggered
+     * backfill is the point even when the scheduled cycle is administratively disabled.
+     *
+     * @param scopeFilter restrict to this workspace, or {@code null} for the whole fleet (the
+     *                    scheduled cycle)
+     * @param handle      the job handle to report progress on and poll for cancellation, or
+     *                    {@code null} when no job owns this pass
+     * @return number of repositories that made progress this pass
+     */
+    public int runBackfillPass(@Nullable Long scopeFilter, @Nullable SyncExecutionHandle handle) {
         GitLabSyncServiceHolder services = syncServiceHolderProvider.getIfAvailable();
         if (services == null) return 0;
 
@@ -86,7 +109,11 @@ public class GitLabHistoricalBackfillService {
         GitLabMergeRequestSyncService mrSync = services.getMergeRequestSyncService();
         if (issueSync == null && mrSync == null) return 0;
 
-        List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB);
+        List<SyncSession> sessions = syncTargetProvider
+            .getSyncSessions(IntegrationKind.GITLAB)
+            .stream()
+            .filter(session -> scopeFilter == null || scopeFilter.equals(session.scopeId()))
+            .toList();
         if (sessions.isEmpty()) return 0;
 
         int batchSize = syncSchedulerProperties.backfill().batchSize();
@@ -96,6 +123,9 @@ public class GitLabHistoricalBackfillService {
             Long providerId = getGitLabProviderId(session.accountLogin());
 
             for (SyncTarget target : session.syncTargets()) {
+                if (handle != null && handle.isCancellationRequested()) {
+                    return processed.get();
+                }
                 if (target.isBackfillComplete()) continue;
                 if (isOnCooldown(target.id())) continue;
 
@@ -119,6 +149,13 @@ public class GitLabHistoricalBackfillService {
 
                 if (worked) {
                     processed.incrementAndGet();
+                }
+                if (handle != null) {
+                    handle.progress(
+                        processed.get(),
+                        null,
+                        Map.of("currentRepository", target.repositoryNameWithOwner())
+                    );
                 }
             }
         }

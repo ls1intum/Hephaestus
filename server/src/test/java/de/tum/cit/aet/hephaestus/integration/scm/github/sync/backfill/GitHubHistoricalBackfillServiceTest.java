@@ -640,7 +640,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void percentComplete_staticOverload_matchesInstanceMethod() {
+        void percentComplete_boundaries_emptyAndCompleteTotals() {
             assertThat(BackfillProgress.percentComplete(true, 25, 100)).isEqualTo(75);
             assertThat(BackfillProgress.percentComplete(false, 0, 0)).isNull();
             assertThat(BackfillProgress.percentComplete(true, 0, 0)).isEqualTo(100);

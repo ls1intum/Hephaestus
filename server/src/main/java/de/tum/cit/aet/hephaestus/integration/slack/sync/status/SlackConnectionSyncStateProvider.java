@@ -65,8 +65,7 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             CronSchedules.nextRun(properties.cron()),
             null,
             null,
-            false,
-            null
+            false
         );
     }
 

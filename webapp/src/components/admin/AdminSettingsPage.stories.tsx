@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
@@ -30,7 +30,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+/** Every feature off — the Features section still renders; only the league card is conditional. */
+export const Default: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("heading", { name: /^features$/i })).toBeInTheDocument();
+		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
+	},
+};
 
 export const ResettingLeagues: Story = {
 	args: { isResettingLeagues: true, features: { ...allOff, leaguesEnabled: true } },

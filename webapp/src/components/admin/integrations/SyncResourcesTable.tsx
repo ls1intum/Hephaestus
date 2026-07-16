@@ -21,7 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { relativeTime, resourceStateLabel } from "./sync-format";
+import { relativeTime, stateLabel } from "./sync-format";
 
 export interface SyncResourcesTableProps {
 	resources: SyncResourceState[];
@@ -29,8 +29,8 @@ export interface SyncResourcesTableProps {
 	isError?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
-	resourceNoun?: string;
-	resourceNounPlural?: string;
+	resourceNoun: string;
+	resourceNounPlural: string;
 }
 
 export function SyncResourcesTable({
@@ -39,8 +39,8 @@ export function SyncResourcesTable({
 	isError = false,
 	error,
 	onRetry,
-	resourceNoun = "resource",
-	resourceNounPlural = `${resourceNoun}s`,
+	resourceNoun,
+	resourceNounPlural,
 }: SyncResourcesTableProps) {
 	if (isError) {
 		return (
@@ -101,7 +101,7 @@ export function SyncResourcesTable({
 								<div className="text-muted-foreground font-mono text-xs">{resource.externalId}</div>
 							</TableCell>
 							<TableCell>
-								<Badge variant="outline">{resourceStateLabel(resource.state)}</Badge>
+								<Badge variant="outline">{stateLabel(resource.state)}</Badge>
 							</TableCell>
 							<TableCell className="text-muted-foreground">
 								{relativeTime(resource.lastSyncedAt)}

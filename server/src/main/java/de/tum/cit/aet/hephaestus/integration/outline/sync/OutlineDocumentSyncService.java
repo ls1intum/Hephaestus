@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
@@ -115,14 +116,14 @@ public class OutlineDocumentSyncService {
 
     /**
      * Same full reconcile as {@link #syncWorkspace(long)}, additionally reporting per-collection progress
-     * and checking cooperative cancellation between collections through {@code progressListener} — the hook
-     * the unified sync-job runner threads a {@code SyncJobHandle} through (via {@link OutlineSyncProgress}).
-     * {@code null} behaves exactly like {@link #syncWorkspace(long)}.
+     * and checking cooperative cancellation between collections through {@code handle} — the port the
+     * unified sync-job runner threads its job handle through. {@code null} behaves exactly like
+     * {@link #syncWorkspace(long)}.
      */
-    public void syncWorkspace(long workspaceId, @Nullable OutlineSyncProgressListener progressListener) {
+    public void syncWorkspace(long workspaceId, @Nullable SyncExecutionHandle handle) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
-            reportWarning(progressListener);
+            reportWarning(handle);
             return;
         }
         Instant now = Instant.now();
@@ -139,28 +140,24 @@ public class OutlineDocumentSyncService {
             int total = collections.size();
             int done = 0;
             for (OutlineCollection collection : collections) {
-                if (progressListener != null && progressListener.isCancelled()) {
+                if (handle != null && handle.isCancellationRequested()) {
                     break;
                 }
                 if (!live.containsKey(collection.getCollectionId())) {
                     // Visibility loss ≠ deletion: never tombstone documents we merely cannot see.
                     recordCollectionError(ctx, collection, "Collection is no longer visible to the integration token");
-                    reportWarning(progressListener);
+                    reportWarning(handle);
                     done++;
-                    if (progressListener != null) {
-                        progressListener.onCollectionDone(done, total, collection.getName());
-                    }
+                    reportCollectionDone(handle, done, total, collection.getName());
                     continue;
                 }
                 if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
                     synced++;
                 } else {
-                    reportWarning(progressListener);
+                    reportWarning(handle);
                 }
                 done++;
-                if (progressListener != null) {
-                    progressListener.onCollectionDone(done, total, collection.getName());
-                }
+                reportCollectionDone(handle, done, total, collection.getName());
             }
             // Self-heal the change-notification subscription each reconcile (Outline auto-disables a
             // subscription after repeated delivery failures); best-effort, never throws.
@@ -177,7 +174,7 @@ public class OutlineDocumentSyncService {
             );
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
-            reportWarning(progressListener);
+            reportWarning(handle);
         }
     }
 
@@ -191,14 +188,14 @@ public class OutlineDocumentSyncService {
 
     /**
      * Same resume pass as {@link #syncPendingCollections(long)}, additionally reporting per-collection
-     * progress and checking cooperative cancellation between collections through {@code progressListener}
-     * — the hook the catch-up sync-job runner threads a {@code SyncJobHandle} through (via
-     * {@link OutlineSyncProgress}). {@code null} behaves exactly like {@link #syncPendingCollections(long)}.
+     * progress and checking cooperative cancellation between collections through {@code handle} — the
+     * port the catch-up sync-job runner threads its job handle through. {@code null} behaves exactly
+     * like {@link #syncPendingCollections(long)}.
      */
-    public void syncPendingCollections(long workspaceId, @Nullable OutlineSyncProgressListener progressListener) {
+    public void syncPendingCollections(long workspaceId, @Nullable SyncExecutionHandle handle) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
-            reportWarning(progressListener);
+            reportWarning(handle);
             return;
         }
         List<OutlineCollection> pending = collectionRepository
@@ -216,29 +213,44 @@ public class OutlineDocumentSyncService {
         int done = 0;
         try {
             for (OutlineCollection collection : pending) {
-                if (progressListener != null && progressListener.isCancelled()) {
+                if (handle != null && handle.isCancellationRequested()) {
                     break;
                 }
                 if (!syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
-                    reportWarning(progressListener);
+                    reportWarning(handle);
                 }
                 done++;
-                if (progressListener != null) {
-                    progressListener.onCollectionDone(done, total, collection.getName());
-                }
+                reportCollectionDone(handle, done, total, collection.getName());
             }
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
-            reportWarning(progressListener);
+            reportWarning(handle);
         }
         // The catch-up tick exports bodies too, so it must also enforce the cap — including after a
         // rate-limited abort, since bodies exported before the pause still count against it.
         enforceSizeCap(workspaceId);
     }
 
-    private static void reportWarning(@Nullable OutlineSyncProgressListener progressListener) {
-        if (progressListener != null) {
-            progressListener.onWarning();
+    /** Marks the enclosing job partially successful; no-op on the unhandled (scheduled/webhook) paths. */
+    private static void reportWarning(@Nullable SyncExecutionHandle handle) {
+        if (handle != null) {
+            handle.reportWarnings();
+        }
+    }
+
+    /** Reports one collection's finished sync attempt (success or recorded error) to the enclosing job. */
+    private static void reportCollectionDone(
+        @Nullable SyncExecutionHandle handle,
+        int done,
+        int total,
+        @Nullable String collectionName
+    ) {
+        if (handle != null) {
+            handle.progress(
+                done,
+                total,
+                collectionName == null ? Map.of() : Map.of("currentCollection", collectionName)
+            );
         }
     }
 

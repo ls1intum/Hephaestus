@@ -12,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionAdminService;
@@ -38,9 +39,11 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -55,6 +58,9 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
     private static final long CONNECTION_ID = 10L;
+    /** A sibling connection in the SAME workspace — the cross-connection cancel scope check. */
+    private static final long OTHER_CONNECTION_ID = 11L;
+    private static final long JOB_ID = 555L;
 
     @Mock
     private ConnectionAdminService connectionAdminService;
@@ -200,7 +206,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
     @Test
     void getStatus_vendorHealthDegraded_healthIsDegraded() {
         when(githubProvider.describe(any(), anyLong())).thenReturn(
-            new ConnectionSyncDetails(null, null, null, null, true, "installation suspended")
+            new ConnectionSyncDetails(null, null, null, null, true)
         );
 
         assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).health()).isEqualTo(ConnectionHealth.DEGRADED);
@@ -245,6 +251,40 @@ class SyncStatusServiceTest extends BaseUnitTest {
 
         assertThat(status.lastEventProcessedAt()).isNull();
         assertThat(status.lastEventType()).isNull();
+    }
+
+    // --- backfill capability ---
+    // backfillSupported is what the admin UI gates its "Backfill" button on, so it must track the
+    // runner's own answer rather than the connection's kind — otherwise the button and triggerSync's
+    // 409 disagree.
+
+    @Test
+    void getStatus_runnerSupportsBackfill_backfillSupportedIsTrue() {
+        when(githubRunner.supportsBackfill()).thenReturn(true);
+
+        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported()).isTrue();
+    }
+
+    @Test
+    void getStatus_runnerDoesNotSupportBackfill_backfillSupportedIsFalse() {
+        when(githubRunner.supportsBackfill()).thenReturn(false);
+
+        assertThat(service.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported()).isFalse();
+    }
+
+    @Test
+    void getStatus_noRunnerRegisteredForKind_backfillSupportedIsFalse() {
+        SyncStatusService noRunners = new SyncStatusService(
+            connectionAdminService,
+            syncJobService,
+            syncJobRepository,
+            connectionActivityRepository,
+            taskExecutor,
+            List.of(githubProvider),
+            List.of()
+        );
+
+        assertThat(noRunners.getStatus(WORKSPACE_ID, CONNECTION_ID).backfillSupported()).isFalse();
     }
 
     // --- trigger ---
@@ -373,6 +413,70 @@ class SyncStatusServiceTest extends BaseUnitTest {
         verify(syncJobService).failStarted(eq(started), any());
     }
 
+    // --- cancel ---
+
+    @Test
+    @DisplayName(
+        "cancelling a job that belongs to a SIBLING connection in the same workspace must 404 without cancelling"
+    )
+    void cancelJob_jobBelongsToDifferentConnection_throwsEntityNotFoundAndNeverCancels() {
+        // The (workspace, connection) scope check is a security control: a job id that exists and is
+        // readable in this workspace, but hangs off a DIFFERENT connection, must not have its cancel
+        // flag flipped through the path connection. `never(requestCancel)` is the assertion that dies
+        // if the ownership `.filter(...)` is dropped — the trailing re-read would 404 regardless.
+        SyncJob siblingConnectionJob = jobOnConnection(OTHER_CONNECTION_ID);
+        when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(
+            Optional.of(siblingConnectionJob)
+        );
+
+        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID)).isInstanceOf(
+            EntityNotFoundException.class
+        );
+
+        verify(syncJobService, never()).requestCancel(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("cancelling a job that exists but lives in another workspace must 404 without cancelling")
+    void cancelJob_jobNotInWorkspace_throwsEntityNotFoundAndNeverCancels() {
+        // The job row exists globally (findById would find it) but is not visible in this workspace.
+        // Stubbing the unscoped findById proves the workspace predicate — not mere absence — is what
+        // rejects the request: swapping findByIdAndWorkspace_Id for findById makes this test go red.
+        when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
+        lenient().when(syncJobRepository.findById(JOB_ID)).thenReturn(Optional.of(jobOnConnection(CONNECTION_ID)));
+
+        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID)).isInstanceOf(
+            EntityNotFoundException.class
+        );
+
+        verify(syncJobService, never()).requestCancel(anyLong(), anyLong());
+    }
+
+    @Test
+    void cancelJob_ownJobInWorkspace_requestsCancelAndReturnsRereadJob() {
+        SyncJob job = jobOnConnection(CONNECTION_ID);
+        when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(Optional.of(job));
+        when(syncJobRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+        SyncJobDTO dto = service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID);
+
+        assertThat(dto.id()).isEqualTo(JOB_ID);
+        verify(syncJobService).requestCancel(WORKSPACE_ID, JOB_ID);
+    }
+
+    @Test
+    void cancelJob_terminalJob_propagatesStateConflictFromEngine() {
+        SyncJob job = jobOnConnection(CONNECTION_ID);
+        when(syncJobRepository.findByIdAndWorkspace_Id(JOB_ID, WORKSPACE_ID)).thenReturn(Optional.of(job));
+        doThrow(new SyncStateConflictException("already terminal", Map.of()))
+            .when(syncJobService)
+            .requestCancel(WORKSPACE_ID, JOB_ID);
+
+        assertThatThrownBy(() -> service.cancelJob(WORKSPACE_ID, CONNECTION_ID, JOB_ID)).isInstanceOf(
+            SyncStateConflictException.class
+        );
+    }
+
     // --- catalog ---
 
     @Test
@@ -436,7 +540,30 @@ class SyncStatusServiceTest extends BaseUnitTest {
             SyncJobTrigger.MANUAL,
             null
         );
-        job.setId(555L);
+        job.setId(JOB_ID);
+        return job;
+    }
+
+    /** A {@link #JOB_ID} job hanging off an arbitrary connection id, for the cancel scope checks. */
+    private SyncJob jobOnConnection(long connectionId) {
+        Workspace ws = new Workspace();
+        ws.setId(WORKSPACE_ID);
+        Connection owner = new Connection(
+            ws,
+            IntegrationKind.GITHUB,
+            String.valueOf(connectionId),
+            new ConnectionConfig.GitHubAppConfig(connectionId, "acme", null, Set.of())
+        );
+        setConnectionId(owner, connectionId);
+        SyncJob job = new SyncJob(
+            ws,
+            owner,
+            IntegrationKind.GITHUB,
+            SyncJobType.RECONCILIATION,
+            SyncJobTrigger.MANUAL,
+            null
+        );
+        job.setId(JOB_ID);
         return job;
     }
 

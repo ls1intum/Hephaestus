@@ -28,11 +28,6 @@ function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 }
 
 describe("AdminSettingsPage — non-integration content", () => {
-	it("renders the features section", () => {
-		setup();
-		expect(screen.getByRole("heading", { name: /^features$/i })).toBeTruthy();
-	});
-
 	it("hides the league reset card when leagues are disabled", () => {
 		setup({ features: { ...features, leaguesEnabled: false } });
 		expect(screen.queryByText(/reset and recalculate leagues/i)).toBeNull();

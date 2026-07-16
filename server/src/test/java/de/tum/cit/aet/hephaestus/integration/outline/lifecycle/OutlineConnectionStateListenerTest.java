@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
@@ -24,7 +25,6 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
-import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineSyncProgressListener;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -75,7 +75,7 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThat(request.kind()).isEqualTo(IntegrationKind.OUTLINE);
         assertThat(request.type()).isEqualTo(SyncJobType.INITIAL);
         assertThat(request.trigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
-        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
+        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class));
         // Not cancelled → the job records its natural outcome, never CANCELLED.
         verify(handle, never()).reportCancelled();
     }
@@ -88,7 +88,7 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
 
         listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE));
 
-        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
+        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class));
         verify(handle).reportCancelled();
     }
 
@@ -111,7 +111,7 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThatCode(() ->
             listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE))
         ).doesNotThrowAnyException();
-        verify(syncScheduler, never()).syncWorkspaceNow(eq(5L), any(OutlineSyncProgressListener.class));
+        verify(syncScheduler, never()).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class));
     }
 
     @Test

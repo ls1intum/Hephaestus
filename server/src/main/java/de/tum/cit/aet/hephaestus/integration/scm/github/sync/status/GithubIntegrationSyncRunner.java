@@ -55,9 +55,16 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
         }
     }
 
+    /**
+     * Manual backfill is always offered: {@code hephaestus.sync.backfill.enabled} gates the scheduled
+     * backfill cycle, not the vendor's ability to backfill on request. {@link
+     * GitHubHistoricalBackfillService#runBackfillBatch} deliberately ignores the flag for exactly this
+     * reason, so gating the capability here would make an administratively paused cycle also
+     * un-resumable by hand — the exact situation manual backfill exists for.
+     */
     @Override
     public boolean supportsBackfill() {
-        return syncSchedulerProperties.backfill().enabled();
+        return true;
     }
 
     /**

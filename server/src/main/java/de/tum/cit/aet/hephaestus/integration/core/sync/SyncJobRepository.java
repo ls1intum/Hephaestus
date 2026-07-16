@@ -92,35 +92,25 @@ public interface SyncJobRepository extends JpaRepository<SyncJob, Long> {
     )
     int markRunning(@Param("id") long id);
 
+    /**
+     * Terminal transition, compare-and-set on {@code status IN :activeStatuses} so a late writer cannot
+     * overwrite a row that already finished.
+     *
+     * <p>Deliberately does not filter on {@code cancelRequested}: the outcome belongs to the runner that
+     * executed the body (see {@code SyncJobService#executeBody}), so a cancel request the runner never
+     * honored must not turn its reported outcome into CANCELLED.
+     */
     @WorkspaceAgnostic("ID-based terminal transition; jobId comes from the active in-process handle")
     @Modifying(clearAutomatically = true)
     @Query(
         "UPDATE SyncJob j SET j.status = :status, j.finishedAt = instant, j.errorSummary = :errorSummary, " +
             "j.itemsProcessed = :itemsProcessed, j.itemsTotal = :itemsTotal, j.progress = :progress " +
-            "WHERE j.id = :id AND j.status IN :activeStatuses " +
-            "AND (:honorCancellation = false OR j.cancelRequested = false)"
+            "WHERE j.id = :id AND j.status IN :activeStatuses"
     )
     int completeActiveJob(
         @Param("id") long id,
         @Param("status") SyncJobStatus status,
         @Param("errorSummary") String errorSummary,
-        @Param("itemsProcessed") Integer itemsProcessed,
-        @Param("itemsTotal") Integer itemsTotal,
-        @Param("progress") java.util.Map<String, Object> progress,
-        @Param("activeStatuses") Collection<SyncJobStatus> activeStatuses,
-        @Param("honorCancellation") boolean honorCancellation
-    );
-
-    @WorkspaceAgnostic("ID-based cancellation completion; jobId comes from the active in-process handle")
-    @Modifying(clearAutomatically = true)
-    @Query(
-        "UPDATE SyncJob j SET j.status = de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus.CANCELLED, " +
-            "j.finishedAt = instant, j.errorSummary = null, j.itemsProcessed = :itemsProcessed, " +
-            "j.itemsTotal = :itemsTotal, j.progress = :progress " +
-            "WHERE j.id = :id AND j.status IN :activeStatuses AND j.cancelRequested = true"
-    )
-    int completeCancelRequestedJob(
-        @Param("id") long id,
         @Param("itemsProcessed") Integer itemsProcessed,
         @Param("itemsTotal") Integer itemsTotal,
         @Param("progress") java.util.Map<String, Object> progress,

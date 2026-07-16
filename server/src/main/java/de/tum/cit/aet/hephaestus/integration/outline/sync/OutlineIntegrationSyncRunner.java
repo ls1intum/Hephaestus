@@ -27,7 +27,7 @@ public class OutlineIntegrationSyncRunner implements IntegrationSyncRunner {
 
     @Override
     public void reconcile(IntegrationRef ref, SyncExecutionHandle handle) {
-        syncScheduler.syncWorkspaceNow(ref.workspaceId(), OutlineSyncProgress.adapt(handle));
+        syncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }

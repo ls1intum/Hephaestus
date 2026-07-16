@@ -73,8 +73,7 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             CronSchedules.nextRun(syncSchedulerProperties.cron()),
             rateLimit,
             null,
-            false,
-            null
+            false
         );
     }
 

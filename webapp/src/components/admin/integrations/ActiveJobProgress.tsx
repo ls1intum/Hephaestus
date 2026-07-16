@@ -1,15 +1,13 @@
 import type { SyncJob } from "@/api/types.gen";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
 import { JOB_TYPE_LABEL, jobCurrentStep } from "./sync-format";
 
 export interface ActiveJobProgressProps {
 	job?: SyncJob | null;
-	className?: string;
 }
 
-export function ActiveJobProgress({ job, className }: ActiveJobProgressProps) {
+export function ActiveJobProgress({ job }: ActiveJobProgressProps) {
 	if (!job) return null;
 
 	const processed = job.itemsProcessed ?? 0;
@@ -19,7 +17,7 @@ export function ActiveJobProgress({ job, className }: ActiveJobProgressProps) {
 	if (total != null && total > 0) {
 		const percent = Math.min(100, Math.round((processed / total) * 100));
 		return (
-			<div className={cn("flex items-center gap-2 text-sm text-muted-foreground", className)}>
+			<div className="flex items-center gap-2 text-sm text-muted-foreground">
 				<Progress
 					value={percent}
 					className="w-32"
@@ -37,7 +35,7 @@ export function ActiveJobProgress({ job, className }: ActiveJobProgressProps) {
 	}
 
 	return (
-		<div className={cn("flex items-center gap-2 text-sm text-muted-foreground", className)}>
+		<div className="flex items-center gap-2 text-sm text-muted-foreground">
 			<Spinner className="size-4" />
 			<span>{currentStep ?? `${JOB_TYPE_LABEL[job.type]} running…`}</span>
 		</div>

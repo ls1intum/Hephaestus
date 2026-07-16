@@ -83,20 +83,15 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             installationId = appConfig.installationId();
         }
 
-        boolean vendorHealthDegraded = false;
-        String degradedReason = null;
-        if (installationId != null && suspensionTracker.isInstallationMarkedSuspended(installationId)) {
-            vendorHealthDegraded = true;
-            degradedReason = "GitHub App installation is suspended";
-        }
+        boolean vendorHealthDegraded =
+            installationId != null && suspensionTracker.isInstallationMarkedSuspended(installationId);
 
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(syncSchedulerProperties.cron()),
             rateLimitTracker.snapshot(workspaceId),
             aggregateBackfill(workspaceId),
-            vendorHealthDegraded,
-            degradedReason
+            vendorHealthDegraded
         );
     }
 

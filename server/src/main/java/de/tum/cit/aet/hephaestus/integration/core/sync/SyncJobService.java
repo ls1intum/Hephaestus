@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync;
 
+import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -44,16 +45,19 @@ public class SyncJobService implements SmartLifecycle {
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
-    private final Map<Long, ActiveExecution> activeExecutions = new ConcurrentHashMap<>();
+    /**
+     * Handles of the jobs whose bodies are executing in THIS JVM, by job id. Registration is what
+     * makes a job "locally owned": {@link #reapAbandoned} skips these rows, and cancel requests
+     * landing on this pod reach the runner through the handle instead of waiting out the lease
+     * heartbeat.
+     *
+     * <p>Deliberately holds the handle only — never the runner's {@link Thread}. Cancellation here is
+     * cooperative by construction: an interrupt is a no-op on a platform thread blocked in a pgjdbc
+     * socket read (the case where it would be useful), and on a virtual thread it closes the socket
+     * out from under the driver, which would destroy the runner's own terminal write.
+     */
+    private final Map<Long, SyncJobHandle> activeHandles = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
-
-    private record ActiveExecution(SyncJobHandle handle, Thread thread) {
-        void cancel() {
-            handle.refreshCancellation(true);
-            handle.reportCancelled();
-            thread.interrupt();
-        }
-    }
 
     public SyncJobService(
         SyncJobRepository syncJobRepository,
@@ -121,12 +125,24 @@ public class SyncJobService implements SmartLifecycle {
             throw e;
         }
 
-        // Register only after the body starts so a rejected dispatch cannot keep a PENDING lease alive.
         SyncJobHandle handle = new SyncJobHandle(job.getId(), this::persistProgress);
         return new Started(job, handle);
     }
 
-    /** Runs a prepared job body and records its terminal outcome instead of propagating runner failures. */
+    /**
+     * Runs a prepared job body and records its terminal outcome instead of propagating runner failures.
+     *
+     * <p>One rule, no exceptions: the outcome is the <em>runner's</em> to report, never a canceller's.
+     * Only a body that called {@link SyncJobHandle#reportCancelled()} is recorded CANCELLED. A body
+     * that returns normally is SUCCEEDED even if a cancel request committed while it was finishing —
+     * from any replica, or from {@link #stop()} — because its work is done and its watermarks are
+     * advanced, and calling that "cancelled" would hide a real success from {@code lastSuccessfulJob}.
+     * A body that throws is FAILED with the real reason, even mid-shutdown: a vendor error that happens
+     * to land during a deploy is a vendor error.
+     *
+     * <p>Cancellation is therefore a <em>request</em>, not an outcome: {@code cancel_requested} asks the
+     * runner to stop, and only the runner's own report decides whether it did.
+     */
     public void executeBody(Started started, Consumer<? super SyncJobHandle> body) {
         long jobId = started.job().getId();
         SyncJobHandle handle = started.handle();
@@ -136,12 +152,15 @@ public class SyncJobService implements SmartLifecycle {
             if (!start.started()) {
                 return;
             }
-            ActiveExecution execution = new ActiveExecution(handle, Thread.currentThread());
-            activeExecutions.put(jobId, execution);
+            // Register only once the job is RUNNING, so a rejected dispatch cannot keep a PENDING
+            // lease alive and the reaper's local-ownership skip only covers bodies that really started.
+            activeHandles.put(jobId, handle);
             registered = true;
             handle.refreshCancellation(start.cancelRequested());
             if (!running.get()) {
-                execution.cancel();
+                // Shutdown began before the body ran. Nothing was attempted, so this runner can
+                // honestly report CANCELLED itself — no interrupt, no outcome written by a canceller.
+                handle.refreshCancellation(true);
                 completeJob(jobId, SyncJobStatus.CANCELLED, null, handle);
                 return;
             }
@@ -154,7 +173,7 @@ public class SyncJobService implements SmartLifecycle {
             completeJob(jobId, finalStatus, null, handle);
         } catch (Exception e) {
             if (handle.cancelledReported()) {
-                log.info("Sync job {} stopped during application shutdown", jobId);
+                log.info("Sync job {} aborted after its runner observed cancellation: {}", jobId, e.toString());
                 completeJob(jobId, SyncJobStatus.CANCELLED, null, handle);
                 return;
             }
@@ -162,7 +181,7 @@ public class SyncJobService implements SmartLifecycle {
             completeJob(jobId, SyncJobStatus.FAILED, truncate(summarize(e)), handle);
         } finally {
             if (registered) {
-                activeExecutions.remove(jobId);
+                activeHandles.remove(jobId);
             }
             pruneRetention(started.job().getConnection().getId());
         }
@@ -207,9 +226,61 @@ public class SyncJobService implements SmartLifecycle {
             publish(workspaceId, job.getConnection().getId(), job.getKind(), SyncStateChangedEvent.Scope.JOB);
         });
 
-        ActiveExecution execution = activeExecutions.get(jobId);
-        if (execution != null) {
-            execution.handle().refreshCancellation(true);
+        notifyLocalRunner(jobId);
+    }
+
+    /**
+     * Fences connection teardown: reaps leases the hourly sweep hasn't reached yet, then requests
+     * cooperative cancellation of whatever job still holds the connection.
+     *
+     * <p>This is the admin-disconnect door's helper, and it exists so that door never wedges. The
+     * inline reap mirrors {@link #beginJob}'s, so a job stranded RUNNING by a pod crash frees the
+     * connection as soon as its lease expires rather than at the next hourly sweep. The cancel request
+     * is what makes a 409 recoverable: the admin retries and the second attempt finds the connection
+     * free, instead of being told "busy" forever with nothing they can do about it.
+     *
+     * <p>Residual, by design: a runner wedged in a vendor call with no socket timeout never observes
+     * the flag and keeps heartbeating, so it is neither reapable nor cancellable. Its row clears on the
+     * next restart, when {@link SyncJobZombieSweeper}'s startup sweep runs with an empty local registry.
+     * We do not interrupt it — see {@link #activeHandles}.
+     *
+     * @return the id of the job still holding the connection, empty when the connection is free
+     */
+    public Optional<Long> requestCancelForTeardown(long connectionId) {
+        reapAbandonedForConnection(connectionId);
+        return Optional.ofNullable(
+            transactionTemplate.execute(status ->
+                syncJobRepository
+                    .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
+                    .map(job -> {
+                        if (syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE) == 0) {
+                            // Completed between the read and the write — the connection is free after all.
+                            return null;
+                        }
+                        publish(
+                            job.getWorkspace().getId(),
+                            connectionId,
+                            job.getKind(),
+                            SyncStateChangedEvent.Scope.JOB
+                        );
+                        return job.getId();
+                    })
+                    .orElse(null)
+            )
+        ).map(jobId -> {
+            notifyLocalRunner(jobId);
+            return jobId;
+        });
+    }
+
+    /**
+     * Hands a committed cancel request to the runner immediately when the job is executing in THIS
+     * JVM, so the common single-pod case does not wait out the 60s lease-heartbeat sweep.
+     */
+    private void notifyLocalRunner(long jobId) {
+        SyncJobHandle handle = activeHandles.get(jobId);
+        if (handle != null) {
+            handle.refreshCancellation(true);
         }
     }
 
@@ -221,17 +292,17 @@ public class SyncJobService implements SmartLifecycle {
     @Scheduled(fixedDelay = 60, initialDelay = 60, timeUnit = TimeUnit.SECONDS)
     @WorkspaceAgnostic("Refreshes only leases registered in this JVM; job ids are globally unique")
     public void refreshLeases() {
-        if (activeExecutions.isEmpty()) {
+        if (activeHandles.isEmpty()) {
             return;
         }
-        List<Long> ids = List.copyOf(activeExecutions.keySet());
+        List<Long> ids = List.copyOf(activeHandles.keySet());
         try {
             transactionTemplate.executeWithoutResult(status -> {
                 syncJobRepository.touchHeartbeat(ids);
                 for (SyncJobRepository.CancelFlagProjection projection : syncJobRepository.findCancelFlags(ids)) {
-                    ActiveExecution execution = activeExecutions.get(projection.getId());
-                    if (execution != null) {
-                        execution.handle().refreshCancellation(projection.isCancelRequested());
+                    SyncJobHandle handle = activeHandles.get(projection.getId());
+                    if (handle != null) {
+                        handle.refreshCancellation(projection.isCancelRequested());
                     }
                 }
             });
@@ -265,12 +336,15 @@ public class SyncJobService implements SmartLifecycle {
         }
         int reaped = 0;
         for (SyncJob job : stale) {
-            if (activeExecutions.containsKey(job.getId())) {
+            if (activeHandles.containsKey(job.getId())) {
                 // A live runner in THIS JVM still owns the job, so it is not abandoned — a stale lease
                 // here only means the heartbeat scheduler was briefly starved, never that the work died.
                 // Leave the row ACTIVE: the runner finishes on its own and connection teardown stays
                 // fenced on it (ConnectionService's lifecycle lock, not this sweep). Reaping it here would
                 // kill a healthy sync — e.g. a "Sync now" click running the inline reap first.
+                // Connection teardown does not deadlock behind this: ConnectionService's disconnect
+                // fence requests cancellation and returns a retryable 409 (see
+                // {@link #requestCancelForTeardown}), and PURGE / vendor uninstall are not fenced at all.
                 continue;
             }
             int updated = syncJobRepository.markAbandoned(
@@ -307,24 +381,44 @@ public class SyncJobService implements SmartLifecycle {
         stop(() -> {});
     }
 
+    /**
+     * Requests cancellation of every job this JVM is running — in memory, so a runner polling
+     * {@link SyncJobHandle#isCancellationRequested()} aborts promptly, and durably in
+     * {@code cancel_requested}, so the request survives the process and outlives this pod.
+     *
+     * <p>It does <em>not</em> report an outcome on the runner's behalf, and it does not interrupt
+     * anyone. Consequences, accepted deliberately:
+     *
+     * <ul>
+     *   <li>A runner that notices the flag aborts cooperatively and writes its own CANCELLED row.
+     *   <li>A runner the JVM exits from under leaves its row RUNNING. That row is honest — the work
+     *       stopped in an unknown place — and {@link SyncJobZombieSweeper}'s startup sweep reaps it
+     *       once the lease expires. Faking CANCELLED here would claim a clean abort we never observed,
+     *       and (before this was removed) fabricating it from the canceller could stamp CANCELLED over
+     *       a sync that had already finished successfully.
+     * </ul>
+     *
+     * <p>This returns without draining {@link #activeHandles}; the drain budget is
+     * {@code syncJobExecutor}'s {@code awaitTerminationSeconds}, at the next-lower lifecycle phase.
+     */
     @Override
     public void stop(Runnable callback) {
         try {
             if (!running.compareAndSet(true, false)) {
                 return;
             }
-            List<Map.Entry<Long, ActiveExecution>> executions = List.copyOf(activeExecutions.entrySet());
-            if (executions.isEmpty()) {
+            List<Long> jobIds = List.copyOf(activeHandles.keySet());
+            if (jobIds.isEmpty()) {
                 return;
             }
-            log.info("Cancelling {} in-flight sync job(s) for application shutdown", executions.size());
-            for (Map.Entry<Long, ActiveExecution> entry : executions) {
-                entry.getValue().cancel();
+            log.info("Requesting cancellation of {} in-flight sync job(s) for application shutdown", jobIds.size());
+            for (Long jobId : jobIds) {
+                notifyLocalRunner(jobId);
             }
             try {
                 transactionTemplate.executeWithoutResult(status -> {
-                    for (Map.Entry<Long, ActiveExecution> entry : executions) {
-                        syncJobRepository.markCancelRequested(entry.getKey(), SyncJobStatus.ACTIVE);
+                    for (Long jobId : jobIds) {
+                        syncJobRepository.markCancelRequested(jobId, SyncJobStatus.ACTIVE);
                     }
                 });
             } catch (Exception e) {
@@ -363,10 +457,17 @@ public class SyncJobService implements SmartLifecycle {
         return result == null ? new MarkRunningResult(false, false) : result;
     }
 
+    /**
+     * Writes {@code status} as the job's terminal outcome, compare-and-set against the ACTIVE statuses
+     * so a late writer can never overwrite a row that already finished.
+     *
+     * <p>Deliberately does <em>not</em> consult {@code cancel_requested}: per {@link #executeBody}'s one
+     * rule, the caller has already folded the runner's own {@link SyncJobHandle#reportCancelled()} into
+     * {@code status}, and a cancel request that the runner never honored must not rewrite the outcome
+     * it did report.
+     */
     private void completeJob(long jobId, SyncJobStatus status, @Nullable String errorSummary, SyncJobHandle handle) {
         transactionTemplate.executeWithoutResult(txStatus -> {
-            boolean honorCancellation =
-                status == SyncJobStatus.SUCCEEDED || status == SyncJobStatus.SUCCEEDED_WITH_WARNINGS;
             int updated = syncJobRepository.completeActiveJob(
                 jobId,
                 status,
@@ -374,18 +475,8 @@ public class SyncJobService implements SmartLifecycle {
                 handle.currentItemsProcessed(),
                 handle.currentItemsTotal(),
                 handle.currentProgressDetail(),
-                SyncJobStatus.ACTIVE,
-                honorCancellation
+                SyncJobStatus.ACTIVE
             );
-            if (updated == 0 && honorCancellation) {
-                updated = syncJobRepository.completeCancelRequestedJob(
-                    jobId,
-                    handle.currentItemsProcessed(),
-                    handle.currentItemsTotal(),
-                    handle.currentProgressDetail(),
-                    SyncJobStatus.ACTIVE
-                );
-            }
             if (updated == 0) {
                 log.warn("Sync job {} was no longer active at completion (attempted {})", jobId, status);
                 return;
@@ -449,9 +540,18 @@ public class SyncJobService implements SmartLifecycle {
         eventPublisher.publishEvent(new SyncStateChangedEvent(workspaceId, connectionId, kind, scope));
     }
 
+    /**
+     * Builds the {@code error_summary} value. The message is vendor-controlled and this string is
+     * persisted, then rendered to admins and echoed into logs — so it goes through
+     * {@link LoggingUtils#sanitizeForLog} to strip control characters and ANSI escapes rather than
+     * trusting the vendor not to embed them.
+     */
     private static String summarize(Exception e) {
         String message = e.getMessage();
-        return e.getClass().getSimpleName() + (message == null || message.isBlank() ? "" : ": " + message);
+        return (
+            e.getClass().getSimpleName() +
+            (message == null || message.isBlank() ? "" : ": " + LoggingUtils.sanitizeForLog(message))
+        );
     }
 
     private static String truncate(String s) {

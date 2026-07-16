@@ -9,6 +9,8 @@ const baseStatus: ConnectionSyncStatus = {
 	kind: "SLACK",
 	health: "HEALTHY",
 	resourceCounts: { total: 3, errored: 0 },
+	// SlackIntegrationSyncRunner does not override supportsBackfill — Slack reconciles only.
+	backfillSupported: false,
 	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),
 };
 
@@ -104,5 +106,21 @@ export const NeverSynced: Story = {
 	},
 };
 
-/** Suspended — controls hidden while the connection is not active. */
-export const Suspended: Story = { args: { isConnectionActive: false } };
+/**
+ * Suspended after a successful history — the complement of {@link NeverSynced}. The last-synced
+ * timestamp still reads truthfully (the collected data did not disappear), but no control is
+ * offered while the connection is not active.
+ */
+export const Suspended: Story = {
+	args: {
+		isConnectionActive: false,
+		status: { ...baseStatus, connectionState: "SUSPENDED", health: "SUSPENDED" },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/last synced/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/never synced/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+	},
+};

@@ -10,8 +10,11 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.status.GithubConnectionSyncStateProvider;
@@ -70,8 +73,16 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @MockitoBean
     private GithubIntegrationSyncRunner githubSyncRunner;
 
+    @Autowired
+    private SyncJobRepository syncJobRepository;
+
     private Workspace workspace;
     private Connection connection;
+
+    /** A second tenant the test's admin has NO membership in — the cross-tenant IDOR target. */
+    private Workspace otherWorkspace;
+    private Connection otherConnection;
+    private SyncJob otherJob;
 
     @BeforeEach
     void setUp() {
@@ -100,6 +111,38 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         );
         connection.setState(IntegrationState.ACTIVE);
         connection = connectionRepository.save(connection);
+
+        // A second tenant, owned by a different user. The @WithAdminUser principal is made an ADMIN of
+        // `workspace` only (via ensureAdminMembership) and never of this one, so every request it makes
+        // against these ids is a genuine cross-tenant reach.
+        User otherOwner = persistUser("sync-other-owner-" + System.nanoTime());
+        otherWorkspace = createWorkspace(
+            "sync-other-ws-" + System.nanoTime(),
+            "Other Tenant",
+            "other-org",
+            AccountType.ORG,
+            otherOwner
+        );
+        otherConnection = connectionRepository.save(
+            new Connection(
+                otherWorkspace,
+                IntegrationKind.GITHUB,
+                "200",
+                new ConnectionConfig.GitHubAppConfig(200L, "other-org", null, Set.of())
+            )
+        );
+        otherConnection.setState(IntegrationState.ACTIVE);
+        otherConnection = connectionRepository.save(otherConnection);
+        otherJob = syncJobRepository.save(
+            new SyncJob(
+                otherWorkspace,
+                otherConnection,
+                IntegrationKind.GITHUB,
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.MANUAL,
+                null
+            )
+        );
     }
 
     @Test
@@ -390,6 +433,96 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .expectStatus()
             .isForbidden();
         triggerRequest(TestAuthUtils.getCurrentUserToken()).expectStatus().isForbidden();
+    }
+
+    @Test
+    @WithAdminUser
+    @DisplayName("an admin of workspace A cannot reach workspace B's connection through ANY sync endpoint")
+    void crossTenantConnection_everyEndpointReturns404() {
+        ensureAdminMembership(workspace);
+        String adminToken = TestAuthUtils.getCurrentUserToken();
+        long foreignId = otherConnection.getId();
+
+        // 404, never 403: distinguishing "no such connection" from "exists, but not yours" would hand a
+        // probing admin an existence oracle over other tenants' connection ids. And never 200 — that is
+        // the IDOR itself. Both wrong answers are asserted against by pinning the exact status.
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), foreignId)
+            .headers(h -> h.setBearerAuth(adminToken))
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/connections/{id}/sync/resources", workspace.getWorkspaceSlug(), foreignId)
+            .headers(h -> h.setBearerAuth(adminToken))
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), foreignId)
+            .headers(h -> h.setBearerAuth(adminToken))
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), foreignId)
+            .headers(h -> h.setBearerAuth(adminToken))
+            .bodyValue(new TriggerSyncJobRequestDTO(SyncJobType.RECONCILIATION))
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        webTestClient
+            .patch()
+            .uri(
+                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                workspace.getWorkspaceSlug(),
+                foreignId,
+                otherJob.getId()
+            )
+            .headers(h -> h.setBearerAuth(adminToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"cancelRequested\":true}")
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        // The reach must not have mutated the other tenant's job on the way to the 404.
+        assertThat(syncJobRepository.findById(otherJob.getId()).orElseThrow().isCancelRequested()).isFalse();
+    }
+
+    @Test
+    @WithAdminUser
+    @DisplayName("another tenant's job id, laundered through the admin's OWN connection, is still a 404")
+    void crossTenantJobViaOwnConnection_returns404AndDoesNotCancel() {
+        // The cancel path resolves the job by (jobId, workspaceId) rather than via the connection, so it
+        // needs its own cross-tenant probe: a valid connection the caller genuinely owns, paired with a
+        // job id belonging to another tenant.
+        ensureAdminMembership(workspace);
+
+        webTestClient
+            .patch()
+            .uri(
+                "/workspaces/{slug}/connections/{id}/sync/jobs/{jobId}",
+                workspace.getWorkspaceSlug(),
+                connection.getId(),
+                otherJob.getId()
+            )
+            .headers(h -> h.setBearerAuth(TestAuthUtils.getCurrentUserToken()))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"cancelRequested\":true}")
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+
+        assertThat(syncJobRepository.findById(otherJob.getId()).orElseThrow().isCancelRequested()).isFalse();
     }
 
     // --- helpers ---

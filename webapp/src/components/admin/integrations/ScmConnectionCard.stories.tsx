@@ -9,6 +9,7 @@ const baseStatus: ConnectionSyncStatus = {
 	kind: "GITHUB",
 	health: "HEALTHY",
 	resourceCounts: { total: 12, errored: 0 },
+	backfillSupported: true,
 	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),
 	lastEventProcessedAt: new Date("2026-07-15T09:30:00Z"),
 	webhookRegistered: true,
@@ -30,8 +31,9 @@ const runningJob: SyncJob = {
 /**
  * The connection plane for a source-control integration: last-sync, webhook activity (or a "Not
  * registered" warning), a rate-limit gauge, an optional backfill rollup, live-job progress and the
- * action row. Actions vary by provider — GitHub gets a Backfill trigger and, for app installs, a
- * "Manage installation" link — and a running job exposes a cooperative Cancel that flips to
+ * action row. The Backfill trigger follows the server's own `backfillSupported` capability rather than
+ * the vendor name, so it appears for every kind whose runner offers a backfill pass; app installs also
+ * get a "Manage installation" link. A running job exposes a cooperative Cancel that flips to
  * "Stopping…" once requested. Load failures show a retryable error instead of a blank card.
  */
 const meta = {
@@ -39,7 +41,6 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		provider: "GITHUB",
 		label: "GitHub",
 		status: baseStatus,
 		isLoading: false,
@@ -112,14 +113,19 @@ export const Cancelling: Story = {
 	},
 };
 
-/** GitHub with a backfill in flight — the rollup line and the Backfill trigger are shown. */
+/**
+ * GitHub with a backfill in flight — the rollup line and the Backfill trigger are shown. `IN_PROGRESS`
+ * is one of the four states the provider actually emits (`DISABLED`/`NOT_STARTED`/`IN_PROGRESS`/
+ * `COMPLETE`), and it reaches the admin title-cased rather than as a raw token.
+ */
 export const GitHubWithBackfill: Story = {
 	args: {
-		status: { ...baseStatus, backfill: { state: "RUNNING", percent: 40 } },
+		status: { ...baseStatus, backfill: { state: "IN_PROGRESS", percent: 40 } },
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/RUNNING — 40%/i)).toBeInTheDocument();
+		await expect(canvas.getByText("In Progress — 40%")).toBeInTheDocument();
+		await expect(canvas.queryByText(/IN_PROGRESS/)).not.toBeInTheDocument();
 		await expect(canvas.getByRole("button", { name: /backfill/i })).toBeInTheDocument();
 	},
 };
@@ -134,26 +140,34 @@ export const AppInstallationWorkspace: Story = {
 	},
 };
 
-/** GitLab connection — no Backfill trigger (GitHub-only) and provider-specific labelling. */
+/**
+ * GitLab connection — its runner supports backfill too, so the trigger is offered exactly as it is for
+ * GitHub. The card reads the capability off the status, so nothing here is keyed to the vendor name.
+ */
 export const GitLab: Story = {
 	args: {
-		provider: "GITLAB",
 		label: "GitLab",
 		status: { ...baseStatus, kind: "GITLAB" },
+	},
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: /backfill/i }));
+		await expect(args.onBackfill).toHaveBeenCalledTimes(1);
+	},
+};
+
+/**
+ * A kind whose runner offers no backfill pass — the trigger is withheld rather than offered and then
+ * rejected with a 409. Sync now stays available.
+ */
+export const BackfillUnsupported: Story = {
+	args: {
+		status: { ...baseStatus, backfillSupported: false },
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeInTheDocument();
 		await expect(canvas.queryByRole("button", { name: /backfill/i })).not.toBeInTheDocument();
-	},
-};
-
-/** The rate-limit budget is running low — the gauge reads near-empty. */
-export const RateLimitLow: Story = {
-	args: {
-		status: {
-			...baseStatus,
-			rateLimit: { limit: 5000, remaining: 90, resetAt: new Date(Date.now() + 8 * 60 * 1000) },
-		},
 	},
 };

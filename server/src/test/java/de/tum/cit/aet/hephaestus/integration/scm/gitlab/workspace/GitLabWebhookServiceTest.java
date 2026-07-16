@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -570,8 +571,13 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 .when(webhookClient)
                 .deregisterGroupWebhook(1L, 42L, 99L);
 
-            // Never throws.
-            webhookService.deregisterActiveWebhook(1L);
+            assertThatCode(() -> webhookService.deregisterActiveWebhook(1L)).doesNotThrowAnyException();
+
+            // The swallow must be the ONLY effect: the vendor call was really attempted, and the failure
+            // left the stored ids intact for the disconnect txn that owns the row.
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
+            verify(connectionService, never()).updateConfig(anyLong(), any(), any());
         }
     }
 
@@ -616,8 +622,12 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 .when(webhookClient)
                 .deregisterGroupWebhook(1L, 42L, 99L);
 
-            // Never throws — the orphaned hook auto-disables upstream.
-            webhookService.deregisterWebhookForConnection(1L, 7L);
+            // Swallowed by design: the connection's credentials are already gone post-purge, so the
+            // orphaned hook cannot be deleted here — it auto-disables upstream instead.
+            assertThatCode(() -> webhookService.deregisterWebhookForConnection(1L, 7L)).doesNotThrowAnyException();
+
+            // Distinguishes "attempted and swallowed" from "silently skipped the vendor call entirely".
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
         }
 
         @Test

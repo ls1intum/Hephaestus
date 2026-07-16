@@ -22,6 +22,13 @@ public record ConnectionSyncStatusDTO(
     Instant lastEventProcessedAt,
     @Schema(description = "The most recently processed event's type, if any") String lastEventType,
     @Schema(description = "Current rate-limit budget, if known") RateLimitSnapshotDTO rateLimit,
+    @NonNull
+    @Schema(
+        description = "Whether this kind's runner offers an explicitly triggerable backfill pass. Reflects the " +
+            "vendor capability only — the scheduled-backfill flag does not gate it, so a manual backfill stays " +
+            "available while the automatic cycle is administratively paused."
+    )
+    Boolean backfillSupported,
     @Schema(description = "Connection-level backfill rollup, if applicable") BackfillSummaryDTO backfill,
     @NonNull @Schema(description = "Resource-level rollup") ResourceCountsDTO resourceCounts
 ) {}

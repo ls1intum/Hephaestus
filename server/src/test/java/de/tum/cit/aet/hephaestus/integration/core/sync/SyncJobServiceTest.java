@@ -3,9 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -155,10 +153,10 @@ class SyncJobServiceTest extends BaseUnitTest {
                     )
                     .toList();
             });
+        // Mirrors the real JPQL: compare-and-set on status IN :activeStatuses, and deliberately no
+        // cancelRequested filter — the runner's reported outcome is authoritative.
         lenient()
-            .when(
-                syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any(), anyBoolean())
-            )
+            .when(syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any()))
             .thenAnswer(inv -> {
                 SyncJob job = store.get((Long) inv.getArgument(0));
                 if (job == null || !SyncJobStatus.ACTIVE.contains(job.getStatus())) {
@@ -340,10 +338,14 @@ class SyncJobServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void stop_cancelsAndInterruptsRunningJob() throws Exception {
+    void stop_requestsCooperativeCancellationWithoutInterruptingTheRunner() throws Exception {
+        // Scheduled syncs run on VIRTUAL threads, where an interrupt closes the JDBC socket out from
+        // under pgjdbc — so the runner's own terminal write would die and the row would stick RUNNING
+        // through every deploy. stop() must therefore only raise the flag: cooperative, never forced.
         SyncJobService.Started started = beginTestJob();
         CountDownLatch bodyEntered = new CountDownLatch(1);
-        CountDownLatch interrupted = new CountDownLatch(1);
+        CountDownLatch stopRequested = new CountDownLatch(1);
+        AtomicBoolean interruptFlagSeen = new AtomicBoolean();
         AtomicBoolean cancellationObserved = new AtomicBoolean();
         service.start();
 
@@ -352,26 +354,166 @@ class SyncJobServiceTest extends BaseUnitTest {
                 service.executeBody(started, handle -> {
                     bodyEntered.countDown();
                     try {
-                        Thread.sleep(Duration.ofMinutes(1));
+                        assertThat(stopRequested.await(2, TimeUnit.SECONDS)).isTrue();
                     } catch (InterruptedException e) {
-                        cancellationObserved.set(handle.isCancellationRequested());
-                        interrupted.countDown();
                         Thread.currentThread().interrupt();
-                        throw new IllegalStateException("provider call interrupted", e);
+                        throw new IllegalStateException("runner was interrupted", e);
                     }
+                    // The runner polls the flag between units of work, and reports its own outcome.
+                    cancellationObserved.set(handle.isCancellationRequested());
+                    interruptFlagSeen.set(Thread.currentThread().isInterrupted());
+                    handle.reportCancelled();
                 })
             );
             assertThat(bodyEntered.await(2, TimeUnit.SECONDS)).isTrue();
 
             service.stop();
+            stopRequested.countDown();
 
             running.get(2, TimeUnit.SECONDS);
         }
 
-        assertThat(interrupted.getCount()).isZero();
         assertThat(cancellationObserved).isTrue();
+        assertThat(interruptFlagSeen).as("stop() must not interrupt the runner thread").isFalse();
+        // The terminal write landed, on a thread whose JDBC connection stop() left intact.
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+        assertThat(started.job().getFinishedAt()).isNotNull();
         verify(syncJobRepository).markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE);
+    }
+
+    @Test
+    void stop_racingABodyThatAlreadyFinishedItsWork_marksSucceededNotCancelled() throws Exception {
+        // The deploy-time interleaving: the body returns normally, and stop() fires while the job is
+        // still registered (deregistration happens in executeBody's finally). The canceller must not be
+        // able to stamp CANCELLED over a sync that did all of its work and advanced its watermarks —
+        // that would also hide it from lastSuccessfulJob.
+        SyncJobService.Started started = beginTestJob();
+        CountDownLatch bodyReturning = new CountDownLatch(1);
+        CountDownLatch stopFired = new CountDownLatch(1);
+        service.start();
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var running = executor.submit(() ->
+                service.executeBody(started, handle -> {
+                    // Body completed its work; hand control to stop() before executeBody maps the outcome.
+                    bodyReturning.countDown();
+                    try {
+                        assertThat(stopFired.await(2, TimeUnit.SECONDS)).isTrue();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(e);
+                    }
+                })
+            );
+            assertThat(bodyReturning.await(2, TimeUnit.SECONDS)).isTrue();
+
+            service.stop();
+            stopFired.countDown();
+
+            running.get(2, TimeUnit.SECONDS);
+        }
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+        assertThat(started.handle().cancelledReported()).as("only the runner may report that it aborted").isFalse();
+    }
+
+    @Test
+    void executeBody_bodyThrowsWhileShuttingDown_keepsTheRealFailureInsteadOfMaskingItAsCancelled() {
+        // A vendor 500 that happens to land during a deploy is a vendor 500. Reporting CANCELLED with a
+        // null summary here would discard the only evidence of what actually broke — and assert a cause
+        // ("stopped for shutdown") that isn't the cause. Only the runner may claim it aborted.
+        SyncJobService.Started started = beginTestJob();
+        service.start();
+
+        service.executeBody(started, handle -> {
+            service.stop(); // shutdown begins mid-body
+            throw new IllegalStateException("vendor returned HTTP 500");
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
+        assertThat(started.job().getErrorSummary()).contains("vendor returned HTTP 500");
+    }
+
+    @Test
+    void executeBody_shutdownBeganBeforeBodyStarted_cancelsWithoutRunningIt() {
+        SyncJobService.Started started = beginTestJob();
+        AtomicBoolean bodyInvoked = new AtomicBoolean();
+        service.stop();
+
+        service.executeBody(started, handle -> bodyInvoked.set(true));
+
+        assertThat(bodyInvoked).isFalse();
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+    }
+
+    @Test
+    void requestCancelForTeardown_crashedJobWithStaleLease_reapsInlineAndReportsConnectionFree() {
+        // The disconnect fence's no-wedge half: a job stranded RUNNING by a pod crash is reaped here,
+        // so the admin's Disconnect succeeds as soon as the lease expires rather than 409ing until the
+        // hourly sweep runs.
+        SyncJob crashed = newJob(7L, SyncJobStatus.RUNNING);
+        crashed.setHeartbeatAt(Instant.now().minus(Duration.ofMinutes(30)));
+        when(syncJobRepository.findAbandonedForConnection(CONNECTION_ID, 900)).thenReturn(List.of(crashed));
+        when(syncJobRepository.markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900)).thenReturn(1);
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                CONNECTION_ID,
+                SyncJobStatus.ACTIVE
+            )
+        ).thenReturn(Optional.empty());
+
+        assertThat(service.requestCancelForTeardown(CONNECTION_ID)).isEmpty();
+
+        verify(syncJobRepository).markAbandoned(7L, "Abandoned: no heartbeat (likely pod restart)", 900);
+    }
+
+    @Test
+    void requestCancelForTeardown_liveJob_requestsCancellationAndNamesItSoTheAdminCanRetry() {
+        SyncJob live = newJob(8L, SyncJobStatus.RUNNING);
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                CONNECTION_ID,
+                SyncJobStatus.ACTIVE
+            )
+        ).thenReturn(Optional.of(live));
+        when(syncJobRepository.markCancelRequested(8L, SyncJobStatus.ACTIVE)).thenReturn(1);
+
+        assertThat(service.requestCancelForTeardown(CONNECTION_ID)).contains(8L);
+
+        // Durable, so a runner on another pod picks it up on its next heartbeat pass — the 409 is a
+        // "retry shortly", not a dead end.
+        verify(syncJobRepository).markCancelRequested(8L, SyncJobStatus.ACTIVE);
+    }
+
+    @Test
+    void requestCancelForTeardown_jobCompletedBetweenReadAndWrite_reportsConnectionFree() {
+        SyncJob raced = newJob(8L, SyncJobStatus.RUNNING);
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                CONNECTION_ID,
+                SyncJobStatus.ACTIVE
+            )
+        ).thenReturn(Optional.of(raced));
+        when(syncJobRepository.markCancelRequested(8L, SyncJobStatus.ACTIVE)).thenReturn(0);
+
+        assertThat(service.requestCancelForTeardown(CONNECTION_ID)).isEmpty();
+    }
+
+    @Test
+    void requestCancelForTeardown_runningLocally_reachesTheRunnerWithoutWaitingForTheHeartbeat() {
+        SyncJobService.Started started = beginTestJob();
+        when(
+            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                CONNECTION_ID,
+                SyncJobStatus.ACTIVE
+            )
+        ).thenReturn(Optional.of(started.job()));
+        when(syncJobRepository.markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE)).thenReturn(1);
+
+        service.executeBody(started, handle -> {
+            service.requestCancelForTeardown(CONNECTION_ID);
+            assertThat(handle.isCancellationRequested()).isTrue();
+        });
     }
 
     @Test
@@ -399,23 +541,41 @@ class SyncJobServiceTest extends BaseUnitTest {
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
     }
 
+    /**
+     * Interleaving A — the body wins the race: a cancel request commits (from another replica, or from
+     * {@link SyncJobService#stop()}) while the body is finishing, and the body returns normally without
+     * ever observing it. The work is done and the watermarks are advanced, so the outcome is SUCCEEDED:
+     * recording CANCELLED here would hide a real success from {@code lastSuccessfulJob}.
+     */
     @Test
-    void executeBody_databaseCancellationFromAnotherReplicaWinsAtCompletion() {
+    void executeBody_cancelRequestCommittedWhileBodyReturnedNormally_staysSucceeded() {
         SyncJobService.Started started = beginTestJob();
-        when(
-            syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any(), eq(true))
-        ).thenReturn(0);
-        when(syncJobRepository.completeCancelRequestedJob(anyLong(), any(), any(), any(), any())).thenReturn(1);
 
-        service.executeBody(started, handle -> {});
+        service.executeBody(started, handle -> {
+            // Another replica flips the durable flag mid-body; this runner never polls it.
+            started.job().setCancelRequested(true);
+        });
 
-        verify(syncJobRepository).completeCancelRequestedJob(
-            eq(started.job().getId()),
-            any(),
-            any(),
-            any(),
-            eq(SyncJobStatus.ACTIVE)
-        );
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+    }
+
+    /**
+     * Interleaving B — the cancel wins the race: the same durable flag is committed, but this time the
+     * body observes it and aborts. The runner's own report is what makes it CANCELLED, so the
+     * cross-replica cancel path still works end to end.
+     */
+    @Test
+    void executeBody_cancelRequestCommittedAndBodyAborted_recordsCancelled() {
+        SyncJobService.Started started = beginTestJob();
+
+        service.executeBody(started, handle -> {
+            started.job().setCancelRequested(true);
+            handle.refreshCancellation(true);
+            assertThat(handle.isCancellationRequested()).isTrue();
+            handle.reportCancelled();
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
     }
 
     @Test

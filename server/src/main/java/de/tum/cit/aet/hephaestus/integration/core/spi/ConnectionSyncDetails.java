@@ -18,17 +18,15 @@ import org.jspecify.annotations.Nullable;
  *                                trouble (e.g. GitHub App installation suspended) that should push
  *                                connection health to DEGRADED even absent a failed job or errored
  *                                resource
- * @param degradedReason          human-readable reason, set together with {@code vendorHealthDegraded}
  */
 public record ConnectionSyncDetails(
     @Nullable Boolean webhookRegistered,
     @Nullable Instant nextScheduledSyncAt,
     @Nullable RateLimitSnapshot rateLimit,
     @Nullable BackfillSummary backfill,
-    boolean vendorHealthDegraded,
-    @Nullable String degradedReason
+    boolean vendorHealthDegraded
 ) {
     public static ConnectionSyncDetails empty() {
-        return new ConnectionSyncDetails(null, null, null, null, false, null);
+        return new ConnectionSyncDetails(null, null, null, null, false);
     }
 }

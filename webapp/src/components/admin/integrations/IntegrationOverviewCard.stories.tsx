@@ -9,6 +9,7 @@ const status: ConnectionSyncStatus = {
 	kind: "GITHUB",
 	health: "HEALTHY",
 	resourceCounts: { total: 12, errored: 0 },
+	backfillSupported: true,
 	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),
 };
 

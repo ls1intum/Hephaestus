@@ -20,6 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackSyncProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -99,10 +101,27 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     void describe_nextScheduledSyncAt_isComputedFromTheCronExpression() {
         provider = providerWith("0 0 4 * * *");
         when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+        Instant before = Instant.now();
 
         ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
 
-        assertThat(details.nextScheduledSyncAt()).isNotNull().isAfter(Instant.now());
+        // The cron fires daily at 04:00: assert the actual next occurrence, not merely "in the future"
+        // (which any future instant, e.g. now+1s, would satisfy).
+        Instant next = details.nextScheduledSyncAt();
+        assertThat(next).isNotNull();
+        ZonedDateTime fire = next.atZone(ZoneId.systemDefault());
+        assertThat(fire.getHour()).isEqualTo(4);
+        assertThat(fire.getMinute()).isZero();
+        assertThat(fire.getSecond()).isZero();
+        assertThat(next).isAfter(before).isBeforeOrEqualTo(before.plus(Duration.ofDays(1)));
+    }
+
+    @Test
+    void describe_invalidCron_yieldsNullNextScheduledSyncAt() {
+        provider = providerWith("not a cron");
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+
+        assertThat(provider.describe(REF, CONNECTION_ID).nextScheduledSyncAt()).isNull();
     }
 
     @Test

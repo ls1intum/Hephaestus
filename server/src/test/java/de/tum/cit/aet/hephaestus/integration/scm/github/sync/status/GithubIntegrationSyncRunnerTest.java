@@ -116,8 +116,8 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
     class Backfill {
 
         @Test
-        void reportsUnsupportedWhenBackfillIsDisabled() {
-            SyncSchedulerProperties disabled = new SyncSchedulerProperties(
+        void supportsBackfill_isStillOfferedWhenTheScheduledCycleIsDisabled() {
+            SyncSchedulerProperties cycleDisabled = new SyncSchedulerProperties(
                 true,
                 7,
                 "0 0 3 * * *",
@@ -127,14 +127,17 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
                 null,
                 null
             );
-            GithubIntegrationSyncRunner disabledRunner = new GithubIntegrationSyncRunner(
+            GithubIntegrationSyncRunner runnerWithCycleDisabled = new GithubIntegrationSyncRunner(
                 dataSyncScheduler,
                 syncTargetProvider,
                 backfillService,
-                disabled
+                cycleDisabled
             );
 
-            assertThat(disabledRunner.supportsBackfill()).isFalse();
+            // hephaestus.sync.backfill.enabled gates the scheduled cycle, not the capability —
+            // GitHubHistoricalBackfillService#runBackfillBatch deliberately ignores it, so an
+            // administratively paused cycle must stay resumable by hand.
+            assertThat(runnerWithCycleDisabled.supportsBackfill()).isTrue();
         }
 
         @Test

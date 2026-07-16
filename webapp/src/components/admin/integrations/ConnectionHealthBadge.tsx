@@ -16,20 +16,14 @@ export interface ConnectionHealthBadgeProps {
 	health: ConnectionHealth;
 	/** A running job supersedes a stale last-failed health so the badge reads "Syncing", not "Failed". */
 	isSyncing?: boolean;
-	className?: string;
 }
 
-export function ConnectionHealthBadge({
-	health,
-	isSyncing = false,
-	className,
-}: ConnectionHealthBadgeProps) {
+export function ConnectionHealthBadge({ health, isSyncing = false }: ConnectionHealthBadgeProps) {
 	const variant: BadgeVariant = isSyncing ? "secondary" : HEALTH_VARIANT[health];
 	const label = isSyncing ? "Syncing" : HEALTH_LABEL[health];
 	return (
 		<Badge
 			variant={variant}
-			className={className}
 			role="status"
 			aria-live="polite"
 			aria-label={`Connection health: ${label}`}

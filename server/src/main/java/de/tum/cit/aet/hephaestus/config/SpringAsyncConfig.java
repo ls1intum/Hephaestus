@@ -54,9 +54,10 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(0);
         executor.setThreadNamePrefix("sync-job-");
-        // SyncJobService first records cooperative cancellation and interrupts each owning thread.
-        // shutdownNow then reinforces that interrupt instead of merely logging after the termination
-        // budget and leaking this non-daemon pool past context close.
+        // SyncJobService (a lifecycle phase above) records cooperative cancellation first; runners
+        // observe it and unwind on their own. shutdownNow is the backstop that bounds context close
+        // rather than leaking this non-daemon pool — it must never be the primary mechanism, since an
+        // interrupt is ignored by a pgjdbc socket read here and destroys one on a virtual thread.
         executor.setWaitForTasksToCompleteOnShutdown(false);
         executor.setAwaitTerminationSeconds(30);
         return executor;

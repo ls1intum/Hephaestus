@@ -82,5 +82,9 @@ class GitLabConnectionStateListenerTest extends BaseUnitTest {
         assertThatCode(() ->
             listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.GITLAB))
         ).doesNotThrowAnyException();
+
+        // Distinguishes "attempted and swallowed" from "silently never dispatched": the swallow is only
+        // correct if initialization was actually tried for this workspace.
+        verify(initService).initializeAsync(5L);
     }
 }

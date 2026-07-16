@@ -78,7 +78,7 @@ public class OutlineDocumentSyncScheduler {
         for (Long workspaceId : collectionRepository.findDistinctWorkspaceIdsWithPendingSync()) {
             try {
                 runReconcileJob(workspaceId, SyncJobTrigger.SYSTEM, handle -> {
-                    syncService.syncPendingCollections(workspaceId, OutlineSyncProgress.adapt(handle));
+                    syncService.syncPendingCollections(workspaceId, handle);
                     if (handle != null && handle.isCancellationRequested()) {
                         handle.reportCancelled();
                     }
@@ -102,7 +102,7 @@ public class OutlineDocumentSyncScheduler {
         for (Long workspaceId : workspaceIds) {
             try {
                 runReconcileJob(workspaceId, SyncJobTrigger.SCHEDULED, handle -> {
-                    syncService.syncWorkspace(workspaceId, OutlineSyncProgress.adapt(handle));
+                    syncService.syncWorkspace(workspaceId, handle);
                     if (handle != null && handle.isCancellationRequested()) {
                         handle.reportCancelled();
                     }
@@ -170,12 +170,13 @@ public class OutlineDocumentSyncScheduler {
     }
 
     /**
-     * Same pass as {@link #syncWorkspaceNow(long)}, threading a progress/cancellation listener — the shape
-     * the manual-trigger {@code OutlineIntegrationSyncRunner} uses so a {@code SyncExecutionHandle} sees
-     * per-collection progress. Workspace-scoped, no bypass — see {@link #syncWorkspaceNow(long)}.
+     * Same pass as {@link #syncWorkspaceNow(long)}, threading the job's {@link SyncExecutionHandle} so it
+     * sees per-collection progress and can cancel cooperatively — the shape the manual-trigger
+     * {@code OutlineIntegrationSyncRunner} uses. Workspace-scoped, no bypass — see
+     * {@link #syncWorkspaceNow(long)}.
      */
-    public void syncWorkspaceNow(long workspaceId, OutlineSyncProgressListener progressListener) {
-        syncService.syncWorkspace(workspaceId, progressListener);
+    public void syncWorkspaceNow(long workspaceId, @Nullable SyncExecutionHandle handle) {
+        syncService.syncWorkspace(workspaceId, handle);
     }
 
     /** Targeted single-collection sync; workspace-scoped, no bypass — see {@link #syncWorkspaceNow}. */

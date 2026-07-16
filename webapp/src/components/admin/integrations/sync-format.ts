@@ -44,22 +44,13 @@ export const JOB_STATUS_LABEL: Record<SyncJob["status"], string> = {
 	CANCELLED: "Cancelled",
 };
 
-const RESOURCE_STATE_LABEL: Record<string, string> = {
-	PENDING: "Pending",
-	SYNCED: "Synced",
-	SYNCING: "Syncing",
-	BACKFILLING: "Backfilling",
-	ACTIVE: "Active",
-	ERROR: "Error",
-	FAILED: "Failed",
-	PAUSED: "Paused",
-	SUSPENDED: "Suspended",
-	DISABLED: "Disabled",
-};
-
-export function resourceStateLabel(state: string): string {
-	const known = RESOURCE_STATE_LABEL[state];
-	if (known) return known;
+/**
+ * Both `SyncResourceState.state` and `BackfillSummary.state` are free-form, integration-defined
+ * strings on the wire, so title-case whatever arrives rather than render a raw SCREAMING_SNAKE token:
+ * `IN_PROGRESS` → "In Progress". There is deliberately no lookup table — each integration owns its own
+ * vocabulary, so a table here could only drift out of date and fall back to this same rule anyway.
+ */
+export function stateLabel(state: string): string {
 	return state
 		.toLowerCase()
 		.split(/[\s_]+/)

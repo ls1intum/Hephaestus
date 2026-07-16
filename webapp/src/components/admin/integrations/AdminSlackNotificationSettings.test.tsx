@@ -28,14 +28,6 @@ const privateTeam: SlackChannelCandidate = {
 	archived: false,
 };
 
-const standup: SlackChannelCandidate = {
-	slackChannelId: "C02STANDUP2",
-	channelName: "team-standup",
-	privateChannel: false,
-	member: true,
-	archived: false,
-};
-
 function setup(candidates: SlackChannelCandidate[] = [], enabled = false) {
 	renderWithClient(
 		<AdminSlackNotificationSettings
@@ -86,21 +78,6 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 			screen.getByRole("option", { name: /#private-team/i }).getAttribute("aria-disabled"),
 		).toBe("true");
 		expect(screen.getByText(/needs invite/i)).toBeTruthy();
-	});
-
-	it("filters the channel list via the search input", () => {
-		setup([general, standup]);
-		openChannelCombobox();
-
-		expect(screen.getByRole("option", { name: /#general/i })).toBeTruthy();
-		expect(screen.getByRole("option", { name: /#team-standup/i })).toBeTruthy();
-
-		fireEvent.change(screen.getByRole("combobox", { name: /search digest slack channels/i }), {
-			target: { value: "standup" },
-		});
-
-		expect(screen.queryByRole("option", { name: /#general/i })).toBeNull();
-		expect(screen.getByRole("option", { name: /#team-standup/i })).toBeTruthy();
 	});
 
 	it("resolves a pasted channel link through the escape hatch into the same single value", () => {

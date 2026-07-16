@@ -60,13 +60,21 @@ export const TypeToConfirm: Story = {
 
 /** A wrong ID marks the field invalid and says so — it does not silently do nothing. */
 export const ConfirmMismatch: Story = {
-	play: async () => {
+	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await userEvent.type(dialog.getByLabelText(/to confirm/i), "C0-WRONG");
+		const input = dialog.getByLabelText(/to confirm/i);
+		await userEvent.type(input, "C0-WRONG");
 		await userEvent.click(dialog.getByRole("button", { name: /remove & erase/i }));
 
-		await expect(dialog.getByLabelText(/to confirm/i)).toHaveAttribute("aria-invalid", "true");
+		await expect(input).toHaveAttribute("aria-invalid", "true");
 		await expect(dialog.getByText(/that does not match/i)).toBeInTheDocument();
+		await expect(args.onConfirm).not.toHaveBeenCalled();
+
+		// Correcting the value clears the invalid state — the error is not sticky.
+		await userEvent.clear(input);
+		await userEvent.type(input, active.slackChannelId);
+		await expect(input).toHaveAttribute("aria-invalid", "false");
+		await expect(dialog.queryByText(/that does not match/i)).not.toBeInTheDocument();
 	},
 };
 

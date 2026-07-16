@@ -64,8 +64,12 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	} = useQuery({
 		...collectionsQueryOptions,
 		enabled: isConnectionActive,
+		// A collection still PENDING is work in flight, so it drives the same adaptive cadence as
+		// an active job rather than a third hand-tuned interval.
 		refetchInterval: (query) =>
-			query.state.data?.some((collection) => collection.syncStatus === "PENDING") ? 3_000 : 60_000,
+			syncPollInterval(
+				query.state.data?.some((collection) => collection.syncStatus === "PENDING") ?? false,
+			),
 	});
 
 	const tokenStatusQueryOptions = getOutlineTokenStatusOptions({ path: { workspaceSlug } });
@@ -240,6 +244,8 @@ export function useOutlineIntegration(workspaceSlug: string) {
 
 	return {
 		connectionId: isConnectionActive ? connectionId : undefined,
+		// Lets the route poll its job-history query on the same adaptive cadence as the rest.
+		hasActiveJob: connectionStatus?.activeJob != null,
 		isLoading: connectionsQuery.isLoading,
 		connectionsError: connectionsQuery.error,
 		retryConnections: () => connectionsQuery.refetch(),

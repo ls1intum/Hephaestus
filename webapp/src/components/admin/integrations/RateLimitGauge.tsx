@@ -4,10 +4,9 @@ import { asDate, relativeTime } from "./sync-format";
 
 export interface RateLimitGaugeProps {
 	rateLimit?: RateLimitSnapshot;
-	className?: string;
 }
 
-export function RateLimitGauge({ rateLimit, className }: RateLimitGaugeProps) {
+export function RateLimitGauge({ rateLimit }: RateLimitGaugeProps) {
 	if (!rateLimit) {
 		return <span className="text-muted-foreground text-sm">–</span>;
 	}
@@ -17,7 +16,7 @@ export function RateLimitGauge({ rateLimit, className }: RateLimitGaugeProps) {
 		rateLimit.limit > 0 ? Math.round((rateLimit.remaining / rateLimit.limit) * 100) : 0;
 
 	return (
-		<div className={className}>
+		<div>
 			<div className="flex items-center gap-2 text-sm">
 				<span className="tabular-nums font-medium">{rateLimit.remaining.toLocaleString()}</span>
 				<span className="text-muted-foreground">/ {rateLimit.limit.toLocaleString()}</span>

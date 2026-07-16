@@ -6,8 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
@@ -35,20 +34,20 @@ public class ConnectionService {
     private final ConnectionAuditRepository auditRepository;
     private final CredentialBundleConverter credentialConverter;
     private final ApplicationEventPublisher eventPublisher;
-    private final SyncJobRepository syncJobRepository;
+    private final SyncJobService syncJobService;
 
     public ConnectionService(
         ConnectionRepository connectionRepository,
         ConnectionAuditRepository auditRepository,
         CredentialBundleConverter credentialConverter,
         ApplicationEventPublisher eventPublisher,
-        SyncJobRepository syncJobRepository
+        SyncJobService syncJobService
     ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
-        this.syncJobRepository = syncJobRepository;
+        this.syncJobService = syncJobService;
     }
 
     @Transactional(readOnly = true)
@@ -386,6 +385,13 @@ public class ConnectionService {
      * Transition the Connection to {@code req.next()}. Idempotent on same-state and on
      * duplicate {@code correlationId}; invalid transitions throw. Transitioning to
      * {@link IntegrationState#UNINSTALLED} clears credentials atomically.
+     *
+     * <p>Authoritative: a sync job in flight does NOT block this. Every caller here is the system or
+     * the vendor stating a fact — workspace PURGE erasing credentials, Slack telling us the app was
+     * uninstalled, a GitHub install replacing its predecessor. None of them can be retried by a human
+     * and none may be preempted by a background reconcile, so they win over the job and let it fail on
+     * its own. Only the interactive admin door ({@link #disconnect}) fences, because only it has
+     * someone to hand a 409 to.
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
@@ -393,22 +399,46 @@ public class ConnectionService {
     }
 
     /**
-     * Disconnect after acquiring the same lifecycle fence used by sync-job creation. The callback may
-     * revoke vendor access or erase provider-specific data, so it runs only after the active-job check
-     * and state-machine validation have succeeded, while the connection row lock is still held.
+     * Admin-initiated disconnect: the one door that refuses to uninstall out from under a running sync.
+     *
+     * <p>The fence is here rather than in {@link #applyTransition} because it trades availability for
+     * tidiness — acceptable when an admin clicked a button and can be told "retry", never acceptable
+     * for erasure or a vendor-driven uninstall.
+     *
+     * <p>It cannot wedge. Under the connection's lifecycle lock we first reap leases the hourly sweep
+     * hasn't reached (so a job stranded by a pod crash frees the connection in minutes, not an hour —
+     * the same inline reap "Sync now" already does), then request the surviving job's cancellation and
+     * report it as a 409 naming that job id. The cancel request is durable even though we throw
+     * ({@code noRollbackFor}), so this is a "retry in a moment", not a dead end: the runner aborts and
+     * the admin's next click succeeds.
+     *
+     * <p>{@code revoke} may kill vendor access or erase provider data, so it runs only after the fence
+     * and the state-machine check have passed, while the row lock is still held.
+     *
+     * @throws ConnectionBusyException 409 — a sync job still holds the connection; its cancellation has
+     *                                 been requested, so retrying shortly will succeed
      */
-    @Transactional
+    @Transactional(noRollbackFor = ConnectionBusyException.class)
     public Connection disconnect(Connection connection, TransitionRequest req, Runnable revoke) {
         if (req.next() != IntegrationState.UNINSTALLED) {
             throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
         }
-        return applyTransition(connection, req, revoke);
+        return applyTransition(connection, req, revoke, /* fenceOnActiveSyncJob */ true);
     }
 
     private Connection applyTransition(
         Connection connection,
         TransitionRequest req,
         @Nullable Runnable beforeLocalTransition
+    ) {
+        return applyTransition(connection, req, beforeLocalTransition, /* fenceOnActiveSyncJob */ false);
+    }
+
+    private Connection applyTransition(
+        Connection connection,
+        TransitionRequest req,
+        @Nullable Runnable beforeLocalTransition,
+        boolean fenceOnActiveSyncJob
     ) {
         if (connection.getId() != null) {
             long connectionId = connection.getId();
@@ -417,11 +447,12 @@ public class ConnectionService {
             connection = connectionRepository
                 .findByIdAndWorkspaceId(connectionId, workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Connection", connectionId));
-            if (req.next() != IntegrationState.ACTIVE) {
-                syncJobRepository
-                    .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
-                    .ifPresent(active -> {
-                        throw new ConnectionBusyException(connectionId, active.getId());
+            if (fenceOnActiveSyncJob) {
+                // Inside the lock, so no job can slip in between this check and the state write.
+                syncJobService
+                    .requestCancelForTeardown(connectionId)
+                    .ifPresent(activeJobId -> {
+                        throw new ConnectionBusyException(connectionId, activeJobId);
                     });
             }
         }

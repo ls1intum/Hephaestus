@@ -2860,6 +2860,10 @@ export type ConnectionSyncStatus = {
      */
     backfill?: BackfillSummary;
     /**
+     * Whether this kind's runner offers an explicitly triggerable backfill pass. Reflects the vendor capability only — the scheduled-backfill flag does not gate it, so a manual backfill stays available while the automatic cycle is administratively paused.
+     */
+    backfillSupported: boolean;
+    /**
      * Connection id
      */
     connectionId: number;

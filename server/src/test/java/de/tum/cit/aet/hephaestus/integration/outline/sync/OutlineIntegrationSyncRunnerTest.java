@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
@@ -32,12 +33,12 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
     }
 
     @Test
-    void reconcile_delegatesToTheWorkspacePass_threadingAProgressListener() {
+    void reconcile_delegatesToTheWorkspacePass_threadingTheJobHandle() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
 
         runner.reconcile(ref, handle);
 
-        verify(syncScheduler).syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
+        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle);
         verify(handle, never()).reportCancelled();
     }
 
@@ -48,19 +49,19 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(ref, handle);
 
-        verify(syncScheduler).syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
+        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle);
         verify(handle).reportCancelled();
     }
 
     @Test
     void reconcile_propagatesPartialFailuresAsWarnings() {
         doAnswer(invocation -> {
-            OutlineSyncProgressListener listener = invocation.getArgument(1);
-            listener.onWarning();
+            SyncExecutionHandle threaded = invocation.getArgument(1);
+            threaded.reportWarnings();
             return null;
         })
             .when(syncScheduler)
-            .syncWorkspaceNow(eq(WORKSPACE), any(OutlineSyncProgressListener.class));
+            .syncWorkspaceNow(eq(WORKSPACE), any(SyncExecutionHandle.class));
 
         runner.reconcile(new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"), handle);
 

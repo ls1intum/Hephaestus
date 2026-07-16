@@ -32,10 +32,7 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/componen
 import { Skeleton } from "@/components/ui/skeleton";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 
-/**
- * Interface for repository item
- */
-export interface RepositoryItem {
+interface RepositoryItem {
 	nameWithOwner: string;
 }
 
@@ -57,7 +54,7 @@ interface AdminRepositoriesSettingsProps {
  * the sync-state table instead. Pure presentation — data and mutations live in the container.
  */
 export function AdminRepositoriesSettings({
-	repositories = [],
+	repositories,
 	isLoading,
 	error,
 	addRepositoryError,
@@ -67,7 +64,7 @@ export function AdminRepositoriesSettings({
 	onRemoveRepository,
 }: AdminRepositoriesSettingsProps) {
 	const [repositoryInput, setRepositoryInput] = useState("");
-	const isValidInput = repositoryInput?.includes("/");
+	const isValidInput = repositoryInput.includes("/");
 
 	const handleAddRepository = () => {
 		if (isValidInput) {

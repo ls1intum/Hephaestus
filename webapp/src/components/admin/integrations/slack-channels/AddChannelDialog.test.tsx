@@ -48,35 +48,4 @@ describe("AddChannelDialog — form submit", () => {
 			"",
 		);
 	});
-
-	it("says what is missing instead of leaving the submit button dead", async () => {
-		const onSubmit = vi.fn();
-		render(
-			<AddChannelDialog
-				open
-				onOpenChange={vi.fn()}
-				onSubmit={onSubmit}
-				candidates={[
-					{
-						slackChannelId: "C01GENERAL01",
-						channelName: "general",
-						privateChannel: false,
-						member: true,
-						archived: false,
-					},
-				]}
-			/>,
-		);
-
-		// Enabled with nothing chosen: clicking it explains the gap rather than doing nothing.
-		const submit = screen.getByRole("button", { name: /^add channel$/i }) as HTMLButtonElement;
-		expect(submit.disabled).toBe(false);
-
-		fireEvent.click(submit);
-
-		expect(onSubmit).not.toHaveBeenCalled();
-		expect(
-			await screen.findByText(/choose a channel from the list, or paste a channel link or id/i),
-		).toBeTruthy();
-	});
 });

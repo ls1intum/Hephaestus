@@ -198,7 +198,6 @@ function ScmIntegrationPage() {
 			/>
 
 			<ScmConnectionCard
-				provider={kind}
 				label={label}
 				status={status}
 				isLoading={workspaceQuery.isLoading || catalogQuery.isLoading || statusQuery.isLoading}

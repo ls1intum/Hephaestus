@@ -9,10 +9,9 @@ import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { LastProcessedEvent } from "./LastProcessedEvent";
 import { RateLimitGauge } from "./RateLimitGauge";
 import { SyncNowButton } from "./SyncNowButton";
-import { relativeTime } from "./sync-format";
+import { relativeTime, stateLabel } from "./sync-format";
 
 export interface ScmConnectionCardProps {
-	provider: "GITHUB" | "GITLAB" | undefined;
 	label: string;
 	status?: ConnectionSyncStatus;
 	isLoading: boolean;
@@ -28,7 +27,6 @@ export interface ScmConnectionCardProps {
 }
 
 export function ScmConnectionCard({
-	provider,
 	label,
 	status,
 	isLoading,
@@ -101,7 +99,7 @@ export function ScmConnectionCard({
 								<div className="space-y-1">
 									<p className="text-muted-foreground text-xs uppercase tracking-wide">Backfill</p>
 									<p className="text-sm">
-										{status.backfill.state}
+										{stateLabel(status.backfill.state)}
 										{status.backfill.percent != null ? ` — ${status.backfill.percent}%` : ""}
 									</p>
 								</div>
@@ -113,7 +111,7 @@ export function ScmConnectionCard({
 						{isConnectionActive && (
 							<div className="flex flex-wrap items-center gap-2 pt-2">
 								<SyncNowButton onClick={onSync} isTriggering={isTriggering} activeJob={activeJob} />
-								{provider === "GITHUB" && status.backfill?.state !== "DISABLED" && (
+								{status.backfillSupported && (
 									<SyncNowButton
 										label="Backfill"
 										onClick={onBackfill}

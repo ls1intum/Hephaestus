@@ -5,18 +5,31 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.GitlabDataSyncScheduler;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.GitLabHistoricalBackfillService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
-/** Runs GitLab reconciliation through the existing cancellable sync path. */
+/**
+ * GitLab {@link IntegrationSyncRunner}: the manual "Sync now" / "Backfill now" job bodies invoked by
+ * {@code SyncJobService.run}.
+ */
 @Component
 @ConditionalOnBean(GitlabDataSyncScheduler.class)
 public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
 
-    private final GitlabDataSyncScheduler dataSyncScheduler;
+    private static final Logger log = LoggerFactory.getLogger(GitlabIntegrationSyncRunner.class);
 
-    public GitlabIntegrationSyncRunner(GitlabDataSyncScheduler dataSyncScheduler) {
+    private final GitlabDataSyncScheduler dataSyncScheduler;
+    private final GitLabHistoricalBackfillService backfillService;
+
+    public GitlabIntegrationSyncRunner(
+        GitlabDataSyncScheduler dataSyncScheduler,
+        GitLabHistoricalBackfillService backfillService
+    ) {
         this.dataSyncScheduler = dataSyncScheduler;
+        this.backfillService = backfillService;
     }
 
     @Override
@@ -29,6 +42,50 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
         dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
+        }
+    }
+
+    /**
+     * Manual backfill is always offered: {@code hephaestus.sync.backfill.enabled} gates the scheduled
+     * backfill cycle, not the vendor's ability to backfill on request. {@link
+     * GitLabHistoricalBackfillService#runBackfillPass} honors that distinction, so gating the
+     * capability here would make an administratively paused cycle also un-resumable by hand — the
+     * exact situation manual backfill exists for.
+     */
+    @Override
+    public boolean supportsBackfill() {
+        return true;
+    }
+
+    /**
+     * Runs one backfill batch per pending repository in this workspace, then returns — the same
+     * per-repository step (cooldown and initial-sync gates included) the 60s scheduler tick performs,
+     * but scoped to one connection and under this job's own progress reporting and cooperative
+     * cancellation.
+     *
+     * <p>Deliberately one pass and no more. {@link GitLabHistoricalBackfillService} puts every
+     * repository that did work on a five-minute cooldown and skips cooled-down repositories, so a
+     * second pass here could only skip exactly what the first pass advanced. The remaining history is
+     * drained by the scheduled cycle at that cadence; one click is one batch per repository.
+     */
+    @Override
+    public void backfill(IntegrationRef ref, SyncExecutionHandle handle) {
+        long workspaceId = ref.workspaceId();
+
+        int processed = backfillService.runBackfillPass(workspaceId, handle);
+
+        if (handle.isCancellationRequested()) {
+            // The pass returns early on a cancel checkpoint between repositories; declare it so the job
+            // finalizes CANCELLED rather than SUCCEEDED.
+            handle.reportCancelled();
+            return;
+        }
+        if (processed == 0) {
+            // No repository advanced: backfill is complete, or every pending one is gated (cooldown /
+            // rate limit). Indistinguishable from here, so surface it as a warning rather than a clean
+            // success — matching GithubIntegrationSyncRunner.
+            handle.reportWarnings();
+            log.info("Manual GitLab backfill advanced no repository: workspaceId={}", workspaceId);
         }
     }
 }

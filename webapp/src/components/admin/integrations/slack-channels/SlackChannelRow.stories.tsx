@@ -121,6 +121,16 @@ export const Revoked: Story = {
 			await screen.findByRole("menuitem", { name: /set up again/i }),
 		).toBeInTheDocument();
 		await expect(
+			await screen.findByRole("menuitem", { name: /view history/i }),
+		).toBeInTheDocument();
+
+		// Terminal state: no lifecycle transition and nothing left to erase.
+		await expect(
+			screen.queryByRole("menuitem", { name: /activate monitoring/i }),
+		).not.toBeInTheDocument();
+		await expect(screen.queryByRole("menuitem", { name: /^pause$/i })).not.toBeInTheDocument();
+		await expect(screen.queryByRole("menuitem", { name: /^resume$/i })).not.toBeInTheDocument();
+		await expect(
 			screen.queryByRole("menuitem", { name: /remove & erase/i }),
 		).not.toBeInTheDocument();
 	},
@@ -131,7 +141,11 @@ export const WithOptOuts: Story = {
 	args: { channel: { ...channel, optedOutMemberCount: 3 } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: "3" })).toBeInTheDocument();
+		// A bare non-interactive <span> trigger has no accessible role for keyboard/SR users; the
+		// tooltip trigger must be a real, enabled <button> so Tab can reach it.
+		const trigger = canvas.getByRole("button", { name: "3" });
+		await expect(trigger.tagName).toBe("BUTTON");
+		await expect(trigger).toBeEnabled();
 	},
 };
 

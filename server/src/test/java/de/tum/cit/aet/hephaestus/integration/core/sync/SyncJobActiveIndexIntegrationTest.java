@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionBusyException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -167,20 +168,11 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     @Test
-    void uninstallRefusesToCrossLifecycleBoundaryWhileSyncJobIsActive() {
-        SyncJob active = syncJobRepository.saveAndFlush(
-            new SyncJob(
-                workspace,
-                connection,
-                IntegrationKind.GITHUB,
-                SyncJobType.RECONCILIATION,
-                SyncJobTrigger.MANUAL,
-                null
-            )
-        );
+    void adminDisconnectRefusesToCrossLifecycleBoundaryWhileSyncJobIsActive() {
+        SyncJob active = activeJob();
 
         assertThatThrownBy(() ->
-            connectionService.transition(
+            connectionService.disconnect(
                 connection,
                 new ConnectionService.TransitionRequest(
                     IntegrationState.UNINSTALLED,
@@ -189,15 +181,62 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "test-admin",
                     "disconnect-race-test",
                     "disconnect"
-                )
+                ),
+                () -> {}
             )
-        ).hasMessageContaining("active sync job");
+        )
+            .isInstanceOf(ConnectionBusyException.class)
+            .hasMessageContaining("active sync job");
 
         assertThat(connectionRepository.findById(connection.getId()).orElseThrow().getState()).isEqualTo(
             IntegrationState.ACTIVE
         );
+        SyncJob afterFence = syncJobRepository.findById(active.getId()).orElseThrow();
+        assertThat(afterFence.getStatus()).isEqualTo(SyncJobStatus.PENDING);
+        // The escape hatch, proven against real Postgres: the 409 rolls back the transition but NOT the
+        // cancel request (noRollbackFor). Without this commit the admin would be told "busy" with no way
+        // to make it stop — the runner picks the flag up and the retried disconnect succeeds.
+        assertThat(afterFence.isCancelRequested()).isTrue();
+    }
+
+    @Test
+    void systemUninstallIsAuthoritativeAndProceedsDespiteAnActiveSyncJob() {
+        // Workspace PURGE / vendor app_uninstalled state a fact: nobody is holding a retry button, and
+        // erasure must never be preemptable by a background reconcile. These go through transition(),
+        // which is deliberately unfenced.
+        SyncJob active = activeJob();
+
+        connectionService.transition(
+            connection,
+            new ConnectionService.TransitionRequest(
+                IntegrationState.UNINSTALLED,
+                "WORKSPACE_PURGED",
+                "SYSTEM",
+                "workspace-purge",
+                "purge-with-active-job",
+                "Cascade from workspace PURGE"
+            )
+        );
+
+        assertThat(connectionRepository.findById(connection.getId()).orElseThrow().getState()).isEqualTo(
+            IntegrationState.UNINSTALLED
+        );
+        // The job is left to fail on its own terms rather than blocking the erasure.
         assertThat(syncJobRepository.findById(active.getId()).orElseThrow().getStatus()).isEqualTo(
             SyncJobStatus.PENDING
+        );
+    }
+
+    private SyncJob activeJob() {
+        return syncJobRepository.saveAndFlush(
+            new SyncJob(
+                workspace,
+                connection,
+                IntegrationKind.GITHUB,
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.MANUAL,
+                null
+            )
         );
     }
 
@@ -223,8 +262,7 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
             3,
             5,
             Map.of("warnings", 1),
-            SyncJobStatus.ACTIVE,
-            true
+            SyncJobStatus.ACTIVE
         );
 
         assertThat(completed).isEqualTo(1);
@@ -239,13 +277,51 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
                 0,
                 5,
                 Map.of(),
-                SyncJobStatus.ACTIVE,
-                true
+                SyncJobStatus.ACTIVE
             )
         ).isZero();
         assertThat(syncJobRepository.findById(job.getId()).orElseThrow().getStatus()).isEqualTo(
             SyncJobStatus.SUCCEEDED_WITH_WARNINGS
         );
+    }
+
+    /**
+     * The runner owns its outcome, enforced at the SQL layer: {@code completeActiveJob} must not filter
+     * on {@code cancel_requested}, so a body that finished its work still records SUCCEEDED even though
+     * a cancel request committed (from another replica, or from shutdown) while it was finishing.
+     * Re-introducing a {@code AND j.cancelRequested = false} guard turns this row CANCELLED and hides a
+     * real success from {@code lastSuccessfulJob} — this test is what fails when that happens.
+     */
+    @Test
+    @Transactional
+    void terminalTransition_ignoresACancelRequestTheRunnerNeverHonored() {
+        SyncJob job = syncJobRepository.saveAndFlush(
+            new SyncJob(
+                workspace,
+                connection,
+                IntegrationKind.GITHUB,
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.MANUAL,
+                null
+            )
+        );
+        assertThat(syncJobRepository.markRunning(job.getId())).isEqualTo(1);
+        assertThat(syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE)).isEqualTo(1);
+
+        int completed = syncJobRepository.completeActiveJob(
+            job.getId(),
+            SyncJobStatus.SUCCEEDED,
+            null,
+            10,
+            10,
+            Map.of(),
+            SyncJobStatus.ACTIVE
+        );
+
+        assertThat(completed).isEqualTo(1);
+        SyncJob persisted = syncJobRepository.findById(job.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+        assertThat(persisted.isCancelRequested()).isTrue();
     }
 
     @Test

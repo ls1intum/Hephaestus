@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Parameter object for {@link SyncJobService#beginJob} / {@link SyncJobService#run} — keeps both
- * methods under the repo's 6-parameter ceiling (CodeQualityTest) once the runner body is added.
+ * methods under the repo's 6-parameter ceiling (CodeQualityTest).
  */
 public record SyncJobRequest(
     long workspaceId,

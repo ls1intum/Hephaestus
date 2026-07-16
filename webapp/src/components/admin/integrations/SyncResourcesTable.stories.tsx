@@ -98,6 +98,31 @@ export const Default: Story = { args: { resources } };
 /** Every labelled state rendered at once, so a badge regression is visible at a glance. */
 export const AllStates: Story = { args: { resources: allStates } };
 
+/**
+ * `state` is a free-form string on the wire, so a vendor can send one the UI has never heard of.
+ * It is title-cased for display rather than shown as a raw SCREAMING_SNAKE token.
+ */
+export const UnknownState: Story = {
+	args: {
+		resources: [
+			{
+				id: 300,
+				externalId: "octocat/rate-limited-repo",
+				name: "octocat/rate-limited-repo",
+				type: "REPOSITORY",
+				state: "RATE_LIMITED" as SyncResourceState["state"],
+				lastSyncedAt: new Date("2026-07-14T09:00:00Z"),
+				itemCount: 12,
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Rate Limited")).toBeInTheDocument();
+		await expect(canvas.queryByText("RATE_LIMITED")).not.toBeInTheDocument();
+	},
+};
+
 /** The error popover surfaces the resource's last error, keyed to the failing row. */
 export const ErrorPopover: Story = {
 	args: { resources },

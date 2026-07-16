@@ -8,8 +8,6 @@ export interface SyncNowButtonProps {
 	isTriggering?: boolean;
 	activeJob?: SyncJob | null;
 	label?: string;
-	variant?: React.ComponentProps<typeof Button>["variant"];
-	size?: React.ComponentProps<typeof Button>["size"];
 }
 
 export function SyncNowButton({
@@ -17,15 +15,13 @@ export function SyncNowButton({
 	isTriggering = false,
 	activeJob,
 	label = "Sync now",
-	variant = "outline",
-	size = "sm",
 }: SyncNowButtonProps) {
 	const disabled = isTriggering || activeJob != null;
 	const text = activeJob != null ? "Syncing…" : isTriggering ? "Starting…" : label;
 
 	return (
 		<>
-			<Button variant={variant} size={size} onClick={onClick} disabled={disabled}>
+			<Button variant="outline" size="sm" onClick={onClick} disabled={disabled}>
 				{isTriggering || activeJob != null ? (
 					<Spinner className="size-4" />
 				) : (

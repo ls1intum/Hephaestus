@@ -98,6 +98,10 @@ public class SyncStatusService {
         Connection connection = connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
         ConnectionSyncStateProvider provider = providerFor(connection.getKind());
         IntegrationRef ref = connection.toRef();
+        // Same predicate triggerSync guards BACKFILL with, so the UI offers the action exactly when the
+        // request would be accepted. No runner registered for this kind → no backfill.
+        IntegrationSyncRunner runner = runnerFor(connection.getKind());
+        boolean backfillSupported = runner != null && runner.supportsBackfill();
         ConnectionSyncDetails providerDetails =
             provider == null ? ConnectionSyncDetails.empty() : provider.describe(ref, connectionId);
         Optional<ConnectionActivity> activity = connectionActivityRepository.findById(connectionId);
@@ -141,6 +145,7 @@ public class SyncStatusService {
             activity.map(ConnectionActivity::getLastEventAt).orElse(null),
             activity.map(ConnectionActivity::getLastEventType).orElse(null),
             providerDetails.rateLimit() == null ? null : RateLimitSnapshotDTO.from(providerDetails.rateLimit()),
+            backfillSupported,
             providerDetails.backfill() == null ? null : BackfillSummaryDTO.from(providerDetails.backfill()),
             new ResourceCountsDTO((long) resources.size(), erroredResources)
         );

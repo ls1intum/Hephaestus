@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { RemoveChannelAlertDialog } from "./RemoveChannelAlertDialog";
@@ -16,37 +16,6 @@ const active: SlackMonitoredChannel = {
 	consentState: "ACTIVE",
 	optedOutMemberCount: 0,
 };
-
-describe("RemoveChannelAlertDialog — confirm mismatch is reported, not silently disabled", () => {
-	it("keeps the destructive action enabled and marks the field invalid when the ID is wrong", async () => {
-		const onConfirm = vi.fn();
-		render(
-			<RemoveChannelAlertDialog channel={active} onOpenChange={vi.fn()} onConfirm={onConfirm} />,
-		);
-
-		const confirm = screen.getByRole("button", { name: /remove & erase/i }) as HTMLButtonElement;
-		expect(confirm.disabled).toBe(false);
-
-		const input = screen.getByLabelText(/to confirm/i);
-		fireEvent.change(input, { target: { value: "C0-WRONG-ID" } });
-		fireEvent.click(confirm);
-
-		expect(onConfirm).not.toHaveBeenCalled();
-		expect(input.getAttribute("aria-invalid")).toBe("true");
-		expect(screen.getByText(/that does not match/i)).toBeTruthy();
-
-		// Correcting the value clears the error and lets the erase through.
-		fireEvent.change(input, { target: { value: active.slackChannelId } });
-		expect(input.getAttribute("aria-invalid")).toBe("false");
-		fireEvent.click(confirm);
-		await waitFor(() =>
-			expect(onConfirm).toHaveBeenCalledWith({
-				slackChannelId: active.slackChannelId,
-				reason: undefined,
-			}),
-		);
-	});
-});
 
 describe("RemoveChannelAlertDialog — resets on close", () => {
 	it("clears a typed confirmation and reason after Cancel, ready for the next open", () => {

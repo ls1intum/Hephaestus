@@ -57,6 +57,10 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
     @Mock
     private Connection connection2;
 
+    /** Stands in for the handle {@link SyncJobService#run} threads into every job body. */
+    @Mock
+    private SyncJobHandle jobHandle;
+
     private OutlineDocumentSyncScheduler scheduler;
 
     @BeforeEach
@@ -78,7 +82,7 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
     private void runJobsSynchronously() {
         doAnswer(invocation -> {
             Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(null);
+            body.accept(jobHandle);
             return null;
         })
             .when(syncJobService)
@@ -120,8 +124,8 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
                     SyncJobTrigger.SCHEDULED
                 )
             );
-        verify(syncService).syncWorkspace(eq(WORKSPACE_1), any(OutlineSyncProgressListener.class));
-        verify(syncService).syncWorkspace(eq(WORKSPACE_2), any(OutlineSyncProgressListener.class));
+        verify(syncService).syncWorkspace(WORKSPACE_1, jobHandle);
+        verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle);
     }
 
     @Test
@@ -144,7 +148,7 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
                 throw new SyncJobConflictException(activeJob);
             }
             Consumer<SyncJobHandle> body = invocation.getArgument(1);
-            body.accept(null);
+            body.accept(jobHandle);
             return null;
         })
             .when(syncJobService)
@@ -152,8 +156,8 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
 
         assertThatCode(() -> scheduler.syncAllNow()).doesNotThrowAnyException();
 
-        verify(syncService, never()).syncWorkspace(eq(WORKSPACE_1), any(OutlineSyncProgressListener.class));
-        verify(syncService).syncWorkspace(eq(WORKSPACE_2), any(OutlineSyncProgressListener.class));
+        verify(syncService, never()).syncWorkspace(WORKSPACE_1, jobHandle);
+        verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle);
     }
 
     @Test
@@ -183,7 +187,7 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
         assertThat(captor.getValue().connectionId()).isEqualTo(CONNECTION_1);
         assertThat(captor.getValue().type()).isEqualTo(SyncJobType.RECONCILIATION);
         assertThat(captor.getValue().trigger()).isEqualTo(SyncJobTrigger.SYSTEM);
-        verify(syncService).syncPendingCollections(eq(WORKSPACE_1), any(OutlineSyncProgressListener.class));
+        verify(syncService).syncPendingCollections(WORKSPACE_1, jobHandle);
     }
 
     @Test

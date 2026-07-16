@@ -42,16 +42,5 @@ export const NoLimit: Story = {
 	args: { rateLimit: { limit: 0, remaining: 0 } },
 };
 
-/** Very large budgets are grouped for readability (e.g. GraphQL point budgets). */
-export const LargeNumbers: Story = {
-	args: {
-		rateLimit: {
-			limit: 15000,
-			remaining: 12873,
-			resetAt: new Date(Date.now() + 55 * 60 * 1000),
-		},
-	},
-};
-
 /** No snapshot available — the gauge degrades to a dash rather than rendering a stale bar. */
 export const Unknown: Story = { args: { rateLimit: undefined } };
