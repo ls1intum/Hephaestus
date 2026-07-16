@@ -97,7 +97,11 @@ export function ScmConnectionCard({
 							</div>
 							{status.backfill && (
 								<div className="space-y-1">
-									<p className="text-muted-foreground text-xs uppercase tracking-wide">Backfill</p>
+									{/* The scheduled cycle's state — "Disabled" here means the background cycle is off,
+									    not that the Backfill button below (a manual run) is unavailable. */}
+									<p className="text-muted-foreground text-xs uppercase tracking-wide">
+										Scheduled backfill
+									</p>
 									<p className="text-sm">
 										{stateLabel(status.backfill.state)}
 										{status.backfill.percent != null ? ` — ${status.backfill.percent}%` : ""}

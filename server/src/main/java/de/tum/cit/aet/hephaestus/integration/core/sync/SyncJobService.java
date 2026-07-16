@@ -132,13 +132,17 @@ public class SyncJobService implements SmartLifecycle {
     /**
      * Runs a prepared job body and records its terminal outcome instead of propagating runner failures.
      *
-     * <p>One rule, no exceptions: the outcome is the <em>runner's</em> to report, never a canceller's.
-     * Only a body that called {@link SyncJobHandle#reportCancelled()} is recorded CANCELLED. A body
-     * that returns normally is SUCCEEDED even if a cancel request committed while it was finishing —
-     * from any replica, or from {@link #stop()} — because its work is done and its watermarks are
-     * advanced, and calling that "cancelled" would hide a real success from {@code lastSuccessfulJob}.
-     * A body that throws is FAILED with the real reason, even mid-shutdown: a vendor error that happens
-     * to land during a deploy is a vendor error.
+     * <p>The rule for a body that RAN: its outcome is the <em>runner's</em> to report, never a
+     * canceller's. Only a body that called {@link SyncJobHandle#reportCancelled()} is recorded
+     * CANCELLED. A body that returns normally is SUCCEEDED even if a cancel request committed while it
+     * was finishing — from any replica, or from {@link #stop()} — because its work is done and its
+     * watermarks are advanced, and calling that "cancelled" would hide a real success from
+     * {@code lastSuccessfulJob}. A body that throws is FAILED with the real reason, even mid-shutdown:
+     * a vendor error that happens to land during a deploy is a vendor error.
+     *
+     * <p>The one case this method decides itself is a body that never ran at all: if shutdown began
+     * before the body was invoked, nothing was attempted, so CANCELLED is the honest record and there
+     * is no runner report to defer to.
      *
      * <p>Cancellation is therefore a <em>request</em>, not an outcome: {@code cancel_requested} asks the
      * runner to stop, and only the runner's own report decides whether it did.

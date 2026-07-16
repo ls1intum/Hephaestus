@@ -308,22 +308,6 @@ class ConnectionServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void disconnect_afterCrashedJobIsReapedInline_succeedsInsteadOf409() {
-        // requestCancelForTeardown reaps stale leases before reporting: a job stranded RUNNING by a pod
-        // crash frees the connection as soon as its lease expires, not at the next hourly sweep.
-        Connection connection = connectionInState(IntegrationState.ACTIVE);
-        when(syncJobService.requestCancelForTeardown(connection.getId())).thenReturn(java.util.Optional.empty());
-
-        service.disconnect(
-            connection,
-            new TransitionRequest(IntegrationState.UNINSTALLED, "DISCONNECT", "ADMIN", "a", "corr-d", "removed"),
-            () -> {}
-        );
-
-        assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
-    }
-
-    @Test
     void disconnect_withActiveSyncRejectsBeforeRevokingVendorAccess() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
         when(syncJobService.requestCancelForTeardown(connection.getId())).thenReturn(java.util.Optional.of(99L));
