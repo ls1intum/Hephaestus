@@ -497,12 +497,18 @@ public class GitHubDeletionSweepService {
                                   .toList();
                 }
             } catch (RuntimeException e) {
+                // Log the root cause, not just e.toString(): Spring wraps every decode failure in a
+                // GraphQlClientException whose message is a bare "Cannot read field '<path>'" and
+                // whose cause carries the only text that identifies the actual fault. Reporting the
+                // wrapper alone makes a client-side Jackson error indistinguishable from an upstream
+                // GraphQL error, which is precisely how a decode bug hid behind the fail-closed skip.
                 log.warn(
-                    "Deletion sweep decode failed: entity={}, repoName={}, page={}, message={}",
+                    "Deletion sweep decode failed: entity={}, repoName={}, page={}, message={}, cause={}",
                     entity.plural,
                     safeNameWithOwner,
                     pageCount,
-                    e.toString()
+                    e.toString(),
+                    rootCauseOf(e).toString()
                 );
                 return UpstreamListing.incomplete("decodeFailed");
             }
@@ -542,5 +548,14 @@ public class GitHubDeletionSweepService {
 
     private static boolean isCancelled(@Nullable SyncExecutionHandle handle) {
         return handle != null && handle.isCancellationRequested();
+    }
+
+    /** Unwraps to the innermost cause, guarding against a self-referential cause chain. */
+    private static Throwable rootCauseOf(Throwable throwable) {
+        Throwable cause = throwable;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
 }

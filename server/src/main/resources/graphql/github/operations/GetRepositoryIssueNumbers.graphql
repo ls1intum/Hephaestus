@@ -10,6 +10,13 @@
 # silently stopped short would be indistinguishable from a repository that really has fewer issues —
 # and would authorize deleting every issue past the truncation point.
 #
+# `__typename` is selected because GHIssue inherits a `@JsonTypeInfo(property = "__typename")` type
+# resolver from GHProjectV2ItemContent's Jackson mixin. Omitting it happens to decode anyway — that
+# mixin's `defaultImpl` is GHIssue, so the fallback lands on the right type by luck rather than by
+# construction. Selecting it explicitly costs nothing (it is a meta field) and removes the reliance
+# on a default that exists for an unrelated reason; the pull-request twin of this query has no such
+# luck and hard-failed for exactly this reason.
+#
 # No `filterBy: {since:}` and no `states:` — a sweep must see EVERY issue that exists upstream,
 # including ancient and closed ones. Any filter here turns "absent from upstream" into "absent from
 # this filtered view", which is precisely how a sweep deletes live data.
@@ -28,6 +35,7 @@ query GetRepositoryIssueNumbers($owner: String!, $name: String!, $first: Int!, $
                 endCursor
             }
             nodes {
+                __typename
                 number
             }
         }

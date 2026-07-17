@@ -112,10 +112,22 @@ public class GitHubGraphQlConfig {
             .register(meterRegistry);
     }
 
-    @Bean
-    public WebClient gitHubGraphQlWebClient(JsonMapper baseObjectMapper) {
+    /**
+     * Builds the mapper every GitHub GraphQL response is decoded with.
+     *
+     * <p>Exposed as a static factory rather than inlined into {@link #gitHubGraphQlWebClient} so
+     * tests can decode against the <em>real</em> mixin set instead of a hand-rolled copy of it. The
+     * mixins are not cosmetic: several of them install {@code @JsonTypeInfo(property = "__typename")}
+     * type resolvers, which Jackson inherits onto the concrete node types, so whether a given
+     * operation document decodes at all depends on this configuration. A test that rebuilt this list
+     * by hand would drift out of agreement with production and stop testing the thing that breaks.
+     *
+     * @param baseObjectMapper the application-wide mapper to derive from
+     * @return the mapper used by the GitHub GraphQL codecs
+     */
+    public static JsonMapper gitHubGraphQlObjectMapper(JsonMapper baseObjectMapper) {
         // GitHub databaseId values exceed 32-bit int range.
-        JsonMapper graphQlObjectMapper = baseObjectMapper
+        return baseObjectMapper
             .rebuild()
             .enable(DeserializationFeature.USE_LONG_FOR_INTS)
             .addMixIn(GHActor.class, GitHubActorMixin.class)
@@ -128,6 +140,11 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHIssue.class, GitHubIssueMixin.class)
             .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
             .build();
+    }
+
+    @Bean
+    public WebClient gitHubGraphQlWebClient(JsonMapper baseObjectMapper) {
+        JsonMapper graphQlObjectMapper = gitHubGraphQlObjectMapper(baseObjectMapper);
 
         // The buffer limit must be set on the CUSTOM decoder, not only via
         // defaultCodecs().maxInMemorySize(): the latter governs the default codecs, but our
