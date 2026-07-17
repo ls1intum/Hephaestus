@@ -21,10 +21,12 @@ import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedIntegrationsRouteImport } from './routes/_authenticated/integrations'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as WWorkspaceSlugLoginRouteImport } from './routes/w/$workspaceSlug/login'
 import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin.workspaces'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
+import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminLoginProvidersRouteImport } from './routes/_authenticated/admin.login-providers'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_authenticated/workspaces/new/index'
@@ -114,6 +116,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const WWorkspaceSlugLoginRoute = WWorkspaceSlugLoginRouteImport.update({
   id: '/w/$workspaceSlug/login',
   path: '/w/$workspaceSlug/login',
@@ -136,6 +143,12 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminSettingsRoute =
+  AuthenticatedAdminSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminLoginProvidersRoute =
   AuthenticatedAdminLoginProvidersRouteImport.update({
     id: '/login-providers',
@@ -318,10 +331,12 @@ export interface FileRoutesByFullPath {
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
+  '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
@@ -356,17 +371,18 @@ export interface FileRoutesByTo {
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
-  '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/integrations': typeof AuthenticatedIntegrationsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
+  '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
@@ -408,10 +424,12 @@ export interface FileRoutesById {
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
+  '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/_authenticated/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
   '/_authenticated/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
@@ -455,10 +473,12 @@ export interface FileRouteTypes {
     | '/auth/error'
     | '/admin/audit'
     | '/admin/login-providers'
+    | '/admin/settings'
     | '/admin/users'
     | '/admin/workspaces'
     | '/mentor'
     | '/w/$workspaceSlug/login'
+    | '/admin/'
     | '/w/$workspaceSlug/achievements'
     | '/w/$workspaceSlug/mentor'
     | '/workspaces/new/github'
@@ -493,17 +513,18 @@ export interface FileRouteTypes {
     | '/landing'
     | '/login'
     | '/privacy'
-    | '/admin'
     | '/integrations'
     | '/settings'
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
     | '/admin/login-providers'
+    | '/admin/settings'
     | '/admin/users'
     | '/admin/workspaces'
     | '/mentor'
     | '/w/$workspaceSlug/login'
+    | '/admin'
     | '/w/$workspaceSlug/achievements'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
@@ -544,10 +565,12 @@ export interface FileRouteTypes {
     | '/auth/error'
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/login-providers'
+    | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
     | '/_authenticated/mentor/_mentor_access'
     | '/w/$workspaceSlug/login'
+    | '/_authenticated/admin/'
     | '/_authenticated/w/$workspaceSlug/achievements'
     | '/_authenticated/w/$workspaceSlug/mentor'
     | '/_authenticated/workspaces/new/github'
@@ -675,6 +698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/w/$workspaceSlug/login': {
       id: '/w/$workspaceSlug/login'
       path: '/w/$workspaceSlug/login'
@@ -701,6 +731,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/settings': {
+      id: '/_authenticated/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AuthenticatedAdminSettingsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/login-providers': {
@@ -905,15 +942,19 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
   AuthenticatedAdminLoginProvidersRoute: typeof AuthenticatedAdminLoginProvidersRoute
+  AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
   AuthenticatedAdminLoginProvidersRoute: AuthenticatedAdminLoginProvidersRoute,
+  AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWorkspacesRoute: AuthenticatedAdminWorkspacesRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =

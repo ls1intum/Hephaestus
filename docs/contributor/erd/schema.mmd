@@ -374,6 +374,14 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
+    InstanceSetting {
+        BIGINT id PK
+        BOOLEAN silent_mode_engaged "NOT NULL"
+        VARCHAR(500) silent_mode_reason
+        TIMESTAMPTZ silent_mode_changed_at
+        VARCHAR(255) silent_mode_changed_by
+    }
+
     Issue {
         VARCHAR(31) issue_type UK "NOT NULL"
         BIGINT id PK

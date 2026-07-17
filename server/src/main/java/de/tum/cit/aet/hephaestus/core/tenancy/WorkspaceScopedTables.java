@@ -69,6 +69,8 @@ public class WorkspaceScopedTables {
         "worker_registry",
         // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
         "login_provider",
+        // Singleton instance-wide operator settings (silent-mode brake, #1386); by definition cross-tenant
+        "instance_settings",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

@@ -18,7 +18,7 @@ export function NavFooter({ isAppAdmin = false }: NavFooterProps) {
 			{isAppAdmin && (
 				<>
 					<SidebarMenuItem>
-						<SidebarMenuButton tooltip="Instance admin" render={<Link to="/admin/users" />}>
+						<SidebarMenuButton tooltip="Instance admin" render={<Link to="/admin" />}>
 							<ShieldCheck />
 							<span>Instance&nbsp;admin</span>
 						</SidebarMenuButton>

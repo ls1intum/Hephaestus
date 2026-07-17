@@ -49,8 +49,11 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
     private IssueReviewHandler handler;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
+        silentModeEngaged = false;
         handler = new IssueReviewHandler(
             objectMapper,
             workspaceContextBuilder,
@@ -59,7 +62,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new PracticeDetectionResultParser(objectMapper),
             deliveryService,
             commentPoster,
-            feedbackLedgerRecorder
+            feedbackLedgerRecorder,
+            () -> silentModeEngaged
         );
     }
 
@@ -151,6 +155,17 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         void closedIssue_isSuppressed_neverPosts() {
             handler.postIssueNote(issueJob("CLOSED"), note());
             verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+        }
+
+        @Test
+        void silentModeEngaged_isSuppressed_neverPosts() {
+            silentModeEngaged = true;
+
+            handler.postIssueNote(issueJob("OPEN"), note());
+
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+            // Suppression is not a delivery failure, so no undelivered ledger unit is recorded.
+            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
         }
 
         @Test

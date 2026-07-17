@@ -21,6 +21,13 @@ export function eventSeverity(eventType: string, result: string): AuditSeverity 
 	return "info";
 }
 
+/** Tailwind class for the severity status dot; shared by the audit table and the overview activity card. */
+export const SEVERITY_DOT: Record<AuditSeverity, string> = {
+	error: "bg-destructive",
+	warning: "bg-amber-500",
+	info: "bg-muted-foreground/40",
+};
+
 /** A short human label for an event type — `APP_ROLE_CHANGED` → `App role changed`. */
 export function eventLabel(eventType: string): string {
 	const lower = eventType.replace(/_/g, " ").toLowerCase();

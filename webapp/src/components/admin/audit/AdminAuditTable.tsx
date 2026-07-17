@@ -14,13 +14,13 @@ import {
 } from "@/components/ui/table";
 import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
 import {
-	type AuditSeverity,
 	accountLabel,
 	eventLabel,
 	eventSeverity,
 	formatTimestamp,
 	humanizeDetails,
 	relativeTime,
+	SEVERITY_DOT,
 } from "./auditFormat";
 
 export interface AdminAuditTableProps {
@@ -37,12 +37,6 @@ export interface AdminAuditTableProps {
 	/** Resolve a workspace id to its name for the detail drawer (client-side, from the admin list). */
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
-
-const SEVERITY_DOT: Record<AuditSeverity, string> = {
-	error: "bg-destructive",
-	warning: "bg-amber-500",
-	info: "bg-muted-foreground/40",
-};
 
 /**
  * Read-only table of auth audit events (newest first). The actor column attributes impersonated

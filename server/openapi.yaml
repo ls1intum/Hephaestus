@@ -27,6 +27,8 @@ tags:
   name: Slack channel activation
 - description: Manage practice areas
   name: Practice Areas
+- description: Instance-admin settings
+  name: Admin
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -327,6 +329,38 @@ paths:
                 $ref: "#/components/schemas/LoginProviderView"
           description: OK
       summary: Update a login provider
+      tags:
+      - Admin
+  /admin/settings:
+    get:
+      operationId: adminGetInstanceSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceSettings"
+          description: OK
+      summary: Get instance settings
+      tags:
+      - Admin
+  /admin/settings/silent-mode:
+    put:
+      operationId: adminUpdateSilentMode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSilentModeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceSettings"
+          description: OK
+      summary: Engage or release the instance-wide silent mode
       tags:
       - Admin
   /admin/users:
@@ -5422,6 +5456,20 @@ components:
         vendorUrl:
           type: string
           format: uri
+    InstanceSettings:
+      type: object
+      properties:
+        silentModeChangedAt:
+          type: string
+          format: date-time
+        silentModeChangedBy:
+          type: string
+        silentModeEngaged:
+          type: boolean
+        silentModeReason:
+          type: string
+      required:
+      - silentModeEngaged
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -7407,6 +7455,17 @@ components:
             from leaderboard calculations
       required:
       - hiddenFromContributions
+    UpdateSilentModeRequest:
+      type: object
+      properties:
+        engaged:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - engaged
     UpdateSlackChannelConsentRequest:
       type: object
       description: Transition a Slack channel to a target consent state

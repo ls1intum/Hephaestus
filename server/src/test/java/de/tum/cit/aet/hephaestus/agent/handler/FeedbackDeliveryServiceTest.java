@@ -75,8 +75,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     private PracticeReviewProperties reviewProperties;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
+        silentModeEngaged = false;
         reviewProperties = new PracticeReviewProperties(
             /* runForAllUsers */ false,
             /* skipDrafts */ true,
@@ -95,7 +98,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             workspaceRepository,
             reviewProperties,
             feedbackLedgerRecorder,
-            observationTrendService
+            observationTrendService,
+            () -> silentModeEngaged
         );
         // Inline reconciliation runs on every OPEN-PR delivery — even with zero diff notes — to clear an
         // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
@@ -254,6 +258,19 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
 
             service.deliverFeedback(job, null);
+
+            verifyNoInteractions(commentPoster);
+            verifyNoInteractions(pullRequestRepository);
+        }
+
+        @Test
+        @DisplayName("instance silent mode suppresses delivery before any PR lookup (#1386)")
+        void skipsWhenSilentModeEngaged() {
+            silentModeEngaged = true;
+            AgentJob job = createJob();
+
+            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
@@ -630,7 +647,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             workspaceRepository,
             props,
             feedbackLedgerRecorder,
-            observationTrendService
+            observationTrendService,
+            () -> silentModeEngaged
         );
     }
 

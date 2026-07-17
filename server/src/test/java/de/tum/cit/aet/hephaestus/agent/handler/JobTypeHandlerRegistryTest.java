@@ -74,7 +74,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             parser,
             deliveryService,
             commentPoster,
-            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+            () -> false
         );
     }
 

@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +51,7 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final PracticeDetectionDeliveryService deliveryService;
     private final PullRequestCommentPoster commentPoster;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
+    private final SilentModeQuery silentModeQuery;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -59,7 +61,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         PullRequestCommentPoster commentPoster,
-        FeedbackLedgerRecorder feedbackLedgerRecorder
+        FeedbackLedgerRecorder feedbackLedgerRecorder,
+        SilentModeQuery silentModeQuery
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -69,6 +72,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.deliveryService = deliveryService;
         this.commentPoster = commentPoster;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
+        this.silentModeQuery = silentModeQuery;
     }
 
     @Override
@@ -210,6 +214,10 @@ public class IssueReviewHandler implements JobTypeHandler {
      */
     void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         if (delivery == null || delivery.mrNote() == null) {
+            return;
+        }
+        if (silentModeQuery.isSilentModeEngaged()) {
+            log.warn("Issue delivery suppressed: instance silent mode engaged, jobId={}", job.getId());
             return;
         }
         JsonNode metadata = job.getMetadata();

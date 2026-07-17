@@ -22,6 +22,7 @@ import com.slack.api.model.User;
 import com.slack.api.model.assistant.SuggestedPrompt;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -76,11 +77,31 @@ public class SlackMessageService {
 
     private final Slack slack;
     private final SlackCredentialProvider credentialProvider;
+    private final SilentModeQuery silentModeQuery;
     private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
 
-    public SlackMessageService(SlackCredentialProvider credentialProvider) {
+    public SlackMessageService(SlackCredentialProvider credentialProvider, SilentModeQuery silentModeQuery) {
         this.slack = Slack.getInstance();
         this.credentialProvider = credentialProvider;
+        this.silentModeQuery = silentModeQuery;
+    }
+
+    /**
+     * Instance-wide emergency brake (#1386): while engaged, a new outbound send ({@code sendForWorkspace},
+     * {@code sendEphemeralForWorkspace}, {@code startStream}) fails with the {@code silent_mode_engaged}
+     * error code, so callers log-and-swallow it exactly like any other send failure. An <em>in-flight</em>
+     * stream ({@code appendStream}/{@code stopStream}) is deliberately left to finish rather than tear off
+     * mid-message; read-side calls (lookups, history) are unaffected.
+     */
+    private void ensureNotSilenced(long workspaceId, String channelId) {
+        if (silentModeQuery.isSilentModeEngaged()) {
+            log.warn(
+                "Slack send suppressed: instance silent mode engaged, workspaceId={}, channelId={}",
+                workspaceId,
+                channelId
+            );
+            throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
+        }
     }
 
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {
@@ -94,6 +115,7 @@ public class SlackMessageService {
         List<LayoutBlock> blocks,
         String fallback
     ) {
+        ensureNotSilenced(workspaceId, channelId);
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
@@ -141,6 +163,7 @@ public class SlackMessageService {
         List<LayoutBlock> blocks,
         String fallback
     ) {
+        ensureNotSilenced(workspaceId, channelId);
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
         );
@@ -219,6 +242,7 @@ public class SlackMessageService {
      * to. {@code markdownText} is standard Markdown (Slack renders it, incl. tables) — not Slack mrkdwn.
      */
     public String startStream(long workspaceId, String channel, String threadTs, String markdownText) {
+        ensureNotSilenced(workspaceId, channel);
         String token = resolveToken(workspaceId).orElseThrow(() ->
             new SlackSendException(workspaceId, channel, "no_active_slack_connection")
         );

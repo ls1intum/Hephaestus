@@ -65,7 +65,7 @@ class SlackMessageServiceLiveTest {
         when(connectionService.findActive(workspaceId, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
 
         SlackCredentialProvider credentialProvider = new SlackCredentialProvider(connectionService, converter);
-        SlackMessageService service = new SlackMessageService(credentialProvider);
+        SlackMessageService service = new SlackMessageService(credentialProvider, () -> false);
 
         // The real send: block-kit payload through the app's SlackMessageService to the live channel.
         assertThatCode(() ->

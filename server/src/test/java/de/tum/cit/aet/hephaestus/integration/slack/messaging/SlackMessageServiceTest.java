@@ -29,9 +29,42 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     private SlackMessageService service;
 
+    private boolean silentModeEngaged;
+
     @BeforeEach
     void setUp() {
-        service = new SlackMessageService(credentialProvider);
+        silentModeEngaged = false;
+        service = new SlackMessageService(credentialProvider, () -> silentModeEngaged);
+    }
+
+    @Test
+    void sendForWorkspace_silentMode_throwsBeforeTokenResolution() {
+        silentModeEngaged = true;
+
+        assertThatThrownBy(() -> service.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "fallback"))
+            .isInstanceOf(SlackSendException.class)
+            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
+        org.mockito.Mockito.verifyNoInteractions(credentialProvider);
+    }
+
+    @Test
+    void startStream_silentMode_throws() {
+        silentModeEngaged = true;
+
+        assertThatThrownBy(() -> service.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi"))
+            .isInstanceOf(SlackSendException.class)
+            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
+        org.mockito.Mockito.verifyNoInteractions(credentialProvider);
+    }
+
+    @Test
+    void sendEphemeralForWorkspace_silentMode_throws() {
+        silentModeEngaged = true;
+
+        assertThatThrownBy(() -> service.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "fallback"))
+            .isInstanceOf(SlackSendException.class)
+            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
+        org.mockito.Mockito.verifyNoInteractions(credentialProvider);
     }
 
     @Test
