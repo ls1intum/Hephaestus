@@ -434,6 +434,40 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
+     * Process a {@code transferred} event: the issue has moved to another repository and no longer
+     * exists in this one.
+     *
+     * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is the
+     * source-side issue. Routing it to {@link #process} — as this used to — re-upserted the issue
+     * into the repository it had just left, so the transfer created a permanent phantom instead of
+     * removing one. A transfer is not a delete event, but from this repository's perspective the
+     * outcome is identical: the issue is gone.
+     *
+     * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
+     * feedback/observation rows reference it by bare id with no FK, so removing the row would orphan
+     * them. The sweep would eventually catch this anyway (a transferred issue vanishes from the
+     * source repository's upstream listing); handling the event makes it immediate.
+     */
+    @Transactional
+    public void processTransferred(GitHubIssueDTO issueDto, ProcessingContext context) {
+        issueRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .ifPresent(issue -> {
+                if (issue.getDeletedAt() != null) {
+                    return;
+                }
+                issue.setDeletedAt(Instant.now());
+                issueRepository.save(issue);
+                log.info(
+                    "Tombstoned transferred issue: issueId={}, number={}, repoId={}",
+                    issue.getId(),
+                    issueDto.number(),
+                    context.repository().getId()
+                );
+            });
+    }
+
+    /**
      * Process a deleted event.
      * Publishes IssueDeleted domain event.
      */

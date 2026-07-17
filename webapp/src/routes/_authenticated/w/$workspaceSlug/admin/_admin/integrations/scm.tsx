@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { WebhookIcon } from "lucide-react";
+import { ExternalLinkIcon, WebhookIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -19,14 +19,17 @@ import {
 	updateConnectionSyncJobMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminRepositoriesSettings } from "@/components/admin/integrations/AdminRepositoriesSettings";
-import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
-import { ScmConnectionCard } from "@/components/admin/integrations/ScmConnectionCard";
-import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
+import {
+	SCM_CLASS_KEYS,
+	SyncResourcesTable,
+} from "@/components/admin/integrations/SyncResourcesTable";
+import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
@@ -219,21 +222,34 @@ function ScmIntegrationPage() {
 				}
 				title={label}
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
-				actions={
-					status && (
-						<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
-					)
-				}
 			/>
 
-			<ScmConnectionCard
+			<SyncStatusHeader
 				label={label}
 				status={status}
 				isLoading={workspaceQuery.isLoading || catalogQuery.isLoading || statusQuery.isLoading}
 				error={workspaceQuery.error ?? catalogQuery.error ?? statusQuery.error}
 				isConnectionActive={isConnectionActive}
-				isAppInstallationWorkspace={isAppInstallationWorkspace}
 				triggeringType={triggeringType}
+				actions={
+					isAppInstallationWorkspace && (
+						<Button
+							variant="outline"
+							size="sm"
+							nativeButton={false}
+							render={
+								<a
+									href="https://github.com/settings/installations"
+									target="_blank"
+									rel="noreferrer"
+								/>
+							}
+						>
+							Manage installation on GitHub
+							<ExternalLinkIcon className="size-3.5" />
+						</Button>
+					)
+				}
 				isCancelling={cancelJob.isPending}
 				onRetry={() => {
 					workspaceQuery.refetch();
@@ -295,6 +311,10 @@ function ScmIntegrationPage() {
 							onRetry={() => refetchResources()}
 							resourceNoun="repository"
 							resourceNounPlural="repositories"
+							// Without the cadence the matrix prints every watermark and judges none of them —
+							// the server sends it precisely so the client doesn't have to guess a schedule.
+							syncIntervalSeconds={status?.syncIntervalSeconds}
+							expectedClassKeys={SCM_CLASS_KEYS}
 						/>
 					</CardContent>
 				</Card>

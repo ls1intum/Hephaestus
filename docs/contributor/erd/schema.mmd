@@ -422,6 +422,7 @@ erDiagram
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
         VARCHAR(40) merge_commit_sha
+        TIMESTAMPTZ deleted_at
     }
 
     IssueAssignee {

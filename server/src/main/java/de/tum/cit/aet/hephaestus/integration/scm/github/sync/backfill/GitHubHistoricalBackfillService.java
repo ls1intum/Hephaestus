@@ -845,6 +845,7 @@ public class GitHubHistoricalBackfillService {
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;
+        int totalCommentsSynced = 0;
         int batchMinNumber = Integer.MAX_VALUE;
         int batchMaxNumber = Integer.MIN_VALUE;
         boolean hasMore = true;
@@ -953,6 +954,7 @@ public class GitHubHistoricalBackfillService {
                 totalPRsSynced += pageResult.prCount();
                 totalReviewsSynced += pageResult.reviewCount();
                 totalReviewCommentsSynced += pageResult.reviewCommentCount();
+                totalCommentsSynced += pageResult.commentCount();
                 // Track min/max across pages (sync goes newest to oldest by CREATED_AT DESC)
                 if (pageResult.prCount() > 0) {
                     batchMinNumber = Math.min(batchMinNumber, pageResult.minNumber());
@@ -1063,11 +1065,12 @@ public class GitHubHistoricalBackfillService {
 
         if (totalPRsSynced > 0) {
             log.debug(
-                "Backfill PRs batch complete: repo={}, prs={}, reviews={}, reviewComments={}, numberRange=[#{}..#{}], prsWithReviewPagination={}",
+                "Backfill PRs batch complete: repo={}, prs={}, reviews={}, reviewComments={}, comments={}, numberRange=[#{}..#{}], prsWithReviewPagination={}",
                 sanitizeForLog(repoNameForLog),
                 totalPRsSynced,
                 totalReviewsSynced,
                 totalReviewCommentsSynced,
+                totalCommentsSynced,
                 batchMinNumber,
                 batchMaxNumber,
                 allPrsNeedingReviewPagination.size()
@@ -1076,7 +1079,7 @@ public class GitHubHistoricalBackfillService {
 
         return new BackfillBatchResult(
             totalPRsSynced,
-            totalReviewsSynced + totalReviewCommentsSynced,
+            totalReviewsSynced + totalReviewCommentsSynced + totalCommentsSynced,
             hasMore,
             batchMinNumber,
             batchMaxNumber
@@ -1206,6 +1209,7 @@ public class GitHubHistoricalBackfillService {
             int prCount = 0;
             int reviewCount = 0;
             int reviewCommentCount = 0;
+            int commentCount = 0;
             int minNumber = Integer.MAX_VALUE;
             int maxNumber = Integer.MIN_VALUE;
             List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
@@ -1220,6 +1224,20 @@ public class GitHubHistoricalBackfillService {
                         int number = processed.getNumber();
                         minNumber = Math.min(minNumber, number);
                         maxNumber = Math.max(maxNumber, number);
+
+                        // Process embedded conversation comments (first 10 per PR in historical query).
+                        // Same IssueComment entity and processor as issue comments — repository.issues
+                        // excludes PRs, so backfill is the only place a backfilled repo can pick these up.
+                        EmbeddedCommentsDTO embeddedComments = prData.embeddedComments();
+                        for (var commentDto : embeddedComments.comments()) {
+                            if (issueCommentProcessor.process(commentDto, processed.getNumber(), context) != null) {
+                                commentCount++;
+                            }
+                        }
+
+                        // Note: as with issue backfill, PRs with more than 10 conversation comments
+                        // get the tail from the regular incremental sync, which paginates them.
+                        // Keeps backfill simple and avoids extra API calls during historical sync.
 
                         // Process embedded reviews (first 50 per PR in historical query)
                         // Pass context to enable activity event creation
@@ -1265,12 +1283,13 @@ public class GitHubHistoricalBackfillService {
                 prCount,
                 reviewCount,
                 reviewCommentCount,
+                commentCount,
                 prsNeedingReviewPagination,
                 minNumber,
                 maxNumber
             );
         });
-        return result != null ? result : new PullRequestPageResult(0, 0, 0, new ArrayList<>(), 0, 0);
+        return result != null ? result : new PullRequestPageResult(0, 0, 0, 0, new ArrayList<>(), 0, 0);
     }
 
     // Note: Backfill tracking is now initialized inline during the first batch.
@@ -1405,6 +1424,7 @@ public class GitHubHistoricalBackfillService {
         int prCount,
         int reviewCount,
         int reviewCommentCount,
+        int commentCount,
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
         int minNumber,
         int maxNumber

@@ -1,0 +1,49 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Deletion reconciliation: tombstone column for issues/pull requests removed upstream. -->
+
+    <changeSet author="FelixTJDietrich" id="1784243388042-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="issue.deleted_at already present">
+            <not><columnExists tableName="issue" columnName="deleted_at"/></not>
+        </preConditions>
+        <comment>
+            Tombstone marker for an issue/pull request that no longer exists upstream, set by the
+            RECONCILIATION deletion sweep (GitHubDeletionSweepService) and by the issues.transferred
+            webhook. A tombstone rather than a hard DELETE because feedback.artifact_id,
+            observation.artifact_id (NOT NULL) and activity_event.target_id reference issue rows by
+            bare id with no FK — a hard delete orphans them silently. Keeping the row preserves those
+            lookups; the read side excludes tombstones via "deleted_at IS NULL".
+        </comment>
+        <addColumn tableName="issue">
+            <column name="deleted_at" type="timestamp with time zone"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="issue" columnName="deleted_at"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1784243388042-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_issue_repository_live already present">
+            <not><indexExists indexName="ix_issue_repository_live"/></not>
+        </preConditions>
+        <comment>
+            Serves the per-repository live counts the admin sync UI renders
+            (IssueRepository.count{Issues,PullRequests}GroupedByRepositoryIds) and the sweep's
+            local-number listing. Partial on the tombstone predicate: tombstones are the rare case,
+            and every read of this table that isn't the sweep itself wants only live rows.
+        </comment>
+        <sql>
+            CREATE INDEX ix_issue_repository_live ON issue (repository_id, issue_type)
+                WHERE deleted_at IS NULL
+        </sql>
+        <rollback>
+            <dropIndex tableName="issue" indexName="ix_issue_repository_live"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

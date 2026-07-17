@@ -91,7 +91,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Mockito.when(githubSyncStateProvider.describe(any(), anyLong())).thenReturn(ConnectionSyncDetails.empty());
         Mockito.when(githubSyncStateProvider.resources(any(), anyLong())).thenReturn(List.of());
         Mockito.when(githubSyncRunner.kind()).thenReturn(IntegrationKind.GITHUB);
-        Mockito.doNothing().when(githubSyncRunner).reconcile(any(), any());
+        Mockito.doNothing().when(githubSyncRunner).reconcile(any(), any(), any());
 
         User owner = persistUser("sync-owner-" + System.nanoTime());
         workspace = createWorkspace(
@@ -216,7 +216,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             return null;
         })
             .when(githubSyncRunner)
-            .reconcile(any(), any());
+            .reconcile(any(), any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken)));
@@ -266,7 +266,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             return null;
         })
             .when(githubSyncRunner)
-            .reconcile(any(), any());
+            .reconcile(any(), any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken))); // RECONCILIATION
@@ -332,7 +332,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             return null;
         })
             .when(githubSyncRunner)
-            .reconcile(any(), any());
+            .reconcile(any(), any(), any());
 
         AtomicReference<WebTestClient.ResponseSpec> firstResponse = new AtomicReference<>();
         Thread firstCaller = new Thread(() -> firstResponse.set(triggerRequest(adminToken)));

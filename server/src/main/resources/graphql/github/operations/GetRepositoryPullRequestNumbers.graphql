@@ -1,0 +1,32 @@
+# Full upstream pull-request-number listing for one repository — the upstream half of the
+# RECONCILIATION deletion sweep's set difference (GitHubDeletionSweepService). The pull-request
+# counterpart of GetRepositoryIssueNumbers; see that file for the full rationale.
+#
+# Distinct from GetRepositoryPullRequests.graphql (the content sync's query) on purpose: this one
+# selects `number` only, costing ~1 rate-limit point per page of 100.
+#
+# GitHub emits no `pull_request.deleted` webhook — the action does not exist — so unlike issues,
+# this sweep is the ONLY mechanism by which a vanished pull request is ever noticed.
+#
+# `states:` is deliberately omitted so MERGED and CLOSED pull requests are enumerated too; filtering
+# here would make every filtered-out PR look deleted.
+query GetRepositoryPullRequestNumbers($owner: String!, $name: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequests(first: $first, after: $after, orderBy: { field: CREATED_AT, direction: ASC }) {
+            totalCount
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                number
+            }
+        }
+    }
+}

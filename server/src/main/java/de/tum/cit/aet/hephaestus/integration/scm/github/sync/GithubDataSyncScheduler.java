@@ -101,6 +101,7 @@ public class GithubDataSyncScheduler {
     private final SyncTargetProvider syncTargetProvider;
     private final SyncContextProvider syncContextProvider;
     private final GithubDataSyncService dataSyncService;
+    private final GitHubDeletionSweepService deletionSweepService;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
@@ -118,6 +119,7 @@ public class GithubDataSyncScheduler {
         SyncTargetProvider syncTargetProvider,
         SyncContextProvider syncContextProvider,
         GithubDataSyncService dataSyncService,
+        GitHubDeletionSweepService deletionSweepService,
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubIssueDependencySyncService issueDependencySyncService,
@@ -134,6 +136,7 @@ public class GithubDataSyncScheduler {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
         this.dataSyncService = dataSyncService;
+        this.deletionSweepService = deletionSweepService;
         this.subIssueSyncService = subIssueSyncService;
         this.issueTypeSyncService = issueTypeSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
@@ -279,15 +282,19 @@ public class GithubDataSyncScheduler {
         }
     }
 
-    /** Run the same warning-aware body used by the scheduled path for one manual job. */
-    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle) {
+    /**
+     * Run the same warning-aware body used by the scheduled path for one manual job.
+     *
+     * @param type the job type; decides whether the body ends with a deletion sweep
+     */
+    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle, SyncJobType type) {
         SyncSession session = syncTargetProvider
             .getSyncSessions(IntegrationKind.GITHUB)
             .stream()
             .filter(candidate -> candidate.scopeId().equals(workspaceId))
             .findFirst()
             .orElseThrow(() -> new IllegalStateException("No active GitHub sync scope for workspace " + workspaceId));
-        runScopeSyncBody(session, handle);
+        runScopeSyncBody(session, handle, type);
     }
 
     /**
@@ -309,7 +316,7 @@ public class GithubDataSyncScheduler {
                 IntegrationState.ACTIVE
             );
         if (connection.isEmpty()) {
-            runScopeSyncBody(session, null);
+            runScopeSyncBody(session, null, SyncJobType.RECONCILIATION);
             return;
         }
 
@@ -323,7 +330,7 @@ public class GithubDataSyncScheduler {
                     SyncJobTrigger.SCHEDULED,
                     null
                 ),
-                handle -> runScopeSyncBody(session, handle)
+                handle -> runScopeSyncBody(session, handle, SyncJobType.RECONCILIATION)
             );
         } catch (SyncJobConflictException e) {
             log.info(
@@ -341,7 +348,7 @@ public class GithubDataSyncScheduler {
      * cooperative cancel between repositories — parity with the manual "Sync now" runner. The unrecorded
      * fallback (no ACTIVE connection) passes {@code null} and simply runs to completion.
      */
-    private void runScopeSyncBody(SyncSession session, @Nullable SyncExecutionHandle handle) {
+    private void runScopeSyncBody(SyncSession session, @Nullable SyncExecutionHandle handle, SyncJobType type) {
         try {
             // Set context for logging and isolation
             syncContextProvider.setContext(session.syncContext());
@@ -484,6 +491,28 @@ public class GithubDataSyncScheduler {
                         rateLimitTracker.getRemaining(session.scopeId())
                     );
                     reportWarning(handle);
+                }
+
+                // Deletion sweep — RECONCILIATION only, and the one thing that makes RECONCILIATION
+                // different from INITIAL. Everything above this line only ever upserts, so an issue or
+                // pull request deleted upstream would otherwise survive here forever and keep inflating
+                // the per-repository counts (webhooks are not redeliverable, and GitHub has no
+                // pull_request.deleted event at all).
+                //
+                // Not on INITIAL: a mirror still being populated has nothing stale in it, and every row
+                // not fetched yet would read as an upstream deletion.
+                //
+                // Last, deliberately: the sweep's set difference is only meaningful against a mirror
+                // that has already had this run's upserts applied. Sweeping first would race the fetch
+                // and tombstone rows that were about to arrive.
+                if (type == SyncJobType.RECONCILIATION) {
+                    var sweep = deletionSweepService.sweepScope(session.scopeId(), handle);
+                    if (sweep.skipped()) {
+                        // At least one repository's upstream listing could not be proven complete, so
+                        // its deletions are still outstanding. Surface it rather than reporting a clean
+                        // reconciliation that did not fully reconcile.
+                        reportWarning(handle);
+                    }
                 }
             });
 

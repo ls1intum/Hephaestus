@@ -265,6 +265,9 @@ export function useOutlineIntegration(workspaceSlug: string) {
 			connected: hasConnection,
 			connectionState: outlineConnection?.state,
 			connectionLabel: outlineConnection?.displayName,
+			// Health sits with the freshness it judges, not in the page header — the same move the SCM and
+			// Slack pages make into SyncStatusHeader; Outline's connection plane is this card.
+			health: connectionStatus?.health,
 			status: syncSummary,
 			isStatusLoading: hasConnection && isStatusLoading,
 			tokenStatus,

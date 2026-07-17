@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackChannelHistorySyncService.WorkspaceSyncSummary;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -44,7 +45,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
         WorkspaceSyncSummary summary = new WorkspaceSyncSummary(3, 2, 1, 7L, 4, false, 0);
         when(dataSyncScheduler.syncWorkspaceNow(WS, handle)).thenReturn(summary);
 
-        runner.reconcile(REF, handle);
+        runner.reconcile(REF, handle, SyncJobType.RECONCILIATION);
 
         verify(dataSyncScheduler).syncWorkspaceNow(WS, handle);
         verify(handle).progress(eq(3), eq(3), any(SyncProgress.class));
@@ -56,7 +57,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
         WorkspaceSyncSummary partial = new WorkspaceSyncSummary(4, 1, 2, 2L, 4, true, 1);
         when(dataSyncScheduler.syncWorkspaceNow(WS, handle)).thenReturn(partial);
 
-        runner.reconcile(REF, handle);
+        runner.reconcile(REF, handle, SyncJobType.RECONCILIATION);
 
         verify(handle).progress(eq(3), eq(4), any(SyncProgress.class));
         verify(handle).reportWarnings();
@@ -67,7 +68,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
         WorkspaceSyncSummary partial = new WorkspaceSyncSummary(3, 1, 2, 2L, 4, true, 0);
         when(dataSyncScheduler.syncWorkspaceNow(WS, handle)).thenReturn(partial);
 
-        runner.reconcile(REF, handle);
+        runner.reconcile(REF, handle, SyncJobType.RECONCILIATION);
 
         verify(handle).reportWarnings();
     }
@@ -78,7 +79,7 @@ class SlackIntegrationSyncRunnerTest extends BaseUnitTest {
         when(dataSyncScheduler.syncWorkspaceNow(WS, handle)).thenReturn(summary);
         when(handle.isCancellationRequested()).thenReturn(true);
 
-        runner.reconcile(REF, handle);
+        runner.reconcile(REF, handle, SyncJobType.RECONCILIATION);
 
         verify(handle).reportCancelled();
     }

@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -100,9 +101,9 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
         @Test
         void delegatesToHandleAwareDataSyncServiceEntryPoint() {
-            runner.reconcile(ref, handle);
+            runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
-            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
+            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
             verify(handle, never()).reportCancelled();
         }
 
@@ -110,10 +111,19 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
         void reportsCancelledWhenTheHandleIsStillCancelledOnReturn() {
             when(handle.isCancellationRequested()).thenReturn(true);
 
-            runner.reconcile(ref, handle);
+            runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
-            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
+            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
             verify(handle).reportCancelled();
+        }
+
+        @Test
+        void forwardsTheJobTypeSoInitialDoesNotSweep() {
+            // The scheduler decides the sweep off this value; dropping it here would silently make
+            // INITIAL and RECONCILIATION identical again — the exact bug this change fixes.
+            runner.reconcile(ref, handle, SyncJobType.INITIAL);
+
+            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.INITIAL);
         }
     }
 

@@ -25,6 +25,13 @@ public enum SyncPhase {
     COMMITS("commits"),
     /** Teams and memberships. */
     TEAMS("teams"),
+    /**
+     * Deletion reconciliation — set-differencing the full upstream id set against the local mirror to
+     * retire what upstream no longer has. Distinct from the entity phases above because those only
+     * ever add: this is the only phase that removes, and an operator watching a sync deserves to see
+     * which of the two is running.
+     */
+    SWEEP("sweep"),
     /** Slack channels. */
     CHANNELS("channels"),
     /** Outline collections. */

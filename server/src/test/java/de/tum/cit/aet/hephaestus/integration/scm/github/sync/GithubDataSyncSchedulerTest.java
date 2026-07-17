@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider.SyncContext;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncStatistics;
@@ -64,6 +65,9 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
     @Mock
     private GithubDataSyncService dataSyncService;
+
+    @Mock
+    private GitHubDeletionSweepService deletionSweepService;
 
     @Mock
     private GitHubSubIssueSyncService subIssueSyncService;
@@ -114,6 +118,7 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
             syncTargetProvider,
             syncContextProvider,
             dataSyncService,
+            deletionSweepService,
             subIssueSyncService,
             issueTypeSyncService,
             issueDependencySyncService,
@@ -244,6 +249,61 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
             verify(syncJobService, never()).run(any(), any());
             verify(issueTypeSyncService).syncIssueTypesForScope(WORKSPACE_ID);
+        }
+    }
+
+    /**
+     * The deletion sweep is the ONLY thing separating a RECONCILIATION from an INITIAL pass — before
+     * it existed the two enum constants dispatched to a byte-identical body, so the type carried no
+     * meaning. These tests pin that difference to the job type.
+     */
+    @Nested
+    class DeletionSweep {
+
+        @Mock
+        private SyncExecutionHandle handle;
+
+        @BeforeEach
+        void stubSession() {
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session()));
+            // Override the outer setUp's critical-rate-limit stub. That gate warns on its own, which
+            // would make "did the sweep warn?" unanswerable — two warnings and no way to tell whose.
+            lenient().when(rateLimitTracker.isCritical(WORKSPACE_ID)).thenReturn(false);
+        }
+
+        @Test
+        void shouldSweepForDeletionsWhenReconciliation() {
+            when(deletionSweepService.sweepScope(WORKSPACE_ID, handle)).thenReturn(
+                new GitHubDeletionSweepService.SweepOutcome(2, 1, false)
+            );
+
+            scheduler.syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
+
+            verify(deletionSweepService).sweepScope(WORKSPACE_ID, handle);
+            // A sweep that verified every repository is a clean pass, not a degraded one.
+            verify(handle, never()).reportWarnings();
+        }
+
+        @Test
+        void shouldNotSweepForDeletionsWhenInitial() {
+            // A first sync has nothing stale to retire, and every row it has not fetched yet would look
+            // deleted to a set difference — sweeping here would delete the mirror it is building.
+            scheduler.syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.INITIAL);
+
+            verify(deletionSweepService, never()).sweepScope(anyLong(), any());
+        }
+
+        @Test
+        void shouldReportWarningsWhenSweepCouldNotVerifyEveryRepository() {
+            when(deletionSweepService.sweepScope(WORKSPACE_ID, handle)).thenReturn(
+                new GitHubDeletionSweepService.SweepOutcome(0, 0, true)
+            );
+
+            scheduler.syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
+
+            // A reconciliation that could not verify a repository has not fully reconciled; saying so
+            // is the difference between a degraded pass and a false clean bill of health.
+            verify(handle).reportWarnings();
         }
     }
 }

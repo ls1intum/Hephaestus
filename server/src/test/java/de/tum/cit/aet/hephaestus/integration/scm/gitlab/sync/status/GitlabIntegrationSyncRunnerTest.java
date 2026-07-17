@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.GitlabDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.GitLabHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -47,7 +48,7 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, "gitlab.com:1");
         when(handle.isCancellationRequested()).thenReturn(true);
 
-        runner.reconcile(ref, handle);
+        runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
         verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
         verify(handle).reportCancelled();
@@ -58,7 +59,7 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, null);
         when(handle.isCancellationRequested()).thenReturn(false);
 
-        runner.reconcile(ref, handle);
+        runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
         verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
         verify(handle, never()).reportCancelled();

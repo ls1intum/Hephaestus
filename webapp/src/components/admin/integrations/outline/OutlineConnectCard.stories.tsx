@@ -108,16 +108,25 @@ export const ConnectUnavailable: Story = {
 	},
 };
 
-/** Connected and healthy — webhook live, document count, relative last sync, healthy token. */
+/**
+ * Connected and healthy — webhook live, document count, relative last sync, healthy token.
+ *
+ * The health badge sits here rather than in the page header: health and the freshness it judges belong
+ * together, and Outline's connection plane is this card (the SCM and Slack pages make the same move
+ * into `SyncStatusHeader`). It also stops the badge popping into the header late, once the status
+ * query resolves under a heading that had already painted.
+ */
 export const Connected: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
+		health: "HEALTHY",
 		status: healthyStatus,
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
+		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Healthy");
 		await expect(canvas.getByText(/outline connected/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/acme wiki/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/webhook registered/i)).toBeInTheDocument();

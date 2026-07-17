@@ -1,11 +1,11 @@
 import type { VariantProps } from "class-variance-authority";
 import { formatDistanceStrict } from "date-fns";
-import { AlertCircleIcon, ChevronRightIcon, HistoryIcon } from "lucide-react";
-import { Fragment, useState } from "react";
+import { AlertCircleIcon, ChevronDownIcon, HistoryIcon } from "lucide-react";
 import type { SyncJob } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Badge, type badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Empty,
 	EmptyDescription,
@@ -13,6 +13,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import {
 	Pagination,
 	PaginationContent,
@@ -20,15 +21,8 @@ import {
 	PaginationNext,
 	PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { RelativeTime } from "./RelativeTime";
 import {
 	asDate,
 	JOB_STATUS_LABEL,
@@ -36,7 +30,6 @@ import {
 	JOB_TYPE_LABEL,
 	jobProgress,
 	phaseLabel,
-	relativeTime,
 	type SyncJobProgress,
 } from "./sync-format";
 import { TableRowsSkeleton } from "./TableRowsSkeleton";
@@ -87,8 +80,8 @@ function formatItems(job: SyncJob): string {
 	return "–";
 }
 
-// The expander cell plus the seven data columns — the detail row spans all of them.
-const COLUMN_COUNT = 8;
+// The expander cell plus the six data columns — the detail row spans all of them.
+const COLUMN_COUNT = 7;
 
 function hasProgressDetail(progress: SyncJobProgress): boolean {
 	return (
@@ -107,7 +100,7 @@ function hasProgressDetail(progress: SyncJobProgress): boolean {
  * account id and this client has no endpoint that resolves one to a person — there is no account
  * lookup in the generated API at all. Rendering "Triggered by 42" would answer the accountability
  * question with a number the admin still has to go look up by hand, so the field stays unrendered
- * until the server either resolves it to a name or exposes a lookup. The Trigger column already says
+ * until the server either resolves it to a name or exposes a lookup. The Type column already says
  * *how* the job started; only *who* is missing.
  */
 function JobProgressPanel({ progress }: { progress: SyncJobProgress }) {
@@ -164,7 +157,6 @@ function JobsTableHeader() {
 				</TableHead>
 				<TableHead>Status</TableHead>
 				<TableHead>Type</TableHead>
-				<TableHead>Trigger</TableHead>
 				<TableHead>Started</TableHead>
 				<TableHead>Duration</TableHead>
 				<TableHead className="text-right">Items</TableHead>
@@ -177,7 +169,91 @@ function JobsTableHeader() {
 }
 
 /** Placeholder widths sized to the copy each column actually holds; the expander/error slots promise nothing. */
-const SKELETON_COLUMNS = [null, "w-16", "w-24", "w-16", "w-20", "w-12", "w-14", null];
+const SKELETON_COLUMNS = [null, "w-16", "w-32", "w-20", "w-12", "w-14", null];
+
+/**
+ * One job, as a disclosure.
+ *
+ * `Collapsible` renders as a `<tbody>` and its panel as a `<tr>`: a disclosure needs its trigger and
+ * panel under one root, and the only element that can legally wrap two `<tr>`s is a `<tbody>` (a table
+ * may hold many). That keeps the panel inside the real table so its columns stay aligned with the
+ * header — and it is the same idiom the resources table uses, rather than a second hand-rolled
+ * `useState<Set>` re-implementing the ARIA wiring the primitive already ships.
+ */
+function JobRow({ job }: { job: SyncJob }) {
+	const started = asDate(job.startedAt) ?? asDate(job.createdAt);
+	const progress = jobProgress(job);
+	const canExpand = hasProgressDetail(progress);
+
+	const cells = (
+		<TableRow data-job-id={job.id}>
+			<TableCell className="w-0 pr-0">
+				{canExpand && (
+					<CollapsibleTrigger
+						className="group"
+						render={
+							<Button variant="ghost" size="icon-sm" aria-label={`Show details for job ${job.id}`}>
+								<ChevronDownIcon className="size-4 transition-transform group-data-[panel-open]:rotate-180" />
+							</Button>
+						}
+					/>
+				)}
+			</TableCell>
+			<TableCell>
+				<Badge variant={STATUS_VARIANT[job.status]}>{JOB_STATUS_LABEL[job.status]}</Badge>
+			</TableCell>
+			{/* Type and trigger are one fact read as one phrase — "Reconciliation · scheduled" — not two
+			    columns, one of which repeated the same word down every row of a scheduled connection. */}
+			<TableCell>
+				{JOB_TYPE_LABEL[job.type]}
+				<span className="text-muted-foreground">
+					{" · "}
+					{JOB_TRIGGER_LABEL[job.trigger].toLowerCase()}
+				</span>
+			</TableCell>
+			<TableCell className="text-muted-foreground">
+				<RelativeTime value={started} />
+			</TableCell>
+			<TableCell className="text-muted-foreground">{formatDuration(job)}</TableCell>
+			<TableCell className="text-right tabular-nums text-muted-foreground">
+				{formatItems(job)}
+			</TableCell>
+			<TableCell className="text-right">
+				{job.errorSummary && (
+					<HoverCard>
+						<HoverCardTrigger
+							render={
+								<button
+									type="button"
+									aria-label={`Error for job ${job.id}`}
+									className="inline-flex cursor-help rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+								/>
+							}
+						>
+							<AlertCircleIcon className="size-4 text-destructive" aria-hidden />
+						</HoverCardTrigger>
+						<HoverCardContent className="w-80 wrap-anywhere">{job.errorSummary}</HoverCardContent>
+					</HoverCard>
+				)}
+			</TableCell>
+		</TableRow>
+	);
+
+	if (!canExpand) {
+		return <tbody>{cells}</tbody>;
+	}
+
+	return (
+		<Collapsible render={<tbody />}>
+			{cells}
+			<CollapsibleContent render={<tr data-job-detail={job.id} />}>
+				<td colSpan={COLUMN_COUNT} className="border-b p-0">
+					<JobProgressPanel progress={progress} />
+				</td>
+			</CollapsibleContent>
+		</Collapsible>
+	);
+}
 
 export function SyncJobsTable({
 	jobs,
@@ -189,16 +265,6 @@ export function SyncJobsTable({
 	totalPages,
 	onPageChange,
 }: SyncJobsTableProps) {
-	const [expandedJobs, setExpandedJobs] = useState<ReadonlySet<number>>(new Set());
-
-	const toggleExpanded = (jobId: number) => {
-		setExpandedJobs((current) => {
-			const next = new Set(current);
-			if (!next.delete(jobId)) next.add(jobId);
-			return next;
-		});
-	};
-
 	if (isError) {
 		return (
 			<QueryErrorAlert error={error} title="We couldn't load the job history" onRetry={onRetry} />
@@ -238,74 +304,9 @@ export function SyncJobsTable({
 		<div className="space-y-3">
 			<Table>
 				<JobsTableHeader />
-				<TableBody>
-					{jobs.map((job) => {
-						const started = asDate(job.startedAt) ?? asDate(job.createdAt);
-						const progress = jobProgress(job);
-						const canExpand = hasProgressDetail(progress);
-						const isExpanded = expandedJobs.has(job.id);
-						return (
-							<Fragment key={job.id}>
-								<TableRow data-job-id={job.id}>
-									<TableCell className="w-0 pr-0">
-										{canExpand && (
-											<Button
-												variant="ghost"
-												size="icon-sm"
-												aria-label={isExpanded ? "Hide job details" : "Show job details"}
-												aria-expanded={isExpanded}
-												onClick={() => toggleExpanded(job.id)}
-											>
-												<ChevronRightIcon
-													className={`size-4 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-												/>
-											</Button>
-										)}
-									</TableCell>
-									<TableCell>
-										<Badge variant={STATUS_VARIANT[job.status]}>
-											{JOB_STATUS_LABEL[job.status]}
-										</Badge>
-									</TableCell>
-									<TableCell>{JOB_TYPE_LABEL[job.type]}</TableCell>
-									<TableCell className="text-muted-foreground">
-										{JOB_TRIGGER_LABEL[job.trigger]}
-									</TableCell>
-									<TableCell className="text-muted-foreground">{relativeTime(started)}</TableCell>
-									<TableCell className="text-muted-foreground">{formatDuration(job)}</TableCell>
-									<TableCell className="text-right tabular-nums text-muted-foreground">
-										{formatItems(job)}
-									</TableCell>
-									<TableCell className="text-right">
-										{job.errorSummary && (
-											<Popover>
-												<PopoverTrigger
-													render={
-														<Button
-															variant="ghost"
-															size="icon-sm"
-															aria-label={`Error for job ${job.id}`}
-														>
-															<AlertCircleIcon className="size-4 text-destructive" />
-														</Button>
-													}
-												/>
-												<PopoverContent>{job.errorSummary}</PopoverContent>
-											</Popover>
-										)}
-									</TableCell>
-								</TableRow>
-								{canExpand && isExpanded && (
-									<TableRow data-job-detail={job.id} className="hover:bg-transparent">
-										<TableCell colSpan={COLUMN_COUNT} className="p-0">
-											<JobProgressPanel progress={progress} />
-										</TableCell>
-									</TableRow>
-								)}
-							</Fragment>
-						);
-					})}
-				</TableBody>
+				{jobs.map((job) => (
+					<JobRow key={job.id} job={job} />
+				))}
 			</Table>
 
 			{showFooter && (

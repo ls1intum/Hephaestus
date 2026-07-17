@@ -39,7 +39,7 @@ function IntegrationsOverview() {
 			/>
 
 			{catalogQuery.isLoading ? (
-				<div className="grid gap-4 sm:grid-cols-2">
+				<div className="grid items-stretch gap-4 sm:grid-cols-2">
 					<Skeleton className="h-40 w-full" />
 					<Skeleton className="h-40 w-full" />
 				</div>
@@ -50,7 +50,7 @@ function IntegrationsOverview() {
 					onRetry={() => catalogQuery.refetch()}
 				/>
 			) : (
-				<div className="grid gap-4 sm:grid-cols-2">
+				<div className="grid items-stretch gap-4 sm:grid-cols-2">
 					{(catalogQuery.data ?? []).map((entry) => (
 						<IntegrationOverviewCardContainer key={entry.kind} workspaceSlug={slug} entry={entry} />
 					))}
@@ -103,6 +103,10 @@ function IntegrationOverviewCardContainer({
 			status={statusQuery.data}
 			isStatusLoading={statusQuery.isLoading}
 			isStatusError={statusQuery.isError}
+			// The card's alert can only name the failure and judge whether Retry helps if it is handed the
+			// error and a refetch — without these it rendered a title over a blank card and no way out.
+			statusError={statusQuery.error}
+			onRetryStatus={() => statusQuery.refetch()}
 			isTriggering={triggerSync.isPending}
 			onSync={() => {
 				if (connectionId == null) return;

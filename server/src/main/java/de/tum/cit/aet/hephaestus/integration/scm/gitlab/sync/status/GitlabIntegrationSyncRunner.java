@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.GitlabDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.GitLabHistoricalBackfillService;
 import org.slf4j.Logger;
@@ -37,8 +38,10 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
         return IntegrationKind.GITLAB;
     }
 
+    /** GitLab has no deletion sweep yet — {@code type} is unused here. The GitHub sweep
+     * (GitHubDeletionSweepService) is the model if one is added. */
     @Override
-    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle) {
+    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle, SyncJobType type) {
         dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();

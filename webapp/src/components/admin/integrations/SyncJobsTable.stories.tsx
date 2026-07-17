@@ -113,9 +113,14 @@ const allStatuses: SyncJob[] = [
 
 /**
  * Paginated audit trail of sync jobs. Each row carries a status badge (its colour matched to the
- * outcome), a humanised type/trigger, a computed duration ("Running…" while live, a dash when a
- * queued job has not started) and, on failures, an error popover. Container states — loading,
- * error-with-retry, empty and paged — are all covered.
+ * outcome), the type and trigger read as one phrase ("Reconciliation · scheduled"), a start time that
+ * ticks and carries its absolute instant in a tooltip, a computed duration ("Running…" while live, a
+ * dash when a queued job has not started) and, on failures, an error hover.
+ *
+ * Correlating a failed run with a server log is this table's entire job, which is why "3 days ago" is
+ * not good enough on its own and why the exact timestamp is always one hover away. Rows with a
+ * persisted progress report expand — through the same `Collapsible`-as-`tbody` idiom the rest of the
+ * surface uses, rather than a second hand-rolled expansion protocol.
  */
 const meta = {
 	component: SyncJobsTable,
@@ -131,15 +136,63 @@ export const Default: Story = { args: { jobs } };
 /** Every status the wire can report, including the queued/no-duration and warning edges. */
 export const AllStatuses: Story = { args: { jobs: allStatuses } };
 
-/** The error popover surfaces the truncated summary on demand, keyed to the failing row. */
-export const ErrorPopover: Story = {
+/** Type and trigger are one phrase, not two columns — the second repeated one word down every row. */
+export const TypeCarriesTrigger: Story = {
+	args: { jobs },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByRole("columnheader", { name: "Trigger" })).toBeNull();
+		await expect(canvas.getAllByText("Reconciliation", { exact: false }).length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText(/· scheduled/i).length).toBeGreaterThan(0);
+	},
+};
+
+/** The start time is relative for scanning and absolute for grepping a log — hover gets the instant. */
+export const StartedRevealsAbsoluteTime: Story = {
+	args: { jobs },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.hover(canvas.getAllByText(/ago$/)[0]);
+		await expect(await screen.findByText(/\d{4}, \d{2}:\d{2}:\d{2}$/)).toBeInTheDocument();
+	},
+};
+
+/** The error hover surfaces the summary on demand, keyed to the failing row. No click, no focus trap. */
+export const ErrorHover: Story = {
 	args: { jobs: allStatuses },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /error for job 10/i }));
+		await userEvent.hover(canvas.getByRole("button", { name: /error for job 10/i }));
 		await expect(
 			await screen.findByText(/rate limit exceeded after 3 retries/i),
 		).toBeInTheDocument();
+	},
+};
+
+/** A job that persisted a progress report expands to it; one with nothing to show grows no chevron. */
+export const ExpandProgressDetail: Story = {
+	args: {
+		jobs: [
+			{
+				...jobs[0],
+				progress: {
+					phase: "pullRequests",
+					currentStep: "Backfilling ls1intum/Artemis — issues #4812 → #3200",
+					currentRepository: "ls1intum/Artemis",
+					unitsCompleted: 1_612,
+					unitsTotal: 4_812,
+				},
+			},
+			jobs[2],
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// Only the job with a progress report is expandable.
+		await expect(canvas.getAllByRole("button", { name: /show details for job/i })).toHaveLength(1);
+		await userEvent.click(canvas.getByRole("button", { name: /show details for job 3/i }));
+		await expect(await canvas.findByText(/backfilling ls1intum\/artemis/i)).toBeInTheDocument();
+		await expect(canvas.getByText("Pull requests")).toBeInTheDocument();
 	},
 };
 

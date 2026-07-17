@@ -1,24 +1,32 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedCommentsDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Container for a Pull Request DTO with its embedded reviews, review threads, and project items.
+ * Container for a Pull Request DTO with its embedded conversation comments, reviews,
+ * review threads, and project items.
  * <p>
- * Used during sync to process reviews, review comments, and project items inline with PRs,
- * eliminating N+1 queries.
+ * Used during sync to process comments, reviews, review comments, and project items inline
+ * with PRs, eliminating N+1 queries.
  * <p>
  * <h2>Embedded Data</h2>
  * <ul>
+ *   <li>{@code embeddedComments} - First 10 conversation comments (pagination for PRs with more)</li>
  *   <li>{@code embeddedReviews} - First 5 reviews (pagination for PRs with more)</li>
  *   <li>{@code embeddedReviewThreads} - First 5 review threads with their comments</li>
  *   <li>{@code embeddedProjectItems} - First 5 project items (pagination for PRs in more projects)</li>
  * </ul>
+ * <p>
+ * Conversation comments are the top-level {@code IssueComment}s on the PR's conversation tab —
+ * distinct from review-thread comments, and reusing the issue-comment DTO because GitHub models
+ * both with the same type.
  */
 public record PullRequestWithReviewThreads(
     GitHubPullRequestDTO pullRequest,
+    EmbeddedCommentsDTO embeddedComments,
     EmbeddedReviewsDTO embeddedReviews,
     EmbeddedReviewThreadsDTO embeddedReviewThreads,
     EmbeddedProjectItemsDTO embeddedProjectItems
@@ -38,6 +46,7 @@ public record PullRequestWithReviewThreads(
         String context = "PR #" + ghPullRequest.getNumber();
 
         GitHubPullRequestDTO dto = GitHubPullRequestDTO.fromPullRequest(ghPullRequest);
+        EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghPullRequest.getComments(), context);
         EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews(), context);
         EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(
             ghPullRequest.getReviewThreads(),
@@ -48,6 +57,6 @@ public record PullRequestWithReviewThreads(
             context
         );
 
-        return new PullRequestWithReviewThreads(dto, reviews, threads, projectItems);
+        return new PullRequestWithReviewThreads(dto, comments, reviews, threads, projectItems);
     }
 }

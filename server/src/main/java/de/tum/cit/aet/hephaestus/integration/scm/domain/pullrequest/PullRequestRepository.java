@@ -238,7 +238,14 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             head_ref_oid = COALESCE(EXCLUDED.head_ref_oid, issue.head_ref_oid),
             base_ref_oid = COALESCE(EXCLUDED.base_ref_oid, issue.base_ref_oid),
             merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id),
-            merge_commit_sha = COALESCE(EXCLUDED.merge_commit_sha, issue.merge_commit_sha)
+            merge_commit_sha = COALESCE(EXCLUDED.merge_commit_sha, issue.merge_commit_sha),
+            -- Resurrect: upstream just handed us this PR, so any tombstone on it is wrong. This is
+            -- what makes a deletion-sweep tombstone reversible — a sweep that tombstoned on bad
+            -- data self-heals on the next ordinary sync instead of needing an operator.
+            -- Keep this comment free of the apostrophe character: Hibernate reads one as the start of
+            -- a quoted range it never finds the end of, and the whole ApplicationContext fails to
+            -- start. NativeQueryCommentArchTest enforces this.
+            deleted_at = NULL
         """,
         nativeQuery = true
     )

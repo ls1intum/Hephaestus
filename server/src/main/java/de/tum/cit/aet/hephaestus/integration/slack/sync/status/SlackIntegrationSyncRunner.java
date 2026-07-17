@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationSyncRunner;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackChannelHistorySyncService.WorkspaceSyncSummary;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackDataSyncScheduler;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,8 +28,9 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
         return IntegrationKind.SLACK;
     }
 
+    /** Slack has no deletion sweep of its own — {@code type} is unused here. */
     @Override
-    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle) {
+    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle, SyncJobType type) {
         WorkspaceSyncSummary summary = dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
         handle.progress(summary.synced() + summary.skipped(), summary.channels(), progressDetail(summary));
         if (summary.failed() > 0 || summary.budgetExhausted()) {

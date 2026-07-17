@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -45,20 +46,30 @@ import reactor.util.retry.Retry;
  * Uses typed GraphQL models for type-safe deserialization and delegates
  * persistence to GitHubIssueCommentProcessor.
  * <p>
- * <b>Note:</b> Most comments are fetched inline with issues via GetRepositoryIssues query.
- * This service is primarily used to:
+ * <b>Note:</b> Most comments are fetched inline with issues via GetRepositoryIssues query,
+ * and inline with pull requests via GetRepositoryPullRequests. This service is primarily used to:
  * <ul>
  *   <li>Fetch remaining comments for issues that have more than 10 (embedded limit)</li>
  *   <li>Handle standalone comment sync when issues aren't involved</li>
  * </ul>
+ * <p>
+ * <b>Pull requests:</b> a PR's conversation comments are the same {@code IssueComment} entity as an
+ * issue's, but GitHub exposes them under a different root ({@code repository.pullRequest} rather than
+ * {@code repository.issue}, since {@code repository.issues} excludes PRs). {@link #syncRemainingComments}
+ * therefore selects the query document and response path from the parent's concrete type — everything
+ * downstream (pagination, rate limiting, persistence) is shared.
  *
  * @see de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueSyncService
+ * @see de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.GitHubPullRequestSyncService
  */
 @Service
 public class GitHubIssueCommentSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubIssueCommentSyncService.class);
     private static final String QUERY_DOCUMENT = "GetIssueComments";
+    private static final String PULL_REQUEST_QUERY_DOCUMENT = "GetPullRequestComments";
+    private static final String ISSUE_PARENT_PATH = "repository.issue";
+    private static final String PULL_REQUEST_PARENT_PATH = "repository.pullRequest";
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubIssueCommentProcessor commentProcessor;
@@ -311,14 +322,19 @@ public class GitHubIssueCommentSyncService {
     }
 
     /**
-     * Synchronizes remaining comments for an issue, starting from the given cursor.
+     * Synchronizes remaining comments for an issue or pull request, starting from the given cursor.
      * <p>
-     * This method is called by GitHubIssueSyncService when an issue has more than 10 comments
-     * (the embedded limit in GetRepositoryIssues query). It continues pagination from where
+     * This method is called by GitHubIssueSyncService when an issue has more than 10 comments, and by
+     * GitHubPullRequestSyncService when a PR has more than 10 conversation comments (the embedded limit
+     * in the GetRepositoryIssues / GetRepositoryPullRequests queries). It continues pagination from where
      * the embedded comments left off, avoiding re-fetching already synced comments.
+     * <p>
+     * The parent's concrete type selects the GraphQL root: a {@link PullRequest} is fetched via
+     * {@code repository.pullRequest} (GetPullRequestComments) because {@code repository.issue} does not
+     * resolve pull requests. Both roots yield the same IssueComment nodes and share the persistence path.
      *
      * @param scopeId the scope ID for authentication
-     * @param issue the issue to fetch remaining comments for
+     * @param issue the issue or pull request to fetch remaining comments for
      * @param startCursor the pagination cursor to start from (from embedded comments)
      * @return number of additional comments synced
      */
@@ -342,6 +358,12 @@ public class GitHubIssueCommentSyncService {
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
+        // A PR's conversation comments hang off repository.pullRequest, not repository.issue.
+        boolean isPullRequest = issue instanceof PullRequest;
+        String queryDocument = isPullRequest ? PULL_REQUEST_QUERY_DOCUMENT : QUERY_DOCUMENT;
+        String parentPath = isPullRequest ? PULL_REQUEST_PARENT_PATH : ISSUE_PARENT_PATH;
+        String commentsPath = parentPath + ".comments";
+
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
@@ -354,9 +376,10 @@ public class GitHubIssueCommentSyncService {
         int reportedTotalCount = -1;
 
         log.debug(
-            "Starting remaining comment sync: repoName={}, issueNumber={}, startCursor={}",
+            "Starting remaining comment sync: repoName={}, issueNumber={}, isPullRequest={}, startCursor={}",
             safeNameWithOwner,
             issue.getNumber(),
+            isPullRequest,
             startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
         );
 
@@ -377,7 +400,7 @@ public class GitHubIssueCommentSyncService {
                 final int currentPage = pageCount;
                 ClientGraphQlResponse response = Mono.defer(() ->
                     client
-                        .documentName(QUERY_DOCUMENT)
+                        .documentName(queryDocument)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
                         .variable("number", issue.getNumber())
@@ -407,7 +430,7 @@ public class GitHubIssueCommentSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
-                    if (isNotFoundError(response, "repository.issue")) {
+                    if (isNotFoundError(response, parentPath)) {
                         log.debug(
                             "Skipped remaining comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
                             safeNameWithOwner,
@@ -462,7 +485,7 @@ public class GitHubIssueCommentSyncService {
                 }
 
                 GHIssueCommentConnection connection = response
-                    .field("repository.issue.comments")
+                    .field(commentsPath)
                     .toEntity(GHIssueCommentConnection.class);
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
@@ -491,7 +514,7 @@ public class GitHubIssueCommentSyncService {
             } catch (InstallationNotFoundException e) {
                 throw e;
             } catch (FieldAccessException e) {
-                if (isNotFoundError(e.getResponse(), "repository.issue")) {
+                if (isNotFoundError(e.getResponse(), parentPath)) {
                     log.debug(
                         "Skipped remaining comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
                         safeNameWithOwner,

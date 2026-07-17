@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { AlertCircleIcon, ArrowRightIcon, PlugZapIcon } from "lucide-react";
+import { ArrowRightIcon, PlugZapIcon } from "lucide-react";
 import type { ConnectionSyncStatus, IntegrationCatalogEntry } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
@@ -10,9 +10,9 @@ import { ActiveJobProgress } from "./ActiveJobProgress";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
-import { LastProcessedEvent } from "./LastProcessedEvent";
+import { RelativeTime } from "./RelativeTime";
 import { SyncNowButton } from "./SyncNowButton";
-import { relativeTime } from "./sync-format";
+import { freshnessTone } from "./sync-format";
 
 const DETAIL_ROUTE: Record<
 	IntegrationCatalogEntry["kind"],
@@ -32,6 +32,27 @@ const KIND_ICON: Record<IntegrationCatalogEntry["kind"], React.ReactNode> = {
 	SLACK: <SlackIcon className="size-5" />,
 	OUTLINE: <OutlineIcon className="size-5" />,
 };
+
+/**
+ * The two ways a connection can be healthy overall and still be failing its job.
+ *
+ * Errored was already here; stale is the one the server has always sent and nothing rendered — and it
+ * is the quieter, more common failure, because a connection whose scheduler has stopped reports
+ * HEALTHY forever. Plain tinted text rather than badges: the health badge is the one badge a card
+ * gets, and two more would out-shout it.
+ */
+function ResourceHealthLine({ counts }: { counts: ConnectionSyncStatus["resourceCounts"] }) {
+	if (counts.errored === 0 && counts.stale === 0) return null;
+
+	return (
+		<p className="flex flex-wrap items-center gap-x-1.5">
+			{counts.errored > 0 && <span className="text-destructive">{counts.errored} errored</span>}
+			{counts.errored > 0 && counts.stale > 0 && <span className="text-muted-foreground">·</span>}
+			{counts.stale > 0 && <span className="text-warning">{counts.stale} stale</span>}
+			<span className="text-muted-foreground">of {counts.total} resources</span>
+		</p>
+	);
+}
 
 export interface IntegrationOverviewCardProps {
 	workspaceSlug: string;
@@ -63,7 +84,9 @@ export function IntegrationOverviewCard({
 	const isScm = entry.kind === "GITHUB" || entry.kind === "GITLAB";
 
 	return (
-		<Card>
+		// `h-full` so a grid of these stretches to one row height instead of raggedly tracking each
+		// card's own content — the footer controls sit on one line across the row.
+		<Card className="h-full">
 			<CardHeader>
 				<IntegrationCardHeading className="flex items-center gap-2">
 					{KIND_ICON[entry.kind]}
@@ -119,29 +142,46 @@ export function IntegrationOverviewCard({
 					status && (
 						<div className="space-y-2 text-sm">
 							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+								{/* Tinted against this connection's own cadence, so the triage page can actually
+								    triage: a card is picked out of the grid by colour, not by reading four dates. */}
 								<span>
-									{status.lastSuccessfulSyncAt
-										? `Last synced ${relativeTime(status.lastSuccessfulSyncAt)}`
-										: "Never synced"}
+									{status.lastSuccessfulSyncAt ? (
+										<>
+											Last synced{" "}
+											<RelativeTime
+												value={status.lastSuccessfulSyncAt}
+												tone={freshnessTone(
+													status.lastSuccessfulSyncAt,
+													status.syncIntervalSeconds,
+												)}
+											/>
+										</>
+									) : (
+										"Never synced"
+									)}
 								</span>
-								<LastProcessedEvent lastEventAt={status.lastEventProcessedAt} />
+								<span>
+									{status.lastEventProcessedAt ? (
+										<>
+											Last event <RelativeTime value={status.lastEventProcessedAt} />
+										</>
+									) : (
+										"No events received yet"
+									)}
+								</span>
 							</div>
-							{status.resourceCounts.errored > 0 && (
-								<p className="flex items-center gap-1.5 text-destructive">
-									<AlertCircleIcon className="size-4" />
-									{status.resourceCounts.errored} of {status.resourceCounts.total} resources errored
-								</p>
-							)}
+							<ResourceHealthLine counts={status.resourceCounts} />
 							<ActiveJobProgress job={status.activeJob} />
 						</div>
 					)
 				)}
 			</CardContent>
 			{isConnectionActive && (
-				<CardFooter className="justify-between gap-2">
+				<CardFooter className="mt-auto justify-between gap-2">
+					{/* This card's trigger only ever enqueues a reconciliation, so that is what it announces. */}
 					<SyncNowButton
 						onClick={onSync}
-						isTriggering={isTriggering}
+						triggeringType={isTriggering ? "RECONCILIATION" : null}
 						activeJob={status?.activeJob}
 					/>
 					<Button

@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { listConnectionSyncJobsOptions } from "@/api/@tanstack/react-query.gen";
-import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { OutlineCollectionsSection } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
@@ -55,11 +54,6 @@ function OutlineIntegrationPage() {
 				icon={<OutlineIcon className="size-6" />}
 				title="Outline"
 				description="Mirror Outline collections so their documents reach practice detection as context."
-				actions={
-					outline.health && (
-						<ConnectionHealthBadge health={outline.health} isSyncing={outline.hasActiveJob} />
-					)
-				}
 			/>
 
 			{workspaceSlug != null && outline.isLoading && <Skeleton className="h-48 w-full" />}

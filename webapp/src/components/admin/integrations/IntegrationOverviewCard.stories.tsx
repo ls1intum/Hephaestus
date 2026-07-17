@@ -3,6 +3,11 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { IntegrationOverviewCard } from "./IntegrationOverviewCard";
 
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+
+/** Hourly reconciliation — what every freshness reading on the card is judged against. */
+const SYNC_INTERVAL_SECONDS = 3_600;
+
 const status: ConnectionSyncStatus = {
 	connectionId: 7,
 	connectionState: "ACTIVE",
@@ -10,7 +15,9 @@ const status: ConnectionSyncStatus = {
 	health: "HEALTHY",
 	resourceCounts: { total: 12, errored: 0, pending: 0, stale: 0 },
 	backfillSupported: true,
-	lastSuccessfulSyncAt: new Date("2026-07-14T10:00:00Z"),
+	syncIntervalSeconds: SYNC_INTERVAL_SECONDS,
+	lastSuccessfulSyncAt: minutesAgo(4),
+	lastEventProcessedAt: minutesAgo(1),
 };
 
 const runningJob: SyncJob = {
@@ -19,18 +26,21 @@ const runningJob: SyncJob = {
 	trigger: "MANUAL",
 	status: "RUNNING",
 	cancelRequested: false,
-	createdAt: new Date("2026-07-15T10:00:00Z"),
-	startedAt: new Date("2026-07-15T10:00:05Z"),
+	createdAt: minutesAgo(2),
+	startedAt: minutesAgo(2),
 	itemsProcessed: 5,
 	itemsTotal: 12,
 };
 
 /**
- * The integrations landing tile for one connection. It surfaces health (a running job flips the
- * badge to "Syncing"), last-sync/last-event, an errored-resources warning and a sync + details
+ * The integrations landing tile for one connection. It surfaces health (a running job flips the badge
+ * to "Syncing"), last-sync/last-event, the errored and stale resource counts, and a sync + details
  * footer while active — and it degrades honestly: a not-connected SCM explains it is chosen at
- * workspace creation, a non-ACTIVE connection hides its controls, and a failed status query shows
- * an inline error rather than a blank card.
+ * workspace creation, a non-ACTIVE connection hides its controls, and a failed status query shows an
+ * inline error rather than a blank card.
+ *
+ * This is the triage page, so its freshness reading is tinted against the connection's own cadence:
+ * a card is picked out of the grid by colour rather than by reading four dates in sequence.
  */
 const meta = {
 	component: IntegrationOverviewCard,
@@ -65,7 +75,7 @@ export const Syncing: Story = {
 	},
 };
 
-/** Some resources are erroring — surfaced as a destructive count line. */
+/** Some resources are erroring — surfaced as a destructive count. */
 export const WithErroredResources: Story = {
 	args: {
 		status: {
@@ -76,7 +86,84 @@ export const WithErroredResources: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/3 of 12 resources errored/i)).toBeInTheDocument();
+		await expect(canvas.getByText("3 errored")).toHaveClass("text-destructive");
+		await expect(canvas.getByText(/of 12 resources/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * Stale resources with nothing errored — the quieter, more common failure, and the one the card used
+ * to hide: a connection whose scheduler has stopped reports HEALTHY forever while its mirror rots.
+ * The server has always counted this; nothing rendered it until now.
+ */
+export const WithStaleResources: Story = {
+	args: { status: { ...status, resourceCounts: { total: 12, errored: 0, pending: 0, stale: 4 } } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("4 stale")).toHaveClass("text-warning");
+	},
+};
+
+/** Both at once — two tinted numbers in one line, and still exactly one badge on the card. */
+export const WithErroredAndStaleResources: Story = {
+	args: {
+		status: {
+			...status,
+			health: "DEGRADED",
+			resourceCounts: { total: 12, errored: 1, pending: 0, stale: 3 },
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("1 errored")).toBeInTheDocument();
+		await expect(canvas.getByText("3 stale")).toBeInTheDocument();
+	},
+};
+
+/**
+ * The sync is two cadences overdue. The reading tints itself, which is the entire point of a triage
+ * grid — this card is findable at a glance among healthy siblings.
+ */
+export const StaleFreshness: Story = {
+	args: { status: { ...status, lastSuccessfulSyncAt: minutesAgo(200) } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/hours ago$/)).toHaveClass("text-warning");
+	},
+};
+
+/** No cadence from the server means no judgement here — the age is printed, not coloured. */
+export const UnknownCadence: Story = {
+	args: {
+		status: {
+			...status,
+			syncIntervalSeconds: undefined,
+			lastSuccessfulSyncAt: minutesAgo(60 * 30),
+			lastEventProcessedAt: undefined,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const reading = canvas.getByText(/ago$/);
+		await expect(reading).not.toHaveClass("text-warning");
+		await expect(reading).not.toHaveClass("text-destructive");
+	},
+};
+
+/** Nothing has ever synced, and no webhook event has arrived either. */
+export const NeverSynced: Story = {
+	args: {
+		status: {
+			...status,
+			health: "PENDING",
+			lastSuccessfulSyncAt: undefined,
+			lastEventProcessedAt: undefined,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Never synced")).toBeInTheDocument();
+		await expect(canvas.getByText(/no events received yet/i)).toBeInTheDocument();
 	},
 };
 

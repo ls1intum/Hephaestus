@@ -260,7 +260,7 @@ public class SyncStatusService {
                         if (type == SyncJobType.BACKFILL) {
                             runner.backfill(ref, handle);
                         } else {
-                            runner.reconcile(ref, handle);
+                            runner.reconcile(ref, handle, type);
                         }
                     })
                 );

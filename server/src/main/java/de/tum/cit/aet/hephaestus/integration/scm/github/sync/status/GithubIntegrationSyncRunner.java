@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.status.BackfillTally;
@@ -49,10 +50,16 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
         return IntegrationKind.GITHUB;
     }
 
-    /** The same warning-aware body the daily scheduler uses, threaded with the job handle. */
+    /**
+     * The same warning-aware body the daily scheduler uses, threaded with the job handle.
+     *
+     * <p>{@code type} is forwarded rather than dropped: it is what decides whether the body ends with
+     * a deletion sweep, and it is the only difference between an {@code INITIAL} and a
+     * {@code RECONCILIATION} run.
+     */
     @Override
-    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle) {
-        dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
+    public void reconcile(IntegrationRef ref, SyncExecutionHandle handle, SyncJobType type) {
+        dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle, type);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }

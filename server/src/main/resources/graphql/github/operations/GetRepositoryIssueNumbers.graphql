@@ -1,0 +1,35 @@
+# Full upstream issue-number listing for one repository — the upstream half of the RECONCILIATION
+# deletion sweep's set difference (GitHubDeletionSweepService).
+#
+# Selects `number` and nothing else: this is deliberately the cheapest possible complete enumeration
+# (~1 rate-limit point per page of 100, vs ~59 for one page of GetRepositoryIssues, which drags in
+# comments/projectItems/assignees/labels). The sweep needs the key set, never the content.
+#
+# `totalCount` is load-bearing, not decoration: the sweep compares it against the number of nodes it
+# actually received and refuses to delete anything unless the two agree. Without it, a listing that
+# silently stopped short would be indistinguishable from a repository that really has fewer issues —
+# and would authorize deleting every issue past the truncation point.
+#
+# No `filterBy: {since:}` and no `states:` — a sweep must see EVERY issue that exists upstream,
+# including ancient and closed ones. Any filter here turns "absent from upstream" into "absent from
+# this filtered view", which is precisely how a sweep deletes live data.
+query GetRepositoryIssueNumbers($owner: String!, $name: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issues(first: $first, after: $after, orderBy: { field: CREATED_AT, direction: ASC }) {
+            totalCount
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                number
+            }
+        }
+    }
+}

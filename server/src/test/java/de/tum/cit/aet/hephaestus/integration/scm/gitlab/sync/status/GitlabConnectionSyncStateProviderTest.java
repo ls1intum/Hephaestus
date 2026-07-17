@@ -312,10 +312,10 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldNeverClaimAPerClassWatermarkBecauseGitlabPersistsNone() {
+        void shouldReportThePerClassWatermarksGitlabPersistsAndNoOthers() {
             RepositoryToMonitor monitor = monitor(5L, "group/honest-repo");
-            // The GitLab sync path never writes these columns; set them anyway so the test would catch a
-            // provider that started reading them (or borrowing repo.lastSyncAt) as a per-class claim.
+            // GitlabDataSyncScheduler.updateSyncTimestamp writes these two columns on every completed
+            // phase, keyed by this monitor row — so the provider must read them rather than discard them.
             monitor.setIssuesSyncedAt(Instant.parse("2026-07-10T03:00:00Z"));
             monitor.setPullRequestsSyncedAt(Instant.parse("2026-07-14T03:00:00Z"));
             when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(monitor));
@@ -333,13 +333,20 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
             SyncResourceState resource = resources.get(0);
 
-            // The repository-wide timestamp is real and reported at row level...
+            // Row level reports the most recent watermark of any kind — here the repository-wide one.
             assertThat(resource.lastSyncedAt()).isEqualTo(repoSyncedAt);
-            // ...but is deliberately NOT borrowed as a per-class claim: GitLab measures no per-class
-            // freshness, so every class reports "not tracked" rather than a freshness nobody measured.
-            assertThat(resource.counts())
-                .hasSize(6)
-                .allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
+
+            // Issues and pull requests each carry their OWN persisted watermark, reported per class
+            // rather than collapsed into lastSyncedAt above — that collapse is what would hide
+            // "pull requests are fresh but issues stalled four days ago" behind the newest sibling.
+            assertThat(resource.counts()).hasSize(6);
+            assertThat(resource.counts().get(0).lastSyncedAt()).isEqualTo(Instant.parse("2026-07-10T03:00:00Z"));
+            assertThat(resource.counts().get(1).lastSyncedAt()).isEqualTo(Instant.parse("2026-07-14T03:00:00Z"));
+
+            // The nested classes have no independent sync phase and therefore no watermark column of
+            // their own. They stay null — "not tracked" — rather than borrowing a sibling's timestamp
+            // and asserting a per-class freshness nobody measured.
+            assertThat(resource.counts().subList(2, 6)).allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
         }
 
         private RepositoryToMonitor monitor(long id, String nameWithOwner) {

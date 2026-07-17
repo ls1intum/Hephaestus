@@ -20,12 +20,11 @@ import {
 import type { SlackConsentState } from "@/components/admin/integrations/AdminSlackChannelsSettings";
 import { AdminSlackChannelsSettings } from "@/components/admin/integrations/AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
-import { ConnectionHealthBadge } from "@/components/admin/integrations/ConnectionHealthBadge";
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
-import { SlackSyncStatusCard } from "@/components/admin/integrations/SlackSyncStatusCard";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
+import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -214,11 +213,6 @@ function SlackIntegrationPage() {
 				icon={<SlackIcon className="size-6" />}
 				title="Slack"
 				description="Connection, weekly digest, monitored channels and sync activity for this workspace's Slack app."
-				actions={
-					status && (
-						<ConnectionHealthBadge health={status.health} isSyncing={status.activeJob != null} />
-					)
-				}
 			/>
 
 			{routeLoading && <Skeleton className="h-48 w-full" />}
@@ -248,11 +242,14 @@ function SlackIntegrationPage() {
 			)}
 
 			{!routeLoading && !routeError && status && (
-				<SlackSyncStatusCard
+				<SyncStatusHeader
+					label="Slack"
 					status={status}
 					isConnectionActive={isConnectionActive}
-					isTriggering={triggerSync.isPending}
+					// Slack's only manual trigger is a reconciliation, so a bare `isPending` names it exactly.
+					triggeringType={triggerSync.isPending ? "RECONCILIATION" : null}
 					isCancelling={cancelJob.isPending}
+					onRetry={() => statusQuery.refetch()}
 					onSync={() => {
 						if (connectionId == null) return;
 						triggerSync.mutate({

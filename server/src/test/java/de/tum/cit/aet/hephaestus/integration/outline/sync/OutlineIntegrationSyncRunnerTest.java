@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -36,7 +37,7 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
     void reconcile_delegatesToTheWorkspacePass_threadingTheJobHandle() {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
 
-        runner.reconcile(ref, handle);
+        runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
         verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle);
         verify(handle, never()).reportCancelled();
@@ -47,7 +48,7 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
         when(handle.isCancellationRequested()).thenReturn(true);
 
-        runner.reconcile(ref, handle);
+        runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
         verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle);
         verify(handle).reportCancelled();
@@ -63,7 +64,11 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
             .when(syncScheduler)
             .syncWorkspaceNow(eq(WORKSPACE), any(SyncExecutionHandle.class));
 
-        runner.reconcile(new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"), handle);
+        runner.reconcile(
+            new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"),
+            handle,
+            SyncJobType.RECONCILIATION
+        );
 
         verify(handle).reportWarnings();
     }

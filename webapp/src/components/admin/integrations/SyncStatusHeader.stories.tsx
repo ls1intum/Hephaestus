@@ -1,0 +1,383 @@
+import type { Meta, StoryObj } from "@storybook/react";
+import { ExternalLinkIcon } from "lucide-react";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
+import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
+import { Button } from "@/components/ui/button";
+import { SyncStatusHeader } from "./SyncStatusHeader";
+
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+const minutesFromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+
+/** Hourly reconciliation — the cadence every freshness reading below is judged against. */
+const SYNC_INTERVAL_SECONDS = 3_600;
+
+const baseStatus: ConnectionSyncStatus = {
+	connectionId: 7,
+	connectionState: "ACTIVE",
+	kind: "GITHUB",
+	health: "HEALTHY",
+	resourceCounts: { total: 12, errored: 0, pending: 0, stale: 0 },
+	backfillSupported: true,
+	syncIntervalSeconds: SYNC_INTERVAL_SECONDS,
+	lastSuccessfulSyncAt: minutesAgo(4),
+	nextScheduledSyncAt: minutesFromNow(56),
+	lastEventProcessedAt: minutesAgo(1),
+	webhookRegistered: true,
+	rateLimit: { limit: 5000, remaining: 4812, resetAt: minutesFromNow(40) },
+};
+
+const runningJob: SyncJob = {
+	id: 12,
+	type: "RECONCILIATION",
+	trigger: "MANUAL",
+	status: "RUNNING",
+	cancelRequested: false,
+	createdAt: minutesAgo(1),
+	startedAt: minutesAgo(1),
+	itemsProcessed: 5,
+	itemsTotal: 12,
+};
+
+/**
+ * The connection plane for every integration: health, freshness, and the controls that change them.
+ *
+ * The headline is one sentence — badge, when the mirror last completed, when it next runs — because
+ * that is the whole question this page is opened to answer. It used to be three places: a badge in the
+ * page header that popped in late, an uppercase-labelled 2x2 metric grid, and a schedule the server
+ * sent on every response that nothing rendered at all. The reading is tinted against the connection's
+ * own cadence, so "4 hours ago" reads as fine on a six-hourly schedule and as a missed run on an
+ * hourly one.
+ *
+ * Everything under it qualifies that sentence: diagnostics that explain a bad reading, the running
+ * job, and one trigger. Sync and Backfill used to sit side by side sharing a mutation, which forced a
+ * protocol between them so neither claimed the other's work; making the rare operation a menu item
+ * deleted the protocol along with the second button.
+ */
+const meta = {
+	component: SyncStatusHeader,
+	parameters: { layout: "padded" },
+	tags: ["autodocs"],
+	args: {
+		label: "GitHub",
+		status: baseStatus,
+		isLoading: false,
+		isConnectionActive: true,
+		triggeringType: null,
+		isCancelling: false,
+		onRetry: fn(),
+		onSync: fn(),
+		onBackfill: fn(),
+		onCancel: fn(),
+	},
+} satisfies Meta<typeof SyncStatusHeader>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/**
+ * Connected, healthy, synced within cadence. The freshness reading is uncoloured because it is fine,
+ * and the schedule behind it is stated — a freshness claim with no cadence to read it against is not
+ * interpretable, which is why `nextScheduledSyncAt` finally has a call site.
+ */
+export const Healthy: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Healthy");
+		await expect(canvas.getByText(/last synced/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/next run in/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * Two cadences without a successful run — the reading is tinted `text-warning`, and this is the
+ * one-line fix the whole freshness system was waiting on: the route now passes the cadence, so
+ * `freshnessTone` finally has a call site and every reading below it can be judged.
+ */
+export const StaleFreshness: Story = {
+	args: {
+		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesAgo(150) },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/hours ago$/)).toHaveClass("text-warning");
+	},
+};
+
+/** Six cadences past due: the reading goes destructive well before anything else reports a fault. */
+export const VeryStaleFreshness: Story = {
+	args: {
+		status: { ...baseStatus, health: "DEGRADED", lastSuccessfulSyncAt: minutesAgo(60 * 11) },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/hours ago$/)).toHaveClass("text-destructive");
+	},
+};
+
+/**
+ * A schedule that is already due. "next run 5 minutes ago" would read as a past event rather than a
+ * pending one, so an overdue cron says so plainly — the worker may simply be busy.
+ */
+export const NextRunDue: Story = {
+	args: { status: { ...baseStatus, nextScheduledSyncAt: minutesAgo(2) } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/next run due/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * No cadence — the schedule is irregular or unparseable, so the server sends null rather than guess.
+ * The reading is printed and deliberately not judged; declining to colour is the honest answer.
+ */
+export const UnknownCadence: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			syncIntervalSeconds: undefined,
+			nextScheduledSyncAt: undefined,
+			lastSuccessfulSyncAt: minutesAgo(60 * 20),
+			lastEventProcessedAt: undefined,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const reading = canvas.getByText(/ago$/);
+		await expect(reading).not.toHaveClass("text-warning");
+		await expect(reading).not.toHaveClass("text-destructive");
+	},
+};
+
+/** Nothing has ever synced, and there are resources that should have. */
+export const NeverSynced: Story = {
+	args: {
+		status: { ...baseStatus, health: "PENDING", lastSuccessfulSyncAt: undefined },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Never synced")).toBeInTheDocument();
+	},
+};
+
+/**
+ * A connection with nothing to sync yet — a fresh Slack workspace with no channels activated. "Never
+ * synced" here is an accusation the facts don't support, so the copy follows the resource count.
+ */
+export const NothingToSyncYet: Story = {
+	args: {
+		label: "Slack",
+		status: {
+			...baseStatus,
+			kind: "SLACK",
+			health: "PENDING",
+			backfillSupported: false,
+			lastSuccessfulSyncAt: undefined,
+			rateLimit: undefined,
+			resourceCounts: { total: 0, errored: 0, pending: 0, stale: 0 },
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/no resources to sync yet/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/never synced/i)).not.toBeInTheDocument();
+	},
+};
+
+/** The vendor webhook is not registered — the card flags it instead of implying live delivery. */
+export const WebhookNotRegistered: Story = {
+	args: { status: { ...baseStatus, webhookRegistered: false } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/not registered/i)).toBeInTheDocument();
+	},
+};
+
+/** Registered, but nothing has arrived through it yet. A dash here would read as a value, not a gap. */
+export const NoWebhookEventsYet: Story = {
+	args: { status: { ...baseStatus, lastEventProcessedAt: undefined } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/no events yet/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * The rate limit is nearly spent — the only reading that earns colour, because it is the only one that
+ * predicts a failure. This replaced a `Progress` bar whose "full = healthy" sat directly beside the
+ * job bar's "full = done": two bars on one card filling for opposite reasons.
+ */
+export const RateLimitNearlyExhausted: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			health: "DEGRADED",
+			rateLimit: { limit: 5000, remaining: 220, resetAt: minutesFromNow(12) },
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("220")).toHaveClass("text-warning");
+	},
+};
+
+/** The reset window is the one fact a bare number loses, so it lives one hover away. */
+export const RateLimitResetTooltip: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.hover(canvas.getByText("4,812"));
+		await expect(await screen.findByText(/resets in/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * The scheduled backfill cycle's own state. "Disabled" here means the background cycle is off — not
+ * that the Run backfill action is unavailable, which is a manual trigger and a different question.
+ * `IN_PROGRESS` reaches the admin title-cased rather than as a raw wire token.
+ */
+export const ScheduledBackfill: Story = {
+	args: { status: { ...baseStatus, backfill: { state: "IN_PROGRESS", percent: 40 } } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("In Progress")).toBeInTheDocument();
+		await expect(canvas.queryByText(/IN_PROGRESS/)).not.toBeInTheDocument();
+	},
+};
+
+/** Backfill lives in the split menu — one visible trigger, so pending can only mean this trigger. */
+export const BackfillFromSplitMenu: Story = {
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByRole("button", { name: /more sync options/i }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: /run backfill/i }));
+		await expect(args.onBackfill).toHaveBeenCalledTimes(1);
+	},
+};
+
+/** A kind whose runner offers no backfill pass — the menu is withheld rather than offered and 409'd. */
+export const BackfillUnsupported: Story = {
+	args: { status: { ...baseStatus, backfillSupported: false } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeInTheDocument();
+		await expect(
+			canvas.queryByRole("button", { name: /more sync options/i }),
+		).not.toBeInTheDocument();
+	},
+};
+
+/** *Sync now* was pressed — one trigger, one pending state, and no second button to lie about it. */
+export const SyncTriggerPending: Story = {
+	args: { triggeringType: "RECONCILIATION" },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /starting…/i })).toBeDisabled();
+		await expect(canvas.getByRole("button", { name: /more sync options/i })).toBeDisabled();
+	},
+};
+
+/** A job is running — the trigger disables, progress appears, and a cooperative Cancel joins the group. */
+export const ActiveJobRunning: Story = {
+	args: { status: { ...baseStatus, activeJob: runningJob } },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Syncing");
+		const cancel = canvas.getByRole("button", { name: /^cancel$/i });
+		await expect(cancel).toBeEnabled();
+		await userEvent.click(cancel);
+		await expect(args.onCancel).toHaveBeenCalledTimes(1);
+	},
+};
+
+/** Cancel already requested — the button reads "Stopping…" and is disabled to block re-clicks. */
+export const Cancelling: Story = {
+	args: {
+		isCancelling: true,
+		status: { ...baseStatus, activeJob: { ...runningJob, cancelRequested: true } },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(
+			canvas.getByRole("button", { name: /stopping after current step/i }),
+		).toBeDisabled();
+	},
+};
+
+/**
+ * Slack: the same component, minus the diagnostics whose payload it never sends. There is no rate
+ * limit and no backfill, so those items are absent rather than dashed — an integration should not have
+ * to render an empty field to prove it doesn't have one.
+ */
+export const Slack: Story = {
+	args: {
+		label: "Slack",
+		status: {
+			...baseStatus,
+			kind: "SLACK",
+			backfillSupported: false,
+			rateLimit: undefined,
+			resourceCounts: { total: 3, errored: 0, pending: 0, stale: 0 },
+		},
+		onBackfill: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText(/rate limit/i)).not.toBeInTheDocument();
+		await expect(canvas.getByText(/webhook/i)).toBeInTheDocument();
+	},
+};
+
+/** An app-installation workspace gets a link out to manage the install on GitHub. */
+export const WithActions: Story = {
+	args: {
+		actions: (
+			<Button
+				variant="outline"
+				size="sm"
+				nativeButton={false}
+				render={
+					<a href="https://github.com/settings/installations" target="_blank" rel="noreferrer" />
+				}
+			>
+				Manage installation on GitHub
+				<ExternalLinkIcon className="size-3.5" />
+			</Button>
+		),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const link = canvas.getByText(/manage installation on github/i).closest("a");
+		await expect(link).toHaveAttribute("href", "https://github.com/settings/installations");
+	},
+};
+
+/** A non-ACTIVE connection keeps its readings and loses its controls — nothing here would succeed. */
+export const ConnectionInactive: Story = {
+	args: {
+		isConnectionActive: false,
+		status: { ...baseStatus, connectionState: "SUSPENDED", health: "SUSPENDED" },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Status still loading. The placeholder reproduces the loaded card's structure — headline, diagnostics
+ * row, action row — so the content lands in a box that is already the right size.
+ */
+export const Loading: Story = { args: { status: undefined, isLoading: true } };
+
+/** No connection row for this workspace — a plain informational line, not an error. */
+export const Missing: Story = { args: { status: undefined, isConnectionActive: false } };
+
+/** The status query failed — a retryable inline error replaces the readings. */
+export const LoadError: Story = {
+	args: { status: undefined, error: new Error("503 Service Unavailable") },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/couldn't load the github connection/i)).toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
+		await expect(args.onRetry).toHaveBeenCalledTimes(1);
+	},
+};

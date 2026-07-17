@@ -24,14 +24,28 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+} from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { ConnectionHealthBadge } from "../ConnectionHealthBadge";
 import { ConnectionStateNotice } from "../ConnectionStateNotice";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
-import { asDate, CONNECTION_STATE_LABEL, type ConnectionState, relativeTime } from "../sync-format";
+import { RelativeTime } from "../RelativeTime";
+import {
+	asDate,
+	CONNECTION_STATE_LABEL,
+	type ConnectionHealth,
+	type ConnectionState,
+} from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
@@ -60,6 +74,8 @@ export interface OutlineConnectCardProps {
 	 */
 	connectionState?: ConnectionState;
 	connectionLabel?: string;
+	/** Derived connection health, from the unified sync status. Absent until that status resolves. */
+	health?: ConnectionHealth;
 	status?: OutlineSyncSummary;
 	isStatusLoading?: boolean;
 	tokenStatus?: OutlineTokenStatus;
@@ -95,6 +111,7 @@ export function OutlineConnectCard({
 	connected,
 	connectionState,
 	connectionLabel,
+	health,
 	status,
 	isStatusLoading = false,
 	tokenStatus,
@@ -129,6 +146,11 @@ export function OutlineConnectCard({
 						<OutlineIcon className="size-4" aria-hidden />
 						Outline documentation
 					</IntegrationCardHeading>
+					{connected && health && (
+						<CardAction>
+							<ConnectionHealthBadge health={health} isSyncing={status?.syncRunning === true} />
+						</CardAction>
+					)}
 					<CardDescription>
 						Mirror Outline collections so their design docs and decision records reach practice
 						detection as context. Use a dedicated bot-user API token; after connecting you choose
@@ -240,9 +262,13 @@ export function OutlineConnectCard({
 												mirrored
 											</span>
 											<span>
-												{status.lastSyncedAt
-													? `Last synced ${relativeTime(status.lastSyncedAt)}`
-													: "Not synced yet"}
+												{status.lastSyncedAt ? (
+													<>
+														Last synced <RelativeTime value={status.lastSyncedAt} />
+													</>
+												) : (
+													"Not synced yet"
+												)}
 											</span>
 											{status.syncRunning && (
 												<span className="flex items-center gap-1.5">
@@ -388,7 +414,11 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 						{tokenStatus.last4 ? ` (…${tokenStatus.last4})` : ""}
 					</span>
 				)}
-				{lastActiveAt && <span>Last used {relativeTime(lastActiveAt)}</span>}
+				{lastActiveAt && (
+					<span>
+						Last used <RelativeTime value={lastActiveAt} />
+					</span>
+				)}
 				{hasMetadata && !expiresAt && <span>Never expires</span>}
 				{expiresAt && !expiringSoon && (
 					<span>

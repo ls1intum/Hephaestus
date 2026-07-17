@@ -107,10 +107,22 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         Map<Long, ScmResourceCounts> countsByRepositoryId
     ) {
         Repository repo = reposByNameWithOwner.get(monitor.getNameWithOwner());
-        Instant lastSyncedAt = repo == null ? null : repo.getLastSyncAt();
         ScmResourceCounts counts =
             repo == null ? null : countsByRepositoryId.getOrDefault(repo.getId(), ScmResourceCounts.empty());
         Long itemCount = counts == null ? null : counts.headlineItemCount();
+
+        // The GitLab sync path DOES persist per-class watermarks on repository_to_monitor
+        // (GitlabDataSyncScheduler.updateSyncTimestamp writes issues_synced_at / pull_requests_synced_at
+        // on every completed phase, keyed by the same monitor row iterated here). Read them — mirroring
+        // GithubConnectionSyncStateProvider — rather than discarding them and reporting "not tracked".
+        Instant issuesSyncedAt = monitor.getIssuesSyncedAt();
+        Instant pullRequestsSyncedAt = monitor.getPullRequestsSyncedAt();
+        Instant lastSyncedAt = latestNonNull(
+            issuesSyncedAt,
+            pullRequestsSyncedAt,
+            monitor.getRepositorySyncedAt(),
+            repo == null ? null : repo.getLastSyncAt()
+        );
         String state = lastSyncedAt != null ? SyncResourceState.STATE_SYNCED : SyncResourceState.STATE_PENDING;
 
         return new SyncResourceState(
@@ -121,16 +133,26 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             state,
             lastSyncedAt,
             itemCount,
-            // Counts are read from the same shared tables GitHub mirrors into, so the breakdown is
-            // identical. The per-class watermarks are NOT: the GitLab sync path writes only
-            // repository.last_sync_at, never repository_to_monitor's per-class *_synced_at columns. Both
-            // classes therefore report a null lastSyncedAt — "not tracked" — instead of borrowing the
-            // repository-wide timestamp, which would assert a per-class freshness nobody measured.
-            counts == null ? List.of() : counts.toSyncResourceCounts(null, null),
+            // Per-class breakdown, each class carrying its own persisted watermark. Issues and pull
+            // requests are reported per class rather than collapsed via latestNonNull above, so
+            // "pull requests are fresh but issues stalled" stays visible instead of the newest sibling
+            // masking the older one.
+            counts == null ? List.of() : counts.toSyncResourceCounts(issuesSyncedAt, pullRequestsSyncedAt),
             null,
             null,
             null,
             null
         );
+    }
+
+    /** Most recent of the non-null instants, or null if all are null. */
+    private static Instant latestNonNull(Instant... candidates) {
+        Instant latest = null;
+        for (Instant candidate : candidates) {
+            if (candidate != null && (latest == null || candidate.isAfter(latest))) {
+                latest = candidate;
+            }
+        }
+        return latest;
     }
 }

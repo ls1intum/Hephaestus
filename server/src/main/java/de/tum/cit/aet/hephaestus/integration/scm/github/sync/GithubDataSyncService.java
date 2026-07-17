@@ -269,11 +269,6 @@ public class GithubDataSyncService {
         );
 
         try {
-            // P3 optimization: capture the previously-stored GitHub updatedAt before re-syncing
-            // metadata. If updatedAt hasn't changed after re-sync, the repository has no new
-            // activity (pushes, issues, PRs, labels, etc.) — we can skip all sub-syncs.
-            Instant previousUpdatedAt = repository.getUpdatedAt();
-
             // Sync repository metadata (skip if we just created it above)
             if (!repositoryCreatedDuringSync) {
                 var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
@@ -290,37 +285,21 @@ public class GithubDataSyncService {
                 }
             }
 
-            // Backfill commits from local git clone (runs BEFORE the repoUnchanged
-            // check because it uses local git, not the GitHub API — no rate limit concern).
-            // Must run even for "unchanged" repos to handle initial backfill when git
-            // checkout is first enabled. The backfill service has its own short-circuit
+            // Backfill commits from local git clone. Uses local git, not the GitHub API, so
+            // there is no rate limit concern. The backfill service has its own short-circuit
             // (HEAD SHA == latest known SHA → fast return).
             int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
 
-            // P3 optimization: skip sub-syncs when the repository has no new activity.
-            // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
-            // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
-            // Only apply this skip when we have a previous timestamp (not on first sync)
-            // AND when both issue/PR syncs have completed at least once (otherwise the
-            // backfill scheduler will spin indefinitely waiting for sync timestamps).
-            boolean initialSyncCompleted =
-                syncTarget.lastIssuesSyncedAt() != null && syncTarget.lastPullRequestsSyncedAt() != null;
-            boolean repoUnchanged =
-                !repositoryCreatedDuringSync &&
-                initialSyncCompleted &&
-                previousUpdatedAt != null &&
-                repository.getUpdatedAt() != null &&
-                !repository.getUpdatedAt().isAfter(previousUpdatedAt);
-
-            if (repoUnchanged) {
-                log.info(
-                    "Skipped sub-syncs: reason=repoUnchanged, repoId={}, repoName={}, updatedAt={}",
-                    repositoryId,
-                    safeNameWithOwner,
-                    repository.getUpdatedAt()
-                );
-                return true;
-            }
+            // NOTE: there used to be a "repoUnchanged" short-circuit here that skipped every
+            // sub-sync when repository.updatedAt had not advanced. Its premise — that GitHub
+            // bumps repository.updatedAt on any activity — is false: opening an issue/PR or
+            // adding a comment does NOT reliably bump it, so new PRs were silently never
+            // ingested. Each sub-sync is independently cost-bounded instead:
+            //   - collaborators/labels/milestones: cooldown-gated below
+            //   - issues: GetRepositoryIssueCount totalCount probe (~1 point)
+            //   - pull requests: GetRepositoryPullRequestLatestUpdate probe (~1 point)
+            //   - discussions: off by default, and stops after the first page older than the cutoff
+            // Do not reintroduce a repository.updatedAt gate — it cannot see issue/PR activity.
 
             // Sync collaborators (with cooldown)
             int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, scopeId, repositoryId);
@@ -331,23 +310,34 @@ public class GithubDataSyncService {
             // Sync milestones (with cooldown — milestones rarely change)
             int milestonesCount = syncMilestonesIfNeeded(syncTarget, scopeId, repositoryId);
 
-            // Sync issues (with cursor persistence for resumability)
-            // Comments are synced inline with issues via the GraphQL query
+            // Sync issues — always from a fresh cursor, with cursor persistence disabled.
+            // Comments are synced inline with issues via the GraphQL query.
+            //
+            // The issue_sync_cursor / pull_request_sync_cursor columns belong to the historical
+            // backfill (GitHubHistoricalBackfillService), which paginates CREATED_AT DESC. This
+            // incremental path paginates UPDATED_AT DESC, so a backfill cursor points somewhere
+            // meaningless in this ordering: resuming from it lands deep in the list and skips the
+            // newest items, and writing our own cursor back clobbers backfill's checkpoint.
+            // Passing null for both the cursor and the syncTargetId (documented as "null to
+            // disable" cursor persistence) severs the read and the write. Cross-run resume of an
+            // updatedAt window is meaningless anyway — each run recomputes its own `since` from
+            // lastIssuesSyncedAt/lastPullRequestsSyncedAt, which are the real incremental state.
+            // As a bonus, a null cursor re-enables the cheap totalCount probe in issue sync.
             SyncResult issueResult = issueSyncService.syncForRepository(
                 scopeId,
                 repositoryId,
-                syncTarget.id(),
-                syncTarget.issueSyncCursor(),
+                null,
+                null,
                 syncTarget.lastIssuesSyncedAt()
             );
 
-            // Sync pull requests (with cursor persistence for resumability)
-            // Review threads and comments are synced inline with PRs via the GraphQL query
+            // Sync pull requests — same rationale as issues above.
+            // Review threads and comments are synced inline with PRs via the GraphQL query.
             SyncResult prResult = pullRequestSyncService.syncForRepository(
                 scopeId,
                 repositoryId,
-                syncTarget.id(),
-                syncTarget.pullRequestSyncCursor(),
+                null,
+                null,
                 syncTarget.lastPullRequestsSyncedAt()
             );
 

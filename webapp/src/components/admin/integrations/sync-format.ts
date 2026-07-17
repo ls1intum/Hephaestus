@@ -1,10 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import type {
-	ConnectionSyncStatus,
-	IntegrationCatalogEntry,
-	SyncJob,
-	SyncResourceCount,
-} from "@/api/types.gen";
+import type { ConnectionSyncStatus, IntegrationCatalogEntry, SyncJob } from "@/api/types.gen";
 
 /**
  * Poll cadence for sync status/resources/jobs queries. SSE hint invalidation is the primary live
@@ -231,16 +226,4 @@ export function nextRunLabel(
 	// "next run 5 minutes ago", which reads as a past event rather than a pending one.
 	if (date.getTime() <= now.getTime()) return "next run due";
 	return `next run ${formatDistanceToNow(date, { addSuffix: true })}`;
-}
-
-/**
- * The per-class breakdown as one compact line: "1,204 pull requests · 3,410 issues · 12,882 comments".
- *
- * Zero-count classes are kept deliberately. "0 comments" next to "3,410 issues" is the single most
- * diagnostic thing this table can say — it is the silent half-broken pipeline the headline item count
- * cannot show — so it must not be tidied away.
- */
-export function formatCountBreakdown(counts: SyncResourceCount[]): string | undefined {
-	if (counts.length === 0) return undefined;
-	return counts.map((c) => `${c.count.toLocaleString()} ${c.label.toLowerCase()}`).join(" · ");
 }
