@@ -816,57 +816,58 @@ export function SyncResourcesTable({
 				</p>
 			</div>
 
-			<div className="max-h-[70vh] overflow-auto rounded-md border">
-				<table className="w-full caption-bottom text-sm">
-					<ResourcesTableHeader
+			{/* The cap and vertical scroll go on the table's own scroll container (see Table's
+			    containerClassName), so the sticky header and totals footer clip and stick against it — one
+			    tested containment path, not a raw `<table>` hand-rolled in a bespoke `max-h` div. */}
+			<Table containerClassName="max-h-[70vh] overflow-y-auto rounded-md border">
+				<ResourcesTableHeader
+					columns={columns}
+					resourceNoun={resourceNoun}
+					sortState={sortState}
+					onSort={onSort}
+				/>
+				<TableBody>
+					{visible.length === 0 ? (
+						<TableRow className="hover:bg-transparent">
+							<TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
+								{normalizedQuery ? (
+									<>
+										No {resourceNounPlural} match “{query.trim()}”.
+									</>
+								) : (
+									<>No {resourceNounPlural} match the current filter.</>
+								)}{" "}
+								<Button variant="ghost" size="sm" onClick={clearFilters}>
+									Clear filter
+								</Button>
+							</TableCell>
+						</TableRow>
+					) : (
+						visible.map((resource) => (
+							<TableRow key={resource.id}>
+								<ResourceNameCell resource={resource} resourceNoun={resourceNoun} />
+								<LastSyncedCell
+									resource={resource}
+									resourceNoun={resourceNoun}
+									syncIntervalSeconds={syncIntervalSeconds}
+								/>
+								{columns.map((column) => (
+									<ClassCountCell key={column.key} resource={resource} column={column} />
+								))}
+								<ResourceErrorCell resource={resource} />
+							</TableRow>
+						))
+					)}
+				</TableBody>
+				{resources.length > 1 && (
+					<TotalsFooter
+						resources={resources}
 						columns={columns}
 						resourceNoun={resourceNoun}
-						sortState={sortState}
-						onSort={onSort}
+						resourceNounPlural={resourceNounPlural}
 					/>
-					<TableBody>
-						{visible.length === 0 ? (
-							<TableRow className="hover:bg-transparent">
-								<TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
-									{normalizedQuery ? (
-										<>
-											No {resourceNounPlural} match “{query.trim()}”.
-										</>
-									) : (
-										<>No {resourceNounPlural} match the current filter.</>
-									)}{" "}
-									<Button variant="ghost" size="sm" onClick={clearFilters}>
-										Clear filter
-									</Button>
-								</TableCell>
-							</TableRow>
-						) : (
-							visible.map((resource) => (
-								<TableRow key={resource.id}>
-									<ResourceNameCell resource={resource} resourceNoun={resourceNoun} />
-									<LastSyncedCell
-										resource={resource}
-										resourceNoun={resourceNoun}
-										syncIntervalSeconds={syncIntervalSeconds}
-									/>
-									{columns.map((column) => (
-										<ClassCountCell key={column.key} resource={resource} column={column} />
-									))}
-									<ResourceErrorCell resource={resource} />
-								</TableRow>
-							))
-						)}
-					</TableBody>
-					{resources.length > 1 && (
-						<TotalsFooter
-							resources={resources}
-							columns={columns}
-							resourceNoun={resourceNoun}
-							resourceNounPlural={resourceNounPlural}
-						/>
-					)}
-				</table>
-			</div>
+				)}
+			</Table>
 		</div>
 	);
 }

@@ -345,6 +345,20 @@ export const SeventyOneRepositories: Story = {
 	args: { resources: manyRepos },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
+
+		// Containment guard: the scroll container clips the tall fleet in place rather than growing the
+		// page (which is what made the footer float above ~614px of phantom scroll). Bounded to its
+		// max-h-[70vh] cap AND scrollable — the same regression the ScrollArea's ManyRepositories story
+		// pins for the manage-repos list, here for the sync table's own scroller.
+		const container = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
+		await expect(container).not.toBeNull();
+		if (container) {
+			await expect(container.clientHeight).toBeLessThanOrEqual(
+				Math.ceil(window.innerHeight * 0.7) + 2,
+			);
+			await expect(container.scrollHeight).toBeGreaterThan(container.clientHeight);
+		}
+
 		// The single very-stale repository is row one, ahead of seventy fresh ones.
 		const firstRow = canvasElement.querySelector("tbody tr");
 		await expect(firstRow?.textContent).toContain("legacy-mirror");
