@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { LibraryIcon, LockIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { listOutlineCollectionCandidatesOptions } from "@/api/@tanstack/react-query.gen";
 import type { OutlineCollectionCandidate } from "@/api/types.gen";
 import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
@@ -9,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/components/ui/command";
+	Combobox,
+	ComboboxEmpty,
+	ComboboxItem,
+	ComboboxList,
+	ComboboxSearchInput,
+	useComboboxFilter,
+} from "@/components/ui/combobox";
 import {
 	Dialog,
 	DialogClose,
@@ -44,6 +44,16 @@ export interface AddCollectionDialogProps {
 	onRegister: (input: { collectionId: string }) => Promise<void> | void;
 }
 
+/** Outline lets a collection go unnamed; the id is then the only honest thing to call it. */
+function labelOf(candidate: OutlineCollectionCandidate) {
+	return candidate.name ?? candidate.collectionId;
+}
+
+/** Search matches the name, the short url id and the raw id, so any of them finds the row. */
+function searchTextOf(candidate: OutlineCollectionCandidate) {
+	return `${labelOf(candidate)} ${candidate.urlId ?? ""} ${candidate.collectionId}`;
+}
+
 /**
  * Searchable picker for the Outline collections the API token can see. The candidates call is a live
  * proxy to Outline and doubles as the connectivity probe, so it stays lazy (only while the dialog is
@@ -55,6 +65,14 @@ export function AddCollectionDialog({
 	onOpenChange,
 	onRegister,
 }: AddCollectionDialogProps) {
+	const { contains } = useComboboxFilter({ sensitivity: "base" });
+	// The dialog opens on a loading skeleton, so Base UI's default initial focus resolves (at open,
+	// before the picker exists) to the first tabbable control — Cancel — and applies it a frame
+	// later, i.e. *after* the reader has focused the search field. That steals focus back to Cancel,
+	// and because the inline combobox drops its highlight on blur, keyboard nav dies. We therefore
+	// refuse the dialog's initial focus while the input is absent (returning `false` schedules
+	// nothing) and hand focus to the search field ourselves via `autoFocus` once it mounts.
+	const comboboxRef = useRef<HTMLDivElement>(null);
 	const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
 	const [submitting, setSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
@@ -77,6 +95,11 @@ export function AddCollectionDialog({
 	const all = candidates ?? [];
 	const selectable = all.filter((candidate) => !candidate.alreadyMirrored);
 	const canSubmit = selectedIds.length > 0 && !submitting;
+	// The ids stay the source of truth (they are what `submit` posts); the combobox works in
+	// candidate objects, so the selection is projected back and forth at this boundary.
+	const selectedCandidates = all.filter((candidate) =>
+		selectedIds.includes(candidate.collectionId),
+	);
 
 	// Reset the form state on close instead of remounting the dialog via a changing `key` —
 	// that kills the close animation. The next open always starts from a clean slate.
@@ -88,15 +111,6 @@ export function AddCollectionDialog({
 			setRegistered(0);
 		}
 		onOpenChange(next);
-	}
-
-	function toggle(candidate: OutlineCollectionCandidate) {
-		if (candidate.alreadyMirrored || submitting) return;
-		setSelectedIds((current) =>
-			current.includes(candidate.collectionId)
-				? current.filter((id) => id !== candidate.collectionId)
-				: [...current, candidate.collectionId],
-		);
 	}
 
 	async function submit() {
@@ -129,7 +143,15 @@ export function AddCollectionDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogContent className="sm:max-w-lg">
+			<DialogContent
+				className="sm:max-w-lg"
+				// Focus the search field if it already exists; otherwise refuse to move focus (`false`)
+				// rather than falling back to the first tabbable control, which would steal focus to
+				// Cancel a frame later. `autoFocus` on the input covers the common load-after-open case.
+				initialFocus={() =>
+					comboboxRef.current?.querySelector<HTMLElement>('input[role="combobox"]') ?? false
+				}
+			>
 				<DialogHeader>
 					<DialogTitle>Add collections to mirror</DialogTitle>
 					<DialogDescription>
@@ -185,35 +207,56 @@ export function AddCollectionDialog({
 							</EmptyHeader>
 						</Empty>
 					) : (
-						// cmdk renders its own visually-hidden <label> and points the input's aria-labelledby
-						// at it, so the accessible name has to come from `label`, not aria-label.
-						<Command className="rounded-lg border" label="Search Outline collections">
-							<CommandInput placeholder="Search collections…" disabled={submitting} />
-							<CommandList>
-								<CommandEmpty>No collections match your search.</CommandEmpty>
-								<CommandGroup>
-									{all.map((candidate) => {
-										const label = candidate.name ?? candidate.collectionId;
+						// `inline` renders the list as part of the dialog body rather than in a popup over
+						// it — Base UI's dedicated mode for this. It forces the list open (no trigger to
+						// reopen from) and, crucially, anchors the floating context to the enclosing
+						// `[role="dialog"]`, which is what makes the roving highlight, `aria-activedescendant`
+						// and `Combobox.Empty` work without a Positioner/Popup.
+						<Combobox
+							multiple
+							inline
+							items={all}
+							value={selectedCandidates}
+							onValueChange={(next) => setSelectedIds(next.map((c) => c.collectionId))}
+							filter={(candidate, query) => contains(candidate, query, searchTextOf)}
+							itemToStringLabel={labelOf}
+						>
+							<div ref={comboboxRef} className="rounded-lg border">
+								{/* The picker mounts only after its async candidates load, so this is the first
+								chance to focus it; the dialog itself declines initial focus (see initialFocus
+								above) to avoid a focus fight that would blur the input and drop the highlight. */}
+								<ComboboxSearchInput
+									autoFocus
+									placeholder="Search collections…"
+									disabled={submitting}
+									aria-label="Search Outline collections"
+								/>
+								<ComboboxEmpty>No collections match your search.</ComboboxEmpty>
+								<ComboboxList>
+									{(candidate: OutlineCollectionCandidate) => {
+										const label = labelOf(candidate);
 										const checked =
 											candidate.alreadyMirrored || selectedIds.includes(candidate.collectionId);
 										return (
-											<CommandItem
+											<ComboboxItem
 												key={candidate.collectionId}
-												value={`${label} ${candidate.urlId ?? ""} ${candidate.collectionId}`}
+												value={candidate}
 												disabled={candidate.alreadyMirrored || submitting}
-												onSelect={() => toggle(candidate)}
+												className="pr-2"
 											>
-												{/* The command item owns the toggle (click AND keyboard Enter land there),
-												so the checkbox is read-only: an interactive Base UI checkbox re-dispatches
-												its click on a hidden input, which bubbles back into the item and would
-												toggle the selection a second time. Out of the tab order for the same
-												reason — the roving focus lives on the list. */}
+												{/* The option owns the toggle (click AND keyboard Enter land there), so the
+												checkbox is a read-only mirror of the option's selected state: an interactive
+												Base UI checkbox re-dispatches its click on a hidden input, which would bubble
+												back into the option and toggle a second time. `pointer-events-none` keeps
+												every click on the option; out of the tab order because the roving highlight
+												lives on the input. */}
 												<Checkbox
 													checked={checked}
 													readOnly
 													disabled={candidate.alreadyMirrored || submitting}
 													tabIndex={-1}
 													aria-label={label}
+													className="pointer-events-none"
 												/>
 												<OutlineCollectionIcon icon={candidate.icon} color={candidate.color} />
 												<span className="min-w-0 flex-1">
@@ -227,12 +270,12 @@ export function AddCollectionDialog({
 												{candidate.alreadyMirrored && (
 													<Badge variant="outline">Already mirrored</Badge>
 												)}
-											</CommandItem>
+											</ComboboxItem>
 										);
-									})}
-								</CommandGroup>
-							</CommandList>
-						</Command>
+									}}
+								</ComboboxList>
+							</div>
+						</Combobox>
 					)}
 
 					{/* One live region for the whole run: progress while it advances, the failure when it
