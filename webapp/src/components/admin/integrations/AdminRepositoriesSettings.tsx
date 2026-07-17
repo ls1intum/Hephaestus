@@ -29,6 +29,7 @@ import {
 	InputGroupInput,
 } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -187,13 +188,13 @@ export function AdminRepositoriesSettings({
 						/>
 					) : hasRepositories ? (
 						/* The sync-state table above is the canonical list of every repository; this is the
-						   add/remove surface for the same set. A native max-height scroller keeps it a
-						   compact pane rather than a second full-height copy of that table — max-h shrinks
-						   to content for a handful of repos and scrolls in place for a large fleet. (A
-						   vendored ScrollArea needs a *fixed* height to clip; with only max-h its viewport
-						   never scrolls and every row renders, overflowing onto the add form below.) */
-						<div className="max-h-80 overflow-y-auto pr-1">
-							<ItemGroup>
+						   add/remove surface for the same set — a compact pane that grows to content for a
+						   handful of repos and scrolls in place for a large fleet. The cap goes on the
+						   Viewport (see ScrollArea's viewportClassName): a max-h on the Root would never
+						   clip, because the Viewport is height:100% and there is no definite-height
+						   ancestor here to resolve against. */
+						<ScrollArea viewportClassName="max-h-80">
+							<ItemGroup className="pr-3">
 								{repositories.map((repo) => (
 									<RepositoryRow
 										key={repo.nameWithOwner}
@@ -203,7 +204,7 @@ export function AdminRepositoriesSettings({
 									/>
 								))}
 							</ItemGroup>
-						</div>
+						</ScrollArea>
 					) : (
 						<Empty>
 							<EmptyHeader>

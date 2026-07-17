@@ -79,6 +79,36 @@ export const Default: Story = {
 };
 
 /**
+ * A large fleet. The list is a compact pane that grows to content for a few repos but caps and scrolls
+ * for many, so it never becomes a second full-height copy of the sync-state table nor overflows onto
+ * the add form. The play asserts the real layout in browser mode: the Base UI ScrollArea viewport is
+ * height-bounded (≤ the max-h-80 cap) and its content overflows it (scrollable) — the exact regression
+ * that shipped when the viewport was left unbounded and every row rendered at full height.
+ */
+export const ManyRepositories: Story = {
+	args: {
+		repositories: Array.from({ length: 40 }, (_, index) => ({
+			nameWithOwner: `ls1intum/repository-number-${index + 1}`,
+		})),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+
+		const viewport = canvasElement.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+		await expect(viewport).not.toBeNull();
+		if (!viewport) return;
+
+		// Bounded: clipped to the max-h-80 (20rem = 320px) cap, not grown to fit all 40 rows.
+		await expect(viewport.clientHeight).toBeLessThanOrEqual(320);
+		// Scrollable: the 40 rows overflow the bounded viewport rather than pushing the page taller.
+		await expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+
+		// The add form still sits below the pane and is interactive — not overlapped by the list.
+		await expect(canvas.getByLabelText("Add a repository")).toBeVisible();
+	},
+};
+
+/**
  * Removing a repository is guarded by a destructive confirm dialog that spells out the consequence.
  */
 export const RemoveConfirm: Story = {
