@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
+import { expect, within } from "storybook/test";
 import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
 import { mockUser, mythicAchievementsUI } from "@/components/achievements/storyMockData";
 
@@ -48,6 +49,16 @@ export const Default: Story = {
 		isOwnProfile: true,
 		targetUsername: mockUser.name,
 	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// The active segment must be visibly raised. Base UI's ToggleGroupItem emits
+		// `data-pressed`, which the corrected `data-pressed:bg-background data-pressed:shadow-sm`
+		// classes style (the old `data-[state=on]` selector matched nothing).
+		const tree = await canvas.findByRole("button", { name: "Tree view" });
+		await expect(tree).toHaveAttribute("data-pressed");
+		const list = canvas.getByRole("button", { name: "List view" });
+		await expect(list).not.toHaveAttribute("data-pressed");
+	},
 };
 
 /**
@@ -92,6 +103,11 @@ export const Loading: Story = {
 		achievements: [],
 		isOwnProfile: true,
 		targetUsername: mockUser.name,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// The loading pill uses the vendored <Spinner/> (role="status"), not a bare Loader2 icon.
+		await expect(await canvas.findByRole("status", { name: "Loading" })).toBeInTheDocument();
 	},
 };
 

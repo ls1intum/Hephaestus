@@ -63,8 +63,7 @@ function IntegrationsCallback() {
 	const iconClass = failed
 		? "size-12 text-destructive"
 		: succeeded
-			? // no semantic success token in the kit
-				"size-12 text-green-600 dark:text-green-400"
+			? "size-12 text-success"
 			: "size-12 text-muted-foreground";
 	const title = failed
 		? "Connection failed"
