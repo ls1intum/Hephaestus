@@ -1,5 +1,5 @@
 import { ChevronDownIcon, DatabaseIcon, GaugeIcon, WebhookIcon, ZapOffIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { ConnectionSyncStatus, RateLimitSnapshot } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ActiveJobProgress } from "./ActiveJobProgress";
@@ -87,40 +88,61 @@ function RateLimitValue({ rateLimit }: { rateLimit: RateLimitSnapshot }) {
 }
 
 function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
-	return (
-		<ItemGroup className="flex-row flex-wrap gap-x-8 gap-y-3">
-			<DiagnosticItem
-				icon={status.webhookRegistered === false ? <ZapOffIcon /> : <WebhookIcon />}
-				label="Webhook"
-			>
-				{status.webhookRegistered === false ? (
-					<span className="text-muted-foreground">Not registered</span>
-				) : status.lastEventProcessedAt ? (
-					<RelativeTime value={status.lastEventProcessedAt} />
-				) : (
-					<span className="text-muted-foreground">No events yet</span>
+	// Each fact is internally tight (icon + label + value at `gap-2`), so a large between-item gap read
+	// as loose and inconsistent. A thin rule between items gives that space a job — the diagnostics now
+	// scan as one grouped row rather than three scattered ones — and a modest, uniform gap keeps the
+	// rhythm calm. The rule is decorative, so it stays out of the assistive-tech list.
+	const diagnostics: ReactElement[] = [
+		<DiagnosticItem
+			key="webhook"
+			icon={status.webhookRegistered === false ? <ZapOffIcon /> : <WebhookIcon />}
+			label="Webhook"
+		>
+			{status.webhookRegistered === false ? (
+				<span className="text-muted-foreground">Not registered</span>
+			) : status.lastEventProcessedAt ? (
+				<RelativeTime value={status.lastEventProcessedAt} />
+			) : (
+				<span className="text-muted-foreground">No events yet</span>
+			)}
+		</DiagnosticItem>,
+	];
+
+	if (status.rateLimit) {
+		diagnostics.push(
+			<DiagnosticItem key="rateLimit" icon={<GaugeIcon />} label="Rate limit">
+				<RateLimitValue rateLimit={status.rateLimit} />
+			</DiagnosticItem>,
+		);
+	}
+
+	if (status.backfill) {
+		diagnostics.push(
+			/* The scheduled cycle's state — "Disabled" here means the background cycle is off, not that
+			   the Run backfill action below (a manual run) is unavailable. */
+			<DiagnosticItem key="backfill" icon={<DatabaseIcon />} label="Scheduled backfill">
+				{stateLabel(status.backfill.state)}
+				{status.backfill.percent != null && (
+					<span className="text-muted-foreground tabular-nums"> · {status.backfill.percent}%</span>
 				)}
-			</DiagnosticItem>
+			</DiagnosticItem>,
+		);
+	}
 
-			{status.rateLimit && (
-				<DiagnosticItem icon={<GaugeIcon />} label="Rate limit">
-					<RateLimitValue rateLimit={status.rateLimit} />
-				</DiagnosticItem>
-			)}
-
-			{status.backfill && (
-				/* The scheduled cycle's state — "Disabled" here means the background cycle is off, not that
-				   the Run backfill action below (a manual run) is unavailable. */
-				<DiagnosticItem icon={<DatabaseIcon />} label="Scheduled backfill">
-					{stateLabel(status.backfill.state)}
-					{status.backfill.percent != null && (
-						<span className="text-muted-foreground tabular-nums">
-							{" "}
-							· {status.backfill.percent}%
-						</span>
+	return (
+		<ItemGroup className="flex-row flex-wrap items-center gap-x-4 gap-y-2">
+			{diagnostics.map((diagnostic, index) => (
+				<Fragment key={diagnostic.key ?? index}>
+					{index > 0 && (
+						<Separator
+							orientation="vertical"
+							aria-hidden
+							className="h-8 self-center max-sm:hidden"
+						/>
 					)}
-				</DiagnosticItem>
-			)}
+					{diagnostic}
+				</Fragment>
+			))}
 		</ItemGroup>
 	);
 }

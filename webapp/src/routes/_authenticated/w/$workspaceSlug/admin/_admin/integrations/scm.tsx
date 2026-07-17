@@ -279,6 +279,31 @@ function ScmIntegrationPage() {
 				}}
 			/>
 
+			{/* The canonical repository list: every monitored repo with its per-class counts and freshness.
+			    The add/remove management card sits below it, so this stays the one full-height scroller. */}
+			{hasConnection && (
+				<Card>
+					<CardHeader>
+						<IntegrationCardHeading>Repository sync state</IntegrationCardHeading>
+					</CardHeader>
+					<CardContent>
+						<SyncResourcesTable
+							resources={resources ?? []}
+							isLoading={isResourcesLoading}
+							isError={isResourcesError}
+							error={resourcesError}
+							onRetry={() => refetchResources()}
+							resourceNoun="repository"
+							resourceNounPlural="repositories"
+							// Without the cadence the ledger prints every reading and judges none of them —
+							// the server sends it precisely so the client doesn't have to guess a schedule.
+							syncIntervalSeconds={status?.syncIntervalSeconds}
+							expectedClassKeys={SCM_CLASS_KEYS}
+						/>
+					</CardContent>
+				</Card>
+			)}
+
 			{isConnectionActive && !isAppInstallationWorkspace && (
 				<AdminRepositoriesSettings
 					repositories={(repositories ?? []).map((repo) => ({ nameWithOwner: repo }))}
@@ -295,29 +320,6 @@ function ScmIntegrationPage() {
 					}}
 					onRetry={() => refetchRepositories()}
 				/>
-			)}
-
-			{hasConnection && (
-				<Card>
-					<CardHeader>
-						<IntegrationCardHeading>Repository sync state</IntegrationCardHeading>
-					</CardHeader>
-					<CardContent>
-						<SyncResourcesTable
-							resources={resources ?? []}
-							isLoading={isResourcesLoading}
-							isError={isResourcesError}
-							error={resourcesError}
-							onRetry={() => refetchResources()}
-							resourceNoun="repository"
-							resourceNounPlural="repositories"
-							// Without the cadence the matrix prints every watermark and judges none of them —
-							// the server sends it precisely so the client doesn't have to guess a schedule.
-							syncIntervalSeconds={status?.syncIntervalSeconds}
-							expectedClassKeys={SCM_CLASS_KEYS}
-						/>
-					</CardContent>
-				</Card>
 			)}
 
 			{hasConnection && (

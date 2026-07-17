@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.BackfillProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -185,13 +187,96 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldNeverReportBackfillOrDegradedInV1() {
+        void shouldNeverReportVendorHealthDegraded() {
             when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
 
             ConnectionSyncDetails details = provider.describe(ref, CONNECTION_ID);
 
-            assertThat(details.backfill()).isNull();
+            // GitLab has no independent vendor-health signal (unlike GitHub App suspension), so this
+            // stays false — the connection is only DEGRADED via a failed job or errored resource.
             assertThat(details.vendorHealthDegraded()).isFalse();
+        }
+
+        @Test
+        void shouldReportBackfillDisabledWhenScheduledBackfillOff() {
+            // The default scheduler props (setUp) leave backfill disabled — parity with GitHub, which
+            // reports "DISABLED" for the scheduled-backfill diagnostic when the flag is off.
+            when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+
+            ConnectionSyncDetails details = provider.describe(ref, CONNECTION_ID);
+
+            assertThat(details.backfill()).isEqualTo(new BackfillSummary("DISABLED", null, null));
+        }
+
+        @Test
+        void shouldReportBackfillNotStartedWhenEnabledButNoMonitoredRepos() {
+            when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
+
+            ConnectionSyncDetails details = backfillEnabledProvider().describe(ref, CONNECTION_ID);
+
+            assertThat(details.backfill().state()).isEqualTo("NOT_STARTED");
+            assertThat(details.backfill().percent()).isNull();
+        }
+
+        @Test
+        void shouldReportBackfillCompleteWithFullPercentWhenAllReposDone() {
+            when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+            RepositoryToMonitor rtm = monitor(1L, "group/done-repo");
+            rtm.setIssueBackfillHighWaterMark(100);
+            rtm.setIssueBackfillCheckpoint(0);
+            rtm.setPullRequestBackfillHighWaterMark(0);
+            rtm.setPullRequestBackfillCheckpoint(0);
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
+
+            ConnectionSyncDetails details = backfillEnabledProvider().describe(ref, CONNECTION_ID);
+
+            assertThat(details.backfill().state()).isEqualTo("COMPLETE");
+            assertThat(details.backfill().percent()).isEqualTo(100);
+        }
+
+        @Test
+        void shouldReportBackfillInProgressWithCoarsePercentWhenPartiallyDone() {
+            when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
+            RepositoryToMonitor rtm = monitor(2L, "group/partial-repo");
+            // High-water-mark 100, checkpoint (lowest IID still to reach) at 25 → 75 of 100 done.
+            rtm.setIssueBackfillHighWaterMark(100);
+            rtm.setIssueBackfillCheckpoint(25);
+            rtm.setPullRequestBackfillHighWaterMark(0);
+            rtm.setPullRequestBackfillCheckpoint(0);
+            when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(rtm));
+
+            ConnectionSyncDetails details = backfillEnabledProvider().describe(ref, CONNECTION_ID);
+
+            assertThat(details.backfill().state()).isEqualTo("IN_PROGRESS");
+            assertThat(details.backfill().percent()).isEqualTo(75);
+        }
+
+        private GitlabConnectionSyncStateProvider backfillEnabledProvider() {
+            return new GitlabConnectionSyncStateProvider(
+                connectionService,
+                rateLimitTrackerProvider,
+                new SyncSchedulerProperties(
+                    true,
+                    7,
+                    "0 0 3 * * *",
+                    15,
+                    new BackfillProperties(true, 50, 100, 60),
+                    null,
+                    null,
+                    null
+                ),
+                repositoryToMonitorRepository,
+                repositoryRepository,
+                countReader
+            );
+        }
+
+        private RepositoryToMonitor monitor(long id, String nameWithOwner) {
+            RepositoryToMonitor m = new RepositoryToMonitor();
+            ReflectionTestUtils.setField(m, "id", id);
+            m.setNameWithOwner(nameWithOwner);
+            return m;
         }
 
         private ConnectionConfig.GitLabConfig gitLabConfig(Long webhookId) {

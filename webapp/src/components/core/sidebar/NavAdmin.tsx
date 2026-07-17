@@ -7,7 +7,6 @@ import {
 	LayoutGridIcon,
 	ListChecks,
 	Map as MapIcon,
-	MessageSquareIcon,
 	PlayCircle,
 	PlugZapIcon,
 	Settings2,
@@ -15,7 +14,7 @@ import {
 	Trophy,
 	Users,
 } from "lucide-react";
-import { GithubIcon, GitlabIcon, OutlineIcon } from "@/components/icons/brand";
+import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	SidebarGroup,
@@ -248,7 +247,7 @@ export function NavAdmin({
 										/>
 									}
 								>
-									<MessageSquareIcon />
+									<SlackIcon />
 									<span>Slack</span>
 								</SidebarMenuSubButton>
 							</SidebarMenuSubItem>

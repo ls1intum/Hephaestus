@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -14,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmBackfillRollup;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader.ScmResourceCounts;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -69,12 +71,22 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         GitLabRateLimitTracker tracker = rateLimitTrackerProvider.getIfAvailable();
         RateLimitSnapshot rateLimit = tracker == null ? null : tracker.snapshot(workspaceId);
 
+        // GitLab's scheduled backfill (GitLabHistoricalBackfillService#runBackfillCycle) writes the same
+        // repository_to_monitor high-water-mark / checkpoint columns as GitHub, honors the same
+        // hephaestus.sync.backfill.enabled flag, and its runner already reports supportsBackfill()=true.
+        // So the rollup is computed identically — via the shared helper — rather than left null, which is
+        // what hid the "Scheduled backfill" diagnostic on the GitLab side.
+        BackfillSummary backfill = ScmBackfillRollup.summarize(
+            syncSchedulerProperties.backfill().enabled(),
+            repositoryToMonitorRepository.findByWorkspaceId(workspaceId)
+        );
+
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(syncSchedulerProperties.cron()),
             CronSchedules.interval(syncSchedulerProperties.cron()),
             rateLimit,
-            null,
+            backfill,
             false
         );
     }

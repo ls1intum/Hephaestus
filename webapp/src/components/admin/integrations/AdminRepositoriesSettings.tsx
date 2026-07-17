@@ -29,6 +29,7 @@ import {
 	InputGroupInput,
 } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -156,9 +157,10 @@ export function AdminRepositoriesSettings({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<IntegrationCardHeading>Monitored repositories</IntegrationCardHeading>
+					<IntegrationCardHeading>Manage repositories</IntegrationCardHeading>
 					<CardDescription>
-						Repositories Hephaestus watches for practice detection and mentoring.
+						Add or remove the repositories Hephaestus watches for practice detection and mentoring.
+						Their per-class sync freshness is shown in the sync-state table above.
 					</CardDescription>
 				</CardHeader>
 
@@ -185,16 +187,21 @@ export function AdminRepositoriesSettings({
 							onRetry={onRetry}
 						/>
 					) : hasRepositories ? (
-						<ItemGroup className="max-h-80 overflow-y-auto pr-1">
-							{repositories.map((repo) => (
-								<RepositoryRow
-									key={repo.nameWithOwner}
-									repo={repo}
-									isRemoving={isRemovingRepository}
-									onRemove={onRemoveRepository}
-								/>
-							))}
-						</ItemGroup>
+						/* The sync-state table above is the canonical list of every repository; this is the
+						   add/remove surface for the same set. A vendored ScrollArea keeps it a compact,
+						   consistently-styled pane rather than a second full-height copy of that table. */
+						<ScrollArea className="max-h-80">
+							<ItemGroup className="pr-3">
+								{repositories.map((repo) => (
+									<RepositoryRow
+										key={repo.nameWithOwner}
+										repo={repo}
+										isRemoving={isRemovingRepository}
+										onRemove={onRemoveRepository}
+									/>
+								))}
+							</ItemGroup>
+						</ScrollArea>
 					) : (
 						<Empty>
 							<EmptyHeader>

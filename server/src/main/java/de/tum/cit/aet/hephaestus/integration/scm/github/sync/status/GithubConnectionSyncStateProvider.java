@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -17,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ScopedRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService.BackfillProgress;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationSuspensionTracker;
+import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmBackfillRollup;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.status.ScmResourceCountReader.ScmResourceCounts;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -92,7 +92,10 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             CronSchedules.nextRun(syncSchedulerProperties.cron()),
             CronSchedules.interval(syncSchedulerProperties.cron()),
             rateLimitTracker.snapshot(workspaceId),
-            aggregateBackfill(workspaceId),
+            ScmBackfillRollup.summarize(
+                syncSchedulerProperties.backfill().enabled(),
+                repositoryToMonitorRepository.findByWorkspaceId(workspaceId)
+            ),
             vendorHealthDegraded
         );
     }
@@ -177,46 +180,6 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             null,
             backfillPercent
         );
-    }
-
-    /**
-     * Connection-level backfill rollup, computed from a single {@code findByWorkspaceId}
-     * load using the same high-water-mark / remaining / initialized fields {@code toResourceState} reads per
-     * resource — so no per-target {@code getProgress} re-fetch (an N+1 over the monitor set) is needed.
-     */
-    private BackfillSummary aggregateBackfill(long workspaceId) {
-        if (!syncSchedulerProperties.backfill().enabled()) {
-            return new BackfillSummary("DISABLED", null, null);
-        }
-        List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspaceId);
-        if (monitors.isEmpty()) {
-            return new BackfillSummary("NOT_STARTED", null, null);
-        }
-
-        boolean anyInitialized = false;
-        boolean allComplete = true;
-        long totalItems = 0;
-        long doneItems = 0;
-        for (RepositoryToMonitor rtm : monitors) {
-            anyInitialized = anyInitialized || rtm.isBackfillInitialized();
-            allComplete = allComplete && rtm.isBackfillComplete();
-            int highWaterMark =
-                (rtm.getIssueBackfillHighWaterMark() != null ? rtm.getIssueBackfillHighWaterMark() : 0) +
-                (rtm.getPullRequestBackfillHighWaterMark() != null ? rtm.getPullRequestBackfillHighWaterMark() : 0);
-            totalItems += highWaterMark;
-            doneItems += Math.max(0, highWaterMark - rtm.getBackfillRemaining());
-        }
-
-        String state = allComplete ? "COMPLETE" : (anyInitialized ? "IN_PROGRESS" : "NOT_STARTED");
-        Integer percent = null;
-        if (totalItems > 0) {
-            percent = (int) Math.round((100.0 * doneItems) / totalItems);
-        } else if (anyInitialized) {
-            percent = 100;
-        }
-
-        // See toResourceState: no per-item timestamp exists for a number-based backfill horizon.
-        return new BackfillSummary(state, null, percent);
     }
 
     @Nullable
