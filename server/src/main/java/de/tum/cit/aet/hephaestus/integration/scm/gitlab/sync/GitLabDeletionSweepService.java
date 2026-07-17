@@ -32,7 +32,7 @@ import org.springframework.stereotype.Service;
  * Deletion reconciliation for GitLab issues and merge requests — the half of "sync" that upserts
  * cannot do. The GitLab counterpart of {@code GitHubDeletionSweepService}, reusing the same shared,
  * integration-agnostic tombstone infrastructure ({@code Issue#deletedAt},
- * {@link IssueRepository#tombstoneByRepositoryIdAndNumbers}).
+ * {@code IssueRepository#tombstone{Issues,PullRequests}ByRepositoryIdAndNumbers}).
  *
  * <p>Every GitLab sync path is upsert-only, so an issue or merge request removed upstream survives
  * locally forever. It is worse than for GitHub: GitLab emits <em>no issue- or merge-request-deletion
@@ -379,7 +379,14 @@ public class GitLabDeletionSweepService {
             return 0;
         }
 
-        int tombstoned = issueRepository.tombstoneByRepositoryIdAndNumbers(repositoryId, missing, Instant.now());
+        // Type-discriminated write: on GitLab, issue IIDs and merge-request IIDs are separate per-project
+        // namespaces (issue #5 and MR !5 coexist), and both share the single-table `issue` table. A
+        // type-blind UPDATE keyed on (repository_id, number) would tombstone a live MR when an issue with
+        // the same IID is swept (and vice versa). Target only the class this pass proved complete.
+        int tombstoned =
+            entity == SweptEntity.ISSUE
+                ? issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(repositoryId, missing, Instant.now())
+                : issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(repositoryId, missing, Instant.now());
         log.info(
             "GitLab deletion sweep tombstoned upstream-deleted items: entity={}, projectPath={}, repoId={}, tombstoned={}, localCount={}, upstreamCount={}",
             entity.plural,

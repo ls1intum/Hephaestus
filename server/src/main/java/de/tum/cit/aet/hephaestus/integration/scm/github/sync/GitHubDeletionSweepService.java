@@ -374,7 +374,14 @@ public class GitHubDeletionSweepService {
             return 0;
         }
 
-        int tombstoned = issueRepository.tombstoneByRepositoryIdAndNumbers(repositoryId, missing, Instant.now());
+        // Type-discriminated write: issues and pull requests share the single-table `issue` table, so a
+        // type-blind UPDATE keyed on (repository_id, number) would tombstone the wrong discriminator when
+        // the two share a number. GitHub's numbers are shared across the namespace, but the write must
+        // still target the class it just proved complete — never the other one. See IssueRepository.
+        int tombstoned =
+            entity == SweptEntity.ISSUE
+                ? issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(repositoryId, missing, Instant.now())
+                : issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(repositoryId, missing, Instant.now());
         log.info(
             "Deletion sweep tombstoned upstream-deleted items: entity={}, repoName={}, repoId={}, tombstoned={}, localCount={}, upstreamCount={}",
             entity.plural,

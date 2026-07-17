@@ -117,8 +117,8 @@ public class Issue extends BaseGitServiceEntity {
      *       ({@code IssueRepository.count{Issues,PullRequests}GroupedByRepositoryIds});
      *   <li>the sweep's own local-number listing
      *       ({@code IssueRepository.findLive{Issue,PullRequest}NumbersByRepositoryId});
-     *   <li>{@code IssueRepository.tombstoneByRepositoryIdAndNumbers}, where it preserves the first
-     *       observation time.
+     *   <li>{@code IssueRepository.tombstone{Issues,PullRequests}ByRepositoryIdAndNumbers}, where it
+     *       preserves the first observation time.
      * </ul>
      *
      * <p><strong>Everything else still shows upstream-deleted rows.</strong> The product read

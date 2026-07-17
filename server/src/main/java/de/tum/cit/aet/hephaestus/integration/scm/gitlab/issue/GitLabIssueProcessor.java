@@ -151,7 +151,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         }
         int number = attrs.iid();
         long repositoryId = context.repository().getId();
-        int tombstoned = issueRepository.tombstoneByRepositoryIdAndNumbers(
+        // Issue-typed tombstone: a confidential-issue IID must never touch a live merge request that
+        // happens to share the IID — GitLab issues and MRs are separate per-project namespaces.
+        int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
             repositoryId,
             List.of(number),
             Instant.now()

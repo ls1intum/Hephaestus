@@ -174,6 +174,20 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
         lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(mergeRequests);
     }
 
+    /**
+     * Asserts the sweep wrote no tombstone at all. The write is type-discriminated — issues and merge
+     * requests are tombstoned through separate repository methods, since GitLab keeps their IIDs in
+     * separate namespaces — so "deleted nothing" means neither was called.
+     */
+    private void verifyNothingTombstoned() {
+        verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+        verify(issueRepository, never()).tombstonePullRequestsByRepositoryIdAndNumbers(
+            anyLong(),
+            anyCollection(),
+            any()
+        );
+    }
+
     @Nested
     class RemovesWhatUpstreamNoLongerHas {
 
@@ -184,12 +198,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1, 3), false, 2)));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
-            when(issueRepository.tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(1);
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
+                1
+            );
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneByRepositoryIdAndNumbers(
+            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
                 eq(REPO_ID),
                 captor.capture(),
                 any(Instant.class)
@@ -206,12 +222,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0)));
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(10), false, 1)));
             stubLocalNumbers(List.of(), List.of(10, 11));
-            when(issueRepository.tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(1);
+            when(
+                issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())
+            ).thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneByRepositoryIdAndNumbers(
+            verify(issueRepository).tombstonePullRequestsByRepositoryIdAndNumbers(
                 eq(REPO_ID),
                 captor.capture(),
                 any(Instant.class)
@@ -228,7 +246,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.total()).isZero();
             assertThat(outcome.skipped()).isFalse();
         }
@@ -243,7 +261,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
         }
     }
 
@@ -272,7 +290,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.issuesTombstoned()).isZero();
             assertThat(outcome.skipped()).isFalse();
         }
@@ -293,12 +311,14 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
                 })
             );
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0)));
-            when(issueRepository.tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(1);
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
+                1
+            );
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneByRepositoryIdAndNumbers(
+            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
                 eq(REPO_ID),
                 captor.capture(),
                 any(Instant.class)
@@ -326,7 +346,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.issuesTombstoned()).isZero();
             assertThat(outcome.skipped()).isTrue();
         }
@@ -342,7 +362,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.skipped()).isTrue();
         }
 
@@ -360,7 +380,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.skipped()).isTrue();
         }
 
@@ -374,7 +394,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.skipped()).isTrue();
         }
 
@@ -400,7 +420,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.skipped()).isTrue();
         }
 
@@ -411,14 +431,22 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1), false, 900))); // count mismatch → skip
             scriptedResponses.add(Mono.just(mergeRequestPage(List.of(10), false, 1)));
             stubLocalNumbers(List.of(1, 2), List.of(10, 11));
-            when(issueRepository.tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(1);
+            when(
+                issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())
+            ).thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             assertThat(outcome.issuesTombstoned()).isZero();
             assertThat(outcome.mergeRequestsTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isTrue();
-            verify(issueRepository, times(1)).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            // The incomplete issue listing tombstoned no issues; only the merge-request write ran.
+            verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verify(issueRepository, times(1)).tombstonePullRequestsByRepositoryIdAndNumbers(
+                anyLong(),
+                anyCollection(),
+                any()
+            );
         }
 
         @Test
@@ -429,7 +457,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             var outcome = service.sweepRepository(SCOPE_ID, blank, handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             assertThat(outcome.total()).isZero();
         }
     }
@@ -444,8 +472,30 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             service.sweepRepository(SCOPE_ID, repository(), handle);
 
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
             verify(client, never()).documentName(anyString());
+        }
+
+        @Test
+        void shouldDeleteNothingWhenCancelledMidListing() {
+            // Cancel AFTER page one of a two-page listing, so the accumulator genuinely holds a partial
+            // set {1,2} — the dangerous case that a bare cancel-before test never exercises. The
+            // cancellation flag is polled at: sweepRepository entry (false), the entity loop for ISSUE
+            // (false), the listing's while-loop before page one (false → page one IS fetched), then the
+            // while-loop before page two (true → abort with a populated accumulator). Nothing may be
+            // tombstoned.
+            when(handle.isCancellationRequested()).thenReturn(false, false, false, true);
+            scriptedResponses.add(Mono.just(issuePage(List.of(1, 2), true, 4)));
+            scriptedResponses.add(Mono.just(issuePage(List.of(3, 4), false, 4)));
+            stubLocalNumbers(List.of(1, 2, 3, 4, 5), List.of());
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            // Exactly one page was fetched before the cancel — proof the accumulator was mid-listing,
+            // not empty as it would be for a cancel-before-page-one.
+            verify(requestSpec, times(1)).execute();
+            verifyNothingTombstoned();
+            assertThat(outcome.total()).isZero();
         }
 
         @Test
@@ -460,7 +510,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             var outcome = service.sweepScope(SCOPE_ID, handle);
 
             assertThat(outcome.total()).isZero();
-            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            verifyNothingTombstoned();
         }
     }
 

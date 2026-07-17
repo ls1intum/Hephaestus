@@ -208,20 +208,20 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             // drops out of every live query.
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
             when(
-                issueRepository.tombstoneByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
+                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
             ).thenReturn(1);
 
             boolean purged = processor.purgeConfidential(event, createContext());
 
             assertThat(purged).isTrue();
-            verify(issueRepository).tombstoneByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any());
+            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any());
         }
 
         @Test
         void purgeConfidentialIsNoopWhenNothingStored() {
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
             when(
-                issueRepository.tombstoneByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
+                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
             ).thenReturn(0);
 
             boolean purged = processor.purgeConfidential(event, createContext());

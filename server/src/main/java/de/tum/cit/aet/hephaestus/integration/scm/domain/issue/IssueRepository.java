@@ -131,7 +131,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     List<Integer> findLivePullRequestNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /**
-     * Tombstones the given issue/pull-request numbers of one repository in a single statement.
+     * Tombstones the given <em>issue</em> numbers of one repository in a single statement.
+     *
+     * <p>{@code TYPE(i) = Issue} excludes the {@code PullRequest} subclass rows that share this table
+     * under single-table inheritance. This is not cosmetic: for GitLab, issue IIDs and merge-request
+     * IIDs occupy <em>separate</em> per-project namespaces (issue #5 and MR !5 routinely coexist), so a
+     * type-blind UPDATE keyed only on {@code (repository.id, number)} would tombstone a live merge
+     * request whenever an issue with the same number is swept — hiding it from counts, mentor and
+     * detection until the next reconciliation upsert revives it. Every other query in this repository
+     * carries the same discriminator for exactly this reason; the tombstone must too.
      *
      * <p>{@code deletedAt IS NULL} in the predicate makes this idempotent and preserves the
      * <em>first</em> observation time: a re-sweep of an already-tombstoned row must not push its
@@ -142,10 +150,29 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE i.repository.id = :repositoryId " +
+        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId " +
             "AND i.number IN :numbers AND i.deletedAt IS NULL"
     )
-    int tombstoneByRepositoryIdAndNumbers(
+    int tombstoneIssuesByRepositoryIdAndNumbers(
+        @Param("repositoryId") Long repositoryId,
+        @Param("numbers") Collection<Integer> numbers,
+        @Param("deletedAt") Instant deletedAt
+    );
+
+    /**
+     * Tombstones the given <em>pull-request / merge-request</em> numbers of one repository in a single
+     * statement. Counterpart to {@link #tombstoneIssuesByRepositoryIdAndNumbers}; {@code TYPE(i) =
+     * PullRequest} keeps the pure-issue rows out of the write for the same separate-namespace reason.
+     *
+     * @return the number of rows newly tombstoned
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query(
+        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId " +
+            "AND i.number IN :numbers AND i.deletedAt IS NULL"
+    )
+    int tombstonePullRequestsByRepositoryIdAndNumbers(
         @Param("repositoryId") Long repositoryId,
         @Param("numbers") Collection<Integer> numbers,
         @Param("deletedAt") Instant deletedAt

@@ -93,7 +93,7 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         upsertIssue(number);
         assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(number);
 
-        int tombstoned = issueRepository.tombstoneByRepositoryIdAndNumbers(
+        int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
             repository.getId(),
             java.util.List.of(number),
             Instant.now()
@@ -115,7 +115,7 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
             number
         );
 
-        int tombstoned = issueRepository.tombstoneByRepositoryIdAndNumbers(
+        int tombstoned = issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(
             repository.getId(),
             java.util.List.of(number),
             Instant.now()
@@ -128,6 +128,57 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(
             number
         );
+    }
+
+    /**
+     * The P1 regression guard. GitLab keeps issue IIDs and merge-request IIDs in <em>separate</em>
+     * per-project namespaces, both starting at 1, so an issue #5 and an MR !5 routinely coexist — and
+     * both live in the single {@code issue} table under the discriminator. When the issue sweep proves
+     * its listing complete and tombstones a deleted issue #5, the write must not reach across the
+     * discriminator and hide the live merge request that happens to share the IID. A type-blind
+     * {@code UPDATE issue SET deleted_at ... WHERE repository_id = ? AND number IN (?)} tombstones both;
+     * the MR then reads as already-gone by the MR sweep and stays hidden until the next daily upsert
+     * revives it (~24h). This test fails against that type-blind query and passes with the
+     * {@code TYPE(i) = Issue} discriminator restored.
+     */
+    @Test
+    void tombstoningACollidingIssueIidDoesNotHideTheMergeRequestWithTheSameIid() {
+        int iid = 5;
+        upsertIssue(iid);
+        upsertMergeRequest(iid);
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+
+        // Issue #5 was deleted upstream; the issue sweep computed missing=[5] and tombstones the ISSUE.
+        int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
+            repository.getId(),
+            java.util.List.of(iid),
+            Instant.now()
+        );
+
+        assertThat(tombstoned).isEqualTo(1);
+        // Issue #5 is retired...
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).isEmpty();
+        // ...but the merge request in the other namespace must remain live.
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+    }
+
+    /** The symmetric direction: sweeping a deleted MR !5 must not hide a live issue #5. */
+    @Test
+    void tombstoningACollidingMergeRequestIidDoesNotHideTheIssueWithTheSameIid() {
+        int iid = 5;
+        upsertIssue(iid);
+        upsertMergeRequest(iid);
+
+        int tombstoned = issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(
+            repository.getId(),
+            java.util.List.of(iid),
+            Instant.now()
+        );
+
+        assertThat(tombstoned).isEqualTo(1);
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).isEmpty();
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(iid);
     }
 
     private void upsertIssue(int number) {
