@@ -411,9 +411,9 @@ export type UpdateWorkspaceTokenRequest = {
  */
 export type UpdateWorkspaceStatusRequest = {
     /**
-     * New lifecycle status (PENDING, ACTIVE, ARCHIVED)
+     * Target lifecycle status. PURGED is not a status transition: purge is irreversible and owner-only, so it lives at DELETE /workspaces/{workspaceSlug}.
      */
-    status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
+    status: 'ACTIVE' | 'SUSPENDED';
 };
 
 /**

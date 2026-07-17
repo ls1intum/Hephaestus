@@ -7520,11 +7520,11 @@ components:
       properties:
         status:
           type: string
-          description: "New lifecycle status (PENDING, ACTIVE, ARCHIVED)"
+          description: "Target lifecycle status. PURGED is not a status transition:\
+            \ purge is irreversible and owner-only, so it lives at DELETE /workspaces/{workspaceSlug}."
           enum:
           - ACTIVE
           - SUSPENDED
-          - PURGED
       required:
       - status
     UpdateWorkspaceTokenRequest:
