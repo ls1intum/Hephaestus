@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -20,8 +21,10 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -114,11 +117,11 @@ public class PracticeDetectionDeliveryService {
         Instant observedAt = Instant.now();
 
         // Keyed by finding IDENTITY, not value-equality — two findings can be value-equal yet must each carry
-        // their own key. Only known-slug findings are entered; unknown-slug ones never get a key.
-        Map<ValidatedFinding, String> findingFingerprints = new IdentityHashMap<>();
+        // their own keys. Only known-slug findings are entered; unknown-slug ones never get keys.
+        Map<ValidatedFinding, ObservationKeys> observationKeys = new IdentityHashMap<>();
 
-        // Current criteria-revision per practice, memoized — every finding pins to the criteria as it was
-        // (SCD-2 reproducibility). Null if a practice has no revision yet (pre-versioning legacy practices).
+        // Criteria-revision per practice, memoized. Null if a practice has no revision yet (pre-versioning).
+        Instant criteriaAsOf = job.getStartedAt();
         Map<Long, Long> revisionByPractice = new HashMap<>();
 
         for (int i = 0; i < validFindings.size(); i++) {
@@ -136,7 +139,7 @@ public class PracticeDetectionDeliveryService {
             }
 
             // The index disambiguates multiple findings for the same practice on one artifact.
-            String idempotencyKey =
+            String occurrenceKey =
                 finding.practiceSlug() + ":" + i + ":" + artifactType.name() + ":" + artifactId + ":" + job.getId();
 
             String evidenceJson = null;
@@ -151,20 +154,17 @@ public class PracticeDetectionDeliveryService {
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
             // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
-            String findingFingerprint = ObservationFingerprint.compute(
+            String recurrenceKey = ObservationFingerprint.compute(
                 finding.practiceSlug(),
                 artifactType.name(),
                 artifactId,
                 aboutUserId,
                 firstLocationPath(finding.evidence())
             );
-            findingFingerprints.put(finding, findingFingerprint);
+            observationKeys.put(finding, new ObservationKeys(occurrenceKey, recurrenceKey));
 
             Long practiceRevisionId = revisionByPractice.computeIfAbsent(practice.getId(), pid ->
-                practiceRevisionRepository
-                    .findFirstByPracticeIdOrderByRevisionNumberDesc(pid)
-                    .map(rev -> rev.getId())
-                    .orElse(null)
+                resolvePinnedRevisionId(pid, criteriaAsOf)
             );
 
             // Self-enforce the ADR-0022 invariant that Observation.@PrePersist applies but the native
@@ -175,7 +175,7 @@ public class PracticeDetectionDeliveryService {
 
             int rows = observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
-                idempotencyKey,
+                occurrenceKey,
                 job.getId(),
                 practice.getId(),
                 practiceRevisionId,
@@ -189,7 +189,7 @@ public class PracticeDetectionDeliveryService {
                 finding.confidence(),
                 evidenceJson,
                 finding.reasoning(),
-                findingFingerprint,
+                recurrenceKey,
                 observedAt
             );
 
@@ -227,7 +227,31 @@ public class PracticeDetectionDeliveryService {
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, findingFingerprints);
+        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, observationKeys);
+    }
+
+    /**
+     * The criteria revision the detector was actually given: the latest that existed when the job's inputs were
+     * prepared. {@code startedAt} is stamped at claim, immediately before the catalog injector reads the
+     * criteria into the sandbox, so a revision an admin appends mid-run is a rubric this run never saw. Falls
+     * back to the latest revision when the as-of lookup finds none (a practice created mid-run) or the job
+     * carries no {@code startedAt}; null when the practice has no revision at all (pre-versioning rows).
+     */
+    private Long resolvePinnedRevisionId(Long practiceId, @Nullable Instant asOf) {
+        if (asOf != null) {
+            Optional<PracticeRevision> pinned =
+                practiceRevisionRepository.findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
+                    practiceId,
+                    asOf
+                );
+            if (pinned.isPresent()) {
+                return pinned.get().getId();
+            }
+        }
+        return practiceRevisionRepository
+            .findFirstByPracticeIdOrderByRevisionNumberDesc(practiceId)
+            .map(PracticeRevision::getId)
+            .orElse(null);
     }
 
     /**
@@ -311,18 +335,18 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * @param findingFingerprints the stable cross-run key persisted for each delivered finding, keyed by finding
-     *     identity, so the caller can stamp the SAME key onto its deliverable findings without recomputing it
-     *     (no drift from what was persisted). Empty when no findings were persisted.
+     * @param observationKeys the keys persisted for each delivered finding, by finding identity, so the caller
+     *     stamps the SAME keys onto its deliverable findings rather than recomputing them (no drift from what
+     *     was persisted). Empty when no findings were persisted.
      */
     public record DeliveryResult(
         int inserted,
         int discardedUnknownSlug,
         int discardedDuplicate,
         boolean hasNegative,
-        Map<ValidatedFinding, String> findingFingerprints
+        Map<ValidatedFinding, ObservationKeys> observationKeys
     ) {
-        /** Compatibility shape for call sites/tests that do not consume per-finding correlation keys. */
+        /** Compatibility shape for call sites/tests that do not consume per-finding keys. */
         public DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {
             this(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, Map.of());
         }

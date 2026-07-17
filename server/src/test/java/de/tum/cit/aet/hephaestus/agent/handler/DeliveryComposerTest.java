@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.WithheldFinding;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -1561,7 +1563,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove the commented-out block."
-        ).withRecurrenceKey("corr-synth-123");
+        ).withKeys(new ObservationKeys("occ-corr-synth-123", "corr-synth-123"));
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1586,7 +1588,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove it."
-        ).withRecurrenceKey("corr-delivered");
+        ).withKeys(new ObservationKeys("occ-corr-delivered", "corr-delivered"));
         ValidatedFinding failed = negativeFinding(
             "meaningful-naming",
             "Non-descriptive name 'Data'",
@@ -1595,7 +1597,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Rename to a domain term.",
             "Use PortfolioSnapshot."
-        ).withRecurrenceKey("corr-failed");
+        ).withKeys(new ObservationKeys("occ-corr-failed", "corr-failed"));
 
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
@@ -1633,7 +1635,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withRecurrenceKey("k-a");
+        ).withKeys(new ObservationKeys("occ-k-a", "k-a"));
         ValidatedFinding b = negativeFinding(
             "code-hygiene",
             "Dead code B",
@@ -1642,7 +1644,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withRecurrenceKey("k-b");
+        ).withKeys(new ObservationKeys("occ-k-b", "k-b"));
 
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(a, b),
@@ -1697,7 +1699,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withRecurrenceKey("corr-suggested-456");
+        ).withKeys(new ObservationKeys("occ-corr-suggested-456", "corr-suggested-456"));
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1730,7 +1732,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withRecurrenceKey("corr-scrub-789");
+        ).withKeys(new ObservationKeys("occ-corr-scrub-789", "corr-scrub-789"));
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1787,7 +1789,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Remove unused imports.",
             "Delete the import.",
             List.of(suggested)
-        ).withRecurrenceKey("corr-relativise-1");
+        ).withKeys(new ObservationKeys("occ-corr-relativise-1", "corr-relativise-1"));
 
         String diff =
             "diff --git a/src/components/Button.tsx b/src/components/Button.tsx\n" +
@@ -2180,5 +2182,153 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(result).isNotNull();
         assertThat(result.diffNotes()).hasSize(1); // no-op guard ⇒ anchor kept
+    }
+
+    // Withheld-finding report (issue #1363): the composer must tell the ledger what it decided NOT to render.
+
+    @Test
+    void compose_withheld_reportsCappedImprovementTailAsPolicyFloorDrop() {
+        // 5 keyed MINOR nudges, cap = 3 → the 2 folded ones are reported withheld with VOLUME_CAPPED.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            findings.add(
+                negativeFinding(
+                    "nudge-" + i,
+                    "Nudge " + i,
+                    Severity.MINOR,
+                    List.of(new LocationSpec("Views/N" + i + ".swift", 10 + i)),
+                    null,
+                    "Reasoning " + i + ".",
+                    null
+                ).withKeys(new ObservationKeys("occ-" + i, "rk-" + i))
+            );
+        }
+
+        DeliveryContent result = DeliveryComposer.compose(findings);
+
+        assertThat(result).isNotNull();
+        assertThat(result.withheld())
+            .hasSize(2)
+            .allSatisfy(w -> assertThat(w.reason()).isEqualTo(FeedbackSuppressionReason.VOLUME_CAPPED));
+        // Nothing reported withheld was rendered: the two collapsed nudges are absent from the summary.
+        Map<String, String> titleByKey = findings
+            .stream()
+            .collect(Collectors.toMap(ValidatedFinding::occurrenceKey, ValidatedFinding::title));
+        for (WithheldFinding w : result.withheld()) {
+            assertThat(result.mrNote()).doesNotContain(titleByKey.get(w.occurrenceKey()));
+        }
+    }
+
+    @Test
+    void compose_withheld_addressesOneObservation_notTheWholeLocus() {
+        // Four findings of one practice on one file share a recurrence key by design (the key is a LOCUS).
+        // The cap keeps three and drops the fourth; the report must name the dropped OBSERVATION. Keying by
+        // locus instead would see the key surviving on a kept finding and report nothing — leaving the
+        // dropped finding silently bound to the DELIVERED unit.
+        List<ValidatedFinding> sameLocus = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            sameLocus.add(
+                negativeFinding(
+                    "ships-tests-with-the-change",
+                    "Gap " + i,
+                    Severity.MINOR,
+                    List.of(new LocationSpec("src/Foo.java", 10)),
+                    null,
+                    "A gap.",
+                    null
+                ).withKeys(new ObservationKeys("occ-" + i, "shared-locus"))
+            );
+        }
+
+        List<WithheldFinding> withheld = DeliveryComposer.compose(sameLocus).withheld();
+
+        assertThat(withheld).hasSize(1);
+        assertThat(withheld.get(0).occurrenceKey()).startsWith("occ-").isNotEqualTo("shared-locus");
+    }
+
+    @Test
+    void compose_withheld_reportsCoOccurrenceDedupAsComposerDeduped() {
+        // ready-and-traceable-handoff + ships-tests-with-the-change both BAD → the redundant one collapses
+        // and must be reported COMPOSER_DEDUPED (not silently bound as delivered).
+        ValidatedFinding redundant = negativeFinding(
+            "ready-and-traceable-handoff",
+            "DoD checkbox claims tests pass",
+            Severity.MAJOR,
+            List.of(),
+            null,
+            "The DoD claims all tests pass but no tests changed.",
+            null
+        ).withKeys(new ObservationKeys("occ-rk-redundant", "rk-redundant"));
+        ValidatedFinding preferred = negativeFinding(
+            "ships-tests-with-the-change",
+            "No tests shipped with the change",
+            Severity.MAJOR,
+            List.of(new LocationSpec("Sources/Feature.swift", 12)),
+            null,
+            "The change adds behaviour without tests.",
+            null
+        ).withKeys(new ObservationKeys("occ-rk-preferred", "rk-preferred"));
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(redundant, preferred));
+
+        assertThat(result).isNotNull();
+        assertThat(result.withheld()).containsExactly(
+            new WithheldFinding("occ-rk-redundant", FeedbackSuppressionReason.COMPOSER_DEDUPED)
+        );
+    }
+
+    @Test
+    void compose_withheld_skipsUnkeyedFindings() {
+        // Findings with no stamped recurrence key cannot be correlated back to an observation — the report
+        // must skip them rather than emit a null key the ledger cannot match.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            findings.add(
+                negativeFinding(
+                    "nudge-" + i,
+                    "Nudge " + i,
+                    Severity.MINOR,
+                    List.of(new LocationSpec("Views/N" + i + ".swift", 10 + i)),
+                    null,
+                    "Reasoning " + i + ".",
+                    null
+                )
+            );
+        }
+
+        DeliveryContent result = DeliveryComposer.compose(findings);
+
+        assertThat(result).isNotNull();
+        assertThat(result.withheld()).isEmpty();
+    }
+
+    @Test
+    void compose_withheld_epicStructureDedupOnIssue_reportsComposerDeduped() {
+        ValidatedFinding scoped = negativeFinding(
+            "issue-scoped-to-single-concern",
+            "Issue bundles several concerns",
+            Severity.MAJOR,
+            List.of(),
+            null,
+            "The issue mixes several concerns.",
+            null
+        ).withKeys(new ObservationKeys("occ-rk-scoped", "rk-scoped"));
+        ValidatedFinding checkable = negativeFinding(
+            "issue-has-checkable-outcome",
+            "No checkable outcome",
+            Severity.MINOR,
+            List.of(),
+            null,
+            "The issue has no checkable outcome.",
+            null
+        ).withKeys(new ObservationKeys("occ-rk-checkable", "rk-checkable"));
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(scoped, checkable), WorkArtifact.ISSUE);
+
+        assertThat(result).isNotNull();
+        // Severity-sorted: the MAJOR scoped finding leads and is kept; the sibling collapses.
+        assertThat(result.withheld()).containsExactly(
+            new WithheldFinding("occ-rk-checkable", FeedbackSuppressionReason.COMPOSER_DEDUPED)
+        );
     }
 }
