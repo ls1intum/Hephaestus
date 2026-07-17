@@ -49,7 +49,10 @@ jobs:
       - name: Maintain Version PR
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
-          version: pnpm changeset version
+          # Also syncs the self-host IMAGE_TAG / install-guide version to the new
+          # release (scripts/sync-selfhost-version.mjs), so those literals never
+          # drift. The changesets action commits whatever the version step writes.
+          version: pnpm run changeset:version
           # No `publish:` — tagging, GitHub Release, and deploys are release.yml's
           # job (it uses `v`-prefixed tags to stay consistent with existing tags,
           # docker IMAGE_TAG, and the release-pin asset; `changeset tag` would emit
