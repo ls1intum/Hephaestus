@@ -12,6 +12,9 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -24,6 +27,7 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -38,6 +42,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
     @Mock
     private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private ConfigAuditPort configAudit;
 
     @InjectMocks
     private AgentConfigService agentConfigService;
@@ -190,7 +197,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             existing.setAllowInternet(false);
             existing.setCredentialMode(CredentialMode.PROXY);
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
 
             var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
 
@@ -212,7 +219,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             existing.setAllowInternet(true);
             existing.setCredentialMode(CredentialMode.PROXY);
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
 
             var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
 
@@ -231,7 +238,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             existing.setAllowInternet(true);
             existing.setCredentialMode(CredentialMode.API_KEY);
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
 
             var request = UpdateAgentConfigRequestDTO.builder().allowInternet(false).build();
 
@@ -356,7 +363,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             existing.setLlmProvider(LlmProvider.ANTHROPIC);
             existing.setLlmApiKey("sk-existing-secret");
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             var request = UpdateAgentConfigRequestDTO.builder()
@@ -380,7 +387,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             existing.setLlmProvider(LlmProvider.ANTHROPIC);
             existing.setLlmApiKey("sk-existing-secret");
 
-            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // clearLlmApiKey wins over any provided key.
@@ -393,7 +400,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
         @Test
         void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
-            when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(999L, 1L)).thenReturn(Optional.empty());
 
             var request = UpdateAgentConfigRequestDTO.builder().build();
 
@@ -503,6 +510,40 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 999L)).isInstanceOf(
                 EntityNotFoundException.class
             );
+        }
+    }
+
+    @Nested
+    class ConfigAuditWrites {
+
+        @Test
+        void updateRecordsThePreMutationStateAsBefore() {
+            // Pins snapshot ORDERING, not just presence: move `before` below the setters and every
+            // agent-config update becomes an empty diff, which the recorder suppresses as a no-op —
+            // total, silent audit loss for updates, with a green build.
+            AgentConfig config = new AgentConfig();
+            config.setId(7L);
+            config.setWorkspace(workspace);
+            config.setName("primary");
+            config.setLlmProvider(LlmProvider.OPENAI);
+            config.setModelName("old-model");
+            when(agentConfigRepository.findByIdAndWorkspaceIdForUpdate(7L, 1L)).thenReturn(Optional.of(config));
+            when(agentConfigRepository.save(any(AgentConfig.class))).thenAnswer(i -> i.getArgument(0));
+
+            agentConfigService.updateConfig(
+                workspaceContext,
+                7L,
+                UpdateAgentConfigRequestDTO.builder().modelName("new-model").build()
+            );
+
+            ArgumentCaptor<ConfigAuditEntry> captor = ArgumentCaptor.forClass(ConfigAuditEntry.class);
+            verify(configAudit).record(captor.capture());
+            ConfigAuditEntry entry = captor.getValue();
+            assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.AGENT_CONFIG);
+            assertThat(entry.entityId()).isEqualTo("7");
+            assertThat(entry.before()).hasToString(entry.before().toString());
+            assertThat(String.valueOf(entry.before())).contains("old-model");
+            assertThat(String.valueOf(entry.after())).contains("new-model");
         }
     }
 }

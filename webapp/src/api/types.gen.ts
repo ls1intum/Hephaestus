@@ -1673,6 +1673,66 @@ export type ObservationList = {
     title: string;
 };
 
+export type PageConfigAuditEntryView = {
+    content?: Array<ConfigAuditEntryView>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+/**
+ * A human-readable actor identity on an audit row. Both fields are null once the account is
+ * tombstoned — the id still attributes the action, which is why <code>AccountPurger</code> de-identifies
+ * the account rather than the trail.
+ *
+ * <p>Named distinctly from the auth trail's own <code>AccountRefDTO</code>: the OpenAPI schema key is the
+ * simple name minus the <code>DTO</code> suffix, so two <code>AccountRefDTO</code> records would collide and one
+ * would be silently dropped from the spec.
+ */
+export type ConfigAuditActorRef = {
+    displayName?: string;
+    email?: string;
+    id?: number;
+};
+
+/**
+ * One audit row, flattened for a viewer. Crosses the module boundary, so it carries no entity.
+ */
+export type ConfigAuditEntryView = {
+    actingAccountId?: number;
+    /**
+     * resolved impersonator, present only for {@link ConfigAuditActorKind#IMPERSONATED ConfigAuditActorKind#IMPERSONATED}
+     */
+    actingActor?: ConfigAuditActorRef;
+    action?: 'CREATED' | 'UPDATED' | 'DELETED';
+    /**
+     * resolved identity of {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorAccountId #actorAccountId}; null for SYSTEM rows or once the
+     * account is gone. Read together with {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorKind #actorKind} — that is what keeps
+     * "a system did this" distinct from "we no longer know who did this".
+     */
+    actor?: ConfigAuditActorRef;
+    actorAccountId?: number;
+    actorKind?: 'USER' | 'SYSTEM' | 'IMPERSONATED';
+    /**
+     * dot-paths that differ between {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#oldValue #oldValue} and {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#newValue #newValue}
+     */
+    changedKeys?: Array<string>;
+    entityId?: string;
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG';
+    id?: number;
+    newValue?: string;
+    occurredAt?: Date;
+    oldValue?: string;
+    workspaceId?: number;
+};
+
 export type PageAuthEventView = {
     content?: Array<AuthEventView>;
     empty?: boolean;
@@ -3069,6 +3129,33 @@ export type AdminExportAuthEventsResponses = {
 
 export type AdminExportAuthEventsResponse = AdminExportAuthEventsResponses[keyof AdminExportAuthEventsResponses];
 
+export type AdminListConfigAuditEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workspaceId?: number;
+        page?: number;
+        size?: number;
+        entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG';
+        entityId?: string;
+        changedKey?: string;
+        action?: 'CREATED' | 'UPDATED' | 'DELETED';
+        actorId?: number;
+        from?: Date;
+        to?: Date;
+    };
+    url: '/admin/config-audit';
+};
+
+export type AdminListConfigAuditEventsResponses = {
+    /**
+     * OK
+     */
+    200: PageConfigAuditEntryView;
+};
+
+export type AdminListConfigAuditEventsResponse = AdminListConfigAuditEventsResponses[keyof AdminListConfigAuditEventsResponses];
+
 export type AdminListLoginProvidersData = {
     body?: never;
     path?: never;
@@ -4074,6 +4161,37 @@ export type UpdatePracticeReviewSettingsResponses = {
 };
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+
+export type ListWorkspaceConfigAuditEventsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG';
+        entityId?: string;
+        changedKey?: string;
+        action?: 'CREATED' | 'UPDATED' | 'DELETED';
+        actorId?: number;
+        from?: Date;
+        to?: Date;
+    };
+    url: '/workspaces/{workspaceSlug}/config-audit';
+};
+
+export type ListWorkspaceConfigAuditEventsResponses = {
+    /**
+     * OK
+     */
+    200: PageConfigAuditEntryView;
+};
+
+export type ListWorkspaceConfigAuditEventsResponse = ListWorkspaceConfigAuditEventsResponses[keyof ListWorkspaceConfigAuditEventsResponses];
 
 export type ListData = {
     body?: never;

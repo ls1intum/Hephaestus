@@ -187,6 +187,21 @@ erDiagram
         BIGINT pull_request_id PK,FK
     }
 
+    ConfigAuditEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(16) actor_kind "NOT NULL"
+        BIGINT actor_account_id FK
+        BIGINT acting_account_id FK
+        VARCHAR(48) entity_type "NOT NULL"
+        VARCHAR(64) entity_id "NOT NULL"
+        VARCHAR(16) action "NOT NULL"
+        ARRAY changed_keys "NOT NULL"
+        JSONB old_value
+        JSONB new_value
+    }
+
     Connection {
         BIGINT id PK
         BIGINT workspace_id FK,UK "NOT NULL"
@@ -374,6 +389,14 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
+    InstanceSetting {
+        BIGINT id PK
+        BOOLEAN silent_mode_engaged "NOT NULL"
+        VARCHAR(500) silent_mode_reason
+        TIMESTAMPTZ silent_mode_changed_at
+        VARCHAR(255) silent_mode_changed_by
+    }
+
     Issue {
         VARCHAR(31) issue_type UK "NOT NULL"
         BIGINT id PK
@@ -487,6 +510,21 @@ erDiagram
         TIMESTAMPTZ updated_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    LlmUsageEvent {
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(40) job_type "NOT NULL"
+        UUID source_id UK "NOT NULL"
+        VARCHAR(128) model
+        BIGINT input_tokens "NOT NULL"
+        BIGINT output_tokens "NOT NULL"
+        BIGINT cache_read_tokens "NOT NULL"
+        BIGINT cache_write_tokens "NOT NULL"
+        INTEGER total_calls "NOT NULL"
+        NUMERIC(12,6) cost_usd
+        TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
     LoginProvider {
@@ -1078,6 +1116,7 @@ erDiagram
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
+        NUMERIC(10,2) monthly_llm_budget_usd
     }
 
     WorkspaceMembership {
@@ -1189,6 +1228,9 @@ erDiagram
     Workspace ||--o{ ChatThread : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
+    Workspace ||--o{ ConfigAuditEvent : has
+    Account ||--o{ ConfigAuditEvent : actor_account_id
+    Account ||--o{ ConfigAuditEvent : acting_account_id
     Connection ||--o{ ConnectionAudit : has
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
@@ -1215,6 +1257,7 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
+    Workspace ||--o{ LlmUsageEvent : has
     ChatThread ||--o{ MentorSlackThread : has
     User ||--o{ Milestone : created_by
     Practice ||--o{ Observation : has
