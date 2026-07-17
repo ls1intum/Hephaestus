@@ -19,6 +19,7 @@ import {
 	updateConnectionSyncJobMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { AdminRepositoriesSettings } from "@/components/admin/integrations/AdminRepositoriesSettings";
+import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
@@ -224,6 +225,12 @@ function ScmIntegrationPage() {
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
 			/>
 
+			{/* A suspended/uninstalled connection paints an otherwise normal-looking header; the shared
+			    notice is what says sync stopped and why — the same explanation Slack and Outline show. */}
+			{hasConnection && !isConnectionActive && (
+				<ConnectionStateNotice connectionState={entry?.connectionState} displayName={label} />
+			)}
+
 			<SyncStatusHeader
 				label={label}
 				status={status}
@@ -307,6 +314,7 @@ function ScmIntegrationPage() {
 			{isConnectionActive && !isAppInstallationWorkspace && (
 				<AdminRepositoriesSettings
 					repositories={(repositories ?? []).map((repo) => ({ nameWithOwner: repo }))}
+					providerLabel={label}
 					isLoading={isLoadingRepositories}
 					error={repositoriesError as Error | null}
 					addRepositoryError={addRepository.error as Error | null}

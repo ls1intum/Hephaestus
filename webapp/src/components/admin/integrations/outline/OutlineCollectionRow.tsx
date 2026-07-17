@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { relativeTime } from "../sync-format";
+import { RelativeTime } from "../RelativeTime";
 
 /** The mirror lifecycle states, sourced from the generated DTO so they never drift. */
 export type OutlineMirrorState = OutlineCollection["state"];
@@ -127,8 +127,8 @@ export function OutlineCollectionRow({
 				</div>
 			</TableCell>
 
-			<TableCell className="tabular-nums">
-				<div className="flex items-center gap-1.5">
+			<TableCell className="text-right tabular-nums">
+				<div className="flex items-center justify-end gap-1.5">
 					<span>
 						{collection.documentCount}
 						{typeof collection.documentsUpstream === "number" && (
@@ -165,11 +165,7 @@ export function OutlineCollectionRow({
 			</TableCell>
 
 			<TableCell className="text-muted-foreground text-sm">
-				{collection.lastSyncedAt ? (
-					relativeTime(collection.lastSyncedAt)
-				) : (
-					<span aria-hidden>—</span>
-				)}
+				<RelativeTime value={collection.lastSyncedAt} fallback="Never" />
 			</TableCell>
 
 			<TableCell className="text-right">

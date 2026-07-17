@@ -234,10 +234,13 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		await removeCollection.mutateAsync({ path: { workspaceSlug, collectionId } });
 	};
 
-	const documentCount = (collections ?? []).reduce(
-		(sum, collection) => sum + collection.documentCount,
-		0,
-	);
+	// The collections query is gated on `isConnectionActive`, so for a SUSPENDED/UNINSTALLED
+	// connection it never runs and `data` is undefined. Summing `(collections ?? [])` there would
+	// print a confident "0 documents mirrored" for a count that was never actually read — leave it
+	// undefined so the card renders nothing rather than a fabricated zero.
+	const documentCount = collections
+		? collections.reduce((sum, collection) => sum + collection.documentCount, 0)
+		: undefined;
 	const syncSummary: OutlineSyncSummary | undefined = connectionStatus && {
 		webhookRegistered: connectionStatus.webhookRegistered,
 		documentCount,

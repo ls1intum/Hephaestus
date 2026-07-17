@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { SlackChannelCombobox } from "./slack-channels/SlackChannelCombobox";
@@ -151,7 +152,7 @@ export function AdminSlackNotificationSettings({
 		},
 		onError: (e) => {
 			toast.error("Failed to save Slack digest settings", {
-				description: e instanceof Error ? e.message : undefined,
+				description: problemDetailOf(e),
 			});
 		},
 	});
@@ -173,7 +174,7 @@ export function AdminSlackNotificationSettings({
 		},
 		onError: (e) => {
 			toast.error("Test message failed", {
-				description: e instanceof Error ? e.message : undefined,
+				description: problemDetailOf(e),
 			});
 		},
 	});
@@ -189,7 +190,7 @@ export function AdminSlackNotificationSettings({
 		},
 		onError: (e) => {
 			toast.error("Could not start Slack OAuth", {
-				description: e instanceof Error ? e.message : undefined,
+				description: problemDetailOf(e),
 			});
 		},
 	});
@@ -203,7 +204,7 @@ export function AdminSlackNotificationSettings({
 		},
 		onError: (e) => {
 			toast.error("Failed to disconnect Slack", {
-				description: e instanceof Error ? e.message : undefined,
+				description: problemDetailOf(e),
 			});
 		},
 	});

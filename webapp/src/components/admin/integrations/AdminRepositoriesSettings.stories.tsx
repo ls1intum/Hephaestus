@@ -41,6 +41,7 @@ const meta = {
 			{ nameWithOwner: "microsoft/vscode" },
 			{ nameWithOwner: "facebook/react" },
 		],
+		providerLabel: "GitHub",
 		isLoading: false,
 		error: null,
 		addRepositoryError: null,
@@ -109,7 +110,9 @@ export const ManyRepositories: Story = {
 };
 
 /**
- * Removing a repository is guarded by a destructive confirm dialog that spells out the consequence.
+ * Removing a repository is guarded by a destructive confirm dialog. The copy now names WHAT is erased
+ * and states the upstream is untouched and re-syncable — the discipline Slack's and Outline's dialogs
+ * already had, and which the vaguer "remove all data associated with this repository" line lacked.
  */
 export const RemoveConfirm: Story = {
 	play: async ({ canvasElement }) => {
@@ -120,7 +123,14 @@ export const RemoveConfirm: Story = {
 		await expect(
 			within(dialog).getByText(/stop monitoring octocat\/Hello-World/i),
 		).toBeInTheDocument();
-		await expect(within(dialog).getByText(/cannot be undone/i)).toBeInTheDocument();
+		await expect(
+			within(dialog).getByText(/permanently erases everything Hephaestus has mirrored/i),
+		).toBeInTheDocument();
+		// Names the provider and says the upstream repository survives and can be re-monitored.
+		await expect(
+			within(dialog).getByText(/repository on GitHub itself is not affected/i),
+		).toBeInTheDocument();
+		await expect(within(dialog).getByText(/monitoring it again later/i)).toBeInTheDocument();
 		await expect(within(dialog).getByRole("button", { name: /stop monitoring/i })).toBeEnabled();
 	},
 };

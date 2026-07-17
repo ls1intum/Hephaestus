@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/empty";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
+import { swallow } from "../swallow";
 import { TableRowsSkeleton } from "../TableRowsSkeleton";
 import { AddCollectionDialog } from "./AddCollectionDialog";
 import { OutlineCollectionRow, type OutlineMirrorState } from "./OutlineCollectionRow";
@@ -29,7 +30,7 @@ function CollectionsTableHeader() {
 				<TableHead>Collection</TableHead>
 				<TableHead>State</TableHead>
 				<TableHead>Sync</TableHead>
-				<TableHead>Documents</TableHead>
+				<TableHead className="text-right">Documents</TableHead>
 				<TableHead>Last synced</TableHead>
 				<TableHead className="w-0 text-right">
 					<span className="sr-only">Actions</span>
@@ -58,15 +59,6 @@ export interface OutlineCollectionsSectionProps {
 	/** Remove the collection and erase its mirrored documents. Resolves on success, rejects to
 	 * keep the confirm dialog open. */
 	onRemoveCollection: (input: { collectionId: string }) => Promise<void> | void;
-}
-
-/**
- * Fire a container mutation without awaiting it (reversible, no-confirm transitions) while
- * swallowing rejections — the mutation's own onError already surfaced a toast, so leaving the
- * promise unhandled here would otherwise reject into the void.
- */
-function swallow(result: Promise<void> | void): void {
-	Promise.resolve(result).catch(() => {});
 }
 
 /**

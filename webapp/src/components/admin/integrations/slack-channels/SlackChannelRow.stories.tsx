@@ -33,7 +33,7 @@ const meta = {
 					<TableRow>
 						<TableHead>Channel</TableHead>
 						<TableHead>Status</TableHead>
-						<TableHead>Opted out</TableHead>
+						<TableHead className="text-right">Opted out</TableHead>
 						<TableHead>Announced</TableHead>
 						<TableHead className="w-0 text-right">
 							<span className="sr-only">Actions</span>
@@ -74,6 +74,9 @@ export const NotStarted: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("Not started")).toBeInTheDocument();
+		// No announcement yet — the empty timestamp is the screen-reader-visible "Never", not an
+		// aria-hidden em-dash that vanishes for assistive tech.
+		await expect(canvas.getByText("Never")).toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
 		await expect(
@@ -88,6 +91,10 @@ export const Monitoring: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("Monitoring")).toBeInTheDocument();
+		// The announced time is the shared ticking RelativeTime, exposed as a real tooltip button
+		// (its absolute time is one hover away) rather than the frozen string the row printed before.
+		const announced = canvas.getByRole("button", { name: /ago$/i });
+		await expect(announced.tagName).toBe("BUTTON");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
 		await expect(await screen.findByRole("menuitem", { name: /^pause$/i })).toBeInTheDocument();

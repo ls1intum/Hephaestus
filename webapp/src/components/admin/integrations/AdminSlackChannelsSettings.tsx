@@ -23,6 +23,7 @@ import { ChannelHistorySheet } from "./slack-channels/ChannelHistorySheet";
 import type { SlackConsentState } from "./slack-channels/consent-terms";
 import { RemoveChannelAlertDialog } from "./slack-channels/RemoveChannelAlertDialog";
 import { SlackChannelRow } from "./slack-channels/SlackChannelRow";
+import { swallow } from "./swallow";
 import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 export type { SlackConsentState };
@@ -36,7 +37,7 @@ function ChannelsTableHeader() {
 			<TableRow>
 				<TableHead>Channel</TableHead>
 				<TableHead>Status</TableHead>
-				<TableHead>Opted out</TableHead>
+				<TableHead className="text-right">Opted out</TableHead>
 				<TableHead>Announced</TableHead>
 				<TableHead className="w-0 text-right">
 					<span className="sr-only">Actions</span>
@@ -73,15 +74,6 @@ export interface AdminSlackChannelsSettingsProps {
 	}) => Promise<void> | void;
 	/** Terminal revoke + erase. Resolves on success, rejects to keep the dialog open. */
 	onRemoveChannel: (input: { slackChannelId: string; reason?: string }) => Promise<void> | void;
-}
-
-/**
- * Fire a route-handler mutation without awaiting it (reversible, no-confirm transitions) while
- * swallowing rejections — the mutation's own onError already surfaced a toast, so leaving the
- * promise unhandled here would otherwise reject into the void.
- */
-function swallow(result: Promise<void> | void): void {
-	Promise.resolve(result).catch(() => {});
 }
 
 /**

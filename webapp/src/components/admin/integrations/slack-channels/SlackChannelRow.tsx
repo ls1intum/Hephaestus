@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { relativeTime } from "../sync-format";
+import { RelativeTime } from "../RelativeTime";
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface SlackChannelRowProps {
@@ -63,7 +63,7 @@ export function SlackChannelRow({
 				<ConsentStateBadge state={channel.consentState} />
 			</TableCell>
 
-			<TableCell>
+			<TableCell className="text-right tabular-nums">
 				{channel.optedOutMemberCount > 0 ? (
 					<Tooltip>
 						{/* Default TooltipTrigger renders a real <button>, so it's reachable by keyboard
@@ -82,11 +82,7 @@ export function SlackChannelRow({
 			</TableCell>
 
 			<TableCell className="text-muted-foreground text-sm">
-				{channel.consentAnnouncedAt ? (
-					relativeTime(channel.consentAnnouncedAt)
-				) : (
-					<span aria-hidden>—</span>
-				)}
+				<RelativeTime value={channel.consentAnnouncedAt} fallback="Never" />
 			</TableCell>
 
 			<TableCell className="text-right">

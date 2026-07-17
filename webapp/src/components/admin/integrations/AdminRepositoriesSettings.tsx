@@ -50,10 +50,12 @@ interface RepositoryItem {
  */
 function RepositoryRow({
 	repo,
+	providerLabel,
 	isRemoving,
 	onRemove,
 }: {
 	repo: RepositoryItem;
+	providerLabel: string;
 	isRemoving: boolean;
 	onRemove: (nameWithOwner: string) => void;
 }) {
@@ -87,8 +89,13 @@ function RepositoryRow({
 						<AlertDialogHeader>
 							<AlertDialogTitle>Stop monitoring {repo.nameWithOwner}?</AlertDialogTitle>
 							<AlertDialogDescription>
-								Are you sure you want to stop monitoring this repository? This action cannot be
-								undone and will remove all data associated with this repository.
+								This stops syncing the repository and{" "}
+								<strong>
+									permanently erases everything Hephaestus has mirrored from it — its issues, pull
+									requests, reviews, and the practice detections built from them
+								</strong>
+								. The repository on {providerLabel} itself is not affected, and you can start
+								monitoring it again later.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>
@@ -113,6 +120,9 @@ function RepositoryRow({
 
 interface AdminRepositoriesSettingsProps {
 	repositories: RepositoryItem[];
+	/** The provider these repositories live on ("GitHub"/"GitLab"), named in the remove confirm so the
+	 * admin knows the upstream repository is untouched. */
+	providerLabel?: string;
 	isLoading: boolean;
 	error: Error | null;
 	addRepositoryError: Error | null;
@@ -132,6 +142,7 @@ interface AdminRepositoriesSettingsProps {
  */
 export function AdminRepositoriesSettings({
 	repositories,
+	providerLabel = "GitHub or GitLab",
 	isLoading,
 	error,
 	addRepositoryError,
@@ -199,6 +210,7 @@ export function AdminRepositoriesSettings({
 									<RepositoryRow
 										key={repo.nameWithOwner}
 										repo={repo}
+										providerLabel={providerLabel}
 										isRemoving={isRemovingRepository}
 										onRemove={onRemoveRepository}
 									/>

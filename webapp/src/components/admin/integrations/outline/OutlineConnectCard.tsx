@@ -60,7 +60,12 @@ export interface OutlineConnectInput {
  */
 export interface OutlineSyncSummary {
 	webhookRegistered?: boolean;
-	documentCount: number;
+	/**
+	 * Total mirrored documents across the connection's collections. Absent when the collections query
+	 * never resolved (a non-ACTIVE connection gates it off) — the card must then render nothing rather
+	 * than a fabricated "0 documents mirrored" for a count that was never actually read.
+	 */
+	documentCount?: number;
 	lastSyncedAt?: Date | string;
 	syncRunning: boolean;
 	erroredCollections: number;
@@ -256,11 +261,13 @@ export function OutlineConnectCard({
 													Polling only — webhook not registered
 												</span>
 											)}
-											<span className="flex items-center gap-1.5">
-												<FileTextIcon className="size-4" aria-hidden />
-												{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
-												mirrored
-											</span>
+											{typeof status.documentCount === "number" && (
+												<span className="flex items-center gap-1.5">
+													<FileTextIcon className="size-4" aria-hidden />
+													{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
+													mirrored
+												</span>
+											)}
 											<span>
 												{status.lastSyncedAt ? (
 													<>

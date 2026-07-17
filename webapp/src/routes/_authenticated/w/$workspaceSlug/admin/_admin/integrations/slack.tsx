@@ -198,6 +198,8 @@ function SlackIntegrationPage() {
 					path: { workspaceSlug: slug, connectionId },
 				}),
 			});
+			// Matches SCM/Outline, which both confirm the cancel — a silent one reads as a no-op.
+			toast.success("Cancelling — stopping after current channel…");
 		},
 		onError: (e) => {
 			toast.error("Failed to cancel sync", { description: problemDetailOf(e) });

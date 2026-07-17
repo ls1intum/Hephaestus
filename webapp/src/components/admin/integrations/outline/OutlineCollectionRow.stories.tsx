@@ -54,6 +54,10 @@ export const Mirroring: Story = {
 		await expect(canvas.getByText("Mirroring")).toBeInTheDocument();
 		await expect(canvas.getByText(/up to date/i)).toBeInTheDocument();
 		await expect(canvas.getByText("engineering-4nZ3x")).toBeInTheDocument();
+		// Last synced is the shared ticking RelativeTime, exposed as a real tooltip button (its absolute
+		// time is one hover away) rather than the frozen string helper the row printed before.
+		const lastSynced = canvas.getByRole("button", { name: /ago$/i });
+		await expect(lastSynced.tagName).toBe("BUTTON");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for engineering/i }));
 		await expect(await screen.findByRole("menuitem", { name: /^pause$/i })).toBeInTheDocument();
@@ -95,6 +99,9 @@ export const Syncing: Story = {
 		await expect(canvas.getByText(/syncing…/i)).toBeInTheDocument();
 		// No urlId ⇒ no subtitle at all; the raw UUID is never printed at the admin.
 		await expect(canvas.queryByText(/col-decisions/)).not.toBeInTheDocument();
+		// Never synced — the empty timestamp is the screen-reader-visible "Never", not an aria-hidden
+		// em-dash that vanishes for assistive tech.
+		await expect(canvas.getByText("Never")).toBeInTheDocument();
 	},
 };
 

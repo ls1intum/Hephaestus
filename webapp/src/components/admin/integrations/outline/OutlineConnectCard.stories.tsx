@@ -230,6 +230,28 @@ export const ConnectedPollingOnly: Story = {
 	},
 };
 
+/**
+ * A non-ACTIVE connection gates off the collections query, so the document rollup never resolves and
+ * the container passes `documentCount: undefined`. The card must then render nothing rather than a
+ * confident "0 documents mirrored" for a count that was never actually read.
+ */
+export const ConnectedCountUnavailable: Story = {
+	args: {
+		connected: true,
+		connectionState: "SUSPENDED",
+		connectionLabel: "Acme Wiki",
+		status: { webhookRegistered: false, syncRunning: false, erroredCollections: 0 },
+		tokenStatus: healthyToken,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText(/documents mirrored/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/^0 documents/i)).not.toBeInTheDocument();
+		// The suspended notice still shows — the count is absent, not the whole status strip.
+		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
+	},
+};
+
 /** A full reconcile has just been requested — the Sync-now action is held down. */
 export const Syncing: Story = {
 	args: {
