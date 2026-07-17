@@ -85,6 +85,8 @@ public class AuthMetrics {
     private static final String AUDIT_WRITE_FAILED_METRIC = "auth.audit.write_failed";
     private static final String REFRESH_RESULT_METRIC = "auth.token.refresh.result";
     private static final String REVOCATION_CHECK_FAILED_METRIC = "auth.revocation.check_failed";
+    private static final String STEP_UP_DENIED_METRIC = "auth.step_up.denied";
+    private static final String IMPERSONATION_AUTO_EXIT_METRIC = "auth.impersonation.auto_exit";
 
     private final MeterRegistry registry;
     private final Counter loginSuccess;
@@ -196,5 +198,32 @@ public class AuthMetrics {
      */
     public void recordAuditWriteFailed() {
         auditWriteFailed.increment();
+    }
+
+    /**
+     * Count one step-up denial ({@code StepUpPolicy} refused a high-risk admin action for a stale/absent
+     * {@code auth_time}), tagged by the gated action. A burst is the signal a hijacked admin session is
+     * probing for powers (OWASP A09) — but note the SPA deliberately elicits one denial to open its
+     * Confirm-access dialog, so alert on rate-of-change, not presence. {@code action} is a bounded enum.
+     */
+    public void recordStepUpDenied(String action) {
+        Counter.builder(STEP_UP_DENIED_METRIC)
+            .description("High-risk admin actions denied by StepUpPolicy (stale/absent auth_time), tagged by action.")
+            .tag("action", action)
+            .register(registry)
+            .increment();
+    }
+
+    /**
+     * Count one impersonation auto-exit on refresh, tagged by {@code reason} ({@code expired} time-box,
+     * or {@code target_promoted} — a mid-session APP_ADMIN promotion the rotation refused to carry). The
+     * reason otherwise lives only inside {@code auth_event.details} JSON, unqueryable by the viewer.
+     */
+    public void recordImpersonationAutoExit(String reason) {
+        Counter.builder(IMPERSONATION_AUTO_EXIT_METRIC)
+            .description("Impersonations auto-exited on refresh, tagged by reason (expired / target_promoted).")
+            .tag("reason", reason)
+            .register(registry)
+            .increment();
     }
 }

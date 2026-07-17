@@ -55,13 +55,19 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
     )
     int touchLastLogin(@Param("id") Long id, @Param("now") Instant now);
 
-    /** Active (non-disabled) identity links for an account. */
+    /**
+     * Active (non-disabled) identity links for an account, most-recently-used first. The order is
+     * load-bearing: callers take {@code findFirst()} as "the primary identity" — the login source the
+     * SPA shows and the provider the step-up re-auth dialog offers (issue #1323). {@code NULLS LAST}
+     * keeps a never-logged-in link (freshly linked, {@code last_login_at} null) from sorting first.
+     */
     @Query(
         """
         SELECT il
           FROM IdentityLink il
          WHERE il.account.id = :accountId
            AND il.disabledAt IS NULL
+         ORDER BY il.lastLoginAt DESC NULLS LAST, il.id DESC
         """
     )
     List<IdentityLink> findActiveByAccountId(@Param("accountId") Long accountId);

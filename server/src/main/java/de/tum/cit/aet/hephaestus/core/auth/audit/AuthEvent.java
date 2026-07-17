@@ -113,6 +113,10 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
+        /** An instance admin reached a workspace via elevation, not membership. De-duplicated per window. */
+        WORKSPACE_ELEVATION,
+        /** An instance admin created / updated / deleted a {@code login_provider}. */
+        LOGIN_PROVIDER_CHANGED,
     }
 
     public enum Result {

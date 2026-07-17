@@ -162,6 +162,8 @@ paths:
           - EXPORT_REQUESTED
           - APP_ROLE_CHANGED
           - RESEARCH_CONSENT_REVOKED
+          - WORKSPACE_ELEVATION
+          - LOGIN_PROVIDER_CHANGED
       - in: query
         name: result
         required: false
@@ -227,6 +229,8 @@ paths:
           - EXPORT_REQUESTED
           - APP_ROLE_CHANGED
           - RESEARCH_CONSENT_REVOKED
+          - WORKSPACE_ELEVATION
+          - LOGIN_PROVIDER_CHANGED
       - in: query
         name: result
         required: false

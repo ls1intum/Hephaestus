@@ -6,12 +6,14 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -132,12 +134,10 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             return;
         }
 
+        Instant now = clock.instant();
         HephaestusJwtIssuer.Token issued = jwtIssuer.issue(
             principalFactory.forAccount(account),
-            /* impersonator */ null,
-            /* impersonationExpiresAt */ null,
-            // Absolute session ceiling, stamped once at login and carried through every refresh.
-            clock.instant().plus(authProperties.sessionMaxLifetime()),
+            TokenConstraints.session(now.plus(authProperties.sessionMaxLifetime()), now),
             request
         );
         setAccessCookie(

@@ -69,6 +69,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        enforced on every {@code POST /auth/refresh} rotation (the silent-refresh
  *                        keep-alive cannot extend an impersonation past it). See
  *                        {@code docs/contributor/instance-admin.md}.
+ * @param stepUpMaxAge    Maximum age of the last interactive authentication ({@code auth_time}) for the
+ *                        step-up-gated admin actions (impersonate-begin, app-role change, login-provider
+ *                        mutation). Older — or a token without the claim — is denied with
+ *                        {@code 403 code=step_up_required} until the admin signs in again. Must be
+ *                        positive (startup fails otherwise) and below {@code sessionMaxLifetime} or the
+ *                        gate is inert. Default 5m — far tighter than GitHub sudo mode's 2h, affordable
+ *                        because re-auth here is a redirect, not a password prompt. See
+ *                        {@code docs/contributor/instance-admin.md}.
  * @param sessionMaxLifetime Absolute ceiling on an ordinary session ({@code session_exp}), set at login
  *                        and carried unchanged through every silent refresh. The access token's
  *                        {@code exp} is capped at {@code min(now + accessTtl, session_exp)}, so the
@@ -102,6 +110,7 @@ public record AuthProperties(
     @DefaultValue("") String bootstrapToken,
     @DefaultValue("1h") Duration impersonationMaxLifetime,
     @DefaultValue("12h") Duration sessionMaxLifetime,
+    @DefaultValue("5m") Duration stepUpMaxAge,
     @DefaultValue("false") boolean devLoginEnabled,
     @DefaultValue("true") boolean cookieSecure
 ) {

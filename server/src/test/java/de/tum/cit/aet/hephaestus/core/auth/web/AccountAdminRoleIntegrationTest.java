@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
 import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
@@ -236,7 +237,12 @@ class AccountAdminRoleIntegrationTest {
             .count();
     }
 
+    // A fresh-login token: role changes are step-up gated (issue #1323), so the admin's token must
+    // carry a recent auth_time to pass the gate — exactly what a real login mints.
     private String tokenFor(Account account) {
-        return jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+        Instant now = Instant.now();
+        return jwtIssuer
+            .issue(principalFactory.forAccount(account), TokenConstraints.session(now.plusSeconds(43_200), now), null)
+            .value();
     }
 }

@@ -2,8 +2,12 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -61,15 +65,46 @@ public class LoginProviderService {
     private final LoginProviderRepository repository;
     private final LoginProviderClientRegistrationRepository registrationCache;
     private final AuthProperties authProperties;
+    private final StepUpPolicy stepUpPolicy;
+    private final AuthEventLogger authEventLogger;
 
     public LoginProviderService(
         LoginProviderRepository repository,
         LoginProviderClientRegistrationRepository registrationCache,
-        AuthProperties authProperties
+        AuthProperties authProperties,
+        StepUpPolicy stepUpPolicy,
+        AuthEventLogger authEventLogger
     ) {
         this.repository = repository;
         this.registrationCache = registrationCache;
         this.authProperties = authProperties;
+        this.stepUpPolicy = stepUpPolicy;
+        this.authEventLogger = authEventLogger;
+    }
+
+    /**
+     * Step-up gate for a provider mutation: it repoints the IdP this instance trusts for every identity
+     * behind it (issue #1323). Called after the request is otherwise valid, so an audited denial always
+     * reflects a request that would have succeeded — the ordering {@code ImpersonationService.begin} uses.
+     */
+    private void requireStepUp(Long actingAccountId, @Nullable Instant actorAuthTime) {
+        stepUpPolicy.requireRecentAuthentication(
+            actorAuthTime,
+            AuthEvent.EventType.LOGIN_PROVIDER_CHANGED,
+            null,
+            actingAccountId
+        );
+    }
+
+    /** Audit a completed mutation. Called after persist so a rejected request never logs a SUCCESS. */
+    private void auditChange(Long actingAccountId, String registrationId, String action) {
+        // registrationId matches ^[a-z][a-z0-9-]{1,62}$ (validated on create, read back from the DB
+        // otherwise) and action is a literal, so the inline JSON is injection-safe.
+        authEventLogger
+            .event(AuthEvent.EventType.LOGIN_PROVIDER_CHANGED, AuthEvent.Result.SUCCESS)
+            .actingAccount(actingAccountId)
+            .details("{\"registrationId\":\"" + registrationId + "\",\"action\":\"" + action + "\"}")
+            .record();
     }
 
     /** Enabled providers for the login page / discovery, stable order. */
@@ -105,7 +140,7 @@ public class LoginProviderService {
 
     /** Create a new login provider (instance admin). The client secret is sealed at rest. */
     @Transactional
-    public LoginProvider create(Draft draft) {
+    public LoginProvider create(Draft draft, Long actingAccountId, @Nullable Instant actorAuthTime) {
         String registrationId = draft.registrationId() == null ? "" : draft.registrationId().trim();
         if (!registrationId.matches("^[a-z][a-z0-9-]{1,62}$")) {
             throw new ResponseStatusException(
@@ -129,14 +164,21 @@ public class LoginProviderService {
         provider.setScopes(resolveScopes(draft.type(), draft.scopes()));
         provider.setEnabled(true);
         provider.setSeededFromEnv(false);
+        requireStepUp(actingAccountId, actorAuthTime); // last, so a denial reflects a would-succeed request
         LoginProvider saved = persist(provider);
+        auditChange(actingAccountId, registrationId, "CREATE");
         log.info("auth.login-provider: admin created '{}' ({})", registrationId, saved.getType());
         return saved;
     }
 
     /** Apply a partial update (only non-null fields). registrationId + type are immutable identity. */
     @Transactional
-    public LoginProvider update(String registrationId, Patch patch) {
+    public LoginProvider update(
+        String registrationId,
+        Patch patch,
+        Long actingAccountId,
+        @Nullable Instant actorAuthTime
+    ) {
         LoginProvider provider = require(registrationId);
         if (patch.displayName() != null && !patch.displayName().isBlank()) {
             provider.setDisplayName(patch.displayName().trim());
@@ -160,20 +202,24 @@ public class LoginProviderService {
         } else if (patch.enabled() != null && patch.enabled()) {
             provider.setEnabled(true);
         }
+        requireStepUp(actingAccountId, actorAuthTime); // last, so a denial reflects a would-succeed request
         LoginProvider saved = persist(provider);
+        auditChange(actingAccountId, registrationId, "UPDATE");
         log.info("auth.login-provider: admin updated '{}' (enabled={})", registrationId, saved.isEnabled());
         return saved;
     }
 
     /** Delete a login provider. Refuses to remove the last enabled one (would lock everyone out). */
     @Transactional
-    public void delete(String registrationId) {
+    public void delete(String registrationId, Long actingAccountId, @Nullable Instant actorAuthTime) {
         LoginProvider provider = require(registrationId);
         if (provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "delete");
         }
+        requireStepUp(actingAccountId, actorAuthTime);
         repository.delete(provider);
         registrationCache.evict(registrationId);
+        auditChange(actingAccountId, registrationId, "DELETE");
         log.info("auth.login-provider: admin deleted '{}'", registrationId);
     }
 
@@ -316,7 +362,10 @@ public class LoginProviderService {
     }
 
     private LoginProvider persist(LoginProvider provider) {
-        LoginProvider saved = repository.save(provider);
+        // Flush here, not at commit: the UNIQUE(type, base_url) violation must surface before the
+        // caller audits a SUCCESS for a change that is about to roll back (the audit row is written in
+        // its own REQUIRES_NEW transaction, so it would survive).
+        LoginProvider saved = repository.saveAndFlush(provider);
         registrationCache.evict(saved.getRegistrationId());
         return saved;
     }

@@ -17,8 +17,9 @@ import type {
 } from "@/api/types.gen";
 import { LoginProviderFormDialog } from "@/components/admin/login-providers/LoginProviderFormDialog";
 import { LoginProvidersTable } from "@/components/admin/login-providers/LoginProvidersTable";
+import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
 import { Button } from "@/components/ui/button";
-import { problemDetailOf } from "@/lib/problem-detail";
+import { isStepUpRequired, problemDetailOf, type StepUpProblem } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/login-providers")({
 	component: AdminLoginProvidersPage,
@@ -36,6 +37,17 @@ function AdminLoginProvidersPage() {
 	const invalidate = () =>
 		queryClient.invalidateQueries({ queryKey: adminListLoginProvidersQueryKey() });
 
+	// A step-up challenge prompts re-auth instead of a toast the admin can't act on.
+	const [stepUpChallenge, setStepUpChallenge] = useState<StepUpProblem | undefined>(undefined);
+	const reportError = (error: unknown, fallback: string) => {
+		if (isStepUpRequired(error)) {
+			setDialogOpen(false);
+			setStepUpChallenge(error);
+			return;
+		}
+		toast.error(problemDetailOf(error, fallback));
+	};
+
 	const createMutation = useMutation({
 		...adminCreateLoginProviderMutation(),
 		onSuccess: () => {
@@ -43,7 +55,7 @@ function AdminLoginProvidersPage() {
 			setDialogOpen(false);
 			toast.success("Login provider added");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not add the login provider")),
+		onError: (error) => reportError(error, "Could not add the login provider"),
 	});
 
 	const updateMutation = useMutation({
@@ -53,7 +65,7 @@ function AdminLoginProvidersPage() {
 			setDialogOpen(false);
 			toast.success("Login provider updated");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not update the login provider")),
+		onError: (error) => reportError(error, "Could not update the login provider"),
 		onSettled: () => setMutatingId(null),
 	});
 
@@ -63,7 +75,7 @@ function AdminLoginProvidersPage() {
 			invalidate();
 			toast.success("Login provider deleted");
 		},
-		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the login provider")),
+		onError: (error) => reportError(error, "Could not delete the login provider"),
 		onSettled: () => setMutatingId(null),
 	});
 
@@ -130,6 +142,14 @@ function AdminLoginProvidersPage() {
 				isSubmitting={createMutation.isPending || updateMutation.isPending}
 				onCreate={handleCreate}
 				onUpdate={handleUpdate}
+			/>
+
+			<ConfirmAccessDialog
+				open={stepUpChallenge !== undefined}
+				maxAgeSeconds={stepUpChallenge?.maxAgeSeconds}
+				onOpenChange={(open) => {
+					if (!open) setStepUpChallenge(undefined);
+				}}
 			/>
 		</div>
 	);

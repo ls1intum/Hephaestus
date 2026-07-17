@@ -10,7 +10,7 @@ import {
 	adminListWorkspacesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { adminExportAuthEvents } from "@/api/sdk.gen";
-import type { AuthEventView, PageAuthEventView } from "@/api/types.gen";
+import type { AdminListAuthEventsData, AuthEventView, PageAuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,23 +30,33 @@ import { cn } from "@/lib/utils";
 const PAGE_SIZE = 50;
 const ALL = "ALL";
 
-// Mirrors AuthEvent.EventType server-side; kept explicit so the filter stays a typed union.
-const EVENT_TYPES = [
-	"LOGIN",
-	"LOGIN_FAILED",
-	"LOGOUT",
-	"TOKEN_REFRESH",
-	"JWT_REVOKED",
-	"IDENTITY_LINKED",
-	"IDENTITY_UNLINKED",
-	"IMPERSONATION_BEGIN",
-	"IMPERSONATION_END",
-	"ACCOUNT_DELETED",
-	"EXPORT_REQUESTED",
-	"APP_ROLE_CHANGED",
-] as const;
+/** The server's audit event types, from the generated client — the single source of truth. */
+type AuditEventType = NonNullable<NonNullable<AdminListAuthEventsData["query"]>["eventType"]>;
 
-type EventTypeFilter = (typeof EVENT_TYPES)[number];
+// Keyed by the generated union so BOTH drift directions are compile errors: a missing type (how
+// RESEARCH_CONSENT_REVOKED silently vanished from this filter) fails the Record, an unknown one fails
+// `satisfies`. Key order is the render order.
+const EVENT_TYPE_FILTERS = {
+	LOGIN: true,
+	LOGIN_FAILED: true,
+	LOGOUT: true,
+	TOKEN_REFRESH: true,
+	JWT_REVOKED: true,
+	IDENTITY_LINKED: true,
+	IDENTITY_UNLINKED: true,
+	IMPERSONATION_BEGIN: true,
+	IMPERSONATION_END: true,
+	ACCOUNT_DELETED: true,
+	EXPORT_REQUESTED: true,
+	APP_ROLE_CHANGED: true,
+	RESEARCH_CONSENT_REVOKED: true,
+	WORKSPACE_ELEVATION: true,
+	LOGIN_PROVIDER_CHANGED: true,
+} satisfies Record<AuditEventType, true>;
+
+const EVENT_TYPES = Object.keys(EVENT_TYPE_FILTERS) as AuditEventType[];
+
+type EventTypeFilter = AuditEventType;
 type ResultFilter = "SUCCESS" | "FAILURE";
 
 export const Route = createFileRoute("/_authenticated/admin/audit")({

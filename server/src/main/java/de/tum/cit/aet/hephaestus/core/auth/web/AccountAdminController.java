@@ -69,7 +69,12 @@ public class AccountAdminController {
         @PathVariable Long id,
         @RequestBody UpdateAccountRequestDTO body
     ) {
-        Account account = accountService.adminSetRole(id, body.appRole(), CurrentAccount.requireId());
+        Account account = accountService.adminSetRole(
+            id,
+            body.appRole(),
+            CurrentAccount.requireId(),
+            CurrentAccount.authTime()
+        );
         return ResponseEntity.ok(toView(account));
     }
 

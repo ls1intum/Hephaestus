@@ -133,17 +133,32 @@ applies cleanly: the only new changesets are this branch's own, and there are no
 - The `issued_jwt` table is swept of expired rows by a scheduled job; alert if its row count
   grows > 2× baseline (sweep broken).
 
+## Step-up re-auth (issue #1323)
+
+- The highest-risk admin actions — impersonate-begin, app-role change, login-provider create/update/delete
+  — require a sign-in newer than `hephaestus.auth.step-up-max-age` (default 5m). Older, and the API returns
+  `403 code=step_up_required` and the UI shows a "Confirm access" prompt.
+- **During a cutover this is expected, not a fault.** The freshly-bootstrapped admin just signed in, so
+  first setup within 5 minutes passes; a slow checklist that crosses the window will hit the Confirm-access
+  prompt mid-run — sign in again (with the same provider) and continue.
+- Alert on `auth.step_up.denied` **rate-of-change**, not presence: the SPA deliberately elicits one denial
+  to open its dialog, so a low baseline is normal; a sustained spike is a hijacked-session probe.
+
 ## Impersonation
 
 - Every `IMPERSONATION_BEGIN` is audited with `(account_id=target, acting_account_id=operator)`
   and a mandatory reason. Alert on every begin during normal hours (not just failures).
 - Impersonation sessions are read-only unless the operator sends
   `X-Impersonation-Allow-Writes: true` after a second confirmation.
+- A refresh auto-exits impersonation near its `imp_exp` ceiling, or immediately if the target is promoted
+  to admin mid-session; both fire `auth.impersonation.auto_exit{reason=expired|target_promoted}`.
 
 ## Key SLOs to dashboard
 
 - login success rate (`auth.login{result=success}` vs `failure`) > 99% (5-min window) → page
 - `auth.ratelimit.blocked` rate spike → notify (credential-stuffing / misconfigured client)
+- `auth.step_up.denied` sustained rate-of-change spike → notify (possible hijacked admin session)
+- `auth.audit.write_failed` any nonzero → page (the tamper-evident trail is losing events)
 - `auth.token.refresh` p99 latency within budget → notify (DB / signing-key contention)
 - JWK rotation success = 100%
 

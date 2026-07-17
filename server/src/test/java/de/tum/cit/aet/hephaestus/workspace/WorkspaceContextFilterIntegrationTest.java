@@ -2,6 +2,10 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -31,6 +35,12 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private AuthEventRepository authEventRepository;
 
     @Test
     @WithAdminUser
@@ -125,6 +135,37 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
 
         assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
         assertThat(response.roles()).containsExactly("ADMIN");
+    }
+
+    @Test
+    void instanceSuperAdminElevationIsAuditTaggedOncePerWindow() {
+        // Issue #1323 elevation tagging: reaching a workspace via instance-admin elevation writes a
+        // WORKSPACE_ELEVATION auth_event attributing (account, workspace) — and the per-request filter
+        // decision is de-duplicated, so a burst of elevated requests yields ONE row, not N.
+        // Uses the numeric-sub mock token (SecurityUtils must resolve a real account id) and a real
+        // Account row (auth_event.account_id is FK-constrained).
+        Account adminAccount = accountRepository.save(new Account("Elevated Admin"));
+        User workspaceOwner = persistUser("elev-audit-owner");
+        Workspace workspace = createWorkspace("elev-audit", "Elevated", "elevaudit", AccountType.ORG, workspaceOwner);
+
+        for (int i = 0; i < 3; i++) {
+            webTestClient
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .headers(h -> h.setBearerAuth("mock-jwt-sub-" + adminAccount.getId()))
+                .exchange()
+                .expectStatus()
+                .isOk();
+        }
+
+        var elevationEvents = authEventRepository
+            .findByAccountSince(adminAccount.getId(), Instant.now().minus(1, ChronoUnit.HOURS))
+            .stream()
+            .filter(e -> e.getEventType() == AuthEvent.EventType.WORKSPACE_ELEVATION)
+            .toList();
+        assertThat(elevationEvents).hasSize(1);
+        assertThat(elevationEvents.get(0).getWorkspaceId()).isEqualTo(workspace.getId());
+        assertThat(elevationEvents.get(0).getResult()).isEqualTo(AuthEvent.Result.SUCCESS);
     }
 
     @Test

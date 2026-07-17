@@ -10,7 +10,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,9 +42,14 @@ class LoginProviderServiceTest extends BaseUnitTest {
         return new LoginProviderService(
             repository,
             registrationCache,
-            AuthPropertiesFixture.withLoginProviders(providers)
+            AuthPropertiesFixture.withLoginProviders(providers),
+            mock(StepUpPolicy.class),
+            new AuthEventLogger(mock(AuthEventWriter.class))
         );
     }
+
+    /** A step-up-passing admin; the gate itself is covered by StepUpPolicyTest + StepUpGateIntegrationTest. */
+    private static final Long ADMIN_ID = 1L;
 
     private LoginProviderService adminService() {
         return service(Map.of());
@@ -282,9 +291,13 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void createSelfHostedGitlabDefaultsScopesAndEvictsCache() {
         when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        LoginProvider created = adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test/", null));
+        LoginProvider created = adminService().create(
+            gitlabDraft("gitlab-acme", "https://gitlab.acme.test/", null),
+            ADMIN_ID,
+            Instant.now()
+        );
 
         assertThat(created.getType()).isEqualTo(LoginProvider.ProviderType.GITLAB);
         assertThat(created.getBaseUrl()).isEqualTo("https://gitlab.acme.test"); // trailing slash stripped
@@ -298,7 +311,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(true);
 
         assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null))
+            adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null), ADMIN_ID, Instant.now())
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
@@ -307,7 +320,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void createRejectsGitlabOpenidScope() {
         // openid flips Spring to the OIDC path and 500s the callback (no jwkSetUri) — must be rejected.
         assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("gitlab-x", "https://gitlab.acme.test", "openid profile read_user"))
+            adminService().create(
+                gitlabDraft("gitlab-x", "https://gitlab.acme.test", "openid profile read_user"),
+                ADMIN_ID,
+                Instant.now()
+            )
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
@@ -320,7 +337,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
         assertThatThrownBy(() ->
             adminService().update(
                 "gitlab",
-                new LoginProviderService.Patch(null, null, null, null, "openid read_user", null)
+                new LoginProviderService.Patch(null, null, null, null, "openid read_user", null),
+                ADMIN_ID,
+                Instant.now()
             )
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
@@ -331,9 +350,13 @@ class LoginProviderServiceTest extends BaseUnitTest {
         // OUTLINE mirrors the GITLAB self-hosted shape: per-instance base URL (validated), plain OAuth2
         // with a pinned minimal "read" scope — see LoginProviderService.OUTLINE_SCOPES.
         when(repository.existsByRegistrationId("outline-acme")).thenReturn(false);
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        LoginProvider created = adminService().create(outlineDraft("outline-acme", "https://wiki.acme.test/", null));
+        LoginProvider created = adminService().create(
+            outlineDraft("outline-acme", "https://wiki.acme.test/", null),
+            ADMIN_ID,
+            Instant.now()
+        );
 
         assertThat(created.getType()).isEqualTo(LoginProvider.ProviderType.OUTLINE);
         assertThat(created.getBaseUrl()).isEqualTo("https://wiki.acme.test"); // trailing slash stripped
@@ -346,7 +369,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
         // Outline is NOT an OIDC provider: openid flips Spring to the OIDC path and 500s the callback
         // (no id_token, no jwkSetUri) — same failure mode the GitLab guard closes.
         assertThatThrownBy(() ->
-            adminService().create(outlineDraft("outline-x", "https://wiki.acme.test", "openid read"))
+            adminService().create(
+                outlineDraft("outline-x", "https://wiki.acme.test", "openid read"),
+                ADMIN_ID,
+                Instant.now()
+            )
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
@@ -359,7 +386,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
         assertThatThrownBy(() ->
             adminService().update(
                 "outline",
-                new LoginProviderService.Patch(null, null, null, null, "openid read", null)
+                new LoginProviderService.Patch(null, null, null, null, "openid read", null),
+                ADMIN_ID,
+                Instant.now()
             )
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
@@ -369,7 +398,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void createRejectsNonHttpsOutlineBaseUrl() {
         // SSRF / HTTPS guard: the Outline base URL takes the same ServerUrlValidator posture as GitLab.
         assertThatThrownBy(() ->
-            adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null))
+            adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null), ADMIN_ID, Instant.now())
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
@@ -377,7 +406,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     @Test
     void createRejectsMalformedRegistrationId() {
         assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null))
+            adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null), ADMIN_ID, Instant.now())
         ).isInstanceOf(ResponseStatusException.class);
     }
 
@@ -391,7 +420,12 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
 
         assertThatThrownBy(() ->
-            adminService().update("github", new LoginProviderService.Patch(null, null, null, null, null, false))
+            adminService().update(
+                "github",
+                new LoginProviderService.Patch(null, null, null, null, null, false),
+                ADMIN_ID,
+                Instant.now()
+            )
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
@@ -402,7 +436,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(only));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
 
-        assertThatThrownBy(() -> adminService().delete("gitlab")).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().delete("gitlab", ADMIN_ID, Instant.now())).isInstanceOf(
+            ResponseStatusException.class
+        );
         verify(repository, never()).delete(any());
         verify(registrationCache, never()).evict(any());
     }
@@ -418,7 +454,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByRegistrationId("outline")).thenReturn(Optional.of(outline));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
 
-        adminService().delete("outline");
+        adminService().delete("outline", ADMIN_ID, Instant.now());
 
         verify(repository).delete(outline);
         verify(registrationCache).evict("outline");
@@ -429,11 +465,13 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProvider outline = outlineProvider("outline", "sealed");
         when(repository.findByRegistrationId("outline")).thenReturn(Optional.of(outline));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(outline));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         LoginProvider saved = adminService().update(
             "outline",
-            new LoginProviderService.Patch(null, null, null, null, null, false)
+            new LoginProviderService.Patch(null, null, null, null, null, false),
+            ADMIN_ID,
+            Instant.now()
         );
 
         assertThat(saved.isEnabled()).isFalse();
@@ -453,7 +491,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
         when(repository.findByRegistrationId("github")).thenReturn(Optional.of(github));
         when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(github, outline));
 
-        assertThatThrownBy(() -> adminService().delete("github")).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> adminService().delete("github", ADMIN_ID, Instant.now())).isInstanceOf(
+            ResponseStatusException.class
+        );
         verify(repository, never()).delete(any());
     }
 
@@ -461,7 +501,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void createRejectsNonHttpsGitlabBaseUrl() {
         // SSRF / HTTPS guard: ServerUrlValidator rejects http:// (and loopback/internal) base URLs.
         assertThatThrownBy(() ->
-            adminService().create(gitlabDraft("gitlab-x", "http://gitlab.acme.test", null))
+            adminService().create(gitlabDraft("gitlab-x", "http://gitlab.acme.test", null), ADMIN_ID, Instant.now())
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
@@ -470,12 +510,22 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void updateLeavesSealedSecretUnchangedWhenPatchSecretIsNullOrBlank() {
         LoginProvider existing = gitlabProvider("gitlab", "sealed-secret");
         when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(existing));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        adminService().update("gitlab", new LoginProviderService.Patch("Renamed", null, null, null, null, null));
+        adminService().update(
+            "gitlab",
+            new LoginProviderService.Patch("Renamed", null, null, null, null, null),
+            ADMIN_ID,
+            Instant.now()
+        );
         assertThat(existing.getClientSecret()).isEqualTo("sealed-secret"); // null secret → unchanged
 
-        adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "   ", null, null));
+        adminService().update(
+            "gitlab",
+            new LoginProviderService.Patch(null, null, null, "   ", null, null),
+            ADMIN_ID,
+            Instant.now()
+        );
         assertThat(existing.getClientSecret()).isEqualTo("sealed-secret"); // blank secret → unchanged
     }
 
@@ -483,9 +533,14 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void updateReplacesSecretWhenPatchSecretIsPresent() {
         LoginProvider existing = gitlabProvider("gitlab", "old-secret");
         when(repository.findByRegistrationId("gitlab")).thenReturn(Optional.of(existing));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "new-secret", null, null));
+        adminService().update(
+            "gitlab",
+            new LoginProviderService.Patch(null, null, null, "new-secret", null, null),
+            ADMIN_ID,
+            Instant.now()
+        );
         assertThat(existing.getClientSecret()).isEqualTo("new-secret");
     }
 

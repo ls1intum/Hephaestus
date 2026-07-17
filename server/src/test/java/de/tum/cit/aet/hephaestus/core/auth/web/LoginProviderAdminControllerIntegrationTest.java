@@ -2,8 +2,11 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
-import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import java.util.Map;
@@ -21,6 +24,24 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private AuthEventRepository authEventRepository;
+
+    /**
+     * A signed-in instance admin. Uses the numeric-subject mock token because these endpoints now
+     * resolve the acting account (they are step-up gated + audited, #1323) — the legacy
+     * {@code admin-user-id} subject is not an account id.
+     */
+    private Account persistAdmin() {
+        Account admin = new Account("Provider Admin");
+        admin.setAppRole(Account.AppRole.APP_ADMIN);
+        admin.setStatus(Account.Status.ACTIVE);
+        return accountRepository.save(admin);
+    }
 
     @Test
     @WithUser
@@ -59,8 +80,9 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
     }
 
     @Test
-    @WithAdminUser
     void adminCanCreateAndListWithoutLeakingTheSecret() {
+        Account admin = persistAdmin();
+        String token = "mock-jwt-sub-" + admin.getId();
         Map<String, Object> body = Map.of(
             "registrationId",
             "gitlab-actest",
@@ -81,7 +103,7 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
         webTestClient
             .post()
             .uri("/admin/login-providers")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(h -> h.setBearerAuth(token))
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(body)
             .exchange()
@@ -102,12 +124,23 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
         webTestClient
             .get()
             .uri("/admin/login-providers")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(h -> h.setBearerAuth(token))
             .exchange()
             .expectStatus()
             .isOk()
             .expectBody()
             .jsonPath("$[?(@.registrationId == 'gitlab-actest')]")
             .exists();
+
+        // Mutating the IdP this instance trusts is audited and attributed (#1323). The event has no
+        // subject account — only an actor — so it is found by scan, not by findByAccountSince.
+        var changes = authEventRepository
+            .findAll()
+            .stream()
+            .filter(e -> e.getEventType() == AuthEvent.EventType.LOGIN_PROVIDER_CHANGED)
+            .toList();
+        assertThat(changes).hasSize(1);
+        assertThat(changes.get(0).getActingAccountId()).isEqualTo(admin.getId());
+        assertThat(changes.get(0).getDetails()).contains("gitlab-actest").contains("CREATE");
     }
 }
