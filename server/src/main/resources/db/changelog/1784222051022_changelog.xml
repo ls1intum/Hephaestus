@@ -1,0 +1,53 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Instance-admin console shell (#1386): singleton instance-wide settings row carrying the
+        emergency silent-mode brake. Seeded at migration time (id = 1, brake released) so reads
+        never race a lazy bootstrap.
+    -->
+
+    <changeSet author="hephaestus-admin-console" id="1784222051022-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="instance_settings already present">
+            <not>
+                <tableExists tableName="instance_settings"/>
+            </not>
+        </preConditions>
+        <comment>Singleton instance-wide operator settings (silent-mode brake).</comment>
+        <createTable tableName="instance_settings">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="instance_settings_pkey"/>
+            </column>
+            <column name="silent_mode_engaged" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="silent_mode_reason" type="VARCHAR(500)"/>
+            <column name="silent_mode_changed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="silent_mode_changed_by" type="VARCHAR(255)"/>
+        </createTable>
+        <rollback>
+            <dropTable tableName="instance_settings"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-admin-console" id="1784222051022-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="instance_settings singleton row already present">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM instance_settings WHERE id = 1</sqlCheck>
+        </preConditions>
+        <comment>Seed the singleton row with the brake released.</comment>
+        <insert tableName="instance_settings">
+            <column name="id" valueNumeric="1"/>
+            <column name="silent_mode_engaged" valueBoolean="false"/>
+        </insert>
+        <rollback>
+            <delete tableName="instance_settings">
+                <where>id = 1</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

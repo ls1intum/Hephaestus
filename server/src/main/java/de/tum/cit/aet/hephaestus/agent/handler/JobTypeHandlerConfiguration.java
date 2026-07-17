@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -37,6 +38,7 @@ public class JobTypeHandlerConfiguration {
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
     private final ReactionSuppressionFilter reactionSuppressionFilter;
+    private final SilentModeQuery silentModeQuery;
 
     JobTypeHandlerConfiguration(
         JsonMapper objectMapper,
@@ -44,7 +46,8 @@ public class JobTypeHandlerConfiguration {
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
-        ReactionSuppressionFilter reactionSuppressionFilter
+        ReactionSuppressionFilter reactionSuppressionFilter,
+        SilentModeQuery silentModeQuery
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -52,6 +55,7 @@ public class JobTypeHandlerConfiguration {
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
         this.reactionSuppressionFilter = reactionSuppressionFilter;
+        this.silentModeQuery = silentModeQuery;
     }
 
     @Bean
@@ -90,7 +94,8 @@ public class JobTypeHandlerConfiguration {
             workspaceRepository,
             reviewProperties,
             feedbackLedgerRecorder,
-            observationTrendService
+            observationTrendService,
+            silentModeQuery
         );
     }
 
@@ -144,7 +149,8 @@ public class JobTypeHandlerConfiguration {
             resultParser,
             deliveryService,
             commentPoster,
-            feedbackLedgerRecorder
+            feedbackLedgerRecorder,
+            silentModeQuery
         );
     }
 

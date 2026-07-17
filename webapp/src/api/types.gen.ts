@@ -524,6 +524,11 @@ export type UpdateSlackChannelConsentRequest = {
     reason?: string;
 };
 
+export type UpdateSilentModeRequest = {
+    engaged: boolean;
+    reason?: string;
+};
+
 /**
  * Request to update repository contribution visibility settings in a workspace
  */
@@ -2207,6 +2212,13 @@ export type LeaderboardEntry = {
     user?: UserInfo;
 };
 
+export type InstanceSettings = {
+    silentModeChangedAt?: Date;
+    silentModeChangedBy?: string;
+    silentModeEngaged: boolean;
+    silentModeReason?: string;
+};
+
 /**
  * Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
  *
@@ -3134,6 +3146,38 @@ export type AdminUpdateLoginProviderResponses = {
 };
 
 export type AdminUpdateLoginProviderResponse = AdminUpdateLoginProviderResponses[keyof AdminUpdateLoginProviderResponses];
+
+export type AdminGetInstanceSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/settings';
+};
+
+export type AdminGetInstanceSettingsResponses = {
+    /**
+     * OK
+     */
+    200: InstanceSettings;
+};
+
+export type AdminGetInstanceSettingsResponse = AdminGetInstanceSettingsResponses[keyof AdminGetInstanceSettingsResponses];
+
+export type AdminUpdateSilentModeData = {
+    body: UpdateSilentModeRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/settings/silent-mode';
+};
+
+export type AdminUpdateSilentModeResponses = {
+    /**
+     * OK
+     */
+    200: InstanceSettings;
+};
+
+export type AdminUpdateSilentModeResponse = AdminUpdateSilentModeResponses[keyof AdminUpdateSilentModeResponses];
 
 export type AdminListUsersData = {
     body?: never;

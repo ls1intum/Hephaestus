@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.T
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -52,16 +53,19 @@ public class BotCommandProcessor {
     private final PullRequestRepository pullRequestRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
     private final Map<IntegrationKind, ScmCommentReactionSink> reactionSinks;
+    private final SilentModeQuery silentModeQuery;
 
     public BotCommandProcessor(
         AgentJobService agentJobService,
         PullRequestRepository pullRequestRepository,
         PracticeReviewDetectionGate practiceReviewDetectionGate,
-        List<ScmCommentReactionSink> reactionSinkList
+        List<ScmCommentReactionSink> reactionSinkList,
+        SilentModeQuery silentModeQuery
     ) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
+        this.silentModeQuery = silentModeQuery;
         Map<IntegrationKind, ScmCommentReactionSink> map = new EnumMap<>(IntegrationKind.class);
         for (ScmCommentReactionSink sink : reactionSinkList) {
             map.put(sink.kind(), sink);
@@ -78,8 +82,12 @@ public class BotCommandProcessor {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
-        // React with eyes emoji to acknowledge the command
-        addEyesReaction(event);
+        // Instance-wide silent mode (#1386) suppresses the acknowledgement reaction too: while the brake
+        // is engaged the review would not be delivered, so acking it with an 👀 would be a misleading
+        // external write onto the MR. The command is otherwise processed (findings still persist).
+        if (!silentModeQuery.isSilentModeEngaged()) {
+            addEyesReaction(event);
+        }
 
         processCommand(event.repositoryId(), event.mrNumber(), event.noteBody(), event.noteAuthor());
     }

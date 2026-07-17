@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -47,6 +48,7 @@ class FeedbackDeliveryService {
     private final PracticeReviewProperties reviewProperties;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final ObservationTrendService observationTrendService;
+    private final SilentModeQuery silentModeQuery;
 
     FeedbackDeliveryService(
         PullRequestCommentPoster commentPoster,
@@ -56,7 +58,8 @@ class FeedbackDeliveryService {
         WorkspaceRepository workspaceRepository,
         PracticeReviewProperties reviewProperties,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        ObservationTrendService observationTrendService
+        ObservationTrendService observationTrendService,
+        SilentModeQuery silentModeQuery
     ) {
         this.commentPoster = commentPoster;
         this.diffNotePoster = diffNotePoster;
@@ -66,6 +69,7 @@ class FeedbackDeliveryService {
         this.reviewProperties = reviewProperties;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.observationTrendService = observationTrendService;
+        this.silentModeQuery = silentModeQuery;
     }
 
     /**
@@ -136,6 +140,16 @@ class FeedbackDeliveryService {
         }
 
         // Suppression guards
+
+        // Instance-wide emergency brake (#1386) — checked once at entry, before per-workspace/per-user
+        // settings, so an engaged brake suppresses this PR/MR feedback delivery. A delivery already past
+        // this point completes its summary+notes rather than tearing off half-posted (same "in-flight
+        // finishes" contract as the Slack stream exemption). Issue feedback and Slack are guarded at their
+        // own choke points: IssueReviewHandler and SlackMessageService.
+        if (silentModeQuery.isSilentModeEngaged()) {
+            log.warn("Delivery suppressed: instance silent mode engaged, jobId={}", job.getId());
+            return;
+        }
 
         var metadata = job.getMetadata();
         Long pullRequestId = (metadata != null && metadata.has("pull_request_id"))
