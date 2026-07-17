@@ -640,14 +640,11 @@ public class GithubDataSyncService {
                     handle.progress(
                         reposProcessed,
                         syncTargets.size(),
+                        // Just the repository — "N of M" is already the progress bar's own reading
+                        // (unitsCompleted/unitsTotal travel on the same record).
                         SyncProgress.ofResource(
                             SyncPhase.REPOSITORIES,
-                            "Syncing " +
-                                sanitizeForLog(target.repositoryNameWithOwner()) +
-                                " — repository " +
-                                reposProcessed +
-                                " of " +
-                                syncTargets.size(),
+                            "Syncing " + sanitizeForLog(target.repositoryNameWithOwner()),
                             sanitizeForLog(target.repositoryNameWithOwner()),
                             reposProcessed,
                             syncTargets.size()

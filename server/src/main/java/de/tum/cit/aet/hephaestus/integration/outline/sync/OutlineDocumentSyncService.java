@@ -251,11 +251,11 @@ public class OutlineDocumentSyncService {
             handle.progress(
                 done,
                 total,
+                // Just the collection — "N of M" is already the progress bar's own reading
+                // (unitsCompleted/unitsTotal travel on the same record).
                 SyncProgress.ofResource(
                     SyncPhase.COLLECTIONS,
-                    collectionName == null
-                        ? "Syncing collection " + done + " of " + total
-                        : "Syncing " + collectionName + " — collection " + done + " of " + total,
+                    collectionName == null ? "Syncing collection" : "Syncing " + collectionName,
                     collectionName,
                     done,
                     total

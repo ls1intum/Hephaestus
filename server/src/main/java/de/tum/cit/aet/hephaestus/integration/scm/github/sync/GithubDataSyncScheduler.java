@@ -435,14 +435,12 @@ public class GithubDataSyncScheduler {
                         handle.progress(
                             reposProcessed,
                             totalRepos,
+                            // Just the repository — the "N of M" is already the progress bar's own
+                            // reading (unitsCompleted/unitsTotal travel on the same record), so
+                            // repeating it in the step text renders the same fact twice.
                             SyncProgress.ofResource(
                                 SyncPhase.REPOSITORIES,
-                                "Syncing " +
-                                    target.repositoryNameWithOwner() +
-                                    " — repository " +
-                                    reposProcessed +
-                                    " of " +
-                                    totalRepos,
+                                "Syncing " + target.repositoryNameWithOwner(),
                                 target.repositoryNameWithOwner(),
                                 reposProcessed,
                                 totalRepos

@@ -148,9 +148,11 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 handle.progress(
                     tally.itemsProcessed(),
                     tally.itemsTotal(),
+                    // Just the repository — "N of M" is already the progress bar's own reading
+                    // (unitsCompleted/unitsTotal travel on the same record).
                     SyncProgress.ofResource(
                         SyncPhase.REPOSITORIES,
-                        "Backfilled " + target.repositoryNameWithOwner() + " — " + reposDone + " of " + pending.size(),
+                        "Backfilled " + target.repositoryNameWithOwner(),
                         target.repositoryNameWithOwner(),
                         reposDone,
                         pending.size()

@@ -691,9 +691,11 @@ public class GitlabDataSyncScheduler {
                 handle.progress(
                     reposProcessed,
                     totalRepos,
+                    // Just the repository — "N of M" is already the progress bar's own reading
+                    // (unitsCompleted/unitsTotal travel on the same record).
                     SyncProgress.ofResource(
                         SyncPhase.REPOSITORIES,
-                        "Syncing " + repo.getNameWithOwner() + " — repository " + reposProcessed + " of " + totalRepos,
+                        "Syncing " + repo.getNameWithOwner(),
                         repo.getNameWithOwner(),
                         reposProcessed,
                         totalRepos
