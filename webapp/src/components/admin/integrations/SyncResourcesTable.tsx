@@ -595,9 +595,12 @@ function TotalsFooter({
 	}));
 	const canWarn = columns.length > 1;
 
+	// Solid `bg-muted` (not `bg-card`): keeps the shadcn footer's distinct muted tint so the totals read
+	// as a summary rather than one more data row, while staying opaque enough that scrolling rows don't
+	// bleed through the sticky footer (the `bg-muted/50` default would). `border-t-2` sets it apart.
 	return (
-		<TableFooter className="sticky bottom-0 z-10 bg-card">
-			<TableRow>
+		<TableFooter className="sticky bottom-0 z-10 border-t-2 bg-muted">
+			<TableRow className="hover:bg-transparent">
 				<TableCell className="font-medium capitalize">All {resourceNounPlural}</TableCell>
 				<TableCell />
 				{sums.map(({ column, sum }) => {
