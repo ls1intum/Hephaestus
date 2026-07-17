@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.api.SyncResourceStateDTO;
 import de.tum.cit.aet.hephaestus.integration.core.sync.api.TriggerSyncJobRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -96,14 +96,10 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         // uses the bounded (maxPages) overload, register/sync the plain one — stub both.
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString()))
-            .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
-            );
+            .thenReturn(List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null)));
         lenient()
             .when(outlineApiClient.listCollections(anyString(), anyString(), anyInt()))
-            .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
-            );
+            .thenReturn(List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null)));
         lenient().when(outlineApiClient.listDocuments(anyString(), anyString(), anyString())).thenReturn(List.of());
         lenient()
             .when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), anyString()))

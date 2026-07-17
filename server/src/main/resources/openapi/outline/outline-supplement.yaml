@@ -1,0 +1,140 @@
+# Local extension of outline/openapi pending upstream PR — delete when merged.
+#
+# The upstream Outline OpenAPI spec (spec3.yml) does not yet document four endpoints
+# that Hephaestus depends on: apiKeys.list, webhookSubscriptions.list,
+# webhookSubscriptions.create, and webhookSubscriptions.delete. This minimal document
+# supplies ONLY the schemas Hephaestus reads from those responses (ApiKey,
+# WebhookSubscription) so the code generator can produce type-safe models for them,
+# mirroring how the vendored spec3.yml supplies every other Outline model.
+#
+# Field shapes match what a real Outline instance returns (verified against the
+# hand-written DTOs this replaced and the OutlineApiClient call sites). Request bodies
+# are intentionally NOT modelled here — they stay as explicit maps in OutlineApiClient
+# (few, stable, fail-loud); only response models are generated.
+#
+# Generated into the same model package as spec3.yml
+# (…integration.outline.client.model) with the Outline name prefix, so ApiKey →
+# OutlineApiKey and WebhookSubscription → OutlineWebhookSubscription.
+openapi: 3.0.0
+info:
+  title: Outline API — Hephaestus local supplement
+  version: "0.1.0"
+  description: >
+    Undocumented-upstream endpoints Hephaestus consumes. Response envelope is Outline's
+    standard { data, pagination } wrapper, deserialized via the hand-written OutlineEnvelope<T>;
+    only the inner models (ApiKey, WebhookSubscription) are generated here.
+paths:
+  /apiKeys.list:
+    post:
+      operationId: apiKeysList
+      summary: List the API keys the token can see.
+      responses:
+        "200":
+          description: The API keys, paginated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiKey"
+  /webhookSubscriptions.list:
+    post:
+      operationId: webhookSubscriptionsList
+      summary: List the change-notification subscriptions the token owns.
+      responses:
+        "200":
+          description: The webhook subscriptions, paginated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WebhookSubscription"
+  /webhookSubscriptions.create:
+    post:
+      operationId: webhookSubscriptionsCreate
+      summary: Register a change-notification subscription.
+      responses:
+        "200":
+          description: The registered subscription.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/WebhookSubscription"
+  /webhookSubscriptions.delete:
+    post:
+      operationId: webhookSubscriptionsDelete
+      summary: Delete a change-notification subscription.
+      responses:
+        "200":
+          description: Empty success envelope.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+components:
+  schemas:
+    ApiKey:
+      type: object
+      description: >
+        An API key belonging to the workspace. Outline never returns a key's plaintext value
+        after creation — only its last four characters — so a caller identifies its own key by
+        matching last4 against the suffix of the token it holds.
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the object.
+          format: uuid
+        name:
+          type: string
+          description: A user-supplied name describing the key.
+        last4:
+          type: string
+          description: The last four characters of the key's plaintext value.
+        expiresAt:
+          type: string
+          nullable: true
+          description: When the key expires, or null if it never expires.
+          format: date-time
+        lastActiveAt:
+          type: string
+          nullable: true
+          description: The last time the key was used to make a request.
+          format: date-time
+    WebhookSubscription:
+      type: object
+      description: >
+        A change-notification subscription. Outline auto-disables a subscription after repeated
+        delivery failures, so a missing or enabled=false entry means the stored id is dead and
+        must be re-registered.
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the object.
+          format: uuid
+        name:
+          type: string
+          description: A user-supplied name describing the subscription.
+        url:
+          type: string
+          description: The delivery URL events are POSTed to.
+        enabled:
+          type: boolean
+          description: Whether the subscription is currently active.
+        events:
+          type: array
+          description: The event names this subscription is registered for.
+          items:
+            type: string

@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -104,12 +104,16 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         return row;
     }
 
-    private void stubLiveCollections(OutlineCollectionListResponse.Collection... collections) {
+    private void stubLiveCollections(
+        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection... collections
+    ) {
         when(outlineApiClient.listCollections(SERVER_URL, TOKEN)).thenReturn(List.of(collections));
     }
 
     /** The candidates path runs under the bounded interactive page budget (5 pages), not the sync cap. */
-    private void stubCandidateCollections(OutlineCollectionListResponse.Collection... collections) {
+    private void stubCandidateCollections(
+        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection... collections
+    ) {
         when(outlineApiClient.listCollections(SERVER_URL, TOKEN, 5)).thenReturn(List.of(collections));
     }
 
@@ -120,14 +124,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
             collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
         ).thenReturn(Optional.empty());
         stubLiveCollections(
-            new OutlineCollectionListResponse.Collection(
-                COLLECTION_ID,
-                "Design",
-                "col1",
-                "#F00",
-                "ruler",
-                "Design team docs"
-            )
+            OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", "#F00", "ruler", "Design team docs")
         );
 
         OutlineCollectionAdminService.RegistrationOutcome outcome = service.register(WS, COLLECTION_ID);
@@ -181,7 +178,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         when(
             collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(WS, CONNECTION_ID, COLLECTION_ID)
         ).thenReturn(Optional.empty());
-        stubLiveCollections(new OutlineCollectionListResponse.Collection("other-id", "Other", null, null, null, null));
+        stubLiveCollections(OutlineClientModels.collection("other-id", "Other", null, null, null, null));
 
         assertThatThrownBy(() -> service.register(WS, COLLECTION_ID)).isInstanceOf(
             UnknownOutlineCollectionException.class
@@ -200,14 +197,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         ).thenReturn(Optional.empty());
         String overLongDescription = "d".repeat(2100);
         stubLiveCollections(
-            new OutlineCollectionListResponse.Collection(
-                COLLECTION_ID,
-                "Design",
-                "col1",
-                null,
-                null,
-                overLongDescription
-            )
+            OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, overLongDescription)
         );
 
         service.register(WS, COLLECTION_ID);
@@ -324,8 +314,8 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
             List.of(registeredRow(MirrorState.ENABLED, SyncStatus.COMPLETE))
         );
         stubCandidateCollections(
-            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null),
-            new OutlineCollectionListResponse.Collection("col-2", "Archive", "col2", null, null, null)
+            OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null),
+            OutlineClientModels.collection("col-2", "Archive", "col2", null, null, null)
         );
 
         List<OutlineCollectionCandidateDTO> candidates = service.listCandidates(WS);
@@ -342,9 +332,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     void candidates_useTheBoundedInteractivePageBudget_notTheSyncCap() {
         OutlineCollectionAdminService service = service();
         when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WS)).thenReturn(List.of());
-        stubCandidateCollections(
-            new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", null, null, null, null)
-        );
+        stubCandidateCollections(OutlineClientModels.collection(COLLECTION_ID, "Design", null, null, null, null));
 
         List<OutlineCollectionCandidateDTO> candidates = service.listCandidates(WS);
 

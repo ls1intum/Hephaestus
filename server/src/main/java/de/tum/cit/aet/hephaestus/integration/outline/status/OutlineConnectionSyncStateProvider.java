@@ -9,15 +9,19 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -31,17 +35,20 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
     private final ConnectionRepository connectionRepository;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineDocumentRepository documentRepository;
+    private final ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider;
     private final String syncCron;
 
     public OutlineConnectionSyncStateProvider(
         ConnectionRepository connectionRepository,
         OutlineCollectionRepository collectionRepository,
         OutlineDocumentRepository documentRepository,
+        ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider,
         @Value("${hephaestus.integration.outline.sync.cron:0 0 */6 * * *}") String syncCron
     ) {
         this.connectionRepository = connectionRepository;
         this.collectionRepository = collectionRepository;
         this.documentRepository = documentRepository;
+        this.rateLimitTrackerProvider = rateLimitTrackerProvider;
         this.syncCron = syncCron;
     }
 
@@ -52,19 +59,29 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
 
     @Override
     public ConnectionSyncDetails describe(IntegrationRef ref, long connectionId) {
-        Boolean webhookRegistered = connectionRepository
+        Optional<ConnectionConfig.OutlineConfig> config = connectionRepository
             .findById(connectionId)
             .map(Connection::getConfig)
             .filter(ConnectionConfig.OutlineConfig.class::isInstance)
-            .map(ConnectionConfig.OutlineConfig.class::cast)
-            .map(config -> config.webhookSubscriptionId() != null && !config.webhookSubscriptionId().isBlank())
+            .map(ConnectionConfig.OutlineConfig.class::cast);
+
+        Boolean webhookRegistered = config
+            .map(c -> c.webhookSubscriptionId() != null && !c.webhookSubscriptionId().isBlank())
             .orElse(null);
+
+        // Rate-limit budget observed on the connection's Outline host, or null until the first API call
+        // since restart (the UI renders that as "–"). Keyed by server origin — see OutlineRateLimitTracker.
+        OutlineRateLimitTracker tracker = rateLimitTrackerProvider.getIfAvailable();
+        RateLimitSnapshot rateLimit =
+            tracker == null
+                ? null
+                : config.map(c -> tracker.snapshot(OutlineRateLimitTracker.scopeOf(c.serverUrl()))).orElse(null);
 
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(syncCron),
             CronSchedules.interval(syncCron),
-            null,
+            rateLimit,
             null,
             false
         );

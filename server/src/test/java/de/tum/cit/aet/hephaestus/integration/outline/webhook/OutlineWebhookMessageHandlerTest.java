@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -296,14 +296,12 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
         handler().onMessage(msg);
 
-        ArgumentCaptor<OutlineDocumentListResponse.Meta> model = ArgumentCaptor.forClass(
-            OutlineDocumentListResponse.Meta.class
-        );
+        ArgumentCaptor<OutlineDocument> model = ArgumentCaptor.forClass(OutlineDocument.class);
         verify(syncScheduler).refreshDocumentNow(eq(42L), eq("documents.update"), eq("doc-9"), model.capture());
         assertThat(model.getValue()).isNotNull();
-        assertThat(model.getValue().id()).isEqualTo("doc-9");
-        assertThat(model.getValue().collectionId()).isEqualTo("col-1");
-        assertThat(model.getValue().title()).isEqualTo("Doc");
+        assertThat(model.getValue().getId()).isEqualTo("doc-9");
+        assertThat(model.getValue().getCollectionId()).isEqualTo("col-1");
+        assertThat(model.getValue().getTitle()).isEqualTo("Doc");
     }
 
     @Test

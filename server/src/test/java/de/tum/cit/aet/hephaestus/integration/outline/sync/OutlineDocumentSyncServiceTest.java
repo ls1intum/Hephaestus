@@ -21,9 +21,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -153,9 +152,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenReturn(Optional.of(collection));
         lenient()
             .when(outlineApiClient.listCollections(SERVER_URL, "token"))
-            .thenReturn(
-                List.of(new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null))
-            );
+            .thenReturn(List.of(OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null)));
         lenient()
             .when(outlineApiClient.listCollectionDocuments(SERVER_URL, "token", COLLECTION_ID))
             .thenReturn(List.of());
@@ -164,8 +161,11 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenReturn(List.of());
     }
 
-    private static OutlineDocumentListResponse.Meta meta(String id, Instant updatedAt) {
-        return new OutlineDocumentListResponse.Meta(
+    private static de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument meta(
+        String id,
+        Instant updatedAt
+    ) {
+        return OutlineClientModels.document(
             id,
             null,
             id,
@@ -181,8 +181,12 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private static OutlineDocumentListResponse.Meta metaWithUrl(String id, Instant updatedAt, String url) {
-        return new OutlineDocumentListResponse.Meta(
+    private static de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument metaWithUrl(
+        String id,
+        Instant updatedAt,
+        String url
+    ) {
+        return OutlineClientModels.document(
             id,
             url,
             id,
@@ -198,8 +202,12 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private static OutlineDocumentListResponse.Meta archivedMeta(String id, Instant updatedAt, Instant archivedAt) {
-        return new OutlineDocumentListResponse.Meta(
+    private static de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument archivedMeta(
+        String id,
+        Instant updatedAt,
+        Instant archivedAt
+    ) {
+        return OutlineClientModels.document(
             id,
             "/doc/" + id,
             id,
@@ -521,20 +529,21 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     @Test
     void refreshDocument_prefetchedMetaMissingCollectionId_fallsBackToDocumentsInfo() {
         when(documentRepository.findSnapshotByDocumentId(WORKSPACE, CONNECTION, "doc-1")).thenReturn(Optional.empty());
-        OutlineDocumentListResponse.Meta incomplete = new OutlineDocumentListResponse.Meta(
-            "doc-1",
-            null,
-            "Doc 1",
-            T1,
-            T2,
-            "doc-1",
-            null,
-            null, // no collectionId — unusable
-            null,
-            null,
-            null,
-            null
-        );
+        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument incomplete =
+            OutlineClientModels.document(
+                "doc-1",
+                null,
+                "Doc 1",
+                T1,
+                T2,
+                "doc-1",
+                null,
+                null, // no collectionId — unusable
+                null,
+                null,
+                null,
+                null
+            );
         when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
         when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
 
@@ -617,7 +626,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         when(documentRepository.findSnapshotByDocumentId(WORKSPACE, CONNECTION, "doc-x")).thenReturn(Optional.empty());
         when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-x")).thenReturn(
             Optional.of(
-                new OutlineDocumentListResponse.Meta(
+                OutlineClientModels.document(
                     "doc-x",
                     null,
                     "X",
@@ -724,7 +733,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         inMirror(evicted);
         when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
             List.of(
-                new OutlineDocumentListResponse.Meta(
+                OutlineClientModels.document(
                     "doc-1",
                     null,
                     "Doc 1",
@@ -733,8 +742,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
                     "doc-1",
                     null,
                     COLLECTION_ID,
-                    new OutlineDocumentListResponse.OutlineUser("user-1", "Ada"),
-                    new OutlineDocumentListResponse.OutlineUser("user-2", "Grace"),
+                    OutlineClientModels.user("user-1", "Ada"),
+                    OutlineClientModels.user("user-2", "Grace"),
                     List.of("user-1", "user-2", "user-3"),
                     null
                 )
@@ -882,8 +891,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         ).thenReturn(Optional.of(collectionB));
         when(outlineApiClient.listCollections(SERVER_URL, "token")).thenReturn(
             List.of(
-                new OutlineCollectionListResponse.Collection(COLLECTION_ID, "Design", "col1", null, null, null),
-                new OutlineCollectionListResponse.Collection(COLLECTION_ID_B, "Eng", "col2", null, null, null)
+                OutlineClientModels.collection(COLLECTION_ID, "Design", "col1", null, null, null),
+                OutlineClientModels.collection(COLLECTION_ID_B, "Eng", "col2", null, null, null)
             )
         );
         when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenThrow(

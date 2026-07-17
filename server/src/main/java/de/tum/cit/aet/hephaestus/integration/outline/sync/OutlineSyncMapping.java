@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionDocumentsResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +15,11 @@ import org.jspecify.annotations.Nullable;
  * authorship transfer, hashing, clamping. No state, no I/O, no decision — every method is a function of
  * its arguments, which is exactly why it lives beside the service rather than inside it: none of it is
  * business logic, and folding it in only inflates the class the reconcile's real decisions live in.
+ *
+ * <p>The wire types are the generated Outline models: {@link OutlineNavigationNode} for the collection tree
+ * and {@link OutlineDocument} for per-document metadata. The mirror entity
+ * ({@code de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument}) shares the {@code OutlineDocument}
+ * simple name, so {@link #applyAuthorship} qualifies it to keep the wire model importable here.
  */
 final class OutlineSyncMapping {
 
@@ -25,20 +29,16 @@ final class OutlineSyncMapping {
     record FlatNode(String id, @Nullable String title, @Nullable String slug, @Nullable String parentId) {}
 
     /** Depth-first flatten of the document tree, carrying each node's parent id down the recursion. */
-    static void flatten(
-        @Nullable List<OutlineCollectionDocumentsResponse.Node> nodes,
-        @Nullable String parentId,
-        List<FlatNode> out
-    ) {
+    static void flatten(@Nullable List<OutlineNavigationNode> nodes, @Nullable String parentId, List<FlatNode> out) {
         if (nodes == null) {
             return;
         }
-        for (OutlineCollectionDocumentsResponse.Node node : nodes) {
-            if (node.id() == null) {
+        for (OutlineNavigationNode node : nodes) {
+            if (node.getId() == null) {
                 continue;
             }
-            out.add(new FlatNode(node.id(), node.title(), slugFromUrl(node.url()), parentId));
-            flatten(node.children(), node.id(), out);
+            out.add(new FlatNode(node.getId(), node.getTitle(), slugFromUrl(node.getUrl()), parentId));
+            flatten(node.getChildren(), node.getId(), out);
         }
     }
 
@@ -50,15 +50,15 @@ final class OutlineSyncMapping {
      * Keeping both paths' slug shape identical is what lets a reference extracted from a full Outline URL
      * (e.g. {@code setup-guide-psUl8qCles}) resolve a document regardless of which path last wrote the row.
      */
-    static @Nullable String resolveSlug(@Nullable FlatNode node, OutlineDocumentListResponse.@Nullable Meta meta) {
+    static @Nullable String resolveSlug(@Nullable FlatNode node, @Nullable OutlineDocument meta) {
         if (node != null && node.slug() != null) {
             return node.slug();
         }
         if (meta == null) {
             return null;
         }
-        String fromUrl = slugFromUrl(meta.url());
-        return fromUrl != null ? fromUrl : meta.urlId();
+        String fromUrl = slugFromUrl(meta.getUrl());
+        return fromUrl != null ? fromUrl : meta.getUrlId();
     }
 
     /** The document slug is the last path segment of its Outline {@code url} (e.g. {@code /doc/<slug>}). */
@@ -82,16 +82,19 @@ final class OutlineSyncMapping {
      * the creator/last-editor pair misses. Only ever applied alongside a body — a metadata-only refresh
      * must not rewrite these columns.
      */
-    static void applyAuthorship(OutlineDocument doc, OutlineDocumentListResponse.Meta meta) {
-        doc.setOutlineCreatedAt(meta.createdAt());
-        doc.setCreatedBySubject(meta.createdBy() == null ? null : meta.createdBy().id());
-        doc.setCreatedByName(meta.createdBy() == null ? null : meta.createdBy().name());
-        doc.setUpdatedBySubject(meta.updatedBy() == null ? null : meta.updatedBy().id());
-        doc.setUpdatedByName(meta.updatedBy() == null ? null : meta.updatedBy().name());
+    static void applyAuthorship(
+        de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument doc,
+        OutlineDocument meta
+    ) {
+        doc.setOutlineCreatedAt(meta.getCreatedAt());
+        doc.setCreatedBySubject(meta.getCreatedBy() == null ? null : meta.getCreatedBy().getId());
+        doc.setCreatedByName(meta.getCreatedBy() == null ? null : meta.getCreatedBy().getName());
+        doc.setUpdatedBySubject(meta.getUpdatedBy() == null ? null : meta.getUpdatedBy().getId());
+        doc.setUpdatedByName(meta.getUpdatedBy() == null ? null : meta.getUpdatedBy().getName());
         doc.setCollaboratorSubjects(
-            meta.collaboratorIds() == null || meta.collaboratorIds().isEmpty()
+            meta.getCollaboratorIds() == null || meta.getCollaboratorIds().isEmpty()
                 ? null
-                : List.copyOf(meta.collaboratorIds())
+                : List.copyOf(meta.getCollaboratorIds())
         );
     }
 

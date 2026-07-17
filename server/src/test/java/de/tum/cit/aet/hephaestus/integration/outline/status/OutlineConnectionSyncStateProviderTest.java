@@ -10,7 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -26,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.beans.factory.ObjectProvider;
 
 class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
 
@@ -45,11 +48,18 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
+    @Mock
+    private ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider;
+
+    @Mock
+    private OutlineRateLimitTracker rateLimitTracker;
+
     private OutlineConnectionSyncStateProvider provider(String cron) {
         return new OutlineConnectionSyncStateProvider(
             connectionRepository,
             collectionRepository,
             documentRepository,
+            rateLimitTrackerProvider,
             cron
         );
     }
@@ -73,6 +83,22 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         assertThat(details.backfill()).isNull();
         assertThat(details.rateLimit()).isNull();
         assertThat(details.vendorHealthDegraded()).isFalse();
+    }
+
+    @Test
+    void describe_surfacesTheTrackedRateLimitForTheConnectionHost() {
+        String serverUrl = "https://outline.example.test";
+        lenient()
+            .when(connection.getConfig())
+            .thenReturn(new ConnectionConfig.OutlineConfig(serverUrl, "sub-1", "secret", Set.of()));
+        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
+
+        RateLimitSnapshot snapshot = new RateLimitSnapshot(1000, 987, Instant.parse("2026-07-17T12:00:00Z"));
+        when(rateLimitTrackerProvider.getIfAvailable()).thenReturn(rateLimitTracker);
+        // Keyed by the normalized server origin, exactly as the exchange filter records it.
+        when(rateLimitTracker.snapshot(OutlineRateLimitTracker.scopeOf(serverUrl))).thenReturn(snapshot);
+
+        assertThat(provider().describe(REF, CONNECTION_ID).rateLimit()).isSameAs(snapshot);
     }
 
     @Test

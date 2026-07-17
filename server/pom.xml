@@ -58,6 +58,9 @@
         <!-- GraphQL Codegen Skip (auto-set by 'quick' profile when target/generated-sources exists) -->
         <graphql.codegen.skip>false</graphql.codegen.skip>
 
+        <!-- Outline OpenAPI model codegen skip (auto-set by 'quick' profile alongside the GraphQL one) -->
+        <outline.codegen.skip>false</outline.codegen.skip>
+
         <!-- Coverage Configuration (disabled by default) -->
         <skipCoverage>true</skipCoverage>
         <jacoco.line.coverage.minimum>0.00</jacoco.line.coverage.minimum>
@@ -92,6 +95,7 @@
         <jgit.version>7.6.0.202603022253-r</jgit.version>
         <java-jwt.version>4.5.2</java-jwt.version>
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
+        <openapi-generator.version>7.19.0</openapi-generator.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
         <shedlock.version>5.16.0</shedlock.version>
@@ -516,6 +520,7 @@
                             <sources>
                                 <source>${project.build.directory}/generated-sources/graphql-github</source>
                                 <source>${project.build.directory}/generated-sources/graphql-gitlab</source>
+                                <source>${project.build.directory}/generated-sources/openapi-outline</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -754,6 +759,102 @@
                                     </fileset>
                                 </replaceregexp>
                             </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- OpenAPI Generator for the Outline REST client models -->
+            <!-- Generates type-safe Java models from Outline's maintained OpenAPI spec (spec3.yml), -->
+            <!-- mirroring the GitHub/GitLab GraphQL codegen split: generated vendor models here, -->
+            <!-- hand-written transport policy in OutlineApiClient. MODELS ONLY (no APIs, no supporting -->
+            <!-- files) — OutlineApiClient owns the SSRF guard, resilience, pagination, and rate-limit -->
+            <!-- capture. Output lands in target/generated-sources/openapi-outline (added via -->
+            <!-- build-helper add-source, PMD-excluded, never committed) and is gated by the -->
+            <!-- outline.codegen.skip property, which the 'quick' profile flips true for incremental dev. -->
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
+                <executions>
+                    <!-- Outline's maintained upstream spec -->
+                    <execution>
+                        <id>outline-spec3</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${outline.codegen.skip}</skip>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/outline/spec3.yml</inputSpec>
+                            <generatorName>java</generatorName>
+                            <library>webclient</library>
+                            <output>${project.build.directory}/generated-sources/openapi-outline</output>
+                            <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
+                            <modelNamePrefix>Outline</modelNamePrefix>
+                            <!-- Models only: OutlineApiClient hand-writes the transport policy -->
+                            <generateApis>false</generateApis>
+                            <generateApiTests>false</generateApiTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelTests>false</generateModelTests>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <!-- date-time → Instant to match the mirror/domain types -->
+                            <typeMappings>
+                                <typeMapping>OffsetDateTime=Instant</typeMapping>
+                                <!-- Outline UUIDs are opaque ids we only ever compare/store as text; -->
+                                <!-- keeping them String avoids UUID.toString() noise across every call site -->
+                                <!-- and matches the mirror/domain column types (transport policy). -->
+                                <typeMapping>UUID=String</typeMapping>
+                            </typeMappings>
+                            <importMappings>
+                                <importMapping>OffsetDateTime=java.time.Instant</importMapping>
+                            </importMappings>
+                            <configOptions>
+                                <useJakartaEe>true</useJakartaEe>
+                                <openApiNullable>false</openApiNullable>
+                                <!-- Emit packages directly under the output dir (no src/main/java prefix) -->
+                                <sourceFolder>.</sourceFolder>
+                                <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                    <!-- Local supplement: endpoints Outline has not yet documented upstream -->
+                    <execution>
+                        <id>outline-supplement</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${outline.codegen.skip}</skip>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/outline/outline-supplement.yaml</inputSpec>
+                            <generatorName>java</generatorName>
+                            <library>webclient</library>
+                            <output>${project.build.directory}/generated-sources/openapi-outline</output>
+                            <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
+                            <modelNamePrefix>Outline</modelNamePrefix>
+                            <generateApis>false</generateApis>
+                            <generateApiTests>false</generateApiTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelTests>false</generateModelTests>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <typeMappings>
+                                <typeMapping>OffsetDateTime=Instant</typeMapping>
+                                <!-- Outline UUIDs are opaque ids we only ever compare/store as text; -->
+                                <!-- keeping them String avoids UUID.toString() noise across every call site -->
+                                <!-- and matches the mirror/domain column types (transport policy). -->
+                                <typeMapping>UUID=String</typeMapping>
+                            </typeMappings>
+                            <importMappings>
+                                <importMapping>OffsetDateTime=java.time.Instant</importMapping>
+                            </importMappings>
+                            <configOptions>
+                                <useJakartaEe>true</useJakartaEe>
+                                <openApiNullable>false</openApiNullable>
+                                <sourceFolder>.</sourceFolder>
+                                <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                            </configOptions>
                         </configuration>
                     </execution>
                 </executions>
@@ -1003,6 +1104,7 @@
                     <excludeRoots>
                         <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>
                         <excludeRoot>${project.build.directory}/generated-sources/graphql-gitlab</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources/openapi-outline</excludeRoot>
                     </excludeRoots>
                 </configuration>
             </plugin>
@@ -1190,6 +1292,7 @@
             </activation>
             <properties>
                 <graphql.codegen.skip>true</graphql.codegen.skip>
+                <outline.codegen.skip>true</outline.codegen.skip>
                 <!-- Preserve .class files for incremental compilation -->
                 <skipCleanStaleClasses>true</skipCleanStaleClasses>
                 <!-- maven.main.skip deliberately NOT set — we want incremental compile -->

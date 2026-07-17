@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsum
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineWebhookEvents;
 import java.security.SecureRandom;
 import java.util.HexFormat;
@@ -128,12 +128,12 @@ public class OutlineWebhookRegistrar {
      */
     private Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
         try {
-            for (OutlineWebhookSubscriptionListResponse.Subscription subscription : outlineApiClient.listWebhookSubscriptions(
+            for (OutlineWebhookSubscription subscription : outlineApiClient.listWebhookSubscriptions(
                 serverUrl,
                 token
             )) {
-                if (subscriptionId.equals(subscription.id())) {
-                    return !Boolean.FALSE.equals(subscription.enabled());
+                if (subscriptionId.equals(subscription.getId())) {
+                    return !Boolean.FALSE.equals(subscription.getEnabled());
                 }
             }
             return false;

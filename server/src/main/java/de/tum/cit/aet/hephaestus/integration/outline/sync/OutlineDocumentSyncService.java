@@ -12,13 +12,11 @@ import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
@@ -130,7 +128,8 @@ public class OutlineDocumentSyncService {
         }
         Instant now = Instant.now();
         try {
-            Map<String, OutlineCollectionListResponse.Collection> live = refreshCatalog(ctx);
+            Map<String, de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection> live =
+                refreshCatalog(ctx);
             List<OutlineCollection> collections = collectionRepository.findForSync(
                 workspaceId,
                 ctx.connectionId(),
@@ -293,7 +292,7 @@ public class OutlineDocumentSyncService {
 
     /**
      * Webhook targeted refresh of one document (≤2 API calls) — no pre-fetched metadata available.
-     * Equivalent to {@link #refreshDocument(long, String, String, OutlineDocumentListResponse.Meta)}
+     * Equivalent to {@link #refreshDocument(long, String, String, OutlineDocument)}
      * with a {@code null} {@code prefetchedMeta}.
      */
     public void refreshDocument(long workspaceId, String eventName, String documentId) {
@@ -313,7 +312,7 @@ public class OutlineDocumentSyncService {
         long workspaceId,
         String eventName,
         String documentId,
-        OutlineDocumentListResponse.@Nullable Meta prefetchedMeta
+        @Nullable OutlineDocument prefetchedMeta
     ) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null || documentId == null || documentId.isBlank()) {
@@ -340,11 +339,11 @@ public class OutlineDocumentSyncService {
             return;
         }
         try {
-            OutlineDocumentListResponse.Meta meta;
-            if (prefetchedMeta != null && prefetchedMeta.id() != null && prefetchedMeta.collectionId() != null) {
+            OutlineDocument meta;
+            if (prefetchedMeta != null && prefetchedMeta.getId() != null && prefetchedMeta.getCollectionId() != null) {
                 meta = prefetchedMeta;
             } else {
-                Optional<OutlineDocumentListResponse.Meta> info = outlineApiClient.getDocumentInfo(
+                Optional<OutlineDocument> info = outlineApiClient.getDocumentInfo(
                     ctx.serverUrl(),
                     ctx.token(),
                     documentId
@@ -357,14 +356,14 @@ public class OutlineDocumentSyncService {
                 }
                 meta = info.get();
             }
-            if (meta.collectionId() == null) {
+            if (meta.getCollectionId() == null) {
                 return;
             }
             Optional<OutlineCollection> collection =
                 collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
                     workspaceId,
                     ctx.connectionId(),
-                    meta.collectionId()
+                    meta.getCollectionId()
                 );
             if (collection.isEmpty() || !collection.get().isEnabled()) {
                 return; // the document lives outside the mirrored collections — not ours to ingest
@@ -422,27 +421,32 @@ public class OutlineDocumentSyncService {
      * One {@code collections.list} call: refresh every mirrored row's human-facing catalog fields and
      * return the live collections by id (the visibility signal for the reconcile).
      */
-    private Map<String, OutlineCollectionListResponse.Collection> refreshCatalog(SyncContext ctx) {
-        Map<String, OutlineCollectionListResponse.Collection> live = new LinkedHashMap<>();
-        for (OutlineCollectionListResponse.Collection collection : outlineApiClient.listCollections(
+    private Map<String, de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection> refreshCatalog(
+        SyncContext ctx
+    ) {
+        Map<String, de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection> live =
+            new LinkedHashMap<>();
+        for (de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection collection : outlineApiClient.listCollections(
             ctx.serverUrl(),
             ctx.token()
         )) {
-            if (collection.id() != null) {
-                live.put(collection.id(), collection);
+            if (collection.getId() != null) {
+                live.put(collection.getId(), collection);
             }
         }
         for (OutlineCollection row : mirroredCollections(ctx)) {
-            OutlineCollectionListResponse.Collection upstream = live.get(row.getCollectionId());
+            de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection upstream = live.get(
+                row.getCollectionId()
+            );
             if (upstream == null) {
                 continue;
             }
             writeCollection(ctx, row, target -> {
-                target.setName(upstream.name());
-                target.setUrlId(upstream.urlId());
-                target.setColor(upstream.color());
-                target.setIcon(upstream.icon());
-                target.setDescription(OutlineSyncMapping.truncate(upstream.description(), MAX_DESCRIPTION_LENGTH));
+                target.setName(upstream.getName());
+                target.setUrlId(upstream.getUrlId());
+                target.setColor(upstream.getColor());
+                target.setIcon(upstream.getIcon());
+                target.setDescription(OutlineSyncMapping.truncate(upstream.getDescription(), MAX_DESCRIPTION_LENGTH));
             });
         }
         return live;
@@ -495,11 +499,7 @@ public class OutlineDocumentSyncService {
         String collectionId = collection.getCollectionId();
         // documents.list is newest-first, so the budget is spent on the most recently edited documents.
         // A truncated enumeration throws rather than returning a short list — see OutlineApiClient.
-        List<OutlineDocumentListResponse.Meta> metas = outlineApiClient.listDocuments(
-            ctx.serverUrl(),
-            ctx.token(),
-            collectionId
-        );
+        List<OutlineDocument> metas = outlineApiClient.listDocuments(ctx.serverUrl(), ctx.token(), collectionId);
         Map<String, OutlineSyncMapping.FlatNode> nodeById = new LinkedHashMap<>();
         List<OutlineSyncMapping.FlatNode> flat = new ArrayList<>();
         OutlineSyncMapping.flatten(
@@ -513,13 +513,13 @@ public class OutlineDocumentSyncService {
 
         Set<String> seen = new HashSet<>();
         int skippedForBudget = 0;
-        for (OutlineDocumentListResponse.Meta meta : metas) {
-            if (meta.id() == null) {
+        for (OutlineDocument meta : metas) {
+            if (meta.getId() == null) {
                 continue;
             }
-            seen.add(meta.id());
+            seen.add(meta.getId());
             if (
-                upsert(ctx, collection, nodeById.get(meta.id()), meta, existing, budget, now) ==
+                upsert(ctx, collection, nodeById.get(meta.getId()), meta, existing, budget, now) ==
                 UpsertOutcome.SKIPPED_FOR_BUDGET
             ) {
                 skippedForBudget++;
@@ -581,27 +581,29 @@ public class OutlineDocumentSyncService {
         SyncContext ctx,
         OutlineCollection collection,
         OutlineSyncMapping.@Nullable FlatNode node,
-        OutlineDocumentListResponse.@Nullable Meta meta,
+        @Nullable OutlineDocument meta,
         Map<String, OutlineDocumentSnapshot> existing,
         @Nullable ExportBudget budget,
         Instant now
     ) {
-        String documentId = node != null ? node.id() : (meta == null ? null : meta.id());
+        String documentId = node != null ? node.id() : (meta == null ? null : meta.getId());
         if (documentId == null) {
             return UpsertOutcome.UNCHANGED;
         }
-        Instant upstreamUpdatedAt = meta == null ? null : meta.updatedAt();
+        Instant upstreamUpdatedAt = meta == null ? null : meta.getUpdatedAt();
         OutlineDocumentSnapshot existingRow = existing.get(documentId);
 
         // Computed once so the skip decision compares against exactly what the mutator would write.
         String desiredCollectionId = collection.getCollectionId();
         String desiredCollectionSlug = OutlineSyncMapping.collectionSlug(collection);
         String desiredParentDocumentId =
-            node != null && node.parentId() != null ? node.parentId() : (meta == null ? null : meta.parentDocumentId());
+            node != null && node.parentId() != null
+                ? node.parentId()
+                : (meta == null ? null : meta.getParentDocumentId());
         String desiredTitle =
-            node != null && node.title() != null ? node.title() : (meta == null ? null : meta.title());
+            node != null && node.title() != null ? node.title() : (meta == null ? null : meta.getTitle());
         String desiredSlug = OutlineSyncMapping.resolveSlug(node, meta);
-        Instant desiredArchivedAt = meta == null ? null : meta.archivedAt();
+        Instant desiredArchivedAt = meta == null ? null : meta.getArchivedAt();
 
         boolean bodyUnchanged =
             existingRow != null &&
@@ -682,15 +684,15 @@ public class OutlineDocumentSyncService {
         Instant now
     ) {
         int skipped = 0;
-        for (OutlineDocumentListResponse.Meta meta : outlineApiClient.listArchivedDocuments(
+        for (OutlineDocument meta : outlineApiClient.listArchivedDocuments(
             ctx.serverUrl(),
             ctx.token(),
             collection.getCollectionId()
         )) {
-            if (meta.id() == null) {
+            if (meta.getId() == null) {
                 continue;
             }
-            seen.add(meta.id());
+            seen.add(meta.getId());
             if (!upsertArchived(ctx, collection, meta, existing, budget, now)) {
                 skipped++;
             }
@@ -709,12 +711,12 @@ public class OutlineDocumentSyncService {
     private boolean upsertArchived(
         SyncContext ctx,
         OutlineCollection collection,
-        OutlineDocumentListResponse.Meta meta,
+        OutlineDocument meta,
         Map<String, OutlineDocumentSnapshot> existing,
         ExportBudget budget,
         Instant now
     ) {
-        String documentId = meta.id();
+        String documentId = meta.getId();
         OutlineDocumentSnapshot snapshot = existing.get(documentId);
         boolean needsExport = snapshot == null || snapshot.isDeleted() || !snapshot.hasBody();
         if (needsExport && !budget.tryConsume()) {
@@ -730,10 +732,10 @@ public class OutlineDocumentSyncService {
             doc -> {
                 doc.setCollectionId(collection.getCollectionId());
                 doc.setCollectionSlug(OutlineSyncMapping.collectionSlug(collection));
-                doc.setParentDocumentId(meta.parentDocumentId());
-                doc.setTitle(meta.title());
+                doc.setParentDocumentId(meta.getParentDocumentId());
+                doc.setTitle(meta.getTitle());
                 doc.setSlug(OutlineSyncMapping.resolveSlug(null, meta));
-                doc.setArchivedAt(meta.archivedAt() != null ? meta.archivedAt() : now);
+                doc.setArchivedAt(meta.getArchivedAt() != null ? meta.getArchivedAt() : now);
                 doc.setDeletedAt(null); // archived is not a tombstone — clear any stale marker
                 if (!needsExport) {
                     return;
@@ -741,7 +743,7 @@ public class OutlineDocumentSyncService {
                 doc.setBodyMarkdown(body);
                 doc.setContentHash(contentHash);
                 doc.setBodyEvictedAt(null);
-                doc.setOutlineUpdatedAt(meta.updatedAt());
+                doc.setOutlineUpdatedAt(meta.getUpdatedAt());
                 OutlineSyncMapping.applyAuthorship(doc, meta);
                 doc.setLastMaterializedAt(now);
             }

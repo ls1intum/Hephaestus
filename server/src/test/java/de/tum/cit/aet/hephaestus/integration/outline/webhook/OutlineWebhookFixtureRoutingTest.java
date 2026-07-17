@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource.SecretLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.WebhookRequest;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -178,17 +178,15 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         handler.onMessage(message);
 
         if (event.startsWith("documents.")) {
-            ArgumentCaptor<OutlineDocumentListResponse.Meta> model = ArgumentCaptor.forClass(
-                OutlineDocumentListResponse.Meta.class
-            );
+            ArgumentCaptor<OutlineDocument> model = ArgumentCaptor.forClass(OutlineDocument.class);
             verify(syncScheduler).refreshDocumentNow(eq(WORKSPACE_ID), eq(event), eq(payloadId), model.capture());
             // Every committed fixture carries a full payload.model — the HMAC-authenticated metadata the
             // handler now trusts, sparing the sync path its own documents.info round-trip.
             assertThat(model.getValue())
                 .as("event %s (payload id %s) must carry a usable payload.model", event, payloadId)
                 .isNotNull();
-            assertThat(model.getValue().id()).isEqualTo(payloadId);
-            assertThat(model.getValue().collectionId()).isNotBlank();
+            assertThat(model.getValue().getId()).isEqualTo(payloadId);
+            assertThat(model.getValue().getCollectionId()).isNotBlank();
 
             ArgumentCaptor<OutlineDocumentEvent> captor = ArgumentCaptor.forClass(OutlineDocumentEvent.class);
             verify(documentEventRepository).save(captor.capture());
