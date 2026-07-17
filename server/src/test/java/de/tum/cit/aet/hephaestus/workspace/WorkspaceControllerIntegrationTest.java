@@ -748,6 +748,37 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     @WithAdminUser
+    void patchingStatusToPurgedReturnsConflictAndLeavesWorkspaceActive() {
+        // Purge is owner-only via DELETE; the admin-level status endpoint must not offer a bypass.
+        User owner = persistUser("purge-bypass-owner");
+        Workspace workspace = createWorkspace("purge-bypass", "Purge Bypass", "purge-bypass", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        ProblemDetail problem = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/status", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceStatusRequestDTO(Workspace.WorkspaceStatus.PURGED))
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.CONFLICT)
+            .expectHeader()
+            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getTitle()).isEqualTo("Workspace lifecycle violation");
+        assertThat(problem.getDetail()).contains("DELETE").contains("OWNER");
+
+        Workspace unchanged = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
+    }
+
+    @Test
+    @WithAdminUser
     void updateStatusEndpointTransitionsWorkspaceLifecycle() {
         User owner = persistUser("status-owner");
         Workspace workspace = createWorkspace("status-space", "Status", "status", AccountType.ORG, owner);

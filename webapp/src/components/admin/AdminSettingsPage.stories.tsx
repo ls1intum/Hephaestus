@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { HttpResponse, http } from "msw";
+import { expect, fn, waitFor, within } from "storybook/test";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 
@@ -14,9 +15,22 @@ const allOff: FeatureValues = {
 	practiceReviewManualTriggerEnabled: true,
 };
 
+// Two sections on this page fetch for themselves, so the page's stories have to answer them: the
+// danger zone reads the caller's role, and the Outline card reads the workspace's connections.
+// Deleting either handler breaks the page silently — an unhandled request is not an error, it
+// falls through to the dev server, which answers with the app's HTML. The role query then errors
+// (the Default play below catches that) and the Outline card throws on a string it expects to be
+// a list, after the play has already finished (nothing catches that).
+const selfFetchedReads = [
+	http.get("*/workspaces/:workspaceSlug/members/me", () =>
+		HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
+	),
+	http.get("*/workspaces/:workspaceSlug/connections", () => HttpResponse.json([])),
+];
+
 const meta = {
 	component: AdminSettingsPage,
-	parameters: { layout: "padded" },
+	parameters: { layout: "padded", msw: { handlers: selfFetchedReads } },
 	tags: ["autodocs"],
 	args: {
 		repositories: [
@@ -53,7 +67,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ canvasElement }) => {
+		// Pins the danger zone to its real state: unmocked, the role query errors and the whole
+		// page snapshots as "couldn't confirm your role".
+		const canvas = within(canvasElement);
+		const deleteButton = await canvas.findByRole("button", { name: /^delete workspace$/i });
+		await waitFor(() => expect(deleteButton).toHaveAttribute("aria-disabled", "false"));
+	},
+};
 
 export const LoadingRepositories: Story = {
 	args: { isLoadingRepositories: true, repositories: [] },

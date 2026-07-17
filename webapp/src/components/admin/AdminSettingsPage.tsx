@@ -1,4 +1,5 @@
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+import { AdminDangerZoneSettings } from "./AdminDangerZoneSettings";
 import {
 	AdminFeaturesSettings,
 	type FeatureKey,
@@ -164,7 +165,12 @@ export function AdminSettingsPage({
 					/>
 				)}
 
-				{workspaceSlug != null && <AdminOutlineSettings workspaceSlug={workspaceSlug} />}
+				{workspaceSlug != null && (
+					<>
+						<AdminOutlineSettings workspaceSlug={workspaceSlug} />
+						<AdminDangerZoneSettings workspaceSlug={workspaceSlug} />
+					</>
+				)}
 			</div>
 		</div>
 	);

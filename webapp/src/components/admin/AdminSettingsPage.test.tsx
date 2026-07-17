@@ -1,16 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+import { renderWithRouter } from "@/test/router";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage, type AdminSettingsPageProps } from "./AdminSettingsPage";
 
-function renderWithClient(node: ReactNode) {
+async function renderWithClient(node: ReactNode) {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 	});
-	return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
+	return renderWithRouter(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
 }
 
 const features: FeatureValues = {
@@ -34,7 +35,7 @@ const staleChannel: SlackMonitoredChannel = {
 	createdAt: new Date("2026-01-01T00:00:00Z"),
 };
 
-function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
+async function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 	const props: AdminSettingsPageProps = {
 		repositories: [],
 		isLoadingRepositories: false,
@@ -61,13 +62,13 @@ function setup(overrides: Partial<AdminSettingsPageProps> = {}) {
 		onRemoveSlackChannel: vi.fn(),
 		...overrides,
 	};
-	renderWithClient(<AdminSettingsPage {...props} />);
+	await renderWithClient(<AdminSettingsPage {...props} />);
 	return { props };
 }
 
 describe("AdminSettingsPage — Slack integration structure", () => {
-	it("keeps channel monitoring discoverable while disconnected, but renders no stale channels", () => {
-		setup({ hasSlackConnection: false, slackChannels: [staleChannel] });
+	it("keeps channel monitoring discoverable while disconnected, but renders no stale channels", async () => {
+		await setup({ hasSlackConnection: false, slackChannels: [staleChannel] });
 
 		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
 		// The section explains itself before an admin commits to installing the app…
@@ -78,8 +79,8 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});
 
-	it("shows connected Slack management under one integration section", () => {
-		setup({ hasSlackConnection: true, slackChannels: [staleChannel] });
+	it("shows connected Slack management under one integration section", async () => {
+		await setup({ hasSlackConnection: true, slackChannels: [staleChannel] });
 
 		expect(screen.getByRole("heading", { name: /slack integration/i })).toBeTruthy();
 		expect(screen.getByRole("heading", { name: /weekly digest/i })).toBeTruthy();
@@ -87,9 +88,9 @@ describe("AdminSettingsPage — Slack integration structure", () => {
 		expect(screen.queryByRole("heading", { name: /slack notifications/i })).toBeNull();
 	});
 
-	it("threads the channel-list query failure into a retry panel, not the empty state", () => {
+	it("threads the channel-list query failure into a retry panel, not the empty state", async () => {
 		const onRetrySlackChannels = vi.fn();
-		setup({
+		await setup({
 			hasSlackConnection: true,
 			slackChannels: [],
 			isSlackChannelsError: true,
