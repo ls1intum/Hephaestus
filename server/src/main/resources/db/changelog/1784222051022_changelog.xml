@@ -22,7 +22,7 @@
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="instance_settings_pkey"/>
             </column>
-            <column name="silent_mode_engaged" type="BOOLEAN" defaultValueBoolean="false">
+            <column name="silent_mode_engaged" type="BOOLEAN">
                 <constraints nullable="false"/>
             </column>
             <column name="silent_mode_reason" type="VARCHAR(500)"/>
