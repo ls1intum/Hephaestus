@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
+import de.tum.cit.aet.hephaestus.core.auth.stepup.StepUpPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
@@ -46,6 +47,8 @@ class AccountServiceTest extends BaseUnitTest {
     private final IdentityLinkRepository identityLinkRepository = mock(IdentityLinkRepository.class);
     private final IssuedJwtRepository issuedJwtRepository = mock(IssuedJwtRepository.class);
     private final AuthEventWriter auditWriter = mock(AuthEventWriter.class);
+    // A freely-passing gate: the step-up policy's own behavior is covered by StepUpPolicyTest.
+    private final StepUpPolicy stepUpPolicy = mock(StepUpPolicy.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
     private AccountService service;
@@ -57,6 +60,7 @@ class AccountServiceTest extends BaseUnitTest {
             identityLinkRepository,
             issuedJwtRepository,
             new AuthEventLogger(auditWriter),
+            stepUpPolicy,
             clock
         );
     }
@@ -155,7 +159,7 @@ class AccountServiceTest extends BaseUnitTest {
     void grantingAdminToAUserPersistsAndAuditsWithoutAnyLockoutCheck() {
         Account account = accountWithRole(2L, Account.AppRole.USER);
 
-        service.adminSetRole(2L, "APP_ADMIN", 1L);
+        service.adminSetRole(2L, "APP_ADMIN", 1L, Instant.parse("2026-01-01T00:00:00Z"));
 
         assertThat(account.getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
         verify(accountRepository).save(account);
@@ -178,7 +182,7 @@ class AccountServiceTest extends BaseUnitTest {
             accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
         ).thenReturn(List.of(new Account(), new Account()));
 
-        service.adminSetRole(2L, "USER", 1L);
+        service.adminSetRole(2L, "USER", 1L, Instant.parse("2026-01-01T00:00:00Z"));
 
         assertThat(account.getAppRole()).isEqualTo(Account.AppRole.USER);
         verify(accountRepository).save(account);
@@ -192,9 +196,10 @@ class AccountServiceTest extends BaseUnitTest {
     void unknownRoleIsRejectedWithoutSavingOrAuditing() {
         accountWithRole(2L, Account.AppRole.USER);
 
-        assertThatThrownBy(() -> service.adminSetRole(2L, "BOGUS", 1L)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThatThrownBy(() ->
+            service.adminSetRole(2L, "BOGUS", 1L, Instant.parse("2026-01-01T00:00:00Z"))
+        ).isInstanceOfSatisfying(ResponseStatusException.class, e ->
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
         );
 
         verify(accountRepository, never()).save(any());
@@ -205,9 +210,10 @@ class AccountServiceTest extends BaseUnitTest {
     void cannotRevokeYourOwnAdmin() {
         accountWithRole(1L, Account.AppRole.APP_ADMIN);
 
-        assertThatThrownBy(() -> service.adminSetRole(1L, "USER", 1L)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
+        assertThatThrownBy(() ->
+            service.adminSetRole(1L, "USER", 1L, Instant.parse("2026-01-01T00:00:00Z"))
+        ).isInstanceOfSatisfying(ResponseStatusException.class, e ->
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
         );
 
         verify(accountRepository, never()).save(any());
@@ -221,9 +227,10 @@ class AccountServiceTest extends BaseUnitTest {
             accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
         ).thenReturn(List.of(new Account()));
 
-        assertThatThrownBy(() -> service.adminSetRole(2L, "USER", 1L)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
+        assertThatThrownBy(() ->
+            service.adminSetRole(2L, "USER", 1L, Instant.parse("2026-01-01T00:00:00Z"))
+        ).isInstanceOfSatisfying(ResponseStatusException.class, e ->
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
         );
 
         verify(accountRepository, never()).save(any());

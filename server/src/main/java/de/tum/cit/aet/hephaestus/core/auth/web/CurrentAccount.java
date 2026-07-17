@@ -127,6 +127,20 @@ public final class CurrentAccount {
         return null;
     }
 
+    /** The {@code auth_time} claim, or null when absent (a pre-#1323 token). */
+    @Nullable
+    public static Instant authTime() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            return null;
+        }
+        Object authTime = jwt.getClaim("auth_time");
+        if (authTime instanceof Number n) {
+            return Instant.ofEpochSecond(n.longValue());
+        }
+        return null;
+    }
+
     private static Jwt requireJwt() {
         Jwt jwt = jwtOrNull();
         if (jwt == null) {

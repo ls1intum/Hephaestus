@@ -85,9 +85,10 @@ public class AuthEventLogger {
             return this;
         }
 
-        public void record() {
+        /** @return whether the row was persisted (see {@link AuthEventWriter#write}). Never throws. */
+        public boolean record() {
             try {
-                writer.write(
+                return writer.write(
                     new AuthEventData(
                         type,
                         result,
@@ -106,6 +107,7 @@ public class AuthEventLogger {
                 // UnexpectedRollbackException at commit when the failed statement aborted that inner tx
                 // (the inner tx is independent, so the caller's tx stays intact once we absorb this).
                 log.warn("auth.audit: {} event could not be persisted; suppressed to protect the request", type, e);
+                return false;
             }
         }
     }

@@ -14,6 +14,7 @@ import type { AdminAccountView } from "@/api/types.gen";
 import { AdminUsersTable } from "@/components/admin/users/AdminUsersTable";
 import { ChangeRoleDialog } from "@/components/admin/users/ChangeRoleDialog";
 import { ImpersonateDialog } from "@/components/admin/users/ImpersonateDialog";
+import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -27,7 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { problemDetailOf } from "@/lib/problem-detail";
+import { isStepUpRequired, problemDetailOf } from "@/lib/problem-detail";
 
 const PAGE_SIZE = 25;
 
@@ -103,11 +104,18 @@ function AdminUsersPage() {
 		},
 		// Errors (e.g. the last-admin 409) are surfaced inline in the dialog, which stays open so the
 		// blocked action and its reason sit together — not a detached toast that auto-dismisses.
+		// A step-up challenge replaces this dialog rather than stacking on it (one modal, one focus trap).
+		onError: (error) => {
+			if (isStepUpRequired(error)) setRoleTarget(null);
+		},
 	});
 
 	const impersonate = useMutation({
 		...impersonateMutation(),
 		// Errors surfaced inline in the dialog (see updateRole).
+		onError: (error) => {
+			if (isStepUpRequired(error)) setImpersonateTarget(null);
+		},
 	});
 
 	const forceSignOut = useMutation({
@@ -137,6 +145,10 @@ function AdminUsersPage() {
 		if (user.id == null) return;
 		updateRole.mutate({ path: { id: user.id }, body: { appRole: nextRole } });
 	};
+
+	const stepUpChallenge = ([updateRole.error, impersonate.error] as unknown[]).find(
+		isStepUpRequired,
+	);
 
 	const handleConfirmImpersonate = (user: AdminAccountView, reason: string) => {
 		if (user.id == null) return;
@@ -234,6 +246,17 @@ function AdminUsersPage() {
 					}
 				}}
 				onConfirm={handleConfirmImpersonate}
+			/>
+
+			<ConfirmAccessDialog
+				open={stepUpChallenge !== undefined}
+				maxAgeSeconds={stepUpChallenge?.maxAgeSeconds}
+				onOpenChange={(open) => {
+					if (!open) {
+						updateRole.reset();
+						impersonate.reset();
+					}
+				}}
 			/>
 
 			<AlertDialog

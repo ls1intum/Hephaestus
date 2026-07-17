@@ -76,6 +76,12 @@ public class DatabaseTestUtils {
     public void doCleanDatabase() {
         entityManager.flush();
 
+        // The Hibernate ddl-auto:create test schema assigns auth_event ids client-side (composite PK
+        // on the partitioned table), so it never creates the BIGSERIAL-backed auth_event_id_seq that
+        // Liquibase creates in production and AuthEventSequence pulls from. Without it every REAL
+        // audit write (AuthEventWriter) fails silently and write-path assertions can't work.
+        entityManager.createNativeQuery("CREATE SEQUENCE IF NOT EXISTS auth_event_id_seq").executeUpdate();
+
         String truncateStatement = getTruncateStatement();
         if (truncateStatement.isEmpty()) {
             entityManager.clear();
