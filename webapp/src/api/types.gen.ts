@@ -117,6 +117,63 @@ export type WorkspaceMembership = {
 };
 
 /**
+ * One calendar month of a workspace's LLM spend, rolled up from the usage ledger
+ */
+export type WorkspaceLlmUsageReport = {
+    byDay: Array<LlmUsageByDay>;
+    byJobType: Array<LlmUsageByJobType>;
+    /**
+     * Calendar month (UTC), ISO yyyy-MM
+     */
+    month: string;
+    /**
+     * Monthly budget cap in USD; null = uncapped
+     */
+    monthlyBudgetUsd?: number;
+    /**
+     * Spend reached the cap — detection and mentor turns are paused for the current month
+     */
+    overBudget: boolean;
+    /**
+     * Total spend in the month, USD
+     */
+    totalCostUsd: number;
+    /**
+     * Events in the month whose cost could not be resolved (unknown model pricing). They count as zero spend, so a non-zero value means the budget cap is not seeing everything — add a model_pricing row for the model.
+     */
+    uncostedEvents: number;
+};
+
+/**
+ * Month spend aggregated by job type
+ */
+export type LlmUsageByJobType = {
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    costUsd: number;
+    /**
+     * Ledger events (jobs / mentor turns)
+     */
+    events: number;
+    inputTokens: number;
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
+    outputTokens: number;
+    /**
+     * LLM API calls, as reported by the runtime. Detection jobs report their real call count; a mentor turn reports 1 per turn regardless of its internal tool loop, so compare turns to turns, not to job calls.
+     */
+    totalCalls: number;
+};
+
+/**
+ * Spend for one UTC day
+ */
+export type LlmUsageByDay = {
+    costUsd: number;
+    day: Date;
+    events: number;
+};
+
+/**
  * Summary information about a workspace for list views
  */
 export type WorkspaceListItem = {
@@ -456,6 +513,16 @@ export type UpdateWorkspaceNotificationsRequest = {
      * Team name for filtering leaderboard notifications
      */
     team?: string;
+};
+
+/**
+ * Set or clear a workspace's monthly LLM budget cap
+ */
+export type UpdateWorkspaceLlmBudgetRequest = {
+    /**
+     * Budget cap in USD; 0 pauses immediately, null removes the cap
+     */
+    monthlyLlmBudgetUsd?: number;
 };
 
 /**
@@ -2955,6 +3022,19 @@ export type AdminWorkspaceView = {
     workspaceSlug: string;
 };
 
+/**
+ * Instance-admin per-workspace month rollup (metadata only, no tenant content)
+ */
+export type AdminWorkspaceLlmUsage = {
+    costUsd: number;
+    displayName: string;
+    events: number;
+    monthlyBudgetUsd?: number;
+    overBudget: boolean;
+    workspaceId: number;
+    workspaceSlug: string;
+};
+
 export type AdminAccountView = {
     appRole?: string;
     displayName?: string;
@@ -3068,6 +3148,24 @@ export type AdminExportAuthEventsResponses = {
 };
 
 export type AdminExportAuthEventsResponse = AdminExportAuthEventsResponses[keyof AdminExportAuthEventsResponses];
+
+export type AdminListLlmUsageData = {
+    body?: never;
+    path?: never;
+    query?: {
+        month?: string;
+    };
+    url: '/admin/llm-usage';
+};
+
+export type AdminListLlmUsageResponses = {
+    /**
+     * OK
+     */
+    200: Array<AdminWorkspaceLlmUsage>;
+};
+
+export type AdminListLlmUsageResponse = AdminListLlmUsageResponses[keyof AdminListLlmUsageResponses];
 
 export type AdminListLoginProvidersData = {
     body?: never;
@@ -3205,6 +3303,22 @@ export type AdminListWorkspacesResponses = {
 };
 
 export type AdminListWorkspacesResponse = AdminListWorkspacesResponses[keyof AdminListWorkspacesResponses];
+
+export type AdminUpdateWorkspaceLlmBudgetData = {
+    body: UpdateWorkspaceLlmBudgetRequest;
+    path: {
+        workspaceId: number;
+    };
+    query?: never;
+    url: '/admin/workspaces/{workspaceId}/llm-budget';
+};
+
+export type AdminUpdateWorkspaceLlmBudgetResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type ImpersonateData = {
     body: ImpersonateRequest;
@@ -4425,6 +4539,29 @@ export type ResetAndRecalculateLeaguesResponses = {
      */
     200: unknown;
 };
+
+export type GetLlmUsageReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        month?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/llm-usage';
+};
+
+export type GetLlmUsageReportResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceLlmUsageReport;
+};
+
+export type GetLlmUsageReportResponse = GetLlmUsageReportResponses[keyof GetLlmUsageReportResponses];
 
 export type ListMembersData = {
     body?: never;

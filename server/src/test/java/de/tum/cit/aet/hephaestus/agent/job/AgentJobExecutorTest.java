@@ -57,6 +57,9 @@ import tools.jackson.databind.ObjectMapper;
 class AgentJobExecutorTest extends BaseUnitTest {
 
     @Mock
+    private de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder usageRecorder;
+
+    @Mock
     private Connection natsConnection;
 
     @Mock
@@ -121,6 +124,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             transactionTemplate,
             objectMapper,
             meterRegistry,
+            usageRecorder,
             Optional.empty(),
             Optional.empty()
         );
@@ -222,6 +226,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 transactionTemplate,
                 objectMapper,
                 meterRegistry,
+                usageRecorder,
                 Optional.empty(),
                 Optional.of(workerPropsWithLlm(null, null))
             );
@@ -501,6 +506,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 transactionTemplate,
                 objectMapper,
                 meterRegistry,
+                usageRecorder,
                 Optional.empty(),
                 Optional.of(workerPropsWithLlm("https://llm-gateway.example/v1", "operator-key"))
             );
@@ -547,6 +553,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 transactionTemplate,
                 objectMapper,
                 meterRegistry,
+                usageRecorder,
                 Optional.empty(),
                 Optional.of(workerPropsWithLlm(null, null))
             );

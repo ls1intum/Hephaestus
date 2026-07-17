@@ -22,7 +22,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -78,7 +77,7 @@ class AgentJobServiceTest extends BaseUnitTest {
     private TransactionTemplate transactionTemplate;
 
     @Mock
-    private SandboxManager sandboxManager;
+    private de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -100,8 +99,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, false),
-            sandboxManager,
-            Optional.empty()
+            llmBudgetService
         );
 
         workspace = new Workspace();
@@ -527,242 +525,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             verify(agentJobRepository).findRecentJobByKeyPrefix(eq(1L), prefix.capture(), any());
             // Phase preserved, freshness stripped, both LIKE metacharacters escaped, config scope appended.
             assertThat(prefix.getValue()).isEqualTo("pr\\_review:my\\_org/my\\%repo:42:authoring:%:config:10");
-        }
-    }
-
-    @Nested
-    class Cancel {
-
-        private AgentJob createJobWithStatus(AgentJobStatus status) {
-            AgentJob job = new AgentJob();
-            job.prePersist();
-            job.setWorkspace(workspace);
-            job.setStatus(status);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            return job;
-        }
-
-        @Test
-        void shouldCancelQueuedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.QUEUED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            when(
-                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
-            ).thenReturn(1);
-
-            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(cancelledJob));
-
-            AgentJob result = service.cancel(1L, jobId);
-
-            assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
-        }
-
-        @Test
-        void shouldCancelRunningJobAndCallSandbox() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            when(
-                agentJobRepository.transitionStatus(eq(jobId), eq(AgentJobStatus.CANCELLED), any(), any(), any())
-            ).thenReturn(1);
-
-            AgentJob cancelledJob = createJobWithStatus(AgentJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(cancelledJob));
-
-            service.cancel(1L, jobId);
-
-            verify(sandboxManager).cancel(jobId);
-        }
-
-        @Test
-        void shouldBeIdempotentForCancelledJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.CANCELLED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            AgentJob result = service.cancel(1L, jobId);
-
-            assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
-            verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
-        }
-
-        @Test
-        void shouldThrow409ForCompletedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.COMPLETED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("COMPLETED");
-        }
-
-        @Test
-        void shouldThrow409ForFailedJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.FAILED);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("FAILED");
-        }
-
-        @Test
-        void shouldThrow409ForTimedOutJob() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.TIMED_OUT);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId)).isInstanceOf(AgentJobStateConflictException.class);
-        }
-
-        @Test
-        void shouldThrow404ForNonExistentJob() {
-            UUID jobId = UUID.randomUUID();
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId)).isInstanceOf(EntityNotFoundException.class);
-        }
-
-        @Test
-        void shouldThrow409WhenExecutorWinsRace() {
-            AgentJob job = createJobWithStatus(AgentJobStatus.RUNNING);
-            UUID jobId = job.getId();
-
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
-            // Executor already transitioned to COMPLETED
-            when(agentJobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(0);
-
-            AgentJob completedJob = createJobWithStatus(AgentJobStatus.COMPLETED);
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(completedJob));
-
-            assertThatThrownBy(() -> service.cancel(1L, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("COMPLETED");
-
-            verify(sandboxManager, never()).cancel(any());
-        }
-    }
-
-    @Nested
-    class RetryDelivery {
-
-        private static final Long WORKSPACE_ID = 1L;
-
-        private AgentJob completedJob;
-        private UUID jobId;
-        private JobTypeHandler handler;
-
-        @BeforeEach
-        @SuppressWarnings("unchecked")
-        void setUpRetryDelivery() {
-            // Make transactionTemplate.execute() actually invoke the callback
-            when(transactionTemplate.execute(any())).thenAnswer(inv -> {
-                TransactionCallback<?> callback = inv.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
-
-            // Make transactionTemplate.executeWithoutResult() invoke the consumer (lenient:
-            // not all tests reach the delivery path that calls executeWithoutResult)
-            lenient()
-                .doAnswer(inv -> {
-                    Consumer<TransactionStatus> action = inv.getArgument(0);
-                    action.accept(mock(TransactionStatus.class));
-                    return null;
-                })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
-
-            completedJob = new AgentJob();
-            completedJob.prePersist();
-            completedJob.setWorkspace(workspace);
-            completedJob.setStatus(AgentJobStatus.COMPLETED);
-            completedJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-
-            jobId = completedJob.getId();
-
-            handler = mock(JobTypeHandler.class);
-            // Lenient: not all tests reach the delivery path that calls getHandler
-            lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-        }
-
-        @Test
-        void shouldThrow404WhenJobNotFound() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
-                .isInstanceOf(EntityNotFoundException.class)
-                .hasMessageContaining("AgentJob");
-        }
-
-        @Test
-        void shouldThrow409WhenCasTransitionReturnsZero() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
-            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
-                0
-            );
-
-            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("delivery status FAILED");
-
-            verify(handler, never()).deliver(any());
-        }
-
-        @Test
-        void shouldDeliverAndUpdateStatusOnSuccess() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
-            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
-                1
-            );
-            when(agentJobRepository.findById(jobId)).thenReturn(Optional.of(completedJob));
-
-            AgentJob result = service.retryDelivery(WORKSPACE_ID, jobId);
-
-            verify(handler).deliver(completedJob);
-            verify(agentJobRepository).updateDeliveryStatus(
-                eq(jobId),
-                eq(DeliveryStatus.DELIVERED),
-                eq(completedJob.getDeliveryCommentId())
-            );
-            assertThat(result.getId()).isEqualTo(jobId);
-        }
-
-        @Test
-        void shouldRevertToFailedOnDeliveryException() {
-            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
-            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
-                1
-            );
-            when(agentJobRepository.findById(jobId)).thenReturn(Optional.of(completedJob));
-
-            doThrow(new RuntimeException("GitHub API rate limited")).when(handler).deliver(completedJob);
-
-            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("Delivery retry failed")
-                .hasMessageContaining("GitHub API rate limited");
-
-            verify(agentJobRepository).updateDeliveryStatus(
-                eq(jobId),
-                eq(DeliveryStatus.FAILED),
-                eq(completedJob.getDeliveryCommentId())
-            );
         }
     }
 

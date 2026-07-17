@@ -20,6 +20,8 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetExhaustedException;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -82,6 +84,7 @@ public class MentorChatService implements MentorTurnRunner {
     private final MentorChatExecutorConfig.MentorTurnExecutor turnExecutor;
     private final MentorChatExecutorConfig.MentorRunnerTimeoutScheduler runnerTimeoutScheduler;
     private final MentorChatMetrics metrics;
+    private final LlmBudgetService llmBudgetService;
 
     /**
      * Submit a turn to the virtual-thread executor and return. {@code clientHolder} lets the
@@ -219,6 +222,13 @@ public class MentorChatService implements MentorTurnRunner {
         MentorChannel channel,
         AtomicReference<MentorRunnerClient> clientHolder
     ) {
+        // Monthly budget cap (#1368): transport-neutral gate covering web SSE and Slack turns.
+        // Checked before ANYTHING persists so a blocked turn leaves no user message or in-flight
+        // assistant row behind. Surfaces as a user-facing error chunk via userFacingError.
+        if (llmBudgetService.isBudgetExhausted(request.workspaceId())) {
+            metrics.recordBudgetBlocked();
+            throw new LlmBudgetExhaustedException(request.workspaceId());
+        }
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = persistence.ensureThread(
             request.workspaceId(),
@@ -635,6 +645,9 @@ public class MentorChatService implements MentorTurnRunner {
      * Raw message stays in the WARN log for ops.
      */
     private static String userFacingError(Throwable e) {
+        if (e instanceof LlmBudgetExhaustedException budget) {
+            return budget.getMessage();
+        }
         if (e instanceof MentorRunnerException) {
             return "The mentor hit an unexpected error. Please try again.";
         }

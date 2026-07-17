@@ -5,6 +5,9 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlight
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.pricing.ModelPricingService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -13,11 +16,11 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -25,8 +28,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -36,7 +42,6 @@ import tools.jackson.databind.node.ObjectNode;
  * runtime exception cannot roll back the user/assistant rows.
  */
 @Service
-@RequiredArgsConstructor
 public class MentorTurnPersistence {
 
     private static final Logger log = LoggerFactory.getLogger(MentorTurnPersistence.class);
@@ -47,6 +52,33 @@ public class MentorTurnPersistence {
     private final WorkspaceRepository workspaceRepository;
     private final ModelPricingService pricingService;
     private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+    private final LlmUsageRecorder usageRecorder;
+
+    /**
+     * Explicit template instead of {@code @Transactional} on {@link #finalise} / {@link #interrupt}:
+     * both must run the ledger write after their transaction closes, which a method-level annotation
+     * cannot express without self-proxying.
+     */
+    private final TransactionTemplate requiresNewTx;
+
+    public MentorTurnPersistence(
+        ChatThreadRepository chatThreadRepository,
+        ChatMessageRepository chatMessageRepository,
+        WorkspaceRepository workspaceRepository,
+        ModelPricingService pricingService,
+        ConversationalDeliveryReconciler conversationalDeliveryReconciler,
+        LlmUsageRecorder usageRecorder,
+        PlatformTransactionManager transactionManager
+    ) {
+        this.chatThreadRepository = chatThreadRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.workspaceRepository = workspaceRepository;
+        this.pricingService = pricingService;
+        this.conversationalDeliveryReconciler = conversationalDeliveryReconciler;
+        this.usageRecorder = usageRecorder;
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     /**
      * Find the thread for {@code (workspaceId, threadId)} owned by {@code user}, creating a
@@ -209,10 +241,14 @@ public class MentorTurnPersistence {
             .orElse(null);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /**
+     * Uses {@link TransactionTemplate} rather than {@code @Transactional} so the ledger write can
+     * run AFTER this transaction closes — see {@link #billTurn}.
+     */
     public void finalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
+        PendingLedgerWrite pending = new PendingLedgerWrite();
         try {
-            doFinalise(cookie, state, finish);
+            requiresNewTx.executeWithoutResult(tx -> doFinalise(cookie, state, finish, pending));
         } catch (OptimisticLockingFailureException stale) {
             // A concurrent writer (typically the in-flight reaper flipping the row to
             // `interrupted`) bumped the @Version after we loaded the snapshot. Their observation
@@ -225,9 +261,15 @@ public class MentorTurnPersistence {
                 cookie.assistantMessageId()
             );
         }
+        billTurn(pending);
     }
 
-    private void doFinalise(TurnPersistenceCookie cookie, TranslatorState state, UIMessageChunk.Finish finish) {
+    private void doFinalise(
+        TurnPersistenceCookie cookie,
+        TranslatorState state,
+        UIMessageChunk.Finish finish,
+        PendingLedgerWrite pending
+    ) {
         ChatMessage assistant = chatMessageRepository
             .findById(cookie.assistantMessageId())
             .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
@@ -271,6 +313,9 @@ public class MentorTurnPersistence {
         }
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
+        // Capture the ledger write BEFORE the flush: the tokens were burned regardless of who wins
+        // the version race below, so losing that race must not lose the billing.
+        pending.capture(assistant, state, wireCostUsd);
         // saveAndFlush (not save): force the optimistic-lock check NOW, inside the try/catch, instead of at the
         // REQUIRES_NEW commit boundary where an OptimisticLockingFailureException would escape uncaught and turn
         // a benign reaper race into a logged turn failure.
@@ -284,6 +329,73 @@ public class MentorTurnPersistence {
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
             chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
+        }
+    }
+
+    /**
+     * Append this turn's spend to the unified {@code llm_usage_event} ledger (#1368) — the
+     * accounting source for the per-workspace rollup and budget cap. {@code chat_message.metadata}
+     * keeps carrying the same numbers for the wire contract; the ledger row survives thread
+     * deletion. Runs for finalise AND interrupt: an interrupted turn still burned tokens.
+     *
+     * <p>Deliberately OUTSIDE the persistence transaction (mirroring {@code AgentJobExecutor}): the
+     * recorder opens its own {@code REQUIRES_NEW} transaction, which under an open outer one would
+     * pin a second pool connection per concurrent turn. The recorder never throws, and the ledger's
+     * {@code source_id} unique constraint makes a re-bill a no-op.
+     */
+    private void billTurn(PendingLedgerWrite pending) {
+        LlmUsageSample sample = pending.sample();
+        if (sample == null) {
+            return;
+        }
+        usageRecorder.record(pending.workspaceId(), sample);
+    }
+
+    /**
+     * Carries the ledger write out of the persistence transaction. Populated before the row flush
+     * so a lost optimistic-lock race still bills the tokens the turn actually burned.
+     */
+    private static final class PendingLedgerWrite {
+
+        @Nullable
+        private Long workspaceId;
+
+        @Nullable
+        private LlmUsageSample sample;
+
+        /** No-op when the turn produced no usage at all (nothing to bill) or the thread is detached. */
+        void capture(ChatMessage assistant, TranslatorState state, @Nullable Double costUsd) {
+            ChatThread thread = assistant.getThread();
+            if (thread == null || thread.getWorkspace() == null) {
+                return;
+            }
+            UsageBreakdown usage = extractUsageFromState(state);
+            if (costUsd == null && usage.inputTokens() <= 0 && usage.outputTokens() <= 0) {
+                return;
+            }
+            this.workspaceId = thread.getWorkspace().getId();
+            this.sample = new LlmUsageSample(
+                LlmUsageJobType.MENTOR_TURN,
+                assistant.getId(),
+                usage.model(),
+                usage.inputTokens(),
+                usage.outputTokens(),
+                usage.cacheReadTokens(),
+                usage.cacheWriteTokens(),
+                1,
+                costUsd != null ? BigDecimal.valueOf(costUsd) : null,
+                Instant.now()
+            );
+        }
+
+        @Nullable
+        LlmUsageSample sample() {
+            return sample;
+        }
+
+        @Nullable
+        Long workspaceId() {
+            return workspaceId;
         }
     }
 
@@ -317,10 +429,11 @@ public class MentorTurnPersistence {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /** Transaction shape mirrors {@link #finalise} — see that method's note on the ledger write. */
     public void interrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
+        PendingLedgerWrite pending = new PendingLedgerWrite();
         try {
-            doInterrupt(cookie, state, cause);
+            requiresNewTx.executeWithoutResult(tx -> doInterrupt(cookie, state, cause, pending));
         } catch (OptimisticLockingFailureException stale) {
             // Another writer (a successful finalise or reaper sweep) bumped the row's version
             // after our snapshot. Their observation wins; we don't downgrade a `completed` row to
@@ -330,9 +443,15 @@ public class MentorTurnPersistence {
                 cookie.assistantMessageId()
             );
         }
+        billTurn(pending);
     }
 
-    private void doInterrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
+    private void doInterrupt(
+        TurnPersistenceCookie cookie,
+        TranslatorState state,
+        Throwable cause,
+        PendingLedgerWrite pending
+    ) {
         chatMessageRepository
             .findById(cookie.assistantMessageId())
             .ifPresent(assistant -> {
@@ -342,6 +461,9 @@ public class MentorTurnPersistence {
                 meta.put("error", cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
                 meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
                 assistant.setMetadata(meta);
+                // Capture before the flush for the same reason as doFinalise: an interrupted turn
+                // still burned its tokens, and losing the version race must not lose the billing.
+                pending.capture(assistant, state, computeFinalCostUsd(state));
                 // saveAndFlush (not save): surface OptimisticLockingFailureException inside the try/catch (the
                 // no-session-bytes interrupt path would otherwise defer the version check to commit, escaping it).
                 chatMessageRepository.saveAndFlush(assistant);

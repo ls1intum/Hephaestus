@@ -23,6 +23,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -266,6 +267,16 @@ public class Workspace {
      */
     @Column(name = "mentor_config_id")
     private Long mentorConfigId;
+
+    /**
+     * Monthly LLM budget cap in USD (#1368). {@code null} = uncapped. When the workspace's
+     * calendar-month (UTC) spend in the {@code llm_usage_event} ledger reaches this cap, agent
+     * job submission and mentor turns pause until the month rolls over or an instance admin
+     * raises the cap. Set exclusively by instance admins — a workspace admin raising their own
+     * cap would defeat the instance-level cost backstop.
+     */
+    @Column(name = "monthly_llm_budget_usd", precision = 10, scale = 2)
+    private BigDecimal monthlyLlmBudgetUsd;
 
     /**
      * Per-workspace practice-review trigger/delivery overrides; read via {@link #getReviewSettings()}.

@@ -18,6 +18,8 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.Counter;
@@ -30,6 +32,7 @@ import io.nats.client.FetchConsumer;
 import io.nats.client.Message;
 import io.nats.client.StreamContext;
 import jakarta.annotation.PreDestroy;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,6 +51,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,6 +107,7 @@ public class AgentJobExecutor {
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final LlmUsageRecorder usageRecorder;
     private final ScheduledExecutorService heartbeatScheduler;
 
     private final Timer executionDuration;
@@ -139,6 +144,7 @@ public class AgentJobExecutor {
         TransactionTemplate transactionTemplate,
         ObjectMapper objectMapper,
         MeterRegistry meterRegistry,
+        LlmUsageRecorder usageRecorder,
         Optional<WorkerCapacityState> capacityState,
         Optional<WorkerProperties> workerProperties
     ) {
@@ -153,6 +159,7 @@ public class AgentJobExecutor {
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.usageRecorder = usageRecorder;
         this.capacityState = capacityState;
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
@@ -806,6 +813,12 @@ public class AgentJobExecutor {
             default -> null;
         };
 
+        // Captured inside the terminal-write transaction, appended to the LLM usage ledger only
+        // after it commits — so a lost fence race (updated == 0) never bills, and the recorder's
+        // own REQUIRES_NEW transaction doesn't hold a second pool connection under this one.
+        AtomicReference<Long> ledgerWorkspaceId = new AtomicReference<>();
+        AtomicReference<LlmUsageRecorder.LlmUsageSample> ledgerSample = new AtomicReference<>();
+
         Boolean persisted = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, terminalStatus, Instant.now(), errorMessage);
 
@@ -862,6 +875,21 @@ public class AgentJobExecutor {
                     if (snap != null) {
                         freshJob.setLlmModelVersion(snap.modelVersion());
                     }
+                    ledgerWorkspaceId.set(freshJob.getWorkspace().getId());
+                    ledgerSample.set(
+                        new LlmUsageRecorder.LlmUsageSample(
+                            LlmUsageJobType.from(freshJob.getJobType()),
+                            freshJob.getId(),
+                            model,
+                            nullToZero(agentUsage.inputTokens()),
+                            nullToZero(agentUsage.outputTokens()),
+                            nullToZero(agentUsage.cacheReadTokens()),
+                            nullToZero(agentUsage.cacheWriteTokens()),
+                            agentUsage.totalCalls(),
+                            agentUsage.costUsd() != null ? BigDecimal.valueOf(agentUsage.costUsd()) : null,
+                            Instant.now()
+                        )
+                    );
                     log.info(
                         "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, cost={}, jobId={}",
                         model,
@@ -877,7 +905,16 @@ public class AgentJobExecutor {
             }
             return true;
         });
-        return Boolean.TRUE.equals(persisted);
+
+        boolean won = Boolean.TRUE.equals(persisted);
+        if (won && ledgerSample.get() != null) {
+            usageRecorder.record(ledgerWorkspaceId.get(), ledgerSample.get());
+        }
+        return won;
+    }
+
+    private static long nullToZero(@Nullable Integer value) {
+        return value != null ? value : 0L;
     }
 
     /**

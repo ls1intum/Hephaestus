@@ -3,6 +3,7 @@ import {
 	BookUser,
 	Bot,
 	ChevronRight,
+	CircleDollarSign,
 	ClipboardCheck,
 	ListChecks,
 	Map as MapIcon,
@@ -184,6 +185,15 @@ export function NavAdmin({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="AI usage"
+						render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+					>
+						<CircleDollarSign />
+						<span>Usage</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			</SidebarMenu>
 		</SidebarGroup>
 	);

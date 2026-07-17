@@ -41,13 +41,23 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
     @Mock
     ConversationalDeliveryReconciler conversationalDeliveryReconciler;
 
+    @Mock
+    de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder usageRecorder;
+
+    // Unused by these tests (they exercise pure cost math), but the persistence constructor builds
+    // its REQUIRES_NEW template from it.
+    @Mock
+    org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     private MentorTurnPersistence persistence() {
         return new MentorTurnPersistence(
             chatThreadRepository,
             chatMessageRepository,
             workspaceRepository,
             pricingService,
-            conversationalDeliveryReconciler
+            conversationalDeliveryReconciler,
+            usageRecorder,
+            transactionManager
         );
     }
 

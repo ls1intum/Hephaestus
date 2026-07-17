@@ -25,6 +25,8 @@ tags:
   name: Admin
 - description: Per-workspace Slack channel consent + activation
   name: Slack channel activation
+- description: Per-workspace LLM spend rollup and budget status
+  name: LLM Usage
 - description: Manage practice areas
   name: Practice Areas
 - description: Workspace-scoped agent configuration management
@@ -257,6 +259,28 @@ paths:
       summary: "Export the filtered audit log as CSV (newest first, capped)"
       tags:
       - Admin
+  /admin/llm-usage:
+    get:
+      operationId: adminListLlmUsage
+      parameters:
+      - in: query
+        name: month
+        required: false
+        schema:
+          type: string
+          pattern: "\\d{4}-(0[1-9]|1[0-2])"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminWorkspaceLlmUsage"
+          description: OK
+      summary: Per-workspace LLM spend rollup for one month (all workspaces)
+      tags:
+      - Admin
   /admin/login-providers:
     get:
       operationId: adminListLoginProviders
@@ -418,6 +442,28 @@ paths:
                   $ref: "#/components/schemas/AdminWorkspaceView"
           description: OK
       summary: List all workspaces (metadata only)
+      tags:
+      - Admin
+  /admin/workspaces/{workspaceId}/llm-budget:
+    put:
+      operationId: adminUpdateWorkspaceLlmBudget
+      parameters:
+      - in: path
+        name: workspaceId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceLlmBudgetRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Set or clear a workspace's monthly LLM budget cap
       tags:
       - Admin
   /auth/impersonate:
@@ -1738,6 +1784,33 @@ paths:
       summary: Reset and recalculate workspace leagues
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/llm-usage:
+    get:
+      operationId: getLlmUsageReport
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: month
+        required: false
+        schema:
+          type: string
+          pattern: "\\d{4}-(0[1-9]|1[0-2])"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceLlmUsageReport"
+          description: OK
+      summary: Get the workspace's LLM usage report for one month
+      tags:
+      - LLM Usage
   /workspaces/{workspaceSlug}/members:
     get:
       description: |-
@@ -4206,6 +4279,34 @@ components:
           type: string
         status:
           type: string
+    AdminWorkspaceLlmUsage:
+      type: object
+      description: "Instance-admin per-workspace month rollup (metadata only, no tenant\
+        \ content)"
+      properties:
+        costUsd:
+          type: number
+        displayName:
+          type: string
+        events:
+          type: integer
+          format: int64
+        monthlyBudgetUsd:
+          type: number
+        overBudget:
+          type: boolean
+        workspaceId:
+          type: integer
+          format: int64
+        workspaceSlug:
+          type: string
+      required:
+      - costUsd
+      - displayName
+      - events
+      - overBudget
+      - workspaceId
+      - workspaceSlug
     AdminWorkspaceView:
       type: object
       description: Metadata-only workspace summary for the instance-admin overview
@@ -5606,6 +5707,66 @@ components:
           type: string
         type:
           type: string
+    LlmUsageByDay:
+      type: object
+      description: Spend for one UTC day
+      properties:
+        costUsd:
+          type: number
+        day:
+          type: string
+          format: date
+        events:
+          type: integer
+          format: int64
+      required:
+      - costUsd
+      - day
+      - events
+    LlmUsageByJobType:
+      type: object
+      description: Month spend aggregated by job type
+      properties:
+        cacheReadTokens:
+          type: integer
+          format: int64
+        cacheWriteTokens:
+          type: integer
+          format: int64
+        costUsd:
+          type: number
+        events:
+          type: integer
+          format: int64
+          description: Ledger events (jobs / mentor turns)
+        inputTokens:
+          type: integer
+          format: int64
+        jobType:
+          type: string
+          enum:
+          - PULL_REQUEST_REVIEW
+          - ISSUE_REVIEW
+          - CONVERSATION_REVIEW
+          - MENTOR_TURN
+        outputTokens:
+          type: integer
+          format: int64
+        totalCalls:
+          type: integer
+          format: int64
+          description: "LLM API calls, as reported by the runtime. Detection jobs\
+            \ report their real call count; a mentor turn reports 1 per turn regardless\
+            \ of its internal tool loop, so compare turns to turns, not to job calls."
+      required:
+      - cacheReadTokens
+      - cacheWriteTokens
+      - costUsd
+      - events
+      - inputTokens
+      - jobType
+      - outputTokens
+      - totalCalls
     LoginProviderView:
       type: object
       description: Admin view of a login provider. The client secret is never included.
@@ -7471,6 +7632,15 @@ components:
         progressionEnabled:
           type: boolean
           description: Enable the league/progression system
+    UpdateWorkspaceLlmBudgetRequest:
+      type: object
+      description: Set or clear a workspace's monthly LLM budget cap
+      properties:
+        monthlyLlmBudgetUsd:
+          type: number
+          description: "Budget cap in USD; 0 pauses immediately, null removes the\
+            \ cap"
+          minimum: 0.00
     UpdateWorkspaceNotificationsRequest:
       type: object
       description: Request to update leaderboard notification settings
@@ -7814,6 +7984,47 @@ components:
       - progressionEnabled
       - status
       - workspaceSlug
+    WorkspaceLlmUsageReport:
+      type: object
+      description: "One calendar month of a workspace's LLM spend, rolled up from\
+        \ the usage ledger"
+      properties:
+        byDay:
+          type: array
+          items:
+            $ref: "#/components/schemas/LlmUsageByDay"
+        byJobType:
+          type: array
+          items:
+            $ref: "#/components/schemas/LlmUsageByJobType"
+        month:
+          type: string
+          description: "Calendar month (UTC), ISO yyyy-MM"
+          example: 2026-07
+        monthlyBudgetUsd:
+          type: number
+          description: Monthly budget cap in USD; null = uncapped
+        overBudget:
+          type: boolean
+          description: Spend reached the cap — detection and mentor turns are paused
+            for the current month
+        totalCostUsd:
+          type: number
+          description: "Total spend in the month, USD"
+        uncostedEvents:
+          type: integer
+          format: int64
+          description: "Events in the month whose cost could not be resolved (unknown\
+            \ model pricing). They count as zero spend, so a non-zero value means\
+            \ the budget cap is not seeing everything — add a model_pricing row for\
+            \ the model."
+      required:
+      - byDay
+      - byJobType
+      - month
+      - overBudget
+      - totalCostUsd
+      - uncostedEvents
     WorkspaceMembership:
       type: object
       description: A user's membership in a workspace

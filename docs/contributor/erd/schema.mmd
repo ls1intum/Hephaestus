@@ -489,6 +489,21 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
+    LlmUsageEvent {
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(40) job_type "NOT NULL"
+        UUID source_id UK "NOT NULL"
+        VARCHAR(128) model
+        BIGINT input_tokens "NOT NULL"
+        BIGINT output_tokens "NOT NULL"
+        BIGINT cache_read_tokens "NOT NULL"
+        BIGINT cache_write_tokens "NOT NULL"
+        INTEGER total_calls "NOT NULL"
+        NUMERIC(12,6) cost_usd
+        TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
     LoginProvider {
         BIGINT id PK
         VARCHAR(64) registration_id UK "NOT NULL"
@@ -1078,6 +1093,7 @@ erDiagram
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
+        NUMERIC(10,2) monthly_llm_budget_usd
     }
 
     WorkspaceMembership {
@@ -1215,6 +1231,7 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
+    Workspace ||--o{ LlmUsageEvent : has
     ChatThread ||--o{ MentorSlackThread : has
     User ||--o{ Milestone : created_by
     Practice ||--o{ Observation : has

@@ -121,6 +121,9 @@ class MentorChatServiceTest extends BaseUnitTest {
     @Mock
     MentorTurnPersistence persistence;
 
+    @Mock
+    de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService llmBudgetService;
+
     private MentorTurnLock turnLock;
     private PiEventToUiChunkTranslator translator;
     private ScheduledExecutorService scheduler;
@@ -165,7 +168,8 @@ class MentorChatServiceTest extends BaseUnitTest {
             mapper,
             turnExecutorBean,
             schedulerBean,
-            new MentorChatMetrics(meterRegistry)
+            new MentorChatMetrics(meterRegistry),
+            llmBudgetService
         );
 
         // Default happy-path collaborator wiring; individual tests override as needed.
