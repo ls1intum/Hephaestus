@@ -8,8 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { server } from "@/mocks/server";
+import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "./outline/OutlineConnectCard";
+import { SyncStatusHeader } from "./SyncStatusHeader";
 
 vi.mock("sonner", () => ({
 	toast: { success: vi.fn(), error: vi.fn() },
@@ -42,7 +44,7 @@ function OutlineIntegrationTestContainer() {
 	}
 	return (
 		<>
-			{outline.statusError && (
+			{outline.hasConnection && outline.statusError && (
 				<QueryErrorAlert
 					error={outline.statusError}
 					title="We couldn't load Outline sync status"
@@ -56,10 +58,12 @@ function OutlineIntegrationTestContainer() {
 					onRetry={outline.retryTokenStatus}
 				/>
 			)}
-			<div className="space-y-10">
-				<OutlineConnectCard {...outline.connectCardProps} />
-				{outline.collectionsProps && <OutlineCollectionsSection {...outline.collectionsProps} />}
-			</div>
+			{outline.hasConnection && !outline.isConnectionActive && (
+				<ConnectionStateNotice connectionState={outline.connectionState} displayName="Outline" />
+			)}
+			{outline.status && <SyncStatusHeader label="Outline" {...outline.syncStatusHeaderProps} />}
+			<OutlineConnectCard {...outline.connectCardProps} />
+			{outline.collectionsProps && <OutlineCollectionsSection {...outline.collectionsProps} />}
 		</>
 	);
 }
@@ -184,10 +188,11 @@ describe("Outline integration — connect happy path", () => {
 			},
 		});
 
-		// The invalidated connections query refetches → the card flips to connected with status. The
-		// strip reads written copy, not the lowercased `ACTIVE` token it used to render.
+		// The invalidated connections query refetches → the card flips to connected. The identity line
+		// reads written copy, not the lowercased `ACTIVE` token it used to render, and the shared
+		// connection header appears with the Sync control now that the connection is active.
 		expect(await screen.findByText(/outline connected/i)).toBeTruthy();
-		expect(await screen.findByText(/webhook registered/i)).toBeTruthy();
+		expect(await screen.findByRole("button", { name: /sync now/i })).toBeTruthy();
 		expect(toast.success).toHaveBeenCalledWith("Outline connected");
 	});
 });
@@ -427,9 +432,10 @@ describe("Outline integration — with live push down, polling keeps a running s
 
 		renderContainer({ livePushUnavailable: true });
 
-		expect(await screen.findByText(/sync in progress/i)).toBeTruthy();
+		// The shared header's ActiveJobProgress narrates the running reconciliation.
+		expect(await screen.findByText(/reconciliation running/i)).toBeTruthy();
 		// No user interaction, no invalidation — only the refetchInterval can clear this.
-		await waitFor(() => expect(screen.queryByText(/sync in progress/i)).toBeNull(), {
+		await waitFor(() => expect(screen.queryByText(/reconciliation running/i)).toBeNull(), {
 			timeout: 8000,
 		});
 		expect(statusReads).toBeGreaterThanOrEqual(2);

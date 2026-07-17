@@ -1,17 +1,7 @@
 import { differenceInCalendarDays, format } from "date-fns";
-import {
-	CheckIcon,
-	CircleAlertIcon,
-	FileTextIcon,
-	KeyRoundIcon,
-	RefreshCwIcon,
-	TriangleAlertIcon,
-	WebhookIcon,
-	ZapOffIcon,
-} from "lucide-react";
+import { CheckIcon, CircleAlertIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import type { OutlineTokenStatus } from "@/api/types.gen";
-import { OutlineIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -24,51 +14,18 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { ConnectionHealthBadge } from "../ConnectionHealthBadge";
-import { ConnectionStateNotice } from "../ConnectionStateNotice";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
 import { RelativeTime } from "../RelativeTime";
-import {
-	asDate,
-	CONNECTION_STATE_LABEL,
-	type ConnectionHealth,
-	type ConnectionState,
-} from "../sync-format";
+import { asDate, CONNECTION_STATE_LABEL, type ConnectionState } from "../sync-format";
 
 export interface OutlineConnectInput {
 	serverUrl: string;
 	token: string;
-}
-
-/**
- * Connection-level sync summary for the card, composed by the container from the unified
- * `ConnectionSyncStatus` (health/webhook/lastSuccessfulSyncAt/activeJob) plus a document-count
- * rollup derived from the mirrored-collections list. Outline's old bespoke
- * `GET /connections/outline/status` DTO was absorbed into the unified sync API.
- */
-export interface OutlineSyncSummary {
-	webhookRegistered?: boolean;
-	/**
-	 * Total mirrored documents across the connection's collections. Absent when the collections query
-	 * never resolved (a non-ACTIVE connection gates it off) — the card must then render nothing rather
-	 * than a fabricated "0 documents mirrored" for a count that was never actually read.
-	 */
-	documentCount?: number;
-	lastSyncedAt?: Date | string;
-	syncRunning: boolean;
-	erroredCollections: number;
 }
 
 export interface OutlineConnectCardProps {
@@ -79,25 +36,15 @@ export interface OutlineConnectCardProps {
 	 */
 	connectionState?: ConnectionState;
 	connectionLabel?: string;
-	/** Derived connection health, from the unified sync status. Absent until that status resolves. */
-	health?: ConnectionHealth;
-	status?: OutlineSyncSummary;
-	isStatusLoading?: boolean;
 	tokenStatus?: OutlineTokenStatus;
 	isTokenStatusLoading?: boolean;
 	isConnecting?: boolean;
 	isDisconnecting?: boolean;
-	isSyncing?: boolean;
-	syncDisabled?: boolean;
-	isCancelling?: boolean;
-	cancelRequested?: boolean;
 	errorMessage?: string;
 	/** This instance has no Outline integration, so the connect form is a dead end and the card says so. */
 	connectUnavailable?: boolean;
 	onConnect: (input: OutlineConnectInput) => void;
 	onDisconnect: () => void;
-	onSyncNow: () => void;
-	onCancel: () => void;
 }
 
 // Client-side format hint only — the server re-validates the URL through the SSRF guard on connect.
@@ -108,31 +55,28 @@ const CLOUD_SERVER_URL = "https://app.getoutline.com";
 const EXPIRY_WARNING_DAYS = 14;
 
 /**
- * Workspace-admin card for the Outline integration: captures the server URL and API token when disconnected,
- * and shows the linked instance, health, token state, sync and a guarded disconnect when connected. Which
- * collections are mirrored is managed in {@link OutlineCollectionsSection}. Pure presentation.
+ * The Outline lifecycle card — the one piece with no SCM/Slack analogue, because Outline is an
+ * API-token paste rather than an OAuth install.
+ *
+ * When disconnected it is the connect form (server URL + API token). When connected it names the
+ * linked instance and shows the stored token's health plus a guarded disconnect; the connection plane
+ * itself — health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls —
+ * lives in the shared {@link import("../SyncStatusHeader").SyncStatusHeader} above this card, and which
+ * collections are mirrored is managed in {@link import("./OutlineCollectionsSection").OutlineCollectionsSection}
+ * below it. Pure presentation.
  */
 export function OutlineConnectCard({
 	connected,
 	connectionState,
 	connectionLabel,
-	health,
-	status,
-	isStatusLoading = false,
 	tokenStatus,
 	isTokenStatusLoading = false,
 	isConnecting = false,
 	isDisconnecting = false,
-	isSyncing = false,
-	syncDisabled = false,
-	isCancelling = false,
-	cancelRequested = false,
 	errorMessage,
 	connectUnavailable = false,
 	onConnect,
 	onDisconnect,
-	onSyncNow,
-	onCancel,
 }: OutlineConnectCardProps) {
 	const [serverUrl, setServerUrl] = useState("");
 	const [token, setToken] = useState("");
@@ -147,20 +91,16 @@ export function OutlineConnectCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<IntegrationCardHeading className="flex items-center gap-2">
-						<OutlineIcon className="size-4" aria-hidden />
-						Outline documentation
+					<IntegrationCardHeading>
+						{connected ? "Outline connection" : "Connect Outline"}
 					</IntegrationCardHeading>
-					{connected && health && (
-						<CardAction>
-							<ConnectionHealthBadge health={health} isSyncing={status?.syncRunning === true} />
-						</CardAction>
+					{!connected && (
+						<CardDescription>
+							Mirror Outline collections so their design docs and decision records reach practice
+							detection as context. Use a dedicated bot-user API token; after connecting you choose
+							exactly which collections are mirrored.
+						</CardDescription>
 					)}
-					<CardDescription>
-						Mirror Outline collections so their design docs and decision records reach practice
-						detection as context. Use a dedicated bot-user API token; after connecting you choose
-						exactly which collections are mirrored.
-					</CardDescription>
 				</CardHeader>
 
 				<CardContent className="space-y-4">
@@ -228,8 +168,9 @@ export function OutlineConnectCard({
 						</FieldGroup>
 					) : (
 						<>
-							{/* The green check is a claim that syncing works, so it is spent only on ACTIVE. Any
-							    other state gets the shared notice below, which says what stopped and what to do. */}
+							{/* Which Outline instance is linked — the one fact the connection plane above doesn't
+							    carry. The green check is a claim that syncing works, so it is spent only on ACTIVE;
+							    any other state is explained by the shared notice above this card. */}
 							<div className="flex items-center gap-2 text-sm">
 								{isConnectionActive ? (
 									<CheckIcon className="size-4 text-success" aria-hidden />
@@ -242,88 +183,15 @@ export function OutlineConnectCard({
 								</span>
 							</div>
 
-							<ConnectionStateNotice connectionState={connectionState} displayName="Outline" />
-
-							{isStatusLoading ? (
-								<Skeleton className="h-5 w-full max-w-md" />
-							) : (
-								status && (
-									<>
-										<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-											{status.webhookRegistered ? (
-												<span className="flex items-center gap-1.5">
-													<WebhookIcon className="size-4 text-success" aria-hidden />
-													Webhook registered
-												</span>
-											) : (
-												<span className="flex items-center gap-1.5">
-													<ZapOffIcon className="size-4" aria-hidden />
-													Polling only — webhook not registered
-												</span>
-											)}
-											{typeof status.documentCount === "number" && (
-												<span className="flex items-center gap-1.5">
-													<FileTextIcon className="size-4" aria-hidden />
-													{status.documentCount} document{status.documentCount === 1 ? "" : "s"}{" "}
-													mirrored
-												</span>
-											)}
-											<span>
-												{status.lastSyncedAt ? (
-													<>
-														Last synced <RelativeTime value={status.lastSyncedAt} />
-													</>
-												) : (
-													"Not synced yet"
-												)}
-											</span>
-											{status.syncRunning && (
-												<span className="flex items-center gap-1.5">
-													<RefreshCwIcon className="size-4 animate-spin" aria-hidden />
-													Sync in progress…
-												</span>
-											)}
-										</div>
-										{status.erroredCollections > 0 && (
-											<p className="flex items-center gap-1.5 text-sm text-destructive">
-												<TriangleAlertIcon className="size-4" aria-hidden />
-												{status.erroredCollections} collection
-												{status.erroredCollections === 1 ? "" : "s"} hit a sync error — check the
-												collections list below.
-											</p>
-										)}
-									</>
-								)
-							)}
-
 							<OutlineTokenPanel tokenStatus={tokenStatus} isLoading={isTokenStatusLoading} />
 						</>
 					)}
 				</CardContent>
 
 				{connected && (
-					<CardFooter className="justify-between gap-2">
-						<div className="flex flex-wrap gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={onSyncNow}
-								disabled={syncDisabled || isSyncing || status?.syncRunning === true}
-							>
-								{isSyncing ? <Spinner /> : <RefreshCwIcon className="size-4" />}
-								{isSyncing ? "Starting sync…" : "Sync now"}
-							</Button>
-							{status?.syncRunning && (
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={onCancel}
-									disabled={isCancelling || cancelRequested}
-								>
-									{cancelRequested ? "Stopping after current collection…" : "Cancel"}
-								</Button>
-							)}
-						</div>
+					// Disconnect is a destructive lifecycle action, so it stands alone in its own footer —
+					// never on the same row as Sync-now (which now lives in the header above).
+					<CardFooter className="justify-end">
 						<Button
 							variant="destructive-outline"
 							size="sm"

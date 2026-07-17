@@ -15,10 +15,8 @@ import {
 	updateOutlineCollectionStateMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { OutlineMirrorState } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
-import type {
-	OutlineConnectInput,
-	OutlineSyncSummary,
-} from "@/components/admin/integrations/outline/OutlineConnectCard";
+import type { OutlineConnectInput } from "@/components/admin/integrations/outline/OutlineConnectCard";
+import type { SyncStatusHeaderProps } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -48,7 +46,6 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	});
 	const {
 		data: connectionStatus,
-		isLoading: isStatusLoading,
 		error: statusError,
 		refetch: refetchStatus,
 	} = useQuery({
@@ -234,19 +231,32 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		await removeCollection.mutateAsync({ path: { workspaceSlug, collectionId } });
 	};
 
-	// The collections query is gated on `isConnectionActive`, so for a SUSPENDED/UNINSTALLED
-	// connection it never runs and `data` is undefined. Summing `(collections ?? [])` there would
-	// print a confident "0 documents mirrored" for a count that was never actually read — leave it
-	// undefined so the card renders nothing rather than a fabricated zero.
-	const documentCount = collections
-		? collections.reduce((sum, collection) => sum + collection.documentCount, 0)
-		: undefined;
-	const syncSummary: OutlineSyncSummary | undefined = connectionStatus && {
-		webhookRegistered: connectionStatus.webhookRegistered,
-		documentCount,
-		lastSyncedAt: connectionStatus.lastSuccessfulSyncAt,
-		syncRunning: connectionStatus.activeJob != null,
-		erroredCollections: connectionStatus.resourceCounts.errored,
+	// The connection plane is now the shared `SyncStatusHeader`, driven by the raw unified status —
+	// health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls all
+	// come from it, exactly as on the SCM and Slack pages. Outline exposes no backfill affordance, so
+	// `onBackfill` is intentionally omitted and the split button never appears.
+	const syncStatusHeaderProps: Omit<SyncStatusHeaderProps, "label"> = {
+		status: connectionStatus,
+		isConnectionActive,
+		// Outline's only manual trigger is a reconciliation, so a bare `isPending` names it exactly.
+		triggeringType: syncNow.isPending ? "RECONCILIATION" : null,
+		isCancelling: cancelJob.isPending,
+		onRetry: () => refetchStatus(),
+		onSync: () => {
+			if (connectionId == null) return;
+			syncNow.mutate({
+				path: { workspaceSlug, connectionId },
+				body: { type: "RECONCILIATION" },
+			});
+		},
+		onCancel: () => {
+			const jobId = connectionStatus?.activeJob?.id;
+			if (connectionId == null || jobId == null) return;
+			cancelJob.mutate({
+				path: { workspaceSlug, connectionId, jobId },
+				body: { cancelRequested: true },
+			});
+		},
 	};
 
 	return {
@@ -254,52 +264,33 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		// see what the last run did before it stopped. Sync CONTROLS stay gated (see isConnectionActive);
 		// reading history is safe and the sibling integrations already show theirs in this state.
 		connectionId,
-		health: connectionStatus?.health,
+		hasConnection,
+		isConnectionActive,
+		connectionState: outlineConnection?.state,
 		// Lets the route poll its job-history query on the same adaptive cadence as the rest.
 		hasActiveJob: connectionStatus?.activeJob != null,
 		isLoading: connectionsQuery.isLoading,
 		connectionsError: connectionsQuery.error,
 		retryConnections: () => connectionsQuery.refetch(),
+		// The raw unified status; the route gates the shared header on its presence, exactly as Slack does.
+		status: connectionStatus,
 		statusError,
 		retryStatus: () => refetchStatus(),
 		tokenStatusError,
 		retryTokenStatus: () => refetchTokenStatus(),
+		syncStatusHeaderProps,
 		connectCardProps: {
 			connected: hasConnection,
 			connectionState: outlineConnection?.state,
 			connectionLabel: outlineConnection?.displayName,
-			// Health sits with the freshness it judges, not in the page header — the same move the SCM and
-			// Slack pages make into SyncStatusHeader; Outline's connection plane is this card.
-			health: connectionStatus?.health,
-			status: syncSummary,
-			isStatusLoading: hasConnection && isStatusLoading,
 			tokenStatus,
 			isTokenStatusLoading: hasConnection && isTokenStatusLoading,
 			isConnecting: connect.isPending,
 			isDisconnecting: disconnect.isPending,
-			isSyncing: syncNow.isPending,
-			syncDisabled: !isConnectionActive || statusError != null || connectionStatus == null,
-			isCancelling: cancelJob.isPending,
-			cancelRequested: connectionStatus?.activeJob?.cancelRequested,
 			errorMessage: connectErrorMessage,
 			connectUnavailable,
 			onConnect: handleConnect,
 			onDisconnect: handleDisconnect,
-			onSyncNow: () => {
-				if (connectionId == null) return;
-				syncNow.mutate({
-					path: { workspaceSlug, connectionId },
-					body: { type: "RECONCILIATION" },
-				});
-			},
-			onCancel: () => {
-				const jobId = connectionStatus?.activeJob?.id;
-				if (connectionId == null || jobId == null) return;
-				cancelJob.mutate({
-					path: { workspaceSlug, connectionId, jobId },
-					body: { cancelRequested: true },
-				});
-			},
 		},
 		collectionsProps: isConnectionActive
 			? {

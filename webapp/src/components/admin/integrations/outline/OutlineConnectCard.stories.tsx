@@ -3,9 +3,11 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { OutlineConnectCard } from "./OutlineConnectCard";
 
 /**
- * Workspace-admin card for the Outline documentation integration. Pure presentation — connect,
- * disconnect and sync-now are delegated to the container via callbacks, so every story is one
- * immutable snapshot.
+ * Outline's token-paste lifecycle card — the one piece with no SCM/Slack analogue. When disconnected
+ * it is the connect form (server URL + API token); when connected it names the linked instance and
+ * shows the stored token's health plus a guarded disconnect. The connection plane (health, freshness,
+ * diagnostics, Sync/Cancel) lives in the shared `SyncStatusHeader` above this card on the real page, so
+ * every story here is one immutable snapshot of connect / token / disconnect only.
  */
 const meta = {
 	component: OutlineConnectCard,
@@ -15,8 +17,6 @@ const meta = {
 		connected: false,
 		onConnect: fn(),
 		onDisconnect: fn(),
-		onSyncNow: fn(),
-		onCancel: fn(),
 	},
 } satisfies Meta<typeof OutlineConnectCard>;
 
@@ -25,14 +25,6 @@ type Story = StoryObj<typeof meta>;
 
 const inDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
-const healthyStatus = {
-	webhookRegistered: true,
-	documentCount: 128,
-	lastSyncedAt: new Date(Date.now() - 15 * 60 * 1000),
-	syncRunning: false,
-	erroredCollections: 0,
-};
 
 /** A token Outline accepts, whose key metadata it also lets us read. */
 const healthyToken = {
@@ -109,33 +101,26 @@ export const ConnectUnavailable: Story = {
 };
 
 /**
- * Connected and healthy — webhook live, document count, relative last sync, healthy token.
- *
- * The health badge sits here rather than in the page header: health and the freshness it judges belong
- * together, and Outline's connection plane is this card (the SCM and Slack pages make the same move
- * into `SyncStatusHeader`). It also stops the badge popping into the header late, once the status
- * query resolves under a heading that had already painted.
+ * Connected and healthy — the linked instance is named and the stored token is accepted, with its
+ * metadata and expiry. Health/freshness/webhook and the Sync controls are not here: they live in the
+ * shared `SyncStatusHeader` above this card on the page.
  */
 export const Connected: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		health: "HEALTHY",
-		status: healthyStatus,
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Healthy");
-		await expect(canvas.getByText(/outline connected/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/acme wiki/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/webhook registered/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/128 documents mirrored/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/outline connected — acme wiki/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/outline accepts this token/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/hephaestus mirror/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/…9f2c/)).toBeInTheDocument();
 		await expect(canvas.getByText(/expires in \d+ days \(on /i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: /disconnect outline/i })).toBeEnabled();
+		// The connection plane's Sync control is not in this card.
+		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
 	},
 };
 
@@ -144,7 +129,6 @@ export const TokenNeverExpires: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: { accepted: true, name: "Hephaestus mirror", last4: "9f2c" },
 	},
 	play: async ({ canvasElement }) => {
@@ -162,7 +146,6 @@ export const TokenExpiringSoon: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: { ...healthyToken, expiresAt: inDays(5) },
 	},
 	play: async ({ canvasElement }) => {
@@ -178,7 +161,6 @@ export const TokenRejected: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: { ...healthyStatus, webhookRegistered: false },
 		tokenStatus: { accepted: false },
 	},
 	play: async ({ canvasElement }) => {
@@ -198,7 +180,6 @@ export const TokenMetadataUnavailable: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: { accepted: true },
 	},
 	play: async ({ canvasElement }) => {
@@ -210,84 +191,11 @@ export const TokenMetadataUnavailable: Story = {
 	},
 };
 
-/** Degraded: the webhook subscription is missing — updates arrive by polling only. */
-export const ConnectedPollingOnly: Story = {
-	args: {
-		connected: true,
-		connectionLabel: "Acme Wiki",
-		status: {
-			webhookRegistered: false,
-			documentCount: 0,
-			syncRunning: false,
-			erroredCollections: 0,
-		},
-		tokenStatus: healthyToken,
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/polling only/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/not synced yet/i)).toBeInTheDocument();
-	},
-};
-
-/**
- * A non-ACTIVE connection gates off the collections query, so the document rollup never resolves and
- * the container passes `documentCount: undefined`. The card must then render nothing rather than a
- * confident "0 documents mirrored" for a count that was never actually read.
- */
-export const ConnectedCountUnavailable: Story = {
-	args: {
-		connected: true,
-		connectionState: "SUSPENDED",
-		connectionLabel: "Acme Wiki",
-		status: { webhookRegistered: false, syncRunning: false, erroredCollections: 0 },
-		tokenStatus: healthyToken,
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.queryByText(/documents mirrored/i)).not.toBeInTheDocument();
-		await expect(canvas.queryByText(/^0 documents/i)).not.toBeInTheDocument();
-		// The suspended notice still shows — the count is absent, not the whole status strip.
-		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
-	},
-};
-
-/** A full reconcile has just been requested — the Sync-now action is held down. */
-export const Syncing: Story = {
-	args: {
-		connected: true,
-		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
-		tokenStatus: healthyToken,
-		isSyncing: true,
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /starting sync/i })).toBeDisabled();
-	},
-};
-
-/** A server-side reconcile is running and one collection carries a sync error. */
-export const SyncRunningWithErrors: Story = {
-	args: {
-		connected: true,
-		connectionLabel: "Acme Wiki",
-		status: { ...healthyStatus, syncRunning: true, erroredCollections: 1 },
-		tokenStatus: healthyToken,
-	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/sync in progress/i)).toBeVisible();
-		await expect(canvas.getByText(/1 collection hit a sync error/i)).toBeVisible();
-	},
-};
-
 /** Connected — opening the disconnect dialog surfaces the erase warning + destructive confirm. */
 export const ConnectedDisconnectDialog: Story = {
 	args: {
 		connected: true,
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {
@@ -303,54 +211,49 @@ export const ConnectedDisconnectDialog: Story = {
 };
 
 /**
- * The provider suspended the connection. The status strip used to lowercase the wire enum into
- * "Outline suspended" *next to a green check* — the token said one thing and the icon said the
- * opposite. The check is now spent only on ACTIVE, and the shared notice explains the consequence.
+ * The provider suspended the connection. The identity line lowercases nothing — it reads the wire enum
+ * through `CONNECTION_STATE_LABEL` and drops the green check (spent only on ACTIVE). The consequence
+ * ("Syncing is paused…") is explained by the shared `ConnectionStateNotice` above this card on the page.
  */
 export const ConnectedButSuspended: Story = {
 	args: {
 		connected: true,
 		connectionState: "SUSPENDED",
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/outline suspended — acme wiki/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/reconnect to resume/i)).toBeInTheDocument();
+		// The token panel still reports the stored key even while syncing is paused.
+		await expect(canvas.getByText(/outline accepts this token/i)).toBeInTheDocument();
 	},
 };
 
-/** Setup hasn't finished — stated plainly, since PENDING resolves on its own. */
+/** Setup hasn't finished — the identity line states PENDING plainly, since it resolves on its own. */
 export const ConnectedButPending: Story = {
 	args: {
 		connected: true,
 		connectionState: "PENDING",
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/outline finishing setup — acme wiki/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/isn't live yet/i)).toBeInTheDocument();
 	},
 };
 
-/** ACTIVE keeps the green check and says nothing extra — the steady state stays quiet. */
+/** ACTIVE keeps the green check and names the linked instance — the steady state stays quiet. */
 export const ConnectedActiveState: Story = {
 	args: {
 		connected: true,
 		connectionState: "ACTIVE",
 		connectionLabel: "Acme Wiki",
-		status: healthyStatus,
 		tokenStatus: healthyToken,
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/outline connected — acme wiki/i)).toBeInTheDocument();
-		await expect(canvas.queryByText(/syncing is paused/i)).not.toBeInTheDocument();
 	},
 };

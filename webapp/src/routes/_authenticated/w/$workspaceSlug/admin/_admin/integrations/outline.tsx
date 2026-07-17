@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { listConnectionSyncJobsOptions } from "@/api/@tanstack/react-query.gen";
+import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
 import { OutlineCollectionsSection } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "@/components/admin/integrations/outline/OutlineConnectCard";
+import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { OutlineIcon } from "@/components/icons/brand";
@@ -68,7 +70,7 @@ function OutlineIntegrationPage() {
 
 			{workspaceSlug != null && !outline.isLoading && !outline.connectionsError && (
 				<>
-					{outline.statusError && (
+					{outline.hasConnection && outline.statusError && (
 						<QueryErrorAlert
 							error={outline.statusError}
 							title="We couldn't load Outline sync status"
@@ -82,12 +84,27 @@ function OutlineIntegrationPage() {
 							onRetry={outline.retryTokenStatus}
 						/>
 					)}
-					<div className="space-y-10">
-						<OutlineConnectCard {...outline.connectCardProps} />
-						{outline.collectionsProps && (
-							<OutlineCollectionsSection {...outline.collectionsProps} />
-						)}
-					</div>
+
+					{/* A suspended/uninstalled connection paints an otherwise normal-looking header; the shared
+					    notice is what says sync stopped and why — the same explanation Slack and SCM show. */}
+					{outline.hasConnection && !outline.isConnectionActive && (
+						<ConnectionStateNotice
+							connectionState={outline.connectionState}
+							displayName="Outline"
+						/>
+					)}
+
+					{/* The connection plane: health, freshness, diagnostics and the Sync/Cancel controls. Gated
+					    on the status being present, exactly as the Slack page gates its header. */}
+					{outline.status && (
+						<SyncStatusHeader label="Outline" {...outline.syncStatusHeaderProps} />
+					)}
+
+					{/* Outline's token-paste lifecycle: the connect form when disconnected, the linked instance
+					    + token health + a guarded disconnect when connected. */}
+					<OutlineConnectCard {...outline.connectCardProps} />
+
+					{outline.collectionsProps && <OutlineCollectionsSection {...outline.collectionsProps} />}
 				</>
 			)}
 
