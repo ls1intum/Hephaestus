@@ -103,6 +103,7 @@ public class GitlabDataSyncScheduler {
     private final Executor monitoringExecutor;
     private final ConnectionRepository connectionRepository;
     private final SyncJobService syncJobService;
+    private final GitLabDeletionSweepService deletionSweepService;
 
     public GitlabDataSyncScheduler(
         SyncTargetProvider syncTargetProvider,
@@ -114,7 +115,8 @@ public class GitlabDataSyncScheduler {
         SyncSchedulerProperties syncSchedulerProperties,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor,
         ConnectionRepository connectionRepository,
-        SyncJobService syncJobService
+        SyncJobService syncJobService,
+        GitLabDeletionSweepService deletionSweepService
     ) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
@@ -126,6 +128,7 @@ public class GitlabDataSyncScheduler {
         this.monitoringExecutor = monitoringExecutor;
         this.connectionRepository = connectionRepository;
         this.syncJobService = syncJobService;
+        this.deletionSweepService = deletionSweepService;
     }
 
     @PostConstruct
@@ -191,15 +194,21 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    /** Run the same warning-aware body used by the scheduled path for one manual job. */
-    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle) {
+    /**
+     * Run the same warning-aware body used by the scheduled path for one manual job.
+     *
+     * <p>{@code type} is forwarded rather than dropped: it is what decides whether the body ends with a
+     * deletion sweep, and it is the only difference between an {@code INITIAL} and a
+     * {@code RECONCILIATION} run.
+     */
+    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle, SyncJobType type) {
         SyncSession session = syncTargetProvider
             .getSyncSessions(IntegrationKind.GITLAB)
             .stream()
             .filter(candidate -> candidate.scopeId().equals(workspaceId))
             .findFirst()
             .orElseThrow(() -> new IllegalStateException("No active GitLab sync scope for workspace " + workspaceId));
-        syncScope(session, handle);
+        syncScope(session, handle, type);
     }
 
     /**
@@ -237,7 +246,7 @@ public class GitlabDataSyncScheduler {
                     SyncJobTrigger.SCHEDULED,
                     null
                 ),
-                handle -> syncScope(session, handle)
+                handle -> syncScope(session, handle, SyncJobType.RECONCILIATION)
             );
         } catch (SyncJobConflictException e) {
             log.info(
@@ -250,7 +259,8 @@ public class GitlabDataSyncScheduler {
 
     /** Unrecorded fallback (no ACTIVE connection to attach a job to): run to completion, no handle. */
     private void syncScope(SyncSession session) {
-        syncScope(session, null);
+        // The unrecorded cron fallback is still a reconciliation pass — sweep deletions like the recorded one.
+        syncScope(session, null, SyncJobType.RECONCILIATION);
     }
 
     /**
@@ -260,7 +270,7 @@ public class GitlabDataSyncScheduler {
      * the SCM manual runner. A cancel observed during the repo phase skips the remaining post-repo/team
      * phases. The unrecorded fallback passes {@code null} and simply runs to completion.
      */
-    private void syncScope(SyncSession session, @Nullable SyncExecutionHandle handle) {
+    private void syncScope(SyncSession session, @Nullable SyncExecutionHandle handle, SyncJobType type) {
         Long scopeId = session.scopeId();
         String safeLogin = sanitizeForLog(session.accountLogin());
 
@@ -306,6 +316,28 @@ public class GitlabDataSyncScheduler {
 
                 // Phase 5: Sync teams (subgroups)
                 syncTeams(services, session, handle);
+
+                // Phase 6: Deletion sweep — RECONCILIATION only, and the one thing that makes
+                // RECONCILIATION different from INITIAL. Every phase above only ever upserts, so an
+                // issue or merge request deleted upstream would otherwise survive here forever and keep
+                // inflating the per-project counts — and GitLab emits no issue/MR-deletion webhook at
+                // all, so there is not even a missed event that could heal it.
+                //
+                // Not on INITIAL: a mirror still being populated has nothing stale in it, and every row
+                // not fetched yet would read as an upstream deletion to a set difference.
+                //
+                // Last, deliberately: the sweep's set difference is only meaningful against a mirror that
+                // has already had this run's upserts applied. Sweeping first would race the fetch and
+                // tombstone rows that were about to arrive.
+                if (type == SyncJobType.RECONCILIATION) {
+                    GitLabDeletionSweepService.SweepOutcome sweep = deletionSweepService.sweepScope(scopeId, handle);
+                    if (sweep.skipped()) {
+                        // At least one project's upstream listing could not be proven complete, so its
+                        // deletions are still outstanding. Surface it rather than reporting a clean
+                        // reconciliation that did not fully reconcile.
+                        reportWarning(handle);
+                    }
+                }
             }
 
             // A still-set cancel flag means the repo phase aborted on a checkpoint; declare it so the job

@@ -443,6 +443,18 @@ class SyncStatusServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void triggerSync_initialType_throwsStateConflictAndRecordsNoJob() {
+        // INITIAL is lifecycle-owned: a manual INITIAL on a mature connection would run a full sync that
+        // silently skips the deletion sweep and record a bogus INITIAL/MANUAL job. Only RECONCILIATION
+        // and BACKFILL are client-triggerable — reject INITIAL before any job row is begun.
+        assertThatThrownBy(() ->
+            service.triggerSync(WORKSPACE_ID, CONNECTION_ID, SyncJobType.INITIAL, null)
+        ).isInstanceOf(SyncStateConflictException.class);
+
+        verify(syncJobService, never()).beginJob(any());
+    }
+
+    @Test
     void triggerSync_newJob_dispatchesAsyncAndReturnsCreatedTrue() {
         SyncJob created = pendingJob();
         SyncJobService.Started started = new SyncJobService.Started(created, null);

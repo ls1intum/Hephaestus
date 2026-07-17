@@ -40,12 +40,14 @@ public enum SyncJobType {
      *   <li><strong>Outline</strong> — genuinely tombstones. Every clean enumeration retires the
      *       mirrored documents it did not see ({@code OutlineDocumentSyncService.tombstoneVanished});
      *       a budget-exhausted pass skips tombstoning rather than guess.
-     *   <li><strong>GitLab</strong> — <em>no deletion repair at all.</em>
-     *       {@code GitlabIntegrationSyncRunner.reconcile} ignores the type, there is no sweep, and
-     *       no {@code processDeleted} handler exists on any GitLab path. Both the UI trigger and
-     *       the cron nonetheless record this type, so a GitLab job reading
-     *       "Reconciliation · Succeeded" means only "re-read upstream" — it cannot remove anything,
-     *       and a GitLab issue/MR deleted upstream stays in the mirror indefinitely.
+     *   <li><strong>GitLab</strong> — a true sweep, mirroring GitHub.
+     *       {@code GitLabDeletionSweepService} set-differences the full upstream issue/merge-request
+     *       IID set (number-only GraphQL queries) against the local mirror and tombstones what
+     *       upstream no longer has. Fail-closed: it removes nothing for a project whose upstream
+     *       listing it cannot prove complete. This is the only thing separating this type from
+     *       {@link #INITIAL} on GitLab, and it matters even more than on GitHub — GitLab emits no
+     *       issue- or merge-request-deletion webhook at all, so there is not even a missed event that
+     *       could otherwise heal the drift.
      *   <li><strong>Slack</strong> — no sweep by design. Deletions arrive solely via the
      *       {@code message_deleted} event; history pagination cannot distinguish a deleted message
      *       from a truncated page, a filtered subtype or a thread reply, so inferring deletion from

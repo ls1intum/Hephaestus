@@ -77,6 +77,9 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
     private SyncJobService syncJobService;
 
     @Mock
+    private GitLabDeletionSweepService deletionSweepService;
+
+    @Mock
     private SyncJobHandle syncJobHandle;
 
     private GitlabDataSyncScheduler scheduler;
@@ -109,7 +112,8 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
             syncProps,
             synchronousExecutor,
             connectionRepository,
-            syncJobService
+            syncJobService,
+            deletionSweepService
         );
 
         // syncScope's first real step: no GitLabSyncServiceHolder available -> it logs and returns
@@ -227,6 +231,64 @@ class GitlabDataSyncSchedulerTest extends BaseUnitTest {
         assertThatCode(() -> scheduler.syncDataCron()).doesNotThrowAnyException();
 
         verify(syncServiceHolderProvider, never()).getIfAvailable();
+    }
+
+    @Test
+    void shouldRunDeletionSweepLastOnReconciliation() {
+        // With the service holder present, syncScope runs to completion and ends with the sweep. A
+        // RECONCILIATION job must invoke it — this is the whole point of the type on GitLab.
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
+        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+        when(deletionSweepService.sweepScope(eq(WORKSPACE_ID), any())).thenReturn(
+            new GitLabDeletionSweepService.SweepOutcome(0, 0, false)
+        );
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
+
+        verify(deletionSweepService).sweepScope(eq(WORKSPACE_ID), eq(syncJobHandle));
+    }
+
+    @Test
+    void shouldNotRunDeletionSweepOnInitial() {
+        // INITIAL populates a fresh mirror; there is nothing stale in it and every not-yet-fetched row
+        // would look deleted. It must skip the sweep entirely — otherwise a manual INITIAL on a mature
+        // connection would mass-tombstone.
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
+        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
+
+        verify(deletionSweepService, never()).sweepScope(any(), any());
+    }
+
+    @Test
+    void shouldReportWarningsWhenSweepCouldNotVerifyEveryProject() {
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
+        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+        when(deletionSweepService.sweepScope(eq(WORKSPACE_ID), any())).thenReturn(
+            new GitLabDeletionSweepService.SweepOutcome(0, 0, true)
+        );
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
+
+        verify(syncJobHandle).reportWarnings();
+    }
+
+    @Test
+    void shouldNotRunDeletionSweepWhenCancelledDuringRepositoryPhase() {
+        // A cancel observed during the repo phase skips the remaining phases, the sweep included.
+        when(syncServiceHolderProvider.getIfAvailable()).thenReturn(mockHolder());
+        lenient().when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of());
+        when(syncJobHandle.isCancellationRequested()).thenReturn(true);
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.RECONCILIATION);
+
+        verify(deletionSweepService, never()).sweepScope(any(), any());
+    }
+
+    /** A holder whose every sub-service is null, so all sync phases no-op and the run reaches the sweep. */
+    private static GitLabSyncServiceHolder mockHolder() {
+        return org.mockito.Mockito.mock(GitLabSyncServiceHolder.class);
     }
 
     private SyncJob existingActiveJob(Connection connection) {

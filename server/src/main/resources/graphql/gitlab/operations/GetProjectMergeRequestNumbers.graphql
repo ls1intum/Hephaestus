@@ -1,0 +1,26 @@
+# Full upstream merge-request-IID listing for one project — the upstream half of the RECONCILIATION
+# deletion sweep's set difference (GitLabDeletionSweepService). The merge-request counterpart of
+# GetProjectIssueNumbers; see that file for the full rationale.
+#
+# GitLab emits no merge-request deletion webhook — the action does not exist — so, exactly as with
+# GitHub pull requests, this sweep is the ONLY mechanism by which a vanished merge request is ever
+# noticed. A missed webhook cannot heal it because there is no event to redeliver.
+#
+# Selects `iid` only, plus the connection `count` that authorizes deletion; `sort: CREATED_ASC` for
+# the same append-only stability GetProjectIssueNumbers relies on. No `state:` filter, so MERGED and
+# CLOSED merge requests are enumerated too — filtering here would make every filtered-out MR look
+# deleted.
+query GetProjectMergeRequestNumbers($fullPath: ID!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        mergeRequests(first: $first, after: $after, sort: CREATED_ASC) {
+            count
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                iid
+            }
+        }
+    }
+}

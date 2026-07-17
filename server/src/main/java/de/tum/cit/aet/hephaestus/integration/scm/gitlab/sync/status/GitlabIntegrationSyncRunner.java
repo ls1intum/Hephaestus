@@ -38,11 +38,18 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
         return IntegrationKind.GITLAB;
     }
 
-    /** GitLab has no deletion sweep yet — {@code type} is unused here. The GitHub sweep
-     * (GitHubDeletionSweepService) is the model if one is added. */
+    /**
+     * The same warning-aware body the daily scheduler uses, threaded with the job handle.
+     *
+     * <p>{@code type} is forwarded rather than dropped: it is what decides whether the body ends with a
+     * deletion sweep ({@code GitLabDeletionSweepService}). A {@code RECONCILIATION} run set-differences
+     * the full upstream issue/merge-request IID set against the local mirror and tombstones what
+     * upstream no longer has (fail-closed); an {@code INITIAL} run does not, because a mirror still
+     * being populated has nothing stale in it. This is the only difference between the two on GitLab.
+     */
     @Override
     public void reconcile(IntegrationRef ref, SyncExecutionHandle handle, SyncJobType type) {
-        dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
+        dataSyncScheduler.syncWorkspaceNow(ref.workspaceId(), handle, type);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }

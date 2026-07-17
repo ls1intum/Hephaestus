@@ -50,7 +50,7 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
-        verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
+        verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
         verify(handle).reportCancelled();
     }
 
@@ -61,7 +61,7 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
-        verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle);
+        verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
         verify(handle, never()).reportCancelled();
     }
 

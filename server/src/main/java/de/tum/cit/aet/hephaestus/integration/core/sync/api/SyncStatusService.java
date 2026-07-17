@@ -237,6 +237,18 @@ public class SyncStatusService {
                 Map.of("connectionId", connectionId, "connectionState", connection.getState())
             );
         }
+        // Only RECONCILIATION and BACKFILL are client-triggerable. INITIAL is lifecycle-owned: it runs
+        // once when a Connection goes ACTIVE and deliberately skips the deletion sweep (a mirror being
+        // populated has nothing stale in it). A manual INITIAL on a mature connection would run a full
+        // sync that silently omits the sweep AND record a bogus INITIAL/MANUAL job row, so reject it —
+        // as an allowlist, so any future non-client type is rejected by default rather than by omission.
+        if (type != SyncJobType.RECONCILIATION && type != SyncJobType.BACKFILL) {
+            throw new SyncStateConflictException(
+                "Cannot trigger a " + type + " sync: only RECONCILIATION and BACKFILL are client-triggerable",
+                Map.of("requestedType", type)
+            );
+        }
+
         IntegrationSyncRunner runner = runnerFor(connection.getKind());
         if (runner == null || (type == SyncJobType.BACKFILL && !runner.supportsBackfill())) {
             throw new SyncNotSupportedException(connection.getKind());
