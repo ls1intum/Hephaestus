@@ -39,6 +39,16 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
     Optional<Workspace> findByOrganization_Login(String login);
+
+    /**
+     * The provider id of the workspace's synced {@code Organization} — the {@code provider_id} its
+     * teams are stamped with at sync time (see {@link WorkspaceTeamScopeResolver}). Empty when there
+     * is no synced organization. A scalar projection, so it works on a detached workspace without
+     * initializing the lazy {@code organization} association.
+     */
+    @Query("SELECT w.organization.provider.id FROM Workspace w WHERE w.id = :workspaceId")
+    Optional<Long> findOrganizationProviderIdByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     Optional<Workspace> findByAccountLoginIgnoreCase(String login);
     List<Workspace> findAllByAccountLoginIgnoreCase(String login);
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
