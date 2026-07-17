@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -104,16 +105,12 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         return row;
     }
 
-    private void stubLiveCollections(
-        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection... collections
-    ) {
+    private void stubLiveCollections(OutlineCollectionModel... collections) {
         when(outlineApiClient.listCollections(SERVER_URL, TOKEN)).thenReturn(List.of(collections));
     }
 
     /** The candidates path runs under the bounded interactive page budget (5 pages), not the sync cap. */
-    private void stubCandidateCollections(
-        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection... collections
-    ) {
+    private void stubCandidateCollections(OutlineCollectionModel... collections) {
         when(outlineApiClient.listCollections(SERVER_URL, TOKEN, 5)).thenReturn(List.of(collections));
     }
 

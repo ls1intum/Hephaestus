@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -296,7 +296,7 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
         handler().onMessage(msg);
 
-        ArgumentCaptor<OutlineDocument> model = ArgumentCaptor.forClass(OutlineDocument.class);
+        ArgumentCaptor<OutlineDocumentModel> model = ArgumentCaptor.forClass(OutlineDocumentModel.class);
         verify(syncScheduler).refreshDocumentNow(eq(42L), eq("documents.update"), eq("doc-9"), model.capture());
         assertThat(model.getValue()).isNotNull();
         assertThat(model.getValue().getId()).isEqualTo("doc-9");

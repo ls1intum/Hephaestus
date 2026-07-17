@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSecretSource.SecretLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.WebhookRequest;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -178,7 +178,7 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         handler.onMessage(message);
 
         if (event.startsWith("documents.")) {
-            ArgumentCaptor<OutlineDocument> model = ArgumentCaptor.forClass(OutlineDocument.class);
+            ArgumentCaptor<OutlineDocumentModel> model = ArgumentCaptor.forClass(OutlineDocumentModel.class);
             verify(syncScheduler).refreshDocumentNow(eq(WORKSPACE_ID), eq(event), eq(payloadId), model.capture());
             // Every committed fixture carries a full payload.model — the HMAC-authenticated metadata the
             // handler now trusts, sparing the sync path its own documents.info round-trip.

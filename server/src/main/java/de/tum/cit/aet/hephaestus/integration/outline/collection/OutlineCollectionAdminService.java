@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionResolver;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
@@ -161,7 +162,7 @@ public class OutlineCollectionAdminService {
             return new RegistrationOutcome(false, toDto(install, existing.get()));
         }
 
-        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection live = outlineApiClient
+        OutlineCollectionModel live = outlineApiClient
             .listCollections(install.serverUrl(), requireToken(workspaceId))
             .stream()
             .filter(c -> collectionId.equals(c.getId()))

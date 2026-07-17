@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.sync.status;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
-import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepoBackfillProgress;
 import java.util.List;
 
 /**
@@ -33,10 +33,10 @@ public final class ScmBackfillRollup {
      * "Scheduled backfill" diagnostic asks about.
      *
      * @param scheduledBackfillEnabled whether the scheduled backfill cycle is enabled
-     * @param monitors                 the workspace's monitored-repository rows (may be empty)
+     * @param monitors                 the workspace's monitored-repository progress projections (may be empty)
      * @return a non-null {@link BackfillSummary} describing the rollup state and coarse percent
      */
-    public static BackfillSummary summarize(boolean scheduledBackfillEnabled, List<RepositoryToMonitor> monitors) {
+    public static BackfillSummary summarize(boolean scheduledBackfillEnabled, List<RepoBackfillProgress> monitors) {
         if (!scheduledBackfillEnabled) {
             return new BackfillSummary("DISABLED", null, null);
         }
@@ -48,14 +48,14 @@ public final class ScmBackfillRollup {
         boolean allComplete = true;
         long totalItems = 0;
         long doneItems = 0;
-        for (RepositoryToMonitor rtm : monitors) {
-            anyInitialized = anyInitialized || rtm.isBackfillInitialized();
-            allComplete = allComplete && rtm.isBackfillComplete();
+        for (RepoBackfillProgress rtm : monitors) {
+            anyInitialized = anyInitialized || rtm.initialized();
+            allComplete = allComplete && rtm.complete();
             int highWaterMark =
-                (rtm.getIssueBackfillHighWaterMark() != null ? rtm.getIssueBackfillHighWaterMark() : 0) +
-                (rtm.getPullRequestBackfillHighWaterMark() != null ? rtm.getPullRequestBackfillHighWaterMark() : 0);
+                (rtm.issueHighWaterMark() != null ? rtm.issueHighWaterMark() : 0) +
+                (rtm.pullRequestHighWaterMark() != null ? rtm.pullRequestHighWaterMark() : 0);
             totalItems += highWaterMark;
-            doneItems += Math.max(0, highWaterMark - rtm.getBackfillRemaining());
+            doneItems += Math.max(0, highWaterMark - rtm.remaining());
         }
 
         String state = allComplete ? "COMPLETE" : (anyInitialized ? "IN_PROGRESS" : "NOT_STARTED");

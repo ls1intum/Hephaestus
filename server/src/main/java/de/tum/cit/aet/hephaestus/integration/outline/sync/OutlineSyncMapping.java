@@ -1,8 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -17,9 +18,9 @@ import org.jspecify.annotations.Nullable;
  * business logic, and folding it in only inflates the class the reconcile's real decisions live in.
  *
  * <p>The wire types are the generated Outline models: {@link OutlineNavigationNode} for the collection tree
- * and {@link OutlineDocument} for per-document metadata. The mirror entity
- * ({@code de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument}) shares the {@code OutlineDocument}
- * simple name, so {@link #applyAuthorship} qualifies it to keep the wire model importable here.
+ * and {@link OutlineDocumentModel} for per-document metadata. The generated model carries the {@code Model}
+ * suffix precisely so it no longer collides with the mirror entity ({@link OutlineDocument}), letting
+ * {@link #applyAuthorship} take both by their plain imported simple names.
  */
 final class OutlineSyncMapping {
 
@@ -50,7 +51,7 @@ final class OutlineSyncMapping {
      * Keeping both paths' slug shape identical is what lets a reference extracted from a full Outline URL
      * (e.g. {@code setup-guide-psUl8qCles}) resolve a document regardless of which path last wrote the row.
      */
-    static @Nullable String resolveSlug(@Nullable FlatNode node, @Nullable OutlineDocument meta) {
+    static @Nullable String resolveSlug(@Nullable FlatNode node, @Nullable OutlineDocumentModel meta) {
         if (node != null && node.slug() != null) {
             return node.slug();
         }
@@ -82,10 +83,7 @@ final class OutlineSyncMapping {
      * the creator/last-editor pair misses. Only ever applied alongside a body — a metadata-only refresh
      * must not rewrite these columns.
      */
-    static void applyAuthorship(
-        de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument doc,
-        OutlineDocument meta
-    ) {
+    static void applyAuthorship(OutlineDocument doc, OutlineDocumentModel meta) {
         doc.setOutlineCreatedAt(meta.getCreatedAt());
         doc.setCreatedBySubject(meta.getCreatedBy() == null ? null : meta.getCreatedBy().getId());
         doc.setCreatedByName(meta.getCreatedBy() == null ? null : meta.getCreatedBy().getName());

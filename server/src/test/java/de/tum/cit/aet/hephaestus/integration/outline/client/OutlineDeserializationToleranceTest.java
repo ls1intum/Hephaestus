@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -65,11 +65,11 @@ class OutlineDeserializationToleranceTest {
             )
             .build();
 
-        OutlineEnvelope<OutlineDocument> envelope = stubbed
+        OutlineEnvelope<OutlineDocumentModel> envelope = stubbed
             .post()
             .uri("https://wiki.example.com/api/documents.info")
             .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<OutlineDocument>>() {})
+            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<OutlineDocumentModel>>() {})
             .block();
 
         assertThat(envelope).isNotNull();
@@ -102,11 +102,11 @@ class OutlineDeserializationToleranceTest {
             )
             .build();
 
-        OutlineEnvelope<List<OutlineDocument>> envelope = stubbed
+        OutlineEnvelope<List<OutlineDocumentModel>> envelope = stubbed
             .post()
             .uri("https://wiki.example.com/api/documents.list")
             .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocument>>>() {})
+            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocumentModel>>>() {})
             .block();
 
         assertThat(envelope).isNotNull();

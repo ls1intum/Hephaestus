@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineApiKey;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineAuth;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineTeam;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
@@ -22,7 +22,7 @@ public final class OutlineClientModels {
     private OutlineClientModels() {}
 
     /** Mirrors the former {@code OutlineDocumentListResponse.Meta} constructor order. */
-    public static OutlineDocument document(
+    public static OutlineDocumentModel document(
         String id,
         String url,
         String title,
@@ -38,7 +38,16 @@ public final class OutlineClientModels {
     ) {
         // Read-only fields (id, url, createdAt, updatedAt, archivedAt) via the JsonCreator constructor;
         // revision/publishedAt/deletedAt are irrelevant to the sync and left null.
-        OutlineDocument document = new OutlineDocument(id, url, null, createdAt, updatedAt, null, archivedAt, null);
+        OutlineDocumentModel document = new OutlineDocumentModel(
+            id,
+            url,
+            null,
+            createdAt,
+            updatedAt,
+            null,
+            archivedAt,
+            null
+        );
         document.setTitle(title);
         document.setUrlId(urlId);
         document.setParentDocumentId(parentDocumentId);
@@ -57,7 +66,7 @@ public final class OutlineClientModels {
     }
 
     /** Mirrors the former {@code OutlineCollectionListResponse.Collection} constructor order. */
-    public static OutlineCollection collection(
+    public static OutlineCollectionModel collection(
         String id,
         String name,
         String urlId,
@@ -65,7 +74,7 @@ public final class OutlineClientModels {
         String icon,
         String description
     ) {
-        OutlineCollection collection = new OutlineCollection(id, null, urlId, null, null, null, null);
+        OutlineCollectionModel collection = new OutlineCollectionModel(id, null, urlId, null, null, null, null);
         collection.setName(name);
         collection.setColor(color);
         collection.setIcon(icon);

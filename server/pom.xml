@@ -791,6 +791,15 @@
                             <output>${project.build.directory}/generated-sources/openapi-outline</output>
                             <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
                             <modelNamePrefix>Outline</modelNamePrefix>
+                            <!-- Rename the two wire models whose simple names collide with the JPA -->
+                            <!-- domain entities (integration.outline.domain.{OutlineCollection, -->
+                            <!-- OutlineDocument}). Mapping bypasses modelNamePrefix, so the value -->
+                            <!-- carries the Outline prefix itself. Keeps both the model and the -->
+                            <!-- entity importable by plain simple name side by side. -->
+                            <modelNameMappings>
+                                <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
+                                <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
+                            </modelNameMappings>
                             <!-- Models only: OutlineApiClient hand-writes the transport policy -->
                             <generateApis>false</generateApis>
                             <generateApiTests>false</generateApiTests>
@@ -833,6 +842,12 @@
                             <output>${project.build.directory}/generated-sources/openapi-outline</output>
                             <modelPackage>de.tum.cit.aet.hephaestus.integration.outline.client.model</modelPackage>
                             <modelNamePrefix>Outline</modelNamePrefix>
+                            <!-- Same collision-avoiding rename as the spec3 execution (harmless if -->
+                            <!-- the supplement omits these schemas); keeps both executions in step. -->
+                            <modelNameMappings>
+                                <modelNameMapping>Collection=OutlineCollectionModel</modelNameMapping>
+                                <modelNameMapping>Document=OutlineDocumentModel</modelNameMapping>
+                            </modelNameMappings>
                             <generateApis>false</generateApis>
                             <generateApiTests>false</generateApiTests>
                             <generateApiDocumentation>false</generateApiDocumentation>

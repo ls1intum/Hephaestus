@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import java.io.InputStream;
@@ -41,13 +41,13 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void documentsList_mapsRealDocumentsIncludingTheNestedChild() throws Exception {
-        OutlineEnvelope<List<OutlineDocument>> response = deserialize(
+        OutlineEnvelope<List<OutlineDocumentModel>> response = deserialize(
             "/outline-api/documents.list.json",
             new TypeReference<>() {}
         );
 
         assertThat(response.data()).isNotNull().isNotEmpty();
-        OutlineDocument parent = findById(response.data(), "7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
+        OutlineDocumentModel parent = findById(response.data(), "7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
         assertThat(parent.getTitle()).isEqualTo("Fixture Capture Doc Renamed");
         assertThat(parent.getUrl()).isEqualTo("/doc/fixture-capture-doc-renamed-JpRHHJuY8M");
         assertThat(parent.getUrlId()).isEqualTo("JpRHHJuY8M");
@@ -60,20 +60,20 @@ class OutlineApiFixtureDeserializationTest {
         assertThat(parent.getCollaboratorIds()).isNotEmpty();
 
         // The nested child — proves parentDocumentId maps correctly off a real tree, not just a flat list.
-        OutlineDocument child = findById(response.data(), "cec98e59-623c-4392-a343-6e96b0995e51");
+        OutlineDocumentModel child = findById(response.data(), "cec98e59-623c-4392-a343-6e96b0995e51");
         assertThat(child.getTitle()).isEqualTo("Fixture Capture Child 2");
         assertThat(child.getParentDocumentId()).isEqualTo("7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
     }
 
     @Test
     void documentsInfo_mapsARootDocumentWithNoParent() throws Exception {
-        OutlineEnvelope<OutlineDocument> response = deserialize(
+        OutlineEnvelope<OutlineDocumentModel> response = deserialize(
             "/outline-api/documents.info.json",
             new TypeReference<>() {}
         );
 
         assertThat(response.data()).isNotNull();
-        OutlineDocument data = response.data();
+        OutlineDocumentModel data = response.data();
         assertThat(data.getId()).isEqualTo("7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
         assertThat(data.getTitle()).isEqualTo("Fixture Capture Doc Renamed");
         assertThat(data.getUrl()).isEqualTo("/doc/fixture-capture-doc-renamed-JpRHHJuY8M");
@@ -87,12 +87,12 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void documentsInfo_mapsANestedChildWithItsParentId() throws Exception {
-        OutlineEnvelope<OutlineDocument> response = deserialize(
+        OutlineEnvelope<OutlineDocumentModel> response = deserialize(
             "/outline-api/documents.info.child.json",
             new TypeReference<>() {}
         );
 
-        OutlineDocument data = response.data();
+        OutlineDocumentModel data = response.data();
         assertThat(data.getId()).isEqualTo("cec98e59-623c-4392-a343-6e96b0995e51");
         assertThat(data.getParentDocumentId()).isEqualTo("7d11d73d-1b36-43e3-9f31-b43e98c69b5b");
         assertThat(data.getCollectionId()).isEqualTo("fbe68839-b131-44e2-bb93-0bc533d39193");
@@ -100,13 +100,13 @@ class OutlineApiFixtureDeserializationTest {
 
     @Test
     void collectionsList_mapsTheRealCollectionCatalog() throws Exception {
-        OutlineEnvelope<List<OutlineCollection>> response = deserialize(
+        OutlineEnvelope<List<OutlineCollectionModel>> response = deserialize(
             "/outline-api/collections.list.json",
             new TypeReference<>() {}
         );
 
         assertThat(response.data()).isNotNull().isNotEmpty();
-        OutlineCollection engineering = response
+        OutlineCollectionModel engineering = response
             .data()
             .stream()
             .filter(c -> "fbe68839-b131-44e2-bb93-0bc533d39193".equals(c.getId()))
@@ -152,7 +152,7 @@ class OutlineApiFixtureDeserializationTest {
         assertThat(subscription.getUrl()).isEqualTo("https://hephaestus-test.felixdietrich.com/webhooks/outline");
     }
 
-    private static OutlineDocument findById(List<OutlineDocument> data, String id) {
+    private static OutlineDocumentModel findById(List<OutlineDocumentModel> data, String id) {
         return data
             .stream()
             .filter(m -> id.equals(m.getId()))

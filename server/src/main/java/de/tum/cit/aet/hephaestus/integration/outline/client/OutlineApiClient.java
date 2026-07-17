@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineApiKey;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineAuth;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineTeam;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
@@ -68,13 +68,13 @@ public class OutlineApiClient {
         new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineApiKey>>> API_KEY_LIST =
         new ParameterizedTypeReference<>() {};
-    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollection>>> COLLECTION_LIST =
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollectionModel>>> COLLECTION_LIST =
         new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineNavigationNode>>> COLLECTION_DOCUMENTS =
         new ParameterizedTypeReference<>() {};
-    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocument>>> DOCUMENT_LIST =
+    private static final ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocumentModel>>> DOCUMENT_LIST =
         new ParameterizedTypeReference<>() {};
-    private static final ParameterizedTypeReference<OutlineEnvelope<OutlineDocument>> DOCUMENT_INFO =
+    private static final ParameterizedTypeReference<OutlineEnvelope<OutlineDocumentModel>> DOCUMENT_INFO =
         new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<OutlineEnvelope<String>> EXPORT =
         new ParameterizedTypeReference<>() {};
@@ -162,7 +162,7 @@ public class OutlineApiClient {
     }
 
     /** Lists the collections the token can see ({@code collections.list}); the catalog pass refreshes mirrored-collection metadata. */
-    public List<OutlineCollection> listCollections(String serverUrl, String token) {
+    public List<OutlineCollectionModel> listCollections(String serverUrl, String token) {
         return listCollections(serverUrl, token, MAX_PAGES);
     }
 
@@ -170,18 +170,18 @@ public class OutlineApiClient {
      * {@link #listCollections(String, String)} under an explicit page cap — interactive admin paths pass a
      * small cap so a pathological instance cannot stall a request thread; a hit cap logs and returns partial.
      */
-    public List<OutlineCollection> listCollections(String serverUrl, String token, int maxPages) {
+    public List<OutlineCollectionModel> listCollections(String serverUrl, String token, int maxPages) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineCollection> all = new ArrayList<>();
+        List<OutlineCollectionModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < maxPages; page++, offset += PAGE_LIMIT) {
-            OutlineEnvelope<List<OutlineCollection>> body = post(
+            OutlineEnvelope<List<OutlineCollectionModel>> body = post(
                 resolvedUrl,
                 token,
                 "/api/collections.list",
                 Map.of("offset", offset, "limit", PAGE_LIMIT),
                 COLLECTION_LIST
             );
-            List<OutlineCollection> pageData = body == null ? null : body.data();
+            List<OutlineCollectionModel> pageData = body == null ? null : body.data();
             if (pageData == null || pageData.isEmpty()) {
                 return all;
             }
@@ -220,11 +220,11 @@ public class OutlineApiClient {
      * Lists per-document metadata ({@code documents.list}, newest-{@code updatedAt} first). Ordering matters:
      * the sync spends its bounded export budget front-to-back, and {@code updatedAt} is the incremental cursor.
      */
-    public List<OutlineDocument> listDocuments(String serverUrl, String token, String collectionId) {
+    public List<OutlineDocumentModel> listDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineDocument> all = new ArrayList<>();
+        List<OutlineDocumentModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
-            OutlineEnvelope<List<OutlineDocument>> body = post(
+            OutlineEnvelope<List<OutlineDocumentModel>> body = post(
                 resolvedUrl,
                 token,
                 "/api/documents.list",
@@ -242,7 +242,7 @@ public class OutlineApiClient {
                 ),
                 DOCUMENT_LIST
             );
-            List<OutlineDocument> pageData = requirePage(body, "documents.list", collectionId);
+            List<OutlineDocumentModel> pageData = requirePage(body, "documents.list", collectionId);
             if (pageData.isEmpty()) {
                 return all;
             }
@@ -258,9 +258,9 @@ public class OutlineApiClient {
      * Fetches one document's metadata ({@code documents.info}); empty on HTTP 404 (the webhook refresh treats
      * that as a tombstone), rethrows every other failure.
      */
-    public Optional<OutlineDocument> getDocumentInfo(String serverUrl, String token, String documentId) {
+    public Optional<OutlineDocumentModel> getDocumentInfo(String serverUrl, String token, String documentId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        OutlineEnvelope<OutlineDocument> body;
+        OutlineEnvelope<OutlineDocumentModel> body;
         try {
             body = post(resolvedUrl, token, "/api/documents.info", Map.of("id", documentId), DOCUMENT_INFO);
         } catch (OutlineApiException e) {
@@ -277,11 +277,11 @@ public class OutlineApiClient {
      * Outline's default listing excludes archived documents, so without this call the tombstone-by-absence
      * sweep would wipe an archived (soft-deleted, recoverable) document as a permanent delete.
      */
-    public List<OutlineDocument> listArchivedDocuments(String serverUrl, String token, String collectionId) {
+    public List<OutlineDocumentModel> listArchivedDocuments(String serverUrl, String token, String collectionId) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
-        List<OutlineDocument> all = new ArrayList<>();
+        List<OutlineDocumentModel> all = new ArrayList<>();
         for (int page = 0, offset = 0; page < MAX_PAGES; page++, offset += PAGE_LIMIT) {
-            OutlineEnvelope<List<OutlineDocument>> body = post(
+            OutlineEnvelope<List<OutlineDocumentModel>> body = post(
                 resolvedUrl,
                 token,
                 "/api/documents.list",
@@ -301,7 +301,7 @@ public class OutlineApiClient {
                 ),
                 DOCUMENT_LIST
             );
-            List<OutlineDocument> pageData = requirePage(body, "documents.list[archived]", collectionId);
+            List<OutlineDocumentModel> pageData = requirePage(body, "documents.list[archived]", collectionId);
             if (pageData.isEmpty()) {
                 return all;
             }
@@ -320,12 +320,12 @@ public class OutlineApiClient {
      * the tombstone-by-absence sweep then deletes every mirrored document past the truncated tail. Failing the
      * call skips the sweep, leaving the mirror intact.
      */
-    private static List<OutlineDocument> requirePage(
-        OutlineEnvelope<List<OutlineDocument>> body,
+    private static List<OutlineDocumentModel> requirePage(
+        OutlineEnvelope<List<OutlineDocumentModel>> body,
         String call,
         String collectionId
     ) {
-        List<OutlineDocument> pageData = body == null ? null : body.data();
+        List<OutlineDocumentModel> pageData = body == null ? null : body.data();
         if (pageData == null) {
             throw new OutlineApiException(
                 "Outline " +

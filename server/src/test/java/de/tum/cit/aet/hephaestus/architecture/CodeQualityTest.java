@@ -509,7 +509,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "OutlineWebhookRegistrar", // IntegrationNatsConsumer is optional (gated on hephaestus.sync.nats.enabled and the server runtime role); the registrar reconciles the scope consumer after every subscription-id change and must not require the bean
                 "SlackScopeConsumerReconciler", // same reason as OutlineWebhookRegistrar: IntegrationNatsConsumer is optional (nats/server-role gated); the Slack lifecycle reconciler must not require the bean
                 "SyncPushService", // Qualified NATS connection is optional when sync push is disabled or under specs
-                "GitlabConnectionSyncStateProvider" // Rate-limit tracker is conditional with the GitLab runtime beans
+                "GitlabConnectionSyncStateProvider", // Rate-limit tracker is conditional with the GitLab runtime beans
+                "OutlineConnectionSyncStateProvider" // Rate-limit tracker (OutlineRateLimitTracker) is @ConditionalOnProperty(outline.enabled) — same optional-bean break as the GitLab provider
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {

@@ -12,7 +12,8 @@ import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -128,8 +129,7 @@ public class OutlineDocumentSyncService {
         }
         Instant now = Instant.now();
         try {
-            Map<String, de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection> live =
-                refreshCatalog(ctx);
+            Map<String, OutlineCollectionModel> live = refreshCatalog(ctx);
             List<OutlineCollection> collections = collectionRepository.findForSync(
                 workspaceId,
                 ctx.connectionId(),
@@ -292,7 +292,7 @@ public class OutlineDocumentSyncService {
 
     /**
      * Webhook targeted refresh of one document (≤2 API calls) — no pre-fetched metadata available.
-     * Equivalent to {@link #refreshDocument(long, String, String, OutlineDocument)}
+     * Equivalent to {@link #refreshDocument(long, String, String, OutlineDocumentModel)}
      * with a {@code null} {@code prefetchedMeta}.
      */
     public void refreshDocument(long workspaceId, String eventName, String documentId) {
@@ -312,7 +312,7 @@ public class OutlineDocumentSyncService {
         long workspaceId,
         String eventName,
         String documentId,
-        @Nullable OutlineDocument prefetchedMeta
+        @Nullable OutlineDocumentModel prefetchedMeta
     ) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null || documentId == null || documentId.isBlank()) {
@@ -339,11 +339,11 @@ public class OutlineDocumentSyncService {
             return;
         }
         try {
-            OutlineDocument meta;
+            OutlineDocumentModel meta;
             if (prefetchedMeta != null && prefetchedMeta.getId() != null && prefetchedMeta.getCollectionId() != null) {
                 meta = prefetchedMeta;
             } else {
-                Optional<OutlineDocument> info = outlineApiClient.getDocumentInfo(
+                Optional<OutlineDocumentModel> info = outlineApiClient.getDocumentInfo(
                     ctx.serverUrl(),
                     ctx.token(),
                     documentId
@@ -421,23 +421,15 @@ public class OutlineDocumentSyncService {
      * One {@code collections.list} call: refresh every mirrored row's human-facing catalog fields and
      * return the live collections by id (the visibility signal for the reconcile).
      */
-    private Map<String, de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection> refreshCatalog(
-        SyncContext ctx
-    ) {
-        Map<String, de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection> live =
-            new LinkedHashMap<>();
-        for (de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection collection : outlineApiClient.listCollections(
-            ctx.serverUrl(),
-            ctx.token()
-        )) {
+    private Map<String, OutlineCollectionModel> refreshCatalog(SyncContext ctx) {
+        Map<String, OutlineCollectionModel> live = new LinkedHashMap<>();
+        for (OutlineCollectionModel collection : outlineApiClient.listCollections(ctx.serverUrl(), ctx.token())) {
             if (collection.getId() != null) {
                 live.put(collection.getId(), collection);
             }
         }
         for (OutlineCollection row : mirroredCollections(ctx)) {
-            de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection upstream = live.get(
-                row.getCollectionId()
-            );
+            OutlineCollectionModel upstream = live.get(row.getCollectionId());
             if (upstream == null) {
                 continue;
             }
@@ -499,7 +491,7 @@ public class OutlineDocumentSyncService {
         String collectionId = collection.getCollectionId();
         // documents.list is newest-first, so the budget is spent on the most recently edited documents.
         // A truncated enumeration throws rather than returning a short list — see OutlineApiClient.
-        List<OutlineDocument> metas = outlineApiClient.listDocuments(ctx.serverUrl(), ctx.token(), collectionId);
+        List<OutlineDocumentModel> metas = outlineApiClient.listDocuments(ctx.serverUrl(), ctx.token(), collectionId);
         Map<String, OutlineSyncMapping.FlatNode> nodeById = new LinkedHashMap<>();
         List<OutlineSyncMapping.FlatNode> flat = new ArrayList<>();
         OutlineSyncMapping.flatten(
@@ -513,7 +505,7 @@ public class OutlineDocumentSyncService {
 
         Set<String> seen = new HashSet<>();
         int skippedForBudget = 0;
-        for (OutlineDocument meta : metas) {
+        for (OutlineDocumentModel meta : metas) {
             if (meta.getId() == null) {
                 continue;
             }
@@ -581,7 +573,7 @@ public class OutlineDocumentSyncService {
         SyncContext ctx,
         OutlineCollection collection,
         OutlineSyncMapping.@Nullable FlatNode node,
-        @Nullable OutlineDocument meta,
+        @Nullable OutlineDocumentModel meta,
         Map<String, OutlineDocumentSnapshot> existing,
         @Nullable ExportBudget budget,
         Instant now
@@ -684,7 +676,7 @@ public class OutlineDocumentSyncService {
         Instant now
     ) {
         int skipped = 0;
-        for (OutlineDocument meta : outlineApiClient.listArchivedDocuments(
+        for (OutlineDocumentModel meta : outlineApiClient.listArchivedDocuments(
             ctx.serverUrl(),
             ctx.token(),
             collection.getCollectionId()
@@ -711,7 +703,7 @@ public class OutlineDocumentSyncService {
     private boolean upsertArchived(
         SyncContext ctx,
         OutlineCollection collection,
-        OutlineDocument meta,
+        OutlineDocumentModel meta,
         Map<String, OutlineDocumentSnapshot> existing,
         ExportBudget budget,
         Instant now

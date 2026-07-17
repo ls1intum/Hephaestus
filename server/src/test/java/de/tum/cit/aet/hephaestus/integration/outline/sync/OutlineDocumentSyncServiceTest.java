@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineRateLimitedException;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -161,10 +162,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             .thenReturn(List.of());
     }
 
-    private static de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument meta(
-        String id,
-        Instant updatedAt
-    ) {
+    private static OutlineDocumentModel meta(String id, Instant updatedAt) {
         return OutlineClientModels.document(
             id,
             null,
@@ -181,11 +179,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private static de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument metaWithUrl(
-        String id,
-        Instant updatedAt,
-        String url
-    ) {
+    private static OutlineDocumentModel metaWithUrl(String id, Instant updatedAt, String url) {
         return OutlineClientModels.document(
             id,
             url,
@@ -202,11 +196,7 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    private static de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument archivedMeta(
-        String id,
-        Instant updatedAt,
-        Instant archivedAt
-    ) {
+    private static OutlineDocumentModel archivedMeta(String id, Instant updatedAt, Instant archivedAt) {
         return OutlineClientModels.document(
             id,
             "/doc/" + id,
@@ -529,21 +519,20 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     @Test
     void refreshDocument_prefetchedMetaMissingCollectionId_fallsBackToDocumentsInfo() {
         when(documentRepository.findSnapshotByDocumentId(WORKSPACE, CONNECTION, "doc-1")).thenReturn(Optional.empty());
-        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument incomplete =
-            OutlineClientModels.document(
-                "doc-1",
-                null,
-                "Doc 1",
-                T1,
-                T2,
-                "doc-1",
-                null,
-                null, // no collectionId — unusable
-                null,
-                null,
-                null,
-                null
-            );
+        OutlineDocumentModel incomplete = OutlineClientModels.document(
+            "doc-1",
+            null,
+            "Doc 1",
+            T1,
+            T2,
+            "doc-1",
+            null,
+            null, // no collectionId — unusable
+            null,
+            null,
+            null,
+            null
+        );
         when(outlineApiClient.getDocumentInfo(SERVER_URL, "token", "doc-1")).thenReturn(Optional.of(meta("doc-1", T2)));
         when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# fresh");
 

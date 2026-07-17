@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.B
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.core.importer.Location;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 
@@ -50,6 +51,25 @@ public abstract class HephaestusArchitectureTest {
     private static volatile boolean initialized = false;
 
     /**
+     * Excludes the generated Outline vendor wire-models from every architecture rule.
+     *
+     * <p>These classes are emitted by {@code openapi-generator-maven-plugin} from Outline's OpenAPI
+     * spec into {@code integration.outline.client.model} (compiled under
+     * {@code target/classes/.../integration/outline/client/model}, sources gitignored). The generator's
+     * {@code java} generator stamps {@code @jakarta.annotation.Nonnull}/{@code @Nullable} on every model
+     * field, which no clean generator flag suppresses. They are not hand-written code and are never part
+     * of the SpringDoc-exposed API surface (never in {@code openapi.yaml}), so rules about nullability
+     * annotation consistency, own-package imports, code quality and module boundaries do not apply to
+     * them — the rules exist to protect hand-authored code and correct SpringDoc generation.
+     *
+     * <p>This is the single, central place the exclusion lives (see {@link #initializeClasses()}); it is
+     * scoped tightly to the generated {@code client.model} package and leaves hand-written Outline code
+     * (client, sync, domain, …) fully governed.
+     */
+    private static final ImportOption EXCLUDE_GENERATED_OUTLINE_MODELS = (Location location) ->
+        !location.contains("integration/outline/client/model");
+
+    /**
      * Initializes shared JavaClasses instances for all architecture tests.
      *
      * <p>Uses double-checked locking to ensure thread-safe lazy initialization.
@@ -64,10 +84,12 @@ public abstract class HephaestusArchitectureTest {
                     classes = new ClassFileImporter()
                         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
+                        .withImportOption(EXCLUDE_GENERATED_OUTLINE_MODELS)
                         .importPackages(BASE_PACKAGE);
 
                     classesWithTests = new ClassFileImporter()
                         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
+                        .withImportOption(EXCLUDE_GENERATED_OUTLINE_MODELS)
                         .importPackages(BASE_PACKAGE);
 
                     initialized = true;

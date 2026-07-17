@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
-import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import java.util.List;
 import java.util.function.Consumer;
@@ -198,7 +198,7 @@ public class OutlineDocumentSyncScheduler {
         long workspaceId,
         String eventName,
         String documentId,
-        @Nullable OutlineDocument prefetchedMeta
+        @Nullable OutlineDocumentModel prefetchedMeta
     ) {
         syncService.refreshDocument(workspaceId, eventName, documentId, prefetchedMeta);
     }

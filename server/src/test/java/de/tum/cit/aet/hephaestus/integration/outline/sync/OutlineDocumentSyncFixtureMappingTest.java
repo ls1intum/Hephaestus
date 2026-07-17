@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineEnvelope;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
@@ -152,10 +154,11 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
 
         // --- wire the mocked client's return values off the real captured fixtures ---
 
-        OutlineEnvelope<
-            List<de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection>
-        > collectionsList = readFixture("/outline-api/collections.list.json", new TypeReference<>() {});
-        de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollection engineeringDocs = collectionsList
+        OutlineEnvelope<List<OutlineCollectionModel>> collectionsList = readFixture(
+            "/outline-api/collections.list.json",
+            new TypeReference<>() {}
+        );
+        OutlineCollectionModel engineeringDocs = collectionsList
             .data()
             .stream()
             .filter(c -> COLLECTION_ID.equals(c.getId()))
@@ -163,9 +166,10 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             .orElseThrow();
         lenient().when(outlineApiClient.listCollections(SERVER_URL, "token")).thenReturn(List.of(engineeringDocs));
 
-        OutlineEnvelope<
-            List<de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument>
-        > documentsList = readFixture("/outline-api/documents.list.json", new TypeReference<>() {});
+        OutlineEnvelope<List<OutlineDocumentModel>> documentsList = readFixture(
+            "/outline-api/documents.list.json",
+            new TypeReference<>() {}
+        );
         lenient()
             .when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID))
             .thenReturn(documentsList.data());

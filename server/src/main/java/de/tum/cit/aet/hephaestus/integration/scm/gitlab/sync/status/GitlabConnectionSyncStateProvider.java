@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvide
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepoBackfillProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -78,7 +79,11 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         // what hid the "Scheduled backfill" diagnostic on the GitLab side.
         BackfillSummary backfill = ScmBackfillRollup.summarize(
             syncSchedulerProperties.backfill().enabled(),
-            repositoryToMonitorRepository.findByWorkspaceId(workspaceId)
+            repositoryToMonitorRepository
+                .findByWorkspaceId(workspaceId)
+                .stream()
+                .map(GitlabConnectionSyncStateProvider::toBackfillProgress)
+                .toList()
         );
 
         return new ConnectionSyncDetails(
@@ -166,5 +171,16 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             }
         }
         return latest;
+    }
+
+    /** Projects a monitored-repository row into the vendor-neutral rollup input for {@link ScmBackfillRollup}. */
+    private static RepoBackfillProgress toBackfillProgress(RepositoryToMonitor monitor) {
+        return new RepoBackfillProgress(
+            monitor.isBackfillInitialized(),
+            monitor.isBackfillComplete(),
+            monitor.getIssueBackfillHighWaterMark(),
+            monitor.getPullRequestBackfillHighWaterMark(),
+            monitor.getBackfillRemaining()
+        );
     }
 }

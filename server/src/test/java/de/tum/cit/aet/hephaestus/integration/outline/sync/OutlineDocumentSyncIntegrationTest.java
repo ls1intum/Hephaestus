@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineNavigationNode;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineUser;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
@@ -129,7 +130,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
             .toList();
         when(outlineApiClient.listCollectionDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(tree);
 
-        List<de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocument> metas = docIds
+        List<OutlineDocumentModel> metas = docIds
             .stream()
             .map(id ->
                 OutlineClientModels.document(
