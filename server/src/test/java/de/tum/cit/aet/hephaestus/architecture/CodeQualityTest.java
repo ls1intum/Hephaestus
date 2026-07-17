@@ -496,6 +496,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
                 "GitHubWorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
                 "WorkspaceRepositoryMonitorService",
+                "WorkspaceSyncTargetProvider", // IntegrationNatsConsumer absent under the webhook runtime role — reconcileSyncTargetIdentity refreshes the scope consumer after a rename re-key
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty

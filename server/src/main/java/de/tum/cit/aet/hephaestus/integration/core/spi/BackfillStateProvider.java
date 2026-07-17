@@ -62,6 +62,30 @@ public interface BackfillStateProvider {
     void removeSyncTarget(Long syncTargetId);
 
     /**
+     * Reconciles a sync target's stable identity against what the provider currently reports for the
+     * repository, healing a rename/transfer:
+     * <ul>
+     *   <li>If the target has no {@code nativeId} yet (legacy/PAT row), captures {@code resolvedNativeId}.</li>
+     *   <li>If {@code resolvedNameWithOwner} differs from the stored name — and the stable id agrees —
+     *       re-keys the monitor's {@code nameWithOwner} and refreshes the workspace's NATS consumer so
+     *       the subject filter tracks the new name. Never renames by name alone.</li>
+     * </ul>
+     * Idempotent and safe to call every sync cycle; a no-op when nothing changed. Implementations must
+     * not throw for a missing sync target (it may have been removed mid-sync).
+     *
+     * @param syncTargetId          the sync target (monitor) id
+     * @param resolvedNativeId      the provider's stable numeric repository id, or {@code null} if unknown
+     * @param resolvedNameWithOwner the repository's current {@code owner/name} as the provider reports it
+     */
+    default void reconcileSyncTargetIdentity(
+        Long syncTargetId,
+        @org.jspecify.annotations.Nullable Long resolvedNativeId,
+        @org.jspecify.annotations.Nullable String resolvedNameWithOwner
+    ) {
+        // Default no-op: providers/tests that don't track a stable monitor identity keep prior behavior.
+    }
+
+    /**
      * Updates the pagination cursor for the given {@link SyncCursorKind}, keyed by
      * {@code syncTargetId}. Collapses the former per-entity {@code update<X>SyncCursor}
      * methods; the implementer switches on the kind to reach the correct column.

@@ -234,8 +234,20 @@ public class GithubDataSyncService {
             try {
                 syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
             } catch (RepositoryNotFoundOnGitProviderException e) {
-                // Definitive 404 from GitHub: the repo really does not exist. Safe to drop
-                // the monitoring row so we stop polling for it.
+                // A definitive name-404. If we hold the repository's stable native id, this is almost
+                // certainly a rename/transfer (the id still resolves upstream), NOT a deletion — and
+                // deleting the monitor on a rename is the confirmed data-loss cascade. Preserve the
+                // monitor and retry next cycle; genuine deletions are cleaned up by the
+                // repository.deleted webhook. Only legacy rows with no stable id fall back to removal.
+                if (syncTarget.nativeId() != null) {
+                    log.warn(
+                        "Preserving sync target despite name-404: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoName={}, nativeId={}",
+                        scopeId,
+                        safeNameWithOwner,
+                        syncTarget.nativeId()
+                    );
+                    return false;
+                }
                 log.info(
                     "Removing sync target: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
                     scopeId,
@@ -260,6 +272,15 @@ public class GithubDataSyncService {
         }
 
         Long repositoryId = repository.getId();
+
+        // Backfill the monitor's stable native id (legacy/PAT rows start null) and re-key its name if
+        // the domain repository already reflects an upstream rename. Once the id is captured, the
+        // NOT_FOUND handlers can distinguish a rename (heal) from a real deletion (remove).
+        syncTargetProvider.reconcileSyncTargetIdentity(
+            syncTarget.id(),
+            repository.getNativeId(),
+            repository.getNameWithOwner()
+        );
 
         log.info(
             "Starting repository sync: scopeId={}, repoId={}, repoName={}",
@@ -432,19 +453,33 @@ public class GithubDataSyncService {
             boolean removed = false;
             switch (category) {
                 case NOT_FOUND -> {
-                    log.warn(
-                        "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
-                        scopeId,
-                        repositoryId,
-                        safeNameWithOwner,
-                        classification.message()
-                    );
-                    // Clean up the orphaned repository to prevent permanent sync errors
-                    // The repository no longer exists on GitHub, so delete it locally
-                    cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
-                    // Also remove the sync target to stop perpetual retries
-                    syncTargetProvider.removeSyncTarget(syncTarget.id());
-                    removed = true;
+                    if (syncTarget.nativeId() != null) {
+                        // Stable id present → treat a name-404 as a rename/transfer, not a deletion.
+                        // Preserve BOTH the repository and the monitor; a real deletion is handled by
+                        // the repository.deleted webhook. Deleting here on a rename is the confirmed
+                        // data-loss cascade. See the create-block handler above for the full rationale.
+                        log.warn(
+                            "Preserving repository and sync target despite NOT_FOUND: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoId={}, repoName={}, nativeId={}",
+                            scopeId,
+                            repositoryId,
+                            safeNameWithOwner,
+                            syncTarget.nativeId()
+                        );
+                    } else {
+                        log.warn(
+                            "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
+                            scopeId,
+                            repositoryId,
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        // Clean up the orphaned repository to prevent permanent sync errors
+                        // The repository no longer exists on GitHub, so delete it locally
+                        cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
+                        // Also remove the sync target to stop perpetual retries
+                        syncTargetProvider.removeSyncTarget(syncTarget.id());
+                        removed = true;
+                    }
                 }
                 case AUTH_ERROR -> log.error(
                     "Repository sync failed - authentication error: scopeId={}, repoId={}, error={}",

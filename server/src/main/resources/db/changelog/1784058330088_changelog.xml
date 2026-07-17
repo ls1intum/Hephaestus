@@ -191,4 +191,27 @@
         </rollback>
     </changeSet>
 
+    <!-- Stable provider repository id on the monitor row, so a rename/transfer re-keys by id. -->
+
+    <changeSet author="FelixTJDietrich" id="1784058330088-9">
+        <preConditions onFail="MARK_RAN" onFailMessage="repository_to_monitor.native_id already present">
+            <not><columnExists tableName="repository_to_monitor" columnName="native_id"/></not>
+        </preConditions>
+        <comment>
+            Stable provider repository id (GitHub repository.id / GitLab project.id) on the monitor
+            row. The per-workspace NATS consumer filter and the periodic reconciliation both key on the
+            mutable name_with_owner today; a rename/transfer rewrites that name upstream, after which
+            events publish under the new name (matching no filter → silently ACK-dropped) and the
+            name-keyed reconciliation can no longer resolve the repo. native_id is the stable identity
+            used to re-key name_with_owner instead. Nullable: legacy rows (and PAT rows whose repo is
+            not yet resolved) are backfilled lazily on the next sync that resolves the repository.
+        </comment>
+        <addColumn tableName="repository_to_monitor">
+            <column name="native_id" type="BIGINT"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="repository_to_monitor" columnName="native_id"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

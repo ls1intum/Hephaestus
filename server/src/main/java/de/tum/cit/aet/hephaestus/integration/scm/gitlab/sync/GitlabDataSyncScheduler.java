@@ -430,6 +430,47 @@ public class GitlabDataSyncScheduler {
         }
     }
 
+    /**
+     * Heals monitors whose {@code name_with_owner} went stale after an upstream rename/transfer.
+     * <p>
+     * The group-project sync (which runs earlier in the cycle) upserts the domain {@link Repository}
+     * by its stable native id, so a renamed project's row already carries the new path while the
+     * {@code RepositoryToMonitor} still holds the old one — the name-keyed monitor join and the NATS
+     * subject filter both then miss it. For each sync target we resolve the domain repository by its
+     * native id (falling back to name for legacy rows that predate the id column, to capture it once)
+     * and hand the current identity to the SPI, which re-keys the monitor and refreshes the consumer.
+     * Best-effort: a per-target failure never aborts the sync.
+     */
+    private void reconcileMonitorIdentities(SyncSession session) {
+        Long providerId = getGitLabProviderId(session.accountLogin());
+        if (providerId == null) {
+            return;
+        }
+        for (SyncTarget target : session.syncTargets()) {
+            try {
+                Repository repo = null;
+                if (target.nativeId() != null) {
+                    repo = repositoryRepository.findByNativeIdAndProviderId(target.nativeId(), providerId).orElse(null);
+                }
+                if (repo == null) {
+                    // Legacy row with no captured id yet — resolve by (still-current) name to capture it.
+                    repo = repositoryRepository
+                        .findByNameWithOwnerAndProviderId(target.repositoryNameWithOwner(), providerId)
+                        .orElse(null);
+                }
+                if (repo != null && repo.getNativeId() != null) {
+                    syncTargetProvider.reconcileSyncTargetIdentity(
+                        target.id(),
+                        repo.getNativeId(),
+                        repo.getNameWithOwner()
+                    );
+                }
+            } catch (Exception e) {
+                log.debug("Skipped monitor identity reconcile: syncTargetId={}, error={}", target.id(), e.getMessage());
+            }
+        }
+    }
+
     private void syncGroupMembers(
         GitLabSyncServiceHolder services,
         SyncSession session,
@@ -524,6 +565,12 @@ public class GitlabDataSyncScheduler {
         GitLabCommitSyncService commitSync = services.getCommitSyncService();
         var commitBackfill = services.getCommitBackfillService();
         var commitMrLinker = services.getCommitMergeRequestLinker();
+
+        // Re-key any monitor whose name_with_owner went stale after an upstream rename/transfer BEFORE
+        // the name-keyed join below, so a renamed project re-enters the sync set and its NATS filter is
+        // rebuilt in the same cycle instead of silently dropping out. The domain Repository row was
+        // already healed to the new path by the group-project sync (keyed on the stable native id).
+        reconcileMonitorIdentities(session);
 
         // Find all repositories monitored by this workspace (via RepositoryToMonitor join,
         // which correctly includes subgroup repos — not just top-level group repos)

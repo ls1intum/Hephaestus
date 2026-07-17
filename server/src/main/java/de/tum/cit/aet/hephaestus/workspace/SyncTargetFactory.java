@@ -75,7 +75,8 @@ public final class SyncTargetFactory {
             rtm.getBackfillLastRunAt(),
             rtm.getIssueSyncCursor(),
             rtm.getPullRequestSyncCursor(),
-            rtm.getDiscussionSyncCursor()
+            rtm.getDiscussionSyncCursor(),
+            rtm.getNativeId()
         );
     }
 

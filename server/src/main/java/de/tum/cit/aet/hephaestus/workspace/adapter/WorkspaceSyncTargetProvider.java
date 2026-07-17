@@ -1,7 +1,11 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
+import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
@@ -16,8 +20,10 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,17 +52,25 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final ConnectionService connectionService;
+    private final NatsConnectionProperties natsProperties;
+
+    // Absent under the webhook runtime role — reconcile then skips the consumer refresh.
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     public WorkspaceSyncTargetProvider(
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceScopeFilter workspaceScopeFilter,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        NatsConnectionProperties natsProperties,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.connectionService = connectionService;
+        this.natsProperties = natsProperties;
+        this.natsConsumerService = natsConsumerService;
     }
 
     @Override
@@ -334,6 +348,63 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     @Transactional
     public void removeSyncTarget(Long syncTargetId) {
         repositoryToMonitorRepository.deleteById(syncTargetId);
+    }
+
+    @Override
+    @Transactional
+    public void reconcileSyncTargetIdentity(
+        Long syncTargetId,
+        @Nullable Long resolvedNativeId,
+        @Nullable String resolvedNameWithOwner
+    ) {
+        if (syncTargetId == null) {
+            return;
+        }
+        repositoryToMonitorRepository
+            .findById(syncTargetId)
+            .ifPresent(rtm -> {
+                boolean dirty = false;
+
+                // Capture the stable id the first time we resolve it (legacy / PAT rows start null).
+                if (rtm.getNativeId() == null && resolvedNativeId != null) {
+                    rtm.setNativeId(resolvedNativeId);
+                    dirty = true;
+                }
+
+                boolean nameChanged = false;
+                boolean nameDiffers =
+                    resolvedNameWithOwner != null &&
+                    !resolvedNameWithOwner.isBlank() &&
+                    !resolvedNameWithOwner.equals(rtm.getNameWithOwner());
+                // Re-key only when the stable id agrees (or was just captured) — never rename by name
+                // alone, which could clobber a legitimately reassigned row.
+                boolean idAgrees =
+                    rtm.getNativeId() != null &&
+                    (resolvedNativeId == null || rtm.getNativeId().equals(resolvedNativeId));
+                if (nameDiffers && idAgrees) {
+                    log.info(
+                        "Re-keying repository monitor after upstream rename/transfer: syncTargetId={}, oldName={}, newName={}, nativeId={}",
+                        syncTargetId,
+                        sanitizeForLog(rtm.getNameWithOwner()),
+                        sanitizeForLog(resolvedNameWithOwner),
+                        rtm.getNativeId()
+                    );
+                    rtm.setNameWithOwner(resolvedNameWithOwner);
+                    dirty = true;
+                    nameChanged = true;
+                }
+
+                if (dirty) {
+                    repositoryToMonitorRepository.save(rtm);
+                }
+
+                // A name change moves the repo's NATS subject; rebuild the workspace consumer filters so
+                // live events under the new name are delivered instead of silently ACK-dropped.
+                if (nameChanged && natsProperties.enabled() && rtm.getWorkspace() != null) {
+                    Long workspaceId = rtm.getWorkspace().getId();
+                    natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId));
+                }
+            });
     }
 
     /**

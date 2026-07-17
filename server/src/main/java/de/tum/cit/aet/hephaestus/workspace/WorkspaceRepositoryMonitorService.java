@@ -176,6 +176,7 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
         repositoryToMonitor.setNameWithOwner(nameWithOwner);
+        repositoryToMonitor.setNativeId(resolveNativeId(nameWithOwner));
         repositoryToMonitor.setWorkspace(workspace);
         persistRepositoryMonitor(workspace, repositoryToMonitor);
     }
@@ -489,6 +490,21 @@ public class WorkspaceRepositoryMonitorService {
         return repositoryRepository.findByNameWithOwner(nameWithOwner);
     }
 
+    /**
+     * Best-effort capture of the provider's stable repository id ({@code native_id}) at
+     * monitor-creation time by resolving the (already-upserted) domain {@link Repository} by name.
+     * Returns {@code null} when the repository is not yet known locally — e.g. a GitLab PAT repo added
+     * by name before its first sync — in which case the periodic sync backfills it later via
+     * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider#reconcileSyncTargetIdentity}.
+     */
+    @org.jspecify.annotations.Nullable
+    private Long resolveNativeId(String nameWithOwner) {
+        if (StringUtils.isBlank(nameWithOwner)) {
+            return null;
+        }
+        return findRepository(nameWithOwner).map(Repository::getNativeId).orElse(null);
+    }
+
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }
@@ -615,6 +631,7 @@ public class WorkspaceRepositoryMonitorService {
 
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(nameWithOwner);
+        monitor.setNativeId(resolveNativeId(nameWithOwner));
         monitor.setWorkspace(workspace);
 
         try {
