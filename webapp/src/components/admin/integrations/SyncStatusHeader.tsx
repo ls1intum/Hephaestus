@@ -23,8 +23,8 @@ import {
 	freshnessTone,
 	nextRunLabel,
 	relativeTime,
-	stateLabel,
 	type SyncTriggerType,
+	stateLabel,
 } from "./sync-format";
 
 /** Under this share of the budget a rate limit is a thing that will break the next sync, not a stat. */

@@ -22,12 +22,12 @@ import { AdminRepositoriesSettings } from "@/components/admin/integrations/Admin
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
-import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import {
 	SCM_CLASS_KEYS,
 	SyncResourcesTable,
 } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";

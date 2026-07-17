@@ -107,8 +107,32 @@ public class Issue extends BaseGitServiceEntity {
      * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned
      * — is resurrected by the next ordinary sync with no operator intervention.
      *
-     * <p>Every read that should not see upstream-deleted data filters {@code deletedAt IS NULL}
-     * explicitly; this codebase uses no Hibernate soft-delete filter.
+     * <p><strong>Read scope — deliberately narrow.</strong> This codebase uses no Hibernate
+     * soft-delete filter, and only the queries that exist to serve reconciliation honour the
+     * tombstone. Filtering is opt-in per query, so the exhaustive list of readers that see
+     * {@code deletedAt IS NULL} is:
+     *
+     * <ul>
+     *   <li>the per-repository sync counts the admin UI renders
+     *       ({@code IssueRepository.count{Issues,PullRequests}GroupedByRepositoryIds});
+     *   <li>the sweep's own local-number listing
+     *       ({@code IssueRepository.findLive{Issue,PullRequest}NumbersByRepositoryId});
+     *   <li>{@code IssueRepository.tombstoneByRepositoryIdAndNumbers}, where it preserves the first
+     *       observation time.
+     * </ul>
+     *
+     * <p><strong>Everything else still shows upstream-deleted rows.</strong> The product read
+     * surfaces do not filter this column: {@code LeaderboardReviewQueryRepository},
+     * {@code ProfilePullRequestQueryRepository}, {@code WorkspaceContributionQueryRepository},
+     * {@code ActivityEventRepository}, {@code MentorContextQueryRepository}, and the review /
+     * review-comment / thread repositories all surface tombstoned issues and pull requests.
+     *
+     * <p>That is a scope decision, not an oversight, and it is not a regression: before tombstoning
+     * existed those same rows were already visible on those same surfaces as phantoms that nothing
+     * could ever retire. The tombstone does not yet hide them — it makes them <em>identifiable</em>,
+     * and fixes the counts. Teaching the remaining read paths to filter is a separate change with a
+     * far wider blast radius (scoring, XP, profile history and mentor context would all shift), so
+     * it is intentionally not attempted here.
      */
     @Column(name = "deleted_at")
     private Instant deletedAt;

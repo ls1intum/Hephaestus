@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -246,6 +247,73 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             service.sweepRepository(SCOPE_ID, repository(), handle);
 
             verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+        }
+    }
+
+    /**
+     * The listing is not instant, and the mirror does not hold still while it runs. An item created
+     * upstream mid-listing is legitimately absent from the pages already fetched but present locally
+     * moments later via webhook — the one shape of local-but-not-upstream that is NOT a deletion.
+     */
+    @Nested
+    class ToleratesConcurrentWrites {
+
+        @Test
+        void shouldNotTombstoneAnIssueInsertedByWebhookWhileTheListingWasRunning() {
+            // The mirror starts at {1, 3}. Issue #4 is opened upstream after the listing began, so it
+            // is not in the (complete, correct) upstream page — and its webhook lands locally before
+            // the diff runs. Diffing a post-listing read of the mirror would make #4 look deleted and
+            // tombstone a brand-new issue; it would then stay invisible until the next daily sync
+            // resurrected it.
+            List<Integer> mirror = new ArrayList<>(List.of(1, 3));
+            lenient()
+                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                .thenAnswer(invocation -> List.copyOf(mirror));
+            lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(List.of());
+            scriptedResponses.add(
+                Mono.fromSupplier(() -> {
+                    mirror.add(4); // the webhook insert, landing mid-listing
+                    return issuePage(List.of(1, 3), false, 2);
+                })
+            );
+            scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verify(issueRepository, never()).tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
+            assertThat(outcome.issuesTombstoned()).isZero();
+            assertThat(outcome.skipped()).isFalse();
+        }
+
+        @Test
+        void shouldStillTombstoneItemsThatPredatedTheListing() {
+            // The guard must not become a blanket amnesty: #2 was already in the mirror before the
+            // listing started and upstream does not have it, so it is a genuine deletion.
+            List<Integer> mirror = new ArrayList<>(List.of(1, 2, 3));
+            lenient()
+                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                .thenAnswer(invocation -> List.copyOf(mirror));
+            lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(List.of());
+            scriptedResponses.add(
+                Mono.fromSupplier(() -> {
+                    mirror.add(4);
+                    return issuePage(List.of(1, 3), false, 2);
+                })
+            );
+            scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
+            when(issueRepository.tombstoneByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(1);
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            ArgumentCaptor<java.util.Collection<Integer>> captor = ArgumentCaptor.captor();
+            verify(issueRepository).tombstoneByRepositoryIdAndNumbers(
+                ArgumentMatchers.eq(REPO_ID),
+                captor.capture(),
+                any(Instant.class)
+            );
+            // #2 only — never the concurrently-created #4.
+            assertThat(captor.getValue()).containsExactly(2);
+            assertThat(outcome.issuesTombstoned()).isEqualTo(1);
         }
     }
 

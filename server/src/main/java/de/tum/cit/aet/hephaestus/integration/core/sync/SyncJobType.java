@@ -18,19 +18,40 @@ public enum SyncJobType {
     /**
      * Periodic re-sync that repairs webhook drift.
      *
-     * <p>Runs everything {@link #INITIAL} does, and then the part that repairs drift rather than
-     * merely re-reading: a deletion sweep that set-differences the full upstream issue/pull-request
-     * id set against the local mirror and tombstones what upstream no longer has
-     * ({@code GitHubDeletionSweepService}). This is the only pass that removes anything, and so the
-     * only thing separating it from {@link #INITIAL}.
+     * <p>Runs everything {@link #INITIAL} does, and — <em>for some integrations</em> — additionally
+     * repairs drift that upserts cannot see, by inferring upstream deletion from absence.
      *
-     * <p>The sweep exists because every other path is upsert-only, so an entity deleted upstream is
-     * caught only by a webhook — and webhooks here are not redeliverable (ADR-0008), while GitHub
-     * emits no {@code pull_request.deleted} event whatsoever. Without this pass a single missed
-     * delivery leaves a phantom row that never expires and permanently inflates per-repository counts.
+     * <p>Deletion repair is needed because every other path is upsert-only, so an entity deleted
+     * upstream is caught only by a webhook, and webhooks here are not redeliverable (ADR-0008).
+     * A single missed delivery otherwise leaves a phantom row that never expires.
      *
-     * <p>The sweep is fail-closed: it deletes nothing for a repository whose upstream listing it
-     * cannot prove complete.
+     * <p><strong>What this type actually means depends on the integration.</strong> Every
+     * integration below records a job row of this type, but they do not do the same work, so
+     * "Reconciliation · Succeeded" in the job history does not by itself imply anything was or
+     * could have been removed:
+     *
+     * <ul>
+     *   <li><strong>GitHub</strong> — the only true sweep. {@code GitHubDeletionSweepService}
+     *       set-differences the full upstream issue/pull-request number set against the local
+     *       mirror and tombstones what upstream no longer has. Fail-closed: it removes nothing for
+     *       a repository whose upstream listing it cannot prove complete. This is the only thing
+     *       separating this type from {@link #INITIAL} on GitHub. It matters most for pull
+     *       requests, for which GitHub emits no {@code deleted} event whatsoever.
+     *   <li><strong>Outline</strong> — genuinely tombstones. Every clean enumeration retires the
+     *       mirrored documents it did not see ({@code OutlineDocumentSyncService.tombstoneVanished});
+     *       a budget-exhausted pass skips tombstoning rather than guess.
+     *   <li><strong>GitLab</strong> — <em>no deletion repair at all.</em>
+     *       {@code GitlabIntegrationSyncRunner.reconcile} ignores the type, there is no sweep, and
+     *       no {@code processDeleted} handler exists on any GitLab path. Both the UI trigger and
+     *       the cron nonetheless record this type, so a GitLab job reading
+     *       "Reconciliation · Succeeded" means only "re-read upstream" — it cannot remove anything,
+     *       and a GitLab issue/MR deleted upstream stays in the mirror indefinitely.
+     *   <li><strong>Slack</strong> — no sweep by design. Deletions arrive solely via the
+     *       {@code message_deleted} event; history pagination cannot distinguish a deleted message
+     *       from a truncated page, a filtered subtype or a thread reply, so inferring deletion from
+     *       absence would mass-delete. The cost is that a missed {@code message_deleted} is
+     *       unrepairable — this pass will not fix it.
+     * </ul>
      */
     RECONCILIATION,
     /** Historical backfill of pre-existing data, bounded by a horizon/checkpoint. */

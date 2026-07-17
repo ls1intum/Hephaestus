@@ -23,8 +23,8 @@ import { AdminSlackNotificationSettings } from "@/components/admin/integrations/
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
-import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -299,6 +299,15 @@ public class GitHubDeletionSweepService {
                 // sweep, and the job already finalizes CANCELLED.
                 break;
             }
+            // Read the local side BEFORE the listing starts, and diff only this snapshot. The
+            // listing takes many round trips; anything a webhook inserts while it runs is local but
+            // legitimately absent from the pages already fetched, and diffing a post-listing read
+            // would tombstone it. Snapshotting first makes the candidate set exactly "rows that
+            // existed before we started looking", which is the set the completeness guarantee
+            // actually covers. Items that arrive during the window are simply left for the next
+            // sweep, by which point they are in the listing.
+            List<Integer> localBeforeListing = localLiveNumbers(repository.getId(), entity);
+
             UpstreamListing listing = listUpstreamNumbers(scopeId, parsed.get(), entity, safeNameWithOwner, handle);
             if (!listing.complete()) {
                 skipped = true;
@@ -311,7 +320,13 @@ public class GitHubDeletionSweepService {
                 );
                 continue;
             }
-            int tombstoned = tombstoneMissing(repository.getId(), entity, listing.numbers(), safeNameWithOwner);
+            int tombstoned = tombstoneMissing(
+                repository.getId(),
+                entity,
+                localBeforeListing,
+                listing.numbers(),
+                safeNameWithOwner
+            );
             if (entity == SweptEntity.ISSUE) {
                 issuesTombstoned = tombstoned;
             } else {
@@ -322,21 +337,28 @@ public class GitHubDeletionSweepService {
         return new SweepOutcome(issuesTombstoned, pullRequestsTombstoned, skipped);
     }
 
+    /** The live local numbers for one entity class of one repository. */
+    private List<Integer> localLiveNumbers(Long repositoryId, SweptEntity entity) {
+        return entity == SweptEntity.ISSUE
+            ? issueRepository.findLiveIssueNumbersByRepositoryId(repositoryId)
+            : issueRepository.findLivePullRequestNumbersByRepositoryId(repositoryId);
+    }
+
     /**
-     * Diffs the local live numbers against a <em>provably complete</em> upstream set and tombstones
-     * the difference. Never call this with a listing that is not complete.
+     * Diffs a <em>pre-listing</em> snapshot of the local live numbers against a <em>provably
+     * complete</em> upstream set and tombstones the difference. Never call this with a listing that
+     * is not complete, and never with a {@code local} snapshot read after the listing began — see
+     * the call site for why both halves matter.
+     *
+     * @param local the local live numbers as of before the upstream listing started
      */
     private int tombstoneMissing(
         Long repositoryId,
         SweptEntity entity,
+        List<Integer> local,
         Set<Integer> upstream,
         String safeNameWithOwner
     ) {
-        List<Integer> local =
-            entity == SweptEntity.ISSUE
-                ? issueRepository.findLiveIssueNumbersByRepositoryId(repositoryId)
-                : issueRepository.findLivePullRequestNumbersByRepositoryId(repositoryId);
-
         List<Integer> missing = local
             .stream()
             .filter(number -> !upstream.contains(number))
