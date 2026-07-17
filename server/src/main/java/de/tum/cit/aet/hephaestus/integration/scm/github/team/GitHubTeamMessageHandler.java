@@ -26,6 +26,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub team webhook events.
+ *
+ * <p><b>Subject tiers.</b> GitHub delivers {@code team} events with two different payload shapes and
+ * the generic subject deriver keys them onto two different tiers:
+ * <ul>
+ *   <li>{@code created}/{@code edited}/{@code deleted} carry only an {@code organization} →
+ *       {@code organization.team} (this handler).</li>
+ *   <li>{@code added_to_repository}/{@code removed_from_repository} additionally carry a
+ *       {@code repository} → {@code repository.team}, routed by {@link GitHubTeamRepositoryMessageHandler}
+ *       which delegates back into {@link #routeTeamEvent(GitHubTeamEventDTO)}.</li>
+ * </ul>
+ * Without the second registration the repo-permission actions would key to {@code repository.team},
+ * which has no handler, and be silently ACK-dropped — team↔repo permission changes would only land at
+ * the next full team sync.
  */
 @Component
 public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<GitHubTeamEventDTO> {
@@ -66,6 +79,16 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
 
     @Override
     protected void handleEvent(GitHubTeamEventDTO event) {
+        routeTeamEvent(event);
+    }
+
+    /**
+     * Shared routing for every team action, regardless of subject tier. Package-visible so the
+     * {@code repository.team} sibling handler ({@link GitHubTeamRepositoryMessageHandler}) can reuse the
+     * exact same dispatch for the {@code added_to_repository}/{@code removed_from_repository} deliveries
+     * that arrive on the repository tier.
+     */
+    void routeTeamEvent(GitHubTeamEventDTO event) {
         var teamDto = event.team();
 
         if (teamDto == null) {

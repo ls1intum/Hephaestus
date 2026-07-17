@@ -107,10 +107,11 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
                 issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
             }
             case GitHubEventAction.Issue.UNTYPED -> issueProcessor.processUntyped(issueDto, context);
-            default -> {
-                log.debug("Skipped issue event: reason=unhandledAction, action={}", event.action());
-                issueProcessor.process(issueDto, context);
-            }
+            // Unknown/unmapped actions SKIP rather than upsert. Falling through to process() was the
+            // footgun behind the original transferred-phantom bug: a future action meaning "removed"
+            // would silently re-create the issue. The explicit cases above already cover every real
+            // upsert action, so the safe default is to ack and ignore.
+            default -> log.debug("Skipped issue event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

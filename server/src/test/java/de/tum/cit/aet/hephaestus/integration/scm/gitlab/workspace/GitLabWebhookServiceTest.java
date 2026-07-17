@@ -639,4 +639,76 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             verify(webhookClientProvider, never()).getIfAvailable();
         }
     }
+
+    @Nested
+    class CheckWebhookHealth {
+
+        @BeforeEach
+        void bindActiveHookedWorkspace() {
+            // A workspace with a registered group hook (groupId=42, webhookId=99).
+            bindGitLabConfig(
+                1L,
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            when(workspaceRepository.findByStatus(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(List.of(workspace));
+        }
+
+        @Test
+        void leavesExecutableWebhookUntouched() {
+            when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(
+                Optional.of(new WebhookInfo(99L, EXTERNAL_URL + "/webhooks/gitlab", "executable"))
+            );
+
+            webhookService.checkWebhookHealth();
+
+            verify(webhookClient, never()).deregisterGroupWebhook(anyLong(), anyLong(), anyLong());
+            verify(webhookClient, never()).registerGroupWebhook(anyLong(), anyLong(), any());
+            // Stored id is untouched.
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
+        }
+
+        @Test
+        void reRegistersAutoDisabledWebhook() {
+            // GitLab kept the hook row but flipped it to alert_status=disabled — an existence check
+            // alone would pass forever, so this is the invisible-failure the health check must heal.
+            when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(
+                Optional.of(new WebhookInfo(99L, EXTERNAL_URL + "/webhooks/gitlab", "disabled"))
+            );
+            when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
+            when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
+                new WebhookInfo(100L, EXTERNAL_URL + "/webhooks/gitlab", "executable")
+            );
+
+            webhookService.checkWebhookHealth();
+
+            // The disabled hook is deleted first so registerWebhook's adopt-by-URL step can't re-adopt it,
+            // then a fresh hook is registered and its id persisted.
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            verify(webhookClient).registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class));
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(100L);
+        }
+
+        @Test
+        void reRegistersExternallyDeletedWebhook() {
+            when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(Optional.empty());
+            when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
+            when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
+                new WebhookInfo(100L, EXTERNAL_URL + "/webhooks/gitlab", "executable")
+            );
+
+            webhookService.checkWebhookHealth();
+
+            // Nothing to delete for a row that's already gone; a fresh hook is registered.
+            verify(webhookClient, never()).deregisterGroupWebhook(anyLong(), anyLong(), anyLong());
+            verify(webhookClient).registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class));
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(100L);
+        }
+    }
 }

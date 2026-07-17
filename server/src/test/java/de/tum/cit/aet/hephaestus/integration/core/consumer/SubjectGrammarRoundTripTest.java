@@ -73,6 +73,15 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             return;
         }
         String publisherSubject = GITLAB.deriveSubject(payload, Map.of());
+        // Group-tier lifecycle events (project/subgroup/member) are ORG-scoped: they carry the '?'
+        // placeholder in the project slot and are matched by the workspace's organizationFilter, not the
+        // repo prefix. project.create is the only such fixture that still has a path_with_namespace, so
+        // skip anything whose project token is the placeholder. Their routability is covered by
+        // GitlabSubjectKeyDeriverTest.
+        String[] subjectParts = publisherSubject.split("\\.", -1);
+        if (subjectParts.length >= 3 && "?".equals(subjectParts[2])) {
+            return;
+        }
         String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("gitlab", pathWithNamespace);
         assertThat(publisherSubject)
             .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)

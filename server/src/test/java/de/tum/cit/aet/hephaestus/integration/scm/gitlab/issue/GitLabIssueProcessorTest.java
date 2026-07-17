@@ -203,6 +203,33 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         @Test
+        void purgeConfidentialTombstonesStoredSnapshot() {
+            // Public → confidential flip: the previously-mirrored public row must be tombstoned so it
+            // drops out of every live query.
+            GitLabIssueEventDTO event = createEvent("update", "opened", true);
+            when(
+                issueRepository.tombstoneByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
+            ).thenReturn(1);
+
+            boolean purged = processor.purgeConfidential(event, createContext());
+
+            assertThat(purged).isTrue();
+            verify(issueRepository).tombstoneByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any());
+        }
+
+        @Test
+        void purgeConfidentialIsNoopWhenNothingStored() {
+            GitLabIssueEventDTO event = createEvent("update", "opened", true);
+            when(
+                issueRepository.tombstoneByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
+            ).thenReturn(0);
+
+            boolean purged = processor.purgeConfidential(event, createContext());
+
+            assertThat(purged).isFalse();
+        }
+
+        @Test
         void processFromSyncSkipsConfidential() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",

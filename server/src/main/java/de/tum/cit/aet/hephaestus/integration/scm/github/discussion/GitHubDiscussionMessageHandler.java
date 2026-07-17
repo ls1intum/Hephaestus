@@ -88,7 +88,15 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
         ProcessingContext context
     ) {
         switch (event.actionType()) {
-            case GitHubEventAction.Discussion.DELETED -> discussionProcessor.processDeleted(discussionDto, context);
+            // A transfer moves the discussion OUT of this repository, and the payload's discussion is
+            // the source-side row. Upserting it here — as the shared upsert branch below used to —
+            // re-created the very phantom the removal is meant to retire. Unlike issues, discussions
+            // have no reconciliation sweep to heal it, so the phantom would be permanent. Mirror the
+            // issue handler and route the transfer to the removal path. Discussions hard-delete on
+            // removal (see processDeleted), matching how the DELETED action already behaves.
+            case
+                GitHubEventAction.Discussion.DELETED,
+                GitHubEventAction.Discussion.TRANSFERRED -> discussionProcessor.processDeleted(discussionDto, context);
             case GitHubEventAction.Discussion.CLOSED -> discussionProcessor.processClosed(discussionDto, context);
             case GitHubEventAction.Discussion.REOPENED -> discussionProcessor.processReopened(discussionDto, context);
             case GitHubEventAction.Discussion.ANSWERED -> discussionProcessor.processAnswered(discussionDto, context);
@@ -99,15 +107,14 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
                 GitHubEventAction.Discussion.UNPINNED,
                 GitHubEventAction.Discussion.LOCKED,
                 GitHubEventAction.Discussion.UNLOCKED,
-                GitHubEventAction.Discussion.TRANSFERRED,
                 GitHubEventAction.Discussion.CATEGORY_CHANGED,
                 GitHubEventAction.Discussion.UNANSWERED,
                 GitHubEventAction.Discussion.LABELED,
                 GitHubEventAction.Discussion.UNLABELED -> discussionProcessor.process(discussionDto, context);
-            default -> {
-                log.debug("Skipped discussion event: reason=unhandledAction, action={}", event.action());
-                discussionProcessor.process(discussionDto, context);
-            }
+            // Unknown/unmapped actions SKIP rather than upsert. A future action that means "removed"
+            // must not fall through to an upsert that re-creates a phantom — the explicit cases above
+            // already cover every real upsert action, so the safe default is to ack and ignore.
+            default -> log.debug("Skipped discussion event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

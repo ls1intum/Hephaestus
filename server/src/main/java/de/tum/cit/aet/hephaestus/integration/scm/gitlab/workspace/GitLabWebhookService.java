@@ -504,30 +504,56 @@ public class GitLabWebhookService {
                 );
                 checked++;
 
-                if (existing.isEmpty()) {
+                boolean missing = existing.isEmpty();
+                boolean disabled = existing.isPresent() && existing.get().isDisabled();
+                if (!missing && !disabled) {
+                    continue; // hook exists and is still delivering — nothing to do
+                }
+
+                if (disabled) {
+                    // GitLab auto-disabled the hook after repeated delivery failures: the row still
+                    // exists (so getGroupWebhook returns it) but it delivers nothing. A fresh register
+                    // adopts by URL, which would re-adopt this same disabled hook — so delete it first,
+                    // best-effort, then let registerWebhook create a clean one.
                     log.warn(
-                        "Webhook missing (likely auto-disabled), re-registering: workspaceId={}, webhookId={}",
+                        "Webhook auto-disabled (alert_status=disabled), re-registering: workspaceId={}, webhookId={}",
                         workspace.getId(),
                         candidate.webhookId()
                     );
-                    // Clear stored ID so registerWebhook creates a new one
-                    updateGitLabConfig(workspace.getId(), cfg -> cfg.withGitlabWebhookId(null));
-
-                    WebhookSetupResult result = registerWebhook(workspace);
-                    if (result.registered()) {
-                        reregistered++;
-                        log.info(
-                            "Re-registered webhook: workspaceId={}, newWebhookId={}",
+                    try {
+                        client.deregisterGroupWebhook(workspace.getId(), candidate.groupId(), candidate.webhookId());
+                    } catch (Exception e) {
+                        log.debug(
+                            "Failed to delete disabled webhook before re-register (will retry next cycle): workspaceId={}",
                             workspace.getId(),
-                            result.webhookId()
-                        );
-                    } else {
-                        log.warn(
-                            "Failed to re-register webhook: workspaceId={}, reason={}",
-                            workspace.getId(),
-                            result.failureReason()
+                            e
                         );
                     }
+                } else {
+                    log.warn(
+                        "Webhook missing (deleted externally), re-registering: workspaceId={}, webhookId={}",
+                        workspace.getId(),
+                        candidate.webhookId()
+                    );
+                }
+
+                // Clear stored ID so registerWebhook creates a new one
+                updateGitLabConfig(workspace.getId(), cfg -> cfg.withGitlabWebhookId(null));
+
+                WebhookSetupResult result = registerWebhook(workspace);
+                if (result.registered()) {
+                    reregistered++;
+                    log.info(
+                        "Re-registered webhook: workspaceId={}, newWebhookId={}",
+                        workspace.getId(),
+                        result.webhookId()
+                    );
+                } else {
+                    log.warn(
+                        "Failed to re-register webhook: workspaceId={}, reason={}",
+                        workspace.getId(),
+                        result.failureReason()
+                    );
                 }
             } catch (Exception e) {
                 log.debug("Webhook health check failed: workspaceId={}", workspace.getId(), e);

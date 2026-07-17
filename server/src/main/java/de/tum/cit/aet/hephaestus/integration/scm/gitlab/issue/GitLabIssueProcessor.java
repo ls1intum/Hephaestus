@@ -131,6 +131,42 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
+     * Tombstones an already-mirrored <em>public</em> snapshot of an issue that has flipped to
+     * confidential. GitLab keeps confidential issues server-side and its webhooks stop carrying their
+     * content, but a copy we ingested while the issue was still public would otherwise linger — a stale,
+     * now-restricted public copy of the data. {@link #process} correctly refuses to (re)store a
+     * confidential issue; this closes the complementary gap by removing any row stored before the flip.
+     *
+     * <p>Uses the same soft-delete tombstone the upstream-deletion sweep uses (sets {@code deletedAt}, so
+     * the row drops out of every {@code deletedAt IS NULL} live query). Idempotent: a no-op when nothing
+     * is stored or the row is already tombstoned.
+     *
+     * @return {@code true} if a live row was tombstoned by this call
+     */
+    @Transactional
+    public boolean purgeConfidential(GitLabIssueEventDTO event, ProcessingContext context) {
+        var attrs = event.objectAttributes();
+        if (attrs == null || attrs.iid() == null) {
+            return false;
+        }
+        int number = attrs.iid();
+        long repositoryId = context.repository().getId();
+        int tombstoned = issueRepository.tombstoneByRepositoryIdAndNumbers(
+            repositoryId,
+            List.of(number),
+            Instant.now()
+        );
+        if (tombstoned > 0) {
+            log.info(
+                "Tombstoned public snapshot of now-confidential issue: repositoryId={}, iid={}",
+                repositoryId,
+                number
+            );
+        }
+        return tombstoned > 0;
+    }
+
+    /**
      * Handles an {@code action=update} issue event. Persists the issue via {@link #process} (which
      * overwrites the label set to the new state), then emits one {@link ScmDomainEvent.IssueLabeled}
      * per newly-added label — GitLab has no native "labeled" action, so this is how the IssueLabeled

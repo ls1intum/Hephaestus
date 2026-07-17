@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -123,7 +124,7 @@ public class GitLabWebhookClient {
         long webhookId = idValue.longValue();
         String url = (String) response.get("url");
         log.info("Registered GitLab group webhook: scopeId={}, groupId={}, webhookId={}", scopeId, groupId, webhookId);
-        return new WebhookInfo(webhookId, url);
+        return new WebhookInfo(webhookId, url, (String) response.get("alert_status"));
     }
 
     /**
@@ -191,7 +192,7 @@ public class GitLabWebhookClient {
 
             long id = ((Number) response.get("id")).longValue();
             String url = (String) response.get("url");
-            return Optional.of(new WebhookInfo(id, url));
+            return Optional.of(new WebhookInfo(id, url, (String) response.get("alert_status")));
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 return Optional.empty();
@@ -225,7 +226,13 @@ public class GitLabWebhookClient {
         return response
             .stream()
             .filter(hook -> hook.get("id") != null)
-            .map(hook -> new WebhookInfo(((Number) hook.get("id")).longValue(), (String) hook.get("url")))
+            .map(hook ->
+                new WebhookInfo(
+                    ((Number) hook.get("id")).longValue(),
+                    (String) hook.get("url"),
+                    (String) hook.get("alert_status")
+                )
+            )
             .toList();
     }
 
@@ -243,7 +250,35 @@ public class GitLabWebhookClient {
 
     public record GroupInfo(long id, String name, String fullPath) {}
 
-    public record WebhookInfo(long id, String url) {}
+    /**
+     * A GitLab group hook as read back from the API.
+     *
+     * @param id          the numeric hook id
+     * @param url         the delivery URL
+     * @param alertStatus the hook's delivery health from GitLab's project/group hooks API —
+     *                    {@code "executable"} (healthy), {@code "disabled"} (auto-disabled after
+     *                    repeated failures — GitLab keeps the row but stops delivering), or
+     *                    {@code "temporarily_disabled"} (transient backoff GitLab auto-recovers).
+     *                    {@code null} when the field is absent (older GitLab, or the register response).
+     * @see <a href="https://docs.gitlab.com/ee/api/group_level_webhooks.html">GitLab Group Webhooks API</a>
+     */
+    public record WebhookInfo(long id, String url, @Nullable String alertStatus) {
+        /** Two-arg convenience for callers/tests that don't care about delivery health. */
+        public WebhookInfo(long id, String url) {
+            this(id, url, null);
+        }
+
+        /**
+         * Whether GitLab has auto-disabled this hook (terminal {@code "disabled"} state). A disabled
+         * hook still exists on GitLab — so a mere existence check passes forever — but no longer
+         * delivers, which is exactly the invisible-failure the health check must heal. The transient
+         * {@code "temporarily_disabled"} backoff is deliberately excluded: GitLab re-enables it on its
+         * own, so re-registering on it would only churn.
+         */
+        public boolean isDisabled() {
+            return "disabled".equals(alertStatus);
+        }
+    }
 
     /**
      * Webhook configuration payload matching the GitLab API contract.
