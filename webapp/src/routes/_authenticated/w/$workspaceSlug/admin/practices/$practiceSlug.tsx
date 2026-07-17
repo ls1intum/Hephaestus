@@ -15,7 +15,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/$practiceSlug",
+	"/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug",
 )({
 	component: EditPracticeContainer,
 });

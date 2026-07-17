@@ -149,7 +149,7 @@ export function AppSidebar({
 						activeWorkspace={activeWorkspace}
 						onWorkspaceChange={onWorkspaceChange}
 						onAddWorkspace={onAddWorkspace}
-						isAdmin={isAdmin}
+						isAppAdmin={isAppAdmin}
 					/>
 				)}
 				{contextHeader}

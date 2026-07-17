@@ -18,9 +18,7 @@ import {
 } from "@/components/admin/ai/PracticeDetectionPolicyCard";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/practices/settings",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/settings")({
 	component: ReviewSettingsContainer,
 });
 

@@ -27,14 +27,18 @@ export function WorkspaceSwitcher({
 	onWorkspaceChange,
 	onAddWorkspace,
 	isLoading = false,
-	isAdmin = false,
+	isAppAdmin = false,
 }: {
 	workspaces: WorkspaceListItem[];
 	activeWorkspace?: WorkspaceListItem;
 	onWorkspaceChange?: (workspace: WorkspaceListItem) => void;
 	onAddWorkspace?: () => void;
 	isLoading?: boolean;
-	isAdmin?: boolean;
+	/**
+	 * Instance admin, NOT workspace admin: this only gates the zero-workspace state, where there is
+	 * no workspace to hold a membership role — a workspace-role gate here is always false.
+	 */
+	isAppAdmin?: boolean;
 }) {
 	const { isMobile } = useSidebar();
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -81,7 +85,7 @@ export function WorkspaceSwitcher({
 	}
 
 	if (workspaces.length === 0) {
-		if (isAdmin) {
+		if (isAppAdmin) {
 			return (
 				<SidebarMenu>
 					<SidebarMenuItem>
