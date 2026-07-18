@@ -40,7 +40,12 @@ sequenceDiagram
    is the explicit opt-out for changes with no user-facing effect; write why in the file body.
 2. **The Version PR accumulates.** On every push to `main`, the release workflow maintains a PR
    titled `chore(release): version packages` that previews the next version and the assembled
-   `CHANGELOG.md` section. It is safe to leave open — it updates itself.
+   `CHANGELOG.md` section. It is safe to leave open — it updates itself. It is opened by
+   `github-actions[bot]` and deliberately runs **no CI**: it only bumps a version string and
+   rewrites the changelog, and it is re-pushed on every merge to `main`, so running the full matrix
+   on it would burn CI without validating anything. Validation happens after the merge — `main` runs
+   the full suite and a release is only cut if that run succeeds. Maintainers bypass the branch
+   ruleset, so the absent required checks don't block the merge.
 3. **Merging the Version PR cuts the release.** The release workflow tags `vX.Y.Z` at the merge
    commit, creates the GitHub Release from the new changelog section, retags the CI-built Docker
    images as `X.Y.Z`, `X.Y`, and `latest`, publishes the signed release-pin asset, and starts the
