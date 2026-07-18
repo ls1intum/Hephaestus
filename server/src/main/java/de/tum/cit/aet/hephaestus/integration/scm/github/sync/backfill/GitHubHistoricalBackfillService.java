@@ -9,7 +9,6 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillPageObserver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;

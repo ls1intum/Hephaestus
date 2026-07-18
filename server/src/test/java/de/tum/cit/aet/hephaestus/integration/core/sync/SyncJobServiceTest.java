@@ -65,7 +65,7 @@ class SyncJobServiceTest extends BaseUnitTest {
     private SyncJobService service;
     private final Map<Long, SyncJob> store = new HashMap<>();
     private final AtomicLong idSequence = new AtomicLong(100L);
-    private final MutableClock clock = MutableClock.atEpochUtc();
+    private final MutableClock clock = MutableClock.atFixedInstant();
 
     @BeforeEach
     void setUp() {

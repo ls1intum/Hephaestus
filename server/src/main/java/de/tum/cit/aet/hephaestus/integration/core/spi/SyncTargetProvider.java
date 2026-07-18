@@ -214,60 +214,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         String discussionSyncCursor,
         @org.jspecify.annotations.Nullable Long nativeId
     ) {
-        /**
-         * Backward-compatible constructor for call sites that predate the stable {@code nativeId}
-         * (legacy rows and tests that don't exercise rename re-keying). Defaults {@code nativeId} to
-         * {@code null}; the periodic sync populates it on the first resolve.
-         */
-        public SyncTarget(
-            Long id,
-            Long scopeId,
-            Long installationId,
-            String personalAccessToken,
-            AuthMode authMode,
-            String repositoryNameWithOwner,
-            Instant lastLabelsSyncedAt,
-            Instant lastMilestonesSyncedAt,
-            Instant lastIssuesSyncedAt,
-            Instant lastPullRequestsSyncedAt,
-            Instant lastDiscussionsSyncedAt,
-            Instant lastCollaboratorsSyncedAt,
-            Instant lastFullSyncAt,
-            Integer issueBackfillHighWaterMark,
-            Integer issueBackfillCheckpoint,
-            Integer pullRequestBackfillHighWaterMark,
-            Integer pullRequestBackfillCheckpoint,
-            Instant backfillLastRunAt,
-            String issueSyncCursor,
-            String pullRequestSyncCursor,
-            String discussionSyncCursor
-        ) {
-            this(
-                id,
-                scopeId,
-                installationId,
-                personalAccessToken,
-                authMode,
-                repositoryNameWithOwner,
-                lastLabelsSyncedAt,
-                lastMilestonesSyncedAt,
-                lastIssuesSyncedAt,
-                lastPullRequestsSyncedAt,
-                lastDiscussionsSyncedAt,
-                lastCollaboratorsSyncedAt,
-                lastFullSyncAt,
-                issueBackfillHighWaterMark,
-                issueBackfillCheckpoint,
-                pullRequestBackfillHighWaterMark,
-                pullRequestBackfillCheckpoint,
-                backfillLastRunAt,
-                issueSyncCursor,
-                pullRequestSyncCursor,
-                discussionSyncCursor,
-                null
-            );
-        }
-
         /** @return true if full sync has never run or is older than {@code staleThreshold} */
         public boolean needsFullSync(Instant staleThreshold) {
             return lastFullSyncAt == null || lastFullSyncAt.isBefore(staleThreshold);

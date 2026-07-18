@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.BackfillProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillPageObserver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
@@ -21,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
@@ -174,116 +174,86 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
      * Creates a SyncTarget with completed incremental sync and no backfill progress.
      */
     private SyncTarget createTargetWithIncrementalComplete(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            Instant.now(), // lastLabelsSyncedAt
-            Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesSyncedAt (completed)
-            Instant.now(), // lastPullRequestsSyncedAt (completed)
-            null, // lastDiscussionsSyncedAt
-            Instant.now(), // lastCollaboratorsSyncedAt
-            Instant.now(), // lastFullSyncAt
-            null, // issueBackfillHighWaterMark (not initialized)
-            null, // issueBackfillCheckpoint
-            null, // pullRequestBackfillHighWaterMark (not initialized)
-            null, // pullRequestBackfillCheckpoint
-            null, // backfillLastRunAt
-            null, // issueSyncCursor
-            null, // pullRequestSyncCursor
-            null // discussionSyncCursor
-        );
+        // Incremental sync completed; backfill high-water marks left null (not initialized).
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .lastLabelsSyncedAt(Instant.now())
+            .lastMilestonesSyncedAt(Instant.now())
+            .lastIssuesSyncedAt(Instant.now())
+            .lastPullRequestsSyncedAt(Instant.now())
+            .lastCollaboratorsSyncedAt(Instant.now())
+            .lastFullSyncAt(Instant.now())
+            .build();
     }
 
     /**
      * Creates a SyncTarget where incremental sync has NOT completed yet.
      */
     private SyncTarget createTargetPendingIncrementalSync(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            null, // lastLabelsSyncedAt
-            null, // lastMilestonesSyncedAt
-            null, // lastIssuesSyncedAt (NOT completed)
-            null, // lastPullRequestsSyncedAt (NOT completed)
-            null, // lastDiscussionsSyncedAt
-            null, // lastCollaboratorsSyncedAt
-            null, // lastFullSyncAt
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        // All sync timestamps null => incremental sync NOT completed.
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .build();
     }
 
     /**
      * Creates a SyncTarget where backfill is already complete.
      */
     private SyncTarget createTargetWithBackfillComplete(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            Instant.now(), // lastLabelsSyncedAt
-            Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesSyncedAt
-            Instant.now(), // lastPullRequestsSyncedAt
-            null, // lastDiscussionsSyncedAt
-            Instant.now(), // lastCollaboratorsSyncedAt
-            Instant.now(), // lastFullSyncAt
-            100, // issueBackfillHighWaterMark
-            0, // issueBackfillCheckpoint = 0 means complete
-            50, // pullRequestBackfillHighWaterMark
-            0, // pullRequestBackfillCheckpoint = 0 means complete
-            Instant.now(),
-            null,
-            null,
-            null // discussionSyncCursor
-        );
+        // Checkpoints at 0 => backfill complete.
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .lastLabelsSyncedAt(Instant.now())
+            .lastMilestonesSyncedAt(Instant.now())
+            .lastIssuesSyncedAt(Instant.now())
+            .lastPullRequestsSyncedAt(Instant.now())
+            .lastCollaboratorsSyncedAt(Instant.now())
+            .lastFullSyncAt(Instant.now())
+            .issueBackfillHighWaterMark(100)
+            .issueBackfillCheckpoint(0)
+            .pullRequestBackfillHighWaterMark(50)
+            .pullRequestBackfillCheckpoint(0)
+            .backfillLastRunAt(Instant.now())
+            .build();
     }
 
     /**
      * Creates a SyncTarget with backfill in progress (partially complete).
      */
     private SyncTarget createTargetWithBackfillInProgress(Long id, String repoName) {
-        return new SyncTarget(
-            id,
-            SCOPE_ID,
-            INSTALLATION_ID,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            Instant.now(), // lastLabelsSyncedAt
-            Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesSyncedAt (completed)
-            Instant.now(), // lastPullRequestsSyncedAt (completed)
-            null, // lastDiscussionsSyncedAt
-            Instant.now(), // lastCollaboratorsSyncedAt
-            Instant.now(), // lastFullSyncAt
-            100, // issueBackfillHighWaterMark
-            42, // issueBackfillCheckpoint (in progress)
-            50, // pullRequestBackfillHighWaterMark
-            25, // pullRequestBackfillCheckpoint (in progress)
-            Instant.now().minusSeconds(120),
-            "cursor-issue-page-3", // issueSyncCursor
-            "cursor-pr-page-2", // pullRequestSyncCursor
-            null // discussionSyncCursor
-        );
+        // Checkpoints between 0 and high-water mark => backfill in progress.
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(SCOPE_ID)
+            .installationId(INSTALLATION_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .lastLabelsSyncedAt(Instant.now())
+            .lastMilestonesSyncedAt(Instant.now())
+            .lastIssuesSyncedAt(Instant.now())
+            .lastPullRequestsSyncedAt(Instant.now())
+            .lastCollaboratorsSyncedAt(Instant.now())
+            .lastFullSyncAt(Instant.now())
+            .issueBackfillHighWaterMark(100)
+            .issueBackfillCheckpoint(42)
+            .pullRequestBackfillHighWaterMark(50)
+            .pullRequestBackfillCheckpoint(25)
+            .backfillLastRunAt(Instant.now().minusSeconds(120))
+            .issueSyncCursor("cursor-issue-page-3")
+            .pullRequestSyncCursor("cursor-pr-page-2")
+            .build();
     }
 
     private SyncSession createSession(List<SyncTarget> targets) {
@@ -473,29 +443,15 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnFalseWhenRepoNameIsInvalid() {
-            SyncTarget target = new SyncTarget(
-                SYNC_TARGET_ID_A,
-                SCOPE_ID,
-                INSTALLATION_ID,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "invalid-repo-name", // no owner/name separator
-                null,
-                null,
-                Instant.now(), // lastIssuesSyncedAt
-                Instant.now(), // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null // discussionSyncCursor
-            );
+            SyncTarget target = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_A)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("invalid-repo-name") // no owner/name separator
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .build();
 
             boolean result = service.backfillRepository(target, 50, BackfillPageObserver.NOOP);
 
@@ -702,29 +658,20 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReportZeroRemainingWhenHighWaterMarkIsZero() {
             // Arrange - a repo with zero issues/PRs
-            SyncTarget target = new SyncTarget(
-                SYNC_TARGET_ID_A,
-                SCOPE_ID,
-                INSTALLATION_ID,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "org/empty-repo",
-                null, // lastLabelsSyncedAt
-                null, // lastMilestonesSyncedAt
-                Instant.now(), // lastIssuesSyncedAt
-                Instant.now(), // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null, // lastCollaboratorsSyncedAt
-                null, // lastFullSyncAt
-                0, // issueBackfillHighWaterMark = 0 (no issues)
-                0, // issueBackfillCheckpoint = 0
-                0, // pullRequestBackfillHighWaterMark = 0 (no PRs)
-                0, // pullRequestBackfillCheckpoint = 0
-                Instant.now(),
-                null,
-                null,
-                null
-            );
+            SyncTarget target = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_A)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("org/empty-repo")
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .issueBackfillHighWaterMark(0) // no issues
+                .issueBackfillCheckpoint(0)
+                .pullRequestBackfillHighWaterMark(0) // no PRs
+                .pullRequestBackfillCheckpoint(0)
+                .backfillLastRunAt(Instant.now())
+                .build();
 
             assertThat(target.isIssueBackfillComplete()).isTrue();
             assertThat(target.isPullRequestBackfillComplete()).isTrue();
@@ -736,29 +683,18 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReportHighWaterMarkAsRemainingWhenCheckpointIsNull() {
             // Arrange - initialized but checkpoint not yet set (first batch hasn't completed)
-            SyncTarget target = new SyncTarget(
-                SYNC_TARGET_ID_A,
-                SCOPE_ID,
-                INSTALLATION_ID,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "org/repo-a",
-                null, // lastLabelsSyncedAt
-                null, // lastMilestonesSyncedAt
-                Instant.now(), // lastIssuesSyncedAt
-                Instant.now(), // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null, // lastCollaboratorsSyncedAt
-                null, // lastFullSyncAt
-                200, // issueBackfillHighWaterMark
-                null, // issueBackfillCheckpoint (not yet set)
-                80, // pullRequestBackfillHighWaterMark
-                null, // pullRequestBackfillCheckpoint (not yet set)
-                null,
-                null,
-                null,
-                null
-            );
+            SyncTarget target = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_A)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("org/repo-a")
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .issueBackfillHighWaterMark(200)
+                .pullRequestBackfillHighWaterMark(80)
+                // checkpoints left null (not yet set)
+                .build();
 
             // Assert - remaining should be the high water mark itself
             assertThat(target.getIssueBackfillRemaining()).isEqualTo(200);
@@ -852,29 +788,13 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             Long installationId2 = 300L;
 
             SyncTarget targetInScope1 = createTargetPendingIncrementalSync(SYNC_TARGET_ID_A, "org/repo-a");
-            SyncTarget targetInScope2 = new SyncTarget(
-                SYNC_TARGET_ID_B,
-                scopeId2,
-                installationId2,
-                null,
-                AuthMode.INSTALLATION_APP,
-                "org2/repo-b",
-                null,
-                null,
-                null, // lastIssuesSyncedAt
-                null, // lastPullRequestsSyncedAt
-                null, // lastDiscussionsSyncedAt
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            SyncTarget targetInScope2 = SyncTargetTestBuilder.syncTarget()
+                .id(SYNC_TARGET_ID_B)
+                .scopeId(scopeId2)
+                .installationId(installationId2)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner("org2/repo-b")
+                .build();
 
             SyncSession session1 = createSession(List.of(targetInScope1));
             SyncSession session2 = new SyncSession(

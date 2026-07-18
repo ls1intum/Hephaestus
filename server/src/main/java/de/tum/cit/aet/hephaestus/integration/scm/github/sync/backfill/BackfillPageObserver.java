@@ -1,4 +1,8 @@
-package de.tum.cit.aet.hephaestus.integration.core.spi;
+package de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill;
+
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 
 /**
  * Per-vendor-page callback a backfill service invokes so its driving runner can report progress at the

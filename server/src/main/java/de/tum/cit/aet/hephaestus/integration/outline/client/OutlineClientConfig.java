@@ -59,14 +59,8 @@ public class OutlineClientConfig {
      *       {@code OutlineDeserializationToleranceTest}.</li>
      * </ul>
      *
-     * <p><b>Unknown enum values are handled at the contract level, not here.</b> Outline ships enum values
-     * ahead of its published spec (e.g. a collection {@code permission} of {@code "admin"}). The generated
-     * enums are built with openapi-generator's {@code enumUnknownDefaultCase=true} (see {@code server/pom.xml}),
-     * so an unrecognized value decodes to the enum's {@code UNKNOWN_DEFAULT_OPEN_API} constant instead of
-     * aborting the response. That is deliberately a <em>generator</em> knob rather than the mapper's
-     * {@code READ_UNKNOWN_ENUM_VALUES_AS_NULL}: the mapper feature only rescues the blocking
-     * {@code readValue} path, whereas the generated model's non-throwing {@code fromValue} rescues the
-     * reactive WebClient codec path this client actually runs on. Pinned by
+     * <p>Unknown <em>enum</em> values are tolerated separately, at the contract level (openapi-generator's
+     * {@code enumUnknownDefaultCase=true} in {@code server/pom.xml}), not here — full rationale in
      * {@code OutlineDeserializationToleranceTest#unknownEnumValueDecodesToUnknownDefaultOnWebClientPath}.
      *
      * <p>Exposed so tests that deserialize real fixtures exercise the exact same policy as the running client.

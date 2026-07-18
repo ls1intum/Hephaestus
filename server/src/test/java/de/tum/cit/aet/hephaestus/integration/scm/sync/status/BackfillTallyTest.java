@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -23,29 +24,16 @@ class BackfillTallyTest extends BaseUnitTest {
         Integer prHwm,
         Integer prCheckpoint
     ) {
-        return new SyncTarget(
-            id,
-            1L,
-            null,
-            null,
-            AuthMode.PERSONAL_ACCESS_TOKEN,
-            "owner/repo" + id,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            issueHwm,
-            issueCheckpoint,
-            prHwm,
-            prCheckpoint,
-            null,
-            null,
-            null,
-            null
-        );
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(1L)
+            .authMode(AuthMode.PERSONAL_ACCESS_TOKEN)
+            .repositoryNameWithOwner("owner/repo" + id)
+            .issueBackfillHighWaterMark(issueHwm)
+            .issueBackfillCheckpoint(issueCheckpoint)
+            .pullRequestBackfillHighWaterMark(prHwm)
+            .pullRequestBackfillCheckpoint(prCheckpoint)
+            .build();
     }
 
     @Test

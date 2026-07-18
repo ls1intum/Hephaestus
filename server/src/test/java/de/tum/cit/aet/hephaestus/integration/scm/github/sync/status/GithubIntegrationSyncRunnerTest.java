@@ -15,16 +15,17 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.BackfillProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillPageObserver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncScheduler;
+import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.BackfillPageObserver;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill.GitHubHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -71,29 +72,13 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
     }
 
     private static SyncTarget pendingTarget(long id, String repoName) {
-        return new SyncTarget(
-            id,
-            WORKSPACE_ID,
-            null,
-            null,
-            AuthMode.INSTALLATION_APP,
-            repoName,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null, // issueBackfillHighWaterMark (not initialized -> isBackfillComplete() == false)
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        // issueBackfillHighWaterMark left null (not initialized) -> isBackfillComplete() == false
+        return SyncTargetTestBuilder.syncTarget()
+            .id(id)
+            .scopeId(WORKSPACE_ID)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(repoName)
+            .build();
     }
 
     @Nested
@@ -230,29 +215,16 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
     class PerPageReporting {
 
         private SyncTarget initializedTarget(long id, String repoName, Integer issueHwm, Integer issueCheckpoint) {
-            return new SyncTarget(
-                id,
-                WORKSPACE_ID,
-                null,
-                null,
-                AuthMode.INSTALLATION_APP,
-                repoName,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                issueHwm,
-                issueCheckpoint,
-                0,
-                0,
-                null,
-                null,
-                null,
-                null
-            );
+            return SyncTargetTestBuilder.syncTarget()
+                .id(id)
+                .scopeId(WORKSPACE_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(repoName)
+                .issueBackfillHighWaterMark(issueHwm)
+                .issueBackfillCheckpoint(issueCheckpoint)
+                .pullRequestBackfillHighWaterMark(0)
+                .pullRequestBackfillCheckpoint(0)
+                .build();
         }
 
         /** Drives the observer the runner hands to the backfill service, as pages would. */

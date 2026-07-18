@@ -19,7 +19,7 @@ final class MutableClock extends Clock {
         this.zone = zone;
     }
 
-    static MutableClock atEpochUtc() {
+    static MutableClock atFixedInstant() {
         return new MutableClock(Instant.parse("2026-07-14T10:00:00Z"), ZoneId.of("UTC"));
     }
 

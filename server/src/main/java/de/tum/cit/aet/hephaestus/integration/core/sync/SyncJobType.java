@@ -16,44 +16,15 @@ public enum SyncJobType {
      */
     INITIAL,
     /**
-     * Periodic re-sync that repairs webhook drift.
+     * Periodic re-sync that repairs webhook drift. Runs everything {@link #INITIAL} does and, for some
+     * integrations, additionally infers upstream deletions from absence — webhooks here are not
+     * redeliverable (ADR-0008), so a single missed delete otherwise leaves a phantom row forever.
      *
-     * <p>Runs everything {@link #INITIAL} does, and — <em>for some integrations</em> — additionally
-     * repairs drift that upserts cannot see, by inferring upstream deletion from absence.
-     *
-     * <p>Deletion repair is needed because every other path is upsert-only, so an entity deleted
-     * upstream is caught only by a webhook, and webhooks here are not redeliverable (ADR-0008).
-     * A single missed delivery otherwise leaves a phantom row that never expires.
-     *
-     * <p><strong>What this type actually means depends on the integration.</strong> Every
-     * integration below records a job row of this type, but they do not do the same work, so
-     * "Reconciliation · Succeeded" in the job history does not by itself imply anything was or
-     * could have been removed:
-     *
-     * <ul>
-     *   <li><strong>GitHub</strong> — the only true sweep. {@code GitHubDeletionSweepService}
-     *       set-differences the full upstream issue/pull-request number set against the local
-     *       mirror and tombstones what upstream no longer has. Fail-closed: it removes nothing for
-     *       a repository whose upstream listing it cannot prove complete. This is the only thing
-     *       separating this type from {@link #INITIAL} on GitHub. It matters most for pull
-     *       requests, for which GitHub emits no {@code deleted} event whatsoever.
-     *   <li><strong>Outline</strong> — genuinely tombstones. Every clean enumeration retires the
-     *       mirrored documents it did not see ({@code OutlineDocumentSyncService.tombstoneVanished});
-     *       a budget-exhausted pass skips tombstoning rather than guess.
-     *   <li><strong>GitLab</strong> — a true sweep, mirroring GitHub.
-     *       {@code GitLabDeletionSweepService} set-differences the full upstream issue/merge-request
-     *       IID set (number-only GraphQL queries) against the local mirror and tombstones what
-     *       upstream no longer has. Fail-closed: it removes nothing for a project whose upstream
-     *       listing it cannot prove complete. This is the only thing separating this type from
-     *       {@link #INITIAL} on GitLab, and it matters even more than on GitHub — GitLab emits no
-     *       issue- or merge-request-deletion webhook at all, so there is not even a missed event that
-     *       could otherwise heal the drift.
-     *   <li><strong>Slack</strong> — no sweep by design. Deletions arrive solely via the
-     *       {@code message_deleted} event; history pagination cannot distinguish a deleted message
-     *       from a truncated page, a filtered subtype or a thread reply, so inferring deletion from
-     *       absence would mass-delete. The cost is that a missed {@code message_deleted} is
-     *       unrepairable — this pass will not fix it.
-     * </ul>
+     * <p><strong>The work is per-integration; a recorded job of this type does NOT by itself imply
+     * anything was or could have been removed.</strong> Whether a sweep runs at all, and how it
+     * fail-closes, lives with each integration's deletion path ({@code GitHubDeletionSweepService},
+     * {@code GitLabDeletionSweepService}, {@code OutlineDocumentSyncService#tombstoneVanished}); Slack
+     * does not sweep by design.
      */
     RECONCILIATION,
     /** Historical backfill of pre-existing data, bounded by a horizon/checkpoint. */

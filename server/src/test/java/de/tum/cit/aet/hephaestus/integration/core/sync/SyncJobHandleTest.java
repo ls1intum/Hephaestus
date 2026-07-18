@@ -20,12 +20,10 @@ class SyncJobHandleTest extends BaseUnitTest {
 
     private static final long JOB_ID = 42L;
 
-    /** Past the throttle window by a hair — the trailing flush is due after this much elapsed time. */
-    private static final Duration JUST_PAST_INTERVAL = Duration.ofSeconds(
-        SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS
-    ).plusMillis(200);
+    /** Exactly the throttle window: {@code elapsed == interval} already satisfies the {@code >=} due-check. */
+    private static final Duration THROTTLE_WINDOW = Duration.ofSeconds(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS);
 
-    private final MutableClock clock = MutableClock.atEpochUtc();
+    private final MutableClock clock = MutableClock.atFixedInstant();
 
     /** Captures what actually reached the "database". */
     private static final class RecordingWriter implements SyncJobHandle.ProgressWriter {
@@ -121,7 +119,7 @@ class SyncJobHandleTest extends BaseUnitTest {
         assertThat(handle.flushIfDue()).isFalse();
         assertThat(writer.writeCount()).isEqualTo(1);
 
-        clock.advance(JUST_PAST_INTERVAL);
+        clock.advance(THROTTLE_WINDOW);
 
         assertThat(handle.flushIfDue()).isTrue();
         assertThat(writer.writeCount()).isEqualTo(2);
@@ -139,7 +137,7 @@ class SyncJobHandleTest extends BaseUnitTest {
 
         handle.progress(1, 10, progress("written"));
         handle.progress(2, 10, progress("suppressed"));
-        clock.advance(JUST_PAST_INTERVAL);
+        clock.advance(THROTTLE_WINDOW);
 
         assertThat(handle.flushIfDue()).isTrue();
         // The sweep runs every second against every active handle; a flushed handle with no new
@@ -154,7 +152,7 @@ class SyncJobHandleTest extends BaseUnitTest {
         SyncJobHandle handle = newHandle(writer);
 
         handle.progress(1, 10, progress("first"));
-        clock.advance(JUST_PAST_INTERVAL);
+        clock.advance(THROTTLE_WINDOW);
         handle.progress(2, 10, progress("second"));
 
         assertThat(writer.writeCount()).isEqualTo(2);

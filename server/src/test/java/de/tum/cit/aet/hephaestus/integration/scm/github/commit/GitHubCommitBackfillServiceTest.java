@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
@@ -82,29 +83,14 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     // Helpers
 
     private static SyncTarget createSyncTarget(AuthMode authMode) {
-        return new SyncTarget(
-            1L,
-            100L,
-            authMode == AuthMode.INSTALLATION_APP ? 42L : null,
-            authMode == AuthMode.PERSONAL_ACCESS_TOKEN ? "ghp_test_token" : null,
-            authMode,
-            "owner/repo",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        return SyncTargetTestBuilder.syncTarget()
+            .id(1L)
+            .scopeId(100L)
+            .installationId(authMode == AuthMode.INSTALLATION_APP ? 42L : null)
+            .personalAccessToken(authMode == AuthMode.PERSONAL_ACCESS_TOKEN ? "ghp_test_token" : null)
+            .authMode(authMode)
+            .repositoryNameWithOwner("owner/repo")
+            .build();
     }
 
     private static Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {

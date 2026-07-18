@@ -65,10 +65,22 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     @MethodSource("gitlabFixtures")
     void gitlabFixtureSubjectMatchesConsumerPrefix(Path fixture) throws IOException {
         JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
+        // Mirror the deriver's rootGroupToken path sources that actually carry a namespace: a project's
+        // path_with_namespace, then a subgroup's group.full_path / full_path. Without the full_path fallbacks
+        // subgroup.create (which has no path_with_namespace) fell through the '/' guard below and never
+        // reached the org-filter assertion — leaving its deriver↔organizationFilter agreement unproven.
         String pathWithNamespace = payload.path("project").path("path_with_namespace").asString("");
         if (pathWithNamespace.isEmpty()) {
             pathWithNamespace = payload.path("path_with_namespace").asString("");
         }
+        if (pathWithNamespace.isEmpty()) {
+            pathWithNamespace = payload.path("group").path("full_path").asString("");
+        }
+        if (pathWithNamespace.isEmpty()) {
+            pathWithNamespace = payload.path("full_path").asString("");
+        }
+        // A leaf-only segment (e.g. member.add's group_path on a subgroup) cannot yield a root group and
+        // is documented-unroutable from payload alone — legitimately skipped.
         if (!pathWithNamespace.contains("/")) {
             return;
         }

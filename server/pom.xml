@@ -824,14 +824,8 @@
                                 <!-- Emit packages directly under the output dir (no src/main/java prefix) -->
                                 <sourceFolder>.</sourceFolder>
                                 <hideGenerationTimestamp>true</hideGenerationTimestamp>
-                                <!-- Unknown-enum tolerance at the contract level (path-independent). Outline -->
-                                <!-- ships enum values ahead of its published spec (e.g. a collection -->
-                                <!-- `permission` of "admin"). Generate an unknown-default constant so the -->
-                                <!-- enum's @JsonCreator fromValue returns it instead of throwing on an -->
-                                <!-- unrecognized value. Without this the throwing creator aborts the whole -->
-                                <!-- collections.list / documents.list decode on the reactive WebClient codec -->
-                                <!-- path (the mapper-level READ_UNKNOWN_ENUM_VALUES_AS_NULL is honored only on -->
-                                <!-- the blocking readValue path, not the reactive decoder). -->
+                                <!-- Unknown-enum tolerance on the reactive decode path; full rationale + -->
+                                <!-- revert guard in OutlineDeserializationToleranceTest#unknownEnumValueDecodesToUnknownDefaultOnWebClientPath. -->
                                 <enumUnknownDefaultCase>true</enumUnknownDefaultCase>
                             </configOptions>
                         </configuration>
@@ -878,7 +872,7 @@
                                 <openApiNullable>false</openApiNullable>
                                 <sourceFolder>.</sourceFolder>
                                 <hideGenerationTimestamp>true</hideGenerationTimestamp>
-                                <!-- Same unknown-enum tolerance as the spec3 execution; see the note there. -->
+                                <!-- Same unknown-enum tolerance as the spec3 execution above. -->
                                 <enumUnknownDefaultCase>true</enumUnknownDefaultCase>
                             </configOptions>
                         </configuration>

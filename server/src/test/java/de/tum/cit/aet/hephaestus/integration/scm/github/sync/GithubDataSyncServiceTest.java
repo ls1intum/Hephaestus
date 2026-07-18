@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipList
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.RepositoryNotFoundOnGitProviderException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -243,30 +244,24 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
      * @param pullRequestCursor value for the backfill-owned PR cursor column
      */
     private static SyncTarget syncTarget(String issueCursor, String pullRequestCursor) {
+        // All timestamps recent => within cooldown and initial sync "completed".
         Instant recent = Instant.now();
-        return new SyncTarget(
-            SYNC_TARGET_ID,
-            SCOPE_ID,
-            100L,
-            null,
-            AuthMode.INSTALLATION_APP,
-            REPO_NAME,
-            recent, // lastLabelsSyncedAt — within cooldown
-            recent, // lastMilestonesSyncedAt — within cooldown
-            recent, // lastIssuesSyncedAt — non-null => initial sync "completed"
-            recent, // lastPullRequestsSyncedAt — non-null => initial sync "completed"
-            recent, // lastDiscussionsSyncedAt
-            recent, // lastCollaboratorsSyncedAt — within cooldown
-            recent, // lastFullSyncAt
-            null,
-            null,
-            null,
-            null,
-            null,
-            issueCursor,
-            pullRequestCursor,
-            null
-        );
+        return SyncTargetTestBuilder.syncTarget()
+            .id(SYNC_TARGET_ID)
+            .scopeId(SCOPE_ID)
+            .installationId(100L)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(REPO_NAME)
+            .lastLabelsSyncedAt(recent)
+            .lastMilestonesSyncedAt(recent)
+            .lastIssuesSyncedAt(recent)
+            .lastPullRequestsSyncedAt(recent)
+            .lastDiscussionsSyncedAt(recent)
+            .lastCollaboratorsSyncedAt(recent)
+            .lastFullSyncAt(recent)
+            .issueSyncCursor(issueCursor)
+            .pullRequestSyncCursor(pullRequestCursor)
+            .build();
     }
 
     private static final long NATIVE_ID = 555L;
@@ -274,30 +269,21 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
     /** Same warm target as {@link #syncTarget}, with a stable provider {@code nativeId} attached. */
     private static SyncTarget syncTargetWithNativeId(Long nativeId) {
         Instant recent = Instant.now();
-        return new SyncTarget(
-            SYNC_TARGET_ID,
-            SCOPE_ID,
-            100L,
-            null,
-            AuthMode.INSTALLATION_APP,
-            REPO_NAME,
-            recent,
-            recent,
-            recent,
-            recent,
-            recent,
-            recent,
-            recent,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            nativeId
-        );
+        return SyncTargetTestBuilder.syncTarget()
+            .id(SYNC_TARGET_ID)
+            .scopeId(SCOPE_ID)
+            .installationId(100L)
+            .authMode(AuthMode.INSTALLATION_APP)
+            .repositoryNameWithOwner(REPO_NAME)
+            .lastLabelsSyncedAt(recent)
+            .lastMilestonesSyncedAt(recent)
+            .lastIssuesSyncedAt(recent)
+            .lastPullRequestsSyncedAt(recent)
+            .lastDiscussionsSyncedAt(recent)
+            .lastCollaboratorsSyncedAt(recent)
+            .lastFullSyncAt(recent)
+            .nativeId(nativeId)
+            .build();
     }
 
     @Test

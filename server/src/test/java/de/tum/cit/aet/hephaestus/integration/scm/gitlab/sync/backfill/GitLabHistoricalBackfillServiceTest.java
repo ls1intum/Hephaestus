@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -163,28 +164,16 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
 
     /** A target past initial sync with issue backfill still pending — the only shape that backfills. */
     private static SyncTarget target() {
-        return new SyncTarget(
-            SYNC_TARGET_ID,
-            SCOPE_ID,
-            null,
-            "glpat-token",
-            AuthMode.PERSONAL_ACCESS_TOKEN,
-            REPO,
-            null,
-            null,
-            Instant.now(), // lastIssuesSyncedAt — initial sync done, so backfill is allowed
-            null,
-            null,
-            null,
-            null,
-            500, // issueBackfillHighWaterMark — initialized
-            125, // issueBackfillCheckpoint — still counting down, so not complete
-            null,
-            null,
-            null,
-            "cursor-1",
-            null,
-            null
-        );
+        return SyncTargetTestBuilder.syncTarget()
+            .id(SYNC_TARGET_ID)
+            .scopeId(SCOPE_ID)
+            .personalAccessToken("glpat-token")
+            .authMode(AuthMode.PERSONAL_ACCESS_TOKEN)
+            .repositoryNameWithOwner(REPO)
+            .lastIssuesSyncedAt(Instant.now()) // initial sync done, so backfill is allowed
+            .issueBackfillHighWaterMark(500) // initialized
+            .issueBackfillCheckpoint(125) // still counting down, so not complete
+            .issueSyncCursor("cursor-1")
+            .build();
     }
 }
