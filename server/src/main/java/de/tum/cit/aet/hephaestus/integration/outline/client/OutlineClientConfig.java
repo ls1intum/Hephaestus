@@ -11,7 +11,6 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -52,25 +51,28 @@ public class OutlineClientConfig {
 
     /**
      * The Outline client's tolerant reader, derived from the Boot-configured mapper so it inherits every
-     * module (java.time, etc.) and flips only the two tolerance knobs the generated vendor models need:
+     * module (java.time, etc.) and flips only the one tolerance knob the generated vendor models need:
      *
      * <ul>
      *   <li>{@code FAIL_ON_UNKNOWN_PROPERTIES=false} — Outline returns far more fields than we map, and a
-     *       generated model cannot carry {@code @JsonIgnoreProperties}.</li>
-     *   <li>{@code READ_UNKNOWN_ENUM_VALUES_AS_NULL=true} — Outline adds enum values ahead of its published
-     *       spec (e.g. a collection {@code permission} of {@code "admin"}); a value outside the generated
-     *       enum must map to {@code null}, not abort the whole response. We never read these enum fields, so
-     *       {@code null} is harmless, whereas a hard failure would break {@code collections.list} sync.</li>
+     *       generated model cannot carry {@code @JsonIgnoreProperties}. Pinned by
+     *       {@code OutlineDeserializationToleranceTest}.</li>
      * </ul>
      *
-     * Exposed so tests that deserialize real fixtures exercise the exact same policy as the running client.
+     * <p><b>Unknown enum values are handled at the contract level, not here.</b> Outline ships enum values
+     * ahead of its published spec (e.g. a collection {@code permission} of {@code "admin"}). The generated
+     * enums are built with openapi-generator's {@code enumUnknownDefaultCase=true} (see {@code server/pom.xml}),
+     * so an unrecognized value decodes to the enum's {@code UNKNOWN_DEFAULT_OPEN_API} constant instead of
+     * aborting the response. That is deliberately a <em>generator</em> knob rather than the mapper's
+     * {@code READ_UNKNOWN_ENUM_VALUES_AS_NULL}: the mapper feature only rescues the blocking
+     * {@code readValue} path, whereas the generated model's non-throwing {@code fromValue} rescues the
+     * reactive WebClient codec path this client actually runs on. Pinned by
+     * {@code OutlineDeserializationToleranceTest#unknownEnumValueDecodesToUnknownDefaultOnWebClientPath}.
+     *
+     * <p>Exposed so tests that deserialize real fixtures exercise the exact same policy as the running client.
      */
     public static JsonMapper tolerantMapper(JsonMapper base) {
-        return base
-            .rebuild()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
-            .build();
+        return base.rebuild().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).build();
     }
 
     @Bean

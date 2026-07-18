@@ -116,38 +116,64 @@ class OutlineDeserializationToleranceTest {
     }
 
     /**
-     * The other half of the tolerant-reader contract: unknown enum values decode to {@code null}. Outline
-     * ships enum values ahead of its published spec — a collection {@code permission} of {@code "admin"} is
-     * outside the generated {@code OutlinePermission} enum, whose {@code @JsonCreator fromValue} throws
-     * {@code IllegalArgumentException} on anything it doesn't know. The tolerant policy
-     * ({@link OutlineClientConfig#tolerantMapper}) must turn that into {@code null} (a field we never read)
-     * rather than abort the whole {@code collections.list} response.
+     * The other half of the tolerant-reader contract, exercised on the <b>production decode path</b>: a
+     * poison enum value from Outline must not abort the whole {@code collections.list} response.
      *
-     * <p>Exercised through {@code tolerantMapper(...).readValue}, the same way
-     * {@code OutlineApiFixtureDeserializationTest} pins the policy. The load-bearing knob is the
-     * {@code READ_UNKNOWN_ENUM_VALUES_AS_NULL} feature enabled in {@link OutlineClientConfig#tolerantMapper};
-     * reverting it makes the {@code fromValue} throw abort the decode, so this test fails — which is
-     * exactly the regression it exists to catch.
+     * <p>Outline ships enum values ahead of its published spec — a collection {@code permission} of
+     * {@code "admin"} is outside the generated {@code OutlinePermission} enum ({@code read}/{@code read_write}).
+     * openapi-generator's default {@code @JsonCreator fromValue} throws {@code IllegalArgumentException} on an
+     * unknown value, and the mapper's {@code READ_UNKNOWN_ENUM_VALUES_AS_NULL} feature rescues that <em>only on
+     * the blocking {@code readValue} path</em> — not on the reactive {@code Jackson2JsonDecoder} codec the
+     * running client uses, where the throw surfaces as a {@code DecodingException} and breaks sync for the host.
+     *
+     * <p>The fix is contract-level: the enums are generated with {@code enumUnknownDefaultCase=true}
+     * (see {@code server/pom.xml}), so {@code fromValue} returns {@code UNKNOWN_DEFAULT_OPEN_API} instead of
+     * throwing — path-independent. This test drives the <em>real</em> {@code outlineWebClient} decoder (not
+     * {@code readValue}); reverting the generator knob restores the throwing {@code fromValue}, the decode
+     * aborts, and this test fails — exactly the regression it guards.
      */
     @Test
-    void outOfEnumPermissionDecodesToNullWhileSiblingsStillMap() {
+    void unknownEnumValueDecodesToUnknownDefaultOnWebClientPath() {
+        // A collection list page whose sole row carries an out-of-spec permission ("admin").
         String body = """
             {
-              "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
-              "name": "Engineering Docs",
-              "urlId": "j4Gxqv1NCn",
-              "permission": "admin"
+              "data": [
+                {
+                  "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
+                  "name": "Engineering Docs",
+                  "urlId": "j4Gxqv1NCn",
+                  "permission": "admin"
+                }
+              ],
+              "pagination": {"offset": 0, "limit": 100}
             }
             """;
 
-        OutlineCollectionModel collection = OutlineClientConfig.tolerantMapper(baseObjectMapper).readValue(
-            body,
-            OutlineCollectionModel.class
-        );
+        WebClient stubbed = new OutlineClientConfig(new OutlineRateLimitTracker(new SimpleMeterRegistry()))
+            .outlineWebClient(baseObjectMapper)
+            .mutate()
+            .exchangeFunction(request ->
+                Mono.just(
+                    ClientResponse.create(HttpStatus.OK).header("Content-Type", "application/json").body(body).build()
+                )
+            )
+            .build();
 
-        assertThat(collection).isNotNull();
-        // The unknown enum value maps to null instead of aborting the decode.
-        assertThat(collection.getPermission()).isNull();
+        // The production decode path: retrieve().bodyToMono(...), the reactive Jackson codec — NOT readValue.
+        OutlineEnvelope<List<OutlineCollectionModel>> envelope = stubbed
+            .post()
+            .uri("https://wiki.example.com/api/collections.list")
+            .retrieve()
+            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollectionModel>>>() {})
+            .block();
+
+        assertThat(envelope).isNotNull();
+        assertThat(envelope.data()).hasSize(1);
+        OutlineCollectionModel collection = envelope.data().get(0);
+        // The poison enum decodes to the generated unknown-default rather than aborting the whole page.
+        // Asserted by wire value (not the constant) so a reverted generator knob fails at decode, not compile.
+        assertThat(collection.getPermission()).isNotNull();
+        assertThat(collection.getPermission().getValue()).isEqualTo("unknown_default_open_api");
         // Sibling fields on the same model still map — tolerance is scoped to the poison field only.
         assertThat(collection.getId()).isEqualTo("fbe68839-b131-44e2-bb93-0bc533d39193");
         assertThat(collection.getName()).isEqualTo("Engineering Docs");
