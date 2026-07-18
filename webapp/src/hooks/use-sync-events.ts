@@ -23,7 +23,7 @@ interface SyncEventHint {
 	connectionId: number;
 }
 
-/** Backoff ladder for manual reconnects: 1s, 2s, 4s … capped, each with ±50% jitter. */
+/** Backoff ladder for manual reconnects: 1s, 2s, 4s … capped, each scaled by 0.5–1.0× jitter. */
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_CAP_MS = 30_000;
 
@@ -167,6 +167,8 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 			try {
 				hint = JSON.parse(event.data);
 			} catch {
+				// A malformed hint is safely ignored: the periodic poll backstop still refreshes state.
+				console.debug("Ignoring malformed sync-event hint payload");
 				return;
 			}
 

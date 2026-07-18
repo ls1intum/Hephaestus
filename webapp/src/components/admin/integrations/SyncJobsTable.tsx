@@ -203,7 +203,7 @@ function JobRow({ job }: { job: SyncJob }) {
 				<Badge variant={STATUS_VARIANT[job.status]}>{JOB_STATUS_LABEL[job.status]}</Badge>
 			</TableCell>
 			{/* Type and trigger are one fact read as one phrase — "Reconciliation · scheduled" — not two
-			    columns, one of which repeated the same word down every row of a scheduled connection. */}
+			    columns, since the trigger would repeat the same word down every row of a scheduled connection. */}
 			<TableCell>
 				{JOB_TYPE_LABEL[job.type]}
 				<span className="text-muted-foreground">

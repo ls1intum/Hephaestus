@@ -42,11 +42,10 @@ interface RepositoryItem {
 /**
  * One repository row and its removal confirm.
  *
- * The dialog is controlled so the pending state can exist at all: `AlertDialogAction` closes on
- * click, so a `disabled={isRemoving}` on an uncontrolled action unmounts before the flag ever flips —
- * the state was in the code but could never be reached, let alone seen. Holding the dialog open across
- * the mutation gives the confirm somewhere to say "Removing…", and gives the second click something to
- * bounce off.
+ * In this Base UI port `AlertDialogAction` is a plain button, not a Close, so confirming does not
+ * dismiss the dialog. That is what lets it stay open across the mutation: the confirm can show
+ * "Removing…", the row unmounts on success (taking the dialog with it), and a failure leaves the
+ * dialog open with the confirm pressable again once `isRemoving` clears.
  */
 function RepositoryRow({
 	repo,
@@ -61,11 +60,10 @@ function RepositoryRow({
 }) {
 	const [open, setOpen] = useState(false);
 
-	// The row unmounts on success, so nothing here needs to close the dialog on the happy path. A
-	// failure leaves the row — and this dialog — mounted, which is what lets the flag fall back to
-	// false and the confirm become pressable again.
-	const handleRemove = (event: React.MouseEvent) => {
-		event.preventDefault();
+	// AlertDialogAction does not auto-close, so nothing here needs to close the dialog. The row
+	// unmounts on success; a failure leaves the row — and this dialog — mounted, which lets the flag
+	// fall back to false and the confirm become pressable again.
+	const handleRemove = () => {
 		onRemove(repo.nameWithOwner);
 	};
 

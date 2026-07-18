@@ -160,7 +160,7 @@ describe("Outline integration — connect happy path", () => {
 
 		renderContainer();
 
-		// The disconnected form is server URL + token only — the collection allow-list is gone.
+		// The disconnected form is server URL + token only — no collection allow-list.
 		expect(await screen.findByLabelText(/api token/i)).toBeTruthy();
 		expect(screen.queryByLabelText(/allow-list/i)).toBeNull();
 		expect(screen.queryByLabelText(/collections/i)).toBeNull();
@@ -189,8 +189,8 @@ describe("Outline integration — connect happy path", () => {
 		});
 
 		// The invalidated connections query refetches → the card flips to connected. The identity line
-		// reads written copy, not the lowercased `ACTIVE` token it used to render, and the shared
-		// connection header appears with the Sync control now that the connection is active.
+		// reads written copy ("Outline connected"), not a raw status token, and the shared connection
+		// header appears with the Sync control now that the connection is active.
 		expect(await screen.findByText(/outline connected/i)).toBeTruthy();
 		expect(await screen.findByRole("button", { name: /sync now/i })).toBeTruthy();
 		expect(toast.success).toHaveBeenCalledWith("Outline connected");

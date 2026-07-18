@@ -12,11 +12,9 @@ import org.jspecify.annotations.Nullable;
  * batch. Shared by both SCM runners: GitHub and GitLab drive different page loops but persist the same
  * high-water-mark / checkpoint columns on {@link SyncTarget}, so the arithmetic is identical.
  *
- * <p><b>Why this exists.</b> The backfill runner used to pass {@code itemsTotal = null}, so however
- * often it reported, the UI could only ever draw an indeterminate spinner — identical at second 1 and
- * second 900. The total was never unknown: backfill walks issue and PR <em>numbers</em> down from a
+ * <p><b>How the total is known.</b> Backfill walks issue and PR <em>numbers</em> down from a
  * high-water mark toward #1, and both the mark and the checkpoint are already persisted per repository.
- * Summing them is the whole trick.
+ * Summing them yields a determinate total.
  *
  * <p><b>The unit is issue/PR numbers, not rows.</b> {@code itemsTotal = Σ highWaterMark} and
  * {@code itemsProcessed = Σ (highWaterMark − remaining)} are consistent with each other and with the

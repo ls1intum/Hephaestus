@@ -33,9 +33,8 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 /**
- * The absolute timestamp is always one hover — or one Tab — away. It is a `span` trigger rather than
- * the primitive's default button because it does nothing when pressed, but it stays focusable so the
- * instant is not mouse-only.
+ * The absolute timestamp is always one hover — or one Tab — away. The trigger is the tooltip
+ * primitive's native button, so the instant stays keyboard-reachable and not mouse-only.
  */
 export const HoverRevealsAbsoluteTime: Story = {
 	args: { value: new Date("2026-07-14T09:30:12Z") },

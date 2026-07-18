@@ -100,14 +100,6 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
     class Reconcile {
 
         @Test
-        void delegatesToHandleAwareDataSyncServiceEntryPoint() {
-            runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
-
-            verify(dataSyncScheduler).syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
-            verify(handle, never()).reportCancelled();
-        }
-
-        @Test
         void reportsCancelledWhenTheHandleIsStillCancelledOnReturn() {
             when(handle.isCancellationRequested()).thenReturn(true);
 

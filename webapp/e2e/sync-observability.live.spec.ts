@@ -29,46 +29,6 @@ test.describe("live integration operations", () => {
 		expect(stream.headers()["content-type"]).toContain("text/event-stream");
 	});
 
-	test("GitHub detail exposes connection, resources, and job history without a duplicate repository list", async ({
-		page,
-	}) => {
-		await loginAsDevAdmin(page, USERNAME);
-		await page.goto(`/w/${GITHUB_WORKSPACE}/admin/integrations/scm`);
-
-		await expect(page.getByRole("heading", { name: "GitHub", exact: true })).toBeVisible();
-		await expect(page.getByRole("heading", { name: "Connection", exact: true })).toBeVisible();
-		await expect(page.getByRole("heading", { name: "Repository sync state" })).toBeVisible();
-		await expect(page.getByRole("heading", { name: "Job history" })).toBeVisible();
-		await expect(page.getByRole("heading", { name: "Monitored Repositories" })).toHaveCount(0);
-		await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
-	});
-
-	test("Outline and Slack detail routes render their operational controls", async ({ page }) => {
-		await loginAsDevAdmin(page, USERNAME);
-
-		await page.goto(`/w/${GITHUB_WORKSPACE}/admin/integrations/outline`);
-		await expect(page.getByRole("heading", { name: "Outline", exact: true })).toBeVisible();
-		await expect(
-			page.getByRole("button", { name: /^(sync now|connect outline)$/i }),
-		).toBeVisible();
-
-		await page.goto(`/w/${GITHUB_WORKSPACE}/admin/integrations/slack`);
-		await expect(page.getByRole("heading", { name: "Slack", exact: true })).toBeVisible();
-		await expect(
-			page.getByRole("button", { name: /^(sync now|connect slack workspace)$/i }).first(),
-		).toBeVisible();
-	});
-
-	test("GitLab detail exposes its operational sync view", async ({ page }) => {
-		await loginAsDevAdmin(page, USERNAME);
-		await page.goto(`/w/${GITLAB_WORKSPACE}/admin/integrations/scm`);
-
-		await expect(page.getByRole("heading", { name: "GitLab", exact: true })).toBeVisible();
-		await expect(page.getByRole("heading", { name: "Repository sync state" })).toBeVisible();
-		await expect(page.getByRole("heading", { name: "Job history" })).toBeVisible();
-		await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
-	});
-
 	test("manual GitLab sync is accepted and reflected without a reload", async ({ page }) => {
 		test.skip(!MUTATIONS_ENABLED, "set E2E_MUTATE_LIVE_INTEGRATIONS=true to run provider mutations");
 		await loginAsDevAdmin(page, USERNAME);

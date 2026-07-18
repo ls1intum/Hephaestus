@@ -125,11 +125,9 @@ public class GitLabHistoricalBackfillService {
         for (SyncSession session : sessions) {
             Long providerId = getGitLabProviderId(session.accountLogin());
 
-            // Determinate progress from the already-persisted high-water-mark / checkpoint columns —
-            // this pass used to report itemsTotal = null, which pinned the UI to an indeterminate
-            // spinner no matter how often it reported. Built over every target of the scope rather than
-            // only the pending ones, so the denominator holds still as repositories complete instead of
-            // shrinking under the bar.
+            // Determinate progress from the already-persisted high-water-mark / checkpoint columns.
+            // Built over every target of the scope rather than only the pending ones, so the
+            // denominator holds still as repositories complete instead of shrinking under the bar.
             //
             // Scoped per session because that is the grain the refresh below can re-read cheaply. Only
             // the handle-driven path reports at all, and it always filters to exactly one session.

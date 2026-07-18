@@ -731,6 +731,12 @@ export function SyncResourcesTable({
 	const freshCount = resources.length - attentionCount;
 	const totalItems = resources.reduce((sum, r) => sum + (r.itemCount ?? 0), 0);
 
+	// The facet ToggleGroup only mounts while there is something to attend to, but `facet` state is
+	// independent: a sync that clears the last attention row unmounts the toggle without resetting
+	// `facet`, which would otherwise collapse the table to "no match". Fall back to "all" whenever the
+	// toggle is not shown.
+	const effectiveFacet = attentionCount > 0 ? facet : "all";
+
 	const normalizedQuery = query.trim().toLowerCase();
 	const searched = normalizedQuery
 		? resources.filter(
@@ -740,9 +746,9 @@ export function SyncResourcesTable({
 			)
 		: resources;
 	const faceted =
-		facet === "attention"
+		effectiveFacet === "attention"
 			? searched.filter((r) => isAttention(r, syncIntervalSeconds))
-			: facet === "fresh"
+			: effectiveFacet === "fresh"
 				? searched.filter((r) => !isAttention(r, syncIntervalSeconds))
 				: searched;
 	const visible = [...faceted].sort((a, b) =>

@@ -15,8 +15,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Drives the connect-time initial sync for GitHub <b>PAT</b> connections off the committed
  * {@code Activated} boundary, closing the asymmetry where a PAT-connected GitHub workspace recorded and
- * ran no INITIAL sync at connect (it previously only synced on the next server restart via
- * {@code WorkspaceActivationService}). Keying on the AFTER_COMMIT ACTIVE transition guarantees the sync
+ * ran no INITIAL sync at connect. Keying on the AFTER_COMMIT ACTIVE transition guarantees the sync
  * runs against a committed, ACTIVE Connection and is therefore recorded as an {@code INITIAL}/{@code
  * LIFECYCLE} {@code SyncJob} through {@code GitHubWorkspaceDataSyncTrigger}.
  *

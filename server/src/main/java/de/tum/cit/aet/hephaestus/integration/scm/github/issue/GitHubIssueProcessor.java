@@ -438,10 +438,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * exists in this one.
      *
      * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is the
-     * source-side issue. Routing it to {@link #process} — as this used to — re-upserted the issue
-     * into the repository it had just left, so the transfer created a permanent phantom instead of
-     * removing one. A transfer is not a delete event, but from this repository's perspective the
-     * outcome is identical: the issue is gone.
+     * source-side issue. Routing it to {@link #process} would re-upsert the issue into the repository
+     * it had just left, creating a permanent phantom instead of removing one. A transfer is not a
+     * delete event, but from this repository's perspective the outcome is identical: the issue is gone.
      *
      * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
      * feedback/observation rows reference it by bare id with no FK, so removing the row would orphan

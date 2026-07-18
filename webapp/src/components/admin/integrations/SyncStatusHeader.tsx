@@ -61,11 +61,9 @@ function DiagnosticItem({
 /**
  * The remaining API budget as a number.
  *
- * This used to be a `Progress` bar, which put "full = healthy" directly beside the job bar's
- * "full = done" — two bars on one card, filling for opposite reasons. The number was always the fact;
- * the bar only added an inverted metaphor. The reset window is the one thing a bare number loses, so
- * it moves into a tooltip, and the only reading that needs colour — a budget about to run out — is the
- * only one that gets it.
+ * Rendered as a bare number rather than a bar: a "full = healthy" budget bar beside the job bar's
+ * "full = done" would put two bars on one card filling for opposite reasons. The reset window moves
+ * into a tooltip, and only a budget about to run out gets colour.
  */
 function RateLimitValue({ rateLimit }: { rateLimit: RateLimitSnapshot }) {
 	const isLow =
@@ -173,15 +171,12 @@ export interface SyncStatusHeaderProps {
  * The connection plane: health, freshness and the controls that change them, for every integration.
  *
  * The headline row is one sentence — health badge, when the mirror last completed, when it will next
- * run — because that is the whole question this page is opened to answer, and it was previously spread
- * across a page-header badge, an uppercase-labelled metric grid and a schedule the server sent but
- * nothing rendered. The freshness reading is tinted against the connection's own cadence, so "4 hours
- * ago" reads as fine on a six-hourly schedule and as a missed run on an hourly one.
+ * run — because that is the whole question this page is opened to answer. The freshness reading is
+ * tinted against the connection's own cadence, so "4 hours ago" reads as fine on a six-hourly
+ * schedule and as a missed run on an hourly one.
  *
  * Everything below it qualifies that sentence: diagnostics that explain a bad reading, the running
- * job's progress, and one trigger. GitHub's card once offered Sync and Backfill side by side and had
- * to run a protocol between them so neither claimed the other's work; a split button makes the rare
- * operation a menu item and the whole problem disappears with the second button.
+ * job's progress, and one trigger, with the rare backfill operation as a split-button menu item.
  */
 export function SyncStatusHeader({
 	label,

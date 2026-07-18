@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The wire types are the generated Outline models: {@link OutlineNavigationNode} for the collection tree
  * and {@link OutlineDocumentModel} for per-document metadata. The generated model carries the {@code Model}
- * suffix precisely so it no longer collides with the mirror entity ({@link OutlineDocument}), letting
+ * suffix to disambiguate it from the mirror entity ({@link OutlineDocument}), letting
  * {@link #applyAuthorship} take both by their plain imported simple names.
  */
 final class OutlineSyncMapping {

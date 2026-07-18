@@ -44,10 +44,9 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
     /**
      * The terminal summary for a Slack reconcile, in the shared progress shape.
      *
-     * <p>The per-channel counters that used to be scattered across their own top-level keys are folded
-     * into {@code currentStep} instead. They were never rendered — the UI reads {@code currentStep} and
-     * nothing else — and every integration inventing its own key set is what made the map unrenderable
-     * in the first place.
+     * <p>Per-channel counters are folded into {@code currentStep} rather than exposed as their own
+     * top-level keys: the UI reads {@code currentStep} and nothing else, so any other keys go
+     * unrendered.
      */
     public static SyncProgress progressDetail(WorkspaceSyncSummary summary) {
         StringBuilder step = new StringBuilder();

@@ -45,9 +45,8 @@ const resources: SyncResourceState[] = [
 		itemCount: (3410 + 1204) * 3,
 	},
 	{
-		// Silent-broken at the row level: thousands of issues, zero comments. Counts carry this where the
-		// old per-class watermark never could — a bare number, not a colour, because 0 comments is broken
-		// on some repositories and normal on others.
+		// Silent-broken at the row level: thousands of issues, zero comments. Counts carry this as a bare
+		// number, not a colour, because 0 comments is broken on some repositories and normal on others.
 		id: 2,
 		externalId: "ls1intum/Athena",
 		name: "ls1intum/Athena",
@@ -278,9 +277,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The headline claim: one column per class (issues, PRs, reviews, comments, commits), one "Last synced"
- * column, and a triage sort that puts the very-stale legacy mirror in row one. The dropped `Items`,
- * `State` and `Synced through` columns do not return.
+ * The headline: one column per class (issues, PRs, reviews, comments, commits), one "Last synced"
+ * column, and a triage sort that puts the very-stale mirror in row one. The `Items`, `State` and
+ * `Synced through` columns are absent.
  */
 export const Default: Story = {
 	args: { resources },

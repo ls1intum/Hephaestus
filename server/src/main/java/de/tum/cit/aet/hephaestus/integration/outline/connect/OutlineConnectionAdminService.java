@@ -14,12 +14,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
- * Admin surface behind the Outline connection endpoints — now scoped to the kind-specific credential
- * concern (the token health probe). The health snapshot and the manual "sync now" trigger were absorbed
- * into the unified sync-observability API: {@code OutlineConnectionSyncStateProvider} (read) and
- * {@code OutlineIntegrationSyncRunner} (manual trigger) replace {@code status()}/{@code syncNow()}, and
- * the per-connection job guard in {@code SyncJobService} replaces the {@code syncsInFlight} CAS this
- * class used to own.
+ * Admin surface behind the Outline connection endpoints, scoped to the kind-specific credential
+ * concern (the token health probe). The health snapshot and manual "sync now" trigger live in the
+ * unified sync-observability API: {@code OutlineConnectionSyncStateProvider} (read) and
+ * {@code OutlineIntegrationSyncRunner} (manual trigger); the per-connection job guard in
+ * {@code SyncJobService} owns in-flight de-duplication.
  */
 @Service
 @ConditionalOnServerRole

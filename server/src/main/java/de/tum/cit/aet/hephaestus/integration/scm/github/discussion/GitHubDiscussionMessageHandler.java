@@ -89,11 +89,11 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
     ) {
         switch (event.actionType()) {
             // A transfer moves the discussion OUT of this repository, and the payload's discussion is
-            // the source-side row. Upserting it here — as the shared upsert branch below used to —
-            // re-created the very phantom the removal is meant to retire. Unlike issues, discussions
-            // have no reconciliation sweep to heal it, so the phantom would be permanent. Mirror the
-            // issue handler and route the transfer to the removal path. Discussions hard-delete on
-            // removal (see processDeleted), matching how the DELETED action already behaves.
+            // the source-side row. Upserting it here would re-create the very phantom the removal is
+            // meant to retire. Unlike issues, discussions have no reconciliation sweep to heal it, so
+            // the phantom would be permanent. Mirror the issue handler and route the transfer to the
+            // removal path. Discussions hard-delete on removal (see processDeleted), matching how the
+            // DELETED action already behaves.
             case
                 GitHubEventAction.Discussion.DELETED,
                 GitHubEventAction.Discussion.TRANSFERRED -> discussionProcessor.processDeleted(discussionDto, context);

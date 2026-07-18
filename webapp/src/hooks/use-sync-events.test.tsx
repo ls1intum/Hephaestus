@@ -73,7 +73,7 @@ function latestSource(): FakeEventSource {
 }
 
 /**
- * Let the pending reconnect fire. The ladder is 1s·2ⁿ⁻¹ with ±50% jitter, so 5s clears any of the
+ * Let the pending reconnect fire. The ladder is 1s·2ⁿ⁻¹ scaled by 0.5–1.0× jitter, so 5s clears any of the
  * first three attempts — the only depth these tests reach. Fake timers move `Date.now()` too, and
  * that is deliberate here: an early flap really does reconnect seconds later, which is what makes
  * the resync throttle bite.
@@ -143,7 +143,7 @@ describe("useSyncEvents", () => {
 		const otherWorkspace = listConnectionSyncJobsQueryKey({
 			path: { workspaceSlug: "another-workspace", connectionId: CONNECTION_ID },
 		});
-		// Not an integration query: the old workspace-wide predicate swept queries like this one in.
+		// Not an integration query: a workspace-wide predicate would sweep this in; the scoped predicate must not.
 		const unrelated = getUserProfileQueryKey({ path: { workspaceSlug: WORKSPACE, login: "ada" } });
 		for (const key of [included, otherWorkspace, unrelated]) queryClient.setQueryData(key, []);
 

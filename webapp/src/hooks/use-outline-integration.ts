@@ -231,10 +231,10 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		await removeCollection.mutateAsync({ path: { workspaceSlug, collectionId } });
 	};
 
-	// The connection plane is now the shared `SyncStatusHeader`, driven by the raw unified status —
+	// The connection plane is the shared `SyncStatusHeader`, driven by the raw unified status —
 	// health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls all
-	// come from it, exactly as on the SCM and Slack pages. Outline exposes no backfill affordance, so
-	// `onBackfill` is intentionally omitted and the split button never appears.
+	// come from it. Outline exposes no backfill affordance, so `onBackfill` is intentionally omitted
+	// and the split button never appears.
 	const syncStatusHeaderProps: Omit<SyncStatusHeaderProps, "label"> = {
 		status: connectionStatus,
 		isConnectionActive,

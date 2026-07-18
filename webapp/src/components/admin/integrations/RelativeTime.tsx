@@ -58,7 +58,7 @@ function getServerSnapshot(): number {
 }
 
 /** The shared clock, in epoch milliseconds. Advances every {@link TICK_MS} while anything reads it. */
-export function useNow(): number {
+function useNow(): number {
 	return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 

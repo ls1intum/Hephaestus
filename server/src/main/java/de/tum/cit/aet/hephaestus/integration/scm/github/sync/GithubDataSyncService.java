@@ -311,16 +311,9 @@ public class GithubDataSyncService {
             // (HEAD SHA == latest known SHA → fast return).
             int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
 
-            // NOTE: there used to be a "repoUnchanged" short-circuit here that skipped every
-            // sub-sync when repository.updatedAt had not advanced. Its premise — that GitHub
-            // bumps repository.updatedAt on any activity — is false: opening an issue/PR or
-            // adding a comment does NOT reliably bump it, so new PRs were silently never
-            // ingested. Each sub-sync is independently cost-bounded instead:
-            //   - collaborators/labels/milestones: cooldown-gated below
-            //   - issues: GetRepositoryIssueCount totalCount probe (~1 point)
-            //   - pull requests: GetRepositoryPullRequestLatestUpdate probe (~1 point)
-            //   - discussions: off by default, and stops after the first page older than the cutoff
-            // Do not reintroduce a repository.updatedAt gate — it cannot see issue/PR activity.
+            // Do not gate the sub-syncs below on repository.updatedAt — GitHub does not reliably
+            // bump it on issue/PR/comment activity, so such a gate cannot see new PRs. Each sub-sync
+            // is independently cost-bounded (cooldowns; ~1-point count/latest-update probes).
 
             // Sync collaborators (with cooldown)
             int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, scopeId, repositoryId);
