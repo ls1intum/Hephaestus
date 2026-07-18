@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceLifecycleService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -52,8 +53,9 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>{@link #onInstanceInstalled} — parses installation id from
  *       {@link IntegrationRef#instanceKey()} and delegates to
  *       {@link #createOrUpdateFromInstallation(long, Long, String, AccountKind, String, RepositorySelection)}.</li>
- *   <li>{@link #onInstanceUninstalled} — marks the workspace {@code PURGED} (final state)
- *       after stopping its NATS scope consumer.</li>
+ *   <li>{@link #onInstanceUninstalled} — runs the full workspace purge via
+ *       {@link #purgeWorkspaceForInstallation}, which is the same
+ *       {@code WorkspaceLifecycleService#purgeWorkspace} chain an admin deletion runs.</li>
  *   <li>{@link #onScopeChanged} — logs delta sizes for audit (repository membership
  *       reconciliation runs in {@code WorkspaceProvisioningAdapter} which has the
  *       monitor-service dependency; pure SPI dispatch arrives here without that
@@ -91,6 +93,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
     private final ConnectionService connectionService;
+    private final WorkspaceLifecycleService workspaceLifecycleService;
 
     public GithubLifecycleListener(
         NatsConnectionProperties natsProperties,
@@ -104,7 +107,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         GitHubAppTokenService gitHubAppTokenService,
         OrganizationService organizationService,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        WorkspaceLifecycleService workspaceLifecycleService
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -118,6 +122,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.organizationService = organizationService;
         this.connectionService = connectionService;
+        this.workspaceLifecycleService = workspaceLifecycleService;
     }
 
     @Override
@@ -156,9 +161,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * SPI hook: stop the NATS scope consumer and mark the workspace {@code PURGED}.
-     * Repository monitor cleanup is the adapter's responsibility (needs the monitor
-     * service); we own status + NATS lifecycle here.
+     * SPI hook: run the full workspace purge for a vendor-side uninstall.
+     * Delegates to {@link #purgeWorkspaceForInstallation(long)} — see there for why a bare
+     * status write is not an acceptable substitute.
      */
     @Override
     public void onInstanceUninstalled(IntegrationRef ref) {
@@ -167,8 +172,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             log.warn("GitHub onInstanceUninstalled: skipped, reason=invalidInstanceKey, ref={}", ref);
             return;
         }
-        stopNatsForInstallation(installationId);
-        updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
+        purgeWorkspaceForInstallation(installationId);
     }
 
     /**
@@ -464,14 +468,77 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
+     * Vendor-side uninstall ({@code installation.deleted}) — runs the SAME purge an admin-initiated
+     * workspace deletion runs, via {@link WorkspaceLifecycleService#purgeWorkspace(String)}.
+     *
+     * <p><b>Why not a status write.</b> {@code PURGED} is a terminal, slug-burning state that the
+     * rest of the system reads as "this workspace's data is gone". Setting it without running the
+     * purge chain makes that a lie: none of the {@code WorkspacePurgeContributor} beans fire, so
+     * mirrored Slack messages, Outline documents, org-tier {@code team} /
+     * {@code organization_membership} rows, practices/activity derived rows and still-ACTIVE
+     * {@code Connection} rows all survive under a label that says they were erased. An org admin
+     * uninstalling the App on github.com is exactly the moment the lawful basis for holding that
+     * mirror ends, so it must erase at least as much as an admin disconnect does.
+     *
+     * <p><b>Idempotent.</b> {@code installation.deleted} can be redelivered; the delegate returns
+     * early on an already-{@code PURGED} workspace, and every step underneath is delete-if-present.
+     *
+     * <p><b>Scope.</b> {@code findByInstallationId} resolves through the {@code Connection} row
+     * ({@code kind=GITHUB, instance_key=installationId}) and is at-most-one by construction, so
+     * this purges exactly the workspace that installation backs — never a sibling tenant. Shared
+     * rows (repositories another workspace still monitors, the {@code Organization} identity) are
+     * protected by the orphan guards inside the purge chain, not by this method.
+     *
+     * <p><b>Transaction.</b> Callers on the webhook-consumer path already run inside the
+     * {@code TransactionTemplate} boundary opened by {@code AbstractIntegrationMessageHandler},
+     * which the delegate's {@code REQUIRED} propagation joins; the reconciliation path opens its
+     * own here. Tenancy needs no ambient workspace context — the purge chain's cross-tenant
+     * queries are the {@code @WorkspaceAgnostic} ones that open their own bypass scope.
+     *
+     * @param installationId the GitHub App installation ID
+     * @return the purged workspace, or empty if no workspace is bound to the installation
+     */
+    @Transactional
+    public Optional<Workspace> purgeWorkspaceForInstallation(long installationId) {
+        var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
+        if (workspaceOpt.isEmpty()) {
+            log.warn(
+                "Skipped installation purge: reason=noWorkspaceForInstallation, installationId={}",
+                installationId
+            );
+            return Optional.empty();
+        }
+
+        Workspace purged = workspaceLifecycleService.purgeWorkspace(workspaceOpt.get().getWorkspaceSlug());
+        log.info(
+            "Purged workspace after vendor-side uninstall: installationId={}, workspaceId={}",
+            installationId,
+            purged.getId()
+        );
+        return Optional.of(purged);
+    }
+
+    /**
      * Update workspace status for a given installation if the status differs.
+     *
+     * <p>{@code PURGED} is rejected: it is not a status flip but a data-erasure operation, and
+     * routing it through here silently skipped every {@code WorkspacePurgeContributor}. Use
+     * {@link #purgeWorkspaceForInstallation(long)}.
      *
      * @param installationId the GitHub App installation ID
      * @param status         the new workspace status
      * @return the updated workspace, or empty if no workspace exists for the installation
+     * @throws IllegalArgumentException if {@code status} is {@code PURGED}
      */
     @Transactional
     public Optional<Workspace> updateWorkspaceStatus(long installationId, Workspace.WorkspaceStatus status) {
+        if (status == Workspace.WorkspaceStatus.PURGED) {
+            throw new IllegalArgumentException(
+                "PURGED must go through purgeWorkspaceForInstallation so the purge contributors run: installationId=" +
+                    installationId
+            );
+        }
+
         var workspaceOpt = workspaceRepository.findByInstallationId(installationId);
         if (workspaceOpt.isEmpty() || status == null) {
             return workspaceOpt;

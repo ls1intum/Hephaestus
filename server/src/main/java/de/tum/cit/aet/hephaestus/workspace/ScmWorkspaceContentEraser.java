@@ -66,7 +66,7 @@ import org.springframework.transaction.annotation.Transactional;
  * operational audit (kind/type/status/timestamps only, no mirrored third-party content, capped per
  * connection by the sync-job pruner) and retaining them uniformly with Slack/Outline is what makes
  * a disconnect auditable after the fact. Global identity rows ({@code user}, {@code organization},
- * {@code identity_provider}) are likewise never touched: they are cross-tenant shared, and
+ * {@code identity_provider}) are likewise never touched: they are instance-global identity rows, and
  * person-level erasure is a separate operator process.
  *
  * <p><b>Ordering and idempotency.</b> Sync and consumers are already stopped before this runs —
@@ -181,13 +181,37 @@ public class ScmWorkspaceContentEraser {
 
     /**
      * Org-tier mirror ({@code team}, {@code team_membership}, {@code organization_membership}) —
-     * erased only when no other non-purged workspace is still bound to the same {@link Organization}.
-     * These tables key on the org, not on a repository, so the repository cascade cannot reach them;
-     * the org-orphan check is their equivalent of {@code deleteRepositoryIfOrphaned}'s guard.
+     * erased together with the workspace's binding to the {@link Organization} that keys them. These
+     * tables key on the org, not on a repository, so the repository cascade cannot reach them; this
+     * is their equivalent of {@code deleteRepositoryIfOrphaned}'s guard.
      *
-     * <p>The {@link Organization} row itself is never deleted — it is a global, cross-tenant shared
-     * entity; {@code WorkspaceLifecycleService#purgeWorkspace} step 7 merely unlinks it. A workspace
-     * with no organization binding (a personal-account install) has no org-tier mirror to erase.
+     * <p><b>The organization binding is exclusive, not shared.</b> {@code Workspace.organization} is
+     * a {@code @OneToOne} over a {@code unique = true} {@code organization_id} column (DB constraint
+     * {@code workspace_organization_id_key}), so an organization backs at most ONE workspace. There
+     * is therefore no "other tenant" that could still hold a lawful basis for this org's mirror: the
+     * workspace being erased is always the last one, and the org-tier rows always go. The
+     * {@code countOtherActiveWorkspacesForOrganization} guard below is defensive — it keeps this
+     * method correct if that 1:1 mapping is ever relaxed — not a condition that fires today.
+     *
+     * <p>Contrast this with the repository tier, which genuinely IS shared: many workspaces may
+     * monitor the same {@code repository}, which is why that tier needs a real orphan check.
+     *
+     * <p><b>Why the link is released.</b> A disconnect does not purge the workspace, so a workspace
+     * that kept pointing at the org would occupy that organization's single binding slot forever —
+     * no other workspace could ever install the same organization without violating the unique
+     * constraint, and this workspace would be left pointing at an org whose mirror it just erased.
+     * Releasing the link (and flushing, so the guard's {@code COUNT} reads the released state) frees
+     * the organization for re-binding. That costs nothing on the reconnect path: the link is
+     * re-provisioned on every install event — {@code GithubLifecycleListener#createOrUpdateFromInstallation}
+     * re-resolves the org via {@code OrganizationService#upsertIdentity}, including the
+     * reactivate-an-existing-workspace branch, and {@code GitLabWorkspaceInitializationService} does
+     * the same.
+     *
+     * <p>The {@link Organization} row itself is never deleted — it is a global identity row reached
+     * by {@code team} and {@code organization_membership} and by person-level identity resolution;
+     * this method (like {@code WorkspaceLifecycleService#purgeWorkspace} step 7) merely unlinks it.
+     * A workspace with no organization binding (a personal-account install) has no org-tier mirror
+     * to erase.
      *
      * @return the number of teams erased (their memberships cascade via {@code Team.memberships})
      */
@@ -197,6 +221,11 @@ public class ScmWorkspaceContentEraser {
             return 0;
         }
 
+        workspace.setOrganization(null);
+        workspaceRepository.saveAndFlush(workspace);
+
+        // Defensive: the 1:1 organization binding means this count is always 0 today. Kept so the
+        // method stays correct if that mapping is ever relaxed, and independent of this call order.
         long otherTenants = workspaceRepository.countOtherActiveWorkspacesForOrganization(
             organization.getId(),
             workspace.getId()

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
@@ -15,9 +16,16 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.connect.GithubConnectionStrategy;
+import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubWorkspaceProvisioningAdapter;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.connect.GitlabConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
@@ -25,6 +33,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.adapter.ScmWorkspacePurgeAdapter;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,6 +53,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *
  * <p>Also pins idempotency (the erase is re-runnable), and the retention decisions: another
  * integration's rows and the {@code sync_job} history are NOT erased.
+ *
+ * <p>Two further erasure defects are pinned here because both need real rows to show up at all:
+ * a vendor-side GitHub uninstall must run the whole purge chain rather than write a {@code PURGED}
+ * label over surviving data, and a disconnecting workspace must release its organization binding —
+ * which is exclusive, one workspace per organization — instead of squatting it forever.
  */
 class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
@@ -88,6 +102,18 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitlabConnectionStrategy gitlabConnectionStrategy;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private OrganizationMembershipRepository organizationMembershipRepository;
+
+    @Autowired
+    private GitHubWorkspaceProvisioningAdapter provisioningAdapter;
 
     private IdentityProvider gitProvider;
     private Workspace tenantA;
@@ -227,6 +253,158 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
         // Still cross-tenant safe on the GitLab path.
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
+    }
+
+    /**
+     * Defect B: a disconnect erased the org-tier mirror but left the workspace's {@code organization}
+     * FK dangling at the now-empty {@link Organization}.
+     *
+     * <p>That binding is <b>exclusive</b>, not shared: {@code Workspace.organization} is a
+     * {@code @OneToOne} on a {@code unique = true} {@code organization_id} column, so an organization
+     * backs at most ONE workspace and the DB enforces it as {@code workspace_organization_id_key}.
+     * A disconnected workspace that kept the link therefore squatted the organization forever — the
+     * org could never be installed into any other workspace, because binding it would violate that
+     * unique constraint. Since a disconnect does not purge the workspace, the squat was permanent.
+     *
+     * <p>The eraser now releases the link as part of the erase, so the organization is free to be
+     * bound again — by this workspace on reconnect, or by a different one entirely.
+     */
+    @Test
+    @DisplayName("disconnect erases the org-tier mirror and releases the organization for re-binding")
+    void erase_releasesTheOrganizationAndErasesItsOrgTierMirror() {
+        Organization organization = persistOrganization(4242L, "acme");
+        bindOrganization(tenantA, organization);
+        persistTeam(organization, 7101L, "backend");
+        organizationMembershipRepository.upsertMembership(organization.getId(), 8101L, OrganizationMemberRole.MEMBER);
+
+        eraser.eraseWorkspaceScmMirror(tenantA.getId());
+
+        // The org-tier mirror is gone: no lawful basis survives the only workspace that held it.
+        assertThat(teamsFor(organization)).isEmpty();
+        assertThat(organizationMembershipRepository.findByOrganizationId(organization.getId())).isEmpty();
+
+        // The link is released rather than left dangling at an org whose mirror no longer exists.
+        // Read the FK column directly: Workspace.organization is LAZY, so asserting on the entity
+        // getter outside a session reports a proxy-initialization error instead of the real diff.
+        assertThat(organizationIdOf(tenantA)).isNull();
+
+        // The Organization identity row itself survives — it is a global identity row, never deleted.
+        assertThat(organizationRepository.findById(organization.getId())).isPresent();
+
+        // And the released organization can be bound again. Before the fix this threw a
+        // duplicate-key violation on workspace_organization_id_key, because the disconnected
+        // workspace still occupied the organization's single binding slot.
+        bindOrganization(tenantB, organization);
+        assertThat(organizationIdOf(tenantB)).isEqualTo(organization.getId());
+
+        // The unrelated tenant's own SCM mirror is untouched by tenant A's erase.
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantB.getId()))
+            .singleElement()
+            .extracting(RepositoryToMonitor::getNameWithOwner)
+            .isEqualTo(SHARED_REPO);
+        assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
+    }
+
+    /**
+     * Defect A: {@code installation.deleted} used to remove monitors and then write
+     * {@code status=PURGED} directly, so none of the {@code WorkspacePurgeContributor} beans ran —
+     * the workspace was labelled purged while Slack/Outline content, org-tier rows and an ACTIVE
+     * Connection all survived. The vendor-side uninstall now runs the same purge chain an admin
+     * deletion runs.
+     */
+    @Test
+    @DisplayName("a vendor-side GitHub uninstall runs the full purge chain, not just a status write")
+    void onInstallationDeleted_runsEveryPurgeContributorNotJustAStatusWrite() {
+        Organization organization = persistOrganization(4243L, "acme");
+        bindOrganization(tenantA, organization);
+        persistTeam(organization, 7102L, "platform");
+
+        SlackThread slackThread = new SlackThread();
+        slackThread.setWorkspaceId(tenantA.getId());
+        slackThread.setSlackChannelId("C999");
+        slackThread.setSlackThreadTs("1700000000.000900");
+        slackThread.setCreatedAt(Instant.now());
+        slackThreadRepository.save(slackThread);
+
+        provisioningAdapter.onInstallationDeleted(5001L);
+
+        Workspace purged = workspaceRepository.findById(tenantA.getId()).orElseThrow();
+        assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
+
+        // Contributor evidence: Slack content (SlackWorkspacePurgeAdapter) is gone, the SCM mirror
+        // (ScmWorkspacePurgeAdapter) is gone, and the Connection (ConnectionPurgeContributor) is
+        // torn down rather than left ACTIVE behind a "purged" label.
+        assertThat(countRows("slack_thread")).isZero();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
+        assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
+        assertThat(connectionRepository.findByWorkspaceId(tenantA.getId())).allSatisfy(connection ->
+            assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED)
+        );
+
+        // tenantB co-monitors the shared repo and is untouched — a vendor uninstall purges exactly
+        // the one workspace that installation backs, never a sibling tenant.
+        assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
+        assertThat(workspaceRepository.findById(tenantB.getId()).orElseThrow().getStatus()).isEqualTo(
+            Workspace.WorkspaceStatus.ACTIVE
+        );
+        assertThat(teamsFor(organization)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a redelivered installation.deleted is a no-op on the already-purged workspace")
+    void onInstallationDeleted_isIdempotentAcrossWebhookRedelivery() {
+        provisioningAdapter.onInstallationDeleted(5001L);
+        long repositoriesAfterFirst = repositoryRepository.count();
+
+        provisioningAdapter.onInstallationDeleted(5001L);
+
+        assertThat(repositoryRepository.count()).isEqualTo(repositoriesAfterFirst);
+        assertThat(workspaceRepository.findById(tenantA.getId()).orElseThrow().getStatus()).isEqualTo(
+            Workspace.WorkspaceStatus.PURGED
+        );
+    }
+
+    private List<Team> teamsFor(Organization organization) {
+        return teamRepository.findByOrganizationIgnoreCaseAndProviderId(organization.getLogin(), gitProvider.getId());
+    }
+
+    private Organization persistOrganization(long nativeId, String login) {
+        Organization organization = new Organization();
+        organization.setNativeId(nativeId);
+        organization.setLogin(login);
+        organization.setName("Org " + login);
+        organization.setProvider(gitProvider);
+        organization.setCreatedAt(Instant.now());
+        organization.setUpdatedAt(Instant.now());
+        return organizationRepository.save(organization);
+    }
+
+    private void bindOrganization(Workspace workspace, Organization organization) {
+        Workspace managed = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        managed.setOrganization(organization);
+        workspaceRepository.save(managed);
+    }
+
+    private void persistTeam(Organization organization, long nativeId, String slug) {
+        Team team = new Team();
+        team.setNativeId(nativeId);
+        team.setProvider(gitProvider);
+        team.setName(slug);
+        team.setSlug(slug);
+        team.setOrganization(organization.getLogin());
+        team.setHtmlUrl("https://github.com/orgs/" + organization.getLogin() + "/teams/" + slug);
+        team.setCreatedAt(Instant.now());
+        team.setUpdatedAt(Instant.now());
+        teamRepository.save(team);
+    }
+
+    /** The workspace's {@code organization_id} FK, read as a column so no lazy proxy is involved. */
+    private Long organizationIdOf(Workspace workspace) {
+        return jdbcTemplate.queryForObject(
+            "SELECT organization_id FROM workspace WHERE id = ?",
+            Long.class,
+            workspace.getId()
+        );
     }
 
     private long countRows(String table) {

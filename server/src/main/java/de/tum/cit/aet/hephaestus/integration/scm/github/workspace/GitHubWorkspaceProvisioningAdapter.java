@@ -124,15 +124,14 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // 1. Stop NATS consumer for the workspace first (before removing monitors)
-        githubLifecycleListener.stopNatsForInstallation(installationId);
-
-        // 2. Remove all repository monitors AND delete repositories for this installation
-        // When installation is deleted, we clean up all associated data
-        repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId, true);
-
-        // 3. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
-        githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
+        // Run the real purge, not a status write. The bespoke stop-NATS / remove-monitors pair
+        // this used to do here is a strict subset of the purge chain (purgeWorkspace step 1 stops
+        // the consumer; ScmWorkspacePurgeAdapter at order -200 drops the monitors through the
+        // orphan-guarded cascade, which — unlike removeAllRepositoriesFromMonitor — will not delete
+        // a repository another workspace still monitors). What it MISSED was everything else:
+        // Slack/Outline content, org-tier teams and organization memberships, practices/activity
+        // derived rows, and the Connection teardown that clears stored credentials.
+        githubLifecycleListener.purgeWorkspaceForInstallation(installationId);
 
         log.info("Completed installation cleanup: installationId={}", installationId);
     }

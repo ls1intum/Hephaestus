@@ -50,9 +50,15 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     /**
      * Org-tier orphan check for {@link ScmWorkspaceContentEraser}: how many workspaces OTHER than
      * {@code excludedWorkspaceId} are still bound to this organization and not already purged.
-     * A non-zero count means another tenant still holds a lawful basis for the org-tier mirror
+     * A non-zero count would mean another tenant still holds a lawful basis for the org-tier mirror
      * ({@code team}, {@code team_membership}, {@code organization_membership}), so it must survive
-     * the erasing workspace — the org-level equivalent of the shared-repository guard.
+     * the erasing workspace.
+     *
+     * <p><b>Defensive only.</b> Unlike {@code repository}, which many workspaces genuinely share, the
+     * organization binding is exclusive: {@code Workspace.organization} is a {@code @OneToOne} over a
+     * {@code unique = true} {@code organization_id} column, so an organization backs at most one
+     * workspace and this count is always 0 in production. It is kept so
+     * {@link ScmWorkspaceContentEraser} stays correct if that 1:1 mapping is ever relaxed.
      */
     @Query(
         """

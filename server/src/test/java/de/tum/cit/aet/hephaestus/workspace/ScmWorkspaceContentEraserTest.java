@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -150,6 +151,11 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
         verifyNoInteractions(eventPublisher, repositoryMonitorService, teamRepository);
     }
 
+    /**
+     * The guard is defensive only: the {@code unique} {@code organization_id} column means no second
+     * workspace can be bound to the org today, so this count is always 0 in production. Pinned with a
+     * stub so the guard keeps working if that 1:1 mapping is ever relaxed.
+     */
     @Test
     void erase_keepsOrgTierMirrorWhenAnotherNonPurgedWorkspaceIsStillBoundToTheOrganization() {
         Workspace workspace = workspaceWithMonitors("acme/alpha");
@@ -173,6 +179,24 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
 
         verify(teamRepository).deleteAll(List.of(team));
         verify(organizationMembershipRepository).deleteByOrganizationId(7L);
+    }
+
+    @Test
+    void erase_releasesTheOrganizationLinkAndFlushesItBeforeTheLastTenantGuardCounts() {
+        Workspace workspace = workspaceWithMonitors("acme/alpha");
+        workspace.setOrganization(organization(7L, "acme"));
+        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID)).thenReturn(0L);
+
+        eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
+
+        // The organization binding is exclusive (unique organization_id), so a retained link would
+        // squat that organization's single binding slot forever — a disconnect does not purge, so
+        // no other workspace could ever install the same organization.
+        assertThat(workspace.getOrganization()).isNull();
+        // Flushed first, or the guard's COUNT still reads the stale link.
+        InOrder order = inOrder(workspaceRepository);
+        order.verify(workspaceRepository, times(2)).saveAndFlush(workspace);
+        order.verify(workspaceRepository).countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID);
     }
 
     private static Workspace newWorkspace() {
