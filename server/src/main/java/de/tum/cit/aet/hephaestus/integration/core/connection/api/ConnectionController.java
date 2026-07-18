@@ -197,9 +197,16 @@ public class ConnectionController {
     }
 
     /**
-     * Best-effort vendor-side revoke before the UNINSTALLED transition. The strategy may be
-     * missing if the kind was de-registered after the row was written, and the vendor call may
-     * fail — in both cases we log and proceed so the admin can still clear the stale row locally.
+     * Vendor-side revoke callback handed to {@link ConnectionService#disconnect}, which invokes it
+     * before the UNINSTALLED transition. A missing strategy (the kind was de-registered after the row
+     * was written) is a local no-op — there is nothing to call.
+     *
+     * <p>A failing {@code revoke} is deliberately NOT caught here. The revoke reaches
+     * {@code @Transactional} erasers, so a swallowed {@code DataAccessException} would leave the
+     * surrounding transaction rollback-only and the "proceed locally" promise would be a lie that
+     * surfaces as a 500 at commit. {@code ConnectionService} instead runs this callback in its own
+     * transaction and absorbs the failure there, which is the only place the absorption actually
+     * works. Letting it propagate from here is what hands it the failure to absorb.
      */
     private void revokeBestEffort(Connection connection) {
         ConnectionStrategy strategy = strategies.get(connection.getKind());
@@ -211,16 +218,7 @@ public class ConnectionController {
             );
             return;
         }
-        try {
-            strategy.revoke(connection.toRef());
-        } catch (RuntimeException e) {
-            log.warn(
-                "Vendor-side revoke failed for connection={} kind={}: {} — proceeding with local UNINSTALLED transition",
-                connection.getId(),
-                connection.getKind(),
-                e.toString()
-            );
-        }
+        strategy.revoke(connection.toRef());
     }
 
     @GetMapping("/{id}/audit")

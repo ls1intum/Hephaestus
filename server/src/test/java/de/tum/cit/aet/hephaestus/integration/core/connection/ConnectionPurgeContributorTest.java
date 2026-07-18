@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * Erasure must not be preemptable. Wired against a real {@link ConnectionService} rather than a mock
@@ -44,6 +45,13 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
     @Mock
     private SyncJobService syncJobService;
 
+    /**
+     * Purge goes through {@code transition}, which passes no revoke callback, so the revoke transaction
+     * template is never exercised here — an unstubbed mock is enough to construct the service.
+     */
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private CredentialBundleConverter credentialConverter;
     private ConnectionService connectionService;
     private Workspace workspace;
@@ -56,7 +64,8 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
             auditRepository,
             credentialConverter,
             eventPublisher,
-            syncJobService
+            syncJobService,
+            transactionManager
         );
         Mockito.lenient()
             .when(connectionRepository.save(any(Connection.class)))

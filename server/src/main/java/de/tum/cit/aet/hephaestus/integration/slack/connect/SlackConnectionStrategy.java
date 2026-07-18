@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -146,8 +147,17 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         );
     }
 
+    /**
+     * Runs {@link Propagation#NOT_SUPPORTED} — this method holds NO transaction of its own, matching
+     * {@code GitLabWebhookService#deregisterActiveWebhook}. The Slack token revoke below is an external
+     * HTTP round-trip, and the disconnect path already holds the connection's {@code FOR UPDATE}
+     * lifecycle lock on another connection; opening a transaction across the network call would pin a
+     * second pooled DB connection idle-in-transaction for its duration. Each collaborator still gets a
+     * transaction: the credential lookup and {@code SlackWorkspaceContentEraser#eraseWorkspace} are
+     * {@code @Transactional} on their own beans, so the erase remains atomic in itself.
+     */
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revoke(IntegrationRef ref) {
         // 1) Best-effort vendor-side uninstall while the token is still resolvable (credentials are cleared by
         //    the caller only after this callback returns). A failed/absent token never blocks the local erase.
@@ -168,7 +178,8 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         }
         // 2) GDPR erase on disconnect (symmetric with Outline): drop every ingested Slack row + per-channel
         //    consent for the workspace so nothing outlives the connection and a later reconnect cannot silently
-        //    backfill the disconnected consent gap. Runs inside the fenced disconnect transaction.
+        //    backfill the disconnected consent gap. Opens its own transaction (see the propagation note
+        //    above); if it fails, ConnectionService absorbs it and the local UNINSTALLED transition still lands.
         workspaceContentEraser.eraseWorkspace(ref.workspaceId());
         log.info(
             "slack.audit: revoke erase — cleared ingested Slack content + consent for workspace={}",

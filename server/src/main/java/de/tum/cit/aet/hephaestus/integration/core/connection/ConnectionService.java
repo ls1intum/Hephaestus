@@ -18,7 +18,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Connection lookups + state transitions. Transitions are guarded by
@@ -36,18 +39,28 @@ public class ConnectionService {
     private final ApplicationEventPublisher eventPublisher;
     private final SyncJobService syncJobService;
 
+    /**
+     * Runs the pre-transition revoke/erase callback in its OWN transaction — see
+     * {@link #runRevokeIsolated}. {@code REQUIRES_NEW} is the whole point: it is what keeps a
+     * failing erase from marking the lifecycle transaction rollback-only.
+     */
+    private final TransactionTemplate revokeTransactionTemplate;
+
     public ConnectionService(
         ConnectionRepository connectionRepository,
         ConnectionAuditRepository auditRepository,
         CredentialBundleConverter credentialConverter,
         ApplicationEventPublisher eventPublisher,
-        SyncJobService syncJobService
+        SyncJobService syncJobService,
+        PlatformTransactionManager transactionManager
     ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
         this.syncJobService = syncJobService;
+        this.revokeTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.revokeTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional(readOnly = true)
@@ -415,6 +428,18 @@ public class ConnectionService {
      * <p>{@code revoke} may kill vendor access or erase provider data, so it runs only after the fence
      * and the state-machine check have passed, while the row lock is still held.
      *
+     * <p>{@code revoke} is <b>best effort and owns no veto</b>: it runs in its own transaction and any
+     * {@code RuntimeException} it raises is logged and absorbed here, so the local {@code UNINSTALLED}
+     * transition still commits and the admin can always clear a stale row. {@link #runRevokeIsolated}
+     * explains why the isolation is load-bearing rather than decorative, and callers must NOT
+     * re-implement the swallow themselves — doing so inside the callback converts the failure into an
+     * {@code UnexpectedRollbackException} at the nested commit instead of suppressing it.
+     *
+     * <p><b>Stated limitation:</b> the connection's lifecycle row lock is held for the whole disconnect,
+     * vendor round-trips included. That fence is deliberate — it is what makes the sync-job check
+     * atomic with the state write — and the vendor calls are individually kept out of a transaction
+     * ({@code Propagation.NOT_SUPPORTED}) so they at least do not also pin a DB transaction.
+     *
      * @throws ConnectionBusyException 409 — a sync job still holds the connection; its cancellation has
      *                                 been requested, so retrying shortly will succeed
      */
@@ -467,7 +492,7 @@ public class ConnectionService {
             );
         }
         if (beforeLocalTransition != null) {
-            beforeLocalTransition.run();
+            runRevokeIsolated(connection, beforeLocalTransition);
         }
         ConnectionAudit audit = new ConnectionAudit(
             connection,
@@ -500,6 +525,56 @@ public class ConnectionService {
         Connection saved = connectionRepository.save(connection);
         publishLifecycleEvent(saved, current, req.next());
         return saved;
+    }
+
+    /**
+     * Runs the vendor revoke / provider-data erase in its own {@code REQUIRES_NEW} transaction and
+     * absorbs its failure, so "best effort, proceed locally" is actually reachable.
+     *
+     * <p><b>Why a nested transaction and not a plain try/catch.</b> The erasers
+     * ({@code ScmWorkspaceContentEraser}, {@code SlackWorkspaceContentEraser}, the Outline
+     * {@code deleteByWorkspaceId} sweep) are {@code @Transactional} with the default {@code REQUIRED}
+     * propagation, so before this change they JOINED the lifecycle transaction. A
+     * {@code DataAccessException} from any of them — an FK surprise, a statement timeout on a large
+     * mirror delete — therefore marked the shared transaction rollback-only. Catching it changed
+     * nothing: the transition and the audit row were written, and the commit then failed with
+     * {@code UnexpectedRollbackException}. The admin got a 500, the connection was still ACTIVE, and
+     * the log claimed we had proceeded. Running the callback on its own transaction confines that
+     * poisoning to the callback, and catching OUTSIDE the template means we also absorb the
+     * {@code UnexpectedRollbackException} raised at the nested commit when a callback swallowed the
+     * failure internally.
+     *
+     * <p><b>Why this cannot deadlock against our own row lock.</b> We hold {@code SELECT … FOR UPDATE}
+     * on the {@code connection} row on the outer connection, and the nested transaction runs on a
+     * second pooled connection — so it must never wait on that row. It does not: no revoke path writes
+     * the {@code connection} row (both {@code OutlineWebhookRegistrar#deregister} and
+     * {@code GitLabWebhookService#deregisterActiveWebhook} already refuse to rewrite config there, for
+     * the neighbouring optimistic-locking reason), and the FK children they DO write are only ever
+     * deleted — {@code outline_document}, {@code outline_collection} and {@code outline_document_event}
+     * carry a {@code connection_id}, but PostgreSQL runs no parent-side referential check on a child
+     * DELETE, so no {@code FOR KEY SHARE} is taken on the locked row. Plain reads of {@code connection}
+     * from the nested transaction (e.g. {@code findActiveBearerToken}) are MVCC snapshots and never
+     * block on {@code FOR UPDATE}. Adding a write of {@code connection} — or an INSERT into any table
+     * keyed on it — to a revoke path would break this and self-deadlock.
+     *
+     * <p><b>Accepted consequence.</b> Erase and transition are no longer atomic. A revoke that erases
+     * successfully now commits even if the transition afterwards fails (duplicate-correlation
+     * short-circuit, illegal transition), leaving erased data behind an ACTIVE connection. Every erase
+     * path is documented idempotent and the next disconnect re-runs it, so this is recoverable — and it
+     * is the direction we want to fail in, because the reverse (the documented-unreachable case above)
+     * silently stranded the admin with a 500.
+     */
+    private void runRevokeIsolated(Connection connection, Runnable revoke) {
+        try {
+            revokeTransactionTemplate.executeWithoutResult(status -> revoke.run());
+        } catch (RuntimeException e) {
+            log.warn(
+                "Vendor revoke/erase failed for connection={} kind={}: {} — proceeding with the local transition",
+                connection.getId(),
+                connection.getKind(),
+                e.toString()
+            );
+        }
     }
 
     /**

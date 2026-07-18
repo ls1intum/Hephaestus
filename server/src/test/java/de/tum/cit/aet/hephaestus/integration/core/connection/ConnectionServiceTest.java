@@ -30,6 +30,11 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 /**
  * State-machine contract for {@link ConnectionService#transition}. Exercises the legal
@@ -53,6 +58,9 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Mock
     private SyncJobService syncJobService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private CredentialBundleConverter credentialConverter;
     private ConnectionService service;
     private Workspace workspace;
@@ -63,12 +71,16 @@ class ConnectionServiceTest extends BaseUnitTest {
         // Real converter so the credential-purge case operates on a genuine AES-GCM blob,
         // not a mock stand-in.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
+        // The revoke callback runs through a TransactionTemplate over this manager; a stub status is
+        // enough to let the template execute, and it lets us assert the propagation it asked for.
+        Mockito.lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         service = new ConnectionService(
             connectionRepository,
             auditRepository,
             credentialConverter,
             eventPublisher,
-            syncJobService
+            syncJobService,
+            transactionManager
         );
         // Default: the connection is free. Only the disconnect fence ever asks.
         Mockito.lenient()
@@ -305,6 +317,61 @@ class ConnectionServiceTest extends BaseUnitTest {
         order.verify(syncJobService).requestCancelForTeardown(connection.getId());
         order.verify(revoke).run();
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
+    }
+
+    /**
+     * The revoke callback must run on its OWN transaction. Running it on the lifecycle transaction is
+     * what made the documented "best effort, proceed locally" contract unreachable: the erasers join
+     * with REQUIRED propagation, so their DataAccessException marked the shared transaction
+     * rollback-only and the commit blew up with UnexpectedRollbackException after we had "proceeded".
+     */
+    @Test
+    void disconnect_runsRevokeOnItsOwnRequiresNewTransaction() {
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+
+        service.disconnect(connection, disconnectRequest(), Mockito.mock(Runnable.class));
+
+        ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior()).isEqualTo(
+            TransactionDefinition.PROPAGATION_REQUIRES_NEW
+        );
+    }
+
+    @Test
+    void disconnect_revokeThrowsDataAccessException_isAbsorbedAndUninstalledStillCommits() {
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+        connection.setCredentials(new BearerToken("xoxb-secret", null), credentialConverter);
+        // Stands in for a statement timeout on a large mirror delete inside ScmWorkspaceContentEraser.
+        Runnable revoke = () -> {
+            throw new QueryTimeoutException("statement timeout erasing workspace mirror");
+        };
+
+        Connection result = service.disconnect(connection, disconnectRequest(), revoke);
+
+        assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(result.getCredentialsEncrypted()).as("credentials are still purged").isNull();
+        verify(auditRepository).save(any(ConnectionAudit.class));
+        verify(connectionRepository).save(any(Connection.class));
+    }
+
+    /**
+     * If a caller swallows the erase failure inside the callback, the nested transaction is already
+     * rollback-only and its commit raises UnexpectedRollbackException. That must be absorbed too —
+     * it is the exact exception that used to reach the admin as a 500.
+     */
+    @Test
+    void disconnect_revokeSwallowsFailureAndNestedCommitRollsBack_isStillAbsorbed() {
+        Connection connection = connectionInState(IntegrationState.ACTIVE);
+        Mockito.doThrow(new UnexpectedRollbackException("Transaction silently rolled back"))
+            .when(transactionManager)
+            .commit(any());
+
+        Connection result = service.disconnect(connection, disconnectRequest(), () -> {
+            /* callback catches its own failure, as the old controller did */
+        });
+
+        assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
     }
 
     @Test
@@ -568,6 +635,17 @@ class ConnectionServiceTest extends BaseUnitTest {
             .when(connectionRepository.findByIdAndWorkspaceId(connection.getId(), workspace.getId()))
             .thenReturn(java.util.Optional.of(connection));
         return connection;
+    }
+
+    private static TransitionRequest disconnectRequest() {
+        return new TransitionRequest(
+            IntegrationState.UNINSTALLED,
+            "DISCONNECT",
+            "ADMIN",
+            "actor-1",
+            "corr-disconnect",
+            "removed"
+        );
     }
 
     private static void setId(Connection connection, long id) {

@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -322,16 +323,29 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(req.getValue().eventType()).isEqualTo("DISCONNECT");
     }
 
+    /**
+     * The controller must NOT swallow a revoke failure itself — swallowing it inside the callback
+     * leaves the surrounding transaction rollback-only and turns "proceed locally" into a 500 at
+     * commit. It lets the exception out of the callback and {@code ConnectionService} absorbs it on
+     * the far side of its own transaction; the stub below mimics that real behaviour.
+     */
     @Test
-    void updateStatus_uninstalledRevokeThrows_stillTransitions() {
+    void updateStatus_uninstalledRevokeThrows_isNotSwallowedInTheCallbackButStillTransitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
         githubStrategy.revokeThrows = true;
+        AtomicReference<RuntimeException> escaped = new AtomicReference<>();
         when(
             connectionService.disconnect(any(Connection.class), any(TransitionRequest.class), any(Runnable.class))
         ).thenAnswer(inv -> {
-            inv.<Runnable>getArgument(2).run();
+            // Stands in for ConnectionService#runRevokeIsolated: run the callback on its own
+            // transaction, absorb whatever escapes, then commit the local transition anyway.
+            try {
+                inv.<Runnable>getArgument(2).run();
+            } catch (RuntimeException e) {
+                escaped.set(e);
+            }
             Connection conn = inv.getArgument(0);
             conn.setState(IntegrationState.UNINSTALLED);
             return conn;
@@ -346,6 +360,11 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody().state()).isEqualTo(IntegrationState.UNINSTALLED);
+        assertThat(githubStrategy.revokeCalls).isEqualTo(1);
+        // The load-bearing assertion: the failure reached the service, which is the only layer that
+        // can absorb it without poisoning the lifecycle transaction.
+        assertThat(escaped.get()).as("revoke failure must escape the controller callback").isNotNull();
         verify(connectionService, times(1)).disconnect(
             any(Connection.class),
             any(TransitionRequest.class),
