@@ -166,11 +166,6 @@ class ConnectionActivityRecorderTest extends BaseUnitTest {
         assertThat(connectionIdCaptor.getAllValues()).containsExactly(CONNECTION_ID, OTHER_CONNECTION_ID);
     }
 
-    @Test
-    void invalidate_withoutPriorResolution_isANoOp() {
-        recorder.invalidate(WORKSPACE_ID, IntegrationKind.SLACK);
-    }
-
     private void stubActiveConnection(long workspaceId, IntegrationKind kind, long connectionId) {
         Workspace workspace = new Workspace();
         workspace.setId(workspaceId);

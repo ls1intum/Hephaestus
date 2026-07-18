@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -36,6 +37,12 @@ public final class SyncJobHandle implements SyncExecutionHandle {
     private final long jobId;
     private final ProgressWriter writer;
 
+    /**
+     * Source of "now" for the write-throttle window. Injected so the throttle is testable by advancing a
+     * controllable clock rather than sleeping real wall-clock time; {@code Clock.systemUTC()} in production.
+     */
+    private final Clock clock;
+
     private volatile boolean cancellationRequested;
     private volatile boolean cancelledReported;
     private volatile boolean warningsReported;
@@ -66,9 +73,10 @@ public final class SyncJobHandle implements SyncExecutionHandle {
 
     private Map<String, Object> progressDetail = Map.of();
 
-    SyncJobHandle(long jobId, ProgressWriter writer) {
+    SyncJobHandle(long jobId, ProgressWriter writer, Clock clock) {
         this.jobId = jobId;
         this.writer = writer;
+        this.clock = clock;
     }
 
     @Override
@@ -115,7 +123,7 @@ public final class SyncJobHandle implements SyncExecutionHandle {
             // JSONB column, so no runner has to know the wire keys.
             this.progressDetail = progressDetail == null ? Map.of() : progressDetail.toDetail();
 
-            Instant now = Instant.now();
+            Instant now = clock.instant();
             if (Duration.between(lastWriteAt, now).compareTo(MIN_WRITE_INTERVAL) >= 0) {
                 lastWriteAt = now;
                 pendingWrite = false;
@@ -143,7 +151,7 @@ public final class SyncJobHandle implements SyncExecutionHandle {
             if (!pendingWrite) {
                 return false;
             }
-            Instant now = Instant.now();
+            Instant now = clock.instant();
             if (Duration.between(lastWriteAt, now).compareTo(MIN_WRITE_INTERVAL) < 0) {
                 return false;
             }

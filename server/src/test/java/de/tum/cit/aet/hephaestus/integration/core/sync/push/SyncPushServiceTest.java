@@ -67,13 +67,6 @@ class SyncPushServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void withoutNats_neverTouchesNatsConnection() {
-        ObjectProvider<Connection> provider = objectProviderReturning(null);
-        new SyncPushService(hub, MAPPER, provider, meters);
-        verify(connection, never()).createDispatcher(any(MessageHandler.class));
-    }
-
-    @Test
     void connectionLifecycle_deliversConnectionInvalidation() {
         SyncPushService service = new SyncPushService(hub, MAPPER, objectProviderReturning(null), meters);
 

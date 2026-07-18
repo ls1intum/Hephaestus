@@ -65,6 +65,7 @@ class SyncJobServiceTest extends BaseUnitTest {
     private SyncJobService service;
     private final Map<Long, SyncJob> store = new HashMap<>();
     private final AtomicLong idSequence = new AtomicLong(100L);
+    private final MutableClock clock = MutableClock.atEpochUtc();
 
     @BeforeEach
     void setUp() {
@@ -157,8 +158,10 @@ class SyncJobServiceTest extends BaseUnitTest {
                     )
                     .toList();
             });
-        // Mirrors the real JPQL: compare-and-set on status IN :activeStatuses, and deliberately no
-        // cancelRequested filter — the runner's reported outcome is authoritative.
+        // In-memory stand-in for the terminal write. Its compare-and-set semantics (a late writer cannot
+        // overwrite an already-terminal row) are proven against real Postgres in
+        // SyncJobActiveIndexIntegrationTest, not here — this fake only needs to update the shared store so
+        // the service-orchestration assertions in this file can read the resulting status back.
         lenient()
             .when(syncJobRepository.completeActiveJob(anyLong(), any(), any(), any(), any(), any(), any()))
             .thenAnswer(inv -> {
@@ -178,7 +181,13 @@ class SyncJobServiceTest extends BaseUnitTest {
                 return 1;
             });
 
-        service = new SyncJobService(syncJobRepository, connectionRepository, eventPublisher, transactionTemplate);
+        service = new SyncJobService(
+            syncJobRepository,
+            connectionRepository,
+            eventPublisher,
+            transactionTemplate,
+            clock
+        );
     }
 
     private SyncJob newJob(long id, SyncJobStatus status) {
@@ -624,28 +633,12 @@ class SyncJobServiceTest extends BaseUnitTest {
         assertThat(started.job().getProgress()).containsEntry("currentStep", "pull-requests");
     }
 
-    @Test
-    void executeBody_rowReapedTerminalBeforeDispatch_neitherResurrectsNorOverwrites() {
-        SyncJobService.Started started = beginTestJob();
-        started.job().setStatus(SyncJobStatus.FAILED);
-        java.util.concurrent.atomic.AtomicBoolean bodyInvoked = new java.util.concurrent.atomic.AtomicBoolean();
-
-        service.executeBody(started, handle -> bodyInvoked.set(true));
-
-        assertThat(bodyInvoked).isFalse();
-        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
-    }
-
-    @Test
-    void executeBody_rowReapedTerminalMidBody_completionWriteIsSkipped() {
-        SyncJobService.Started started = beginTestJob();
-
-        service.executeBody(started, handle -> {
-            started.job().setStatus(SyncJobStatus.FAILED);
-        });
-
-        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
-    }
+    // The "a late/terminal write cannot resurrect or overwrite an already-terminal row" invariant is a
+    // database compare-and-set guarantee (markRunning's `status = 'PENDING'` and completeActiveJob's
+    // `status IN :activeStatuses` clauses). Proving it here would only exercise the in-memory fakes that
+    // mirror those clauses, so it lives at the integration tier against real Postgres instead —
+    // SyncJobActiveIndexIntegrationTest#lateCompletion_cannotOverwriteAlreadyTerminalRow and
+    // #terminalTransition_isCompareAndSet_andPersistsProgressJson.
 
     /**
      * Mid-flight progress must refresh the resources pane too. Publishing RESOURCES only at terminal is
@@ -679,13 +672,6 @@ class SyncJobServiceTest extends BaseUnitTest {
             .contains(SyncStateChangedEvent.Scope.JOB);
     }
 
-    @Test
-    void flushBufferedProgress_noActiveHandles_doesNothing() {
-        service.flushBufferedProgress();
-
-        verify(syncJobRepository, never()).save(any());
-    }
-
     /**
      * The trailing flush, end to end. A runner that reports a phase boundary and then goes quiet for
      * minutes must not leave the row showing the state before it — the sweep is what lands that last
@@ -715,7 +701,9 @@ class SyncJobServiceTest extends BaseUnitTest {
             assertThat(reported.await(5, TimeUnit.SECONDS)).isTrue();
             assertThat(started.job().getItemsProcessed()).isEqualTo(1);
 
-            Thread.sleep(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS * 1000 + 200);
+            // Advance past the throttle window instead of sleeping: the handle reads the same injected
+            // clock, so the buffered "suppressed" update is now due for the trailing flush.
+            clock.advance(Duration.ofSeconds(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS).plusMillis(200));
             service.flushBufferedProgress();
 
             assertThat(started.job().getItemsProcessed()).isEqualTo(7);

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -59,16 +61,38 @@ public class SyncJobService implements SmartLifecycle {
     private final Map<Long, SyncJobHandle> activeHandles = new ConcurrentHashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
 
+    /**
+     * Source of "now" handed to every {@link SyncJobHandle} for its write-throttle window. Held here
+     * rather than injected as a Spring bean because this service loads in every runtime role and the
+     * {@code Clock} bean is server-role-scoped; tests use the package-private constructor to advance a
+     * controllable clock instead of sleeping.
+     */
+    private final Clock clock;
+
+    // @Autowired marks this as the constructor Spring injects; the second (Clock-taking) constructor is a
+    // test seam, so without this marker Spring sees two candidates and falls back to a no-arg it can't find.
+    @Autowired
     public SyncJobService(
         SyncJobRepository syncJobRepository,
         ConnectionRepository connectionRepository,
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate
     ) {
+        this(syncJobRepository, connectionRepository, eventPublisher, transactionTemplate, Clock.systemUTC());
+    }
+
+    SyncJobService(
+        SyncJobRepository syncJobRepository,
+        ConnectionRepository connectionRepository,
+        ApplicationEventPublisher eventPublisher,
+        TransactionTemplate transactionTemplate,
+        Clock clock
+    ) {
         this.syncJobRepository = syncJobRepository;
         this.connectionRepository = connectionRepository;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
+        this.clock = clock;
     }
 
     public record Started(SyncJob job, SyncJobHandle handle) {}
@@ -125,7 +149,7 @@ public class SyncJobService implements SmartLifecycle {
             throw e;
         }
 
-        SyncJobHandle handle = new SyncJobHandle(job.getId(), this::persistProgress);
+        SyncJobHandle handle = new SyncJobHandle(job.getId(), this::persistProgress, clock);
         return new Started(job, handle);
     }
 
@@ -367,7 +391,12 @@ public class SyncJobService implements SmartLifecycle {
                 SyncStateChangedEvent.Scope.JOB
             );
         }
-        log.warn("Reaped {} abandoned sync job(s)", reaped);
+        // Only page when work was actually reaped: every candidate can be locally-owned or
+        // heartbeat-refreshed, leaving reaped==0, and a WARN there would be a false alert
+        // (mirrors SyncJobZombieSweeper.sweep's guard).
+        if (reaped > 0) {
+            log.warn("Reaped {} abandoned sync job(s)", reaped);
+        }
         return reaped;
     }
 

@@ -324,6 +324,61 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(persisted.isCancelRequested()).isTrue();
     }
 
+    /**
+     * The core compare-and-set invariant, isolated against real Postgres: once a row is terminal a
+     * stale/late completion — a second replica or a delayed executor firing its terminal write after the
+     * job already finished — must be a no-op, never an overwrite. {@code completeActiveJob}'s
+     * {@code status IN :activeStatuses} clause is what enforces this; deleting that clause makes the late
+     * {@code completeActiveJob} below return 1 and stamp FAILED over the SUCCEEDED row, so this test is
+     * exactly what fails when the clause regresses.
+     */
+    @Test
+    @Transactional
+    void lateCompletion_cannotOverwriteAlreadyTerminalRow() {
+        SyncJob job = syncJobRepository.saveAndFlush(
+            new SyncJob(
+                workspace,
+                connection,
+                IntegrationKind.GITHUB,
+                SyncJobType.RECONCILIATION,
+                SyncJobTrigger.MANUAL,
+                null
+            )
+        );
+        assertThat(syncJobRepository.markRunning(job.getId())).isEqualTo(1);
+
+        // The real winner completes the row.
+        assertThat(
+            syncJobRepository.completeActiveJob(
+                job.getId(),
+                SyncJobStatus.SUCCEEDED,
+                null,
+                8,
+                8,
+                Map.of(),
+                SyncJobStatus.ACTIVE
+            )
+        ).isEqualTo(1);
+
+        // A stale/late writer tries to complete the same row again — it must not match, and must not
+        // rewrite the terminal outcome.
+        int lateWrite = syncJobRepository.completeActiveJob(
+            job.getId(),
+            SyncJobStatus.FAILED,
+            "stale late completion",
+            0,
+            8,
+            Map.of("late", true),
+            SyncJobStatus.ACTIVE
+        );
+
+        assertThat(lateWrite).as("a late completion must not match an already-terminal row").isZero();
+        SyncJob persisted = syncJobRepository.findById(job.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+        assertThat(persisted.getErrorSummary()).isNull();
+        assertThat(persisted.getItemsProcessed()).isEqualTo(8);
+    }
+
     @Test
     @Transactional
     void reaperUpdate_rechecksLeaseAfterSelectingCandidate() {

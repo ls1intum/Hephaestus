@@ -193,7 +193,8 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
             assertThat(fire.getHour()).isEqualTo(3);
             assertThat(fire.getMinute()).isZero();
             assertThat(fire.getSecond()).isZero();
-            assertThat(next).isAfter(before).isBeforeOrEqualTo(before.plus(Duration.ofDays(1)));
+            // 25h, not 24h: on the DST fall-back day the gap to the next 03:00 fire stretches to 25h.
+            assertThat(next).isAfter(before).isBeforeOrEqualTo(before.plus(Duration.ofHours(25)));
         }
 
         @Test

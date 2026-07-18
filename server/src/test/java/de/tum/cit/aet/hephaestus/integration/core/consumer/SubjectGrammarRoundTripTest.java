@@ -74,18 +74,56 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         }
         String publisherSubject = GITLAB.deriveSubject(payload, Map.of());
         // Group-tier lifecycle events (project/subgroup/member) are ORG-scoped: they carry the '?'
-        // placeholder in the project slot and are matched by the workspace's organizationFilter, not the
-        // repo prefix. project.create is the only such fixture that still has a path_with_namespace, so
-        // skip anything whose project token is the placeholder. Their routability is covered by
-        // GitlabSubjectKeyDeriverTest.
+        // placeholder in the project slot and route via the workspace's organizationFilter
+        // (gitlab.<rootGroup>.?.>), not the repo prefix. Bind the derived subject to that filter through a
+        // real NATS token match so a drift in EITHER buildSubjectPrefix/organizationFilter or the deriver's
+        // group-tier subject format fails here — the exact regression 90f63f784 fixed. (Previously this
+        // branch was skipped, leaving group-tier routing unguarded end to end.)
         String[] subjectParts = publisherSubject.split("\\.", -1);
         if (subjectParts.length >= 3 && "?".equals(subjectParts[2])) {
+            String rootGroup = pathWithNamespace.substring(0, pathWithNamespace.indexOf('/'));
+            String orgFilter = ConsumerSubjectMath.organizationFilter("gitlab", rootGroup);
+            assertThat(subjectMatchesFilter(publisherSubject, orgFilter))
+                .as(
+                    "group-tier publisher %s (%s) should be matched by org filter '%s'",
+                    fixture.getFileName(),
+                    publisherSubject,
+                    orgFilter
+                )
+                .isTrue();
             return;
         }
         String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("gitlab", pathWithNamespace);
         assertThat(publisherSubject)
             .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
             .startsWith(consumerPrefix + ".");
+    }
+
+    /**
+     * NATS subject/filter token match: {@code *} matches exactly one token, {@code >} matches one or more
+     * trailing tokens, every other token must match literally (the {@code ?} org-scope placeholder is a
+     * literal token here, not a wildcard). This is the delivery predicate a JetStream consumer applies, so
+     * matching through it — rather than a prefix string compare — is what genuinely proves the derived
+     * subject would be routed by the filter.
+     */
+    private static boolean subjectMatchesFilter(String subject, String filter) {
+        String[] s = subject.split("\\.", -1);
+        String[] f = filter.split("\\.", -1);
+        for (int i = 0; i < f.length; i++) {
+            if (">".equals(f[i])) {
+                return i < s.length; // '>' requires at least one remaining subject token
+            }
+            if (i >= s.length) {
+                return false;
+            }
+            if ("*".equals(f[i])) {
+                continue;
+            }
+            if (!f[i].equals(s[i])) {
+                return false;
+            }
+        }
+        return s.length == f.length;
     }
 
     @ParameterizedTest(name = "GitHub fixture {0}")

@@ -163,7 +163,9 @@ class OutlineApiFixtureDeserializationTest {
     private <T> T deserialize(String classpath, TypeReference<T> type) throws Exception {
         try (InputStream in = getClass().getResourceAsStream(classpath)) {
             assertThat(in).as("fixture %s must be on the classpath", classpath).isNotNull();
-            // Read through the exact tolerant policy the running client uses (unknown fields + unknown enums).
+            // Read through the exact tolerant policy the running client uses. These fixtures exercise the
+            // unknown-field tolerance; the out-of-enum tolerance (READ_UNKNOWN_ENUM_VALUES_AS_NULL) is
+            // pinned separately by OutlineDeserializationToleranceTest with a poison "admin" permission.
             return OutlineClientConfig.tolerantMapper(jackson3).readValue(in.readAllBytes(), type);
         }
     }

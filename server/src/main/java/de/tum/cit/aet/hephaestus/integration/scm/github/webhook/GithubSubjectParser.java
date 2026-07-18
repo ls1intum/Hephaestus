@@ -17,8 +17,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>The literal {@code ?} placeholder is reserved (matches the producer-side
  * {@link GithubSubjectKeyDeriver}). Subjects with fewer than four dot-delimited
- * components are malformed and throw {@link IllegalArgumentException} — the consumer
- * pipeline turns those into a dead-letter rather than a silent drop.
+ * components are malformed and throw {@link IllegalArgumentException}. That exception is
+ * caught by {@code IntegrationMessageDispatcher#dispatch}, which logs it at DEBUG and
+ * returns no handler — the consumer then ACKs and skips the message. A malformed subject is
+ * therefore a silent ACK-drop, not a dead-letter (nothing is redelivered or parked).
  */
 @Component
 public class GithubSubjectParser implements SubjectParser {

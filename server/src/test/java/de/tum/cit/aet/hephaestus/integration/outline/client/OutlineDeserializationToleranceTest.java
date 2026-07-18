@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -112,5 +113,44 @@ class OutlineDeserializationToleranceTest {
         assertThat(envelope).isNotNull();
         assertThat(envelope.data()).hasSize(2);
         assertThat(envelope.data().get(0).getId()).isEqualTo("doc-1");
+    }
+
+    /**
+     * The other half of the tolerant-reader contract: unknown enum values decode to {@code null}. Outline
+     * ships enum values ahead of its published spec — a collection {@code permission} of {@code "admin"} is
+     * outside the generated {@code OutlinePermission} enum, whose {@code @JsonCreator fromValue} throws
+     * {@code IllegalArgumentException} on anything it doesn't know. The tolerant policy
+     * ({@link OutlineClientConfig#tolerantMapper}) must turn that into {@code null} (a field we never read)
+     * rather than abort the whole {@code collections.list} response.
+     *
+     * <p>Exercised through {@code tolerantMapper(...).readValue}, the same way
+     * {@code OutlineApiFixtureDeserializationTest} pins the policy. The load-bearing knob is the
+     * {@code READ_UNKNOWN_ENUM_VALUES_AS_NULL} feature enabled in {@link OutlineClientConfig#tolerantMapper};
+     * reverting it makes the {@code fromValue} throw abort the decode, so this test fails — which is
+     * exactly the regression it exists to catch.
+     */
+    @Test
+    void outOfEnumPermissionDecodesToNullWhileSiblingsStillMap() {
+        String body = """
+            {
+              "id": "fbe68839-b131-44e2-bb93-0bc533d39193",
+              "name": "Engineering Docs",
+              "urlId": "j4Gxqv1NCn",
+              "permission": "admin"
+            }
+            """;
+
+        OutlineCollectionModel collection = OutlineClientConfig.tolerantMapper(baseObjectMapper).readValue(
+            body,
+            OutlineCollectionModel.class
+        );
+
+        assertThat(collection).isNotNull();
+        // The unknown enum value maps to null instead of aborting the decode.
+        assertThat(collection.getPermission()).isNull();
+        // Sibling fields on the same model still map — tolerance is scoped to the poison field only.
+        assertThat(collection.getId()).isEqualTo("fbe68839-b131-44e2-bb93-0bc533d39193");
+        assertThat(collection.getName()).isEqualTo("Engineering Docs");
+        assertThat(collection.getUrlId()).isEqualTo("j4Gxqv1NCn");
     }
 }

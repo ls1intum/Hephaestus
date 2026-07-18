@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +13,19 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The write-throttle contract: over-calling is free, nothing buffered is lost, and the last update
- * before a quiet period still lands.
+ * before a quiet period still lands. The throttle window is driven by an injected {@link MutableClock}
+ * that the tests advance explicitly, so timing is deterministic and no test sleeps real wall-clock time.
  */
 class SyncJobHandleTest extends BaseUnitTest {
 
     private static final long JOB_ID = 42L;
+
+    /** Past the throttle window by a hair — the trailing flush is due after this much elapsed time. */
+    private static final Duration JUST_PAST_INTERVAL = Duration.ofSeconds(
+        SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS
+    ).plusMillis(200);
+
+    private final MutableClock clock = MutableClock.atEpochUtc();
 
     /** Captures what actually reached the "database". */
     private static final class RecordingWriter implements SyncJobHandle.ProgressWriter {
@@ -40,6 +49,10 @@ class SyncJobHandleTest extends BaseUnitTest {
         }
     }
 
+    private SyncJobHandle newHandle(RecordingWriter writer) {
+        return new SyncJobHandle(JOB_ID, writer, clock);
+    }
+
     private static SyncProgress progress(String step) {
         return SyncProgress.of(SyncPhase.ISSUES, step);
     }
@@ -47,7 +60,7 @@ class SyncJobHandleTest extends BaseUnitTest {
     @Test
     void firstProgressCall_writesImmediately() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
         handle.progress(1, 10, progress("first"));
 
@@ -57,9 +70,9 @@ class SyncJobHandleTest extends BaseUnitTest {
     @Test
     void burstOfCallsWithinTheInterval_writesOnceButKeepsTheLatestValue() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
-        // A runner reporting every page: the whole point is that this is free.
+        // A runner reporting every page without the clock advancing: the whole point is that this is free.
         for (int i = 1; i <= 50; i++) {
             handle.progress(i, 50, progress("page " + i));
         }
@@ -73,7 +86,7 @@ class SyncJobHandleTest extends BaseUnitTest {
     @Test
     void flushIfDue_isANoOpWhenNothingWasSuppressed() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
         handle.progress(1, 10, progress("first"));
 
         boolean flushed = handle.flushIfDue();
@@ -85,7 +98,7 @@ class SyncJobHandleTest extends BaseUnitTest {
     @Test
     void flushIfDue_isANoOpOnAFreshHandleThatNeverReported() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
         assertThat(handle.flushIfDue()).isFalse();
         assertThat(writer.writeCount()).isZero();
@@ -96,9 +109,9 @@ class SyncJobHandleTest extends BaseUnitTest {
      * update followed by a long quiet period must not sit in memory until the next call.
      */
     @Test
-    void suppressedUpdate_isFlushedOnceTheIntervalElapses() throws InterruptedException {
+    void suppressedUpdate_isFlushedOnceTheIntervalElapses() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
         handle.progress(1, 10, progress("written"));
         handle.progress(2, 10, progress("suppressed — the last word before a quiet period"));
@@ -108,7 +121,7 @@ class SyncJobHandleTest extends BaseUnitTest {
         assertThat(handle.flushIfDue()).isFalse();
         assertThat(writer.writeCount()).isEqualTo(1);
 
-        Thread.sleep(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS * 1000 + 200);
+        clock.advance(JUST_PAST_INTERVAL);
 
         assertThat(handle.flushIfDue()).isTrue();
         assertThat(writer.writeCount()).isEqualTo(2);
@@ -120,13 +133,13 @@ class SyncJobHandleTest extends BaseUnitTest {
     }
 
     @Test
-    void flushIfDue_writesAtMostOncePerSuppressedUpdate() throws InterruptedException {
+    void flushIfDue_writesAtMostOncePerSuppressedUpdate() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
         handle.progress(1, 10, progress("written"));
         handle.progress(2, 10, progress("suppressed"));
-        Thread.sleep(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS * 1000 + 200);
+        clock.advance(JUST_PAST_INTERVAL);
 
         assertThat(handle.flushIfDue()).isTrue();
         // The sweep runs every second against every active handle; a flushed handle with no new
@@ -136,12 +149,12 @@ class SyncJobHandleTest extends BaseUnitTest {
     }
 
     @Test
-    void progressAfterTheIntervalElapses_writesDirectlyWithoutNeedingASweep() throws InterruptedException {
+    void progressAfterTheIntervalElapses_writesDirectlyWithoutNeedingASweep() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
         handle.progress(1, 10, progress("first"));
-        Thread.sleep(SyncJobHandle.MIN_WRITE_INTERVAL_SECONDS * 1000 + 200);
+        clock.advance(JUST_PAST_INTERVAL);
         handle.progress(2, 10, progress("second"));
 
         assertThat(writer.writeCount()).isEqualTo(2);
@@ -151,7 +164,7 @@ class SyncJobHandleTest extends BaseUnitTest {
     @Test
     void progressDetail_isFlattenedToTheSharedWireKeys() {
         RecordingWriter writer = new RecordingWriter();
-        SyncJobHandle handle = new SyncJobHandle(JOB_ID, writer);
+        SyncJobHandle handle = newHandle(writer);
 
         handle.progress(3, 7, SyncProgress.ofResource(SyncPhase.PULL_REQUESTS, "step text", "owner/repo", 3, 7));
 

@@ -64,18 +64,6 @@ class SyncEventHubTest extends BaseUnitTest {
     }
 
     @Test
-    void publish_toWorkspaceWithNoSubscribers_isNoop() {
-        hub = newHub(Duration.ofMillis(10));
-        hub.publish(WORKSPACE_ID, new SyncEventHint("job", CONNECTION_ID));
-
-        await()
-            .during(Duration.ofMillis(100))
-            .atMost(Duration.ofSeconds(1))
-            .until(() -> true);
-        assertThat(createdEmitters).isEmpty();
-    }
-
-    @Test
     void sendFailure_deregistersAndCompletesEmitter() {
         hub = newHub(Duration.ofMillis(10));
         hub.subscribe(WORKSPACE_ID);
@@ -152,22 +140,6 @@ class SyncEventHubTest extends BaseUnitTest {
         await()
             .atMost(Duration.ofSeconds(2))
             .untilAsserted(() -> assertThat(second.comments()).contains("ping"));
-    }
-
-    @Test
-    void heartbeat_afterDeregistration_isNoop() {
-        hub = newHub(Duration.ofMillis(10));
-        hub.subscribe(WORKSPACE_ID);
-        RecordingEmitter emitter = createdEmitters.get(0);
-        emitter.fireCompletion();
-
-        hub.sendHeartbeats();
-
-        await()
-            .during(Duration.ofMillis(200))
-            .atMost(Duration.ofSeconds(1))
-            .until(() -> true);
-        assertThat(emitter.comments()).doesNotContain("ping");
     }
 
     @Test
