@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.O
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineDocumentListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineDocumentModel;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.sync.OutlineDocumentSyncScheduler;
@@ -165,7 +165,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
      * {@code documents.export} still runs whenever content is needed. Returns {@code null} on any parse
      * failure or an incomplete model, so the sync path falls back to a {@code documents.info} call.
      */
-    private OutlineDocumentListResponse.@Nullable Meta parseModel(String event, JsonNode modelNode) {
+    private @Nullable OutlineDocumentModel parseModel(String event, JsonNode modelNode) {
         if (!event.startsWith("documents.") || modelNode == null || modelNode.isMissingNode() || modelNode.isNull()) {
             return null;
         }
@@ -173,7 +173,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
             return null;
         }
         try {
-            return objectMapper.treeToValue(modelNode, OutlineDocumentListResponse.Meta.class);
+            return objectMapper.treeToValue(modelNode, OutlineDocumentModel.class);
         } catch (RuntimeException e) {
             return null;
         }
@@ -201,6 +201,6 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         String payloadId,
         String actorId,
         @Nullable Instant occurredAt,
-        OutlineDocumentListResponse.@Nullable Meta model
+        @Nullable OutlineDocumentModel model
     ) {}
 }

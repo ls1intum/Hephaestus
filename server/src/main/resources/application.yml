@@ -668,6 +668,11 @@ resilience4j:
 # silenced here (3rd-party loggers) or downgraded to DEBUG at the source (our own packages).
 logging:
     level:
+        # Spring's generic web DEBUG logger includes decoded request/response bodies. Vendor OAuth and
+        # installation-token responses can contain credentials, so keep the body logger closed even when
+        # a broader org.springframework.web package is raised to DEBUG for local troubleshooting.
+        org.springframework.web.HttpLogging: INFO
+        org.springframework.web.reactive.function.client.ExchangeFunctions: INFO
         # Liquibase logs every changeset at INFO on each boot (the bulk of startup noise).
         # WARN keeps real migration problems (validation/checksum/lock-wait).
         liquibase: WARN

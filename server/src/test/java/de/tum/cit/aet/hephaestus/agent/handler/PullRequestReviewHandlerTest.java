@@ -104,7 +104,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     "",
                     15,
                     false,
-                    false,
                     false
                 )
             )
@@ -687,9 +686,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // it received with a deterministic correlation key derived from the instance the handler passed.
             when(deliveryService.deliver(eq(job), any())).thenAnswer(invocation -> {
                 List<PracticeDetectionResultParser.ValidatedFinding> received = invocation.getArgument(1);
-                Map<PracticeDetectionResultParser.ValidatedFinding, String> keys = new java.util.IdentityHashMap<>();
+                Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keys =
+                    new java.util.IdentityHashMap<>();
                 for (var f : received) {
-                    keys.put(f, "corr-" + f.practiceSlug());
+                    keys.put(f, new ObservationKeys("occ-" + f.practiceSlug(), "corr-" + f.practiceSlug()));
                 }
                 return new DeliveryResult(received.size(), 0, 0, true, keys);
             });

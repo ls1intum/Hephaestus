@@ -106,6 +106,14 @@ public class OutlineConnectionStrategy implements ConnectionStrategy {
         );
     }
 
+    /**
+     * Stays {@code @Transactional} (default {@code REQUIRED}) because the three {@code deleteByWorkspaceId}
+     * sweeps below are derived delete queries and need one. The vendor round-trip is NOT covered by it:
+     * {@code OutlineWebhookRegistrar#deregister} suspends via {@code Propagation.NOT_SUPPORTED}, so the
+     * subscription DELETE never runs inside this transaction. If the erase fails,
+     * {@code ConnectionService#disconnect} runs this whole callback on its own transaction and absorbs
+     * the failure, so the local UNINSTALLED transition still commits.
+     */
     @Override
     @Transactional
     public void revoke(IntegrationRef ref) {

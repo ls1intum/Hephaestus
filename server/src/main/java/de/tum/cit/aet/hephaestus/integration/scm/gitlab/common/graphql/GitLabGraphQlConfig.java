@@ -137,8 +137,11 @@ public class GitLabGraphQlConfig {
      * Uses the {@code (request, next)} filter pattern (not just response processor) to access
      * the scopeId from the request's {@link GitLabGraphQlClientProvider#SCOPE_ID_ATTRIBUTE}.
      * The tracker update is a non-blocking side-effect via {@code doOnNext}.
+     * <p>
+     * Package-private for direct unit testing of the scopeId-attribute → tracker seam
+     * (see {@code GitLabGraphQlConfigRateLimitFilterTest}) without a full WebClient round-trip.
      */
-    private ExchangeFilterFunction rateLimitTrackingFilter() {
+    ExchangeFilterFunction rateLimitTrackingFilter() {
         return (request, next) ->
             next
                 .exchange(request)

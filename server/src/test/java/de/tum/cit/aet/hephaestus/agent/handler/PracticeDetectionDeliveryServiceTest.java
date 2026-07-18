@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -29,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -162,6 +164,91 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
+    class RevisionPinning {
+
+        /** The practice_revision_id the service passed to insertIfAbsent for the single persisted finding. */
+        private Long persistedRevisionId() {
+            ArgumentCaptor<Long> revisionId = ArgumentCaptor.forClass(Long.class);
+            verify(observationRepository).insertIfAbsent(
+                any(),
+                anyString(),
+                any(),
+                anyLong(),
+                revisionId.capture(),
+                anyString(),
+                anyLong(),
+                anyLong(),
+                any(),
+                anyString(),
+                any(),
+                any(),
+                anyFloat(),
+                any(),
+                any(),
+                anyString(),
+                any()
+            );
+            return revisionId.getValue();
+        }
+
+        private PracticeRevision revision(long id) {
+            var revision = org.mockito.Mockito.mock(PracticeRevision.class);
+            lenient().when(revision.getId()).thenReturn(id);
+            return revision;
+        }
+
+        @Test
+        void pinsTheRevisionThatExistedWhenTheJobStarted_notTheLatest() {
+            // An admin edit while the sandbox runs appends a revision the detector never saw. The observation
+            // must pin the criteria as of startedAt — the moment before the catalog injector read them.
+            testJob.setStartedAt(Instant.parse("2026-07-16T10:00:00Z"));
+            Optional<PracticeRevision> asOfStart = Optional.of(revision(41L));
+            Optional<PracticeRevision> midRunEdit = Optional.of(revision(42L));
+            when(
+                practiceRevisionRepository.findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
+                    10L,
+                    testJob.getStartedAt()
+                )
+            ).thenReturn(asOfStart);
+            lenient()
+                .when(practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(10L))
+                .thenReturn(midRunEdit);
+
+            service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
+
+            assertThat(persistedRevisionId()).isEqualTo(41L);
+        }
+
+        @Test
+        void fallsBackToTheLatestRevision_whenNoneExistedAtJobStart() {
+            // A practice created mid-run has no as-of revision; pinning the latest beats pinning nothing.
+            testJob.setStartedAt(Instant.parse("2026-07-16T10:00:00Z"));
+            when(
+                practiceRevisionRepository.findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
+                    any(),
+                    any()
+                )
+            ).thenReturn(Optional.empty());
+            Optional<PracticeRevision> latest = Optional.of(revision(7L));
+            when(practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(10L)).thenReturn(latest);
+
+            service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
+
+            assertThat(persistedRevisionId()).isEqualTo(7L);
+        }
+
+        @Test
+        void fallsBackToTheLatestRevision_whenTheJobHasNoStartedAt() {
+            Optional<PracticeRevision> latest = Optional.of(revision(7L));
+            when(practiceRevisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(10L)).thenReturn(latest);
+
+            service.deliver(testJob, List.of(validFinding("pr-description-quality", Presence.PRESENT)));
+
+            assertThat(persistedRevisionId()).isEqualTo(7L);
+        }
+    }
+
+    @Nested
     class HappyPath {
 
         @Test
@@ -200,7 +287,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(fingerprintCaptor.getValue())
                 .as("persisted recurrence_key matches the returned findingFingerprint")
                 .matches("[0-9a-f]{64}")
-                .isEqualTo(result.findingFingerprints().values().iterator().next());
+                .isEqualTo(result.observationKeys().values().iterator().next().recurrenceKey());
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             PracticeDetectionCompletedEvent event = eventCaptor.getValue();

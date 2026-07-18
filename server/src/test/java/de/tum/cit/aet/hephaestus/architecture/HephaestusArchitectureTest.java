@@ -55,6 +55,16 @@ public abstract class HephaestusArchitectureTest {
      * <p>Uses double-checked locking to ensure thread-safe lazy initialization.
      * The class import is expensive (~3-5 seconds), so we cache the result
      * across all test classes that extend this base.
+     *
+     * <p><b>Generated Outline vendor models.</b> The imported set deliberately includes the
+     * {@code openapi-generator}-emitted models in {@code integration.outline.client.model} (Jackson-2
+     * annotations, {@code @jakarta.annotation.Nonnull}, plain wire POJOs). They are <em>not</em> globally
+     * excluded here: a blanket exclusion would also blind {@link OutlineApiDtoIsolationTest}, whose whole
+     * job is to keep those exact classes on the extract seam, so the boundary guard would silently match
+     * zero classes and pass vacuously. Each rule that legitimately does not apply to generated wire models
+     * (nullability-annotation consistency, Jackson-namespace, external-vendor-import allowlist, …) instead
+     * exempts the {@code ..integration.outline.client.model..} package on its own {@code .that()} subject
+     * set, so the exemption is visible and auditable at the rule that needs it rather than hidden here.
      */
     @BeforeAll
     static void initializeClasses() {

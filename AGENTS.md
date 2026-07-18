@@ -81,10 +81,11 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
-- **Filename convention (required):** the committed file MUST be `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`, i.e. what the draft tool emits), strictly greater than the latest existing changelog so `master.xml` stays monotonic. Do NOT invent a round number and do NOT use a descriptive suffix; keep the `_changelog.xml` name. `changeSet` ids follow `<timestamp>-1`, `<timestamp>-2`, …
+- **Filename convention (required):** the committed file MUST be `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`, i.e. what the draft tool emits), strictly greater than the latest existing changelog. Do NOT invent a round number and do NOT use a descriptive suffix; keep the `_changelog.xml` name. New `<include>` entries are **appended** to `master.xml` — the committed list is append-only (CI-enforced), not globally timestamp-sorted. `changeSet` ids follow `<timestamp>-1`, `<timestamp>-2`, …
 - **One consolidated changelog per branch/PR (required):** add every schema change for a branch as additional `<changeSet>` entries inside that single file. Never open a PR with more than one new changelog file — consolidate. Each `changeSet` should be preconditioned (`onFail="MARK_RAN"`) with a `<rollback>`, matching the existing files.
 - After drafting a changelog, run `pnpm run db:generate-erd-docs` to keep ERD docs in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
+- **Released Liquibase changelogs are immutable (CI-enforced):** once a changelog file reaches `main` it must never be edited, renamed, or deleted, and `master.xml` is append-only — the `Migrations` quality gate fails otherwise. Fix mistakes forward with a new changelog. Destructive schema changes (drop/rename of released tables/columns) follow deprecate-then-remove across two releases — see `docs/contributor/database-migration.mdx`. (This is the DB changelog; the `.changeset/*.md` release notes in §10 are a separate thing.)
 
 ## 6. Frontend (webapp) expectations
 
@@ -111,7 +112,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Group new tests under the proper JUnit tag so CI picks them up (`@Tag("unit")`, `@Tag("integration")`, or `@Tag("live")`). Follow AAA structure, single assertion focus, deterministic data. See `server/AGENTS.md` for testing patterns.
 - Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `integration.scm.domain.team` for established patterns.
 - Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
-- Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.
+- Give each new changelog a fresh millisecond-timestamp ID greater than the previous one and append its `<include>` to the end of `master.xml` (append-only; the historical list is not globally sorted). Align entity annotations with the generated change sets.
 - Annotate record components in DTOs with `org.jspecify.annotations.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
 - Prefer resource-oriented workspace endpoints: express lifecycle transitions via HTTP methods (for example `PATCH /workspaces/{workspaceSlug}/status`) instead of RPC-style verbs and return consistent `ProblemDetail` payloads for errors.
 - When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.
@@ -137,7 +138,24 @@ Before opening a PR, run `pnpm run format && pnpm run check`. The PR template (`
 
 - **Title**: Follow Conventional Commits—see `CONTRIBUTING.md` for types/scopes.
 - **Generated files**: Regenerate and commit OpenAPI specs, clients, and ERD docs when APIs or entities change.
-- **Database changes**: Run `pnpm run db:draft-changelog` and prune to minimal deltas.
+- **Database changes**: Run `pnpm run db:draft-changelog`, prune to minimal deltas, and ship a **release changeset** (see below).
+- **Changeset**: Every PR that changes shipped code ships one (see below).
+
+### Changesets (release notes)
+
+These are **release changesets** — `.changeset/*.md` files that become `CHANGELOG.md` and drive the version bump. Do not confuse them with Liquibase `<changeSet>`s (the DB changelog in §5); a schema change needs *both*. Full flow: `docs/contributor/release-management.mdx`.
+
+- **Every PR that changes shipped code (anything under `server/`, `webapp/`, or `docker/` except tests and in-tree docs) ships a changeset.** Run `pnpm changeset` (pick the bump, write the summary). If the change is invisible to operators and users (refactor, tests, CI, docs-only), run `pnpm changeset --empty` and write why in the file body. CI (`verify-changesets`) fails a shipped-code PR that has neither.
+- **The summary lands in `CHANGELOG.md` verbatim, in the operator/user's voice.** Lead with what an operator or user can now do, or the symptom a fix removes — no class names, hook names, or file paths. If operators must act, add a line: `**Operators:** set FOO_BAR (optional, default …)`. Never put co-authored-by / agent-attribution trailers in the body; never hand-edit `CHANGELOG.md`.
+  - ✗ `Refactor LeaderboardService scoring hooks` → ✓ `Fixes duplicate leaderboard entries after a team rename.`
+  - **One changeset per user-visible change**; a PR shipping two unrelated visible changes ships two files. When unsure, add one.
+  - **No TTY (agent/CI)?** `pnpm changeset` is interactive; instead write `.changeset/<slug>.md` by hand — frontmatter `"hephaestus": <bump>` and the summary as the body (exact shape in `.changeset/README.md`). This is the one sanctioned hand-write; `CHANGELOG.md` and frontmatter you invent elsewhere are not.
+- **The bump is the operator's upgrade cost, not code semantics:**
+  - `patch` — upgrade needs no action (bug fix, internal change, additive migration that runs automatically).
+  - `minor` — new capability, still zero-action; call out any new *optional* env var / feature flag in the summary.
+  - `major` — the operator must act before/at upgrade (required new env var, removed/renamed config, destructive or manual migration, dropped API). State the action and update `MIGRATION.md`.
+  - **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and `verify-changesets` rejects it. Breaking changes ride in `minor` instead, so a pre-1.0 `minor` is *not* guaranteed zero-action: if the operator must act, say so in the summary (`**Operators:** …`) and update `MIGRATION.md` exactly as a `major` would.
+- **Schema migrations:** the release notes flag them automatically (the release workflow diffs `db/changelog/`), so the changeset does NOT mention an automatic migration — keep it user-facing. Only when the operator must act does the changeset say so (`**Operators:** …` + `MIGRATION.md`). Touching `db/changelog/` without touching `.changeset/` is always wrong.
 
 ## 11. Known command caveats
 

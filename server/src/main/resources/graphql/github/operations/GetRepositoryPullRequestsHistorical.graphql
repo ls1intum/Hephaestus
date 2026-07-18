@@ -141,6 +141,33 @@ query GetRepositoryPullRequestsHistorical(
                     }
                 }
 
+                # Conversation (top-level) comments — same IssueComment entity as issue
+                # comments. repository.issues excludes PRs, so a backfilled repo would
+                # otherwise never receive its PR conversation comments.
+                # Embedded first 10, mirroring the issue backfill: PRs with more than 10
+                # get the tail from the regular incremental sync, which paginates.
+                comments(first: 10) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        body
+                        url
+                        createdAt
+                        updatedAt
+
+                        author {
+                            ...ActorFields
+                        }
+
+                        authorAssociation
+                    }
+                }
+
                 # Reviews with embedded comments (fetch 50 to cover most PRs, pagination handles the rest)
                 reviews(first: 50) {
                     totalCount

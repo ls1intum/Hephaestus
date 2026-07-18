@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.time.Instant;
@@ -79,6 +80,20 @@ public class ConversationalFeedbackPreparer {
             )
             .collect(Collectors.toList());
 
+        // Every admitted observation now consumes a slot (raised or withheld), so the band is no longer
+        // bounded by the per-recipient cap. Overflowing it would collide with the next band and silently drop
+        // the very rows this records — fail loud instead; a job with this many admitted loci is pathological.
+        if (ordered.size() > FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
+            throw new IllegalStateException(
+                "Conversational units exceed the ordinal band: jobId=" +
+                    agentJobId +
+                    ", admitted=" +
+                    ordered.size() +
+                    ", band=" +
+                    FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH
+            );
+        }
+
         Map<Long, Integer> perRecipientCount = new HashMap<>();
         // Newly CREATED units only (re-run no-ops excluded) — feeds the per-recipient prepared event.
         Map<Long, Integer> newlyPreparedByRecipient = new HashMap<>();
@@ -88,10 +103,13 @@ public class ConversationalFeedbackPreparer {
         for (Observation observation : ordered) {
             long recipient = observation.getAboutUserId();
             int count = perRecipientCount.getOrDefault(recipient, 0);
-            if (count >= TOP_N_PER_RECIPIENT) {
-                continue;
+            // Over the per-recipient cap the locus is withheld, not raised. The router already established
+            // nobody has seen it, so it still gets a row — dropping it silently would leave it bound to a
+            // DELIVERED unit and read as feedback the developer ignored.
+            boolean overCap = count >= TOP_N_PER_RECIPIENT;
+            if (!overCap) {
+                perRecipientCount.put(recipient, count + 1);
             }
-            perRecipientCount.put(recipient, count + 1);
             int unitPosition = position++;
             if (feedbackRepository.existsByAgentJobIdAndPosition(agentJobId, unitPosition)) {
                 continue;
@@ -106,7 +124,8 @@ public class ConversationalFeedbackPreparer {
                     .aboutUserId(recipient)
                     .channel(FeedbackChannel.CONVERSATION)
                     .position(unitPosition)
-                    .deliveryState(FeedbackDeliveryState.PREPARED)
+                    .deliveryState(overCap ? FeedbackDeliveryState.SUPPRESSED : FeedbackDeliveryState.PREPARED)
+                    .suppressionReason(overCap ? FeedbackSuppressionReason.VOLUME_CAPPED : null)
                     .source(FeedbackSource.AGENT)
                     .createdAt(now)
                     .build()
@@ -117,8 +136,10 @@ public class ConversationalFeedbackPreparer {
                 EvidenceRole.PRIMARY.name(),
                 0
             );
-            newlyPreparedByRecipient.merge(recipient, 1, Integer::sum);
-            prepared++;
+            if (!overCap) {
+                newlyPreparedByRecipient.merge(recipient, 1, Integer::sum);
+                prepared++;
+            }
         }
         if (prepared > 0) {
             log.info("Conversational feedback prepared: jobId={}, units={}", agentJobId, prepared);

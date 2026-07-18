@@ -190,6 +190,22 @@ public class AgentJob {
     @Column(name = "worker_id", length = 255)
     private String workerId;
 
+    /**
+     * The run's prompt-template version: a digest of the prompt scaffolding it consumed (orchestrator prompt,
+     * runner, sidecar scripts). Equal digests ran byte-identical prompt assembly, so an evaluation groups runs
+     * by this value. Null only for rows written before provenance existed.
+     */
+    @Column(name = "prompt_digest", length = 64)
+    private String promptDigest;
+
+    /**
+     * The run's input snapshot: a digest over every file materialised into the sandbox workspace, with the
+     * job's own id elided so two runs over identical work agree. The read-only repo mount is NOT hashed — its
+     * state is pinned by {@code metadata.commit_sha}. Null only for rows written before provenance existed.
+     */
+    @Column(name = "inputs_digest", length = 64)
+    private String inputsDigest;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

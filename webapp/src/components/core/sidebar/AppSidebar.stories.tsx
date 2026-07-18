@@ -72,7 +72,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Regular user sidebar without administrative privileges.
+ * MEMBER: the workspace-admin nav is hidden outright rather than shown disabled — a member cannot
+ * become an admin by clicking, so a disabled control would be a dead end.
  */
 export const RegularUser: Story = {
 	args: {
@@ -82,10 +83,34 @@ export const RegularUser: Story = {
 		context: "main",
 		activeWorkspace: mockWorkspace,
 	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText("Administration")).not.toBeInTheDocument();
+	},
 };
 
 /**
- * Admin user sidebar with administrative privileges.
+ * ADMIN/OWNER of the workspace, without instance-admin rights — the two roles are separate axes,
+ * so the workspace-admin nav appears while the instance-admin entry does not.
+ */
+export const WorkspaceAdminUser: Story = {
+	args: {
+		username: "admin",
+		isAdmin: true,
+		isAppAdmin: false,
+		hasMentorAccess: true,
+		context: "main",
+		activeWorkspace: mockWorkspace,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Administration")).toBeInTheDocument();
+		await expect(canvas.queryByText("Instance admin")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Admin user sidebar with both workspace-admin and instance-admin privileges.
  */
 export const AdminUser: Story = {
 	args: {
@@ -95,6 +120,10 @@ export const AdminUser: Story = {
 		hasMentorAccess: true,
 		context: "main",
 		activeWorkspace: mockWorkspace,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Administration")).toBeInTheDocument();
 	},
 };
 

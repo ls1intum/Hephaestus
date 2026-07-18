@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { createContext, useContext } from "react";
-import { getCurrentUserOptions } from "@/api/@tanstack/react-query.gen";
 import { authClient, toUserProfile, type UserProfile } from "./authClient";
-import { isAppAdmin as computeIsAppAdmin } from "./guard";
+import { isAppAdmin as computeIsAppAdmin, currentUserQueryOptions } from "./guard";
 
 export type { UserProfile } from "./authClient";
 
@@ -60,13 +59,8 @@ interface AuthProviderProps {
  * keycloak-js implementation so existing consumers keep working.
  */
 export function AuthProvider({ children }: AuthProviderProps) {
-	// Don't retry on auth failure (a 401 is a definitive "not signed in", not a transient error)
-	// and keep the result fresh-enough to avoid a refetch storm; the guards seed the same cache.
-	const userQuery = useQuery({
-		...getCurrentUserOptions(),
-		retry: false,
-		staleTime: 30_000,
-	});
+	// Shared with the route guards so both read one cache entry on one schedule.
+	const userQuery = useQuery(currentUserQueryOptions());
 
 	const user = userQuery.data ?? null;
 	// `isPending` is true only while the very first fetch is in flight (no cached data yet),

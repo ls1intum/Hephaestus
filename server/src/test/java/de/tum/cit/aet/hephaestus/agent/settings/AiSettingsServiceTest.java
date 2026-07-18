@@ -48,7 +48,6 @@ class AiSettingsServiceTest extends BaseUnitTest {
         "",
         15,
         false,
-        false,
         false
     );
 

@@ -92,6 +92,47 @@ public class Issue extends BaseGitServiceEntity {
      */
     private Instant lastSyncAt;
 
+    /**
+     * Tombstone: when set, this issue/pull request no longer exists upstream.
+     *
+     * <p>Written by the {@code RECONCILIATION} deletion sweep (which set-differences the full
+     * upstream number set against the local rows) and by the {@code issues.transferred} webhook.
+     * A tombstone rather than a row deletion because {@code feedback.artifact_id},
+     * {@code observation.artifact_id} (NOT NULL) and {@code activity_event.target_id} point at
+     * this row by bare id with no foreign key — a hard delete would orphan them silently rather
+     * than fail loudly. Keeping the row keeps those lookups resolvable.
+     *
+     * <p>Deliberately reversible: the sweep infers deletion from <em>absence</em> from a listing,
+     * which is fallible in a way an explicit webhook event is not. {@code upsertCore} clears this
+     * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned
+     * — is resurrected by the next ordinary sync with no operator intervention.
+     *
+     * <p><strong>Read scope — deliberately narrow.</strong> This codebase uses no Hibernate
+     * soft-delete filter, and only the queries that exist to serve reconciliation honour the
+     * tombstone. Filtering is opt-in per query, so the exhaustive list of readers that see
+     * {@code deletedAt IS NULL} is:
+     *
+     * <ul>
+     *   <li>the per-repository sync counts the admin UI renders
+     *       ({@code IssueRepository.count{Issues,PullRequests}GroupedByRepositoryIds});
+     *   <li>the sweep's own local-number listing
+     *       ({@code IssueRepository.findLive{Issue,PullRequest}NumbersByRepositoryId});
+     *   <li>{@code IssueRepository.tombstone{Issues,PullRequests}ByRepositoryIdAndNumbers}, where it
+     *       preserves the first observation time.
+     * </ul>
+     *
+     * <p><strong>Everything else still shows upstream-deleted rows.</strong> The product read
+     * surfaces do not filter this column: {@code LeaderboardReviewQueryRepository},
+     * {@code ProfilePullRequestQueryRepository}, {@code WorkspaceContributionQueryRepository},
+     * {@code ActivityEventRepository}, {@code MentorContextQueryRepository}, and the review /
+     * review-comment / thread repositories all surface tombstoned issues and pull requests. The
+     * tombstone makes those rows <em>identifiable</em> and fixes the counts; it does not hide them.
+     * Teaching the remaining read paths to filter has a far wider blast radius (scoring, XP, profile
+     * history and mentor context would all shift) and is a separate change.
+     */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude

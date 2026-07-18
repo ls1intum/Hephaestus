@@ -223,7 +223,8 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
                     ),
                 "https://hephaestus.test"
             ),
-            new TransactionTemplate(transactionManager)
+            new TransactionTemplate(transactionManager),
+            event -> {} // the activation kick is asserted in SlackChannelConsentServiceTest, not here
         );
         handler = new SlackInteractivityHandler(
             workspaceResolver,

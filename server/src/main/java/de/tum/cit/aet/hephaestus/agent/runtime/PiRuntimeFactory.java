@@ -72,14 +72,19 @@ public class PiRuntimeFactory {
             SandboxLayout.PI_AGENT_PREFIX + "settings.json",
             buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
         );
-        inputFiles.put(SandboxLayout.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
-        inputFiles.put(
+        // The scaffolding is the run's prompt template; its digest is the job's prompt version. settings.json
+        // is deliberately EXCLUDED — it varies by model, which the job's config snapshot already pins.
+        Map<String, byte[]> promptScaffolding = new LinkedHashMap<>();
+        promptScaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, loadClasspathResource("pi-orchestrator.md"));
+        promptScaffolding.put(
             SandboxLayout.RUNNER_SCRIPT_FILENAME,
             loadClasspathResource(spec.runnerProfile().runnerScript())
         );
         for (String sidecar : spec.runnerProfile().sidecarScripts()) {
-            inputFiles.put(sidecar, loadClasspathResource(sidecar));
+            promptScaffolding.put(sidecar, loadClasspathResource(sidecar));
         }
+        String promptDigest = ProvenanceDigest.rootDigestHex(promptScaffolding);
+        inputFiles.putAll(promptScaffolding);
         inputFiles.putAll(spec.extraInputs());
 
         long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
@@ -138,7 +143,13 @@ public class PiRuntimeFactory {
             spec.credentialMode(),
             inputFiles.size()
         );
-        return new PiPlan(List.of("sh", "-c", command), Map.copyOf(env), Map.copyOf(inputFiles), networkPolicy);
+        return new PiPlan(
+            List.of("sh", "-c", command),
+            Map.copyOf(env),
+            Map.copyOf(inputFiles),
+            networkPolicy,
+            promptDigest
+        );
     }
 
     private static String renderNodeFlags(List<String> flags) {
@@ -241,18 +252,25 @@ public class PiRuntimeFactory {
         }
     }
 
-    /** Materialised Pi sandbox plan. Caller wraps in the appropriate per-agent spec record. */
+    /**
+     * Materialised Pi sandbox plan. Caller wraps in the appropriate per-agent spec record.
+     *
+     * @param promptDigest digest of the prompt scaffolding (orchestrator + runner + sidecars) — the run's
+     *     prompt version
+     */
     public record PiPlan(
         List<String> command,
         Map<String, String> environment,
         Map<String, byte[]> inputFiles,
-        NetworkPolicy networkPolicy
+        NetworkPolicy networkPolicy,
+        String promptDigest
     ) {
         public PiPlan {
             command = List.copyOf(Objects.requireNonNull(command, "command"));
             environment = Map.copyOf(Objects.requireNonNull(environment, "environment"));
             inputFiles = Map.copyOf(Objects.requireNonNull(inputFiles, "inputFiles"));
             Objects.requireNonNull(networkPolicy, "networkPolicy");
+            Objects.requireNonNull(promptDigest, "promptDigest");
         }
     }
 }

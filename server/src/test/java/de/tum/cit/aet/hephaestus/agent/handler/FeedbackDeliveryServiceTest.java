@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -84,8 +85,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             /* appBaseUrl */ APP_BASE_URL,
             /* cooldownMinutes */ 15,
             /* progressFooter */ false,
-            /* reactionSuppression */ false,
-            /* policyFloor */ false
+            /* reactionSuppression */ false
         );
         service = new FeedbackDeliveryService(
             commentPoster,
@@ -152,7 +152,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
-            var delivery = new DeliveryContent("Fix the tests.", diffNotes);
+            var delivery = new DeliveryContent("Fix the tests.", diffNotes, List.of());
             service.deliverFeedback(job, delivery);
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
@@ -171,7 +171,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Re-reviewed: still fix the tests.", List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Re-reviewed: still fix the tests.", List.of(), List.of())
+            );
 
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
@@ -189,7 +192,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
 
-            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of(), List.of()));
 
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
@@ -206,7 +209,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
 
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
@@ -216,7 +219,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsWhenPrNotStubbed() {
             AgentJob job = createJob();
 
-            var delivery = new DeliveryContent("This should not be posted.", List.of());
+            var delivery = new DeliveryContent("This should not be posted.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
@@ -237,7 +240,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 observationTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
 
-            footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
+            footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
 
             // (a) the edited summary body carries the rendered footer
             var body = ArgumentCaptor.forClass(String.class);
@@ -266,10 +269,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
+            );
         }
 
         @Test
@@ -279,10 +287,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setState(Issue.State.MERGED);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_MERGED)
+            );
         }
 
         @Test
@@ -300,7 +313,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment789");
 
-            service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of(), List.of()));
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
         }
@@ -312,10 +325,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setDraft(true);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_DRAFT)
+            );
         }
 
         @Test
@@ -326,10 +344,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             prefs.setAiReviewEnabled(false);
             when(userPreferencesRepository.findByUserId(AUTHOR_ID)).thenReturn(Optional.of(prefs));
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
+            );
         }
 
         @Test
@@ -337,10 +360,71 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.empty());
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_noInlineLanded_recordsEmptyAfterSanitize() {
+            // The composed body sanitises to blank and no inline note lands → NOTHING reached the developer.
+            // The run must be ledgered SUPPRESSED (EMPTY_AFTER_SANITIZE), never as a phantom DELIVERED unit.
+            AgentJob job = createJob();
+            stubOpenPr();
+
+            var delivery = new DeliveryContent("", List.of(), List.of());
+            service.deliverFeedback(job, delivery);
+
+            verify(commentPoster, never()).postFormattedBody(any(), any());
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                eq(job),
+                eq(delivery),
+                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
+            );
+            verify(feedbackLedgerRecorder, never()).record(
+                any(),
+                any(),
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.anyBoolean()
+            );
+        }
+
+        @Test
+        void blankAfterSanitize_inlineLanded_recordsDeliveredWithoutSummary() {
+            // Blank summary but a posted inline note: the run IS a (summary-less) delivery — the ledger
+            // records DELIVERED (the recorder skips the SUMMARY placement since no comment id exists).
+            AgentJob job = createJob();
+            stubOpenPr();
+            var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
+            var signal = new InlineFindingChannel.DeliveredSignal(
+                "ck-foo",
+                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFindingChannel.Disposition.POSTED,
+                "note-1",
+                "disc-1"
+            );
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal))
+            );
+
+            var delivery = new DeliveryContent("", List.of(note), List.of());
+            service.deliverFeedback(job, delivery);
+
+            verify(feedbackLedgerRecorder).record(
+                eq(job),
+                eq(delivery),
+                eq(WorkArtifact.PULL_REQUEST),
+                any(),
+                eq(true)
+            );
+            verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
         }
 
         @Test
@@ -351,7 +435,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
 
-            var delivery = new DeliveryContent("A real, non-blank summary body.", List.of());
+            var delivery = new DeliveryContent("A real, non-blank summary body.", List.of(), List.of());
 
             assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
@@ -374,7 +458,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("no inline channel wired")
             );
 
-            var delivery = new DeliveryContent("Summary.", List.of(new DiffNote("src/Foo.java", 3, null, "x")));
+            var delivery = new DeliveryContent(
+                "Summary.",
+                List.of(new DiffNote("src/Foo.java", 3, null, "x")),
+                List.of()
+            );
             assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
@@ -390,7 +478,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment456");
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
@@ -403,7 +491,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
 
-            var delivery = new DeliveryContent("Summary.", List.of());
+            var delivery = new DeliveryContent("Summary.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             assertThat(job.getDeliveryCommentId()).isNull();
@@ -422,7 +510,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNote("src/Foo.java", 10, null, "Fix this"),
                 new DiffNote("src/Bar.java", 20, null, "And this")
             );
-            var delivery = new DeliveryContent(null, diffNotes);
+            var delivery = new DeliveryContent(null, diffNotes, List.of());
             service.deliverFeedback(job, delivery);
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
@@ -436,7 +524,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
 
-            service.deliverFeedback(job, new DeliveryContent("Summary only, nothing inline.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Summary only, nothing inline.", List.of(), List.of()));
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(List.of()));
         }
@@ -450,7 +538,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            service.deliverFeedback(job, new DeliveryContent("Summary.", List.of()));
+            service.deliverFeedback(job, new DeliveryContent("Summary.", List.of(), List.of()));
 
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
         }
@@ -461,7 +549,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
 
-            var delivery = new DeliveryContent("Summary.", List.of());
+            var delivery = new DeliveryContent("Summary.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
         }
 
@@ -470,7 +558,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             job.setMetadata(null);
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
@@ -484,7 +572,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             metadata.put("pr_number", 42);
             job.setMetadata(metadata);
 
-            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
@@ -523,7 +611,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var delivery = new DeliveryContent(
                 "Full-line summary.",
-                List.of(new DiffNote("src/Foo.java", 10, null, "x"))
+                List.of(new DiffNote("src/Foo.java", 10, null, "x")),
+                List.of()
             );
             // The recomposer must be CALLED with exactly the delivered key set, and its output must be what
             // gets edited in place — a no-op that ignored the signals would never invoke updateFormattedBody.
@@ -546,7 +635,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             // Inline reconcile produced ZERO delivered signals (default benign stub, no signals).
             boolean[] recomposed = { false };
 
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> {
+            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys -> {
                 recomposed[0] = true;
                 return "should-not-be-used";
             });
@@ -572,7 +661,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNotePoster.DiffNoteResult(0, 1, List.of(failed))
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> "demoted");
+            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys ->
+                "demoted"
+            );
 
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
@@ -619,8 +710,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             /* appBaseUrl */ APP_BASE_URL,
             /* cooldownMinutes */ 15,
             /* progressFooter */ true,
-            /* reactionSuppression */ false,
-            /* policyFloor */ false
+            /* reactionSuppression */ false
         );
         return new FeedbackDeliveryService(
             commentPoster,

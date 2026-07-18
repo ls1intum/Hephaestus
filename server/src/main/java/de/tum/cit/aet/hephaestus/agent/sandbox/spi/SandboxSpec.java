@@ -53,7 +53,7 @@ public record SandboxSpec(
         // Default nullable collection fields to empty — avoids null-checking in consumers
         command = command != null ? command : List.of();
         environment = environment != null ? environment : Map.of();
-        inputFiles = inputFiles != null ? inputFiles : Map.of();
+        inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();
         volumeMounts = volumeMounts != null ? volumeMounts : Map.of();
     }
 }

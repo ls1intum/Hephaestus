@@ -20,7 +20,11 @@ import org.springframework.context.annotation.Import;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.WEBHOOK_PROPERTY, havingValue = "true", matchIfMissing = true)
-@ConditionalOnBean(Connection.class)
+// Gate on the specifically-named webhook/sync connection, NOT any Connection: the agent runtime
+// contributes its own `agentNatsConnection` bean (hephaestus.agent.nats.enabled), and matching that
+// would activate these producers while `WebhookProducerBeans` still requires @Qualifier("natsConnection"),
+// failing the whole context. The two NATS connections are independent — this config needs its own.
+@ConditionalOnBean(name = "natsConnection")
 @Import(WebhookProducerBeans.class)
 public class WebhookConfiguration {
 

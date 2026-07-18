@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
@@ -147,10 +148,12 @@ class FeedbackDeliveryService {
 
         if (pr == null) {
             log.info("Delivery suppressed: PR not found, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_GONE);
             return;
         }
         if (pr.getState() == Issue.State.CLOSED) {
             log.info("Delivery suppressed: PR closed, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_CLOSED);
             return;
         }
         // Resolve per-workspace overrides. getId() on the lazy proxy is safe outside a tx (the id is
@@ -163,10 +166,12 @@ class FeedbackDeliveryService {
             pr.getState() == Issue.State.MERGED && !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())
         ) {
             log.info("Delivery suppressed: PR merged, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_MERGED);
             return;
         }
         if (settings.resolveSkipDrafts(reviewProperties.skipDrafts()) && pr.isDraft()) {
             log.info("Delivery suppressed: PR is draft, jobId={}", job.getId());
+            recordGateSuppressed(job, delivery, FeedbackSuppressionReason.ARTIFACT_DRAFT);
             return;
         }
         if (pr.getAuthor() != null) {
@@ -176,6 +181,7 @@ class FeedbackDeliveryService {
                 .orElse(true);
             if (!enabled) {
                 log.info("Delivery suppressed: user opted out, jobId={}", job.getId());
+                recordGateSuppressed(job, delivery, FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
                 return;
             }
         }
@@ -206,8 +212,30 @@ class FeedbackDeliveryService {
         // Skip this entirely on a TRANSIENT no-op: the summary edit did NOT land this run, so the live comment is
         // the PRIOR run's summary. Re-editing it with this run's recomposed body would silently overwrite that
         // prior summary — the two paths must be mutually exclusive.
-        if (summaryOutcome != SummaryOutcome.TRANSIENT_NOOP) {
+        if (summaryOutcome == SummaryOutcome.POSTED) {
             reEditSummaryWithSignals(job, recomposer, inlineSignals, trend);
+        }
+
+        // The body sanitised to blank, so no summary was ever posted this run. If the inline notes did not
+        // land either, NOTHING reached the developer — record the whole prepared review as SUPPRESSED
+        // (EMPTY_AFTER_SANITIZE) instead of a phantom DELIVERED unit, so an eval never treats the silence as
+        // exposure. When at least one inline note landed, the run IS a (summary-less) delivery and falls
+        // through to the normal DELIVERED record below.
+        if (summaryOutcome == SummaryOutcome.SKIPPED_EMPTY && !anyInlineLanded(inlineSignals)) {
+            try {
+                feedbackLedgerRecorder.recordSuppressedUnit(
+                    job,
+                    delivery,
+                    FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE
+                );
+            } catch (RuntimeException e) {
+                log.warn(
+                    "Gate-suppressed ledger record failed (delivery unaffected): jobId={}, error={}",
+                    job.getId(),
+                    e.getMessage()
+                );
+            }
+            return;
         }
 
         // Record the delivered-feedback ledger (ADR 0021 C6) as a best-effort write-through side-effect:
@@ -230,6 +258,30 @@ class FeedbackDeliveryService {
         }
     }
 
+    /** True when at least one inline note actually landed this run (any disposition except FAILED). */
+    private static boolean anyInlineLanded(List<InlineFindingChannel.DeliveredSignal> inlineSignals) {
+        return inlineSignals.stream().anyMatch(s -> s.disposition() != InlineFindingChannel.Disposition.FAILED);
+    }
+
+    /**
+     * Best-effort SUPPRESSED-unit persist for a whole-review delivery gate: the prepared review
+     * was withheld by policy, so the ledger must say why — otherwise an evaluator cannot tell a withheld
+     * review apart from one that was delivered and ignored. REQUIRES_NEW in the recorder + this catch mean a
+     * ledger failure never affects the (already suppressed) delivery outcome.
+     */
+    private void recordGateSuppressed(AgentJob job, DeliveryContent delivery, FeedbackSuppressionReason reason) {
+        try {
+            feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Gate-suppressed ledger record failed (delivery unaffected): jobId={}, reason={}, error={}",
+                job.getId(),
+                reason,
+                e.getMessage()
+            );
+        }
+    }
+
     /**
      * Outcome of {@link #postSummaryNote}: whether a fresh/edited summary is now live (and may have its inline
      * section demoted afterwards), or whether the run was a transient no-op that kept the PRIOR summary
@@ -246,6 +298,12 @@ class FeedbackDeliveryService {
         POSTED,
         /** The edit hit a recoverable error; the PRIOR run's summary stays live and untouched (no fresh post). */
         TRANSIENT_NOOP,
+        /**
+         * The composed body sanitised to blank, so NO summary was posted this run. Distinct from POSTED so the
+         * ledger can record the run as SUPPRESSED (EMPTY_AFTER_SANITIZE) when the inline notes did not land
+         * either, instead of a phantom DELIVERED unit for words nobody saw.
+         */
+        SKIPPED_EMPTY,
     }
 
     private SummaryOutcome postSummaryNote(AgentJob job, DeliveryContent delivery, @Nullable TrendDelta trend) {
@@ -255,7 +313,7 @@ class FeedbackDeliveryService {
         String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (sanitized.isBlank()) {
             log.debug("Practice note was empty after sanitization, skipping post: jobId={}", job.getId());
-            return SummaryOutcome.POSTED;
+            return SummaryOutcome.SKIPPED_EMPTY;
         }
         // B1/B3: append the collapsed progress-delta footer (empty string when nothing meaningfully changed).
         String footer = ProgressFooterRenderer.render(trend);
