@@ -43,6 +43,18 @@ public interface OrganizationMembershipRepository
         @Param("role") OrganizationMemberRole role
     );
 
+    /**
+     * Drop the whole membership mirror for one organization — the org-tier half of
+     * {@code workspace.ScmWorkspaceContentEraser}, run only after the eraser has established that no
+     * non-purged workspace is still bound to this organization. The {@code organization} row itself
+     * is global and survives; only the person↔org edges this instance mirrored are removed.
+     * Idempotent.
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM OrganizationMembership m WHERE m.organizationId = :orgId")
+    void deleteByOrganizationId(@Param("orgId") Long organizationId);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM OrganizationMembership m WHERE m.organizationId = :orgId AND m.userId IN :userIds")

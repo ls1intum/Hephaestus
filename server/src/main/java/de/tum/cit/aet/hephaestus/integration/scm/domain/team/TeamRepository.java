@@ -56,6 +56,18 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     Optional<Team> findByOrganizationIgnoreCaseAndSlugAndProviderId(String organization, String slug, Long providerId);
 
     /**
+     * Every team mirrored for one organization on one provider — the org-tier erase set used by
+     * {@code workspace.ScmWorkspaceContentEraser} once no non-purged workspace is bound to that
+     * organization any more. Provider-scoped so a same-named org on a second GitLab instance is not
+     * swept up. Returns entities (not a bulk delete) so {@code Team}'s {@code CascadeType.REMOVE}
+     * reaches {@code team_membership}.
+     *
+     * @param organization the organization login / root group path (case-insensitive)
+     * @param providerId   the identity provider instance
+     */
+    List<Team> findByOrganizationIgnoreCaseAndProviderId(String organization, Long providerId);
+
+    /**
      * Fetch teams with collections eagerly loaded for DTO conversion.
      * Uses EntityGraph to fetch repoPermissions (with nested repository),
      * and memberships (with users).

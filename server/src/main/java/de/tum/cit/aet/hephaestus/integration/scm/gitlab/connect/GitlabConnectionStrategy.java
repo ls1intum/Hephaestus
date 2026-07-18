@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWebhookService;
+import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +32,13 @@ import org.springframework.stereotype.Component;
  * user's profile page — there is no third-party revoke API), but it DOES tear down the group
  * webhook we registered on connect. It runs from the disconnect flow while the Connection is
  * still ACTIVE and the PAT still live — the only window in which GitLab will hand out a token to
- * delete the hook — mirroring {@code OutlineConnectionStrategy.revoke}. Local state transitions
+ * delete the hook — mirroring {@code OutlineConnectionStrategy.revoke}. It then erases this
+ * workspace's mirrored SCM data through {@link ScmWorkspaceContentEraser}. Local state transitions
  * are handled by the caller via {@code ConnectionService.disconnect()}.
+ *
+ * <p>Disconnect is GitLab's <b>only</b> erase trigger: unlike a GitHub App there is no vendor-side
+ * uninstall signal for a PAT, so before this wiring GitLab-mirrored data could not be erased at all
+ * short of manual SQL.
  */
 @ConditionalOnServerRole
 @Component
@@ -44,9 +50,11 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
     static final String INPUT_GROUP_ID = "group_id";
 
     private final GitLabWebhookService webhookService;
+    private final ScmWorkspaceContentEraser contentEraser;
 
-    public GitlabConnectionStrategy(GitLabWebhookService webhookService) {
+    public GitlabConnectionStrategy(GitLabWebhookService webhookService, ScmWorkspaceContentEraser contentEraser) {
         this.webhookService = webhookService;
+        this.contentEraser = contentEraser;
     }
 
     @Override
@@ -102,5 +110,10 @@ public class GitlabConnectionStrategy implements ConnectionStrategy {
             ref.instanceKey()
         );
         webhookService.deregisterActiveWebhook(ref.workspaceId());
+
+        // Webhook teardown FIRST (it needs the still-live PAT), then the local erase. Runs inside
+        // the fenced disconnect transaction — sync jobs are already cancelled/refused — and is
+        // orphan-guarded, so a project shared with another workspace survives.
+        contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
     }
 }
