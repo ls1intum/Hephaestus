@@ -47,6 +47,32 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     boolean existsByIdAndOrganizationId(Long id, Long organizationId);
 
+    /**
+     * Org-tier orphan check for {@link ScmWorkspaceContentEraser}: how many workspaces OTHER than
+     * {@code excludedWorkspaceId} are still bound to this organization and not already purged.
+     * A non-zero count would mean another tenant still holds a lawful basis for the org-tier mirror
+     * ({@code team}, {@code team_membership}, {@code organization_membership}), so it must survive
+     * the erasing workspace.
+     *
+     * <p><b>Defensive only.</b> Unlike {@code repository}, which many workspaces genuinely share, the
+     * organization binding is exclusive: {@code Workspace.organization} is a {@code @OneToOne} over a
+     * {@code unique = true} {@code organization_id} column, so an organization backs at most one
+     * workspace and this count is always 0 in production. It is kept so
+     * {@link ScmWorkspaceContentEraser} stays correct if that 1:1 mapping is ever relaxed.
+     */
+    @Query(
+        """
+        SELECT COUNT(w) FROM Workspace w
+        WHERE w.organization.id = :organizationId
+          AND w.id <> :excludedWorkspaceId
+          AND w.status <> de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus.PURGED
+        """
+    )
+    long countOtherActiveWorkspacesForOrganization(
+        @Param("organizationId") Long organizationId,
+        @Param("excludedWorkspaceId") Long excludedWorkspaceId
+    );
+
     List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
 
     List<Workspace> findByStatusNotAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus status);

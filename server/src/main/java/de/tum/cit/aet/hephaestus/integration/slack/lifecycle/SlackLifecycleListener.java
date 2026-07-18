@@ -6,10 +6,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Minimal lifecycle listener required by the integration framework bootstrap for every
- * registered kind. The Slack persistence layer (slack_channel / slack_message) has been
- * removed — all methods fall through to the no-op defaults on
- * {@link IntegrationLifecycleListener}.
+ * Minimal lifecycle listener required by the integration framework bootstrap for every registered kind;
+ * all methods fall through to the no-op defaults on {@link IntegrationLifecycleListener}.
+ *
+ * <p>Deactivation (disconnect/uninstall) does <b>not</b> hook in here: the Slack persistence layer
+ * ({@code slack_message}, {@code slack_thread}, {@code slack_monitored_channel},
+ * {@code slack_participant_consent}, {@code mentor_slack_thread}) is real and PII-bearing, and its GDPR
+ * hard-erase runs synchronously inside the fenced disconnect transaction in
+ * {@code SlackConnectionStrategy#revoke} (via {@code SlackWorkspaceContentEraser}) rather than on an
+ * AFTER_COMMIT lifecycle event — see {@code OutlineConnectionStrategy#revoke} for the symmetric pattern.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)

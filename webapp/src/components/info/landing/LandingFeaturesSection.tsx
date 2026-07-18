@@ -23,7 +23,7 @@ export function LandingFeaturesSection() {
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<Trophy className="h-5 w-5 text-yellow-500" />
+								<Trophy className="h-5 w-5 text-warning" />
 							</div>
 							<CardTitle>Code Review Gamification</CardTitle>
 							<CardDescription>Transform code reviews into learning opportunities</CardDescription>

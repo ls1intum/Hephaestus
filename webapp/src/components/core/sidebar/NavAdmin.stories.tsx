@@ -75,3 +75,10 @@ export const AllFeaturesDisabled: Story = {
 		practicesEnabled: false,
 	},
 };
+
+/** A GitLab-backed workspace — the Integrations sub-item is labeled and iconed for GitLab. */
+export const GitLabWorkspace: Story = {
+	args: {
+		scmProviderType: "GITLAB",
+	},
+};
