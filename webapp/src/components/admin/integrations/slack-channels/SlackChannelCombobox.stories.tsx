@@ -114,8 +114,7 @@ export const KeyboardNavigation: Story = {
 		const search = await screen.findByPlaceholderText(/search channels/i);
 		await waitFor(() => expect(search).toHaveFocus());
 
-		// Exactly one option is highlighted at a time — the defect this replaced painted every
-		// option as highlighted at once, which made the moving highlight invisible.
+		// Exactly one option is highlighted at a time, or the moving highlight is invisible.
 		await userEvent.keyboard("{ArrowDown}");
 		const first = await screen.findByRole("option", { name: /#general/i });
 		await waitFor(() => expect(first).toHaveAttribute("data-highlighted"));
