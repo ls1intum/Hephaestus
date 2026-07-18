@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -288,6 +290,49 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository).save(claimed.capture());
             assertThat(claimed.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
             assertThat(claimed.getValue().getStartedAt()).isNotNull();
+        }
+    }
+
+    @Nested
+    class ProvenanceDigests {
+
+        @Test
+        void areStampedBeforeTheSandboxRuns_soAFailedRunKeepsThem() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            setupFullExecution();
+
+            executor.executeJob(msg);
+
+            // The adapter's prompt digest, and an inputs digest over the merged file set — written first, so an
+            // observation can always be tied to what produced it even when the sandbox then fails.
+            ArgumentCaptor<String> inputsDigest = ArgumentCaptor.forClass(String.class);
+            InOrder order = inOrder(jobRepository, sandboxManager);
+            order.verify(jobRepository).updateProvenanceDigests(eq(jobId), eq("prompt-digest"), inputsDigest.capture());
+            order.verify(sandboxManager).execute(any());
+            assertThat(inputsDigest.getValue()).matches("[0-9a-f]{64}");
+        }
+
+        @Test
+        void aWriteMatchingNoJobRow_failsTheRunRatherThanBurningTheLlmBudget() {
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            // Only the prepare chain — the run must abort before the sandbox, so nothing past it is stubbed.
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.prepareInputFiles(any())).thenReturn(Map.of("task.json", "{}".getBytes()));
+            when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
+            when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(0); // job row is gone
+
+            executor.executeJob(msg);
+
+            verify(sandboxManager, never()).execute(any());
         }
     }
 
@@ -586,6 +631,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     private JobTypeHandler setupFullExecution(SandboxResult sandboxResult) {
+        // Every execution stamps its provenance digests before the sandbox starts, and fails loud if the write
+        // matches no row — so the standard path must report the row it updated.
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
@@ -598,13 +646,28 @@ class AgentJobExecutorTest extends BaseUnitTest {
             "/output",
             SecurityProfile.DEFAULT,
             new NetworkPolicy(false, null, "test-token", "anthropic"),
-            null
+            null,
+            "prompt-digest"
         );
         when(practiceAgent.buildSandboxSpec(any())).thenReturn(agentSpec);
         when(practiceAgent.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
 
         when(sandboxManager.execute(any())).thenReturn(sandboxResult);
         return handler;
+    }
+
+    private static PracticeSandboxSpec minimalSpec() {
+        return new PracticeSandboxSpec(
+            "ghcr.io/agent:latest",
+            List.of("/bin/agent"),
+            Map.of(),
+            Map.of(),
+            "/output",
+            null,
+            null,
+            null,
+            "prompt-digest"
+        );
     }
 
     private static WorkerProperties workerPropsWithLlm(String baseUrl, String apiKey) {
@@ -619,6 +682,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     private void setupFullExecutionWithException(Exception exception) {
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of());
@@ -629,6 +693,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             Map.of(),
             Map.of(),
             "/output",
+            null,
             null,
             null,
             null

@@ -423,17 +423,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        // Stamp each finding with the EXACT correlation key deliver() persisted (ADR 0021 C2), keyed by
-        // identity so a delivered inline note can be matched back to its persisted finding without recomputing
-        // the key downstream (which could drift). Done BEFORE the reaction filter so an escalated copy inherits
-        // the key too. A finding absent from the map (unknown slug — never persisted, never delivered) is left
-        // unstamped; it cannot reach compose() anyway since the filter only re-emits what was passed in.
-        Map<PracticeDetectionResultParser.ValidatedFinding, String> findingFingerprints = result.findingFingerprints();
+        // Stamp each finding with the EXACT keys deliver() persisted (ADR 0021 C2), by identity, so downstream
+        // stages address the stored observation without recomputing a key that could drift. Done BEFORE the
+        // reaction filter so an escalated copy inherits them. A finding absent from the map (unknown slug —
+        // never persisted) stays unstamped.
+        Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
         for (int i = 0; i < scopedFindings.size(); i++) {
-            String key = findingFingerprints.get(scopedFindings.get(i));
-            if (key != null) {
-                scopedFindings.set(i, scopedFindings.get(i).withRecurrenceKey(key));
-            }
+            scopedFindings.set(i, scopedFindings.get(i).withKeys(keysByFinding.get(scopedFindings.get(i))));
         }
 
         // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
@@ -493,7 +489,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                         validLines,
                         job.getId().toString()
                     );
-                    delivery = new PracticeDetectionResultParser.DeliveryContent(delivery.mrNote(), correctedNotes);
+                    delivery = delivery.withDiffNotes(correctedNotes);
                 }
             }
         }

@@ -144,6 +144,19 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
+     * Persist the run-provenance digests. Written before the sandbox starts, so even a failed or cancelled run
+     * keeps the record of what it was about to consume.
+     */
+    @WorkspaceAgnostic("ID-based provenance stamp; job ID from worker-local execution context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AgentJob j SET j.promptDigest = :promptDigest, j.inputsDigest = :inputsDigest WHERE j.id = :id")
+    int updateProvenanceDigests(
+        @Param("id") UUID id,
+        @Param("promptDigest") String promptDigest,
+        @Param("inputsDigest") String inputsDigest
+    );
+
+    /**
      * Zombie sweeper: QUEUED jobs older than cutoff (never picked up by the NATS consumer). Returns a
      * projection (not entities) so the sweeper can re-publish outside any transaction — without it the
      * lazy {@code workspace} access would force the publish loop to hold a DB connection across NATS I/O.

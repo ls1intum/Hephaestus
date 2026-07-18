@@ -251,7 +251,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("returned findingFingerprints align exactly with the persisted recurrence_key set")
+        @DisplayName("returned observationKeys align exactly with the persisted recurrence_key set")
         void returnedFingerprintsMatchPersistedRecurrenceKeys() {
             var findings = List.of(
                 finding("pr-description-quality", Presence.PRESENT),
@@ -262,7 +262,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             // The map the service returns is the contract the delivery layer keys feedback supersession on;
             // it MUST be the same value written to observation.recurrence_key, or supersession breaks.
-            assertThat(result.findingFingerprints().values())
+            assertThat(result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList())
                 .as("one stable key returned per delivered finding")
                 .hasSize(2)
                 .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
@@ -274,7 +274,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                 .toList();
             assertThat(persistedKeys)
                 .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
-                .containsExactlyInAnyOrderElementsOf(result.findingFingerprints().values());
+                .containsExactlyInAnyOrderElementsOf(
+                    result.observationKeys().values().stream().map(ObservationKeys::recurrenceKey).toList()
+                );
         }
 
         @Test

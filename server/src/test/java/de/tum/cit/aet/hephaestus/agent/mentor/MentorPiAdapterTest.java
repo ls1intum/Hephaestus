@@ -47,7 +47,8 @@ class MentorPiAdapterTest extends BaseUnitTest {
             List.of("sh", "-c", "true"),
             Map.of(),
             Map.of(),
-            new NetworkPolicy(true, null, null, null)
+            new NetworkPolicy(true, null, null, null),
+            "0".repeat(64)
         );
         when(runtimeFactory.build(any())).thenReturn(plan);
         adapter = newAdapter("");
