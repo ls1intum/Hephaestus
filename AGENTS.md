@@ -81,10 +81,11 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
-- **Filename convention (required):** the committed file MUST be `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`, i.e. what the draft tool emits), strictly greater than the latest existing changelog so `master.xml` stays monotonic. Do NOT invent a round number and do NOT use a descriptive suffix; keep the `_changelog.xml` name. `changeSet` ids follow `<timestamp>-1`, `<timestamp>-2`, …
+- **Filename convention (required):** the committed file MUST be `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`, i.e. what the draft tool emits), strictly greater than the latest existing changelog. Do NOT invent a round number and do NOT use a descriptive suffix; keep the `_changelog.xml` name. New `<include>` entries are **appended** to `master.xml` — the committed list is append-only (CI-enforced), not globally timestamp-sorted. `changeSet` ids follow `<timestamp>-1`, `<timestamp>-2`, …
 - **One consolidated changelog per branch/PR (required):** add every schema change for a branch as additional `<changeSet>` entries inside that single file. Never open a PR with more than one new changelog file — consolidate. Each `changeSet` should be preconditioned (`onFail="MARK_RAN"`) with a `<rollback>`, matching the existing files.
 - After drafting a changelog, run `pnpm run db:generate-erd-docs` to keep ERD docs in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
+- **Released Liquibase changelogs are immutable (CI-enforced):** once a changelog file reaches `main` it must never be edited, renamed, or deleted, and `master.xml` is append-only — the `Migrations` quality gate fails otherwise. Fix mistakes forward with a new changelog. Destructive schema changes (drop/rename of released tables/columns) follow deprecate-then-remove across two releases — see `docs/contributor/database-migration.mdx`. (This is the DB changelog; the `.changeset/*.md` release notes in §10 are a separate thing.)
 
 ## 6. Frontend (webapp) expectations
 
@@ -111,7 +112,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Group new tests under the proper JUnit tag so CI picks them up (`@Tag("unit")`, `@Tag("integration")`, or `@Tag("live")`). Follow AAA structure, single assertion focus, deterministic data. See `server/AGENTS.md` for testing patterns.
 - Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `integration.scm.domain.team` for established patterns.
 - Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
-- Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.
+- Give each new changelog a fresh millisecond-timestamp ID greater than the previous one and append its `<include>` to the end of `master.xml` (append-only; the historical list is not globally sorted). Align entity annotations with the generated change sets.
 - Annotate record components in DTOs with `org.jspecify.annotations.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
 - Prefer resource-oriented workspace endpoints: express lifecycle transitions via HTTP methods (for example `PATCH /workspaces/{workspaceSlug}/status`) instead of RPC-style verbs and return consistent `ProblemDetail` payloads for errors.
 - When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.

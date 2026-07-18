@@ -58,9 +58,10 @@ cuts the release — tag `vX.Y.Z`, GitHub Release, docker tags `X.Y.Z`/`X.Y`/`la
 
 Before any release, code must pass:
 
-| Gate            | Tool        | Purpose              |
+| Gate (leg)      | Tool        | Purpose              |
 | --------------- | ----------- | -------------------- |
-| Database drift  | Liquibase   | JPA ↔ Schema sync    |
+| Migration chain + drift (`Database`) | Liquibase | Full chain applies empty → head, then schema is diffed against JPA entities |
+| Changelog immutability (`Migrations`) | git diff | Released changesets + `master.xml` are append-only |
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
 | Java formatting | Spotless    | Code style           |
 | TypeScript      | Biome + tsc | Lint + typecheck     |
@@ -203,7 +204,7 @@ The Docker build workflow will automatically use these credentials if present, f
 ### Parallel Execution
 
 - 6 test types run in parallel (3 app-server, 3 webapp). Webhook reception is part of the app-server test surface since ADR 0008.
-- 8 quality gate checks run in parallel
+- 5 quality-gate legs run in parallel (App Server, Webapp, OpenAPI, Database, Migrations), plus a legacy-cleanup guard
 - 4 Docker builds × 2 architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
 

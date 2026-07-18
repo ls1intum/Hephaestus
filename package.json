@@ -44,6 +44,7 @@
 		"check:ports": "scripts/check-ports.sh",
 		"github:update-schema": "pnpm exec tsx scripts/update-github-schema.ts",
 		"gitlab:update-schema": "pnpm exec tsx scripts/update-gitlab-schema.ts",
+		"outline:update-spec": "pnpm exec tsx scripts/update-outline-spec.ts",
 		"docs:dev": "pnpm --filter docs run start",
 		"docs:build": "pnpm --filter docs run build",
 		"docs:serve": "pnpm --filter docs run serve",

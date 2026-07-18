@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionBusyException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
@@ -179,23 +180,33 @@ public class ConnectionController {
             case PENDING -> throw new IllegalArgumentException("PENDING is not an admin-settable connection state");
         };
 
-        // Entering the terminal state additionally revokes the vendor-side grant.
-        if (target == IntegrationState.UNINSTALLED) {
-            revokeBestEffort(connection);
-        }
-
         String correlationId = eventType.toLowerCase(Locale.ROOT) + "-" + connection.getId() + "-" + UUID.randomUUID();
-        connection = connectionService.transition(
-            connection,
-            new TransitionRequest(target, eventType, "ADMIN", actorRef(authentication), correlationId, body.reason())
+        TransitionRequest request = new TransitionRequest(
+            target,
+            eventType,
+            "ADMIN",
+            actorRef(authentication),
+            correlationId,
+            body.reason()
         );
-        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
+        Connection updated =
+            target == IntegrationState.UNINSTALLED
+                ? connectionService.disconnect(connection, request, () -> revokeBestEffort(connection))
+                : connectionService.transition(connection, request);
+        return ResponseEntity.ok(ConnectionSummaryDTO.from(updated, admin.manifests()));
     }
 
     /**
-     * Best-effort vendor-side revoke before the UNINSTALLED transition. The strategy may be
-     * missing if the kind was de-registered after the row was written, and the vendor call may
-     * fail — in both cases we log and proceed so the admin can still clear the stale row locally.
+     * Vendor-side revoke callback handed to {@link ConnectionService#disconnect}, which invokes it
+     * before the UNINSTALLED transition. A missing strategy (the kind was de-registered after the row
+     * was written) is a local no-op — there is nothing to call.
+     *
+     * <p>A failing {@code revoke} is deliberately NOT caught here. The revoke reaches
+     * {@code @Transactional} erasers, so a swallowed {@code DataAccessException} would leave the
+     * surrounding transaction rollback-only and the "proceed locally" promise would be a lie that
+     * surfaces as a 500 at commit. {@code ConnectionService} instead runs this callback in its own
+     * transaction and absorbs the failure there, which is the only place the absorption actually
+     * works. Letting it propagate from here is what hands it the failure to absorb.
      */
     private void revokeBestEffort(Connection connection) {
         ConnectionStrategy strategy = strategies.get(connection.getKind());
@@ -207,16 +218,7 @@ public class ConnectionController {
             );
             return;
         }
-        try {
-            strategy.revoke(connection.toRef());
-        } catch (RuntimeException e) {
-            log.warn(
-                "Vendor-side revoke failed for connection={} kind={}: {} — proceeding with local UNINSTALLED transition",
-                connection.getId(),
-                connection.getKind(),
-                e.toString()
-            );
-        }
+        strategy.revoke(connection.toRef());
     }
 
     @GetMapping("/{id}/audit")
@@ -250,6 +252,15 @@ public class ConnectionController {
         log.info("Connection lookup 404: {}", e.getMessage());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
         problem.setTitle("Resource not found");
+        return problem;
+    }
+
+    @ExceptionHandler(ConnectionBusyException.class)
+    ProblemDetail handleBusyConnection(ConnectionBusyException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        problem.setTitle("Connection has an active sync job");
+        problem.setProperty("connectionId", e.connectionId());
+        problem.setProperty("jobId", e.jobId());
         return problem;
     }
 }

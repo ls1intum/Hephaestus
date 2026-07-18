@@ -2,6 +2,10 @@
 
 Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
 
+## Maintenance Status
+
+Hephaestus is a research project at TUM, actively developed but maintained primarily by one person. Issues and pull requests are triaged on a best-effort basis. Security reports are the exception and get priority — see [SECURITY.md](SECURITY.md) for how to report vulnerabilities privately.
+
 ## Identity and Transparency
 
 To ensure a transparent and trustworthy environment, we have established different guidelines for members of our organization and external contributors.

@@ -2,7 +2,8 @@ name: Security
 
 # CodeQL SAST scanning is handled by GitHub's Default Setup (enabled in repo settings).
 # This provides automatic scanning on push/PR with incremental analysis and zero maintenance.
-# This workflow handles dependency scanning (Trivy) and secret detection (TruffleHog).
+# This workflow handles dependency scanning (Trivy), secret detection (TruffleHog), and
+# a freshness check on the RFC 9116 security.txt Expires field.
 
 on:
   workflow_call:
@@ -27,6 +28,8 @@ jobs:
             display-name: "Dependencies"
           - scan-type: secrets
             display-name: "Secrets"
+          - scan-type: policy
+            display-name: "Policy"
     permissions:
       security-events: write
       contents: read
@@ -58,3 +61,21 @@ jobs:
           base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
           head: ${{ github.event_name == 'pull_request' && 'HEAD' || '' }}
           extra_args: --debug --only-verified
+
+      # RFC 9116 requires a valid Expires date. Fail before it lapses so an
+      # active branch is forced to renew it — a stale file signals abandonment.
+      - name: security.txt freshness
+        if: matrix.scan-type == 'policy'
+        run: |
+          file="webapp/public/.well-known/security.txt"
+          expires="$(grep -i '^Expires:' "$file" | head -1 | cut -d' ' -f2)"
+          if [ -z "$expires" ]; then
+            echo "::error file=$file::Missing required RFC 9116 Expires field"
+            exit 1
+          fi
+          days=$(( ( $(date -u -d "$expires" +%s) - $(date -u +%s) ) / 86400 ))
+          echo "security.txt expires in $days day(s) ($expires)"
+          if [ "$days" -lt 30 ]; then
+            echo "::error file=$file::Expires is $days day(s) away (<30); renew it per RFC 9116"
+            exit 1
+          fi

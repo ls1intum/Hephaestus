@@ -118,6 +118,19 @@ class FooControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
 Documenting each new controller integration test in this format keeps future work predictable and minimises copy/paste.
 
+## Cross-tenant isolation tests
+
+Tenancy bugs are silent data leaks: the endpoint answers `200` with plausible data, so nothing fails loudly. Every **new workspace-scoped read path** gets an isolation case in `CrossTenantIsolationIntegrationTest` (in `workspace/`), whose fixture and rationale are documented in its class Javadoc — two workspaces sharing an `account_login`, one overlapping member.
+
+Checklist for a new read path:
+
+- **List endpoint** — assert A's collection under A's slug never contains B's rows (`length()` + value, not just "my row is present").
+- **Detail endpoint (anti-IDOR)** — assert B's entity id through A's slug returns `404`, and pair it with a positive control (A's own id returns `2xx`) so the `404` can't pass against a broken endpoint.
+- **Query keyed on anything but `workspace_id`** (an org login, a login string, an external native id) is a red flag — scope by `workspace_id`, or add the provider/workspace predicate, before shipping. The `#1372` leaks (leaderboard roster by org-login, team lists by org-string) were exactly this shape.
+- **`@WorkspaceAgnostic` repository?** The SQL statement inspector is **off** for it, so the integration test is the only automated guard — do not skip it.
+
+The `hephaestus.tenancy.enforcement: throw` setting in `application-test.yml` fails any test that reads a `workspace_id`-bearing table without a `workspace_id` predicate — a free safety net, but it cannot see `@WorkspaceAgnostic` queries or string-keyed scoping, which is why the HTTP-level assertions still matter.
+
 ## Webhook fixtures and tooling
 
 Reusable webhook JSON lives in `src/test/resources/github`. Use `@GitHubPayload("event.name")` to inject them, or extract new samples with:

@@ -47,8 +47,11 @@ so when it does. Always read them and test in staging first. This caveat ends wi
 the release's Compose files and images, and on startup Liquibase applies every not-yet-applied changeset
 from the intervening releases in changelog order. You do not need to step through intermediate releases.
 
-This rests on the migration chain being append-only, which we enforce by review, not by a test that replays
-old schemas. Take a database backup before upgrading. Downgrades are not supported.
+This rests on the migration chain being append-only. CI enforces that mechanically — a released changelog
+can never be edited, renamed, or deleted, and `master.xml` only grows — and replays the whole chain against
+an empty database on every change. What CI does *not* prove is that a migration is safe against real
+existing data (an empty-database replay can't), so data-affecting migrations stay a review responsibility.
+Take a database backup before upgrading. Downgrades are not supported.
 
 ## Deprecation policy
 

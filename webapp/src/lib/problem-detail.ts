@@ -27,3 +27,31 @@ export function problemDetailOf(
 	}
 	return fallback;
 }
+
+/**
+ * Extract the HTTP status from a thrown request error, or `undefined` when there isn't one.
+ *
+ * RFC 9457 puts `status` in the problem body, which is what the generated client throws, so that is
+ * the primary source; `response.status` is read as a fallback for the shapes that carry the raw
+ * `Response` instead. `undefined` is meaningful and must not be collapsed to a number: it means the
+ * request never got an HTTP answer (offline, DNS failure, CORS, an aborted fetch), which is a
+ * different situation from any status the server could have returned.
+ */
+export function problemStatusOf(err: unknown): number | undefined {
+	if (!err || typeof err !== "object") {
+		return undefined;
+	}
+	const record = err as Record<string, unknown>;
+	const direct = record.status;
+	if (typeof direct === "number" && Number.isInteger(direct)) {
+		return direct;
+	}
+	const response = record.response;
+	if (response && typeof response === "object") {
+		const nested = (response as Record<string, unknown>).status;
+		if (typeof nested === "number" && Number.isInteger(nested)) {
+			return nested;
+		}
+	}
+	return undefined;
+}

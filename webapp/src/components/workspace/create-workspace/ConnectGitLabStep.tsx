@@ -186,7 +186,7 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 
 			{state.preflightResult?.valid && (
 				<Alert>
-					<CircleCheckIcon aria-hidden="true" className="text-green-600 dark:text-green-400" />
+					<CircleCheckIcon aria-hidden="true" className="text-success" />
 					<AlertTitle>Token valid</AlertTitle>
 					<AlertDescription>
 						Authenticated as <strong>{state.preflightResult.username}</strong>

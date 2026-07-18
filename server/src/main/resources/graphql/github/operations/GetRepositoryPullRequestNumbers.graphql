@@ -1,0 +1,45 @@
+# Full upstream pull-request-number listing for one repository — the upstream half of the
+# RECONCILIATION deletion sweep's set difference (GitHubDeletionSweepService). The pull-request
+# counterpart of GetRepositoryIssueNumbers; see that file for the full rationale.
+#
+# Distinct from GetRepositoryPullRequests.graphql (the content sync's query) on purpose: this one
+# selects `number` only, costing ~1 rate-limit point per page of 100.
+#
+# GitHub emits no `pull_request.deleted` webhook — the action does not exist — so unlike issues,
+# this sweep is the ONLY mechanism by which a vanished pull request is ever noticed.
+#
+# `states:` is deliberately omitted so MERGED and CLOSED pull requests are enumerated too; filtering
+# here would make every filtered-out PR look deleted.
+#
+# `__typename` is required for decoding. GHPullRequest implements GHProjectV2ItemContent, whose
+# Jackson mixin (GitHubProjectV2ItemContentMixin) declares
+# `@JsonTypeInfo(use = NAME, property = "__typename", defaultImpl = GHIssue.class)`. Jackson inherits
+# that type resolver onto the concrete GHPullRequest, so decoding a node without `__typename` falls
+# back to the default impl GHIssue — which is not a GHPullRequest — and throws
+# `InvalidTypeIdException: missing type id property '__typename'`. Every other document that decodes
+# into GHIssue/GHPullRequest selects it for the same reason. It is a meta field: it costs nothing.
+# No feature-flag selection, unlike GetRepositoryIssueNumbers' `hasIssuesEnabled`: GitHub has no
+# repository-level toggle for pull requests — they cannot be switched off — so there is nothing to
+# interrogate. The sweep's empty-listing guard (refuse a complete-but-empty upstream while the mirror
+# still holds live rows) still covers this connection.
+query GetRepositoryPullRequestNumbers($owner: String!, $name: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequests(first: $first, after: $after, orderBy: { field: CREATED_AT, direction: ASC }) {
+            totalCount
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                __typename
+                number
+            }
+        }
+    }
+}
