@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.73.2
+
+### Patch Changes
+
+- Fixes a release deploy that never started: the signature check on the pinned agent image rejected every
+  valid release, so the application server stayed down.
+
 ---
 
 Newest first. Entries are authored as [changesets](https://github.com/changesets/changesets) in each PR
