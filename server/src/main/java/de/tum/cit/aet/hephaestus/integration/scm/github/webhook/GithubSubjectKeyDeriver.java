@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.webhook;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -18,6 +19,10 @@ import tools.jackson.databind.JsonNode;
  * Missing or blank tokens collapse to the literal {@code ?} placeholder; dots inside
  * any token are rewritten to {@code ~} to preserve the four-segment dot-delimited
  * subject contract.
+ *
+ * <p>One exception: the {@code repository} lifecycle event is emitted ORG-scoped as
+ * {@code github.<owner>.?.repository} (see {@link #deriveSubject}), which
+ * {@link GithubSubjectParser} re-keys onto the {@code organization.} tier.
  *
  * <p>Dedup keys reuse GitHub's {@code X-GitHub-Delivery} UUID (prefixed with
  * {@code github-}); when the header is absent the key falls back to a SHA-256 hex
@@ -55,6 +60,28 @@ public class GithubSubjectKeyDeriver implements SubjectKeyDeriver {
                 org = sanitize(orPlaceholder(organization.path("login").asString("")));
             }
         }
+
+        // Repository-lifecycle events (created/deleted/renamed/transferred/archived/…) are ORG-scoped,
+        // mirroring GitlabSubjectKeyDeriver#isGroupTierEvent for `project`. The repo-name token is
+        // UNSTABLE across rename/transfer: the payload carries the NEW name, so a repo-tier subject
+        // built from it matches neither the monitored-repo filter `github.<owner>.<OLDrepo>.>` nor the
+        // org filter, and the event (and every later event for that repo) is silently ACK-dropped while
+        // the repo's data freezes. The workspace organization filter `github.<owner>.?.>`, keyed on the
+        // stable owner, is the only tier that catches the rename in real time.
+        // Residual: a transfer to a DIFFERENT owner derives the NEW owner and so reaches no filter of
+        // the old workspace — that case heals on the next reconcile via RepositoryToMonitor.nativeId.
+        if (GitHubEventType.REPOSITORY.getValue().equals(eventSegment)) {
+            if (PLACEHOLDER.equals(org)) {
+                // Owner is only absent on a malformed payload; fall back to the organization block so
+                // the event still reaches the org tier rather than collapsing onto installation tier.
+                JsonNode organization = payload == null ? null : payload.path("organization");
+                if (organization != null && !organization.isMissingNode() && !organization.isNull()) {
+                    org = sanitize(orPlaceholder(organization.path("login").asString("")));
+                }
+            }
+            repo = PLACEHOLDER;
+        }
+
         return SUBJECT_PREFIX + org + "." + repo + "." + eventSegment;
     }
 

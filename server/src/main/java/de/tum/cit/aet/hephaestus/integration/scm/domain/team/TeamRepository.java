@@ -7,12 +7,6 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for team entities.
- *
- * <p>Teams are scoped through their organization field which carries scope
- * through the Team.organization relationship.
- */
 @Repository
 @WorkspaceAgnostic("Teams scoped through workspace_id via organization chain")
 public interface TeamRepository extends JpaRepository<Team, Long> {
@@ -54,6 +48,18 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
      * @return the team if found
      */
     Optional<Team> findByOrganizationIgnoreCaseAndSlugAndProviderId(String organization, String slug, Long providerId);
+
+    /**
+     * Every team mirrored for one organization on one provider — the org-tier erase set used by
+     * {@code workspace.ScmWorkspaceContentEraser} once no non-purged workspace is bound to that
+     * organization any more. Provider-scoped so a same-named org on a second GitLab instance is not
+     * swept up. Returns entities (not a bulk delete) so {@code Team}'s {@code CascadeType.REMOVE}
+     * reaches {@code team_membership}.
+     *
+     * @param organization the organization login / root group path (case-insensitive)
+     * @param providerId   the identity provider instance
+     */
+    List<Team> findByOrganizationIgnoreCaseAndProviderId(String organization, Long providerId);
 
     /**
      * Fetch teams with collections eagerly loaded for DTO conversion.

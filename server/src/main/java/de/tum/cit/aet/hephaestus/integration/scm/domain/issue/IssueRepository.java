@@ -1,11 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -65,10 +66,126 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
 
-    List<Issue> findAllByRepository_Id(Long repositoryId);
+    /**
+     * Repository-wide list of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
+     * subclass rows that share this table under single-table inheritance.
+     *
+     * <p>Not cosmetic: for GitLab, issue IIDs and merge-request IIDs occupy <em>separate</em>
+     * per-project namespaces (issue #5 and MR !5 routinely coexist), so a type-blind list keyed by IID
+     * would collide the two — mistaking a merge request for the issue of the same number. Callers here
+     * key issues by {@code getNumber()} (the IID) for issue-only concepts (sub-issue parenting,
+     * issue-dependency links), so they must never see {@code PullRequest} rows.
+     *
+     * @param repositoryId the repository ID
+     * @return every pure issue of the repository (pull/merge requests excluded)
+     */
+    @Query("SELECT i FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId")
+    List<Issue> findAllIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
-    /** Slice (rather than Page) so batching needs no count query. */
-    Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
+    /**
+     * Per-repository count of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
+     * subclass rows that share this table under single-table inheritance.
+     *
+     * <p>Split from its pull-request counterpart, rather than one combined count, because the combined
+     * number is exactly what makes a stalled entity class invisible: issues and pull requests sync on
+     * separate code paths, and one of them stopping keeps the sum rising.
+     *
+     * <p>Batched over a collection of repository ids: the sync-observability read model this backs
+     * renders every repository of a connection on one page load, so a per-repository call would be an
+     * N+1 by construction.
+     *
+     * <p>Tombstoned rows ({@code deletedAt IS NOT NULL} — deleted upstream, kept only so
+     * feedback/observation rows referencing them still resolve) are excluded: this number is the
+     * admin's answer to "what is in the mirror", and counting rows that no longer exist upstream is
+     * exactly the permanent inflation the deletion sweep exists to remove.
+     *
+     * @param repositoryIds the repository IDs to count for
+     * @return one projection row per repository that has at least one live issue
+     */
+    @Query(
+        "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
+            "WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds " +
+            "GROUP BY i.repository.id"
+    )
+    List<RepositoryItemCountProjection> countIssuesGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
+
+    /** Per-repository count of live pull/merge requests. Counterpart to {@link #countIssuesGroupedByRepositoryIds}. */
+    @Query(
+        "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i " +
+            "WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds " +
+            "GROUP BY i.repository.id"
+    )
+    List<RepositoryItemCountProjection> countPullRequestsGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
+
+    /**
+     * Live (non-tombstoned) issue numbers for one repository — the local half of the deletion
+     * sweep's set difference. {@code TYPE(i) = Issue} keeps pull requests out; they are swept
+     * separately against a different upstream connection.
+     *
+     * <p>Returns bare numbers rather than entities: the sweep only needs the key set, and a repo
+     * with 50k issues would otherwise hydrate 50k entity graphs to compare integers.
+     */
+    @Query(
+        "SELECT i.number FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id = :repositoryId"
+    )
+    List<Integer> findLiveIssueNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /** Live pull-request numbers for one repository. Counterpart to {@link #findLiveIssueNumbersByRepositoryId}. */
+    @Query(
+        "SELECT i.number FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id = :repositoryId"
+    )
+    List<Integer> findLivePullRequestNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Tombstones the given <em>issue</em> numbers of one repository in a single statement.
+     *
+     * <p>{@code TYPE(i) = Issue} excludes the {@code PullRequest} subclass rows sharing this table
+     * under single-table inheritance. Not cosmetic: for GitLab, issue and merge-request IIDs occupy
+     * <em>separate</em> per-project namespaces (issue #5 and MR !5 coexist), so a type-blind UPDATE
+     * keyed only on {@code (repository.id, number)} would tombstone a live merge request whenever an
+     * issue of the same number is swept — hiding it from counts, mentor and detection until the next
+     * reconciliation upsert revives it.
+     *
+     * <p>{@code deletedAt IS NULL} in the predicate makes this idempotent and preserves the
+     * <em>first</em> observation time: a re-sweep of an already-tombstoned row must not push its
+     * timestamp forward, or a future hard-delete retention window would never elapse.
+     *
+     * @return the number of rows newly tombstoned
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query(
+        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId " +
+            "AND i.number IN :numbers AND i.deletedAt IS NULL"
+    )
+    int tombstoneIssuesByRepositoryIdAndNumbers(
+        @Param("repositoryId") Long repositoryId,
+        @Param("numbers") Collection<Integer> numbers,
+        @Param("deletedAt") Instant deletedAt
+    );
+
+    /**
+     * Tombstones the given <em>pull-request / merge-request</em> numbers of one repository in a single
+     * statement. Counterpart to {@link #tombstoneIssuesByRepositoryIdAndNumbers}; {@code TYPE(i) =
+     * PullRequest} keeps the pure-issue rows out of the write for the same separate-namespace reason.
+     *
+     * @return the number of rows newly tombstoned
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query(
+        "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId " +
+            "AND i.number IN :numbers AND i.deletedAt IS NULL"
+    )
+    int tombstonePullRequestsByRepositoryIdAndNumbers(
+        @Param("repositoryId") Long repositoryId,
+        @Param("numbers") Collection<Integer> numbers,
+        @Param("deletedAt") Instant deletedAt
+    );
 
     /**
      * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
@@ -197,7 +314,14 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             parent_issue_id = COALESCE(EXCLUDED.parent_issue_id, issue.parent_issue_id),
             sub_issues_total = COALESCE(EXCLUDED.sub_issues_total, issue.sub_issues_total),
             sub_issues_completed = COALESCE(EXCLUDED.sub_issues_completed, issue.sub_issues_completed),
-            sub_issues_percent_completed = COALESCE(EXCLUDED.sub_issues_percent_completed, issue.sub_issues_percent_completed)
+            sub_issues_percent_completed = COALESCE(EXCLUDED.sub_issues_percent_completed, issue.sub_issues_percent_completed),
+            -- Resurrect: upstream just handed us this issue, so any tombstone on it is wrong. This is
+            -- what makes a deletion-sweep tombstone reversible — a sweep that tombstoned on bad
+            -- data self-heals on the next ordinary sync instead of needing an operator.
+            -- Keep this comment free of the apostrophe character: Hibernate reads one as the start of
+            -- a quoted range it never finds the end of, and the whole ApplicationContext fails to
+            -- start. NativeQueryCommentArchTest enforces this.
+            deleted_at = NULL
         """,
         nativeQuery = true
     )
