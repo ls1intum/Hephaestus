@@ -59,7 +59,7 @@ public class OpenAPIConfiguration {
     /**
      * Domain objects to include even without DTO suffix
      */
-    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject");
+    private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject", "ProblemDetail");
     /**
      * Domain objects to include by specific suffix (like AchievementProgress records)
      */

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.connect.SlackOAuthClient.OAuthV2Access;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
+import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspaceContentEraser;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -20,10 +21,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Slack OAuth v2 connection strategy. Token-rotation apps are rejected at finalize because
  * token refresh is not yet implemented.
+ *
+ * <p>{@link #revoke} is a GDPR hard-erase on disconnect, symmetric with Outline: it uninstalls the bot
+ * (best-effort OAuth token revoke while the token is still resolvable) <b>and</b> erases every Slack-owned
+ * row for the workspace through {@link SlackWorkspaceContentEraser} — the same choke point workspace-purge
+ * drives. Nothing ingested (message content, thread aggregates, per-channel consent registrations, per-person
+ * opt-outs, mentor DM threads, derived conversation feedback) outlives the connection, so a later reconnect
+ * starts from a clean slate rather than backfilling the disconnected consent gap.
  */
 @ConditionalOnServerRole
 @Component
@@ -51,6 +61,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     private final OAuthStateService oauthStateService;
     private final SlackOAuthClient oauthClient;
     private final SlackCredentialProvider credentialProvider;
+    private final SlackWorkspaceContentEraser workspaceContentEraser;
     private final String clientId;
     private final String scopes;
     private final String redirectUri;
@@ -59,12 +70,14 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         OAuthStateService oauthStateService,
         SlackOAuthClient oauthClient,
         SlackCredentialProvider credentialProvider,
+        SlackWorkspaceContentEraser workspaceContentEraser,
         @Value("${hephaestus.integration.slack.client-id:}") String clientId,
         @Value("${hephaestus.integration.slack.redirect-uri:}") String redirectUri
     ) {
         this.oauthStateService = oauthStateService;
         this.oauthClient = oauthClient;
         this.credentialProvider = credentialProvider;
+        this.workspaceContentEraser = workspaceContentEraser;
         this.clientId = clientId;
         this.scopes = String.join(",", DEFAULT_SCOPES);
         this.redirectUri = redirectUri;
@@ -134,23 +147,44 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
         );
     }
 
+    /**
+     * Runs {@link Propagation#NOT_SUPPORTED} — this method holds NO transaction of its own, matching
+     * {@code GitLabWebhookService#deregisterActiveWebhook}. The Slack token revoke below is an external
+     * HTTP round-trip, and the disconnect path already holds the connection's {@code FOR UPDATE}
+     * lifecycle lock on another connection; opening a transaction across the network call would pin a
+     * second pooled DB connection idle-in-transaction for its duration. Each collaborator still gets a
+     * transaction: the credential lookup and {@code SlackWorkspaceContentEraser#eraseWorkspace} are
+     * {@code @Transactional} on their own beans, so the erase remains atomic in itself.
+     */
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void revoke(IntegrationRef ref) {
+        // 1) Best-effort vendor-side uninstall while the token is still resolvable (credentials are cleared by
+        //    the caller only after this callback returns). A failed/absent token never blocks the local erase.
         var bundle = credentialProvider.resolve(ref);
-        if (bundle.isEmpty() || !(bundle.get() instanceof BearerToken bt)) {
-            log.debug("Slack revoke skipped: no bearer token for workspace={}", ref.workspaceId());
-            return;
+        if (bundle.isPresent() && bundle.get() instanceof BearerToken bt) {
+            try {
+                boolean revoked = oauthClient.revoke(bt.token());
+                log.info("Slack revoke for workspace={}: success={}", ref.workspaceId(), revoked);
+            } catch (RuntimeException e) {
+                log.warn(
+                    "Slack revoke call failed for workspace={} (local erase still applied): {}",
+                    ref.workspaceId(),
+                    e.toString()
+                );
+            }
+        } else {
+            log.debug("Slack token revoke skipped: no bearer token for workspace={}", ref.workspaceId());
         }
-        try {
-            boolean revoked = oauthClient.revoke(bt.token());
-            log.info("Slack revoke for workspace={}: success={}", ref.workspaceId(), revoked);
-        } catch (RuntimeException e) {
-            log.warn(
-                "Slack revoke call failed for workspace={} (local UNINSTALLED still applied): {}",
-                ref.workspaceId(),
-                e.toString()
-            );
-        }
+        // 2) GDPR erase on disconnect (symmetric with Outline): drop every ingested Slack row + per-channel
+        //    consent for the workspace so nothing outlives the connection and a later reconnect cannot silently
+        //    backfill the disconnected consent gap. Opens its own transaction (see the propagation note
+        //    above); if it fails, ConnectionService absorbs it and the local UNINSTALLED transition still lands.
+        workspaceContentEraser.eraseWorkspace(ref.workspaceId());
+        log.info(
+            "slack.audit: revoke erase — cleared ingested Slack content + consent for workspace={}",
+            ref.workspaceId()
+        );
     }
 
     private String redirectUri() {

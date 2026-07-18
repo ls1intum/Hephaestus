@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "repository_to_monitor")
@@ -29,6 +30,21 @@ public class RepositoryToMonitor {
 
     @NonNull
     private String nameWithOwner;
+
+    /**
+     * The provider's stable numeric repository id (GitHub {@code repository.id}, GitLab
+     * {@code project.id}). Unlike {@link #nameWithOwner} — which the provider rewrites on a
+     * rename/transfer and which, once stale, silently severs the per-workspace NATS filter and the
+     * name-keyed reconciliation lookup — the native id never changes for the life of the repository.
+     * It is the identity of record used to re-key {@code nameWithOwner} after an upstream rename.
+     *
+     * <p>Nullable: rows created before this column existed (and PAT rows whose repository has not yet
+     * been resolved from the provider) carry {@code null} until the next sync that resolves the repo
+     * populates it. A workspace has a single SCM connection, so the id is unambiguous without a
+     * provider discriminator column.
+     */
+    @Nullable
+    private Long nativeId;
 
     private Instant repositorySyncedAt;
     private Instant labelsSyncedAt;

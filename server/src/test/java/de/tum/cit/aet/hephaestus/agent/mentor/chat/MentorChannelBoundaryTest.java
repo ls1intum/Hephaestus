@@ -11,13 +11,15 @@ import org.junit.jupiter.api.Test;
  * Guards the {@link MentorChannel} transport seam.
  *
  * <p>The mentor orchestrator drives a turn through {@link MentorChannel}; only the web adapter
- * package ({@code agent.mentor.chat}) may touch Spring's {@code SseEmitter}. A future Slack DM
+ * package ({@code agent.mentor.chat}) may touch Spring's {@code SseEmitter}. The independent sync
+ * status web adapter ({@code integration.core.sync.push}) is also an HTTP transport boundary. A future Slack DM
  * adapter (in {@code integration.slack.mentor}) must render through the port, never reach for the
  * HTTP-specific emitter — this rule fails the build if it tries.
  */
 class MentorChannelBoundaryTest extends HephaestusArchitectureTest {
 
     private static final String WEB_ADAPTER = "..agent.mentor.chat..";
+    private static final String SYNC_PUSH_WEB_ADAPTER = "..integration.core.sync.push..";
     private static final String SSE_EMITTER = "org.springframework.web.servlet.mvc.method.annotation.SseEmitter";
 
     @Test
@@ -25,7 +27,7 @@ class MentorChannelBoundaryTest extends HephaestusArchitectureTest {
     void sseEmitterConfinedToWebAdapter() {
         ArchRule rule = noClasses()
             .that()
-            .resideOutsideOfPackage(WEB_ADAPTER)
+            .resideOutsideOfPackages(WEB_ADAPTER, SYNC_PUSH_WEB_ADAPTER)
             .should()
             .dependOnClassesThat()
             .haveFullyQualifiedName(SSE_EMITTER)

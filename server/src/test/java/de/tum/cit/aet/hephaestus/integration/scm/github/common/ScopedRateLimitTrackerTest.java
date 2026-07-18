@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -297,6 +298,150 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
     }
 
     @Nested
+    class Snapshot {
+
+        @Test
+        void shouldReturnNullForNeverObservedScope() {
+            assertThat(tracker.snapshot(999L)).isNull();
+        }
+
+        @Test
+        void shouldReturnNullForNullScope() {
+            assertThat(tracker.snapshot(null)).isNull();
+        }
+
+        @Test
+        void shouldReturnSnapshotAfterObservedResponse() {
+            Long scopeId = 1L;
+            OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+
+            var snapshot = tracker.snapshot(scopeId);
+
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.limit()).isEqualTo(5000);
+            assertThat(snapshot.remaining()).isEqualTo(4200);
+            assertThat(snapshot.resetAt()).isEqualTo(resetTime.toInstant());
+            assertThat(snapshot.observedAt()).isNotNull();
+        }
+
+        /**
+         * GitHub reporting no {@code resetAt} must leave the snapshot's resetAt null, not serve the
+         * constructor's fabricated {@code now() + 1h} as a measured value.
+         */
+        @Test
+        void shouldNotFabricateResetAtWhenPayloadOmitsIt() {
+            Long scopeId = 1L;
+
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, null));
+
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.resetAt()).isNull();
+            assertThat(snapshot.remaining()).isEqualTo(4200);
+            assertThat(snapshot.limit()).isEqualTo(5000);
+        }
+
+        /**
+         * The "optimistic reset" is a throttling heuristic: it must move the decision APIs while leaving
+         * the displayed observation untouched, never written into state and rendered as measured.
+         */
+        @Test
+        void shouldNotLetOptimisticResetLeakIntoSnapshot() {
+            Long scopeId = 1L;
+            OffsetDateTime pastReset = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, pastReset));
+
+            // Decision API assumes a full budget because the window has rolled over...
+            assertThat(tracker.getRemaining(scopeId)).isEqualTo(5000);
+
+            // ...but nothing derived from that assumption is reported.
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.remaining()).isNull();
+            assertThat(snapshot.resetAt()).isNull();
+            assertThat(snapshot.limit()).isEqualTo(5000); // a ceiling is window-invariant
+        }
+
+        @Test
+        void shouldKeepObservedRemainingWhileWindowIsOpen() {
+            Long scopeId = 1L;
+            OffsetDateTime futureReset = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(20);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, futureReset));
+
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.remaining()).isEqualTo(7);
+            assertThat(snapshot.resetAt()).isEqualTo(futureReset.toInstant());
+        }
+
+        @Test
+        void shouldNeverReportThrottledUntilFromGraphQlObservations() {
+            Long scopeId = 1L;
+            OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+
+            assertThat(tracker.snapshot(scopeId).throttledUntil()).isNull();
+        }
+    }
+
+    /**
+     * The REST {@code GET /rate_limit} seed. Its whole point is that a scope's ceiling is a measured fact
+     * before the first GraphQL call — and that the ceiling can be something other than the assumed 5000,
+     * which is exactly the case for App installations with more than 20 repositories (up to 12,500).
+     */
+    @Nested
+    class RestSeed {
+
+        @Test
+        void shouldSurfaceRestObservationAsARealSnapshot() {
+            Long scopeId = 1L;
+            Instant resetAt = Instant.now().plusSeconds(3600);
+            Instant observedAt = Instant.now();
+
+            tracker.updateFromRestRateLimit(scopeId, 12_500, 12_500, resetAt, observedAt);
+
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.limit()).isEqualTo(12_500);
+            assertThat(snapshot.remaining()).isEqualTo(12_500);
+            assertThat(snapshot.resetAt()).isEqualTo(resetAt);
+            assertThat(snapshot.observedAt()).isEqualTo(observedAt);
+        }
+
+        @Test
+        void shouldMakeTheRealCeilingDriveThrottleDecisionsInsteadOfTheAssumedOne() {
+            Long scopeId = 1L;
+
+            assertThat(tracker.getLimit(scopeId)).isEqualTo(5000); // assumption, pre-seed
+            tracker.updateFromRestRateLimit(scopeId, 12_500, 12_400, Instant.now().plusSeconds(3600), Instant.now());
+
+            assertThat(tracker.getLimit(scopeId)).isEqualTo(12_500);
+        }
+
+        @Test
+        void shouldNotOverwriteAFresherObservationWithAStalerSeed() {
+            Long scopeId = 1L;
+            OffsetDateTime resetTime = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(4200, 5000, 800, 3, resetTime));
+
+            // A probe that was in flight before the GraphQL response landed.
+            tracker.updateFromRestRateLimit(scopeId, 5000, 4999, resetTime.toInstant(), Instant.now().minusSeconds(30));
+
+            assertThat(tracker.snapshot(scopeId).remaining()).isEqualTo(4200);
+        }
+
+        @Test
+        void shouldReportNoObservationUntilSomethingIsSeeded() {
+            assertThat(tracker.hasObservation(7L)).isFalse();
+
+            tracker.updateFromRestRateLimit(7L, 5000, 5000, Instant.now().plusSeconds(3600), Instant.now());
+
+            assertThat(tracker.hasObservation(7L)).isTrue();
+        }
+    }
+
+    @Nested
     class Metrics {
 
         @Test
@@ -320,6 +465,29 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             assertThat(
                 meterRegistry.find("github.graphql.ratelimit.seconds_until_reset").tag("scope_id", "1").gauge()
             ).isNotNull();
+        }
+
+        /**
+         * The optimistic reset must not <em>write</em>. The gauge reads the same observed field the
+         * snapshot does, so if a throttle decision ever mutates state back up to the limit, this gauge
+         * reports 5000 for a budget nobody measured.
+         */
+        @Test
+        void throttleDecisionMustNotWriteBackIntoObservedState() {
+            Long scopeId = 1L;
+            OffsetDateTime pastReset = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
+            tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, pastReset));
+
+            // Exercise every decision API that could mutate state back up.
+            tracker.getRemaining(scopeId);
+            tracker.isCritical(scopeId);
+            tracker.isLow(scopeId);
+            tracker.getRecommendedDelay(scopeId);
+            assertThatNoException().isThrownBy(() -> tracker.waitIfNeeded(scopeId));
+
+            assertThat(
+                meterRegistry.find("github.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge().value()
+            ).isEqualTo(7.0);
         }
 
         @Test

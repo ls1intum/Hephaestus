@@ -1,0 +1,43 @@
+# GraphQL query for fetching pull request conversation (top-level) comments.
+# The PR mirror of GetIssueComments: GitHub models both as IssueComment, but they hang off
+# different roots (repository.issue vs repository.pullRequest), so the tail of a PR's
+# conversation needs its own selection. Same node shape as GetIssueComments so the
+# response feeds the identical GitHubCommentDTO -> GitHubIssueCommentProcessor path.
+#
+# Uses fullDatabaseId for comment (BigInt) since databaseId (Int) can overflow for newer GitHub entities.
+# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
+
+query GetPullRequestComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+            comments(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    url
+                    createdAt
+                    updatedAt
+
+                    # Author
+                    author {
+                        ...ActorFields
+                    }
+
+                    authorAssociation
+                }
+            }
+        }
+    }
+}
