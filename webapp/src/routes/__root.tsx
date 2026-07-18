@@ -8,7 +8,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import type React from "react";
-import { Toaster } from "sonner";
 import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
@@ -20,6 +19,7 @@ import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
@@ -27,7 +27,6 @@ import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
-import { useTheme } from "@/integrations/theme";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
 
@@ -38,7 +37,6 @@ interface MyRouterContext {
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => {
-		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, isLoading } = useAuth();
 		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
@@ -83,7 +81,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					<ProviderColorScope>
 						<Outlet />
 					</ProviderColorScope>
-					<Toaster theme={theme} />
+					<Toaster />
 				</>
 			);
 		}
@@ -107,7 +105,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 						</SidebarInset>
 					</SidebarProvider>
 				</ProviderColorScope>
-				<Toaster theme={theme} />
+				<Toaster />
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
 				<FeatureFlagDevTools />
@@ -121,7 +119,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			<p className="text-muted-foreground mb-8">
 				The page you're looking for doesn't exist or you don't have permission to view it.
 			</p>
-			<Link to="/" className="text-blue-500 hover:underline font-medium">
+			<Link to="/" className="text-primary hover:underline font-medium">
 				Return to Home
 			</Link>
 		</div>

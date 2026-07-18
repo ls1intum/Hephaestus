@@ -2,9 +2,26 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+function Table({
+	className,
+	containerClassName,
+	...props
+}: React.ComponentProps<"table"> & {
+	/**
+	 * Classes for the scroll container that wraps the `<table>` — the element that actually overflows.
+	 * A bounding height and vertical scroll belong here (e.g. `max-h-[70vh] overflow-y-auto`) so a tall
+	 * table clips and scrolls in place with a sticky header/footer, rather than a consumer hand-rolling a
+	 * raw `<table>` inside its own `max-h` div. Mirrors ScrollArea's `viewportClassName`: the cap goes on
+	 * the element that scrolls. The default `overflow-x-auto` stays for wide tables, so pairing it with
+	 * `overflow-y-auto` here scrolls both axes without a shorthand conflict.
+	 */
+	containerClassName?: string;
+}) {
 	return (
-		<div data-slot="table-container" className="relative w-full overflow-x-auto">
+		<div
+			data-slot="table-container"
+			className={cn("relative w-full overflow-x-auto", containerClassName)}
+		>
 			<table
 				data-slot="table"
 				className={cn("w-full caption-bottom text-sm", className)}

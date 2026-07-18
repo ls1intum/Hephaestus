@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineCollectionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineCollectionModel;
 import de.tum.cit.aet.hephaestus.integration.outline.connect.OutlineConnectionResolver;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
@@ -123,16 +123,16 @@ public class OutlineCollectionAdminService {
         return outlineApiClient
             .listCollections(install.serverUrl(), requireToken(workspaceId), CANDIDATES_MAX_PAGES)
             .stream()
-            .filter(c -> c.id() != null && !c.id().isBlank())
+            .filter(c -> c.getId() != null && !c.getId().isBlank())
             .map(c ->
                 new OutlineCollectionCandidateDTO(
-                    c.id(),
-                    c.name(),
-                    c.urlId(),
-                    c.color(),
-                    c.icon(),
-                    c.description(),
-                    mirrored.contains(c.id())
+                    c.getId(),
+                    c.getName(),
+                    c.getUrlId(),
+                    c.getColor(),
+                    c.getIcon(),
+                    c.getDescription(),
+                    mirrored.contains(c.getId())
                 )
             )
             .sorted(
@@ -162,10 +162,10 @@ public class OutlineCollectionAdminService {
             return new RegistrationOutcome(false, toDto(install, existing.get()));
         }
 
-        OutlineCollectionListResponse.Collection live = outlineApiClient
+        OutlineCollectionModel live = outlineApiClient
             .listCollections(install.serverUrl(), requireToken(workspaceId))
             .stream()
-            .filter(c -> collectionId.equals(c.id()))
+            .filter(c -> collectionId.equals(c.getId()))
             .findFirst()
             .orElseThrow(() -> new UnknownOutlineCollectionException(collectionId));
 
@@ -173,11 +173,11 @@ public class OutlineCollectionAdminService {
         row.setWorkspaceId(workspaceId);
         row.setConnectionId(install.connectionId());
         row.setCollectionId(collectionId);
-        row.setName(live.name());
-        row.setUrlId(live.urlId());
-        row.setColor(live.color());
-        row.setIcon(live.icon());
-        row.setDescription(truncateDescription(live.description()));
+        row.setName(live.getName());
+        row.setUrlId(live.getUrlId());
+        row.setColor(live.getColor());
+        row.setIcon(live.getIcon());
+        row.setDescription(truncateDescription(live.getDescription()));
         row.setState(MirrorState.ENABLED);
         row.setSyncStatus(SyncStatus.PENDING);
         OutlineCollection saved = collectionRepository.save(row);

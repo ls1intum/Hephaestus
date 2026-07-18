@@ -9,6 +9,7 @@ import com.slack.api.methods.SlackApiException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -31,7 +32,7 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new SlackMessageService(credentialProvider);
+        service = new SlackMessageService(credentialProvider, new SlackRateLimitTracker(new SimpleMeterRegistry()));
     }
 
     @Test

@@ -136,7 +136,7 @@ export function QuestionRating({
 									key={rating}
 									value={String(rating)}
 									aria-label={`Rating ${rating} out of ${ratingScale}`}
-									className="data-[state=on]:border-primary data-[state=on]:bg-background data-[state=on]:text-primary data-[state=on]:shadow-sm data-[state=on]:data-[spacing=0]:data-[variant=outline]:border-l-1 not-first:data-[state=on]:ml-[-1px]"
+									className="data-pressed:border-primary data-pressed:bg-background data-pressed:text-primary data-pressed:shadow-sm data-pressed:data-[spacing=0]:data-[variant=outline]:border-l-1 not-first:data-pressed:ml-[-1px]"
 								>
 									{rating}
 								</ToggleGroupItem>

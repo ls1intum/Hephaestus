@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -52,12 +53,24 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
 
     @Override
     public String deriveSubject(JsonNode payload, Map<String, String> headers) {
-        String event = sanitizeEvent(textOrEmpty(payload, "object_kind"));
-        if (event.isEmpty()) {
-            event = sanitizeEvent(textOrEmpty(payload, "event_name"));
+        String rawEvent = textOrEmpty(payload, "object_kind");
+        if (rawEvent.isEmpty()) {
+            rawEvent = textOrEmpty(payload, "event_name");
         }
+        String event = normalizeEvent(rawEvent);
         if (event.isEmpty()) {
             event = UNKNOWN_TOKEN;
+        }
+
+        // Group-tier lifecycle events (project/subgroup/member) are ORG-scoped. They carry no routable
+        // project — subgroup/member payloads have no project.path_with_namespace at all, and a project
+        // event's own path is unstable across rename/transfer. They must land on the workspace's
+        // organization filter `gitlab.<accountLogin>.?.>` (WorkspaceNatsSubscriptionProvider#organizationFilter):
+        // the namespace token is the ROOT group segment and the project slot is the placeholder. Without
+        // this they derive `gitlab.?.?.<event>` (matches no filter) or a repo-scoped subject that no
+        // monitored-repo filter catches on create/rename — i.e. a silent drop.
+        if (isGroupTierEvent(event)) {
+            return SUBJECT_PREFIX + rootGroupToken(payload) + "." + PLACEHOLDER + "." + event;
         }
 
         String pathWithNs = firstNonBlank(
@@ -118,6 +131,72 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
         // Lowercase + replace dots so the event component never collides with NATS
         // token boundaries.
         return value.toLowerCase(Locale.ROOT).replace('.', '~');
+    }
+
+    /**
+     * Normalizes the raw discriminator into the wire event token. {@code object_kind} values
+     * ({@code merge_request}, {@code issue}, {@code note}, …) pass through sanitized. GitLab's
+     * group-tier events instead arrive via {@code event_name} with a granular verb —
+     * {@code project_create}, {@code subgroup_destroy}, {@code user_add_to_group} — which we fold
+     * onto the stable keys the handlers register under ({@link GitLabEventType#PROJECT},
+     * {@link GitLabEventType#SUBGROUP}, {@link GitLabEventType#MEMBER}). This is the single point
+     * of normalization the handler javadocs already promise; registering the handlers under the raw
+     * verbs instead would scatter 3–5 synonyms per handler and still leave the subject token
+     * unnormalized (so a dispatcher round-trip could not agree on one key).
+     */
+    private static String normalizeEvent(String raw) {
+        if (raw == null || raw.isEmpty()) return "";
+        String lower = raw.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("project_")) {
+            return GitLabEventType.PROJECT.getValue();
+        }
+        if (lower.startsWith("subgroup_")) {
+            return GitLabEventType.SUBGROUP.getValue();
+        }
+        // user_add_to_group / user_remove_from_group / user_update_for_group → "member".
+        // Project-member verbs (user_*_to_team) end with "_team", so they never fold to "member".
+        if (lower.startsWith("user_") && lower.endsWith("_group")) {
+            return GitLabEventType.MEMBER.getValue();
+        }
+        return sanitizeEvent(raw);
+    }
+
+    private static boolean isGroupTierEvent(String event) {
+        return (
+            GitLabEventType.PROJECT.getValue().equals(event) ||
+            GitLabEventType.SUBGROUP.getValue().equals(event) ||
+            GitLabEventType.MEMBER.getValue().equals(event)
+        );
+    }
+
+    /**
+     * Root (top-level) group segment for an org-scoped subject, matching the single-token
+     * {@code accountLogin} the workspace subscribes with via {@code organizationFilter}. Tries the
+     * richest path the group-tier payloads carry — a project's {@code path_with_namespace}, a
+     * subgroup's {@code full_path}/{@code parent_full_path}, a member event's {@code group_path} —
+     * then takes the first path segment (sanitizing dots to {@code ~} exactly as
+     * {@link #sanitizeParts}). Falls back to the {@code ?} placeholder when no path is present.
+     *
+     * <p><b>Known limitation:</b> member events on a <em>subgroup</em> carry only the leaf
+     * {@code group_path} (GitLab sends {@code group.path}, not the full path), so their root segment
+     * is the subgroup itself, not the workspace root group — those remain unroutable from payload
+     * alone and are healed by the periodic group-member sync. Member events on the root group route
+     * correctly.
+     */
+    private static String rootGroupToken(JsonNode payload) {
+        String path = firstNonBlank(
+            textOrEmpty(payload.path("project"), "path_with_namespace"),
+            textOrEmpty(payload, "path_with_namespace"),
+            textOrEmpty(payload.path("group"), "full_path"),
+            textOrEmpty(payload, "full_path"),
+            textOrEmpty(payload, "parent_full_path"),
+            textOrEmpty(payload, "group_path")
+        );
+        if (path == null) {
+            return PLACEHOLDER;
+        }
+        List<String> parts = sanitizeParts(path);
+        return parts.isEmpty() ? PLACEHOLDER : parts.get(0);
     }
 
     private static List<String> sanitizeParts(String path) {

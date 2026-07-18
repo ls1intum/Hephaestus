@@ -251,6 +251,8 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 
 **Backfill behavior:** After recent sync completes, backfill works backwards from the highest issue number, syncing in small batches. It pauses when rate limits drop below the threshold and resumes on the next cycle. Progress is checkpointed per repository.
 
+**Disconnecting erases the mirror.** Disconnecting a workspace's GitHub, GitLab, Slack, or Outline connection — and purging a workspace — hard-deletes the data mirrored through it, keeping only the operational sync history. It is irreversible and reconnecting performs a fresh initial sync. See the erasure triggers in the [record of processing](./dsms/record-of-processing.md).
+
 ## Deployment steps
 
 1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.

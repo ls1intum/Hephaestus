@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { problemDetailOf } from "./problem-detail";
+import { problemDetailOf, problemStatusOf } from "./problem-detail";
 
 // `problemDetailOf` turns whatever the generated client throws into a human-readable string
 // for toasts/inline errors. Precedence (detail -> title -> legacy error -> message) is the
@@ -53,5 +53,36 @@ describe("problemDetailOf", () => {
 			"An unexpected error occurred. Please try again.",
 		);
 		expect(problemDetailOf(42)).toBe("An unexpected error occurred. Please try again.");
+	});
+});
+
+// `problemStatusOf` decides whether the UI offers a way out at all — a retryable 503 vs a 403 that no
+// button can fix. `undefined` is meaningful (no HTTP answer) and must never be coerced to a number.
+describe("problemStatusOf", () => {
+	it("reads `status` from the RFC 9457 body the client throws", () => {
+		expect(problemStatusOf({ type: "about:blank", status: 403, detail: "Forbidden" })).toBe(403);
+	});
+
+	it("falls back to `response.status` for shapes carrying the raw Response", () => {
+		expect(problemStatusOf({ response: { status: 503 } })).toBe(503);
+	});
+
+	it("prefers the body status over the response status", () => {
+		expect(problemStatusOf({ status: 409, response: { status: 200 } })).toBe(409);
+	});
+
+	it("returns undefined when the request never got an HTTP answer", () => {
+		// A network failure is not a status the server chose; conflating it with one would let the UI
+		// claim the server said something it never said.
+		expect(problemStatusOf(new TypeError("Failed to fetch"))).toBeUndefined();
+		expect(problemStatusOf(null)).toBeUndefined();
+		expect(problemStatusOf(undefined)).toBeUndefined();
+		expect(problemStatusOf("network down")).toBeUndefined();
+	});
+
+	it("ignores non-integer status values rather than passing them on", () => {
+		expect(problemStatusOf({ status: "403" })).toBeUndefined();
+		expect(problemStatusOf({ status: Number.NaN })).toBeUndefined();
+		expect(problemStatusOf({ status: 403.5 })).toBeUndefined();
 	});
 });

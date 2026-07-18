@@ -1005,10 +1005,16 @@ public class GitHubTeamSyncService {
      */
     private void removeDeletedTeams(String organizationLogin, Set<Long> syncedTeamIds, ProcessingContext context) {
         List<Team> existingTeams = teamRepository.findAllByOrganizationIgnoreCase(organizationLogin);
+        Long providerId = context.providerId();
         int removed = 0;
 
         for (Team team : existingTeams) {
-            if (!syncedTeamIds.contains(team.getNativeId())) {
+            // Only delete teams on this provider — a same-login GitLab group must not be swept by a GitHub sync.
+            if (
+                team.getProvider() != null &&
+                team.getProvider().getId().equals(providerId) &&
+                !syncedTeamIds.contains(team.getNativeId())
+            ) {
                 teamProcessor.delete(team.getNativeId(), context);
                 removed++;
             }
