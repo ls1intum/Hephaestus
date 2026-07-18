@@ -4742,10 +4742,6 @@ components:
       type: object
       description: Connection-level backfill rollup
       properties:
-        completedThrough:
-          type: string
-          format: date-time
-          description: Oldest point-in-time the backfill has reached
         percent:
           type: integer
           format: int32
@@ -5056,9 +5052,6 @@ components:
           format: date-time
           description: "When the last inbound webhook/event was processed for this\
             \ connection, if any"
-        lastEventType:
-          type: string
-          description: "The most recently processed event's type, if any"
         lastJob:
           $ref: "#/components/schemas/SyncJob"
           description: "Most recently finished job, if any"

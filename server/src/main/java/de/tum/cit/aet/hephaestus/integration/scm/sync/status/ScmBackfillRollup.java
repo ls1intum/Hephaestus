@@ -38,10 +38,10 @@ public final class ScmBackfillRollup {
      */
     public static BackfillSummary summarize(boolean scheduledBackfillEnabled, List<RepoBackfillProgress> monitors) {
         if (!scheduledBackfillEnabled) {
-            return new BackfillSummary("DISABLED", null, null);
+            return new BackfillSummary("DISABLED", null);
         }
         if (monitors.isEmpty()) {
-            return new BackfillSummary("NOT_STARTED", null, null);
+            return new BackfillSummary("NOT_STARTED", null);
         }
 
         boolean anyInitialized = false;
@@ -66,8 +66,6 @@ public final class ScmBackfillRollup {
             percent = 100;
         }
 
-        // No per-item timestamp exists for a NUMBER-based backfill horizon (issue/PR number, not date),
-        // so completedThrough stays null for both vendors.
-        return new BackfillSummary(state, null, percent);
+        return new BackfillSummary(state, percent);
     }
 }

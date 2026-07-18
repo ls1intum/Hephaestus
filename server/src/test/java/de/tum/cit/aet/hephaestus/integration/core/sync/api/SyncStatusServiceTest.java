@@ -350,7 +350,7 @@ class SyncStatusServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void getStatus_activityRecorded_includesLastEventFieldsFromActivityRepository_notProvider() {
+    void getStatus_activityRecorded_includesLastEventProcessedAtFromActivityRepository_notProvider() {
         Instant lastEventAt = Instant.parse("2026-07-14T10:00:00Z");
         when(connectionActivityRepository.findById(CONNECTION_ID)).thenReturn(
             Optional.of(new ConnectionActivity(CONNECTION_ID, WORKSPACE_ID, lastEventAt, "push"))
@@ -359,15 +359,13 @@ class SyncStatusServiceTest extends BaseUnitTest {
         var status = service.getStatus(WORKSPACE_ID, CONNECTION_ID);
 
         assertThat(status.lastEventProcessedAt()).isEqualTo(lastEventAt);
-        assertThat(status.lastEventType()).isEqualTo("push");
     }
 
     @Test
-    void getStatus_noActivityRecorded_lastEventFieldsAreNull() {
+    void getStatus_noActivityRecorded_lastEventProcessedAtIsNull() {
         var status = service.getStatus(WORKSPACE_ID, CONNECTION_ID);
 
         assertThat(status.lastEventProcessedAt()).isNull();
-        assertThat(status.lastEventType()).isNull();
     }
 
     // --- backfill capability ---

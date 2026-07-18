@@ -73,9 +73,4 @@ public class ConnectionActivity {
     public Instant getLastEventAt() {
         return lastEventAt;
     }
-
-    @Nullable
-    public String getLastEventType() {
-        return lastEventType;
-    }
 }

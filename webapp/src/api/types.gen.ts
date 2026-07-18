@@ -2918,10 +2918,6 @@ export type ConnectionSyncStatus = {
      */
     lastEventProcessedAt?: Date;
     /**
-     * The most recently processed event's type, if any
-     */
-    lastEventType?: string;
-    /**
      * Most recently finished job, if any
      */
     lastJob?: SyncJob;
@@ -2955,10 +2951,6 @@ export type ConnectionSyncStatus = {
  * Connection-level backfill rollup
  */
 export type BackfillSummary = {
-    /**
-     * Oldest point-in-time the backfill has reached
-     */
-    completedThrough?: Date;
     /**
      * 0-100 completion estimate, if computable
      */

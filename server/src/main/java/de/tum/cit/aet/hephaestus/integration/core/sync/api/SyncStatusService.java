@@ -150,7 +150,6 @@ public class SyncStatusService {
             providerDetails.syncInterval() == null ? null : providerDetails.syncInterval().toSeconds(),
             providerDetails.webhookRegistered(),
             activity.map(ConnectionActivity::getLastEventAt).orElse(null),
-            activity.map(ConnectionActivity::getLastEventType).orElse(null),
             providerDetails.rateLimit() == null ? null : RateLimitSnapshotDTO.from(providerDetails.rateLimit()),
             backfillSupported,
             providerDetails.backfill() == null ? null : BackfillSummaryDTO.from(providerDetails.backfill()),

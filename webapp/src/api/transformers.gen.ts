@@ -231,13 +231,6 @@ const syncJobSchemaResponseTransformer = (data: any) => {
     return data;
 };
 
-const backfillSummarySchemaResponseTransformer = (data: any) => {
-    if (data.completedThrough) {
-        data.completedThrough = new Date(data.completedThrough);
-    }
-    return data;
-};
-
 const rateLimitSnapshotSchemaResponseTransformer = (data: any) => {
     if (data.resetAt) {
         data.resetAt = new Date(data.resetAt);
@@ -248,9 +241,6 @@ const rateLimitSnapshotSchemaResponseTransformer = (data: any) => {
 const connectionSyncStatusSchemaResponseTransformer = (data: any) => {
     if (data.activeJob) {
         data.activeJob = syncJobSchemaResponseTransformer(data.activeJob);
-    }
-    if (data.backfill) {
-        data.backfill = backfillSummarySchemaResponseTransformer(data.backfill);
     }
     if (data.lastEventProcessedAt) {
         data.lastEventProcessedAt = new Date(data.lastEventProcessedAt);

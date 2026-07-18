@@ -232,7 +232,7 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
 
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);
 
-            assertThat(details.backfill()).isEqualTo(new BackfillSummary("DISABLED", null, null));
+            assertThat(details.backfill()).isEqualTo(new BackfillSummary("DISABLED", null));
         }
 
         @Test

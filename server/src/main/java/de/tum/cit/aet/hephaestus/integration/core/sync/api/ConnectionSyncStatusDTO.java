@@ -28,7 +28,6 @@ public record ConnectionSyncStatusDTO(
     Boolean webhookRegistered,
     @Schema(description = "When the last inbound webhook/event was processed for this connection, if any")
     Instant lastEventProcessedAt,
-    @Schema(description = "The most recently processed event's type, if any") String lastEventType,
     @Schema(description = "Current rate-limit budget, if known") RateLimitSnapshotDTO rateLimit,
     @NonNull
     @Schema(
