@@ -26,11 +26,17 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
      * repository of a connection in one grouped join. Joins through the direct {@code pullRequest}
      * association rather than {@code review} — a review comment always has the former, while the
      * latter is null for comments that arrive outside a review decision.
+     *
+     * <p>Comments of a tombstoned pull request are excluded, matching how the pull-request count itself
+     * already drops tombstoned rows. A review comment has no tombstone of its own; the parent's is the
+     * only signal, and counting orphans of a deleted PR would leave this row permanently inflated. The
+     * predicate rides the {@code c.pullRequest} join the grouping already needs.
      */
     @Query(
         "SELECT c.pullRequest.repository.id AS repositoryId, COUNT(c) AS itemCount " +
             "FROM PullRequestReviewComment c " +
-            "WHERE c.pullRequest.repository.id IN :repositoryIds GROUP BY c.pullRequest.repository.id"
+            "WHERE c.pullRequest.repository.id IN :repositoryIds AND c.pullRequest.deletedAt IS NULL " +
+            "GROUP BY c.pullRequest.repository.id"
     )
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
         @Param("repositoryIds") Collection<Long> repositoryIds

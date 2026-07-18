@@ -34,10 +34,16 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * a connection in one grouped join. Reviews arrive nested inside the pull-request backfill's GraphQL
      * pages, so this count stalling while the pull-request count keeps rising is a real and otherwise
      * silent failure — which is the reason this class gets its own row.
+     *
+     * <p>Reviews of a tombstoned pull request are excluded, matching how the pull-request count itself
+     * already drops tombstoned rows. A review has no tombstone of its own; the parent's is the only
+     * signal, and counting orphans of a deleted PR would leave this row permanently inflated. The
+     * predicate rides the {@code r.pullRequest} join the grouping already needs.
      */
     @Query(
         "SELECT r.pullRequest.repository.id AS repositoryId, COUNT(r) AS itemCount FROM PullRequestReview r " +
-            "WHERE r.pullRequest.repository.id IN :repositoryIds GROUP BY r.pullRequest.repository.id"
+            "WHERE r.pullRequest.repository.id IN :repositoryIds AND r.pullRequest.deletedAt IS NULL " +
+            "GROUP BY r.pullRequest.repository.id"
     )
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
         @Param("repositoryIds") Collection<Long> repositoryIds

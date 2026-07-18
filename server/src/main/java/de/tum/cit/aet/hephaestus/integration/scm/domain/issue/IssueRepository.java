@@ -7,7 +7,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -84,9 +83,6 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      */
     @Query("SELECT i FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId")
     List<Issue> findAllIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
-
-    /** Slice (rather than Page) so batching needs no count query. */
-    Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
      * Per-repository count of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}

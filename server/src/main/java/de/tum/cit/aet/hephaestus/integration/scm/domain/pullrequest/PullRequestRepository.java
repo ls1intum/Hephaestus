@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -141,9 +140,6 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
 
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
-
-    /** Slice (rather than Page) so batching needs no count query. */
-    Slice<PullRequest> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
      * Repository-wide pull-request inventory ordered newest-first by number, for the cross-artifact

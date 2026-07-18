@@ -25,10 +25,21 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
      * of a connection in one grouped join. Counts comments on pull requests as well as on pure issues —
      * both are {@code Issue} rows under single-table inheritance, and the sync path that fetches them is
      * the same one, so splitting them here would imply a distinction the sync doesn't make.
+     *
+     * <p>Comments of a tombstoned parent ({@code c.issue.deletedAt IS NOT NULL}) are excluded, matching
+     * how the issue and pull-request counts already drop tombstoned rows. A comment has no tombstone of
+     * its own: it goes away with the issue it hangs off, so the parent's tombstone is the only signal
+     * there is. Counting them would reintroduce on the child row exactly the permanent inflation the
+     * deletion sweep removes from the parent — the admin would see an issue count fall while its
+     * comment count stayed put.
+     *
+     * <p>The predicate rides the {@code c.issue} join that the grouping already needs, so this stays one
+     * grouped query for the whole connection.
      */
     @Query(
         "SELECT c.issue.repository.id AS repositoryId, COUNT(c) AS itemCount FROM IssueComment c " +
-            "WHERE c.issue.repository.id IN :repositoryIds GROUP BY c.issue.repository.id"
+            "WHERE c.issue.repository.id IN :repositoryIds AND c.issue.deletedAt IS NULL " +
+            "GROUP BY c.issue.repository.id"
     )
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
         @Param("repositoryIds") Collection<Long> repositoryIds
