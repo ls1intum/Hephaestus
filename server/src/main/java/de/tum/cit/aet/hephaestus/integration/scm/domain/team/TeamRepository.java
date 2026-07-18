@@ -8,39 +8,45 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@WorkspaceAgnostic("Teams scoped through workspace_id via organization chain")
+@WorkspaceAgnostic(
+    "Team has no workspace_id; the statement inspector cannot scope it. Workspace read/authorization " +
+        "paths MUST scope by (organization, provider_id) via the *AndProviderId finders below — the bare " +
+        "organization-string finders match same-named orgs across providers and leak across tenants."
+)
 public interface TeamRepository extends JpaRepository<Team, Long> {
     Optional<Team> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
-    List<Team> findAllByName(String name);
-
-    List<Team> findAllByOrganizationIgnoreCase(String organization);
+    /**
+     * Provider-scoped name lookup — the workspace-safe form. A same-named team on a different
+     * provider (whose {@code organization} string collides) cannot leak into path resolution.
+     */
+    List<Team> findAllByNameAndProviderId(String name, Long providerId);
 
     /**
-     * Find a team by its natural key (organization + name).
+     * Provider-agnostic organization enumeration. Sync-engine use only ({@code GitHubTeamSyncService} /
+     * {@code GitLabTeamSyncService} stale-team cleanup, where the provider is already fixed in-loop).
+     * Workspace read/auth paths MUST use {@link #findAllByOrganizationIgnoreCaseAndProviderId}.
+     */
+    List<Team> findAllByOrganizationIgnoreCase(String organization);
+
+    /** Provider-scoped organization enumeration — matches the {@code (provider_id, organization)} key prefix. */
+    List<Team> findAllByOrganizationIgnoreCaseAndProviderId(String organization, Long providerId);
+
+    /**
+     * Find a team by its natural key, provider-scoped. Without the provider a same-named team in a
+     * same-named org on another provider matches, and the sync then overwrites that tenant's row.
      *
      * @param organization the organization login (case-insensitive)
      * @param name the team name
+     * @param providerId the git provider ID
      * @return the team if found
      */
-    Optional<Team> findByOrganizationIgnoreCaseAndName(String organization, String name);
+    Optional<Team> findByOrganizationIgnoreCaseAndNameAndProviderId(String organization, String name, Long providerId);
 
     /**
-     * Find a team by organization and slug (the provider-agnostic natural key).
+     * Find a team by organization, slug, and provider — the full natural key.
      * <p>
      * For GitHub: slug = team slug. For GitLab: slug = relative path from root group.
-     * <p>
-     * WARNING: Does not scope by provider. Prefer
-     * {@link #findByOrganizationIgnoreCaseAndSlugAndProviderId} when provider is known.
-     *
-     * @param organization the organization login (case-insensitive)
-     * @param slug the team slug
-     * @return the team if found
-     */
-    Optional<Team> findByOrganizationIgnoreCaseAndSlug(String organization, String slug);
-
-    /**
-     * Find a team by organization, slug, and provider (fully-scoped natural key).
      *
      * @param organization the organization login (case-insensitive)
      * @param slug the team slug
@@ -76,7 +82,7 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     @EntityGraph(
         attributePaths = { "repoPermissions", "repoPermissions.repository", "memberships", "memberships.user" }
     )
-    List<Team> findWithCollectionsByOrganizationIgnoreCase(String organization);
+    List<Team> findWithCollectionsByOrganizationIgnoreCaseAndProviderId(String organization, Long providerId);
 
     /**
      * Fetch a single team by ID with collections eagerly loaded for DTO conversion.

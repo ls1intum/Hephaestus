@@ -40,10 +40,15 @@ public class GitHubTeamProcessor {
             return null;
         }
 
-        // First try natural key lookup (organization + name)
+        // First try natural key lookup (organization + name), scoped to this provider so a same-named
+        // team in a same-named org on another provider is never adopted and overwritten.
         Optional<Team> existingTeam = Optional.empty();
         if (orgLogin != null && dto.name() != null) {
-            existingTeam = teamRepository.findByOrganizationIgnoreCaseAndName(orgLogin, dto.name());
+            existingTeam = teamRepository.findByOrganizationIgnoreCaseAndNameAndProviderId(
+                orgLogin,
+                dto.name(),
+                context.providerId()
+            );
         }
 
         // Fall back to nativeId lookup if natural key not found (handles renames)
@@ -204,8 +209,13 @@ public class GitHubTeamProcessor {
     ) {
         String teamSlug = dto.slug() != null ? dto.slug() : dto.name();
 
-        // Find the team that has the conflicting slug
-        Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlug(orgLogin, teamSlug);
+        // Find the team that has the conflicting slug. Provider-scoped: the rename below is destructive,
+        // and only a team on this provider can actually contend for the slug.
+        Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlugAndProviderId(
+            orgLogin,
+            teamSlug,
+            context.providerId()
+        );
         if (conflicting.isEmpty()) {
             // Conflict resolved concurrently
             log.debug("Team slug conflict resolved concurrently: org={}, slug={}", orgLogin, teamSlug);

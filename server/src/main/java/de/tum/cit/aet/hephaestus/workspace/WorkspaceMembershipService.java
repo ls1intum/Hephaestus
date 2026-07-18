@@ -168,6 +168,19 @@ public class WorkspaceMembershipService {
     }
 
     /**
+     * Human members of the workspace, team memberships fetched — the roster used to pad zero-activity
+     * leaderboard entries. Scoped by {@code workspace_id}, not by the org-login string, so it cannot
+     * leak members between workspaces that share an {@code account_login}. Empty for a null id.
+     */
+    @Transactional(readOnly = true)
+    public List<User> getHumanMembersWithTeams(Long workspaceId) {
+        if (workspaceId == null) {
+            return List.of();
+        }
+        return workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspaceId);
+    }
+
+    /**
      * Additively ensures that every given user has a {@link WorkspaceMembership} in
      * the workspace, without touching existing members or roles.
      * <p>
