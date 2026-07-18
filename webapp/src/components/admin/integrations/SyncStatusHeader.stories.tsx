@@ -203,6 +203,62 @@ export const NoWebhookEventsYet: Story = {
 };
 
 /**
+ * No webhook is tracked for this connection at all — a GitLab project whose hook was never registered
+ * through us, a PAT-backed SCM connection, or Slack, whose events arrive through the app's own
+ * subscription. `webhookRegistered` is null (the DTO's "not applicable/unknown") and no event has ever
+ * been observed, so there is nothing measured to report.
+ *
+ * The row is dropped rather than rendered as "Webhook — No events yet", which is the same lie the
+ * gated rate-limit row already refuses to tell: an unobserved thing is not a broken thing. `false` is
+ * a different case and still shows (see WebhookNotRegistered) — that IS a measurement.
+ */
+export const WebhookNotTracked: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			kind: "GITLAB",
+			webhookRegistered: undefined,
+			lastEventProcessedAt: undefined,
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText(/^webhook$/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/no events yet/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/not registered/i)).not.toBeInTheDocument();
+		// The diagnostics row survives — the rate limit is still a real observation.
+		await expect(canvas.getByText(/rate limit/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * A connection that reports no webhook, no rate limit and no backfill — every diagnostic gated off.
+ * The whole row goes rather than leaving an empty, padded strip under the freshness sentence.
+ */
+export const NoDiagnosticsAtAll: Story = {
+	args: {
+		label: "Slack",
+		status: {
+			...baseStatus,
+			kind: "SLACK",
+			backfillSupported: false,
+			rateLimit: undefined,
+			webhookRegistered: undefined,
+			lastEventProcessedAt: undefined,
+		},
+		onBackfill: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvasElement.querySelector('[data-slot="item-group"]')).toBeNull();
+		await expect(canvas.queryByRole("listitem")).not.toBeInTheDocument();
+		// The headline and the trigger are untouched — only the qualifiers are gone.
+		await expect(canvas.getByText(/last synced/i)).toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: /sync now/i })).toBeInTheDocument();
+	},
+};
+
+/**
  * The rate limit is nearly spent — the only gauge reading that earns colour, because it is the only one
  * that predicts a failure.
  */
@@ -377,6 +433,11 @@ export const Cancelling: Story = {
  * Slack: the same component, minus the diagnostics whose payload it never sends. There is no rate
  * limit and no backfill, so those items are absent rather than dashed — an integration should not have
  * to render an empty field to prove it doesn't have one.
+ *
+ * Slack tracks no per-connection webhook registration (events arrive through the app's own event
+ * subscription), so `webhookRegistered` is null. Once an event has been processed the row is still
+ * worth showing — the timestamp is a real measurement — so it appears with the reading and no
+ * "Not registered" claim behind it.
  */
 export const Slack: Story = {
 	args: {
@@ -386,6 +447,7 @@ export const Slack: Story = {
 			kind: "SLACK",
 			backfillSupported: false,
 			rateLimit: undefined,
+			webhookRegistered: undefined,
 			resourceCounts: { total: 3, errored: 0, pending: 0, stale: 0 },
 		},
 		onBackfill: undefined,
@@ -393,7 +455,8 @@ export const Slack: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByText(/rate limit/i)).not.toBeInTheDocument();
-		await expect(canvas.getByText(/webhook/i)).toBeInTheDocument();
+		await expect(canvas.getByText(/^webhook$/i)).toBeInTheDocument();
+		await expect(canvas.queryByText(/not registered/i)).not.toBeInTheDocument();
 	},
 };
 

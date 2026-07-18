@@ -7,6 +7,10 @@ import { OutlineCollectionRow } from "./OutlineCollectionRow";
 /**
  * One mirrored Outline collection. A `<tr>` is only valid inside a table, so every story wraps the
  * row in a minimal `Table`. Pure — pause / resume / remove are delegated upward.
+ *
+ * This row is the management plane only: document counts and freshness live in the shared
+ * `SyncResourcesTable` the Outline page mounts above the collections card, so the same fact is never
+ * printed twice from two independently-polled queries in two different visual languages.
  */
 const meta = {
 	component: OutlineCollectionRow,
@@ -54,10 +58,11 @@ export const Mirroring: Story = {
 		await expect(canvas.getByText("Mirroring")).toBeInTheDocument();
 		await expect(canvas.getByText(/up to date/i)).toBeInTheDocument();
 		await expect(canvas.getByText("engineering-4nZ3x")).toBeInTheDocument();
-		// Last synced is the shared ticking RelativeTime, exposed as a real tooltip button (its absolute
-		// time is one hover away) rather than the frozen string helper the row printed before.
-		const lastSynced = canvas.getByRole("button", { name: /ago$/i });
-		await expect(lastSynced.tagName).toBe("BUTTON");
+		// The observability facts are NOT here — no freshness reading, no document count. They are the
+		// sync ledger's, which can tint them against the connection's cadence; this row cannot, and two
+		// untinted numbers beside a tinted pair would be the same fact told two incompatible ways.
+		await expect(canvas.queryByRole("button", { name: /ago$/i })).not.toBeInTheDocument();
+		await expect(canvas.queryByText("87")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for engineering/i }));
 		await expect(await screen.findByRole("menuitem", { name: /^pause$/i })).toBeInTheDocument();
@@ -99,9 +104,9 @@ export const Syncing: Story = {
 		await expect(canvas.getByText(/syncing…/i)).toBeInTheDocument();
 		// No urlId ⇒ no subtitle at all; the raw UUID is never printed at the admin.
 		await expect(canvas.queryByText(/col-decisions/)).not.toBeInTheDocument();
-		// Never synced — the empty timestamp is the screen-reader-visible "Never", not an aria-hidden
-		// em-dash that vanishes for assistive tech.
-		await expect(canvas.getByText("Never")).toBeInTheDocument();
+		// "Never synced" is the sync ledger's reading, not this row's — the row says the pass is still
+		// running, which is the management-relevant half of the same situation.
+		await expect(canvas.queryByText("Never")).not.toBeInTheDocument();
 	},
 };
 
@@ -126,7 +131,11 @@ export const SyncError: Story = {
 	},
 };
 
-/** The last pass hit the shared export budget — coverage plus a warning (not an error) detail. */
+/**
+ * The last pass hit the shared export budget. The skip is a property of that pass, so it sits with the
+ * pass's other outcome (the sync error) in the Sync cell rather than beside a coverage count this row
+ * no longer prints — the count itself is the ledger's to report.
+ */
 export const BudgetSkipped: Story = {
 	args: {
 		collection: {
@@ -143,8 +152,9 @@ export const BudgetSkipped: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("480")).toBeInTheDocument();
-		await expect(canvas.getByText(/\/ 512/)).toBeInTheDocument();
+		// The coverage pair moved to the ledger; the warning that qualifies it stayed with the pass.
+		await expect(canvas.queryByText("480")).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/\/ 512/)).not.toBeInTheDocument();
 
 		await userEvent.click(
 			canvas.getByRole("button", { name: /32 exports skipped for budget for research notes/i }),

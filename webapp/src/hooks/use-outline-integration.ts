@@ -6,6 +6,7 @@ import {
 	getOutlineTokenStatusOptions,
 	initiateMutation,
 	listConnectionSyncJobsQueryKey,
+	listConnectionSyncResourcesOptions,
 	listOptions,
 	listOutlineCollectionsOptions,
 	registerOutlineCollectionMutation,
@@ -16,6 +17,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { OutlineMirrorState } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
 import type { OutlineConnectInput } from "@/components/admin/integrations/outline/OutlineConnectCard";
+import type { SyncResourcesTableProps } from "@/components/admin/integrations/SyncResourcesTable";
 import type { SyncStatusHeaderProps } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
@@ -55,6 +57,21 @@ export function useOutlineIntegration(workspaceSlug: string) {
 			syncPollInterval(query.state.data?.activeJob != null, livePushUnavailable),
 	});
 
+	const resourcesQueryOptions = listConnectionSyncResourcesOptions({
+		path: { workspaceSlug, connectionId: connectionId ?? -1 },
+	});
+	const {
+		data: resources,
+		isLoading: isResourcesLoading,
+		isError: isResourcesError,
+		error: resourcesError,
+		refetch: refetchResources,
+	} = useQuery({
+		...resourcesQueryOptions,
+		enabled: hasConnection && connectionId != null,
+		refetchInterval: syncPollInterval(connectionStatus?.activeJob != null, livePushUnavailable),
+	});
+
 	const collectionsQueryOptions = listOutlineCollectionsOptions({ path: { workspaceSlug } });
 	const {
 		data: collections,
@@ -92,6 +109,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	const invalidateOutline = () => {
 		queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
 		queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
+		queryClient.invalidateQueries({ queryKey: resourcesQueryOptions.queryKey });
 		queryClient.invalidateQueries({ queryKey: tokenStatusQueryOptions.queryKey });
 		if (connectionId != null) {
 			queryClient.invalidateQueries({
@@ -279,6 +297,23 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		tokenStatusError,
 		retryTokenStatus: () => refetchTokenStatus(),
 		syncStatusHeaderProps,
+		// The per-collection observability ledger — the same shared table SCM and Slack mount, so all
+		// four integrations report freshness in one visual language. Deliberately NOT gated on ACTIVE:
+		// a suspended connection is exactly when an admin needs to see how far behind each collection
+		// got before sync stopped.
+		syncResourcesProps: {
+			resources: resources ?? [],
+			isLoading: isResourcesLoading,
+			isError: isResourcesError,
+			error: resourcesError,
+			onRetry: () => refetchResources(),
+			resourceNoun: "collection",
+			resourceNounPlural: "collections",
+			// Without the cadence the ledger prints every reading and judges none of them — the server
+			// sends it precisely so the client doesn't have to guess a schedule.
+			syncIntervalSeconds: connectionStatus?.syncIntervalSeconds,
+			expectedClassKeys: ["documents"],
+		} satisfies SyncResourcesTableProps,
 		connectCardProps: {
 			connected: hasConnection,
 			connectionState: outlineConnection?.state,

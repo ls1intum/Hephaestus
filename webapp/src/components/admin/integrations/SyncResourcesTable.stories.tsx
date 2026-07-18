@@ -497,8 +497,11 @@ export const RowHover: Story = {
 };
 
 /**
- * Slack channels mirror one class, so the ledger is a single Messages column with no dead columns. The
- * channel name and its id genuinely differ, so both lines show — the duplicate-line fix is SCM-only.
+ * The Slack admin page's ledger, exactly as that route now mounts it: one Messages column, no dead
+ * columns, and — the parity the page was missing entirely — a per-channel freshness reading judged
+ * against the connection's cadence. `#design` is nearly seven cadences behind, so it is tinted and
+ * floated above the fresh channel by the triage sort. The channel name and its id genuinely differ,
+ * so both lines show; the duplicate-line fix is SCM-only.
  */
 export const SlackChannels: Story = {
 	args: {
@@ -515,12 +518,24 @@ export const SlackChannels: Story = {
 		await expect(canvas.getByText("C0123ABCD")).toBeInTheDocument();
 		// Two channels, one class: the footer sums but the pipeline-break rule is disabled.
 		await expect(canvas.getByText("All channels")).toBeInTheDocument();
+
+		// The stale channel is row one and its reading is judged, not merely printed.
+		const firstRow = canvasElement.querySelector("tbody tr");
+		await expect(firstRow?.textContent).toContain("#design");
+		// The freshness cell specifically — not merely "something red somewhere in the row".
+		const freshnessCell = firstRow?.querySelectorAll("td")[1];
+		await expect(freshnessCell?.querySelector(".text-destructive")).not.toBeNull();
 	},
 };
 
 /**
- * Outline collections: one Documents column, an upstream reading in the hover, and the read-only error
- * peek on the collection whose token was revoked — the one integration that populates `lastError`.
+ * The Outline admin page's ledger, exactly as that route now mounts it: one Documents column, the
+ * upstream coverage reading in the hover, and the read-only error peek on the collection whose token
+ * was revoked — the one integration that populates `lastError`.
+ *
+ * This is the single home for a collection's document count and freshness. The management row in
+ * `OutlineCollectionRow` deliberately no longer prints either, so the two surfaces cannot disagree and
+ * the reading here is the only one — tinted, which the hand-rolled columns never were.
  */
 export const OutlineCollections: Story = {
 	args: {
@@ -534,6 +549,16 @@ export const OutlineCollections: Story = {
 		await expect(canvas.getByRole("columnheader", { name: "Documents" })).toBeInTheDocument();
 		await expect(canvas.getByText("Engineering Handbook")).toBeInTheDocument();
 		await expect(canvas.getByText("col_handbook")).toBeInTheDocument();
+
+		// The nine-day-stale collection is triaged to row one and its reading is tinted.
+		const firstRow = canvasElement.querySelector("tbody tr");
+		await expect(firstRow?.textContent).toContain("Archived Notes");
+		const freshnessCell = firstRow?.querySelectorAll("td")[1];
+		await expect(freshnessCell?.querySelector(".text-destructive")).not.toBeNull();
+
+		// The upstream denominator lives one hover away rather than as a second untinted column.
+		await userEvent.hover(canvas.getByText("Engineering Handbook"));
+		await expect(await screen.findByText("350 items")).toBeInTheDocument();
 
 		await userEvent.hover(canvas.getByRole("button", { name: /error for archived notes/i }));
 		await expect(await screen.findByText(/api token was revoked/i)).toBeInTheDocument();

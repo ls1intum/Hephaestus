@@ -11,6 +11,7 @@ import { server } from "@/mocks/server";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "./outline/OutlineConnectCard";
+import { SyncResourcesTable } from "./SyncResourcesTable";
 import { SyncStatusHeader } from "./SyncStatusHeader";
 
 vi.mock("sonner", () => ({
@@ -90,6 +91,31 @@ const engineering = {
 	createdAt: "2026-06-01T00:00:00Z",
 };
 
+/**
+ * The same collection as the sync API reports it: one Documents class with its own watermark. This is
+ * now the ONLY place the document count and the freshness reading are rendered — the management row
+ * deliberately prints neither, so the two surfaces cannot show different numbers for one fact.
+ */
+const engineeringResource = [
+	{
+		id: 1,
+		externalId: "col-eng",
+		name: "Engineering",
+		type: "COLLECTION",
+		state: "COMPLETE",
+		lastSyncedAt: "2026-07-01T00:00:00Z",
+		itemCount: 12,
+		counts: [
+			{
+				key: "documents",
+				label: "Documents",
+				count: 12,
+				lastSyncedAt: "2026-07-01T00:00:00Z",
+			},
+		],
+	},
+];
+
 const healthyStatus = {
 	connectionId: 7,
 	connectionState: "ACTIVE",
@@ -123,6 +149,9 @@ function useConnectedHandlers(collectionsRef: { current: unknown[] }) {
 		http.get("*/workspaces/demo/connections/outline/token", () => HttpResponse.json(healthyToken)),
 		http.get("*/workspaces/demo/outline/collections", () =>
 			HttpResponse.json(collectionsRef.current),
+		),
+		http.get("*/workspaces/demo/connections/7/sync/resources", () =>
+			HttpResponse.json(engineeringResource),
 		),
 	);
 }
@@ -488,6 +517,48 @@ describe("Outline integration — Outline not enabled on this instance", () => {
 		// The raw ProblemDetail is still shown; the hint is derived from it and added below.
 		expect(await screen.findByText(/outline may not be enabled on this instance/i)).toBeTruthy();
 		expect(screen.getByText(/no connectionstrategy registered for kind=outline/i)).toBeTruthy();
+	});
+});
+
+describe("Outline integration — per-collection sync ledger", () => {
+	/**
+	 * The route's observability half: the shared `SyncResourcesTable` beside the management card, both
+	 * driven by the one hook. Rendered on its own here because the two surfaces name the same
+	 * collection, which is exactly the point — the count and the freshness are printed once, by this
+	 * one, so they cannot disagree.
+	 */
+	function LedgerContainer() {
+		const outline = useOutlineIntegration("demo");
+		return outline.hasConnection ? <SyncResourcesTable {...outline.syncResourcesProps} /> : null;
+	}
+
+	function renderLedger() {
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+		});
+		return render(
+			<QueryClientProvider client={queryClient}>
+				<SyncLivenessProvider livePushUnavailable={false}>
+					<LedgerContainer />
+				</SyncLivenessProvider>
+			</QueryClientProvider>,
+		);
+	}
+
+	it("mounts the shared ledger for the Outline connection with its Documents column and freshness", async () => {
+		const collectionsRef = { current: [engineering] as unknown[] };
+		useConnectedHandlers(collectionsRef);
+
+		renderLedger();
+
+		// The class column is Outline's own, and the count comes from the sync API — not from the
+		// collections list the management card reads.
+		expect(await screen.findByRole("columnheader", { name: "Documents" })).toBeTruthy();
+		expect(screen.queryByRole("columnheader", { name: "Issues" })).toBeNull();
+		expect(await screen.findByText("Engineering")).toBeTruthy();
+		expect(screen.getByText("12")).toBeTruthy();
+		// The freshness column exists here and nowhere else on the page.
+		expect(screen.getByRole("columnheader", { name: "Last synced" })).toBeTruthy();
 	});
 });
 

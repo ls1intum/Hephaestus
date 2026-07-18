@@ -76,7 +76,12 @@ export const Empty: Story = {
 	},
 };
 
-/** Mixed list — an up-to-date collection and one still on its first sync pass. */
+/**
+ * Mixed list — an up-to-date collection and one still on its first sync pass.
+ *
+ * The table is management-only: no Documents column and no Last-synced column, because those are the
+ * shared sync ledger's above this card, where they can be judged against the connection's cadence.
+ */
 export const Populated: Story = {
 	args: { collections: [engineering, decisions] },
 	play: async ({ canvasElement }) => {
@@ -84,7 +89,14 @@ export const Populated: Story = {
 		await expect(canvas.getByText("Engineering")).toBeInTheDocument();
 		await expect(canvas.getByText(/up to date/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/syncing…/i)).toBeInTheDocument();
-		await expect(canvas.getByText("87")).toBeInTheDocument();
+
+		await expect(
+			canvas.queryByRole("columnheader", { name: /documents/i }),
+		).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByRole("columnheader", { name: /last synced/i }),
+		).not.toBeInTheDocument();
+		await expect(canvas.queryByText("87")).not.toBeInTheDocument();
 	},
 };
 

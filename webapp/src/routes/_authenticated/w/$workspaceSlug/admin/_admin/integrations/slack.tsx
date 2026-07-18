@@ -9,6 +9,8 @@ import {
 	getWorkspaceOptions,
 	listConnectionSyncJobsOptions,
 	listConnectionSyncJobsQueryKey,
+	listConnectionSyncResourcesOptions,
+	listConnectionSyncResourcesQueryKey,
 	listSlackChannelCandidatesOptions,
 	listSlackChannelConsentEventsQueryKey,
 	listSlackChannelsOptions,
@@ -21,12 +23,15 @@ import type { SlackConsentState } from "@/components/admin/integrations/AdminSla
 import { AdminSlackChannelsSettings } from "@/components/admin/integrations/AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
+import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { IntegrationPageHeader } from "@/components/admin/integrations/IntegrationPageHeader";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
+import { SyncResourcesTable } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SlackIcon } from "@/components/icons/brand";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
@@ -77,6 +82,20 @@ function SlackIntegrationPage() {
 	const status = statusQuery.data;
 	const hasActiveJob = status?.activeJob != null;
 
+	const {
+		data: resources,
+		isLoading: isResourcesLoading,
+		isError: isResourcesError,
+		error: resourcesError,
+		refetch: refetchResources,
+	} = useQuery({
+		...listConnectionSyncResourcesOptions({
+			path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
+		}),
+		enabled: Boolean(workspaceSlug) && connectionId != null,
+		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
+	});
+
 	const jobsQueryOptions = listConnectionSyncJobsOptions({
 		path: { workspaceSlug: slug, connectionId: connectionId ?? -1 },
 		query: { page: jobsPage, size: JOBS_PAGE_SIZE },
@@ -124,6 +143,15 @@ function SlackIntegrationPage() {
 	const invalidateSlackChannels = () => {
 		queryClient.invalidateQueries({ queryKey: slackChannelsQueryOptions.queryKey });
 		queryClient.invalidateQueries({ queryKey: slackChannelCandidatesQueryOptions.queryKey });
+		// Adding or revoking a channel changes what this connection syncs, so the per-channel ledger
+		// below is stale the moment the mutation lands — refresh it here rather than waiting a poll.
+		if (connectionId != null) {
+			queryClient.invalidateQueries({
+				queryKey: listConnectionSyncResourcesQueryKey({
+					path: { workspaceSlug: slug, connectionId },
+				}),
+			});
+		}
 	};
 
 	const registerSlackChannel = useMutation({
@@ -268,6 +296,32 @@ function SlackIntegrationPage() {
 						});
 					}}
 				/>
+			)}
+
+			{/* The per-channel ledger: how many messages each monitored channel mirrors and how fresh it
+			    is, tinted against the connection's own cadence. The consent/management card below stays
+			    the place to add or revoke a channel — this one only reports. */}
+			{hasConnection && (
+				<Card>
+					<CardHeader>
+						<IntegrationCardHeading>Channel sync state</IntegrationCardHeading>
+					</CardHeader>
+					<CardContent>
+						<SyncResourcesTable
+							resources={resources ?? []}
+							isLoading={isResourcesLoading}
+							isError={isResourcesError}
+							error={resourcesError}
+							onRetry={() => refetchResources()}
+							resourceNoun="channel"
+							resourceNounPlural="channels"
+							// Without the cadence the ledger prints every reading and judges none of them —
+							// the server sends it precisely so the client doesn't have to guess a schedule.
+							syncIntervalSeconds={status?.syncIntervalSeconds}
+							expectedClassKeys={["messages"]}
+						/>
+					</CardContent>
+				</Card>
 			)}
 
 			{workspaceSlug != null && !routeLoading && !routeError && (

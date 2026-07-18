@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { RelativeTime } from "../RelativeTime";
 
 /** The mirror lifecycle states, sourced from the generated DTO so they never drift. */
 export type OutlineMirrorState = OutlineCollection["state"];
@@ -42,13 +41,20 @@ export interface OutlineCollectionRowProps {
 }
 
 /**
- * One mirrored Outline collection: name with its Outline color/icon, mirror-state badge,
- * sync progress, document count, last clean sync and a state-gated row action menu.
- * Pure — every transition is delegated upward.
+ * One mirrored Outline collection: name with its Outline color/icon, mirror-state badge, the last
+ * pass's outcome, and a state-gated row action menu. Pure — every transition is delegated upward.
+ *
+ * <p>This row is the <em>management</em> plane and nothing else. The document count and the freshness
+ * reading deliberately do NOT live here: they are the observability plane, owned by the shared
+ * `SyncResourcesTable` the Outline page mounts above this card — the same table SCM and Slack mount,
+ * so all four integrations report freshness in one visual language, tinted against the connection's
+ * cadence. Printing them twice from two independently-polled queries would let the same fact disagree
+ * with itself on screen (`collections.list` vs `sync/resources` refresh on different cadences) and
+ * would say it in two different languages, one of them unable to call a reading stale at all.
  *
  * <p>The sync error and the budget-skip detail hang off a {@link Popover}, not a tooltip: a tooltip
  * never opens on touch, and the sync error is the one string an admin has to be able to read, select
- * and copy.
+ * and copy. Both are properties of the last pass rather than of a count, so both sit in the Sync cell.
  */
 export function OutlineCollectionRow({
 	collection,
@@ -124,21 +130,11 @@ export function OutlineCollectionRow({
 							</PopoverContent>
 						</Popover>
 					)}
-				</div>
-			</TableCell>
-
-			<TableCell className="text-right tabular-nums">
-				<div className="flex items-center justify-end gap-1.5">
-					<span>
-						{collection.documentCount}
-						{typeof collection.documentsUpstream === "number" && (
-							<span className="text-muted-foreground"> / {collection.documentsUpstream}</span>
-						)}
-					</span>
 					{!!collection.exportsSkippedForBudget && (
 						<Popover>
-							{/* Warning, not destructive — this is expected budget throttling, not an error; the
-							next reconcile catches these up. */}
+							{/* A property of the last pass, so it sits with the pass's other outcome (the sync
+							error) rather than beside a count. Warning, not destructive — this is expected budget
+							throttling, and the next reconcile catches these up. */}
 							<PopoverTrigger
 								render={
 									<Button
@@ -162,10 +158,6 @@ export function OutlineCollectionRow({
 						</Popover>
 					)}
 				</div>
-			</TableCell>
-
-			<TableCell className="text-muted-foreground text-sm">
-				<RelativeTime value={collection.lastSyncedAt} fallback="Never" />
 			</TableCell>
 
 			<TableCell className="text-right">

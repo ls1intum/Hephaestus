@@ -118,21 +118,32 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 	// as loose and inconsistent. A thin rule between items gives that space a job — the diagnostics now
 	// scan as one grouped row rather than three scattered ones — and a modest, uniform gap keeps the
 	// rhythm calm. The rule is decorative, so it stays out of the assistive-tech list.
-	const diagnostics: ReactElement[] = [
-		<DiagnosticItem
-			key="webhook"
-			icon={status.webhookRegistered === false ? <ZapOffIcon /> : <WebhookIcon />}
-			label="Webhook"
-		>
-			{status.webhookRegistered === false ? (
-				<span className="text-muted-foreground">Not registered</span>
-			) : status.lastEventProcessedAt ? (
-				<RelativeTime value={status.lastEventProcessedAt} />
-			) : (
-				<span className="text-muted-foreground">No events yet</span>
-			)}
-		</DiagnosticItem>,
-	];
+	const diagnostics: ReactElement[] = [];
+
+	// Gated like the rate limit below, and for the same reason: a diagnostic is only honest when
+	// something was actually observed. `webhookRegistered` is nullable and null means "this connection
+	// tracks no registration" — Slack's events arrive through the app's own subscription, a PAT-backed
+	// SCM connection registers nothing — so `null` with no event ever seen is not a fault, it is silence.
+	// Rendering "Webhook — No events yet" there accuses a connection of a gap it was never watched for.
+	// A `false` registration IS a measured fact ("we should have one and don't"), so it still shows.
+	const tracksWebhook = status.webhookRegistered != null || status.lastEventProcessedAt != null;
+	if (tracksWebhook) {
+		diagnostics.push(
+			<DiagnosticItem
+				key="webhook"
+				icon={status.webhookRegistered === false ? <ZapOffIcon /> : <WebhookIcon />}
+				label="Webhook"
+			>
+				{status.webhookRegistered === false ? (
+					<span className="text-muted-foreground">Not registered</span>
+				) : status.lastEventProcessedAt ? (
+					<RelativeTime value={status.lastEventProcessedAt} />
+				) : (
+					<span className="text-muted-foreground">No events yet</span>
+				)}
+			</DiagnosticItem>,
+		);
+	}
 
 	// A snapshot exists only when the vendor was observed, but an observed snapshot can still carry
 	// nothing renderable (a lapsed throttle with no known ceiling), so the row is gated on the reading
@@ -158,6 +169,11 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 			</DiagnosticItem>,
 		);
 	}
+
+	// Every row is now gated on a real observation, so a connection that reports none (a fresh Slack
+	// workspace before its first event) has nothing to qualify — render no empty row rather than an
+	// invisible flex box the surrounding `space-y-4` would still pad around.
+	if (diagnostics.length === 0) return null;
 
 	return (
 		<ItemGroup className="flex-row flex-wrap items-center gap-x-4 gap-y-2">

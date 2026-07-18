@@ -30,8 +30,6 @@ function CollectionsTableHeader() {
 				<TableHead>Collection</TableHead>
 				<TableHead>State</TableHead>
 				<TableHead>Sync</TableHead>
-				<TableHead className="text-right">Documents</TableHead>
-				<TableHead>Last synced</TableHead>
 				<TableHead className="w-0 text-right">
 					<span className="sr-only">Actions</span>
 				</TableHead>
@@ -62,9 +60,13 @@ export interface OutlineCollectionsSectionProps {
 }
 
 /**
- * Admin surface for the mirrored-collections plane: which Outline collections are mirrored,
- * their sync health, and their lifecycle (add → pause ⇄ resume → remove + erase). Rendered only
- * while an Outline connection is active. Pure: all data + mutations live in the container.
+ * Admin surface for the mirrored-collections plane: which Outline collections are mirrored, the
+ * outcome of their last pass, and their lifecycle (add → pause ⇄ resume → remove + erase). Rendered
+ * only while an Outline connection is active. Pure: all data + mutations live in the container.
+ *
+ * <p>Management only. Per-collection document counts and freshness belong to the shared
+ * `SyncResourcesTable` the Outline page mounts above this card — see {@link OutlineCollectionRow}
+ * for why they are not duplicated here.
  */
 export function OutlineCollectionsSection({
 	workspaceSlug,
@@ -103,10 +105,7 @@ export function OutlineCollectionsSection({
 					{isLoading ? (
 						<Table>
 							<CollectionsTableHeader />
-							<TableRowsSkeleton
-								columns={["w-36", "w-16", "w-14", "w-12", "w-24", null]}
-								rows={3}
-							/>
+							<TableRowsSkeleton columns={["w-36", "w-16", "w-20", null]} rows={3} />
 						</Table>
 					) : error ? (
 						<QueryErrorAlert
