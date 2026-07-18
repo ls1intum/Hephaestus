@@ -25,7 +25,14 @@ jobs:
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
       any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.agent-images == 'true' }}
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      # The changesets Version PR only edits package.json, CHANGELOG.md and
+      # deletes .changeset/*.md — nothing that can break a build, yet it touches
+      # package.json and so would otherwise trigger the full matrix (including
+      # Docker builds) on every merge to main. Skip the heavy legs; the "CI
+      # Status Gate" still reports "All CI Passed" (skipped != failure), which
+      # the branch ruleset requires, and main runs the full suite after the
+      # Version PR merges — before release.yml cuts anything.
+      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' || github.head_ref == 'changeset-release/main' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
