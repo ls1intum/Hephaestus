@@ -30,7 +30,11 @@ Liquibase manages schema changes in the application server. Follow this workflow
    pnpm run db:generate-erd-docs
    ```
 
-7. Commit the migration, the `master.xml` edit, and the documentation
+7. Add a **release changeset** (`pnpm changeset`) — the Liquibase `<changeSet>` and the release
+   changeset are different things, and a schema change needs both. Keep the summary user-facing; the
+   release notes flag the migration automatically. See the
+   [release management guide](./release-management.mdx).
+8. Commit the migration, the `master.xml` edit, the changeset, and the documentation
    (`docs/contributor/erd/schema.mmd`).
 
 :::danger Always validate

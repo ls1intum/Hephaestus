@@ -43,47 +43,33 @@ We use automated semantic pull request validation to ensure consistent and meani
 <type>[optional scope]: <description>
 ```
 
-### Release Behavior (Important)
+### Releases and Changesets (Important)
 
-We use **Semantic Release** to automatically version and release our application based on commit messages.
+**Release ≠ deploy.** Every PR that changes shipped code (anything under `server/`, `webapp/`, or `docker/` except tests and in-tree docs) must carry a
+**changeset** — an operator-facing description of the change plus its version bump. CI enforces this
+(`verify-changesets`); commit types and scopes never affect versioning.
 
-**❌ Will NOT Trigger Release** (Scope Overrides):
+```bash
+pnpm changeset          # user-facing change: pick the bump, describe it
+pnpm changeset --empty  # no user-facing effect — then write why in the file body
+```
 
-| Pattern          | Example                               | Why                                  |
-| ---------------- | ------------------------------------- | ------------------------------------ |
-| `*(ci):`         | `fix(ci): update workflow`            | CI/GitHub Actions only               |
-| `*(config):`     | `chore(config): update renovate.json` | **TOOLING only** (see warning below) |
-| `*(deps-dev):`   | `chore(deps-dev): update test lib`    | Dev dependencies only                |
-| `*(scripts):`    | `fix(scripts): fix build script`      | Build/dev scripts only               |
-| `*(no-release):` | `feat(no-release): internal feature`  | Explicit opt-out                     |
+> ⚠️ **Pre-1.0:** never pick a `major` bump — on `0.x` it cuts 1.0.0 (CI rejects it). Use `minor` for
+> breaking changes until the [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378).
 
-> ⚠️ **`config` scope warning:** Only use for tooling config files like `.prettierrc`, `renovate.json`, `eslint.config.js`. Do NOT use for:
->
-> - Runtime config (`application.yml`) → use `server`
-> - Dockerfiles → use service scope (`webapp`, `server`, etc.)
-> - Production compose files → use `docker`
-
-**✅ WILL Trigger Release**:
-
-| Type      | Version   | Example                          |
-| --------- | --------- | -------------------------------- |
-| `feat:`   | **Minor** | `feat(webapp): add dark mode`    |
-| `fix:`    | **Patch** | `fix(api): handle null response` |
-| `perf:`   | **Patch** | `perf: optimize query`           |
-| `revert:` | **Patch** | `revert: undo change`            |
-| `!:`      | **Major** | `feat!: new api structure`       |
-
-**❌ Will NOT Trigger Release** (Type-Based):
-`docs:`, `style:`, `refactor:`, `test:`, `build:`, `chore:`, `ci:`
+Changesets accumulate into a **Version PR**; merging it cuts the release. How releases are cut, how to
+write good changesets, and what a version number promises all live in the
+[release management guide](https://ls1intum.github.io/Hephaestus/contributor/release-management) and the
+[compatibility policy](https://ls1intum.github.io/Hephaestus/admin/compatibility-policy).
 
 ### Allowed Types
 
-- `fix`: A bug fix (triggers patch release)
-- `feat`: A new feature (triggers minor release)
+- `fix`: A bug fix
+- `feat`: A new feature
 - `docs`: Documentation only changes
 - `style`: Changes that do not affect the meaning of the code
 - `refactor`: A code change that neither fixes a bug nor adds a feature
-- `perf`: A code change that improves performance (triggers patch release)
+- `perf`: A code change that improves performance
 - `test`: Adding missing tests or correcting existing tests
 - `build`: Changes that affect the build system or external dependencies
 - `ci`: Changes to our CI configuration files and scripts
@@ -95,27 +81,32 @@ We use **Semantic Release** to automatically version and release our application
 **Service scopes** (where the code lives):
 
 - `webapp`: React frontend
-- `server`: Java application server (includes the in-process Pi mentor agent)
-- `webhooks`: Webhook ingestion service
+- `server`: Java application server (includes the in-process Pi mentor agent and the webhook receiver)
 - `docs`: Documentation
 
-**Infrastructure scopes that WILL trigger releases** (affect runtime):
+**Infrastructure scopes** (affect runtime):
 
 - `deps`: Production dependencies (security patches, bug fixes)
 - `security`: Security fixes are critical
 - `db`: Database migrations affect runtime
+- `docker`: Dockerfiles, production compose files
 
-**Infrastructure scopes that will NOT trigger releases**:
+**Infrastructure scopes** (tooling and process):
 
 - `ci`: CI/CD workflows
 - `config`: Tooling configuration (renovate, eslint, tsconfig, etc.)
 - `deps-dev`: Dev dependencies only
-- `docker`: Container dev configuration
 - `scripts`: Helper scripts
-- `no-release`: Explicit release prevention
+- `release`: Release engineering (also used by the automated Version PR)
+
+> ⚠️ **`config` scope warning:** Only use for tooling config files like `.prettierrc`, `renovate.json`, `eslint.config.js`. Do NOT use for:
+> - Runtime config (`application.yml`) → use `server`
+> - Dockerfiles → use service scope (`webapp`, `server`, etc.)
+> - Production compose files → use `docker`
 
 **Feature scopes** (domain-specific):
 
+- `auth`: Authentication / identity (Account, IdentityLink, JWT, oauth2Login)
 - `integration`: Cross-cutting integration framework (webhook, oauth, registry, SPI)
 - `scm`: Source-control management (GitHub, GitLab) — formerly `gitprovider`
 - `leaderboard`: Leaderboard and rankings
@@ -134,11 +125,11 @@ We use **Semantic Release** to automatically version and release our application
 - `feat(mentor): add conversation history`
 - `feat(server): add user profile endpoint`
 - `docs: update installation instructions`
-- `refactor(ai): improve code analysis performance`
-- `fix(deps): update vulnerable dependency` (triggers patch release)
-- `fix(security): patch authentication bypass` (triggers patch release)
-- `fix(db): add missing index for performance` (triggers patch release)
-- `chore(deps-dev): update test dependencies` (no release)
+- `refactor(mentor): improve code analysis performance`
+- `fix(deps): update vulnerable dependency`
+- `fix(security): patch authentication bypass`
+- `fix(db): add missing index for performance`
+- `chore(deps-dev): update test dependencies`
 
 **Draft Pull Requests:**
 

@@ -1,0 +1,52 @@
+name: Version PR
+
+# Maintains the accumulating "Version PR" (changesets). On every push to main
+# it folds pending .changeset/*.md files into a PR that bumps the root
+# `hephaestus` package version and rewrites CHANGELOG.md. Merging that PR is
+# the deliberate act that cuts a release — release.yml takes over from there.
+#
+# This workflow only ever opens/updates the PR; it never tags or deploys.
+# Contributor guide: docs/contributor/release-management.mdx
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: version-pr
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  version-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          # PAT (not GITHUB_TOKEN) so the Version PR's own checks run and, once
+          # merged, its CI/CD run can trigger release.yml.
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup pnpm + Node.js
+        uses: ./.github/actions/setup-pnpm-node
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Maintain Version PR
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        with:
+          version: pnpm changeset version
+          # No `publish:` — tagging, GitHub Release, and deploys are release.yml's
+          # job (it uses `v`-prefixed tags to stay consistent with existing tags,
+          # docker IMAGE_TAG, and the release-pin asset; `changeset tag` would emit
+          # `hephaestus@X.Y.Z` instead).
+          title: "chore(release): version packages"
+          commit: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}

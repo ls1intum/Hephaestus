@@ -42,7 +42,7 @@ jobs:
         ${{ github.ref_name }}
         ${{ github.sha }}
         ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Webapp
         org.opencontainers.image.description=Web client for Hephaestus
@@ -67,7 +67,7 @@ jobs:
         ${{ github.ref_name }}
         ${{ github.sha }}
         ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Application Server
         org.opencontainers.image.description=Spring Boot server for Hephaestus
@@ -95,7 +95,7 @@ jobs:
         ${{ github.ref_name }}
         ${{ github.sha }}
         ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Agent - Pi
         org.opencontainers.image.description=Sandboxed Pi coding agent for AI-powered code review
@@ -118,7 +118,7 @@ jobs:
         ${{ github.ref_name }}
         ${{ github.sha }}
         ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Release Pin Fetcher
         org.opencontainers.image.description=Init container that downloads + cosign-verifies the signed release pin asset
@@ -141,7 +141,7 @@ jobs:
         ${{ github.ref_name }}
         ${{ github.sha }}
         ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |
         org.opencontainers.image.title=Hephaestus Postgres
         org.opencontainers.image.description=PostgreSQL + pg_partman for all environments (dev/preview/prod)
