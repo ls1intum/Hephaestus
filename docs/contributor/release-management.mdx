@@ -55,10 +55,10 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
 - **One changeset per user-visible change** — a PR that ships two unrelated visible changes ships two
   changeset files. Unsure whether it's visible? Add one; a reviewer can delete a superfluous note, but a
   missing one is invisible.
-- **Migrations are first-class:** if the PR adds a Liquibase changelog, write
-  `Includes an automatic database migration.` and bump at least `minor`. The release notes additionally
-  get an automatic "back up before upgrading" banner whenever a release touches
-  `server/src/main/resources/db/changelog/`.
+- **Don't mention automatic migrations** — the release notes get an automatic "back up before
+  upgrading" banner whenever a release touches `server/src/main/resources/db/changelog/`, so the
+  changeset stays user-facing. Only a migration that requires operator action belongs in the summary
+  (`**Operators:** …` + [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)).
 - **Bump = the operator's upgrade cost**, not code semantics:
   - `patch` — upgrade needs no action (bug fix, internal change, additive auto-applied migration).
   - `minor` — new capability, still zero-action; note any new *optional* env var / flag in the summary.

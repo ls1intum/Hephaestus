@@ -309,6 +309,13 @@ jobs:
     needs: [release, tag-images]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-staging.yml
+    # The called org workflow (ls1intum/.github deploy-docker-compose.yml@main)
+    # requires these. With the top-level `permissions: {}`, omitting them makes
+    # workflow COMPILATION fail ("requesting 'contents: read' but only allowed
+    # 'none'") — a startup_failure that killed every release since June 2026.
+    permissions:
+      contents: read
+      packages: read
     with:
       image-tag: ${{ needs.release.outputs.version }}
       deploy-app: true

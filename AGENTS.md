@@ -138,7 +138,7 @@ Before opening a PR, run `pnpm run format && pnpm run check`. The PR template (`
 
 - **Title**: Follow Conventional Commits—see `CONTRIBUTING.md` for types/scopes.
 - **Generated files**: Regenerate and commit OpenAPI specs, clients, and ERD docs when APIs or entities change.
-- **Database changes**: Run `pnpm run db:draft-changelog`, prune to minimal deltas, and ship a **release changeset** that mentions the migration (see below).
+- **Database changes**: Run `pnpm run db:draft-changelog`, prune to minimal deltas, and ship a **release changeset** (see below).
 - **Changeset**: Every PR that changes shipped code ships one (see below).
 
 ### Changesets (release notes)
@@ -155,7 +155,7 @@ These are **release changesets** — `.changeset/*.md` files that become `CHANGE
   - `minor` — new capability, still zero-action; call out any new *optional* env var / feature flag in the summary.
   - `major` — the operator must act before/at upgrade (required new env var, removed/renamed config, destructive or manual migration, dropped API). State the action and update `MIGRATION.md`.
   - **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and `verify-changesets` rejects it. Breaking changes ride in `minor` instead, so a pre-1.0 `minor` is *not* guaranteed zero-action: if the operator must act, say so in the summary (`**Operators:** …`) and update `MIGRATION.md` exactly as a `major` would.
-- **Schema migrations are first-class.** If the PR adds a Liquibase changelog under `server/src/main/resources/db/changelog/`, the changeset MUST say so (e.g. `Includes an automatic database migration.`) and be at least `minor`. Touching `db/changelog/` without touching `.changeset/` is always wrong.
+- **Schema migrations:** the release notes flag them automatically (the release workflow diffs `db/changelog/`), so the changeset does NOT mention an automatic migration — keep it user-facing. Only when the operator must act does the changeset say so (`**Operators:** …` + `MIGRATION.md`). Touching `db/changelog/` without touching `.changeset/` is always wrong.
 
 ## 11. Known command caveats
 

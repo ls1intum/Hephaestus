@@ -53,7 +53,7 @@ jobs:
           changesets_added=$(git diff --diff-filter=A --name-only "$BASE_SHA"...HEAD -- '.changeset/*.md' | grep -v 'README\.md' || true)
 
           if git diff --name-only "$BASE_SHA"...HEAD -- server/src/main/resources/db/changelog/ | grep -q .; then
-            echo "::notice::This PR contains Liquibase changesets — note the schema migration in your changeset. See the release management guide."
+            echo "::notice::This PR contains Liquibase changesets — the release notes will flag the migration automatically. If the operator must act, say so in your changeset and update MIGRATION.md."
           fi
 
           # Pre-1.0 guard: a `major` changeset on 0.x would cut 1.0.0. The 1.0
@@ -107,8 +107,7 @@ jobs:
             pnpm changeset --empty  # no user-facing effect — then write why in the file body
             ```
 
-            Write the summary in the operator/user's voice (it becomes the changelog verbatim). If the PR
-            adds a Liquibase migration, say `Includes an automatic database migration.` and bump ≥ minor.
+            Write the summary in the operator/user's voice — it becomes the changelog verbatim.
 
             > 📖 See the [release management guide](https://ls1intum.github.io/Hephaestus/contributor/release-management).
 

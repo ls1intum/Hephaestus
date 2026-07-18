@@ -39,7 +39,7 @@ Fixes # <!-- Link issue if applicable, or delete this line -->
 <!-- Only what CI can't check for you. Changeset presence is enforced by `verify-changesets`. -->
 
 - [ ] My changeset summary reads as an operator/user-facing note (it becomes the changelog entry) — see `.changeset/README.md`
-- [ ] Liquibase migration → the changeset says so and bumps ≥ minor; if the operator must act, the summary says how and `MIGRATION.md` is updated
+- [ ] If the operator must act on this change (new required env var, manual migration step), the changeset summary says how (`**Operators:** …`) and `MIGRATION.md` is updated
 
 ## Screenshots
 

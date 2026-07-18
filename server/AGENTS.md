@@ -277,7 +277,7 @@ public class SyncService {
 
 Migrations live in `src/main/resources/db/changelog/`.
 
-> **Two unrelated things are called "changeset" here.** This section is about Liquibase `<changeSet>`s (schema deltas). A schema change *also* needs a **release changeset** (`.changeset/*.md`) that mentions the migration and bumps ≥ `minor` — see root `AGENTS.md` §10. Touching `db/changelog/` without touching `.changeset/` is always wrong.
+> **Two unrelated things are called "changeset" here.** This section is about Liquibase `<changeSet>`s (schema deltas). A schema change *also* needs a **release changeset** (`.changeset/*.md`, user-facing summary — the release notes flag the migration automatically) — see root `AGENTS.md` §10. Touching `db/changelog/` without touching `.changeset/` is always wrong.
 
 ### Adding Schema Changes
 
@@ -286,7 +286,7 @@ Migrations live in `src/main/resources/db/changelog/`.
 3. Review and prune the generated changelog to minimal deltas
 4. Rename to `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp, no descriptive suffix (root `AGENTS.md` §5)
 5. Run `pnpm run db:generate-erd-docs` to update ERD
-6. Add a release changeset (`pnpm changeset`, ≥ `minor`) noting the migration
+6. Add a release changeset (`pnpm changeset`) with a user-facing summary
 
 ### Changelog Format
 

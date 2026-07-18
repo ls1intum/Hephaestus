@@ -36,7 +36,7 @@ Example (a migration-bearing fix):
 "hephaestus": minor
 ---
 
-Fixes duplicate leaderboard entries after a team rename. Includes an automatic database migration.
+Fixes duplicate leaderboard entries after a team rename.
 ```
 
 Full flow and rules: [release management guide](https://ls1intum.github.io/Hephaestus/contributor/release-management).

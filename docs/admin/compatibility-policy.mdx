@@ -31,8 +31,11 @@ chain), undocumented endpoints, UI layout — may change in any release without 
 | Bump | Meaning |
 | --- | --- |
 | **Major** (`X`.y.z) | You must act before or during the upgrade — a required new config key, a removed or renamed one, a manual or destructive migration, or a dropped API. The release notes say what to do; [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md) has the details. |
-| **Minor** (x.`Y`.z) | New functionality; upgrade needs no action. May include migrations that run automatically and new *optional* config keys. |
+| **Minor** (x.`Y`.z) | New functionality; upgrade needs no action. May include new *optional* config keys. |
 | **Patch** (x.y.`Z`) | Bug and security fixes; upgrade needs no action. |
+
+Any release may include database migrations that run automatically on startup — the release notes flag
+them with a "back up before upgrading" banner.
 
 :::caution Pre-1.0
 While the version is below 1.0.0 the **Minor** row above does not hold: there are no major releases yet, so
