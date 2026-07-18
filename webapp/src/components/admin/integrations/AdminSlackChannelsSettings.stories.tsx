@@ -159,6 +159,9 @@ export const NotConnected: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.queryByRole("button", { name: /add channel/i })).not.toBeInTheDocument();
 		await expect(canvas.getByText(/connect slack to monitor channels/i)).toBeInTheDocument();
+		// The passed-in channel must not render while disconnected: the inert section shows only the
+		// discovery copy, never a monitored-channel row the admin cannot act on.
+		await expect(canvas.queryByText("team-intro")).not.toBeInTheDocument();
 	},
 };
 

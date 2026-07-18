@@ -5,11 +5,7 @@ import { ConnectionStateNotice } from "./ConnectionStateNotice";
 /**
  * The one place a non-ACTIVE connection state is explained.
  *
- * `connectionState` is a wire enum, and the surface used to render it by lowercasing: "Slack is
- * uninstalled.", "Connection is suspended." — a machine token dressed as a sentence, worded
- * differently at each call site for the same fact, and silent on why sync stopped or what to do. Every
- * integration now shares this component, so the states read identically wherever they appear.
- *
+ * Every integration shares this component, so the states read identically wherever they appear.
  * Severity is graded on consequence, not on enum: SUSPENDED and UNINSTALLED mean *nothing is syncing*
  * and warrant a warning; PENDING resolves on its own and stays plain.
  */
@@ -43,7 +39,7 @@ export const Suspended: Story = {
 	},
 };
 
-/** The app was removed upstream. Replaces the notorious "Slack is uninstalled." */
+/** The app was removed upstream. */
 export const Uninstalled: Story = {
 	args: { connectionState: "UNINSTALLED" },
 	play: async ({ canvasElement }) => {

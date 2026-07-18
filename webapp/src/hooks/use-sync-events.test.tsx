@@ -6,6 +6,7 @@ import {
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogQueryKey,
 	getUserProfileQueryKey,
+	getWorkspaceQueryKey,
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
 	listOutlineCollectionsQueryKey,
@@ -50,6 +51,11 @@ class FakeEventSource {
 
 	emit(scope: string, connectionId = CONNECTION_ID) {
 		this.syncListener?.({ data: JSON.stringify({ scope, connectionId }) } as MessageEvent<string>);
+	}
+
+	/** Deliver a raw (possibly non-JSON) payload, to exercise the malformed-hint guard. */
+	emitRaw(data: string) {
+		this.syncListener?.({ data } as MessageEvent<string>);
 	}
 
 	/** The spec's "fail the connection" path: any non-200 or wrong Content-Type. No browser retry. */
@@ -186,6 +192,31 @@ describe("useSyncEvents", () => {
 		expect(latestSource()).not.toBe(first);
 	});
 
+	it("waits out an exponential, jittered backoff that grows after each successive failure", () => {
+		// Pin the jitter so the rungs are deterministic: delay = rung * (0.5 + 0.5·random) = rung · 0.75.
+		const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
+		act(() => latestSource().onopen?.());
+
+		// First failure sits on the 1s rung → 750ms. A flat setTimeout(connect, 0) would already have
+		// reopened after any advance at all, so the "still one instance at 500ms" step catches that.
+		act(() => latestSource().fail());
+		act(() => vi.advanceTimersByTime(500));
+		expect(FakeEventSource.instances).toHaveLength(1);
+		act(() => vi.advanceTimersByTime(250));
+		expect(FakeEventSource.instances).toHaveLength(2);
+
+		// The reconnect fails again before it can open, so the exponent climbs: 2s rung → 1500ms, which
+		// is strictly longer than the first delay — 750ms is no longer enough.
+		act(() => latestSource().fail());
+		act(() => vi.advanceTimersByTime(750));
+		expect(FakeEventSource.instances).toHaveLength(2);
+		act(() => vi.advanceTimersByTime(750));
+		expect(FakeEventSource.instances).toHaveLength(3);
+
+		randomSpy.mockRestore();
+	});
+
 	it("leaves a CONNECTING stream alone — the browser is already retrying that one", () => {
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
 		const source = latestSource();
@@ -295,6 +326,64 @@ describe("useSyncEvents", () => {
 		expect(invalidate).toHaveBeenCalledWith({
 			queryKey: listSlackChannelsQueryKey({ path: { workspaceSlug: WORKSPACE } }),
 		});
+	});
+
+	it("treats a connection hint as a whole-section resync", () => {
+		const queryClient = new QueryClient();
+		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
+
+		// A connect/disconnect moves the catalog, the workspace record and the connection list together,
+		// so this hint invalidates the whole integration section via the scoped predicate.
+		act(() => latestSource().emit("connection"));
+		flushHintDebounce();
+
+		const predicate = invalidate.mock.calls[0]?.[0]?.predicate;
+		expect(predicate).toBeTypeOf("function");
+		if (!predicate) throw new Error("Expected a scoped predicate");
+
+		const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: WORKSPACE } });
+		queryClient.setQueryData(workspaceKey, {});
+		const query = queryClient.getQueryCache().find({ queryKey: workspaceKey, exact: true });
+		if (!query) throw new Error("Expected a cached query");
+		expect(predicate(query)).toBe(true);
+	});
+
+	it("maps an activity hint to just the connection's status, not its whole history", () => {
+		const queryClient = new QueryClient();
+		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
+
+		act(() => latestSource().emit("activity"));
+		flushHintDebounce();
+
+		expect(invalidate).toHaveBeenCalledWith({
+			queryKey: getConnectionSyncStatusQueryKey({
+				path: { workspaceSlug: WORKSPACE, connectionId: CONNECTION_ID },
+			}),
+		});
+		// An activity ping is lightweight — it must not sweep the jobs history the way a job hint does.
+		expect(invalidate).not.toHaveBeenCalledWith({
+			queryKey: listConnectionSyncJobsQueryKey({
+				path: { workspaceSlug: WORKSPACE, connectionId: CONNECTION_ID },
+			}),
+		});
+	});
+
+	it("swallows a malformed hint payload without throwing or invalidating anything", () => {
+		const queryClient = new QueryClient();
+		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+		const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
+
+		// A non-JSON payload must be caught, not propagated out of the event listener.
+		act(() => latestSource().emitRaw("}{ not json"));
+		flushHintDebounce();
+
+		expect(debug).toHaveBeenCalled();
+		expect(invalidate).not.toHaveBeenCalled();
+
+		debug.mockRestore();
 	});
 
 	it("closes the stream and stops reconnecting on unmount", () => {

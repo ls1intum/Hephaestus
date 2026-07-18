@@ -42,16 +42,13 @@ const runningJob: SyncJob = {
  * The connection plane for every integration: health, freshness, and the controls that change them.
  *
  * The headline is one sentence — badge, when the mirror last completed, when it next runs — because
- * that is the whole question this page is opened to answer. It used to be three places: a badge in the
- * page header that popped in late, an uppercase-labelled 2x2 metric grid, and a schedule the server
- * sent on every response that nothing rendered at all. The reading is tinted against the connection's
- * own cadence, so "4 hours ago" reads as fine on a six-hourly schedule and as a missed run on an
- * hourly one.
+ * that is the whole question this page is opened to answer. The reading is tinted against the
+ * connection's own cadence, so "4 hours ago" reads as fine on a six-hourly schedule and as a missed
+ * run on an hourly one.
  *
  * Everything under it qualifies that sentence: diagnostics that explain a bad reading, the running
- * job, and one trigger. Sync and Backfill used to sit side by side sharing a mutation, which forced a
- * protocol between them so neither claimed the other's work; making the rare operation a menu item
- * deleted the protocol along with the second button.
+ * job, and one trigger. Backfill is a menu item rather than a second button, so a pending state can
+ * only mean the one visible trigger.
  */
 const meta = {
 	component: SyncStatusHeader,
@@ -77,7 +74,7 @@ type Story = StoryObj<typeof meta>;
 /**
  * Connected, healthy, synced within cadence. The freshness reading is uncoloured because it is fine,
  * and the schedule behind it is stated — a freshness claim with no cadence to read it against is not
- * interpretable, which is why `nextScheduledSyncAt` finally has a call site.
+ * interpretable.
  */
 export const Healthy: Story = {
 	play: async ({ canvasElement }) => {
@@ -89,9 +86,8 @@ export const Healthy: Story = {
 };
 
 /**
- * Two cadences without a successful run — the reading is tinted `text-warning`, and this is the
- * one-line fix the whole freshness system was waiting on: the route now passes the cadence, so
- * `freshnessTone` finally has a call site and every reading below it can be judged.
+ * Two cadences without a successful run — the reading is tinted `text-warning`, because a reading is
+ * only judged once the route passes the cadence behind it.
  */
 export const StaleFreshness: Story = {
 	args: {
@@ -203,8 +199,7 @@ export const NoWebhookEventsYet: Story = {
 
 /**
  * The rate limit is nearly spent — the only reading that earns colour, because it is the only one that
- * predicts a failure. This replaced a `Progress` bar whose "full = healthy" sat directly beside the
- * job bar's "full = done": two bars on one card filling for opposite reasons.
+ * predicts a failure.
  */
 export const RateLimitNearlyExhausted: Story = {
 	args: {

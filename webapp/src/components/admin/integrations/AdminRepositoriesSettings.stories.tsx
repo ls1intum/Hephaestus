@@ -110,9 +110,8 @@ export const ManyRepositories: Story = {
 };
 
 /**
- * Removing a repository is guarded by a destructive confirm dialog. The copy now names WHAT is erased
- * and states the upstream is untouched and re-syncable — the discipline Slack's and Outline's dialogs
- * already had, and which the vaguer "remove all data associated with this repository" line lacked.
+ * Removing a repository is guarded by a destructive confirm dialog. The copy names WHAT is erased and
+ * states the upstream is untouched and re-syncable.
  */
 export const RemoveConfirm: Story = {
 	play: async ({ canvasElement }) => {
@@ -138,10 +137,10 @@ export const RemoveConfirm: Story = {
 /**
  * A remove is in flight.
  *
- * This state was previously unreachable: `AlertDialogAction` closes the dialog on click, so the node
- * carrying `disabled={isRemovingRepository}` unmounted before the flag could ever flip. The dialog is
- * now controlled and held open across the mutation, which is what gives the confirm somewhere to show
- * "Stopping…" and gives a second click something to bounce off.
+ * The dialog is controlled and held open across the mutation: an uncontrolled `AlertDialogAction`
+ * closes on click, unmounting the node that carries `disabled={isRemovingRepository}` before the flag
+ * can flip. Holding it open gives the confirm somewhere to show "Stopping…" and gives a second click
+ * something to bounce off.
  */
 export const RemoveInProgress: Story = {
 	args: {
@@ -214,16 +213,15 @@ export const LoadError: Story = {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/couldn't load the monitored repositories/i)).toBeInTheDocument();
 		await expect(canvas.getByText(/repositories service is unavailable/i)).toBeInTheDocument();
-		// Every sibling section offers a retry; this one used to be the dead end.
+		// Every sibling section offers a retry.
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},
 };
 
 /**
- * The add mutation failed — the field surfaces the server's own reason under the input. The fixed
- * string this replaced ("An error occurred while adding the repository.") threw away the one piece of
- * information the admin could act on.
+ * The add mutation failed — the field surfaces the server's own reason under the input rather than a
+ * fixed string, so the admin sees the one piece of information they can act on.
  */
 export const AddValidationError: Story = {
 	args: {

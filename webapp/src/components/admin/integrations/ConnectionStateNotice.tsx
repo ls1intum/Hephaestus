@@ -14,9 +14,9 @@ interface StateCopy {
 /**
  * What each non-ACTIVE connection state means, in the admin's terms.
  *
- * `connectionState` is a wire enum. Lowercasing it produced "Slack is uninstalled." — a machine token
- * dressed as a sentence, which names the state but explains neither why sync stopped nor what to do
- * about it. Every state that blocks syncing gets written copy and a next action instead, exactly as
+ * `connectionState` is a wire enum, and lowercasing it yields machine tokens dressed as sentences
+ * ("Slack is uninstalled.") that name the state but explain neither why sync stopped nor what to do.
+ * Every state that blocks syncing gets written copy and a next action instead, exactly as
  * `HEALTH_LABEL` does for `ConnectionHealth`.
  *
  * ACTIVE is deliberately absent: the steady state has nothing to announce, and the lookup returning
@@ -56,10 +56,9 @@ export interface ConnectionStateNoticeProps {
 /**
  * The one place a non-ACTIVE connection state is explained to an admin.
  *
- * Every integration renders this, so a suspended Slack and a suspended Outline read identically —
- * previously the overview card said "Connection is suspended." and the Slack page said "Slack is
- * suspended." for the same fact. SUSPENDED/UNINSTALLED mean *sync is stopped*, which is a warning and
- * not a muted footnote; PENDING resolves on its own and stays quiet.
+ * Every integration renders this, so a suspended Slack and a suspended Outline read identically.
+ * SUSPENDED/UNINSTALLED mean *sync is stopped*, which is a warning and not a muted footnote; PENDING
+ * resolves on its own and stays quiet.
  *
  * Renders nothing for ACTIVE or for a connection that doesn't exist — neither has anything to explain.
  */

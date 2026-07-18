@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { toast } from "sonner";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
@@ -411,11 +411,20 @@ describe("Outline integration — token lifecycle", () => {
 });
 
 describe("Outline integration — with live push down, polling keeps a running sync honest", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	// While the SSE stream is healthy a running job is refreshed by its hints, and the poll is only a
 	// slow 30s backstop against a dropped one. It is when the stream is *down* that polling becomes
 	// the freshness channel and has to be fast enough to be worth the banner's promise — so that is
-	// the mode this pins.
-	it("keeps refetching the status while a job is active, and stops once it settles", async () => {
+	// the mode this pins: the fast 5s poll clears a running job that has since settled. Polling does
+	// NOT stop when the job settles — it drops to the 60s idle cadence — so this asserts the running
+	// state clears, not that refetching halts. Fake timers keep it deterministic and off the wall clock.
+	it("clears a settled job on the fast 5s poll while the live stream is down", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
 		useConnectedHandlers(collectionsRef);
@@ -432,14 +441,19 @@ describe("Outline integration — with live push down, polling keeps a running s
 
 		renderContainer({ livePushUnavailable: true });
 
-		// The shared header's ActiveJobProgress narrates the running reconciliation.
-		expect(await screen.findByText(/reconciliation running/i)).toBeTruthy();
-		// No user interaction, no invalidation — only the refetchInterval can clear this.
-		await waitFor(() => expect(screen.queryByText(/reconciliation running/i)).toBeNull(), {
-			timeout: 8000,
+		// Flush the mount fetches: the shared header's ActiveJobProgress narrates the running reconcile.
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(50);
 		});
+		expect(screen.getByText(/reconciliation running/i)).toBeTruthy();
+
+		// No user interaction, no invalidation — only the 5s refetchInterval can clear this.
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(5_000);
+		});
+		expect(screen.queryByText(/reconciliation running/i)).toBeNull();
 		expect(statusReads).toBeGreaterThanOrEqual(2);
-	}, 10000);
+	});
 });
 
 describe("Outline integration — Outline not enabled on this instance", () => {

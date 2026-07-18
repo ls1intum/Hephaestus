@@ -50,12 +50,10 @@ export const HEALTH_LABEL: Record<ConnectionHealth, string> = {
 export type ConnectionState = NonNullable<IntegrationCatalogEntry["connectionState"]>;
 
 /**
- * The connection lifecycle as a word rather than a wire token.
- *
- * Lowercasing the enum shipped "Slack is uninstalled." and "Outline suspended" to admins — machine
- * tokens dressed as English. This is the {@link HEALTH_LABEL} treatment for `connectionState`: a short
- * label for inline use. Copy that must also explain the *consequence* and the *next action* lives in
- * `ConnectionStateNotice`, which is the only thing that should be explaining a blocked state at length.
+ * The connection lifecycle as a word rather than a wire token — the {@link HEALTH_LABEL} treatment for
+ * `connectionState`: a short label for inline use. Copy that must also explain the *consequence* and
+ * the *next action* lives in `ConnectionStateNotice`, which is the only thing that should be explaining
+ * a blocked state at length.
  */
 export const CONNECTION_STATE_LABEL: Record<ConnectionState, string> = {
 	PENDING: "finishing setup",

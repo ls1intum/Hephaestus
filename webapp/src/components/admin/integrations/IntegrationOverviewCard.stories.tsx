@@ -92,9 +92,9 @@ export const WithErroredResources: Story = {
 };
 
 /**
- * Stale resources with nothing errored — the quieter, more common failure, and the one the card used
- * to hide: a connection whose scheduler has stopped reports HEALTHY forever while its mirror rots.
- * The server has always counted this; nothing rendered it until now.
+ * Stale resources with nothing errored — the quieter, more common failure: a connection whose
+ * scheduler has stopped reports HEALTHY forever while its mirror rots, so the stale count is what
+ * surfaces it.
  */
 export const WithStaleResources: Story = {
 	args: { status: { ...status, resourceCounts: { total: 12, errored: 0, pending: 0, stale: 4 } } },
@@ -168,9 +168,8 @@ export const NeverSynced: Story = {
 };
 
 /**
- * The status query failed. The overview page is the entry point, so this used to be the *one* error on
- * the surface with no way out — bare red text, no detail, no retry. It now renders the same
- * `QueryErrorAlert` as its nine siblings, and a 503 is retryable, so the button is offered.
+ * The status query failed. It renders the same `QueryErrorAlert` as its siblings, and a 503 is
+ * retryable, so the button is offered.
  */
 export const StatusError: Story = {
 	args: {
@@ -207,9 +206,8 @@ export const StatusErrorForbidden: Story = {
 };
 
 /**
- * Connection exists but is suspended — controls are hidden and the copy says why. Previously this
- * lowercased the wire enum into "Connection is suspended."; it now says what stopped and what to do,
- * and reads identically to the suspended state on every other integration.
+ * Connection exists but is suspended — controls are hidden and the copy says what stopped and what to
+ * do, reading identically to the suspended state on every other integration.
  */
 export const ConnectionSuspended: Story = {
 	args: {
@@ -253,8 +251,8 @@ export const ConnectionPending: Story = {
 };
 
 /**
- * The app was removed upstream. "Slack is uninstalled." was the wire enum in a sentence; this names
- * the consequence (nothing is syncing) and the fix (reconnect).
+ * The app was removed upstream. The copy names the consequence (nothing is syncing) and the fix
+ * (reconnect).
  */
 export const ConnectionUninstalled: Story = {
 	args: {

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SyncResourceState } from "@/api/types.gen";
 import { SCM_CLASS_KEYS, SyncResourcesTable } from "./SyncResourcesTable";
@@ -255,6 +256,80 @@ const longNames: SyncResourceState[] = [
 	},
 ];
 
+/** One fresh repository and one very-stale one — the minimal set the Attention/Fresh facet filters. */
+const facetMix: SyncResourceState[] = [
+	{
+		id: 50,
+		externalId: "acme/fresh-service",
+		name: "acme/fresh-service",
+		type: "REPOSITORY",
+		counts: scmCounts(minutesAgo(4)),
+		state: "SYNCED",
+		lastSyncedAt: minutesAgo(4),
+		itemCount: 4614,
+	},
+	{
+		id: 51,
+		externalId: "acme/stale-service",
+		name: "acme/stale-service",
+		type: "REPOSITORY",
+		counts: scmCounts(daysAgo(11)),
+		state: "SYNCED",
+		lastSyncedAt: daysAgo(11),
+		itemCount: 4614,
+	},
+];
+
+/**
+ * Holds the table mounted across a resource change so its internal `facet` state survives, reproducing
+ * the live case where a sync heals the last attention row while the "Attention" facet is selected.
+ */
+function FacetFallbackHarness() {
+	const [healed, setHealed] = useState(false);
+	const withAttention: SyncResourceState[] = [
+		{
+			id: 60,
+			externalId: "acme/fresh-service",
+			name: "acme/fresh-service",
+			type: "REPOSITORY",
+			counts: scmCounts(minutesAgo(4)),
+			state: "SYNCED",
+			lastSyncedAt: minutesAgo(4),
+			itemCount: 4614,
+		},
+		{
+			id: 61,
+			externalId: "acme/stale-service",
+			name: "acme/stale-service",
+			type: "REPOSITORY",
+			counts: scmCounts(daysAgo(11)),
+			state: "SYNCED",
+			lastSyncedAt: daysAgo(11),
+			itemCount: 4614,
+		},
+	];
+	// After the heal, the formerly very-stale row is fresh — so the fleet has zero attention rows left.
+	const allFresh = withAttention.map((resource) =>
+		resource.id === 61
+			? { ...resource, counts: scmCounts(minutesAgo(6)), lastSyncedAt: minutesAgo(6) }
+			: resource,
+	);
+	return (
+		<div className="space-y-3">
+			<button type="button" onClick={() => setHealed(true)}>
+				Heal the stale row
+			</button>
+			<SyncResourcesTable
+				resources={healed ? allFresh : withAttention}
+				resourceNoun="repository"
+				resourceNounPlural="repositories"
+				syncIntervalSeconds={SYNC_INTERVAL_SECONDS}
+				expectedClassKeys={SCM_CLASS_KEYS}
+			/>
+		</div>
+	);
+}
+
 /**
  * The per-resource sync ledger. Counts are the columns — the abundant, real fact where only issues and
  * pull requests carry a watermark — so "0 comments next to 3,410 issues" reads across the whole fleet at
@@ -484,6 +559,61 @@ export const FilteredEmpty: Story = {
 
 		await userEvent.click(canvas.getByRole("button", { name: /clear filter/i }));
 		await expect(canvas.getByText("ls1intum/Artemis")).toBeInTheDocument();
+	},
+};
+
+/**
+ * The status facet: the Attention/Fresh toggle only mounts because at least one row needs attention,
+ * and each facet narrows the set to exactly its half.
+ */
+export const AttentionFilter: Story = {
+	args: { resources: facetMix },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		// The default "all" facet shows both rows.
+		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
+		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+
+		// Attention narrows to the very-stale row.
+		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
+		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();
+
+		// Fresh is the complement.
+		await userEvent.click(canvas.getByRole("button", { name: /fresh \(1\)/i }));
+		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
+		await expect(canvas.queryByText("acme/stale-service")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Clearing the last attention row must not strand the table on the (now unmounted) "Attention" facet.
+ * The toggle only mounts while `attentionCount > 0`, but the `facet` state outlives it, so the table
+ * falls back to "all" whenever the toggle is gone — otherwise a sync that heals the last stale row
+ * would collapse a full fleet to the "no repositories match" empty state.
+ */
+export const AttentionFacetFallsBackWhenCleared: Story = {
+	// The harness owns its own resources; `args` is only here to satisfy the required-prop story type.
+	args: { resources: [] },
+	render: () => <FacetFallbackHarness />,
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+
+		// Filter down to the one attention row.
+		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
+		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();
+
+		// A refresh heals the stale row: same table instance, new resources, no attention rows left.
+		await userEvent.click(canvas.getByRole("button", { name: /heal the stale row/i }));
+
+		// The facet toggle is gone (nothing needs attention) and the table fell back to "all" rather than
+		// stranding on "attention" and rendering the empty state.
+		await expect(canvas.queryByRole("button", { name: /attention/i })).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByText(/no repositories match the current filter/i),
+		).not.toBeInTheDocument();
+		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
 	},
 };
 
