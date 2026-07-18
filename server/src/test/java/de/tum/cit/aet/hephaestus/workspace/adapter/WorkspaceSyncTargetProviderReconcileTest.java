@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,6 +127,41 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         assertThat(rtm.getNameWithOwner()).isEqualTo(OLD_NAME);
         verify(repositoryToMonitorRepository, never()).save(any());
         verify(natsConsumerService, never()).ifAvailable(any());
+    }
+
+    @Test
+    void shouldRekeyEveryMonitorSharingTheRepositoryWhenHealingFromAWebhook() {
+        // A repository can be monitored by several tenants at once; a rename webhook names no sync
+        // target, so the stable native id is the only handle onto all of them.
+        RepositoryToMonitor first = monitor(NATIVE_ID, OLD_NAME);
+        first.setId(SYNC_TARGET_ID);
+        RepositoryToMonitor second = monitor(NATIVE_ID, OLD_NAME);
+        second.setId(SYNC_TARGET_ID + 1);
+        when(repositoryToMonitorRepository.findByNativeId(NATIVE_ID)).thenReturn(List.of(first, second));
+        when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID)).thenReturn(Optional.of(first));
+        when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID + 1)).thenReturn(Optional.of(second));
+        when(workspace.getId()).thenReturn(WORKSPACE_ID);
+        doAnswer(inv -> {
+            Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
+            c.accept(natsConsumer);
+            return null;
+        })
+            .when(natsConsumerService)
+            .ifAvailable(any());
+
+        provider.reconcileSyncTargetsForRepository(NATIVE_ID, NEW_NAME);
+
+        assertThat(first.getNameWithOwner()).isEqualTo(NEW_NAME);
+        assertThat(second.getNameWithOwner()).isEqualTo(NEW_NAME);
+        verify(natsConsumer, times(2)).updateScopeConsumer(WORKSPACE_ID);
+    }
+
+    @Test
+    void shouldNotRekeyByNameWhenTheWebhookCarriesNoStableId() {
+        provider.reconcileSyncTargetsForRepository(null, NEW_NAME);
+
+        verify(repositoryToMonitorRepository, never()).findByNativeId(any());
+        verify(repositoryToMonitorRepository, never()).save(any());
     }
 
     @Test

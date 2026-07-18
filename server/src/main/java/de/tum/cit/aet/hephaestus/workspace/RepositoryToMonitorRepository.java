@@ -32,6 +32,14 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     Optional<RepositoryToMonitor> findByNameWithOwner(String nameWithOwner);
 
     /**
+     * Finds every monitor tracking the repository with the given provider-stable id — across all
+     * workspaces, because a repository can be monitored by several tenants at once. Used to re-key
+     * {@code nameWithOwner} after an upstream rename/transfer, where the name is exactly the value
+     * that has gone stale and so cannot be the lookup key.
+     */
+    List<RepositoryToMonitor> findByNativeId(Long nativeId);
+
+    /**
      * Counts the number of workspaces monitoring a given repository.
      * Used to determine if a repository can be safely deleted when removing a monitor.
      */

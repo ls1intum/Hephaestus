@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -152,10 +153,56 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             payload,
             Map.of("X-GitHub-Event", eventTypeFromFilename(fixture))
         );
+        // Repository-lifecycle events (repository.renamed/.transferred/…) are ORG-scoped for the same
+        // reason GitLab's group-tier events are: the repo-name token is unstable across a
+        // rename/transfer, so the subject carries the '?' placeholder in the repo slot and must route
+        // via the workspace's organizationFilter (github.<owner>.?.>), not the repo prefix. Bind that
+        // through a real NATS token match so a drift in EITHER organizationFilter/buildSubjectPrefix or
+        // the deriver's org-scoping fails here — the freeze-after-rename regression this guards.
+        String[] subjectParts = publisherSubject.split("\\.", -1);
+        if (subjectParts.length >= 3 && "?".equals(subjectParts[2])) {
+            String orgFilter = ConsumerSubjectMath.organizationFilter("github", owner);
+            assertThat(subjectMatchesFilter(publisherSubject, orgFilter))
+                .as(
+                    "org-tier publisher %s (%s) should be matched by org filter '%s'",
+                    fixture.getFileName(),
+                    publisherSubject,
+                    orgFilter
+                )
+                .isTrue();
+            return;
+        }
         String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("github", owner + "/" + repo);
         assertThat(publisherSubject)
             .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
             .startsWith(consumerPrefix + ".");
+    }
+
+    /**
+     * Anchors that the {@code ?}-slot branch above is actually exercised by GitHub fixtures. Without
+     * this, re-tiering {@code repository} events back onto the repository tier (or losing the fixtures)
+     * would make the org-filter assertion vacuous and the guard would pass while the rename freeze
+     * silently returned.
+     */
+    @Test
+    void githubRepositoryLifecycleFixturesAreOrgScoped() throws IOException {
+        for (String name : List.of("repository.renamed.json", "repository.transferred.json")) {
+            Path fixture = GITHUB_DIR.resolve(name);
+            assertThat(Files.exists(fixture)).as("fixture %s must exist", name).isTrue();
+            JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
+            String owner = payload.path("repository").path("owner").path("login").asString("");
+            String subject = GITHUB.deriveSubject(payload, Map.of("X-GitHub-Event", "repository"));
+
+            assertThat(subject).isEqualTo("github." + owner + ".?.repository");
+            assertThat(subjectMatchesFilter(subject, ConsumerSubjectMath.organizationFilter("github", owner)))
+                .as("%s must be routed by the workspace org filter, not a (stale) repo filter", name)
+                .isTrue();
+            // The whole point: the repo filter built from the OLD name cannot match, which is why the
+            // org tier is the only one that heals a rename in real time.
+            assertThat(
+                subjectMatchesFilter(subject, ConsumerSubjectMath.repositoryFilter("github", owner + "/anything"))
+            ).isFalse();
+        }
     }
 
     @ParameterizedTest(name = "Outline fixture {0}")

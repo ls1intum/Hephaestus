@@ -99,4 +99,46 @@ public record GitHubRepositoryEventDTO(
         }
         return null;
     }
+
+    /**
+     * The repository's {@code owner/name} before a rename <em>or</em> a transfer — the single lookup
+     * key for locating the already-mirrored row when its stable id is unavailable.
+     * <ul>
+     *   <li><b>renamed</b>: {@code changes.repository.name.from} under the unchanged owner (delegates
+     *       to {@link #getOldFullName()});</li>
+     *   <li><b>transferred</b>: the unchanged repository name under
+     *       {@code changes.owner.from.{user|organization}.login}.</li>
+     * </ul>
+     *
+     * @return the previous {@code owner/name}, or {@code null} when the payload carries no usable
+     *         change record
+     */
+    public String getPreviousNameWithOwner() {
+        String renamed = getOldFullName();
+        if (renamed != null) {
+            return renamed;
+        }
+        String previousOwner = getPreviousOwnerLogin();
+        if (previousOwner == null || repository == null || repository.name() == null) {
+            return null;
+        }
+        return previousOwner + "/" + repository.name();
+    }
+
+    /**
+     * Extracts {@code changes.owner.from.{user|organization}.login} from a transfer payload. GitHub
+     * nests the previous owner under whichever account type it was, so both keys are probed.
+     */
+    private String getPreviousOwnerLogin() {
+        if (changes == null || changes.owner() == null || changes.owner().from() == null) {
+            return null;
+        }
+        Map<String, Object> from = changes.owner().from();
+        for (String accountKey : new String[] { "organization", "user" }) {
+            if (from.get(accountKey) instanceof Map<?, ?> account && account.get("login") instanceof String login) {
+                return login;
+            }
+        }
+        return null;
+    }
 }

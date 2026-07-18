@@ -86,6 +86,27 @@ public interface BackfillStateProvider {
     }
 
     /**
+     * Re-keys <em>every</em> sync target that tracks the given repository, identified by the provider's
+     * stable numeric id rather than by name. This is the webhook-driven sibling of
+     * {@link #reconcileSyncTargetIdentity}: a rename/transfer arrives as a single vendor event that
+     * names no sync target, and the repository may be monitored by several scopes at once (mirrored
+     * repositories are instance-global and shared across workspaces), so the caller has neither a
+     * {@code syncTargetId} nor a way to enumerate them. Implementations resolve the affected targets by
+     * {@code nativeId} and apply the same re-key + consumer-refresh semantics per target.
+     * <p>
+     * A no-op when {@code nativeId} is unknown (never re-key by name alone) or when no target tracks it.
+     *
+     * @param nativeId          the provider's stable numeric repository id from the webhook payload
+     * @param newNameWithOwner  the repository's new {@code owner/name} as the payload reports it
+     */
+    default void reconcileSyncTargetsForRepository(
+        @org.jspecify.annotations.Nullable Long nativeId,
+        @org.jspecify.annotations.Nullable String newNameWithOwner
+    ) {
+        // Default no-op: see reconcileSyncTargetIdentity.
+    }
+
+    /**
      * Updates the pagination cursor for the given {@link SyncCursorKind}, keyed by
      * {@code syncTargetId}. Collapses the former per-entity {@code update<X>SyncCursor}
      * methods; the implementer switches on the kind to reach the correct column.

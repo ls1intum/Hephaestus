@@ -407,6 +407,19 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             });
     }
 
+    @Override
+    @Transactional
+    public void reconcileSyncTargetsForRepository(@Nullable Long nativeId, @Nullable String newNameWithOwner) {
+        if (nativeId == null || newNameWithOwner == null || newNameWithOwner.isBlank()) {
+            return;
+        }
+        // Shared repositories mean N monitors for one nativeId — re-key each, reusing the single
+        // re-key/consumer-refresh body so webhook healing and reconcile healing cannot diverge.
+        for (RepositoryToMonitor rtm : repositoryToMonitorRepository.findByNativeId(nativeId)) {
+            reconcileSyncTargetIdentity(rtm.getId(), nativeId, newNameWithOwner);
+        }
+    }
+
     /**
      * Persists the pagination cursor for the given kind onto the RepositoryToMonitor
      * ({@code syncTargetId}-keyed) row.
