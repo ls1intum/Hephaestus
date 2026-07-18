@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
@@ -179,6 +180,25 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         assertThat(tombstoned).isEqualTo(1);
         assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).isEmpty();
         assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+    }
+
+    /**
+     * Root-cause guard for the two GitLab sub-issue / dependency sync services, which key rows by IID.
+     * With issue #5 and MR !5 both present, the type-scoped {@code findAllIssuesByRepositoryId} must
+     * return only the issue — never the colliding merge request — so a caller building an IID map cannot
+     * mistake the merge request for the issue of the same number. The pre-fix polymorphic
+     * {@code findAllByRepository_Id} returned both.
+     */
+    @Test
+    void findAllIssuesByRepositoryIdExcludesACollidingMergeRequest() {
+        int iid = 5;
+        upsertIssue(iid);
+        upsertMergeRequest(iid);
+
+        var issues = issueRepository.findAllIssuesByRepositoryId(repository.getId());
+
+        assertThat(issues).extracting(Issue::getNumber).containsExactly(iid);
+        assertThat(issues).noneMatch(Issue::isPullRequest);
     }
 
     private void upsertIssue(int number) {

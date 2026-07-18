@@ -67,7 +67,23 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
 
-    List<Issue> findAllByRepository_Id(Long repositoryId);
+    /**
+     * Repository-wide list of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
+     * subclass rows that share this table under single-table inheritance.
+     *
+     * <p>This is not cosmetic: for GitLab, issue IIDs and merge-request IIDs occupy <em>separate</em>
+     * per-project namespaces (issue #5 and MR !5 routinely coexist), so a type-blind list keyed by IID
+     * would collide the two rows — mistaking a merge request for the issue of the same number. Every
+     * caller that keys issues by {@code getNumber()} (the IID) — sub-issue parenting, issue-dependency
+     * links — is an issue-domain concept a merge request has no part in, so they must never see the
+     * {@code PullRequest} rows. Mirrors the {@code TYPE(i) = Issue} discriminator every other query in
+     * this repository carries for the same reason.
+     *
+     * @param repositoryId the repository ID
+     * @return every pure issue of the repository (pull/merge requests excluded)
+     */
+    @Query("SELECT i FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId")
+    List<Issue> findAllIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
     /** Slice (rather than Page) so batching needs no count query. */
     Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
