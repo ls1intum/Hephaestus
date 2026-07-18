@@ -6,6 +6,17 @@ name: Version PR
 # the deliberate act that cuts a release — release.yml takes over from there.
 #
 # This workflow only ever opens/updates the PR; it never tags or deploys.
+#
+# The PR is opened with GITHUB_TOKEN, so it is authored by github-actions[bot]
+# and carries no CI: events created with that token don't trigger workflows.
+# That is deliberate — the PR only bumps a version string and rewrites
+# CHANGELOG.md, and it is re-pushed on every merge to main, so running the full
+# matrix (Docker builds included) on it would burn CI on every merge without
+# validating anything. The real validation happens after the merge: main runs
+# the full suite and release.yml only cuts a release if that run succeeded.
+# `ls1intum/hephaestus-maintainers` bypasses the branch ruleset, so the missing
+# required checks do not block merging the Version PR.
+#
 # Contributor guide: docs/contributor/release-management.mdx
 
 on:
@@ -28,9 +39,6 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
-          # PAT (not GITHUB_TOKEN) so the Version PR's own checks run and, once
-          # merged, its CI/CD run can trigger release.yml.
-          token: ${{ secrets.GH_PAT }}
 
       - name: Setup pnpm + Node.js
         uses: ./.github/actions/setup-pnpm-node
@@ -49,4 +57,4 @@ jobs:
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
