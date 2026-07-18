@@ -26,10 +26,15 @@ public class OutlineIntegrationSyncRunner implements IntegrationSyncRunner {
         return IntegrationKind.OUTLINE;
     }
 
-    /** Outline has no deletion sweep of its own — {@code type} is unused here. */
+    /**
+     * Outline infers upstream deletion by absence: a clean full enumeration of a collection tombstones the
+     * mirrored documents it did not list. {@code type} is therefore forwarded, not dropped — that inference
+     * is {@code RECONCILIATION}-only, the same rule the SCM sweeps obey, so an {@code INITIAL} run populates
+     * the mirror without ever tombstoning against a mirror it is still building.
+     */
     @Override
     public void reconcile(IntegrationRef ref, SyncExecutionHandle handle, SyncJobType type) {
-        syncScheduler.syncWorkspaceNow(ref.workspaceId(), handle);
+        syncScheduler.syncWorkspaceNow(ref.workspaceId(), handle, type);
         if (handle.isCancellationRequested()) {
             handle.reportCancelled();
         }

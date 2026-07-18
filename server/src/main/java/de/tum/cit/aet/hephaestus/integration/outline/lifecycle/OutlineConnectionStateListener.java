@@ -83,7 +83,9 @@ public class OutlineConnectionStateListener {
                     null
                 ),
                 handle -> {
-                    syncScheduler.syncWorkspaceNow(event.workspaceId(), handle);
+                    // INITIAL, threaded through: a mirror being populated for the first time must not infer
+                    // upstream deletions from its own half-filled state (parity with the SCM initial syncs).
+                    syncScheduler.syncWorkspaceNow(event.workspaceId(), handle, SyncJobType.INITIAL);
                     // Cancelling the initial connect-time sync must record CANCELLED, not SUCCEEDED — mirror the
                     // reportCancelled tail every other Outline entry point (catchUp/syncAllNow/runner) already has.
                     if (handle.isCancellationRequested()) {

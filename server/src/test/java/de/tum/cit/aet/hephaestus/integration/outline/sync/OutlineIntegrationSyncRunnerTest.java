@@ -39,7 +39,7 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
-        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle);
+        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle, SyncJobType.RECONCILIATION);
         verify(handle, never()).reportCancelled();
     }
 
@@ -50,8 +50,19 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
 
         runner.reconcile(ref, handle, SyncJobType.RECONCILIATION);
 
-        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle);
+        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle, SyncJobType.RECONCILIATION);
         verify(handle).reportCancelled();
+    }
+
+    @Test
+    void reconcile_forwardsTheJobTypeRatherThanDroppingIt() {
+        // The type is load-bearing for Outline: it gates tombstone-by-absence. Dropping it here is exactly
+        // the bug this test exists to prevent — an INITIAL run must not reach the sync path as a sweep.
+        IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
+
+        runner.reconcile(ref, handle, SyncJobType.INITIAL);
+
+        verify(syncScheduler).syncWorkspaceNow(WORKSPACE, handle, SyncJobType.INITIAL);
     }
 
     @Test
@@ -62,7 +73,7 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
             return null;
         })
             .when(syncScheduler)
-            .syncWorkspaceNow(eq(WORKSPACE), any(SyncExecutionHandle.class));
+            .syncWorkspaceNow(eq(WORKSPACE), any(SyncExecutionHandle.class), eq(SyncJobType.RECONCILIATION));
 
         runner.reconcile(
             new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"),

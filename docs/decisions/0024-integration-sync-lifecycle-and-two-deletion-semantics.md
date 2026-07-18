@@ -54,8 +54,8 @@ the other.
 
 ### (a) Drift tombstone — recoverable, inferred from absence
 
-A `RECONCILIATION` pass may set a `deleted_at` marker on rows the upstream listing no longer
-contains: `GitHubDeletionSweepService`, `GitLabDeletionSweepService`, and
+A `RECONCILIATION` pass — and only a `RECONCILIATION` pass — may set a `deleted_at` marker on rows the
+upstream listing no longer contains: `GitHubDeletionSweepService`, `GitLabDeletionSweepService`, and
 `OutlineDocumentSyncService#tombstoneVanished`. Slack does not sweep (see Consequences).
 
 Deletion is authorized by **provable completeness and nothing else**. `UpstreamListing.complete()`
@@ -72,6 +72,14 @@ Tombstoning rather than deleting is what makes acting on inference tolerable: `u
 and every row not yet fetched would look like an upstream deletion to a set difference. For the
 same reason a manual `INITIAL` is rejected at the API (`SyncStatusService`); only `RECONCILIATION`
 and `BACKFILL` are client-triggerable.
+
+This rule is **uniform across every integration that infers deletion from absence** — it is not an
+SCM-only convention. Each `IntegrationSyncRunner` forwards its `SyncJobType` instead of dropping it,
+and each inference sits behind a `type == RECONCILIATION` gate: the two SCM schedulers before their
+sweep phase, and `OutlineDocumentSyncService#syncOneCollection` before `tombstoneVanished`. The two
+authorizations are independent and both are required — provable completeness **and**
+`RECONCILIATION` — so a budget-exhausted Outline enumeration still deletes nothing on a reconcile.
+Slack needs no gate because it never infers deletion from absence at all.
 
 ### (b) Mirror erasure — irreversible, triggered by a lawful-basis change
 

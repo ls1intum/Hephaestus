@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
@@ -53,10 +54,13 @@ import org.springframework.stereotype.Service;
  * <p>The diff runs on {@link OutlineDocumentSnapshot}s, never entities — bodies are unbounded {@code text}
  * and the diff needs only timestamps, hashes and body presence. Only rows actually written are loaded whole.
  *
- * <p><b>Invariants.</b> Tombstone-by-absence runs only on a clean pass (full enumeration, nothing skipped for
- * budget): losing visibility of a collection, a truncated enumeration ({@link OutlineApiClient} throws rather
- * than returning a short list), and an HTTP 429 all skip the sweep instead of deleting documents. Archived
- * documents are never tombstoned — see {@link #syncArchivedDocuments}.
+ * <p><b>Invariants.</b> Tombstone-by-absence needs BOTH guards to hold. It runs only on a clean pass (full
+ * enumeration, nothing skipped for budget): losing visibility of a collection, a truncated enumeration
+ * ({@link OutlineApiClient} throws rather than returning a short list), and an HTTP 429 all skip the sweep
+ * instead of deleting documents. And it runs only on a {@link SyncJobType#RECONCILIATION} pass — a mirror
+ * still being populated by an {@code INITIAL} job has nothing stale in it, and every document not fetched
+ * yet would read as an upstream deletion to a set difference. That is the same rule the SCM deletion sweeps
+ * obey. Archived documents are never tombstoned — see {@link #syncArchivedDocuments}.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
@@ -112,7 +116,7 @@ public class OutlineDocumentSyncService {
      * no ACTIVE Outline Connection, no server URL, no resolvable token — or no registered collections.
      */
     public void syncWorkspace(long workspaceId) {
-        syncWorkspace(workspaceId, null);
+        syncWorkspace(workspaceId, null, SyncJobType.RECONCILIATION);
     }
 
     /**
@@ -120,8 +124,12 @@ public class OutlineDocumentSyncService {
      * and checking cooperative cancellation between collections through {@code handle} — the port the
      * unified sync-job runner threads its job handle through. {@code null} behaves exactly like
      * {@link #syncWorkspace(long)}.
+     *
+     * <p>{@code type} is forwarded rather than dropped: it is what decides whether a clean enumeration ends
+     * by tombstoning that collection's vanished documents, and it is the only difference between an
+     * {@code INITIAL} and a {@code RECONCILIATION} run here — every other step only ever upserts.
      */
-    public void syncWorkspace(long workspaceId, @Nullable SyncExecutionHandle handle) {
+    public void syncWorkspace(long workspaceId, @Nullable SyncExecutionHandle handle, SyncJobType type) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
             reportWarning(handle);
@@ -152,7 +160,7 @@ public class OutlineDocumentSyncService {
                     reportCollectionDone(handle, done, total, collection.getName());
                     continue;
                 }
-                if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
+                if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now, type)) {
                     synced++;
                 } else {
                     reportWarning(handle);
@@ -217,7 +225,11 @@ public class OutlineDocumentSyncService {
                 if (handle != null && handle.isCancellationRequested()) {
                     break;
                 }
-                if (!syncOneCollectionRecordingError(ctx, collection, existing, budget, now)) {
+                // The catch-up tick resumes a collection left PENDING by a budget-exhausted reconcile; it is
+                // itself a RECONCILIATION job, so a clean pass here may sweep.
+                if (
+                    !syncOneCollectionRecordingError(ctx, collection, existing, budget, now, SyncJobType.RECONCILIATION)
+                ) {
                     reportWarning(handle);
                 }
                 done++;
@@ -283,7 +295,10 @@ public class OutlineDocumentSyncService {
                 collection.get(),
                 loadExisting(ctx),
                 new ExportBudget(properties.sync().exportBudget()),
-                Instant.now()
+                Instant.now(),
+                // A targeted single-collection pass is a full enumeration of that collection — reconciling
+                // it, not populating a fresh mirror.
+                SyncJobType.RECONCILIATION
             );
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
@@ -455,10 +470,11 @@ public class OutlineDocumentSyncService {
         OutlineCollection collection,
         Map<String, OutlineDocumentSnapshot> existing,
         ExportBudget budget,
-        Instant now
+        Instant now,
+        SyncJobType type
     ) {
         try {
-            syncOneCollection(ctx, collection, existing, budget, now);
+            syncOneCollection(ctx, collection, existing, budget, now, type);
             return true;
         } catch (OutlineRateLimitedException e) {
             throw e;
@@ -478,15 +494,17 @@ public class OutlineDocumentSyncService {
 
     /**
      * Enumerate + upsert one collection under the shared export budget. A CLEAN pass (full enumeration,
-     * no export skipped for budget) tombstones this collection's vanished rows and marks the row COMPLETE;
-     * a budget-exhausted pass leaves the row PENDING so nothing is ever skipped silently.
+     * no export skipped for budget) marks the row COMPLETE, and — on a {@code RECONCILIATION} pass —
+     * tombstones this collection's vanished rows; a budget-exhausted pass leaves the row PENDING so nothing
+     * is ever skipped silently.
      */
     private void syncOneCollection(
         SyncContext ctx,
         OutlineCollection collection,
         Map<String, OutlineDocumentSnapshot> existing,
         ExportBudget budget,
-        Instant now
+        Instant now,
+        SyncJobType type
     ) {
         String collectionId = collection.getCollectionId();
         // documents.list is newest-first, so the budget is spent on the most recently edited documents.
@@ -542,7 +560,13 @@ public class OutlineDocumentSyncService {
             });
             return;
         }
-        int tombstoned = tombstoneVanished(ctx, existing, collectionId, seen, now);
+        // Tombstone-by-absence — RECONCILIATION only, the same rule the SCM deletion sweeps obey, and the
+        // one thing that makes RECONCILIATION different from INITIAL here. Everything above only upserts,
+        // so an INITIAL run still populates the mirror fully; it just never infers a deletion from a mirror
+        // it is only half-way through building. The budget-exhausted return above is the other, independent
+        // guard: an incomplete enumeration deletes nothing regardless of job type.
+        int tombstoned =
+            type == SyncJobType.RECONCILIATION ? tombstoneVanished(ctx, existing, collectionId, seen, now) : 0;
         if (tombstoned > 0) {
             log.info(
                 "outline.sync: tombstoned {} vanished document(s) in collection {} (workspaceId={})",
@@ -746,7 +770,7 @@ public class OutlineDocumentSyncService {
         return true;
     }
 
-    /** Tombstone this collection's mirrored rows that were not seen in a clean pass. */
+    /** Tombstone this collection's mirrored rows that were not seen in a clean RECONCILIATION pass. */
     private int tombstoneVanished(
         SyncContext ctx,
         Map<String, OutlineDocumentSnapshot> existing,

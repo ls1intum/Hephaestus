@@ -102,7 +102,7 @@ public class OutlineDocumentSyncScheduler {
         for (Long workspaceId : workspaceIds) {
             try {
                 runReconcileJob(workspaceId, SyncJobTrigger.SCHEDULED, handle -> {
-                    syncService.syncWorkspace(workspaceId, handle);
+                    syncService.syncWorkspace(workspaceId, handle, SyncJobType.RECONCILIATION);
                     if (handle != null && handle.isCancellationRequested()) {
                         handle.reportCancelled();
                     }
@@ -174,9 +174,13 @@ public class OutlineDocumentSyncScheduler {
      * sees per-collection progress and can cancel cooperatively — the shape the manual-trigger
      * {@code OutlineIntegrationSyncRunner} uses. Workspace-scoped, no bypass — see
      * {@link #syncWorkspaceNow(long)}.
+     *
+     * <p>{@code type} is forwarded rather than dropped, exactly as the SCM schedulers do: it decides whether
+     * a clean enumeration ends by tombstoning that collection's vanished documents. An {@code INITIAL} pass
+     * (connect-time) still populates the mirror in full but infers no deletions.
      */
-    public void syncWorkspaceNow(long workspaceId, @Nullable SyncExecutionHandle handle) {
-        syncService.syncWorkspace(workspaceId, handle);
+    public void syncWorkspaceNow(long workspaceId, @Nullable SyncExecutionHandle handle, SyncJobType type) {
+        syncService.syncWorkspace(workspaceId, handle, type);
     }
 
     /** Targeted single-collection sync; workspace-scoped, no bypass — see {@link #syncWorkspaceNow}. */

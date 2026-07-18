@@ -124,8 +124,8 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
                     SyncJobTrigger.SCHEDULED
                 )
             );
-        verify(syncService).syncWorkspace(WORKSPACE_1, jobHandle);
-        verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle);
+        verify(syncService).syncWorkspace(WORKSPACE_1, jobHandle, SyncJobType.RECONCILIATION);
+        verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle, SyncJobType.RECONCILIATION);
     }
 
     @Test
@@ -156,8 +156,8 @@ class OutlineDocumentSyncSchedulerTest extends BaseUnitTest {
 
         assertThatCode(() -> scheduler.syncAllNow()).doesNotThrowAnyException();
 
-        verify(syncService, never()).syncWorkspace(WORKSPACE_1, jobHandle);
-        verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle);
+        verify(syncService, never()).syncWorkspace(WORKSPACE_1, jobHandle, SyncJobType.RECONCILIATION);
+        verify(syncService).syncWorkspace(WORKSPACE_2, jobHandle, SyncJobType.RECONCILIATION);
     }
 
     @Test

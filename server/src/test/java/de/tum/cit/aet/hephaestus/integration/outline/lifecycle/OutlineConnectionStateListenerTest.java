@@ -75,7 +75,7 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThat(request.kind()).isEqualTo(IntegrationKind.OUTLINE);
         assertThat(request.type()).isEqualTo(SyncJobType.INITIAL);
         assertThat(request.trigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
-        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class));
+        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class), eq(SyncJobType.INITIAL));
         // Not cancelled → the job records its natural outcome, never CANCELLED.
         verify(handle, never()).reportCancelled();
     }
@@ -88,7 +88,7 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
 
         listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE));
 
-        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class));
+        verify(syncScheduler).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class), eq(SyncJobType.INITIAL));
         verify(handle).reportCancelled();
     }
 
@@ -111,7 +111,11 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
         assertThatCode(() ->
             listener.onActivated(new ConnectionLifecycleEvent.Activated(42L, 5L, IntegrationKind.OUTLINE))
         ).doesNotThrowAnyException();
-        verify(syncScheduler, never()).syncWorkspaceNow(eq(5L), any(SyncExecutionHandle.class));
+        verify(syncScheduler, never()).syncWorkspaceNow(
+            eq(5L),
+            any(SyncExecutionHandle.class),
+            eq(SyncJobType.INITIAL)
+        );
     }
 
     @Test

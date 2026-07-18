@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
@@ -292,6 +293,71 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(staleRow.isDeleted()).isTrue();
         assertThat(staleRow.getBodyMarkdown()).isNull();
         assertThat(staleRow.getCreatedBySubject()).isNull();
+    }
+
+    // --- upstream-deletion inference is RECONCILIATION-only, in every integration (ADR 0024) ---
+
+    @Test
+    void initialPass_tombstonesNothing_evenWhenACleanEnumerationOmitsAMirroredDocument() {
+        // Identical fixture to cleanPass_marksCompleteAndTombstonesVanishedRows: the enumeration is clean
+        // and doc-stale is absent upstream. An INITIAL job must still not infer a deletion — the mirror is
+        // being populated, so "absent from the mirror's own half-built state" is not evidence of anything.
+        // This is the rule every SCM sweep already obeys.
+        OutlineDocument staleRow = mirrored("doc-stale");
+        staleRow.setBodyMarkdown("# old");
+        staleRow.setCreatedBySubject("user-1");
+        inMirror(staleRow);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T2)));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# body");
+
+        service(10).syncWorkspace(WORKSPACE, null, SyncJobType.INITIAL);
+
+        // Everything else about the pass is unchanged: it still upserts and still completes cleanly.
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+        assertThat(collection.getDocumentsSyncedAt()).isNotNull();
+        assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
+        assertThat(collection.getExportsSkippedForBudget()).isZero();
+        // Only the tombstone is withheld — body, authorship and the marker itself survive untouched.
+        assertThat(staleRow.isDeleted()).isFalse();
+        assertThat(staleRow.getBodyMarkdown()).isEqualTo("# old");
+        assertThat(staleRow.getCreatedBySubject()).isEqualTo("user-1");
+    }
+
+    @Test
+    void reconciliationPass_withTheSameFixture_doesTombstoneTheVanishedDocument() {
+        // The paired half of the test above: same fixture, RECONCILIATION instead of INITIAL, and the
+        // tombstone lands. Proves the gate discriminates on job type alone.
+        OutlineDocument staleRow = mirrored("doc-stale");
+        staleRow.setBodyMarkdown("# old");
+        staleRow.setCreatedBySubject("user-1");
+        inMirror(staleRow);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(List.of(meta("doc-1", T2)));
+        when(outlineApiClient.exportDocument(SERVER_URL, "token", "doc-1")).thenReturn("# body");
+
+        service(10).syncWorkspace(WORKSPACE, null, SyncJobType.RECONCILIATION);
+
+        assertThat(staleRow.isDeleted()).isTrue();
+        assertThat(staleRow.getBodyMarkdown()).isNull();
+        assertThat(staleRow.getCreatedBySubject()).isNull();
+    }
+
+    @Test
+    void reconciliationPass_withAnIncompleteEnumeration_stillTombstonesNothing() {
+        // The two guards are independent and both must hold. Here the job type permits a sweep, but the
+        // enumeration ran out of export budget, so it is not provably clean — fail closed, delete nothing.
+        OutlineDocument staleRow = mirrored("doc-stale");
+        staleRow.setBodyMarkdown("# old");
+        inMirror(staleRow);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T2), meta("doc-2", T1))
+        );
+        when(outlineApiClient.exportDocument(eq(SERVER_URL), eq("token"), anyString())).thenReturn("# body");
+
+        service(1).syncWorkspace(WORKSPACE, null, SyncJobType.RECONCILIATION);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        assertThat(staleRow.isDeleted()).isFalse();
+        assertThat(staleRow.getBodyMarkdown()).isEqualTo("# old");
     }
 
     @Test
