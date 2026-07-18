@@ -15,7 +15,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Architecture & Data',
-      items: ['system-design', 'database-schema', 'database-migration', 'achievements'],
+      items: ['system-design', 'sync-lifecycle', 'database-schema', 'database-migration', 'achievements'],
     },
     {
       type: 'category',

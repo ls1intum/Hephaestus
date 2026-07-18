@@ -130,6 +130,9 @@ celerybeat.pid
 .env
 .venv
 env/
+
+# Self-host: Traefik writes cert material here inside the operator's checkout
+docker/self-host/letsencrypt/
 venv/
 ENV/
 env.bak/

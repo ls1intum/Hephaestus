@@ -68,8 +68,8 @@ on:
         description: |
           Build only linux/amd64. Callers set this on pull requests to halve Docker build
           wall-clock + cost (the arm64 native build adds ~7 min and PR images are never deployed
-          to production). main + release builds leave this false so :latest and pinned digests stay
-          multi-arch.
+          to production). main + release builds leave this false so release tags and pinned
+          digests stay multi-arch.
     outputs:
       manifest-digest:
         description: "Digest (sha256:…) of the multi-arch manifest list. The release workflow records this for production pinning."
@@ -370,8 +370,9 @@ jobs:
         run: |
           {
             echo "tags<<EOF"
-            # Default tags
-            echo "type=raw,value=latest,enable={{is_default_branch}}"
+            # Default tags. Note: `latest` is NOT applied here — it tracks the latest
+            # release and is applied by the release workflow's retag step, together
+            # with the X.Y.Z and X.Y tags.
             echo "type=ref,event=branch"
             echo "type=ref,event=pr"
             echo "type=sha,prefix="

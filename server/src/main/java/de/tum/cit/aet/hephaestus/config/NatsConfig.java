@@ -32,7 +32,12 @@ public class NatsConfig {
             throw new IllegalStateException("NATS server configuration is missing.");
         }
 
-        Options options = Options.builder().server(natsProperties.server()).build();
+        // Infinite reconnect (-1) rather than the client default of 60: on exhaustion the NATS
+        // client CLOSES the connection and it never self-heals, which would silently and
+        // permanently kill the shared subscriptions riding this bean (SyncPushService's
+        // hephaestus.syncstatus.> live-push and the webhook JetStreamPublisher) installation-wide
+        // until redeploy. Matches IntegrationNatsConsumer#buildOptions.
+        Options options = Options.builder().server(natsProperties.server()).maxReconnects(-1).build();
         return Nats.connect(options);
     }
 }

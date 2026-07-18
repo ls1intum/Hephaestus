@@ -9,6 +9,9 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
@@ -50,8 +53,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -179,32 +185,27 @@ public class GithubDataSyncService {
         this.monitoringExecutor = monitoringExecutor;
     }
 
-    /**
-     * Syncs a sync target asynchronously using GraphQL.
-     *
-     * @param syncTarget the sync target to sync
-     */
+    /** Submits {@link #syncSyncTarget} to the monitoring executor. */
     public void syncSyncTargetAsync(SyncTarget syncTarget) {
         monitoringExecutor.submit(() -> syncSyncTarget(syncTarget));
     }
 
     /**
-     * Syncs a sync target using GraphQL API.
+     * Syncs a single repository's metadata, issues, PRs, and related data via GraphQL.
      *
-     * @param syncTarget the sync target to sync
+     * @return true if the sync succeeded or the target was legitimately removed (repository gone
+     *         upstream); false on a transient failure that should be retried next cycle
      */
-    public void syncSyncTarget(SyncTarget syncTarget) {
+    public boolean syncSyncTarget(SyncTarget syncTarget) {
         Long scopeId = syncTarget.scopeId();
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
 
-        // Check if scope is active before attempting sync
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped sync: reason=scopeNotActive, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
-            return;
+            return false;
         }
 
-        // Resolve the GitHub provider entity
         IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
             .orElseThrow(() ->
@@ -216,8 +217,8 @@ public class GithubDataSyncService {
             .orElse(null);
         boolean repositoryCreatedDuringSync = false;
 
-        // If repository doesn't exist locally, try to fetch and create it from GitHub
-        // This is needed for PAT workspaces where only RepositoryToMonitor entries exist initially
+        // PAT workspaces start with only a RepositoryToMonitor entry — fetch and create the
+        // repository from GitHub on first sync.
         if (repository == null) {
             log.debug(
                 "Repository not found locally, fetching from GitHub: scopeId={}, repoName={}",
@@ -228,25 +229,37 @@ public class GithubDataSyncService {
             try {
                 syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
             } catch (RepositoryNotFoundOnGitProviderException e) {
-                // Definitive 404 from GitHub: the repo really does not exist. Safe to drop
-                // the monitoring row so we stop polling for it.
+                // A definitive name-404. A repository with a stable native id almost certainly renamed
+                // or transferred (the id still resolves upstream) rather than being deleted — deleting
+                // the monitor here would lose data on every rename. Preserve the monitor and retry next
+                // cycle; a real deletion is caught by the repository.deleted webhook. Only legacy rows
+                // with no stable id fall back to removal.
+                if (syncTarget.nativeId() != null) {
+                    log.warn(
+                        "Preserving sync target despite name-404: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoName={}, nativeId={}",
+                        scopeId,
+                        safeNameWithOwner,
+                        syncTarget.nativeId()
+                    );
+                    return false;
+                }
                 log.info(
                     "Removing sync target: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
                     scopeId,
                     safeNameWithOwner
                 );
                 syncTargetProvider.removeSyncTarget(syncTarget.id());
-                return;
+                return true;
             }
             if (syncedRepository.isEmpty()) {
                 // Transient failure (auth, transport, rate limit, classification). Leave the
-                // RTM in place so the next cycle retries. See ADR-0012 / pass-14 incident.
+                // RTM in place so the next cycle retries. See ADR-0012.
                 log.debug(
                     "Skipped sync (transient): reason=syncReturnedEmpty, scopeId={}, repoName={}",
                     scopeId,
                     safeNameWithOwner
                 );
-                return;
+                return false;
             }
             repository = syncedRepository.get();
             repositoryCreatedDuringSync = true;
@@ -254,6 +267,15 @@ public class GithubDataSyncService {
         }
 
         Long repositoryId = repository.getId();
+
+        // Backfill the monitor's stable native id (legacy/PAT rows start null) and re-key its name if
+        // the domain repository already reflects an upstream rename. Once the id is captured, the
+        // NOT_FOUND handlers can distinguish a rename (heal) from a real deletion (remove).
+        syncTargetProvider.reconcileSyncTargetIdentity(
+            syncTarget.id(),
+            repository.getNativeId(),
+            repository.getNameWithOwner()
+        );
 
         log.info(
             "Starting repository sync: scopeId={}, repoId={}, repoName={}",
@@ -263,12 +285,6 @@ public class GithubDataSyncService {
         );
 
         try {
-            // P3 optimization: capture the previously-stored GitHub updatedAt before re-syncing
-            // metadata. If updatedAt hasn't changed after re-sync, the repository has no new
-            // activity (pushes, issues, PRs, labels, etc.) — we can skip all sub-syncs.
-            Instant previousUpdatedAt = repository.getUpdatedAt();
-
-            // Sync repository metadata (skip if we just created it above)
             if (!repositoryCreatedDuringSync) {
                 var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
                 if (syncedRepository.isPresent()) {
@@ -284,37 +300,14 @@ public class GithubDataSyncService {
                 }
             }
 
-            // Backfill commits from local git clone (runs BEFORE the repoUnchanged
-            // check because it uses local git, not the GitHub API — no rate limit concern).
-            // Must run even for "unchanged" repos to handle initial backfill when git
-            // checkout is first enabled. The backfill service has its own short-circuit
+            // Backfill commits from local git clone. Uses local git, not the GitHub API, so
+            // there is no rate limit concern. The backfill service has its own short-circuit
             // (HEAD SHA == latest known SHA → fast return).
             int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
 
-            // P3 optimization: skip sub-syncs when the repository has no new activity.
-            // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
-            // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
-            // Only apply this skip when we have a previous timestamp (not on first sync)
-            // AND when both issue/PR syncs have completed at least once (otherwise the
-            // backfill scheduler will spin indefinitely waiting for sync timestamps).
-            boolean initialSyncCompleted =
-                syncTarget.lastIssuesSyncedAt() != null && syncTarget.lastPullRequestsSyncedAt() != null;
-            boolean repoUnchanged =
-                !repositoryCreatedDuringSync &&
-                initialSyncCompleted &&
-                previousUpdatedAt != null &&
-                repository.getUpdatedAt() != null &&
-                !repository.getUpdatedAt().isAfter(previousUpdatedAt);
-
-            if (repoUnchanged) {
-                log.info(
-                    "Skipped sub-syncs: reason=repoUnchanged, repoId={}, repoName={}, updatedAt={}",
-                    repositoryId,
-                    safeNameWithOwner,
-                    repository.getUpdatedAt()
-                );
-                return;
-            }
+            // Do not gate the sub-syncs below on repository.updatedAt — GitHub does not reliably
+            // bump it on issue/PR/comment activity, so such a gate cannot see new PRs. Each sub-sync
+            // is independently cost-bounded (cooldowns; ~1-point count/latest-update probes).
 
             // Sync collaborators (with cooldown)
             int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, scopeId, repositoryId);
@@ -325,23 +318,34 @@ public class GithubDataSyncService {
             // Sync milestones (with cooldown — milestones rarely change)
             int milestonesCount = syncMilestonesIfNeeded(syncTarget, scopeId, repositoryId);
 
-            // Sync issues (with cursor persistence for resumability)
-            // Comments are synced inline with issues via the GraphQL query
+            // Sync issues — always from a fresh cursor, with cursor persistence disabled.
+            // Comments are synced inline with issues via the GraphQL query.
+            //
+            // The issue_sync_cursor / pull_request_sync_cursor columns belong to the historical
+            // backfill (GitHubHistoricalBackfillService), which paginates CREATED_AT DESC. This
+            // incremental path paginates UPDATED_AT DESC, so a backfill cursor points somewhere
+            // meaningless in this ordering: resuming from it lands deep in the list and skips the
+            // newest items, and writing our own cursor back clobbers backfill's checkpoint.
+            // Passing null for both the cursor and the syncTargetId (documented as "null to
+            // disable" cursor persistence) severs the read and the write. Cross-run resume of an
+            // updatedAt window is meaningless anyway — each run recomputes its own `since` from
+            // lastIssuesSyncedAt/lastPullRequestsSyncedAt, which are the real incremental state.
+            // As a bonus, a null cursor re-enables the cheap totalCount probe in issue sync.
             SyncResult issueResult = issueSyncService.syncForRepository(
                 scopeId,
                 repositoryId,
-                syncTarget.id(),
-                syncTarget.issueSyncCursor(),
+                null,
+                null,
                 syncTarget.lastIssuesSyncedAt()
             );
 
-            // Sync pull requests (with cursor persistence for resumability)
-            // Review threads and comments are synced inline with PRs via the GraphQL query
+            // Sync pull requests — same rationale as issues above.
+            // Review threads and comments are synced inline with PRs via the GraphQL query.
             SyncResult prResult = pullRequestSyncService.syncForRepository(
                 scopeId,
                 repositoryId,
-                syncTarget.id(),
-                syncTarget.pullRequestSyncCursor(),
+                null,
+                null,
                 syncTarget.lastPullRequestsSyncedAt()
             );
 
@@ -368,10 +372,10 @@ public class GithubDataSyncService {
                 );
             }
 
-            // Enrich unresolved commit authors via stored emails + GitHub GraphQL API.
-            // Runs AFTER collaborator/PR/issue sync so that users imported as side effects
-            // of those syncs are available for email → user_id resolution on the first cycle.
-            // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
+            // Enrich unresolved commit authors via stored emails + GitHub GraphQL API. Runs AFTER
+            // collaborator/PR/issue sync so that users imported as a side effect of those syncs are
+            // available for email → user_id resolution on the first cycle. Bounded by unique emails,
+            // not commit count.
             int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
 
             // Enrich commits with multi-author contributor data and associated PR links.
@@ -397,7 +401,6 @@ public class GithubDataSyncService {
                 );
             }
 
-            // Update discussion sync timestamp independently
             if (discussionResult.isCompleted()) {
                 syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.DISCUSSIONS, Instant.now());
             } else {
@@ -425,6 +428,7 @@ public class GithubDataSyncService {
                 issueResult.status(),
                 prResult.status()
             );
+            return issueResult.isCompleted() && prResult.isCompleted() && discussionResult.isCompleted();
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
             throw e;
@@ -432,20 +436,35 @@ public class GithubDataSyncService {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             Category category = classification.category();
 
+            boolean removed = false;
             switch (category) {
                 case NOT_FOUND -> {
-                    log.warn(
-                        "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
-                        scopeId,
-                        repositoryId,
-                        safeNameWithOwner,
-                        classification.message()
-                    );
-                    // Clean up the orphaned repository to prevent permanent sync errors
-                    // The repository no longer exists on GitHub, so delete it locally
-                    cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
-                    // Also remove the sync target to stop perpetual retries
-                    syncTargetProvider.removeSyncTarget(syncTarget.id());
+                    if (syncTarget.nativeId() != null) {
+                        // Stable id present → treat a name-404 as a rename/transfer, not a deletion.
+                        // Preserve both the repository and the monitor; a real deletion is caught by the
+                        // repository.deleted webhook, and deleting here on a rename would lose data. See
+                        // the create-block handler above for the full rationale.
+                        log.warn(
+                            "Preserving repository and sync target despite NOT_FOUND: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoId={}, repoName={}, nativeId={}",
+                            scopeId,
+                            repositoryId,
+                            safeNameWithOwner,
+                            syncTarget.nativeId()
+                        );
+                    } else {
+                        log.warn(
+                            "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
+                            scopeId,
+                            repositoryId,
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        // The repository no longer exists on GitHub; delete it locally so sync doesn't
+                        // fail indefinitely, and remove the sync target to stop perpetual retries.
+                        cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
+                        syncTargetProvider.removeSyncTarget(syncTarget.id());
+                        removed = true;
+                    }
                 }
                 case AUTH_ERROR -> log.error(
                     "Repository sync failed - authentication error: scopeId={}, repoId={}, error={}",
@@ -460,7 +479,6 @@ public class GithubDataSyncService {
                         repositoryId,
                         classification.message()
                     );
-                    // Honor the rate limit - wait before continuing
                     Duration waitTime = classification.suggestedWait();
                     if (waitTime != null && !waitTime.isZero()) {
                         log.info(
@@ -490,6 +508,7 @@ public class GithubDataSyncService {
                     e
                 );
             }
+            return removed;
         }
     }
 
@@ -510,7 +529,22 @@ public class GithubDataSyncService {
      * @param scopeId the scope ID
      */
     public void syncAllRepositories(Long scopeId) {
-        // Fail-fast for suspended installations - don't spawn ANY threads
+        syncAllRepositories(scopeId, null);
+    }
+
+    /**
+     * Same as {@link #syncAllRepositories(Long)}, additionally threading a {@link SyncExecutionHandle} for
+     * the manual "reconcile now" sync-job path ({@code GithubIntegrationSyncRunner}): cooperative
+     * cancellation is checked between repositories (and inside the rate-limit wait, in bounded
+     * slices — see {@link #waitForRateLimitReset(Long, BooleanSupplier)}), and coarse
+     * repos-done/repos-total progress is reported after each repository.
+     *
+     * @param scopeId the scope ID
+     * @param handle  the live job handle, or {@code null} for the untracked scheduled/lifecycle paths
+     *                (unchanged behavior — no cancellation checks, no progress reporting)
+     */
+    public void syncAllRepositories(Long scopeId, @Nullable SyncExecutionHandle handle) {
+        // Fail fast for a suspended installation so no threads are spawned for it at all.
         Long installationId = tokenProvider.getInstallationId(scopeId).orElse(null);
         if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
             log.info(
@@ -521,7 +555,6 @@ public class GithubDataSyncService {
             return;
         }
 
-        // Check if scope is active before attempting sync
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped scope sync: reason=scopeNotActive, scopeId={}", scopeId);
             return;
@@ -552,19 +585,28 @@ public class GithubDataSyncService {
         log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
         try {
-            // Sync organization and memberships first (users need to exist for later syncs)
             syncOrganizationAndMemberships(scopeId);
 
-            // Sync issue types BEFORE repositories (issue types are organization-level
-            // and must exist before issues are synced so they can be linked immediately)
+            // Issue types are organization-level and must exist before issues are synced so they can
+            // be linked immediately.
             syncIssueTypes(scopeId);
 
-            // Sync projects BEFORE repositories so embedded project items can be linked
+            // Projects sync before repositories so embedded project items can be linked.
             syncProjects(scopeId);
 
-            // Sync each repository (creates repository records, issues, PRs)
             int reposProcessed = 0;
             for (SyncTarget target : syncTargets) {
+                // Cooperative cancel for the manual "reconcile now" sync-job path — best-effort,
+                // checked between repositories only (see class-level SyncExecutionHandle javadoc).
+                if (handle != null && handle.isCancellationRequested()) {
+                    log.info(
+                        "Aborting remaining syncs: reason=cancellationRequested, scopeId={}, reposProcessed={}, reposRemaining={}",
+                        scopeId,
+                        reposProcessed,
+                        syncTargets.size() - reposProcessed
+                    );
+                    break;
+                }
                 // Check if installation became suspended mid-sync - abort remaining syncs
                 if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
                     log.info("Aborting remaining syncs: reason=installationSuspended, scopeId={}", scopeId);
@@ -585,11 +627,20 @@ public class GithubDataSyncService {
                         syncTargets.size() - reposProcessed
                     );
                     try {
-                        waitForRateLimitReset(scopeId);
+                        waitForRateLimitReset(scopeId, handle == null ? null : handle::isCancellationRequested);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         log.info(
                             "Startup sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
+                            scopeId,
+                            reposProcessed,
+                            syncTargets.size() - reposProcessed
+                        );
+                        break;
+                    }
+                    if (handle != null && handle.isCancellationRequested()) {
+                        log.info(
+                            "Aborting remaining syncs: reason=cancellationRequestedDuringRateLimitWait, scopeId={}, reposProcessed={}, reposRemaining={}",
                             scopeId,
                             reposProcessed,
                             syncTargets.size() - reposProcessed
@@ -601,12 +652,26 @@ public class GithubDataSyncService {
                     syncSyncTarget(target);
                 }
                 reposProcessed++;
+                if (handle != null) {
+                    handle.progress(
+                        reposProcessed,
+                        syncTargets.size(),
+                        // Just the repository — "N of M" is already the progress bar's own reading
+                        // (unitsCompleted/unitsTotal travel on the same record).
+                        SyncProgress.ofResource(
+                            SyncPhase.REPOSITORIES,
+                            "Syncing " + sanitizeForLog(target.repositoryNameWithOwner()),
+                            sanitizeForLog(target.repositoryNameWithOwner()),
+                            reposProcessed,
+                            syncTargets.size()
+                        )
+                    );
+                }
             }
 
-            // Sync teams AFTER repositories exist (team repo permissions need repos to exist)
+            // Teams sync after repositories exist (team repo permissions need repos to exist).
             syncTeams(scopeId);
 
-            // Sync scope-level relationships (after all issues/PRs are synced)
             syncScopeLevelRelationships(scopeId);
         } catch (InstallationNotFoundException e) {
             log.warn(
@@ -644,12 +709,10 @@ public class GithubDataSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         try {
-            // Sync organization and memberships
             var organization = organizationSyncService.syncOrganization(scopeId, organizationLogin);
             if (organization != null) {
                 log.debug("Synced organization: scopeId={}, orgLogin={}", scopeId, safeOrgLogin);
 
-                // Notify listener to sync scope members from organization members
                 organizationMembershipListener.onOrganizationMembershipsSynced(
                     new OrganizationSyncedEvent(organization.getId(), organizationLogin)
                 );
@@ -694,9 +757,8 @@ public class GithubDataSyncService {
      */
     private void syncIssueTypes(Long scopeId) {
         try {
-            // Sync issue types (has internal cooldown check)
-            // Wrapped with retry because the method is @Transactional and a deadlock
-            // would poison the transaction, requiring a fresh invocation.
+            // Wrapped with retry because the method is @Transactional and a deadlock would poison
+            // the transaction, requiring a fresh invocation.
             int issueTypesCount = retryOnTransientFailure(
                 () -> issueTypeSyncService.syncIssueTypesForScope(scopeId),
                 "issue type sync for scopeId=" + scopeId
@@ -879,7 +941,6 @@ public class GithubDataSyncService {
     private void syncProjectItems(Long scopeId, String organizationLogin) {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
-        // Find the organization to get its ID
         Organization organization = organizationRepository
             .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
             .orElse(null);
@@ -888,7 +949,6 @@ public class GithubDataSyncService {
             return;
         }
 
-        // Get projects needing item sync, ordered by staleness
         List<Project> projects = projectSyncService.getProjectsNeedingItemSync(organization.getId());
         if (projects.isEmpty()) {
             log.debug("Skipped project items sync: reason=noProjects, orgLogin={}", safeOrgLogin);
@@ -966,7 +1026,6 @@ public class GithubDataSyncService {
         }
 
         try {
-            // Sync issue dependencies (has internal cooldown check)
             int dependenciesCount = issueDependencySyncService.syncDependenciesForScope(scopeId);
             if (dependenciesCount >= 0) {
                 log.debug("Synced issue dependencies: scopeId={}, dependencyCount={}", scopeId, dependenciesCount);
@@ -987,7 +1046,6 @@ public class GithubDataSyncService {
         }
 
         try {
-            // Sync sub-issues (has internal cooldown check)
             int subIssuesCount = subIssueSyncService.syncSubIssuesForScope(scopeId);
             if (subIssuesCount >= 0) {
                 log.debug("Synced sub-issues: scopeId={}, subIssueCount={}", scopeId, subIssuesCount);
@@ -1036,7 +1094,6 @@ public class GithubDataSyncService {
             "collaborator sync for repoId=" + repositoryId
         );
 
-        // Update sync timestamp
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
 
         return count;
@@ -1306,32 +1363,94 @@ public class GithubDataSyncService {
      * @throws InterruptedException if the thread is interrupted while waiting
      */
     void waitForRateLimitReset(Long scopeId) throws InterruptedException {
-        for (int cycle = 0; cycle < MAX_RATE_LIMIT_WAIT_CYCLES; cycle++) {
-            rateLimitTracker.waitIfNeeded(scopeId);
-            if (!rateLimitTracker.isCritical(scopeId)) {
-                log.info(
-                    "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
+        waitForRateLimitReset(scopeId, null);
+    }
+
+    /**
+     * Maximum single sleep slice when a cancellation source is supplied, so a manual "Stop" request
+     * is observed within seconds instead of after {@link RateLimitTracker}'s own up-to-5-minute
+     * blocking wait.
+     */
+    private static final Duration MAX_CANCELLABLE_WAIT_SLICE = Duration.ofSeconds(30);
+
+    /**
+     * Same as {@link #waitForRateLimitReset(Long)}, additionally polling {@code cancelRequested}
+     * between sleep slices of at most {@link #MAX_CANCELLABLE_WAIT_SLICE} instead of delegating the
+     * whole wait to {@link RateLimitTracker#waitIfNeeded}, whose single call can block up to 5
+     * minutes. Behavior for {@code cancelRequested == null} is unchanged (existing scheduler/startup
+     * callers).
+     *
+     * @param scopeId         the scope to wait for
+     * @param cancelRequested polled between slices; {@code null} preserves the original
+     *                        non-cancellable behavior
+     * @throws InterruptedException if the thread is interrupted while waiting
+     */
+    void waitForRateLimitReset(Long scopeId, @Nullable BooleanSupplier cancelRequested) throws InterruptedException {
+        if (cancelRequested == null) {
+            for (int cycle = 0; cycle < MAX_RATE_LIMIT_WAIT_CYCLES; cycle++) {
+                rateLimitTracker.waitIfNeeded(scopeId);
+                if (!rateLimitTracker.isCritical(scopeId)) {
+                    log.info(
+                        "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
+                        scopeId,
+                        rateLimitTracker.getRemaining(scopeId),
+                        cycle + 1
+                    );
+                    return;
+                }
+                // Still critical — wait a bit and retry (handles edge cases like
+                // clock skew or API returning lower-than-expected remaining)
+                log.debug(
+                    "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
                     scopeId,
                     rateLimitTracker.getRemaining(scopeId),
-                    cycle + 1
+                    cycle + 1,
+                    MAX_RATE_LIMIT_WAIT_CYCLES
+                );
+            }
+            log.warn(
+                "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
+                scopeId,
+                rateLimitTracker.getRemaining(scopeId),
+                MAX_RATE_LIMIT_WAIT_CYCLES
+            );
+            return;
+        }
+
+        // Cancellable path: mirror the same total budget (cycles * tracker's max wait) as the
+        // non-cancellable path, but in bounded slices so a cancel request lands within seconds.
+        Instant deadline = Instant.now().plus(Duration.ofMinutes(5).multipliedBy(MAX_RATE_LIMIT_WAIT_CYCLES));
+        while (Instant.now().isBefore(deadline)) {
+            if (cancelRequested.getAsBoolean()) {
+                log.info(
+                    "Rate limit wait cancelled: scopeId={}, remaining={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId)
                 );
                 return;
             }
-            // Still critical — wait a bit and retry (handles edge cases like
-            // clock skew or API returning lower-than-expected remaining)
-            log.debug(
-                "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
-                scopeId,
-                rateLimitTracker.getRemaining(scopeId),
-                cycle + 1,
-                MAX_RATE_LIMIT_WAIT_CYCLES
-            );
+            if (!rateLimitTracker.isCritical(scopeId)) {
+                log.info(
+                    "Rate limit recovered, resuming sync: scopeId={}, remaining={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId)
+                );
+                return;
+            }
+            Instant resetAt = rateLimitTracker.getResetAt(scopeId);
+            Duration untilReset =
+                resetAt == null ? MAX_CANCELLABLE_WAIT_SLICE : Duration.between(Instant.now(), resetAt);
+            Duration sleepFor =
+                untilReset.compareTo(MAX_CANCELLABLE_WAIT_SLICE) > 0 ? MAX_CANCELLABLE_WAIT_SLICE : untilReset;
+            if (sleepFor.isNegative() || sleepFor.isZero()) {
+                sleepFor = Duration.ofSeconds(1);
+            }
+            Thread.sleep(sleepFor.toMillis());
         }
         log.warn(
-            "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
+            "Rate limit wait deadline exhausted, proceeding anyway: scopeId={}, remaining={}",
             scopeId,
-            rateLimitTracker.getRemaining(scopeId),
-            MAX_RATE_LIMIT_WAIT_CYCLES
+            rateLimitTracker.getRemaining(scopeId)
         );
     }
 }

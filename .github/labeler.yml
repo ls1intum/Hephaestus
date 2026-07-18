@@ -1,5 +1,5 @@
-# Auto-labeler configuration for PRs
-# Labels assigned here are used by .github/release.yml for categorized release notes
+# Auto-labeler configuration for PRs (triage only — release notes come from
+# changesets, not labels; see docs/contributor/release-management.mdx)
 
 documentation:
   - changed-files:

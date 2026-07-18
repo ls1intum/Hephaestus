@@ -51,7 +51,8 @@ UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.
 
 ### Setup
 
-Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) for the Spring Boot application server (with the in-process Pi mentor agent) and the React client in `webapp`.
+- **Self-hosting:** follow the [install guide](https://ls1intum.github.io/Hephaestus/admin/install) ([INSTALL.md](INSTALL.md)) — one supported Docker Compose path.
+- **Development:** read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) for the Spring Boot application server (with the in-process Pi mentor agent) and the React client in `webapp`.
 
 ## Contributing
 

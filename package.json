@@ -1,8 +1,10 @@
 {
 	"name": "hephaestus",
+	"version": "0.73.2",
 	"private": true,
 	"packageManager": "pnpm@11.1.2",
 	"scripts": {
+		"changeset:version": "changeset version && node scripts/sync-selfhost-version.mjs",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
 		"generate:api:application-server:specs": "cd server && sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then ./mvnw verify -DskipTests=true -Dapp.profiles=specs; else SPRING_DOCKER_COMPOSE_ENABLED=false ./mvnw verify -DskipTests=true -Dapp.profiles=specs; fi'",
 		"generate:api:application-server:client": "pnpm run generate:api:application-server:clean && pnpm --filter webapp run openapi-ts",
@@ -43,6 +45,7 @@
 		"check:ports": "scripts/check-ports.sh",
 		"github:update-schema": "pnpm exec tsx scripts/update-github-schema.ts",
 		"gitlab:update-schema": "pnpm exec tsx scripts/update-gitlab-schema.ts",
+		"outline:update-spec": "pnpm exec tsx scripts/update-outline-spec.ts",
 		"docs:dev": "pnpm --filter docs run start",
 		"docs:build": "pnpm --filter docs run build",
 		"docs:serve": "pnpm --filter docs run serve",
@@ -58,6 +61,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",
+		"@changesets/cli": "2.31.1",
 		"@commitlint/cli": "21.0.1",
 		"@commitlint/config-conventional": "21.0.1",
 		"@nats-io/jetstream": "3.4.0",

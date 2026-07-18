@@ -1,7 +1,6 @@
 import { useReactFlow } from "@xyflow/react";
 import {
 	List,
-	Loader2,
 	Map as MapIcon,
 	Maximize2,
 	RefreshCw,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import type { ViewMode } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +66,7 @@ export function AchievementHeader({
 			<div className="flex items-center gap-4">
 				{isLoading ? (
 					<div className="flex items-center gap-2 px-3 py-1 bg-secondary/30 text-muted-foreground rounded-full border border-border text-xs font-medium">
-						<Loader2 className="w-3.5 h-3.5 animate-spin" />
+						<Spinner className="size-3.5" />
 						Loading achievements...
 					</div>
 				) : isError ? (
@@ -90,7 +90,7 @@ export function AchievementHeader({
 						<ToggleGroupItem
 							value="tree"
 							aria-label="achievements tree view"
-							className="h-8 px-3 data-[state=on]:bg-background"
+							className="h-8 px-3 data-pressed:bg-background data-pressed:shadow-sm"
 						>
 							<MapIcon className="w-4 h-4 mr-1" />
 							<span className="text-sm">Tree</span>
@@ -98,7 +98,7 @@ export function AchievementHeader({
 						<ToggleGroupItem
 							value="list"
 							aria-label="achievements list view"
-							className="h-8 px-3 data-[state=on]:bg-background"
+							className="h-8 px-3 data-pressed:bg-background data-pressed:shadow-sm"
 						>
 							<List className="w-4 h-4 mr-1" />
 							<span className="text-sm">List</span>
