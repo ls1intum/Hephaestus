@@ -15,14 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Pins the attribution fix (75e51c1a5) on the GitHub side: the initiating admin's actorRef must be woven
- * into the OAuth state via the 3-arg issue(), so the post-callback connection audit row attributes the
- * connect to them. The Slack side is covered by SlackConnectionStrategyTest; the GitHub controller test
- * passes a null authentication, so a re-dropped actorRef would otherwise slip through unnoticed.
+ * Attribution: the initiating admin's actorRef must be woven into the OAuth state via the 3-arg
+ * {@code issue()}, so the post-callback connection audit row attributes the connect to them. The GitHub
+ * controller test passes a null authentication, so only this unit test catches a dropped actorRef.
  *
- * <p>Also pins the F2 disconnect-erase wiring: {@code revoke} must drive the shared SCM eraser, not the
- * old no-op log. Without this the admin-disconnect trigger silently regresses to "keeps the mirror
- * forever" while the vendor-uninstall trigger still erases — the exact asymmetry F2 closed.
+ * <p>Disconnect-erase wiring: {@code revoke} must drive the shared SCM eraser, not a no-op. Otherwise
+ * the admin-disconnect trigger keeps the mirror forever while the vendor-uninstall trigger erases —
+ * an asymmetry between the two disconnect paths.
  */
 class GithubConnectionStrategyTest extends BaseUnitTest {
 

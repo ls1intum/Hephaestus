@@ -214,7 +214,7 @@
         </rollback>
     </changeSet>
 
-    <!-- One-time repair of backfill cursors that a pre-fix incremental run could have poisoned. -->
+    <!-- One-time repair of backfill cursors that an interrupted incremental sync could have poisoned. -->
 
     <changeSet author="FelixTJDietrich" id="1784058330088-10">
         <preConditions onFail="MARK_RAN" onFailMessage="repository_to_monitor sync cursor columns not present">
@@ -224,24 +224,24 @@
             </and>
         </preConditions>
         <comment>
-            issue_sync_cursor / pull_request_sync_cursor now belong to the historical backfill alone,
-            which paginates CREATED_AT DESC. Before this branch the incremental sync
-            (GitHubIssueSyncService / GitHubPullRequestSyncService, via GithubDataSyncService) also
-            checkpointed into these same columns while paginating UPDATED_AT DESC, and only cleared
-            them on a clean finish — so any run that aborted mid-pagination (rate limit, restart,
-            transport failure) left an UPDATED_AT-ordered cursor behind. GitHubHistoricalBackfillService
-            reads that column back as its resume offset, so on an existing deployment backfill can
-            resume a CREATED_AT-ordered walk from an offset that means nothing in that ordering, page
-            to the end, and mark itself complete having permanently skipped a window of history: the
-            skipped items are older than lastIssuesSyncedAt, so the incremental "since" window never
-            picks them up either. Code alone cannot repair state already written to the database.
+            issue_sync_cursor / pull_request_sync_cursor belong to the historical backfill alone,
+            which paginates CREATED_AT DESC. An earlier incremental sync path (GitHubIssueSyncService
+            / GitHubPullRequestSyncService, via GithubDataSyncService) also checkpointed into these
+            same columns while paginating UPDATED_AT DESC and cleared them only on a clean finish, so
+            any run that aborted mid-pagination (rate limit, restart, transport failure) could leave
+            an UPDATED_AT-ordered cursor behind. GitHubHistoricalBackfillService reads that column
+            back as its resume offset, so backfill can resume a CREATED_AT-ordered walk from an offset
+            that means nothing in that ordering, page to the end, and mark itself complete having
+            permanently skipped a window of history — the skipped items are older than
+            lastIssuesSyncedAt, so the incremental "since" window never picks them up either.
 
-            The fix is to distrust every cursor that is not provably backfill's own. We cannot tell a
-            poisoned cursor from a legitimate backfill checkpoint, so we clear both columns wherever
-            that kind's backfill has not yet completed and backfill therefore restarts that repository
-            from the top. That is safe — backfill upserts idempotently — and costs one re-pagination.
-            Rows whose backfill already completed are left alone: there is nothing left to resume, so
-            the stale cursor is never read and re-paginating a finished repository would be pure cost.
+            This migration distrusts every cursor that is not provably backfill's own. A poisoned
+            cursor is indistinguishable from a legitimate backfill checkpoint, so it clears both
+            columns wherever that kind's backfill has not yet completed; backfill then restarts that
+            repository from the top. That is safe — backfill upserts idempotently — and costs one
+            re-pagination. Rows whose backfill already completed are left alone: there is nothing left
+            to resume, so the stale cursor is never read and re-paginating a finished repository would
+            be pure cost.
 
             The completeness predicate mirrors RepositoryToMonitor#isIssueBackfillComplete /
             #isPullRequestBackfillComplete exactly: initialized (high water mark set) AND either the
@@ -272,11 +272,10 @@
         </sql>
         <rollback>
             <!--
-                Intentionally empty. This changeset clears untrustworthy cursor values; the values it
-                discards are exactly the ones we do not want back, and they are not recorded anywhere
-                to restore from. Rolling back is a no-op rather than a fake restore: the only effect
-                of the forward migration is that backfill re-paginates from the top, which is
-                idempotent and self-correcting whichever direction the schema moves.
+                Intentionally empty. This changeset clears untrustworthy cursor values that are not
+                recorded anywhere to restore from. The only effect of the forward migration is that
+                backfill re-paginates from the top, which is idempotent and self-correcting, so a
+                rollback has nothing to undo.
             -->
             <empty/>
         </rollback>

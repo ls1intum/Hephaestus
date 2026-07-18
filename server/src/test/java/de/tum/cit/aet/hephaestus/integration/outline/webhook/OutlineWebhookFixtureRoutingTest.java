@@ -115,7 +115,7 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
         String subject = verifySubjectRoundTrip(payload, subscriptionId, event);
         verifyHandlerRouting(body, subscriptionId, event, payloadId, actorId, createdAtRaw);
 
-        // Belt-and-braces: the subject the deriver actually emitted for this fixture round-trips too.
+        // The subject the deriver actually emitted for this fixture round-trips through the parser too.
         assertThat(PARSER.parse(subject).kind()).isEqualTo(IntegrationKind.OUTLINE);
     }
 
@@ -181,7 +181,7 @@ class OutlineWebhookFixtureRoutingTest extends BaseUnitTest {
             ArgumentCaptor<OutlineDocumentModel> model = ArgumentCaptor.forClass(OutlineDocumentModel.class);
             verify(syncScheduler).refreshDocumentNow(eq(WORKSPACE_ID), eq(event), eq(payloadId), model.capture());
             // Every committed fixture carries a full payload.model — the HMAC-authenticated metadata the
-            // handler now trusts, sparing the sync path its own documents.info round-trip.
+            // handler trusts, sparing the sync path its own documents.info round-trip.
             assertThat(model.getValue())
                 .as("event %s (payload id %s) must carry a usable payload.model", event, payloadId)
                 .isNotNull();

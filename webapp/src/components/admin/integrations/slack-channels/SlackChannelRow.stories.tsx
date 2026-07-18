@@ -91,8 +91,8 @@ export const Monitoring: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("Monitoring")).toBeInTheDocument();
-		// The announced time is the shared ticking RelativeTime, exposed as a real tooltip button
-		// (its absolute time is one hover away) rather than the frozen string the row printed before.
+		// The announced time is the shared ticking RelativeTime, exposed as a real tooltip button so
+		// its absolute time is one hover away and reachable by keyboard.
 		const announced = canvas.getByRole("button", { name: /ago$/i });
 		await expect(announced.tagName).toBe("BUTTON");
 
@@ -131,7 +131,6 @@ export const Revoked: Story = {
 			await screen.findByRole("menuitem", { name: /view history/i }),
 		).toBeInTheDocument();
 
-		// Terminal state: no lifecycle transition and nothing left to erase.
 		await expect(
 			screen.queryByRole("menuitem", { name: /activate monitoring/i }),
 		).not.toBeInTheDocument();

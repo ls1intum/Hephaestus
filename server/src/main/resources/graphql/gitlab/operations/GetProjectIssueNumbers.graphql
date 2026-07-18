@@ -7,10 +7,10 @@
 # per node and pays a large complexity cost against GitLab's 100-points-per-minute budget; the sweep
 # needs only the key set, never the content.
 #
-# `count` is load-bearing, not decoration: the sweep compares it against the number of IIDs it
-# actually received and refuses to delete anything unless the two agree. Without it, a listing that
-# silently stopped short would be indistinguishable from a project that really has fewer issues — and
-# would authorize deleting every issue past the truncation point.
+# `count` guards the sweep: it is compared against the number of IIDs actually received, and nothing
+# is deleted unless the two agree. Without it, a listing that silently stopped short would be
+# indistinguishable from a project that really has fewer issues — and would authorize deleting every
+# issue past the truncation point.
 #
 # `sort: CREATED_ASC` (not the content query's UPDATED_DESC): a stable, append-only order. An issue
 # created upstream while pagination is in flight sorts to the END, so it is either enumerated before
@@ -23,8 +23,8 @@
 # how a sweep deletes live data. Confidential issues the token can see are enumerated too; they are a
 # superset of what the mirror stores (the mirror skips confidential), so their presence upstream can
 # only protect a local row, never delete one.
-# `issuesEnabled` is the other load-bearing scalar here, and it exists for a failure the `count`
-# cross-check provably cannot catch. GitLab's IssuesFinder scopes its query with
+# `issuesEnabled` guards a failure the `count` cross-check cannot catch. GitLab's IssuesFinder scopes
+# its query with
 # `.merge(Project.with_issues_enabled)`: a project whose Issues feature is switched off is filtered
 # out of the finder entirely, so this query returns `count: 0` and zero nodes — a syntactically
 # perfect, fully paginated, "complete" empty listing. `0 == 0` passes the count check, and the sweep

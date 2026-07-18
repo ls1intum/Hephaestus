@@ -114,10 +114,8 @@ function rateLimitReading(rateLimit: RateLimitSnapshot): ReactNode {
 }
 
 function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
-	// Each fact is internally tight (icon + label + value at `gap-2`), so a large between-item gap read
-	// as loose and inconsistent. A thin rule between items gives that space a job — the diagnostics now
-	// scan as one grouped row rather than three scattered ones — and a modest, uniform gap keeps the
-	// rhythm calm. The rule is decorative, so it stays out of the assistive-tech list.
+	// A thin vertical rule separates each fact so the diagnostics scan as one grouped row. The rule is
+	// decorative, so it stays out of the assistive-tech list.
 	const diagnostics: ReactElement[] = [];
 
 	// Gated like the rate limit below, and for the same reason: a diagnostic is only honest when
@@ -170,7 +168,7 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 		);
 	}
 
-	// Every row is now gated on a real observation, so a connection that reports none (a fresh Slack
+	// Every row is gated on a real observation, so a connection that reports none (a fresh Slack
 	// workspace before its first event) has nothing to qualify — render no empty row rather than an
 	// invisible flex box the surrounding `space-y-4` would still pad around.
 	if (diagnostics.length === 0) return null;

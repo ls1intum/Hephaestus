@@ -28,8 +28,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
  * system as erased — while Slack messages, Outline documents, org-tier teams and organization
  * memberships, derived practices/activity rows and still-ACTIVE {@code Connection} rows all
  * survived. The end-to-end row-level proof runs against real Postgres in
- * {@code ScmWorkspaceErasureIntegrationTest}; this test pins the delegation itself so the bespoke
- * path cannot come back.
+ * {@code ScmWorkspaceErasureIntegrationTest}; this test pins the delegation itself.
  */
 class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
 

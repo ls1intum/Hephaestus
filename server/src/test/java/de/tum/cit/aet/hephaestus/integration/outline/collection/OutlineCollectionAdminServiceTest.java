@@ -230,7 +230,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
     @Test
     void resume_resetsSyncStatusToPending_andDefersTheKickToAfterCommit() {
         // updateState is transactional and the sync it kicks runs in its OWN transaction. Calling the sync
-        // inline let it read the row before the ENABLED write committed — it would see PAUSED, no-op, and
+        // inline would let it read the row before the ENABLED write commits — it would see PAUSED, no-op, and
         // the collection would stay frozen. The kick must therefore be an event, not a call.
         OutlineCollectionAdminService service = service();
         when(
@@ -254,7 +254,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         service.onCollectionResumed(new OutlineCollectionAdminService.OutlineCollectionResumedEvent(WS, COLLECTION_ID));
 
         verify(syncScheduler).syncCollectionNow(WS, COLLECTION_ID);
-        // The phase is the whole point of the indirection — pin it, not just the fact that an event exists.
+        // Pin the AFTER_COMMIT phase, not just that an event exists — the phase is what defers the kick past commit.
         TransactionalEventListener listener = OutlineCollectionAdminService.class.getDeclaredMethod(
             "onCollectionResumed",
             OutlineCollectionAdminService.OutlineCollectionResumedEvent.class

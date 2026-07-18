@@ -12,12 +12,10 @@ export interface TableRowsSkeletonProps {
 }
 
 /**
- * Placeholder `<tbody>` rows for a table whose `<thead>` is already mounted.
- *
- * A skeleton is only worth rendering if it reserves the box the content will occupy; a stack of
- * full-width grey bars standing in for a table promises the wrong shape and guarantees a shift when
- * the real header and columns arrive. Pairing this with the table's real header means the only thing
- * that changes on resolve is the text.
+ * Placeholder `<tbody>` rows for a table whose `<thead>` is already mounted, so the skeleton reserves
+ * the real column box. A stack of full-width grey bars would promise the wrong shape and shift the
+ * layout when the real columns arrive; pairing this with the real header means only the text changes
+ * on resolve.
  */
 export function TableRowsSkeleton({ columns, rows = 5 }: TableRowsSkeletonProps) {
 	return (

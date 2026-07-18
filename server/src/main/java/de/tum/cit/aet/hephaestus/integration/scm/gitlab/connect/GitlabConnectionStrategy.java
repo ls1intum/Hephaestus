@@ -16,8 +16,7 @@ import org.springframework.stereotype.Component;
 /**
  * GitLab connection lifecycle strategy.
  *
- * <p>GitLab uses a Personal Access Token paste flow (no OAuth round-trip in the
- * first-cut migration). The user enters:
+ * <p>GitLab uses a Personal Access Token paste flow (no OAuth round-trip). The user enters:
  * <ul>
  *   <li>{@code pat} — their GitLab PAT scoped to {@code api}, {@code read_repository}, {@code write_repository}
  *   <li>{@code group_id} — the GitLab group id the PAT has access to; becomes the
@@ -37,8 +36,7 @@ import org.springframework.stereotype.Component;
  * are handled by the caller via {@code ConnectionService.disconnect()}.
  *
  * <p>Disconnect is GitLab's <b>only</b> erase trigger: unlike a GitHub App there is no vendor-side
- * uninstall signal for a PAT, so before this wiring GitLab-mirrored data could not be erased at all
- * short of manual SQL.
+ * uninstall signal for a PAT.
  */
 @ConditionalOnServerRole
 @Component

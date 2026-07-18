@@ -6,11 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjec
 import org.jspecify.annotations.Nullable;
 
 /**
- * Container for a Pull Request DTO with its embedded conversation comments, reviews,
- * review threads, and project items.
- * <p>
- * Used during sync to process comments, reviews, review comments, and project items inline
- * with PRs, eliminating N+1 queries.
+ * Container for a Pull Request DTO with its embedded conversation comments, reviews, review
+ * threads, and project items, fetched inline with PRs during sync to eliminate N+1 queries.
  * <p>
  * <h2>Embedded Data</h2>
  * <ul>

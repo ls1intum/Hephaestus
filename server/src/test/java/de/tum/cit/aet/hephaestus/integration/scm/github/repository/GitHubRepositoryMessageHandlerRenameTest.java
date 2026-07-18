@@ -29,12 +29,12 @@ import org.mockito.Mock;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Proves the real-time half of the rename/transfer fix: a {@code repository.renamed} /
- * {@code repository.transferred} webhook must re-key BOTH the mirrored domain row and every
- * workspace's {@code RepositoryToMonitor} — by the provider-stable {@code repository.id}, never by the
- * name that just moved — and rebuild the NATS consumer filters. Skipping the monitor half leaves the
- * repo-scoped subject filter pinned to the old name, so every later issue/PR/review/push event for the
- * repository is silently ACK-dropped until the next reconcile cycle (the pre-fix freeze).
+ * A {@code repository.renamed} / {@code repository.transferred} webhook must re-key BOTH the mirrored
+ * domain row and every workspace's {@code RepositoryToMonitor} — by the provider-stable
+ * {@code repository.id}, never by the name that just moved — and rebuild the NATS consumer filters.
+ * Skipping the monitor half leaves the repo-scoped subject filter pinned to the old name, so every
+ * later issue/PR/review/push event for the repository is silently ACK-dropped until the next reconcile
+ * cycle.
  */
 class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
 

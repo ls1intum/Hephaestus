@@ -253,9 +253,8 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
     }
 
     /**
-     * The deletion sweep is the ONLY thing separating a RECONCILIATION from an INITIAL pass — before
-     * it existed the two enum constants dispatched to a byte-identical body, so the type carried no
-     * meaning. These tests pin that difference to the job type.
+     * The deletion sweep is the only thing separating a RECONCILIATION from an INITIAL pass; these
+     * tests pin that difference to the job type.
      */
     @Nested
     class DeletionSweep {

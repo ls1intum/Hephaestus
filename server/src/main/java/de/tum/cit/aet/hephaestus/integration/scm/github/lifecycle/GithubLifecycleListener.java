@@ -136,10 +136,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
      * SPI hook: bridge to {@link #createOrUpdateFromInstallation} by parsing the
      * installation id from {@link IntegrationRef#instanceKey()}.
      *
-     * <p>The {@code initialResources} list is intentionally ignored here: repository
-     * monitor creation lives in {@code WorkspaceProvisioningAdapter} which has the
-     * monitor-service dependency. SPI dispatch arrives without that context; the
-     * adapter path is the rich entry, this is the framework-symmetric one.
+     * <p>The {@code initialResources} list is ignored: repository monitor creation lives
+     * in {@code WorkspaceProvisioningAdapter}, which holds the monitor-service dependency
+     * that plain SPI dispatch doesn't carry.
      */
     @Override
     public void onInstanceInstalled(InstanceProvisioned event) {
@@ -260,25 +259,21 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         String avatarUrl,
         RepositorySelection repositorySelection
     ) {
-        // Check if installation is suspended BEFORE any reactivation logic.
-        // This prevents NATS replay of old "created" events from reactivating suspended workspaces
-        // and triggering hundreds of failed repository syncs.
+        // Check suspension before any reactivation logic: replayed NATS "created" events
+        // must not reactivate a suspended workspace and re-trigger failed repository syncs.
         if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
             log.info("Skipped workspace reactivation: reason=installationSuspended, installationId={}", installationId);
             return null;
         }
 
-        // First check if an installation-backed workspace already exists for this
-        // installation ID
         Workspace workspace = workspaceRepository.findByInstallationId(installationId).orElse(null);
 
         if (workspace == null && !isBlank(accountLogin)) {
-            // Check if there's an existing workspace for this account
             Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
 
-            // Refuse cross-vendor attach. A GitHub install for "HephaestusTest" must not
-            // co-tenant onto a workspace whose ACTIVE Connection is GITLAB/SLACK
-            // — they are separate tenants that happen to share the account-login string.
+            // Refuse cross-vendor attach: a GitHub install must not co-tenant onto a workspace
+            // whose ACTIVE Connection is GITLAB/SLACK — separate tenants that happen to share
+            // the account-login string.
             if (existingByLogin != null) {
                 boolean hasNonGithubActive =
                     connectionService.findActive(existingByLogin.getId(), IntegrationKind.GITLAB).isPresent() ||
@@ -349,8 +344,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             );
 
             if (ownerUserId == null) {
-                // Cannot sync the owner user - likely an old/deleted installation
-                // Log and return null to skip workspace creation
+                // Likely an old or deleted installation whose owner user can no longer be resolved.
                 log.warn(
                     "Skipped workspace creation, cannot sync owner user: installationId={}, accountLogin={}",
                     installationId,
@@ -367,10 +361,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 "install-" + installationId + "-" + accountLogin
             );
 
-            // We intentionally do NOT create a redirect from the desired slug to the
-            // allocated slug here, because the desired slug may already belong to
-            // another workspace. Redirecting would leak or hijack that workspace.
-            // Instead, callers must surface the allocated slug to the user.
+            // Do NOT redirect the desired slug to the allocated slug: the desired slug may
+            // belong to another workspace, and redirecting would leak or hijack it. Callers
+            // must surface the allocated slug to the user instead.
             workspace = createWorkspace(availableSlug, accountLogin, accountLogin, wsAccountType, ownerUserId);
             log.info(
                 "Created workspace from installation: workspaceSlug={}, installationId={}, ownerUserId={}, requestedSlug={}",
@@ -389,8 +382,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             workspace.setRepositorySelection(repositorySelection);
         }
 
-        // Reactivate workspace if it was previously purged or suspended
-        // This handles the case where an installation is deleted and then recreated
+        // Reactivating (was PURGED or SUSPENDED) covers an installation deleted and recreated.
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
                 "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
@@ -401,8 +393,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         }
 
-        // Create Organization entity BEFORE repositories are created
-        // This ensures repositories created during provisioning have organization_id set
+        // Organization must exist before repositories are created so they get organization_id set.
         if (accountKind == AccountKind.ORGANIZATION && accountId != null) {
             Long providerId = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -420,10 +411,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
         Workspace saved = workspaceRepository.save(workspace);
 
-        // Bind the GitHub App installation to this workspace via the Connection registry.
-        // upsertGitHubAppConnection retires any non-matching GITHUB connection on this
-        // workspace (PAT or stale App) and either re-uses or creates the new App row.
-        // Correlation id is stable per installation so webhook redelivery is idempotent.
+        // upsertGitHubAppConnection retires any non-matching GITHUB connection on this workspace
+        // (PAT or stale App) and reuses or creates the App row. Correlation id is stable per
+        // installation so webhook redelivery is idempotent.
         connectionService.upsertGitHubAppConnection(
             saved,
             installationId,
@@ -435,9 +425,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Stop NATS consumer for a workspace tied to an installation.
-     * Used when an installation is deleted to clean up consumers before removing
-     * monitors.
+     * Used when an installation is deleted, to stop the NATS consumer before monitors are removed.
      *
      * @param installationId the GitHub App installation ID
      */
@@ -452,8 +440,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Start NATS consumer for a workspace tied to an installation.
-     * Used when an installation is activated (unsuspended) to resume webhook processing.
+     * Used when an installation is unsuspended, to resume webhook processing.
      *
      * @param installationId the GitHub App installation ID
      */
@@ -612,9 +599,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
 
     // Private helpers
 
-    /**
-     * Retargets repository monitors from the old login prefix to the new login.
-     */
     private void retargetRepositoryMonitors(Workspace workspace, String oldLogin, String newLogin) {
         if (workspace == null || isBlank(oldLogin) || isBlank(newLogin) || oldLogin.equalsIgnoreCase(newLogin)) {
             return;
@@ -641,15 +625,11 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 repositoryToMonitorRepository.save(monitor);
             });
 
-        // Update the workspace consumer with new subjects after all renames
         if (shouldUseNats(workspace)) {
             natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
         }
     }
 
-    /**
-     * Renames tracked repositories from the old login prefix to the new login.
-     */
     private void renameTrackedRepositories(String oldLogin, String newLogin) {
         if (isBlank(oldLogin) || isBlank(newLogin) || oldLogin.equalsIgnoreCase(newLogin)) {
             return;
@@ -677,9 +657,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         repositoryRepository.saveAll(repositories);
     }
 
-    /**
-     * Rotates the NATS organization consumer after an account rename.
-     */
     private void rotateOrganizationConsumer(Workspace workspace, String oldLogin, String newLogin) {
         if (
             !natsProperties.enabled() ||
@@ -691,14 +668,9 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return;
         }
 
-        // Update the workspace consumer - it will pick up the new org login from
-        // workspace
         natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspace.getId()));
     }
 
-    /**
-     * Creates a new workspace with the given parameters.
-     */
     private Workspace createWorkspace(
         String slug,
         String displayName,
@@ -722,10 +694,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Looks up or creates a user for workspace ownership assignment.
-     * <p>
-     * If the user doesn't exist in the database but we have account info from the
-     * installation webhook, we create the user entity directly.
+     * Looks up an existing user by login, or creates one from installation webhook account info.
      *
      * @param installationId the GitHub App installation ID
      * @param accountId      the GitHub account database ID
@@ -741,7 +710,6 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         AccountKind accountKind,
         String avatarUrl
     ) {
-        // First check if user already exists
         var existingUser = userRepository.findByLogin(accountLogin);
         if (existingUser.isPresent()) {
             log.info(
@@ -752,8 +720,8 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             return existingUser.get().getId();
         }
 
-        // If we have the account ID, upsert the user using the three-step
-        // approach (lock, free conflicts, insert) to avoid uk_user_login_lower violations.
+        // Three-step upsert (lock, free conflicts, insert) avoids uk_user_login_lower
+        // violations under concurrent installs.
         if (accountId != null) {
             String htmlUrl = "https://github.com/" + accountLogin;
             String typeStr =
@@ -785,8 +753,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
                 typeStr,
                 installationId
             );
-            // Retrieve the JPA-managed entity to get the auto-generated PK
-            // (upsertUser is a native SQL INSERT that doesn't return the generated id)
+            // upsertUser is a native INSERT that doesn't return the generated id; re-fetch for the PK.
             return userRepository
                 .findByLogin(accountLogin)
                 .map(User::getId)
@@ -801,16 +768,10 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         return null;
     }
 
-    /**
-     * Checks if NATS should be used for the given workspace.
-     */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
     }
 
-    /**
-     * Checks if a string is null or blank.
-     */
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

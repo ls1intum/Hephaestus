@@ -35,22 +35,19 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
 /**
- * BUG 1 regression guard for the polymorphic {@code List<Issue>} read.
+ * Guards the polymorphic {@code List<Issue>} read hazard in sub-issue sync.
  *
  * <p>On GitLab, issue IIDs and merge-request IIDs are separate per-project namespaces (issue #5 and
  * MR !5 coexist), and both live in the single-table {@code issue} table under the discriminator. The
- * sub-issue sync keys every row by {@code getNumber()} (the IID) into {@code issueByIid}. When the
- * repository read returns the polymorphic list, issue #5 and MR !5 collide in that map
- * (last-writer-wins on arbitrary result order): the WorkItem node for issue #5 can then resolve to the
- * merge-request row, {@code setParentIssue(parent)} writes a bogus {@code parent_issue_id} onto the
- * merge request, the real issue never gets parented, and {@code clearStaleParents} (keyed on the MR's
- * id) clears the real issue's legitimate parent as "stale."
+ * sub-issue sync keys every row by {@code getNumber()} (the IID) into {@code issueByIid}. A polymorphic
+ * read makes issue #5 and MR !5 collide in that map (last-writer-wins on arbitrary result order): the
+ * WorkItem node for issue #5 can then resolve to the merge-request row, {@code setParentIssue(parent)}
+ * writes a bogus {@code parent_issue_id} onto the merge request, the real issue never gets parented,
+ * and {@code clearStaleParents} (keyed on the MR's id) clears the real issue's legitimate parent as
+ * "stale."
  *
- * <p>The fix routes the read through {@code IssueRepository.findAllIssuesByRepositoryId}
- * ({@code TYPE(i) = Issue}), so a merge request never enters the map. The test drives the map through
- * the mocked repository read: with the type-scoped result (issues only) the parent stays on the issue
- * and the merge request is untouched; feeding the same test the polymorphic result (issue + MR)
- * reproduces the corruption — see {@code #REVERT_VERIFICATION}.
+ * <p>The type-scoped read {@code IssueRepository.findAllIssuesByRepositoryId} ({@code TYPE(i) = Issue})
+ * keeps merge requests out of the map, so the parent stays on the issue and the MR is untouched.
  */
 @Tag("unit")
 class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
@@ -60,14 +57,6 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     private static final int CHILD_IID = 5;
     private static final int PARENT_IID = 10;
 
-    /**
-     * REVERT_VERIFICATION: to confirm this test fails against the pre-fix polymorphic read, stub the
-     * repository call with {@code List.of(childIssue, collidingMergeRequest, parentIssue)} instead of
-     * {@code List.of(childIssue, parentIssue)}. The merge request (last, so it wins the IID-5 slot in
-     * {@code issueByIid}) then receives the bogus parent and the child issue's parent is cleared as
-     * stale — both assertions below fail. Restoring the issues-only stub makes it pass. Verified
-     * manually both directions; the committed stub is the type-scoped result the fix produces.
-     */
     @Mock
     private IssueRepository issueRepository;
 
@@ -104,7 +93,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
         childIssue.setParentIssue(parentIssue); // already parented locally; GitLab still reports the same parent
         PullRequest collidingMr = TestEntities.pullRequest(CHILD_IID * 100L + 1, CHILD_IID, "MR " + CHILD_IID);
 
-        // Type-scoped read (the fix): the merge request never enters issueByIid.
+        // Type-scoped read: the merge request never enters issueByIid.
         when(issueRepository.findAllIssuesByRepositoryId(REPO_ID)).thenReturn(List.of(childIssue, parentIssue));
 
         // GitLab reports issue #5's parent as issue #10 (unchanged), via the WorkItem hierarchy widget.

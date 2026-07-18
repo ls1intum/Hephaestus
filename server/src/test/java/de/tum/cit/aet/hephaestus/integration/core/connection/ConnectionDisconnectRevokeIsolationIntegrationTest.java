@@ -21,22 +21,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The admin disconnect endpoint documents a "best effort, proceed locally" contract: if the vendor
- * revoke fails, log it and still perform the local {@code UNINSTALLED} transition. That contract used
- * to be unreachable for database-side failures.
+ * revoke fails, log it and still perform the local {@code UNINSTALLED} transition.
  *
  * <p>The revoke callback runs inside {@code ConnectionService#disconnect}, which holds a
- * {@code SELECT … FOR UPDATE} lifecycle lock on the connection row. The callback reaches erasers
- * ({@code ScmWorkspaceContentEraser}, {@code SlackWorkspaceContentEraser}, the Outline sweep) that are
- * {@code @Transactional} with default {@code REQUIRED} propagation, so they JOINED that transaction.
- * A {@code DataAccessException} during erasure therefore marked the lifecycle transaction
- * rollback-only. The caller "proceeded", the transition and the audit row were written, and the commit
- * then threw {@code UnexpectedRollbackException} — the admin got a 500 and the connection was still
- * ACTIVE, while the log claimed it had proceeded.
+ * {@code SELECT … FOR UPDATE} lifecycle lock on the connection row. If the callback reached erasers
+ * ({@code ScmWorkspaceContentEraser} and friends) that are {@code @Transactional} with default
+ * {@code REQUIRED} propagation, they JOINED that transaction — so a {@code DataAccessException} during
+ * erasure marked the lifecycle transaction rollback-only, and the commit then threw {@code
+ * UnexpectedRollbackException}: a 500 with the connection still ACTIVE, even though the log claimed it
+ * had proceeded.
  *
- * <p>These tests run against real PostgreSQL because the defect is a transaction-boundary defect:
- * mocks cannot express "this connection's transaction is aborted". {@link FailingEraser} reproduces it
- * faithfully — a {@code @Transactional} REQUIRED bean that genuinely aborts its PostgreSQL transaction
- * — rather than merely throwing a Java exception.
+ * <p>These tests run against real PostgreSQL because this is a transaction-boundary defect: mocks
+ * cannot express "this connection's transaction is aborted". {@link FailingEraser} reproduces it — a
+ * {@code @Transactional} REQUIRED bean that genuinely aborts its PostgreSQL transaction — rather than
+ * merely throwing a Java exception.
  */
 @Import(ConnectionDisconnectRevokeIsolationIntegrationTest.RevokeStubConfig.class)
 class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -82,10 +80,6 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
         connection = connectionRepository.save(connection);
     }
 
-    /**
-     * The regression test. Before the fix this failed with {@code UnexpectedRollbackException} escaping
-     * {@code disconnect} and the row left ACTIVE — i.e. the 500 the endpoint promised never to return.
-     */
     @Test
     void revokeFailingWithDataAccessException_stillCommitsTheLocalUninstalledTransition() {
         Connection result = connectionService.disconnect(connection, disconnectRequest("corr-erase-fails"), () ->
@@ -95,10 +89,9 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
         // No exception escaped: the endpoint returns 200, not 500.
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
 
-        // And it is COMMITTED, not merely mutated in memory — re-read on a fresh transaction. This is
-        // the assertion the old code could not satisfy: the audit INSERT and this UPDATE ran on the
-        // same JDBC connection the eraser had aborted, so PostgreSQL rejected them and the commit
-        // unwound everything.
+        // Re-read on a fresh transaction to prove it COMMITTED, not merely mutated in memory: the audit
+        // INSERT and this UPDATE would otherwise have run on the same JDBC connection the eraser aborted,
+        // so PostgreSQL would reject them and the commit would unwind everything.
         Connection reloaded = connectionRepository.findById(connection.getId()).orElseThrow();
         assertThat(reloaded.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(reloaded.getCredentialsEncrypted()).isNull();
@@ -155,7 +148,7 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
      * Stands in for {@code ScmWorkspaceContentEraser} and friends: {@code @Transactional} with the
      * default {@code REQUIRED} propagation, so it joins whatever transaction the revoke callback runs
      * in. The division by zero is a genuine PostgreSQL error, which leaves that transaction ABORTED —
-     * the state a mocked exception cannot reproduce and the reason a plain try/catch was never enough.
+     * the state a mocked exception cannot reproduce.
      *
      * <p>It deliberately touches no table with a foreign key to {@code connection}: an INSERT into such
      * a table would take a {@code FOR KEY SHARE} lock on the row the caller holds {@code FOR UPDATE},

@@ -34,12 +34,10 @@ const KIND_ICON: Record<IntegrationCatalogEntry["kind"], React.ReactNode> = {
 };
 
 /**
- * The two ways a connection can be healthy overall and still be failing its job.
- *
- * Errored was already here; stale is the one the server has always sent and nothing rendered — and it
- * is the quieter, more common failure, because a connection whose scheduler has stopped reports
- * HEALTHY forever. Plain tinted text rather than badges: the health badge is the one badge a card
- * gets, and two more would out-shout it.
+ * The two ways a connection can read healthy overall and still be failing its job: errored resources,
+ * and the quieter, more common stale ones — a connection whose scheduler has stopped reports HEALTHY
+ * forever. Plain tinted text rather than badges: the health badge is the one badge a card gets, and
+ * two more would out-shout it.
  */
 function ResourceHealthLine({ counts }: { counts: ConnectionSyncStatus["resourceCounts"] }) {
 	if (counts.errored === 0 && counts.stale === 0) return null;
@@ -84,8 +82,8 @@ export function IntegrationOverviewCard({
 	const isScm = entry.kind === "GITHUB" || entry.kind === "GITLAB";
 
 	return (
-		// `h-full` so a grid of these stretches to one row height instead of raggedly tracking each
-		// card's own content — the footer controls sit on one line across the row.
+		// `h-full` so a grid of these stretches to one row height and the footer controls line up
+		// across the row instead of tracking each card's own content height.
 		<Card className="h-full">
 			<CardHeader>
 				<IntegrationCardHeading className="flex items-center gap-2">
@@ -126,8 +124,8 @@ export function IntegrationOverviewCard({
 						displayName={entry.displayName}
 					/>
 				) : isStatusLoading ? (
-					/* Two text lines, matching the status strip this resolves into, so the card keeps its
-					   height instead of growing a slab into a pair of lines. */
+					/* Two text lines, matching the status strip this resolves into, so the card holds its
+					   height across the load. */
 					<div className="space-y-2">
 						<Skeleton className="h-4 w-56" />
 						<Skeleton className="h-4 w-32" />
@@ -142,8 +140,8 @@ export function IntegrationOverviewCard({
 					status && (
 						<div className="space-y-2 text-sm">
 							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-								{/* Tinted against this connection's own cadence, so the triage page can actually
-								    triage: a card is picked out of the grid by colour, not by reading four dates. */}
+								{/* Tinted against this connection's own cadence, so a card is picked out of the
+								    triage grid by colour rather than by reading four dates. */}
 								<span>
 									{status.lastSuccessfulSyncAt ? (
 										<>

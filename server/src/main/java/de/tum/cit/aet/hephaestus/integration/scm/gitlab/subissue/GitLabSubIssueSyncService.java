@@ -34,8 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  * through issue links (the REST issue links API does not support
  * {@code is_child_of}/{@code is_parent_of} — those types do not exist).
  * <p>
- * Uses a single paginated GraphQL query per repository (efficient),
- * unlike the previous REST-based approach which made N+1 API calls.
+ * Uses a single paginated GraphQL query per repository.
  * <p>
  * Includes stale parent cleanup: if a parent-child relationship is
  * removed in GitLab, the local DB is updated to clear the parent.

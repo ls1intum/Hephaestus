@@ -15,9 +15,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for Commit entities.
- *
- * <p>Workspace-agnostic: commits are scoped through {@code repository_id} (a
+ * Workspace-agnostic: commits are scoped through {@code repository_id} (a
  * {@link de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository} belongs to exactly
  * one workspace), not via a direct {@code workspace_id} column. All custom queries take
  * a {@code repositoryId} parameter; Hibernate-emitted entity load/save SQL is allowed by
@@ -26,9 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Commits scoped through repository_id -> repository.workspace_id")
 public interface CommitRepository extends JpaRepository<Commit, Long> {
-    /**
-     * Find a commit by SHA and repository ID.
-     */
     Optional<Commit> findByShaAndRepositoryId(String sha, Long repositoryId);
 
     /**
@@ -44,19 +39,11 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("repositoryIds") Collection<Long> repositoryIds
     );
 
-    /**
-     * Check if a commit exists by SHA and repository ID.
-     */
     boolean existsByShaAndRepositoryId(String sha, Long repositoryId);
 
-    /**
-     * Count commits for a repository.
-     */
     long countByRepositoryId(Long repositoryId);
 
-    /**
-     * Find the most recent commit for a repository by authored date.
-     */
+    /** Most recent commit for a repository by authored date. */
     @Query(
         """
         SELECT c FROM Commit c
@@ -67,15 +54,9 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     Optional<Commit> findLatestByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Delete all commits for a repository.
-     */
     void deleteByRepositoryId(Long repositoryId);
 
-    /**
-     * Find distinct unresolved author emails for a repository.
-     * Returns emails where author_id is NULL but author_email is stored.
-     */
+    /** Distinct author emails on commits with no linked user yet ({@code author_id IS NULL}). */
     @Query(
         value = """
         SELECT DISTINCT gc.author_email FROM git_commit gc
@@ -85,10 +66,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     List<String> findDistinctUnresolvedAuthorEmailsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Find distinct unresolved committer emails for a repository.
-     * Returns emails where committer_id is NULL but committer_email is stored.
-     */
+    /** Distinct committer emails on commits with no linked user yet ({@code committer_id IS NULL}). */
     @Query(
         value = """
         SELECT DISTINCT gc.committer_email FROM git_commit gc
@@ -98,10 +76,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     List<String> findDistinctUnresolvedCommitterEmailsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Bulk update author_id for commits matching a given author email in a repository.
-     * Only updates rows where author_id is currently NULL (safe for concurrent use).
-     */
+    /** Sets {@code author_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
     @Query(
@@ -117,10 +92,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("authorId") Long authorId
     );
 
-    /**
-     * Bulk update committer_id for commits matching a given committer email in a repository.
-     * Only updates rows where committer_id is currently NULL (safe for concurrent use).
-     */
+    /** Sets {@code committer_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
     @Query(
@@ -163,9 +135,6 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     List<Object[]> findRepresentativeShasByUnresolvedEmail(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Find SHAs of commits with null author_id for a repository.
-     */
     @Query(
         value = """
         SELECT gc.sha FROM git_commit gc
@@ -175,9 +144,6 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     List<String> findShasWithNullAuthorByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Find SHAs of commits with null committer_id for a repository.
-     */
     @Query(
         value = """
         SELECT gc.sha FROM git_commit gc
@@ -187,10 +153,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     List<String> findShasWithNullCommitterByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Bulk update author_id for commits matching the given SHAs in a repository.
-     * Only updates rows where author_id is currently NULL (safe for concurrent use).
-     */
+    /** Sets {@code author_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
     @Query(
@@ -206,10 +169,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("authorId") Long authorId
     );
 
-    /**
-     * Bulk update committer_id for commits matching the given SHAs in a repository.
-     * Only updates rows where committer_id is currently NULL (safe for concurrent use).
-     */
+    /** Sets {@code committer_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
     @Query(
@@ -295,10 +255,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     List<String> findShasWithoutContributorsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Link a commit to pull requests by PR numbers within the same repository.
-     * Uses INSERT ... ON CONFLICT DO NOTHING to be idempotent.
-     */
+    /** Links a commit to pull requests by PR number within the same repository. Idempotent ({@code ON CONFLICT DO NOTHING}). */
     @Modifying
     @Transactional
     @Query(
@@ -442,11 +399,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("parentShas") String parentShas
     );
 
-    /**
-     * Find the N most recent commits by a specific author as of a given timestamp,
-     * ordered by authored date descending.
-     * Used by AtomicChanges achievement evaluator.
-     */
+    /** N most recent commits by an author as of {@code asOf}. Used by the AtomicChanges achievement evaluator. */
     @Query(
         """
         SELECT c FROM Commit c
@@ -461,10 +414,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         Pageable pageable
     );
 
-    /**
-     * Find a commit by ID with file changes eagerly loaded.
-     * Used by CrossBoundary achievement evaluator.
-     */
+    /** Commit by id with file changes eagerly loaded. Used by the CrossBoundary achievement evaluator. */
     @Query(
         """
         SELECT c FROM Commit c
@@ -474,10 +424,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     )
     Optional<Commit> findByIdWithFileChanges(@Param("id") Long id);
 
-    /**
-     * Find distinct file extensions across all commits by a specific author as of a given time.
-     * Used by Polyglot achievement evaluator.
-     */
+    /** Distinct file extensions across an author's commits as of {@code asOf}. Used by the Polyglot achievement evaluator. */
     @Query(
         value = """
         SELECT DISTINCT LOWER(

@@ -168,7 +168,6 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         verify(monitoredChannelRepository).save(c);
         assertThat(dto.consentState()).isEqualTo(ConsentState.ACTIVE);
 
-        // Audit row: PENDING → ACTIVE by actor 5 with the reason.
         ArgumentCaptor<SlackChannelConsentEvent> captor = ArgumentCaptor.forClass(SlackChannelConsentEvent.class);
         verify(consentEventRepository).save(captor.capture());
         SlackChannelConsentEvent event = captor.getValue();

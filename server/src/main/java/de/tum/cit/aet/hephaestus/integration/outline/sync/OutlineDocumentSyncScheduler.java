@@ -120,11 +120,10 @@ public class OutlineDocumentSyncScheduler {
 
     /**
      * Runs {@code body} for one workspace through the shared {@link SyncJobService} template, recording a
-     * {@code RECONCILIATION} job — the wiring that replaced Outline's bespoke {@code syncsInFlight} guard
-     * (the job's one-active-job-per-connection guard is the dedup now). A workspace whose ACTIVE connection
-     * vanished between enumeration and this call (deactivated concurrently) is silently skipped: nothing to
-     * record a job against. A connection that already has an active job is also skipped — the running job
-     * IS the record of this pass.
+     * {@code RECONCILIATION} job whose one-active-job-per-connection guard is this pass's dedup. A workspace
+     * whose ACTIVE connection vanished between enumeration and this call (deactivated concurrently) is
+     * silently skipped: nothing to record a job against. A connection that already has an active job is also
+     * skipped — the running job IS the record of this pass.
      */
     private void runReconcileJob(long workspaceId, SyncJobTrigger trigger, Consumer<SyncExecutionHandle> body) {
         connectionService

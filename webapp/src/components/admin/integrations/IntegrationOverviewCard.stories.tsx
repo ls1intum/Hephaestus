@@ -33,14 +33,13 @@ const runningJob: SyncJob = {
 };
 
 /**
- * The integrations landing tile for one connection. It surfaces health (a running job flips the badge
- * to "Syncing"), last-sync/last-event, the errored and stale resource counts, and a sync + details
- * footer while active — and it degrades honestly: a not-connected SCM explains it is chosen at
- * workspace creation, a non-ACTIVE connection hides its controls, and a failed status query shows an
- * inline error rather than a blank card.
+ * The integrations landing tile for one connection: health badge (a running job flips it to
+ * "Syncing"), last-sync/last-event, errored/stale resource counts, and a sync + details footer while
+ * active. It degrades per state — a not-connected SCM explains it is chosen at workspace creation, a
+ * non-ACTIVE connection hides its controls, a failed status query shows an inline error.
  *
- * This is the triage page, so its freshness reading is tinted against the connection's own cadence:
- * a card is picked out of the grid by colour rather than by reading four dates in sequence.
+ * Being the triage page, its freshness reading is tinted against the connection's own cadence so a
+ * card is picked out of the grid by colour rather than by reading four dates.
  */
 const meta = {
 	component: IntegrationOverviewCard,

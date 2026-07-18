@@ -55,17 +55,8 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Production-grade configuration for GitHub GraphQL API client.
- * <p>
- * Features:
- * <ul>
- * <li><b>Rate Limit Tracking:</b> Logs GitHub rate limit usage from response
- * headers</li>
- * <li><b>Retry with Backoff:</b> Automatic retries with exponential backoff for
- * 5xx errors</li>
- * <li><b>Document Loading:</b> Loads queries from
- * {@code classpath:graphql-documents/}</li>
- * </ul>
+ * Configuration for the GitHub GraphQL API client: rate-limit tracking, retry with backoff, and
+ * document loading from {@code classpath:graphql-documents/}.
  *
  * @see org.springframework.graphql.client.HttpGraphQlClient
  */
@@ -75,32 +66,27 @@ public class GitHubGraphQlConfig {
     private static final Logger log = LoggerFactory.getLogger(GitHubGraphQlConfig.class);
 
     private static final String GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
-    private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
+    private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024;
 
-    // Retry configuration for GitHub 502/504 errors and transport-level failures
-    // GitHub infrastructure errors typically resolve within 30-60 seconds.
-    // These values provide ~135 seconds of total retry time:
+    // GitHub infrastructure errors (502/504) typically resolve within 30-60 seconds. These values
+    // provide ~135 seconds of total retry time:
     // Attempt 1: ~5s, Attempt 2: ~10s, Attempt 3: ~20s, Attempt 4: ~40s, Attempt 5: ~60s (capped)
     private static final int MAX_RETRIES = 5;
     private static final Duration INITIAL_BACKOFF = Duration.ofSeconds(5);
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(60);
     private static final double JITTER_FACTOR = 0.5;
 
-    // GitHub rate limit headers
     private static final String HEADER_RATE_LIMIT = "x-ratelimit-limit";
     private static final String HEADER_RATE_REMAINING = "x-ratelimit-remaining";
     private static final String HEADER_RATE_RESET = "x-ratelimit-reset";
     private static final String HEADER_RATE_USED = "x-ratelimit-used";
     private static final String HEADER_RETRY_AFTER = "retry-after";
 
-    // Rate limit metrics - exposed via Micrometer for dashboards/alerting
     private final AtomicInteger rateLimitRemaining = new AtomicInteger(0);
     private final AtomicInteger rateLimitLimit = new AtomicInteger(0);
     private final AtomicInteger rateLimitUsed = new AtomicInteger(0);
 
     public GitHubGraphQlConfig(MeterRegistry meterRegistry) {
-        // Register gauges for rate limit monitoring
-        // These are more appropriate than logs for continuous monitoring
         Gauge.builder("github.graphql.ratelimit.remaining", rateLimitRemaining, AtomicInteger::get)
             .description("GitHub GraphQL API rate limit points remaining")
             .register(meterRegistry);
@@ -116,11 +102,10 @@ public class GitHubGraphQlConfig {
      * Builds the mapper every GitHub GraphQL response is decoded with.
      *
      * <p>Exposed as a static factory rather than inlined into {@link #gitHubGraphQlWebClient} so
-     * tests can decode against the <em>real</em> mixin set instead of a hand-rolled copy of it. The
-     * mixins are not cosmetic: several of them install {@code @JsonTypeInfo(property = "__typename")}
-     * type resolvers, which Jackson inherits onto the concrete node types, so whether a given
-     * operation document decodes at all depends on this configuration. A test that rebuilt this list
-     * by hand would drift out of agreement with production and stop testing the thing that breaks.
+     * tests can decode against the real mixin set. Several mixins install
+     * {@code @JsonTypeInfo(property = "__typename")} type resolvers that Jackson inherits onto the
+     * concrete node types, so whether an operation document decodes at all depends on this exact
+     * configuration.
      *
      * @param baseObjectMapper the application-wide mapper to derive from
      * @return the mapper used by the GitHub GraphQL codecs
@@ -162,23 +147,16 @@ public class GitHubGraphQlConfig {
             })
             .build();
 
-        // Configure connection pool for efficient connection reuse.
-        // This prevents creating new connections for each request and provides:
-        // - Connection reuse across requests (reduces latency)
-        // - Proper cleanup of idle connections
-        // - Limits to prevent resource exhaustion
-        //
-        // NOTE: We use aggressive eviction settings to mitigate PrematureCloseException.
-        // GitHub's load balancers may close connections after ~60s of idle time.
-        // By recycling connections more frequently, we reduce the chance of using
-        // stale connections that will be closed mid-response.
+        // Aggressive eviction mitigates PrematureCloseException: GitHub's load balancers close
+        // connections after ~60s of idle time, so recycling connections more frequently reduces
+        // the chance of reusing a stale connection that gets closed mid-response.
         ConnectionProvider connectionProvider = ConnectionProvider.builder("github-graphql")
-            .maxConnections(50) // Max concurrent connections to GitHub
-            .maxIdleTime(Duration.ofSeconds(20)) // Close idle connections after 20s (reduced from 30s)
-            .maxLifeTime(Duration.ofMinutes(3)) // Recycle connections after 3 min (reduced from 5 min)
-            .pendingAcquireTimeout(Duration.ofSeconds(60)) // Timeout waiting for connection
-            .evictInBackground(Duration.ofSeconds(60)) // Background cleanup interval (reduced from 120s)
-            .lifo() // Use last-in-first-out to prefer fresh connections
+            .maxConnections(50)
+            .maxIdleTime(Duration.ofSeconds(20))
+            .maxLifeTime(Duration.ofMinutes(3))
+            .pendingAcquireTimeout(Duration.ofSeconds(60))
+            .evictInBackground(Duration.ofSeconds(60))
+            .lifo() // prefer fresher connections
             .build();
 
         HttpClient httpClient = HttpClient.create(connectionProvider)
@@ -249,12 +227,10 @@ public class GitHubGraphQlConfig {
             int limitInt = Integer.parseInt(limit);
             int usedInt = used != null ? Integer.parseInt(used) : limitInt - remainingInt;
 
-            // Update metrics for dashboard monitoring (best practice: metrics over logs)
             rateLimitRemaining.set(remainingInt);
             rateLimitLimit.set(limitInt);
             rateLimitUsed.set(usedInt);
 
-            // Only log actionable events - approaching limit is a warning condition
             double usagePercent = (100.0 * (limitInt - remainingInt)) / limitInt;
             if (usagePercent > 80) {
                 log.warn(
@@ -265,10 +241,8 @@ public class GitHubGraphQlConfig {
                     reset
                 );
             }
-            // Routine rate limit status is available via metrics endpoint, not logs
         }
 
-        // Special handling for 429 Too Many Requests - this is an error condition
         if (response.statusCode().value() == 429) {
             String retryAfter = headers.getFirst(HEADER_RETRY_AFTER);
             log.error("Exceeded GitHub rate limit: retryAfterSeconds={}", retryAfter);
@@ -276,18 +250,8 @@ public class GitHubGraphQlConfig {
     }
 
     /**
-     * Retry filter with exponential backoff for transient errors.
-     * <p>
-     * Retries on:
-     * <ul>
-     * <li>5xx server errors (GitHub infrastructure issues)</li>
-     * <li>429 Too Many Requests (rate limited)</li>
-     * </ul>
-     * <p>
-     * Uses exponential backoff starting at 5 seconds, doubling each retry up to 60 seconds,
-     * with 50% jitter to prevent thundering herd. This provides approximately 135 seconds
-     * of total retry time, which is sufficient for GitHub's typical 502/504 recovery time
-     * of 30-60 seconds.
+     * Retries 5xx server errors and 429 (rate limited) responses with exponential backoff; see
+     * {@link #MAX_RETRIES} for the timing rationale.
      */
     private ExchangeFilterFunction retryFilter() {
         return (request, next) ->
@@ -296,14 +260,12 @@ public class GitHubGraphQlConfig {
                 .flatMap(response -> {
                     HttpStatusCode status = response.statusCode();
 
-                    // Don't retry client errors (4xx) except 429
                     if (status.is4xxClientError() && status.value() != 429) {
                         return Mono.just(response);
                     }
 
-                    // Retry on 5xx and 429
                     if (status.is5xxServerError() || status.value() == 429) {
-                        // Release the body to prevent resource leaks
+                        // Release the body to prevent a resource leak on the discarded response
                         return response.releaseBody().then(Mono.error(new RetryableException(status.value())));
                     }
 
@@ -391,9 +353,6 @@ public class GitHubGraphQlConfig {
                 );
     }
 
-    /**
-     * Internal exception for retryable HTTP errors.
-     */
     private static class RetryableException extends RuntimeException {
 
         private final int statusCode;
@@ -408,9 +367,6 @@ public class GitHubGraphQlConfig {
         }
     }
 
-    /**
-     * Exception thrown when GitHub GraphQL requests fail after exhausting retries.
-     */
     public static class GitHubGraphQlException extends RuntimeException {
 
         private final int statusCode;
@@ -425,10 +381,6 @@ public class GitHubGraphQlConfig {
         }
     }
 
-    /**
-     * Exception thrown when GitHub GraphQL requests fail due to transport-level errors
-     * (connection issues, premature close, etc.) after exhausting retries.
-     */
     public static class TransportException extends RuntimeException {
 
         public TransportException(String message, Throwable cause) {

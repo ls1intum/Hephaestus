@@ -145,7 +145,6 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldQueryPullRequestRootWhenParentIsPullRequest() {
-            // Arrange
             PullRequest pr = new PullRequest();
             pr.setId(500L);
             pr.setNumber(NUMBER);
@@ -157,10 +156,9 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
                 List.of(createGHComment(1001L, "tail comment"))
             );
 
-            // Act
             int synced = service.syncRemainingComments(SCOPE_ID, pr, "cursor-page-1");
 
-            // Assert — PR root, resuming from the embedded page's cursor
+            // PR root, resuming from the embedded page's cursor.
             assertThat(synced).isEqualTo(1);
             verify(graphQlClient).documentName("GetPullRequestComments");
             verify(requestSpec).variable("number", NUMBER);
@@ -173,7 +171,6 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldQueryIssueRootWhenParentIsIssue() {
-            // Arrange
             Issue issue = new Issue();
             issue.setId(500L);
             issue.setNumber(NUMBER);
@@ -185,10 +182,8 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
                 List.of(createGHComment(2001L, "issue tail comment"))
             );
 
-            // Act
             int synced = service.syncRemainingComments(SCOPE_ID, issue, "cursor-page-1");
 
-            // Assert — the issue path is unchanged
             assertThat(synced).isEqualTo(1);
             verify(graphQlClient).documentName("GetIssueComments");
         }

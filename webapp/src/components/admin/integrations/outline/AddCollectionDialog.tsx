@@ -76,7 +76,7 @@ export function AddCollectionDialog({
 	const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
 	const [submitting, setSubmitting] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
-	/** How far the sequential registration run has got — drives the live progress line. */
+	/** How many of the selected collections have registered — drives the live progress line. */
 	const [registered, setRegistered] = useState(0);
 
 	const {
@@ -145,9 +145,8 @@ export function AddCollectionDialog({
 		<Dialog open={open} onOpenChange={handleOpenChange}>
 			<DialogContent
 				className="sm:max-w-lg"
-				// Focus the search field if it already exists; otherwise refuse to move focus (`false`)
-				// rather than falling back to the first tabbable control, which would steal focus to
-				// Cancel a frame later. `autoFocus` on the input covers the common load-after-open case.
+				// Focus the search field if it exists, else refuse focus (`false`) rather than let it
+				// fall to Cancel; see the comboboxRef note above.
 				initialFocus={() =>
 					comboboxRef.current?.querySelector<HTMLElement>('input[role="combobox"]') ?? false
 				}
@@ -209,9 +208,9 @@ export function AddCollectionDialog({
 					) : (
 						// `inline` renders the list as part of the dialog body rather than in a popup over
 						// it — Base UI's dedicated mode for this. It forces the list open (no trigger to
-						// reopen from) and, crucially, anchors the floating context to the enclosing
-						// `[role="dialog"]`, which is what makes the roving highlight, `aria-activedescendant`
-						// and `Combobox.Empty` work without a Positioner/Popup.
+						// reopen from) and anchors the floating context to the enclosing `[role="dialog"]`,
+						// which is what makes the roving highlight, `aria-activedescendant` and
+						// `Combobox.Empty` work without a Positioner/Popup.
 						<Combobox
 							multiple
 							inline
@@ -222,9 +221,8 @@ export function AddCollectionDialog({
 							itemToStringLabel={labelOf}
 						>
 							<div ref={comboboxRef} className="rounded-lg border">
-								{/* The picker mounts only after its async candidates load, so this is the first
-								chance to focus it; the dialog itself declines initial focus (see initialFocus
-								above) to avoid a focus fight that would blur the input and drop the highlight. */}
+								{/* First mount after candidates load: autoFocus claims the focus the dialog
+								declined (see the comboboxRef note above). */}
 								<ComboboxSearchInput
 									autoFocus
 									placeholder="Search collections…"

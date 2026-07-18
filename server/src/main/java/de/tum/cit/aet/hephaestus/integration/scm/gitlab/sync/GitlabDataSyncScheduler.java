@@ -784,9 +784,8 @@ public class GitlabDataSyncScheduler {
         }
 
         // Second pass: link commits to MRs. Must run after every repo has finished syncing so
-        // a commit whose SHA appears on an MR in a sibling repo can still be linked. In the
-        // previous single-pass version such cross-repo links were lost because the target MR
-        // repo had not yet synced its MRs when the linker ran.
+        // a commit whose SHA appears on an MR in a sibling repo can still be linked (the target MR
+        // repo may not have synced its MRs when this repo's commits were fetched).
         if (commitMrLinker != null && (handle == null || !handle.isCancellationRequested())) {
             for (Repository repo : repos) {
                 OffsetDateTime repoUpdatedAfter = null;

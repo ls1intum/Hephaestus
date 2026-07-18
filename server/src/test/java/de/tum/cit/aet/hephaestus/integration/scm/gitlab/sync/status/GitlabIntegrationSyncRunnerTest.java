@@ -78,9 +78,9 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
         }
 
         /**
-         * The asymmetry this closes: GitHub's "Run backfill" drives to completion while GitLab's ran a
-         * single batch per click, behind identical-looking buttons. The runner now loops until a pass
-         * advances nothing, exactly like {@code GithubIntegrationSyncRunner#backfill}.
+         * "Run backfill" must drive to completion: the runner loops passes until one advances nothing,
+         * matching {@code GithubIntegrationSyncRunner#backfill} rather than running a single batch per
+         * click.
          */
         @Test
         void keepsRunningPassesWhileRepositoriesAdvance_andStopsOnTheFirstUnproductiveOne() {
@@ -90,10 +90,10 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
 
             verify(backfillService, times(3)).runBackfillPass(WORKSPACE_ID, handle);
             verify(handle, never()).reportCancelled();
-            // Three repositories advanced across the job — the pass that ended the loop is the loop's
-            // termination condition, not a failure, so this is a clean success. (In production the second
-            // pass is already gated by GitLabHistoricalBackfillService's five-minute COOLDOWN_NORMAL, which
-            // is why one click still drains only one batch per repository today.)
+            // The unproductive pass is the loop's termination condition, not a failure, so a job that
+            // advanced something finalizes as a clean success. (In production each repository's second
+            // pass is gated by GitLabHistoricalBackfillService's five-minute COOLDOWN_NORMAL, so one
+            // click still drains only one batch per repository.)
             verify(handle, never()).reportWarnings();
         }
 

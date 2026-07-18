@@ -315,7 +315,7 @@ public class SlackMessageService {
 
     /**
      * Set the assistant "thinking…" status on a thread. Best-effort: only assistant threads support it, so a
-     * failure (e.g. a plain DM thread) is swallowed — it's a liveness nicety, never load-bearing.
+     * failure (e.g. a plain DM thread) is swallowed.
      */
     public void setStatus(long workspaceId, String channel, String threadTs, String status) {
         Optional<String> token = resolveToken(workspaceId);
@@ -332,8 +332,8 @@ public class SlackMessageService {
     }
 
     /**
-     * Set suggested prompts at the top of the agent Messages tab. Best-effort: prompts are a discovery nicety,
-     * never load-bearing.
+     * Set suggested prompts at the top of the agent Messages tab. Best-effort: prompts are a discovery nicety, so
+     * a failure is swallowed.
      */
     public void setSuggestedPrompts(long workspaceId, String channel, String title, List<SuggestedPrompt> prompts) {
         Optional<String> token = resolveToken(workspaceId);
@@ -695,10 +695,8 @@ public class SlackMessageService {
     }
 
     /**
-     * Variant with explicit wait/budget bounds. Interactive callers keep the tight defaults (a user is waiting);
-     * the nightly history reconciliation passes wider bounds because Slack's non-Marketplace clamp on
-     * {@code conversations.history} answers with {@code Retry-After: 60} — a 20s wait cap would retry early, eat
-     * another 429, and burn the request budget.
+     * Variant with explicit wait/budget bounds: interactive callers keep the tight defaults (a user is waiting),
+     * the nightly reconciliation passes the wider {@code SYNC_*} bounds (see {@link #SYNC_RATE_LIMIT_MAX_WAIT_MS}).
      */
     private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call, long maxWaitMs, long totalBudgetMs)
         throws SlackApiException, IOException {

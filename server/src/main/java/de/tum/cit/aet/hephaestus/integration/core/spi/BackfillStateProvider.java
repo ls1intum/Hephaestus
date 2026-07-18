@@ -15,18 +15,12 @@ import java.util.Optional;
  *   <li>Last run time: When the backfill was last executed</li>
  * </ul>
  * <p>
- * Extracted from {@link SyncTargetProvider} to comply with the Interface Segregation Principle.
- * Services that only manage backfill state should depend on this interface.
+ * Services that only manage backfill state depend on this narrow interface rather than the full
+ * {@link SyncTargetProvider}.
  *
  * @see SyncTargetProvider for full sync target operations
  */
 public interface BackfillStateProvider {
-    /**
-     * Finds a sync target by its ID.
-     *
-     * @param syncTargetId the sync target ID
-     * @return the sync target, or empty if not found
-     */
     Optional<SyncTarget> findSyncTargetById(Long syncTargetId);
 
     /**
@@ -54,11 +48,6 @@ public interface BackfillStateProvider {
         Instant lastRunAt
     );
 
-    /**
-     * Removes a sync target from the system.
-     *
-     * @param syncTargetId the sync target ID to remove
-     */
     void removeSyncTarget(Long syncTargetId);
 
     /**
@@ -108,8 +97,7 @@ public interface BackfillStateProvider {
 
     /**
      * Updates the pagination cursor for the given {@link SyncCursorKind}, keyed by
-     * {@code syncTargetId}. Collapses the former per-entity {@code update<X>SyncCursor}
-     * methods; the implementer switches on the kind to reach the correct column.
+     * {@code syncTargetId}; the implementer switches on the kind to reach the correct column.
      * <p>
      * Lets sync resume mid-pagination after interruption; persist within the same
      * transaction as the synced data for consistency.

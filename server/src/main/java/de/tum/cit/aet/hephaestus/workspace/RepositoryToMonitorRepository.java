@@ -11,12 +11,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for {@link RepositoryToMonitor} entities.
- * Tracks which GitHub repositories are monitored by each workspace.
- *
- * <p>Workspace-agnostic: This is a configuration table that maps repositories
- * to workspaces. Queries filter by workspace ID or nameWithOwner which is used
- * to resolve workspace context during sync operations.
+ * Tracks which repositories each workspace monitors. Queries filter by workspace id or
+ * {@code nameWithOwner}, which resolves workspace context during sync.
  */
 @Repository
 @WorkspaceAgnostic("Configuration table mapping repositories to workspaces")
@@ -25,10 +21,7 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     Optional<RepositoryToMonitor> findByWorkspaceIdAndNameWithOwner(Long workspaceId, String nameWithOwner);
     List<RepositoryToMonitor> findByWorkspaceId(Long workspaceId);
 
-    /**
-     * Finds a repository monitor by its full name (owner/name).
-     * Used during sync operations to resolve which workspace a repository belongs to.
-     */
+    /** Resolves which workspace a repository belongs to during sync, by full name (owner/name). */
     Optional<RepositoryToMonitor> findByNameWithOwner(String nameWithOwner);
 
     /**
@@ -39,18 +32,10 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
      */
     List<RepositoryToMonitor> findByNativeId(Long nativeId);
 
-    /**
-     * Counts the number of workspaces monitoring a given repository.
-     * Used to determine if a repository can be safely deleted when removing a monitor.
-     */
+    /** How many workspaces monitor a repository — the orphan check before deleting a shared repository row. */
     long countByNameWithOwner(String nameWithOwner);
 
-    /**
-     * Deletes all repository monitors for a workspace.
-     * Used during workspace purge to clean up monitoring configuration.
-     *
-     * @param workspaceId the workspace ID
-     */
+    /** Deletes all repository monitors for a workspace (workspace purge). */
     @Modifying
     @Transactional
     @Query("DELETE FROM RepositoryToMonitor rtm WHERE rtm.workspace.id = :workspaceId")

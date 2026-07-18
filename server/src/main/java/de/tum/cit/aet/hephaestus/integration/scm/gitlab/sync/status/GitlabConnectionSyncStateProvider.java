@@ -74,9 +74,8 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
 
         // GitLab's scheduled backfill (GitLabHistoricalBackfillService#runBackfillCycle) writes the same
         // repository_to_monitor high-water-mark / checkpoint columns as GitHub, honors the same
-        // hephaestus.sync.backfill.enabled flag, and its runner already reports supportsBackfill()=true.
-        // So the rollup is computed identically — via the shared helper — rather than left null, which is
-        // what hid the "Scheduled backfill" diagnostic on the GitLab side.
+        // hephaestus.sync.backfill.enabled flag, and its runner reports supportsBackfill()=true, so the
+        // rollup is computed identically via the shared helper.
         BackfillSummary backfill = ScmBackfillRollup.summarize(
             syncSchedulerProperties.backfill().enabled(),
             repositoryToMonitorRepository
@@ -128,10 +127,9 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             repo == null ? null : countsByRepositoryId.getOrDefault(repo.getId(), ScmResourceCounts.empty());
         Long itemCount = counts == null ? null : counts.headlineItemCount();
 
-        // The GitLab sync path DOES persist per-class watermarks on repository_to_monitor
-        // (GitlabDataSyncScheduler.updateSyncTimestamp writes issues_synced_at / pull_requests_synced_at
-        // on every completed phase, keyed by the same monitor row iterated here). Read them — mirroring
-        // GithubConnectionSyncStateProvider — rather than discarding them and reporting "not tracked".
+        // GitlabDataSyncScheduler.updateSyncTimestamp persists per-class watermarks on
+        // repository_to_monitor (issues_synced_at / pull_requests_synced_at) on every completed phase,
+        // keyed by the same monitor row iterated here.
         Instant issuesSyncedAt = monitor.getIssuesSyncedAt();
         Instant pullRequestsSyncedAt = monitor.getPullRequestsSyncedAt();
         Instant lastSyncedAt = latestNonNull(

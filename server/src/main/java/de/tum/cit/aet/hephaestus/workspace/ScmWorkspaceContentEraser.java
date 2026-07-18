@@ -25,34 +25,32 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Single workspace-scoped choke point that erases every SCM-mirrored row a workspace is the last
  * tenant to hold — the GitHub/GitLab counterpart of {@code SlackWorkspaceContentEraser} and the
- * Outline disconnect-erase, so all four integrations now answer the same two erase triggers with
- * one shared implementation each.
+ * Outline disconnect-erase.
  *
  * <p><b>Two triggers, one code path.</b> Driven by (1) the admin disconnect
  * ({@code GithubConnectionStrategy#revoke} / {@code GitlabConnectionStrategy#revoke}, invoked from
  * inside the fenced {@code ConnectionService#disconnect} transaction) and (2) the workspace purge
  * ({@code workspace.adapter.ScmWorkspacePurgeAdapter}, order -200). Both erase the identical row
- * set by construction, which is the invariant Slack/Outline already document and this class now
- * extends to SCM.
+ * set by construction.
  *
  * <p><b>Hard-delete, NOT a tombstone — a different operation from the drift sweeps.</b> The SCM
  * deletion sweeps mark upstream-vanished rows with a recoverable {@code deletedAt} tombstone
- * because the source may merely have hidden them; that is a sync-fidelity feature and is
- * reversible. This class is the opposite: an irreversible {@code DELETE} run when the lawful basis
- * for holding the mirror is severed. The two paths deliberately share no code, and neither may be
- * implemented in terms of the other — a tombstoned row is still queryable retained personal data,
- * so it would not satisfy the disconnect/purge trigger, and a hard delete would destroy data the
- * drift sweep expects to be able to resurrect.
+ * because the source may merely have hidden them; that is a reversible sync-fidelity feature. This
+ * class is the opposite: an irreversible {@code DELETE} run when the lawful basis for holding the
+ * mirror is severed. The two paths share no code, and neither may be implemented in terms of the
+ * other — a tombstoned row is still queryable retained personal data, so it would not satisfy the
+ * disconnect/purge trigger, and a hard delete would destroy data the drift sweep expects to be able
+ * to resurrect.
  *
- * <p><b>Cross-tenant safety is the whole design.</b> SCM tables carry no {@code workspace_id};
- * {@code repository} and its cascade are SHARED across every workspace that monitors the same
- * source repository. Erasure is therefore workspace-scoped by construction: this class removes
- * <em>this</em> workspace's {@code repository_to_monitor} rows, flushes, and then delegates the
- * actual cascade to {@link WorkspaceRepositoryMonitorService#deleteRepositoryIfOrphaned(String)},
- * which drops the shared row only when no monitor anywhere still points at it. A repository that
- * another tenant still monitors survives — correctly: the surviving tenant's basis for holding it
- * persists, while the erased tenant's access path (monitor row, NATS consumer filter, and every
- * workspace-scoped query) is gone. There is no global delete anywhere in this class.
+ * <p><b>Cross-tenant safety.</b> SCM tables carry no {@code workspace_id}; {@code repository} and
+ * its cascade are SHARED across every workspace that monitors the same source repository. Erasure
+ * is therefore workspace-scoped by construction: this class removes <em>this</em> workspace's
+ * {@code repository_to_monitor} rows, flushes, and then delegates the cascade to
+ * {@link WorkspaceRepositoryMonitorService#deleteRepositoryIfOrphaned(String)}, which drops the
+ * shared row only when no monitor anywhere still points at it. A repository another tenant still
+ * monitors survives — correctly: that tenant's basis for holding it persists, while the erased
+ * tenant's access path (monitor row, NATS consumer filter, and every workspace-scoped query) is
+ * gone. Nothing here issues a global delete.
  *
  * <p><b>Derived rows.</b> {@code practices} observations/feedback over {@code PULL_REQUEST}/
  * {@code ISSUE} artifacts and {@code activity_event} rows mirror SCM content (soft artifact refs

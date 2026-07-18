@@ -48,7 +48,7 @@ class OutlineConnectionStateListenerTest extends BaseUnitTest {
 
     @SuppressWarnings("unchecked")
     private void runJobsSynchronously(SyncJobHandle handle) {
-        // SyncJobService always passes a non-null handle (started.handle()); the body now reads it to honor cancel.
+        // SyncJobService always passes a non-null handle (started.handle()); the body reads it to honor cancel.
         doAnswer(invocation -> {
             Consumer<SyncJobHandle> body = invocation.getArgument(1);
             body.accept(handle);

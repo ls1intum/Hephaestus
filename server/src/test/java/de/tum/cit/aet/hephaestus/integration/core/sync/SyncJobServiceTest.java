@@ -372,7 +372,6 @@ class SyncJobServiceTest extends BaseUnitTest {
                         Thread.currentThread().interrupt();
                         throw new IllegalStateException("runner was interrupted", e);
                     }
-                    // The runner polls the flag between units of work, and reports its own outcome.
                     cancellationObserved.set(handle.isCancellationRequested());
                     interruptFlagSeen.set(Thread.currentThread().isInterrupted());
                     handle.reportCancelled();
@@ -388,7 +387,6 @@ class SyncJobServiceTest extends BaseUnitTest {
 
         assertThat(cancellationObserved).isTrue();
         assertThat(interruptFlagSeen).as("stop() must not interrupt the runner thread").isFalse();
-        // The terminal write landed, on a thread whose JDBC connection stop() left intact.
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
         assertThat(started.job().getFinishedAt()).isNotNull();
         verify(syncJobRepository).markCancelRequested(started.job().getId(), SyncJobStatus.ACTIVE);
@@ -783,7 +781,6 @@ class SyncJobServiceTest extends BaseUnitTest {
             }
         }
 
-        // The runner finished on its own terms, uncancelled.
         assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
     }
 

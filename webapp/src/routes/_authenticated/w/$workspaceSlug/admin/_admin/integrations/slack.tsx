@@ -174,8 +174,8 @@ function SlackIntegrationPage() {
 				toast.success("Channel updated");
 			}
 			invalidateSlackChannels();
-			// This transition *is* a new row in that channel's consent history, and the history sheet
-			// is cached across open/close — without this it would reopen still denying the change.
+			// This transition is a new row in that channel's consent history, and the history sheet is
+			// cached across open/close — without this it would reopen still denying the change.
 			queryClient.invalidateQueries({
 				queryKey: listSlackChannelConsentEventsQueryKey({
 					path: { workspaceSlug: slug, slackChannelId: variables.path.slackChannelId },
@@ -315,8 +315,8 @@ function SlackIntegrationPage() {
 							onRetry={() => refetchResources()}
 							resourceNoun="channel"
 							resourceNounPlural="channels"
-							// Without the cadence the ledger prints every reading and judges none of them —
-							// the server sends it precisely so the client doesn't have to guess a schedule.
+							// The freshness cadence comes from the server so the client doesn't hard-code
+							// one; without it the ledger can't judge staleness.
 							syncIntervalSeconds={status?.syncIntervalSeconds}
 							expectedClassKeys={["messages"]}
 						/>

@@ -162,10 +162,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         workspace.setAccountLogin("my-group/subgroup");
         ReflectionTestUtils.setField(workspace, "id", 1L);
 
-        // GitLab integration metadata lives on a Connection
-        // row now, not on Workspace. Each test that triggers initialize() needs to see
-        // an active GitLab Connection + bearer token; default-configure that here so the
-        // existing test bodies don't have to know about the Connection registry.
+        // GitLab integration metadata lives on a Connection row, not on Workspace. Each test that
+        // triggers initialize() needs an active GitLab Connection + bearer token; default-configure that
+        // here so the test bodies don't have to know about the Connection registry.
         lenient()
             .when(connectionService.findActiveGitLabConfig(anyLong()))
             .thenReturn(
@@ -331,7 +330,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.initialize(workspace);
 
-            // registerWebhook was still called despite rotation failure
             verify(gitLabWebhookService).registerWebhook(workspace);
         }
 
@@ -348,7 +346,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.initialize(workspace);
 
-            // Discovery was still attempted
             verify(gitLabGroupSyncService).syncGroupProjects(eq(1L), eq("my-group/subgroup"), any());
         }
     }
@@ -383,10 +380,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.initialize(workspace);
 
-            // Verify organization linked
             assertThat(workspace.getOrganization()).isEqualTo(organization);
 
-            // Verify monitors created with correct workspace reference
             ArgumentCaptor<RepositoryToMonitor> captor = ArgumentCaptor.forClass(RepositoryToMonitor.class);
             verify(repositoryToMonitorRepository, times(2)).save(captor.capture());
 
@@ -397,10 +392,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
                 .collect(Collectors.toSet());
             assertThat(createdNames).containsExactlyInAnyOrder("my-group/project-a", "my-group/project-b");
 
-            // Verify workspace reference set on each monitor
             captor.getAllValues().forEach(monitor -> assertThat(monitor.getWorkspace()).isSameAs(workspace));
 
-            // Verify NATS consumer updated for new monitors
             verify(natsConsumerService).updateScopeConsumer(1L);
         }
 
@@ -634,12 +627,11 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.linkWorkspaceToOrganization(workspace);
 
-            // Verify saved via captor
             ArgumentCaptor<Workspace> captor = ArgumentCaptor.forClass(Workspace.class);
             verify(workspaceRepository).save(captor.capture());
             assertThat(captor.getValue().getOrganization()).isEqualTo(organization);
 
-            // Verify in-memory reference updated for subsequent phases
+            // In-memory reference must be updated too, for subsequent init phases in the same call.
             assertThat(workspace.getOrganization()).isEqualTo(organization);
         }
 

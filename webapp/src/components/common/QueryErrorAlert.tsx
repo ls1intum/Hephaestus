@@ -10,36 +10,30 @@ export interface QueryErrorAlertProps {
 	/** What failed, in the reader's terms — e.g. "Could not load your mirrored collections". */
 	title: string;
 	/**
-	 * Retries the failed query. Omit for an error the user cannot retry away. Supplying it is a
-	 * request, not a guarantee: the button is withheld for statuses an identical retry cannot change
-	 * (see {@link classifyError}), because a Retry that cannot work is a lie about the way out.
+	 * Retries the failed query. Omit when the user cannot retry the error away. Even when supplied, the
+	 * button is withheld for statuses an identical retry cannot change (see {@link classifyError}).
 	 */
 	onRetry?: () => void;
 	className?: string;
 }
 
 interface ErrorClass {
-	/** Icon that matches the kind of failure, so the alert reads before it is read. */
 	icon: React.ReactNode;
-	/** What the reader can do about it. Complements the server's `detail`, which says what happened. */
+	/** What the reader can do about it, as opposed to the server's `detail`, which says what happened. */
 	guidance: string;
 	variant: "destructive" | "warning";
 	/**
-	 * Whether re-issuing the identical request could plausibly succeed. False for anything the server
-	 * has already decided (authz, absence, conflict, malformed request) — those need a different
-	 * request, different permissions, or a reload, and none of that is what a Retry button does.
+	 * Whether re-issuing the identical request could succeed. False for anything the server has already
+	 * decided — authz, absence, conflict, malformed request — which needs a different request, different
+	 * permissions, or a reload instead.
 	 */
 	retryable: boolean;
 }
 
-/**
- * Map an HTTP status onto the way out. The distinction that matters is not "error vs not" but
- * "can the reader do something, and is retrying it?" — a 403 and a 503 are both failures, but only
- * one of them gets better if you press a button.
- */
+/** Map an HTTP status onto an icon, guidance, variant, and whether a Retry button could help. */
 function classifyError(status: number | undefined): ErrorClass {
-	// No status at all: the request never reached a server (offline, DNS, CORS, abort). Retrying is
-	// exactly the right move once the network is back.
+	// No status: the request never reached a server (offline, DNS, CORS, abort), so retrying is right
+	// once the network is back.
 	if (status == null) {
 		return {
 			icon: <AlertCircleIcon />,
@@ -73,8 +67,8 @@ function classifyError(status: number | undefined): ErrorClass {
 		};
 	}
 	if (status === 409) {
-		// Usually not a failure at all — something else already holds the thing, or already did the
-		// work. Warning rather than destructive, and no Retry: the answer would be the same.
+		// Often not a real failure — something else already changed it. Warning, not destructive, and
+		// no Retry: the answer would be the same.
 		return {
 			icon: <InfoIcon />,
 			guidance: "Something else changed this first. Reload the page to see the current state.",
@@ -109,9 +103,8 @@ function classifyError(status: number | undefined): ErrorClass {
 }
 
 /**
- * Run the server's account of what happened into our account of what to do about it. Server `detail`
- * strings are not reliably punctuated, so terminate the sentence before appending rather than emit
- * "Rate limit exceeded Wait a moment, then try again."
+ * Join the server's `detail` to our guidance. `detail` strings are not reliably punctuated, so
+ * terminate the sentence before appending rather than emit "Rate limit exceeded Wait a moment".
  */
 function describe(detail: string, guidance: string): string {
 	const lead = detail.trim();
@@ -122,15 +115,15 @@ function describe(detail: string, guidance: string): string {
 }
 
 /**
- * The one failed-query surface. Every section that loads over the network renders this on error, so a
- * failure always looks the same — and, just as importantly, only offers a way out that exists.
+ * Shared failed-query surface: every network-loading section renders this on error, so failures look
+ * the same and only offer a Retry when one could actually work.
  */
 export function QueryErrorAlert({ error, title, onRetry, className }: QueryErrorAlertProps) {
 	const status = problemStatusOf(error);
 	const { icon, guidance, variant, retryable } = classifyError(status);
-	// The server's `detail` says what happened and is more specific than anything we can infer, so it
-	// leads; the status-derived guidance says what to do about it. Falling `detail` back to the
-	// guidance keeps the description from repeating itself when the server said nothing useful.
+	// `detail` (what happened) is more specific than anything we can infer, so it leads; guidance
+	// (what to do) follows. Falling `detail` back to guidance avoids repeating it when the server
+	// said nothing useful.
 	const detail = problemDetailOf(error, guidance);
 	const showRetry = onRetry != null && retryable;
 

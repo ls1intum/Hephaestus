@@ -18,12 +18,8 @@ export interface SyncNowButtonProps {
 }
 
 /**
- * The manual-sync trigger, and the only one on its card.
- *
- * There used to be two — Sync and Backfill, side by side, sharing one mutation — which forced a
- * protocol between them so that a button disabled by its neighbour's run did not claim to be starting
- * work nobody had asked it for. Making Backfill a menu item on this button deleted the protocol along
- * with the second button: there is one visible trigger, so pending means *this* trigger.
+ * The manual-sync trigger, and the only one on its card. With one visible trigger, a pending state can
+ * only mean *this* trigger — Backfill is a menu item sharing the same mutation, not a second button.
  */
 export function SyncNowButton({ onClick, triggeringType = null, activeJob }: SyncNowButtonProps) {
 	const disabled = triggeringType != null || activeJob != null;

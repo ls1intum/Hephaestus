@@ -36,9 +36,8 @@ const candidates: SlackChannelCandidate[] = [
 ];
 
 /**
- * Allow-listing a channel. One primary control — a combobox over the channels Slack reports —
- * with a paste escape hatch for channels Slack did not list. The stable id is what gets stored;
- * it is never something the admin has to read or retype.
+ * Allow-listing a channel: a combobox over the channels Slack reports, with a paste escape hatch
+ * for channels Slack did not list. The stored value is the stable channel id.
  *
  * The dialog is portalled, so the plays query the document rather than the story canvas.
  */

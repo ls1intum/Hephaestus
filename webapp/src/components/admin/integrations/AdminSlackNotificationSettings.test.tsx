@@ -53,11 +53,9 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 
 		fireEvent.click(screen.getByRole("option", { name: /#general/i }));
 
-		// The trigger names the channel the way a human does…
 		expect(screen.getByRole("combobox", { name: /digest channel/i }).textContent).toContain(
 			"#general",
 		);
-		// …and the stable id stays in state: no text box carries it as its value.
 		expect(screen.queryByDisplayValue("C01GENERAL01")).toBeNull();
 	});
 
@@ -83,8 +81,7 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 	it("resolves a pasted channel link through the escape hatch into the same single value", () => {
 		setup([general]);
 
-		// The paste path is secondary — it opens on demand and writes the value the combobox
-		// writes, which is the one the Send-test button reads.
+		// The paste escape hatch writes the same value the combobox does — the one Send-test reads.
 		fireEvent.click(screen.getByRole("button", { name: /paste a channel link or id instead/i }));
 		fireEvent.change(screen.getByLabelText(/paste a channel link or id/i), {
 			target: { value: "https://acme.slack.com/archives/C0974LJBPBK" },

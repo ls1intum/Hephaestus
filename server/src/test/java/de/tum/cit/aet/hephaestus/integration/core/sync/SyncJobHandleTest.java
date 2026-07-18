@@ -70,7 +70,7 @@ class SyncJobHandleTest extends BaseUnitTest {
         RecordingWriter writer = new RecordingWriter();
         SyncJobHandle handle = newHandle(writer);
 
-        // A runner reporting every page without the clock advancing: the whole point is that this is free.
+        // A runner reporting every page without the clock advancing must be free.
         for (int i = 1; i <= 50; i++) {
             handle.progress(i, 50, progress("page " + i));
         }
@@ -103,8 +103,8 @@ class SyncJobHandleTest extends BaseUnitTest {
     }
 
     /**
-     * The trailing edge. This is the regression that bites once runners report per page: a suppressed
-     * update followed by a long quiet period must not sit in memory until the next call.
+     * The trailing edge: a suppressed update followed by a long quiet period must not sit in memory
+     * until the next call.
      */
     @Test
     void suppressedUpdate_isFlushedOnceTheIntervalElapses() {

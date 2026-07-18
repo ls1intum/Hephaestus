@@ -334,7 +334,6 @@ public class GitHubHistoricalBackfillService {
             );
         }
 
-        // Check rate limit for this scope before processing its repositories
         int remainingPoints = graphQlClientProvider.getRateLimitRemaining(scopeId);
         if (remainingPoints < backfillProps.rateLimitThreshold()) {
             log.debug(
@@ -344,7 +343,6 @@ public class GitHubHistoricalBackfillService {
                 backfillProps.rateLimitThreshold(),
                 graphQlClientProvider.getRateLimitResetAt(scopeId)
             );
-            // Count pending repos in this scope for reporting
             for (SyncTarget target : targets) {
                 if (!target.isBackfillComplete()) {
                     pendingRepositories.incrementAndGet();
@@ -354,7 +352,6 @@ public class GitHubHistoricalBackfillService {
         }
 
         for (SyncTarget target : targets) {
-            // Skip if backfill is complete
             if (target.isBackfillComplete()) {
                 continue;
             }
@@ -370,7 +367,6 @@ public class GitHubHistoricalBackfillService {
                 continue;
             }
 
-            // Skip if repository is in cooldown after recent failures
             if (isInCooldown(target.id())) {
                 log.trace(
                     "Skipping backfill: reason=inCooldown, repo={}, cooldownExpiresAt={}",
@@ -381,7 +377,6 @@ public class GitHubHistoricalBackfillService {
                 continue;
             }
 
-            // Re-check rate limit before each repository (within same scope)
             remainingPoints = graphQlClientProvider.getRateLimitRemaining(scopeId);
             if (remainingPoints < backfillProps.rateLimitThreshold()) {
                 log.info(
@@ -391,7 +386,7 @@ public class GitHubHistoricalBackfillService {
                     repositoriesProcessed.get()
                 );
                 pendingRepositories.incrementAndGet();
-                break; // Stop processing this scope
+                break;
             }
 
             try {
@@ -399,7 +394,6 @@ public class GitHubHistoricalBackfillService {
                 boolean didWork = backfillRepository(target, backfillProps.batchSize(), BackfillPageObserver.NOOP);
                 if (didWork) {
                     repositoriesProcessed.incrementAndGet();
-                    // Reset failure counter on success
                     clearFailureState(target.id());
                 }
             } catch (Exception e) {
@@ -443,7 +437,6 @@ public class GitHubHistoricalBackfillService {
         }
         Long repositoryId = repoOpt.get().getId();
 
-        // Check if backfill is already initialized (highWaterMark set) for either issues or PRs
         boolean isIssueFirstBatch = !target.isIssueBackfillInitialized();
         boolean isPullRequestFirstBatch = !target.isPullRequestBackfillInitialized();
         boolean isFirstBatch = isIssueFirstBatch && isPullRequestFirstBatch;
@@ -491,14 +484,12 @@ public class GitHubHistoricalBackfillService {
         );
         totalIssuesSynced = issueResult.itemsSynced();
 
-        // Persist issue backfill progress after each batch.
-        // This gives admin visibility into issue backfill progress.
+        // Persist issue backfill progress after each batch, for admin visibility.
         if (issueResult.itemsSynced() > 0) {
             Integer issueCheckpoint = issueResult.minNumber() > 0 ? issueResult.minNumber() : null;
             Integer issueHighWaterMark =
                 isIssueFirstBatch && issueResult.maxNumber() > 0 ? issueResult.maxNumber() : null;
 
-            // Mark issue backfill complete if no more pages
             if (!issueResult.hasMore()) {
                 issueCheckpoint = 0;
             }
@@ -538,13 +529,11 @@ public class GitHubHistoricalBackfillService {
         );
         totalPRsSynced = prResult.itemsSynced();
 
-        // Persist pull request backfill progress after each batch.
-        // This gives admin visibility into pull request backfill progress.
+        // Persist pull request backfill progress after each batch, for admin visibility.
         if (prResult.itemsSynced() > 0) {
             Integer prCheckpoint = prResult.minNumber() > 0 ? prResult.minNumber() : null;
             Integer prHighWaterMark = isPullRequestFirstBatch && prResult.maxNumber() > 0 ? prResult.maxNumber() : null;
 
-            // Mark PR backfill complete if no more pages
             if (!prResult.hasMore()) {
                 prCheckpoint = 0;
             }
@@ -569,7 +558,6 @@ public class GitHubHistoricalBackfillService {
             log.info("No pull requests to backfill: repo={}", safeRepoName);
         }
 
-        // Check if full backfill is complete
         boolean issuesComplete = !issueResult.hasMore() || target.isIssueBackfillComplete();
         boolean pullRequestsComplete = !prResult.hasMore();
 
@@ -645,9 +633,9 @@ public class GitHubHistoricalBackfillService {
             pageCount++;
 
             try {
-                // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
-                // This is CRITICAL: WebClient ExchangeFilterFunction retries only cover the HTTP exchange,
-                // not body consumption. PrematureCloseException occurs DURING body streaming.
+                // Wrap the entire execute() call in Mono.defer() so retries cover body streaming, not
+                // just the HTTP exchange: WebClient's ExchangeFilterFunction retries only cover the
+                // exchange, and PrematureCloseException occurs during body consumption.
                 final String currentCursor = cursor;
                 ClientGraphQlResponse response = Mono.defer(() ->
                     client
@@ -1088,10 +1076,9 @@ public class GitHubHistoricalBackfillService {
     /**
      * Processes a page of issues and their embedded comments within a transaction.
      * <p>
-     * IMPORTANT: This method accepts repositoryId instead of a Repository entity to avoid
-     * LazyInitializationException. The Repository is fetched INSIDE the transaction with
-     * its organization eagerly loaded, ensuring the entity is attached to the current
-     * persistence context when the processor accesses lazy associations.
+     * Accepts repositoryId rather than a Repository entity to avoid LazyInitializationException: the
+     * Repository is fetched inside the transaction with its organization eagerly loaded, so it stays
+     * attached to the persistence context when the processor accesses lazy associations.
      * <p>
      * Cursor persistence is also done inside this transaction to ensure atomicity.
      * If data processing succeeds but cursor update fails (or vice versa), both are rolled back.
@@ -1137,7 +1124,6 @@ public class GitHubHistoricalBackfillService {
                         minNumber = Math.min(minNumber, number);
                         maxNumber = Math.max(maxNumber, number);
 
-                        // Process embedded comments - this was previously missing!
                         EmbeddedCommentsDTO embeddedComments = issueData.embeddedComments();
                         for (var commentDto : embeddedComments.comments()) {
                             if (issueCommentProcessor.process(commentDto, processed.getNumber(), context) != null) {
@@ -1172,10 +1158,9 @@ public class GitHubHistoricalBackfillService {
     /**
      * Processes a page of pull requests and their embedded reviews/comments within a transaction.
      * <p>
-     * IMPORTANT: This method accepts repositoryId instead of a Repository entity to avoid
-     * LazyInitializationException. The Repository is fetched INSIDE the transaction with
-     * its organization eagerly loaded, ensuring the entity is attached to the current
-     * persistence context when the processor accesses lazy associations.
+     * Accepts repositoryId rather than a Repository entity to avoid LazyInitializationException: the
+     * Repository is fetched inside the transaction with its organization eagerly loaded, so it stays
+     * attached to the persistence context when the processor accesses lazy associations.
      * <p>
      * Cursor persistence is also done inside this transaction to ensure atomicity.
      * If data processing succeeds but cursor update fails (or vice versa), both are rolled back.
@@ -1290,11 +1275,6 @@ public class GitHubHistoricalBackfillService {
         });
         return result != null ? result : new PullRequestPageResult(0, 0, 0, 0, new ArrayList<>(), 0, 0);
     }
-
-    // Note: Backfill tracking is now initialized inline during the first batch.
-    // highWaterMark is set to the actual highest issue/PR number seen.
-    // checkpoint tracks the lowest number synced (counting down to 1).
-    // checkpoint = 0 means backfill is complete.
 
     /**
      * Gets the current backfill progress for a specific sync target.
@@ -1680,9 +1660,9 @@ public class GitHubHistoricalBackfillService {
     /**
      * Creates a retry specification for transport-level errors during body streaming.
      * <p>
-     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
-     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
-     * This retry spec is used with Mono.defer() to wrap the entire execute() call.
+     * WebClient's ExchangeFilterFunction retries do not cover body streaming errors —
+     * PrematureCloseException occurs after HTTP headers are received, during body consumption — so
+     * this retry spec is meant to be used with Mono.defer() wrapping the entire execute() call.
      *
      * @param operation  description of the operation for logging
      * @param repoName   repository name for logging
@@ -1732,12 +1712,8 @@ public class GitHubHistoricalBackfillService {
     // Exception Types
 
     /**
-     * Exception thrown when backfill encounters a transient error that exhausted retries.
-     * This signals to the caller that cooldown should be applied.
-     * <p>
-     * Note: With proper Mono.defer().retryWhen() in place, this exception is only thrown
-     * after transport-level retries have been exhausted. It's not a bandaid - it's a marker
-     * for "retries exhausted, apply repository-level cooldown".
+     * Signals that backfill hit a transient error after Mono.defer().retryWhen() already exhausted
+     * transport-level retries, so the caller should apply repository-level cooldown.
      */
     static class BackfillTransientException extends RuntimeException {
 

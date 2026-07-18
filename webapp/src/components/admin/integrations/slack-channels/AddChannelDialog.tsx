@@ -56,9 +56,8 @@ export function AddChannelDialog({
 				}
 			: null;
 
-	// Reset the form fields on close instead of remounting the dialog via a changing `key` —
-	// that killed the close animation. The next open (of the same, single Add-channel dialog
-	// instance) always starts from a clean slate.
+	// Reset the fields on close rather than remounting via a changing `key`, which would break the
+	// Dialog's exit animation. The single instance persists, so the next open starts clean.
 	function handleOpenChange(next: boolean) {
 		if (!next) {
 			setSelectedCandidate(null);

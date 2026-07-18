@@ -193,7 +193,6 @@ export const InvalidTime: Story = {
 
 /**
  * Disconnect affordance — present only when the server exposes the active connection id.
- * The play opens the confirmation dialog and asserts the destructive copy.
  */
 export const ConnectedWithDisconnect: Story = {
 	args: {
@@ -211,7 +210,6 @@ export const ConnectedWithDisconnect: Story = {
 		// AlertDialog renders in a portal — query the whole document, not just the canvas.
 		const dialog = await screen.findByRole("alertdialog", { name: /disconnect slack\?/i });
 		await expect(dialog).toBeInTheDocument();
-		// Confirm copy + the destructive confirm action are present.
 		await expect(within(dialog).getByText(/the bot is uninstalled/i)).toBeInTheDocument();
 		await expect(within(dialog).getByRole("button", { name: /^disconnect$/i })).toBeInTheDocument();
 	},

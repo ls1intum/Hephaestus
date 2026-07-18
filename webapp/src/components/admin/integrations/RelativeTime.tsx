@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 import { asDate, FRESHNESS_CLASS, type FreshnessTone } from "./sync-format";
 
 /**
- * How often the shared clock advances. A relative time only ever needs to be right to the phrase it
- * prints ("4 minutes ago"), and the coarsest of those is a minute — 30s guarantees the label is never
- * more than half a step behind while costing one timer for the whole page.
+ * How often the shared clock advances. The coarsest phrase a relative time prints is a minute
+ * ("4 minutes ago"), so a 30s tick keeps every label within half a step of correct at the cost of one
+ * timer for the whole page.
  */
 const TICK_MS = 30_000;
 
@@ -16,23 +16,20 @@ let intervalId: ReturnType<typeof setInterval> | undefined;
 let now = Date.now();
 
 /**
- * One module-level clock for every relative time on the surface.
+ * One module-level clock for every relative time on the surface, read through `useSyncExternalStore`
+ * so every subscriber tears off the *same* `now` in the same commit rather than inventing its own
+ * `setInterval`. A hundred cells cost one timer, and the timer only exists while something renders a
+ * time — the last unsubscribe clears it.
  *
- * This is the {@link import("./SyncFreshnessBanner").useIsOnline} pattern applied to time: an external
- * store read through `useSyncExternalStore`, so every subscriber tears off the *same* `now` in the same
- * commit and no component invents its own `setInterval`. A hundred cells therefore cost one timer, and
- * the timer only exists while something is actually rendering a time — the last unsubscribe clears it.
- *
- * The snapshot is the millisecond `now` rather than a tick counter on purpose: it is a real input to
- * the rendered phrase, so React Compiler cannot cache the formatting across ticks. A counter that is
- * subscribed-to but never read would let the compiler memoise the label and freeze it — which is the
- * exact bug this component exists to fix.
+ * The snapshot is the millisecond `now`, not a tick counter, on purpose: it is a real input to the
+ * rendered phrase, so React Compiler cannot cache the formatting across ticks. A counter subscribed-to
+ * but never read would let the compiler memoise the label and freeze it.
  */
 function subscribe(onStoreChange: () => void): () => void {
 	listeners.add(onStoreChange);
 	if (intervalId === undefined) {
-		// A restarted clock may have been parked for hours. Re-read before the first tick so the
-		// re-subscribing render is not served a stale `now` for up to TICK_MS.
+		// After a remount the clock may have been parked for hours. Re-read before the first tick so the
+		// re-subscribing render is not served a `now` up to TICK_MS stale.
 		now = Date.now();
 		intervalId = setInterval(() => {
 			now = Date.now();
@@ -70,7 +67,7 @@ export interface RelativeTimeProps {
 	 * judgeable.
 	 */
 	tone?: FreshnessTone;
-	/** Copy for a missing/invalid timestamp. Never "now": an absent time must not read as a fresh one. */
+	/** Copy for a missing/invalid timestamp. Never "now": an absent time must not read as fresh. */
 	fallback?: string;
 	/**
 	 * The absolute-timestamp Tooltip. Turn it off only where an enclosing hover surface already states
@@ -83,11 +80,10 @@ export interface RelativeTimeProps {
 /**
  * A timestamp as "4 minutes ago", against the shared clock, with the absolute time one hover away.
  *
- * Both halves are the point. A relative time rendered once and never re-rendered is a lie with a
- * half-life: this surface's whole job is freshness, and a "2 minutes ago" that has silently been on
- * screen for an hour is worse than no reading at all. And a relative time is unusable for the task an
- * admin actually brings here — correlating a failed run with a server log — so the exact instant is
- * always available without leaving the row.
+ * Both halves matter. The relative phrase must re-render against the shared clock: this surface reports
+ * freshness, and a "2 minutes ago" that has silently been on screen for an hour is worse than no
+ * reading. The absolute instant stays reachable because that is what an admin needs to correlate a
+ * failed run with a server log, without leaving the row.
  */
 export function RelativeTime({
 	value,
@@ -112,9 +108,8 @@ export function RelativeTime({
 
 	return (
 		<Tooltip>
-			{/* The primitive's own `button` element, rather than a span with a `tabIndex` bolted on: the
-			    absolute time has to be reachable without a mouse, and the only honest way to say "this
-			    reveals something" to assistive tech is to be the thing that natively does. */}
+			{/* The primitive's own `button`, not a span with `tabIndex`: the absolute time must be
+			    reachable without a mouse and announced to assistive tech as an interactive control. */}
 			<TooltipTrigger
 				className={cn(
 					"cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4",

@@ -74,8 +74,7 @@ export const Populated: Story = {
 	},
 	play: async () => {
 		const sheet = within(await screen.findByRole("dialog"));
-		// Human words, not the wire enum: no "ACTIVE"/"PENDING" leaks into the UI. Each state can
-		// appear twice — once as the state left, once as the state entered.
+		// The wire enum must never leak; a state can appear twice (left, then entered).
 		await expect((await sheet.findAllByText("Monitoring")).length).toBeGreaterThan(0);
 		await expect(sheet.getAllByText("Not started").length).toBeGreaterThan(0);
 		await expect(sheet.getByText("Exam week")).toBeInTheDocument();

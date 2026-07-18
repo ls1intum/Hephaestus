@@ -190,7 +190,7 @@ export function OutlineConnectCard({
 
 				{connected && (
 					// Disconnect is a destructive lifecycle action, so it stands alone in its own footer —
-					// never on the same row as Sync-now (which now lives in the header above).
+					// never on the same row as Sync-now, which lives in the header above.
 					<CardFooter className="justify-end">
 						<Button
 							variant="destructive-outline"

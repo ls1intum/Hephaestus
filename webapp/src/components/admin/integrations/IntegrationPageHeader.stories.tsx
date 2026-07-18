@@ -6,8 +6,7 @@ import { IntegrationPageHeader } from "./IntegrationPageHeader";
 
 /**
  * The detail-page header for a single integration: brand icon, title, description and an optional
- * slot for status/actions (health badge, sync button). A layout primitive — the stories pin the
- * default, the with-actions composition, and long-text wrapping.
+ * slot for status/actions (health badge, sync button).
  */
 const meta = {
 	component: IntegrationPageHeader,

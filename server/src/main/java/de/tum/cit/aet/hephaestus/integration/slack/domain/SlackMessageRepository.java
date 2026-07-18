@@ -85,7 +85,6 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      * monitored channel (mirrors {@code IssueRepository.RepositoryItemCount}). Includes tombstoned rows,
      * matching {@link #countByWorkspaceIdAndSlackChannelId} (a storage count, not a content count).
      *
-     * @param workspaceId the workspace to count within
      * @return one projection row per channel that has at least one stored message
      */
     @Query(

@@ -249,10 +249,9 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		await removeCollection.mutateAsync({ path: { workspaceSlug, collectionId } });
 	};
 
-	// The connection plane is the shared `SyncStatusHeader`, driven by the raw unified status —
-	// health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls all
-	// come from it. Outline exposes no backfill affordance, so `onBackfill` is intentionally omitted
-	// and the split button never appears.
+	// The shared `SyncStatusHeader` renders the whole connection plane from the raw unified status.
+	// Outline exposes no backfill affordance, so `onBackfill` is omitted and the split button never
+	// appears.
 	const syncStatusHeaderProps: Omit<SyncStatusHeaderProps, "label"> = {
 		status: connectionStatus,
 		isConnectionActive,
@@ -278,9 +277,8 @@ export function useOutlineIntegration(workspaceSlug: string) {
 	};
 
 	return {
-		// Not gated on ACTIVE: a SUSPENDED connection is exactly when an admin needs the job history to
-		// see what the last run did before it stopped. Sync CONTROLS stay gated (see isConnectionActive);
-		// reading history is safe and the sibling integrations already show theirs in this state.
+		// Exposed even when SUSPENDED: reading job history is safe, and a suspended connection is when
+		// an admin most needs to see what the last run did. Sync controls stay gated (isConnectionActive).
 		connectionId,
 		hasConnection,
 		isConnectionActive,
@@ -290,17 +288,15 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		isLoading: connectionsQuery.isLoading,
 		connectionsError: connectionsQuery.error,
 		retryConnections: () => connectionsQuery.refetch(),
-		// The raw unified status; the route gates the shared header on its presence, exactly as Slack does.
+		// The raw unified status; the route gates the shared header on its presence.
 		status: connectionStatus,
 		statusError,
 		retryStatus: () => refetchStatus(),
 		tokenStatusError,
 		retryTokenStatus: () => refetchTokenStatus(),
 		syncStatusHeaderProps,
-		// The per-collection observability ledger — the same shared table SCM and Slack mount, so all
-		// four integrations report freshness in one visual language. Deliberately NOT gated on ACTIVE:
-		// a suspended connection is exactly when an admin needs to see how far behind each collection
-		// got before sync stopped.
+		// The per-collection observability ledger — the same shared table SCM and Slack mount. Shown
+		// even when suspended, so an admin can see how far behind each collection got before sync stopped.
 		syncResourcesProps: {
 			resources: resources ?? [],
 			isLoading: isResourcesLoading,
@@ -309,8 +305,8 @@ export function useOutlineIntegration(workspaceSlug: string) {
 			onRetry: () => refetchResources(),
 			resourceNoun: "collection",
 			resourceNounPlural: "collections",
-			// Without the cadence the ledger prints every reading and judges none of them — the server
-			// sends it precisely so the client doesn't have to guess a schedule.
+			// The freshness cadence comes from the server so the client doesn't hard-code one; without it
+			// the ledger can't judge staleness.
 			syncIntervalSeconds: connectionStatus?.syncIntervalSeconds,
 			expectedClassKeys: ["documents"],
 		} satisfies SyncResourcesTableProps,

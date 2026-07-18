@@ -41,7 +41,7 @@ import org.springframework.stereotype.Component;
  *
  * <h2>Not a pacer</h2>
  * There is no {@code waitIfNeeded} here. Back-off already lives in
- * {@link SlackMessageService}'s {@code callHonoringRateLimit}, which is where it belongs; this class only
+ * {@link SlackMessageService}'s {@code callHonoringRateLimit}; this class only
  * watches. Slack's synchronous SDK client never self-throttles (only the async client does), so that hand
  * -rolled catch block is the single point where every 429 is already recognized — and therefore the single
  * point that feeds this tracker.

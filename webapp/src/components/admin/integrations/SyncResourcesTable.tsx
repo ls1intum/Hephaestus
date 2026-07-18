@@ -73,7 +73,7 @@ export const SCM_CLASS_KEYS: ClassKey[] = [
 	"commits",
 ];
 
-/** Below the design's read of "silently broken": a class summing to 0 while a sibling has real volume. */
+/** The sibling volume above which a class summing to 0 reads as a silently broken pipeline, not an empty one. */
 const PIPELINE_BREAK_SIBLING_MIN = 50;
 
 function columnsFor(classKeys: Iterable<ClassKey>): ClassColumn[] {
@@ -667,7 +667,7 @@ export interface SyncResourcesTableProps {
  *
  * Counts are the columns because counts are the abundant, real fact (all six SCM classes report a real
  * number, where only issues and pull requests carry a watermark). "0 comments next to 3,410 issues" is
- * the genuine silent-broken signal, and it now reads across the whole fleet at once — triaged so the one
+ * the genuine silent-broken signal, and it reads across the whole fleet at once — triaged so the one
  * broken repository among seventy is row one, searchable, faceted by what needs attention, and totalled.
  */
 export function SyncResourcesTable({
@@ -823,8 +823,7 @@ export function SyncResourcesTable({
 			</div>
 
 			{/* The cap and vertical scroll go on the table's own scroll container (see Table's
-			    containerClassName), so the sticky header and totals footer clip and stick against it — one
-			    tested containment path, not a raw `<table>` hand-rolled in a bespoke `max-h` div. */}
+			    containerClassName), so the sticky header and totals footer clip and stick against it. */}
 			<Table containerClassName="max-h-[70vh] overflow-y-auto rounded-md border">
 				<ResourcesTableHeader
 					columns={columns}

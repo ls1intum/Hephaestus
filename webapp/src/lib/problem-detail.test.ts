@@ -57,7 +57,7 @@ describe("problemDetailOf", () => {
 });
 
 // `problemStatusOf` decides whether the UI offers a way out at all — a retryable 503 vs a 403 that no
-// button can fix. `undefined` is load-bearing and must never be coerced to a number.
+// button can fix. `undefined` is meaningful (no HTTP answer) and must never be coerced to a number.
 describe("problemStatusOf", () => {
 	it("reads `status` from the RFC 9457 body the client throws", () => {
 		expect(problemStatusOf({ type: "about:blank", status: 403, detail: "Forbidden" })).toBe(403);

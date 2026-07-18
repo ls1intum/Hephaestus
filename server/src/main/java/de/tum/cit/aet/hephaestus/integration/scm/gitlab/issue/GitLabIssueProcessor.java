@@ -374,9 +374,6 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return issue;
     }
 
-    /**
-     * Process a closed event.
-     */
     @Transactional
     @Nullable
     public Issue processClosed(GitLabIssueEventDTO event, ProcessingContext context) {
@@ -394,9 +391,6 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return issue;
     }
 
-    /**
-     * Process a reopened event.
-     */
     @Transactional
     @Nullable
     public Issue processReopened(GitLabIssueEventDTO event, ProcessingContext context) {

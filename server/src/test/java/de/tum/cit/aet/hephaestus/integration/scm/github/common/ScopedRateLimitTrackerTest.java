@@ -326,8 +326,8 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The seed bug in its purest form: GitHub reporting no {@code resetAt} must leave the snapshot's
-         * resetAt null, not serve the constructor's fabricated {@code now() + 1h} as a measured value.
+         * GitHub reporting no {@code resetAt} must leave the snapshot's resetAt null, not serve the
+         * constructor's fabricated {@code now() + 1h} as a measured value.
          */
         @Test
         void shouldNotFabricateResetAtWhenPayloadOmitsIt() {
@@ -343,8 +343,8 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The "optimistic reset" is a throttling heuristic. It must move the decision APIs and leave the
-         * displayed observation untouched — the old code wrote it into state and rendered it as measured.
+         * The "optimistic reset" is a throttling heuristic: it must move the decision APIs while leaving
+         * the displayed observation untouched, never written into state and rendered as measured.
          */
         @Test
         void shouldNotLetOptimisticResetLeakIntoSnapshot() {
@@ -468,9 +468,9 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The structural half of the fix: the optimistic reset must not <em>write</em>. The gauge reads the
-         * same observed field the snapshot does, so if a throttle decision ever mutates state back up to
-         * the limit, this gauge reports 5000 for a budget nobody measured.
+         * The optimistic reset must not <em>write</em>. The gauge reads the same observed field the
+         * snapshot does, so if a throttle decision ever mutates state back up to the limit, this gauge
+         * reports 5000 for a budget nobody measured.
          */
         @Test
         void throttleDecisionMustNotWriteBackIntoObservedState() {
@@ -478,7 +478,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
             OffsetDateTime pastReset = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(5);
             tracker.updateFromResponse(scopeId, mockResponseWithRateLimit(7, 5000, 4993, 10, pastReset));
 
-            // Every decision API that used to perform the write-back.
+            // Exercise every decision API that could mutate state back up.
             tracker.getRemaining(scopeId);
             tracker.isCritical(scopeId);
             tracker.isLow(scopeId);

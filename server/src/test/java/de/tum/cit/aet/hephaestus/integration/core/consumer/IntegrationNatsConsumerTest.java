@@ -191,7 +191,7 @@ class IntegrationNatsConsumerTest {
      * cannot be created — the common case being that the {@code outline} stream does not exist yet because the
      * webhook pod creates it on ITS boot — the first stream's consumer has already been {@code start()}ed.
      *
-     * <p>Two invariants, both broken before:
+     * <p>Two invariants:
      * <ol>
      *   <li>every started consumer is TRACKED, so it can still be stopped/updated — an untracked one runs
      *       forever, is invisible to {@code updateScopeConsumer} ("not running"), and gets duplicated on its

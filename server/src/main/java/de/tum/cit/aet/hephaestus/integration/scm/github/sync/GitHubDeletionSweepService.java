@@ -247,8 +247,8 @@ public class GitHubDeletionSweepService {
             try {
                 outcome = sweepRepository(scopeId, repository, handle);
             } catch (RuntimeException e) {
-                // Defensive: sweepRepository is written not to throw, but a sweep must never be the
-                // reason a reconciliation job fails — it is drift repair, not the sync itself.
+                // sweepRepository is not expected to throw, but a sweep failure must never abort the
+                // reconciliation job — this is drift repair, not the sync itself.
                 log.warn(
                     "Deletion sweep failed for repository, continuing: repoName={}, scopeId={}, message={}",
                     sanitizeForLog(repository.getNameWithOwner()),
@@ -595,8 +595,8 @@ public class GitHubDeletionSweepService {
                 // Log the root cause, not just e.toString(): Spring wraps every decode failure in a
                 // GraphQlClientException whose message is a bare "Cannot read field '<path>'" and
                 // whose cause carries the only text that identifies the actual fault. Reporting the
-                // wrapper alone makes a client-side Jackson error indistinguishable from an upstream
-                // GraphQL error, which is precisely how a decode bug hid behind the fail-closed skip.
+                // wrapper alone would make a client-side Jackson error indistinguishable from an
+                // upstream GraphQL error behind the fail-closed skip.
                 log.warn(
                     "Deletion sweep decode failed: entity={}, repoName={}, page={}, message={}, cause={}",
                     entity.plural,

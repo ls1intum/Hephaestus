@@ -61,7 +61,7 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
      * connection being ACTIVE. Slack's Events API subscription is declared once in the app manifest at the
      * app level, so no per-installation subscription id exists to observe (contrast GitHub's App install,
      * GitLab's stored webhook id, Outline's stored subscription id). Reading TRUE off an ACTIVE connection
-     * restated "the install exists" in a column the admin reads as "deliveries are wired up".
+     * would restate "the install exists" in a column the admin reads as "deliveries are wired up".
      */
     @Test
     void describe_webhookRegisteredIsNull_becauseSlackSubscriptionStateIsNotObservable() {
@@ -77,8 +77,7 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
 
     /**
      * A Slack workspace that has never been throttled has no rate-limit fact to state, so the row stays
-     * off the page. The previous hardcoded {@code null} produced the same output by accident; this pins it
-     * as a consequence of "nothing observed" rather than "nothing tracked".
+     * off the page — a consequence of "nothing observed", not "nothing tracked".
      */
     @Test
     void describe_neverThrottled_reportsNoRateLimit() {
@@ -88,9 +87,8 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     }
 
     /**
-     * The state an admin currently cannot see: the non-Marketplace {@code conversations.history} clamp
-     * answers with {@code Retry-After: 60}, and that is now surfaced — as a back-off deadline, never as a
-     * quota, because Slack reports no quota.
+     * The non-Marketplace {@code conversations.history} clamp answers with {@code Retry-After: 60}; it
+     * surfaces as a back-off deadline, never as a quota, because Slack reports no quota.
      */
     @Test
     void describe_afterObserved429_reportsThrottledUntilAndNoQuota() {

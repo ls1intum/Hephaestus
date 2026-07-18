@@ -465,7 +465,6 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             assertThat(outcome.issuesTombstoned()).isZero();
             assertThat(outcome.pullRequestsTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isTrue();
-            // The incomplete issue listing tombstoned no issues; only the pull-request write ran.
             verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
             verify(issueRepository, times(1)).tombstonePullRequestsByRepositoryIdAndNumbers(
                 anyLong(),

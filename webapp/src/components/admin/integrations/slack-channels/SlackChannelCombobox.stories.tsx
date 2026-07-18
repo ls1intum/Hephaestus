@@ -121,7 +121,6 @@ export const KeyboardNavigation: Story = {
 		await expect(search).toHaveAttribute("aria-activedescendant", first.id);
 		await expect(document.querySelectorAll("[data-highlighted]")).toHaveLength(1);
 
-		// ArrowDown advances the highlight, ArrowUp brings it back.
 		await userEvent.keyboard("{ArrowDown}");
 		const second = screen.getByRole("option", { name: /#team-standup/i });
 		await waitFor(() => expect(second).toHaveAttribute("data-highlighted"));
@@ -132,8 +131,8 @@ export const KeyboardNavigation: Story = {
 		await waitFor(() => expect(first).toHaveAttribute("data-highlighted"));
 		await expect(second).not.toHaveAttribute("data-highlighted");
 
-		// Enter selects the highlighted option and closes the popup. The options outlive the close
-		// by one exit animation, so the assertion waits for the popup to actually go.
+		// The options outlive the close by one exit animation, so the assertion waits for the popup
+		// to actually go before checking it is gone.
 		await userEvent.keyboard("{Enter}");
 		await expect(args.onSelect).toHaveBeenCalledWith(
 			expect.objectContaining({ slackChannelId: "C05GENERAL5" }),
@@ -171,7 +170,6 @@ export const AccessibleStructure: Story = {
 			"aria-selected",
 			"false",
 		);
-		// The search field carries the caller's accessible name.
 		await expect(screen.getByPlaceholderText(/search channels/i)).toHaveAccessibleName(
 			"Search Slack channels",
 		);

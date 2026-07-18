@@ -12,15 +12,12 @@ interface StateCopy {
 }
 
 /**
- * What each non-ACTIVE connection state means, in the admin's terms.
+ * What each non-ACTIVE connection state means, in the admin's terms. Lowercasing the wire enum yields
+ * machine tokens dressed as sentences ("Slack is uninstalled.") that name the state but explain
+ * neither why sync stopped nor what to do, so every blocking state gets written copy and a next action.
  *
- * `connectionState` is a wire enum, and lowercasing it yields machine tokens dressed as sentences
- * ("Slack is uninstalled.") that name the state but explain neither why sync stopped nor what to do.
- * Every state that blocks syncing gets written copy and a next action instead, exactly as
- * `HEALTH_LABEL` does for `ConnectionHealth`.
- *
- * ACTIVE is deliberately absent: the steady state has nothing to announce, and the lookup returning
- * `undefined` is what makes {@link ConnectionStateNotice} render nothing.
+ * ACTIVE is absent: the lookup returning `undefined` is what makes {@link ConnectionStateNotice}
+ * render nothing for the steady state.
  */
 const STATE_COPY: Partial<Record<ConnectionState, StateCopy>> = {
 	PENDING: {
@@ -54,11 +51,9 @@ export interface ConnectionStateNoticeProps {
 }
 
 /**
- * The one place a non-ACTIVE connection state is explained to an admin.
- *
- * Every integration renders this, so a suspended Slack and a suspended Outline read identically.
- * SUSPENDED/UNINSTALLED mean *sync is stopped*, which is a warning and not a muted footnote; PENDING
- * resolves on its own and stays quiet.
+ * The one place a non-ACTIVE connection state is explained to an admin. Every integration renders it,
+ * so a suspended Slack and a suspended Outline read identically. Severity tracks consequence:
+ * SUSPENDED/UNINSTALLED mean sync is stopped, so they warn; PENDING resolves on its own and stays quiet.
  *
  * Renders nothing for ACTIVE or for a connection that doesn't exist — neither has anything to explain.
  */

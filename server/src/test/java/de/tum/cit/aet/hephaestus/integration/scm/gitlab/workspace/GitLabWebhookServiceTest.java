@@ -49,12 +49,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Unit tests for {@link GitLabWebhookService}.
- *
- * <p>legacy {@code Workspace.gitlab*} setters are gone; the
- * service now reads/writes the {@code GitLabConfig} on the active GitLab Connection
- * via {@link ConnectionService}. Tests mirror the new flow via a small in-memory map
- * stand-in for the registry so we don't need an integration test container here.
+ * Unit tests for {@link GitLabWebhookService}. The service reads/writes the {@code GitLabConfig} on
+ * the active GitLab Connection via {@link ConnectionService}; these tests back that registry with a
+ * small in-memory map stand-in to avoid an integration test container.
  */
 @Tag("unit")
 class GitLabWebhookServiceTest extends BaseUnitTest {
@@ -133,9 +130,8 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         );
         gitLabBearerTokens.put(1L, new BearerToken("glpat-test-token", null));
 
-        // lenient() — each Nested test exercises a different code path, so a given
-        // stub may go unused per test. Mockito's strict-stub mode would otherwise reject
-        // the shared setUp.
+        // lenient() — each Nested test exercises a different code path, so a shared setUp stub may go
+        // unused per test, which strict-stub mode would otherwise reject.
         Mockito.lenient()
             .when(connectionService.findActiveProviderKind(anyLong()))
             .thenAnswer(inv -> {
@@ -355,7 +351,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(rotationClientProvider.getIfAvailable()).thenReturn(null);
 
             webhookService.rotateTokenIfNeeded(workspace);
-            // No exception, no rotation
         }
 
         @Test
@@ -399,7 +394,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(rotationClient.getTokenInfo(1L)).thenThrow(new IllegalStateException("Connection refused"));
 
-            // Should not throw
             webhookService.rotateTokenIfNeeded(workspace);
         }
     }
@@ -451,12 +445,11 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
 
-            // Simulate API error
             Mockito.doThrow(new RuntimeException("API error")).when(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
 
             webhookService.deregisterWebhook(workspace);
 
-            // Fields should still be cleared (best-effort)
+            // Best-effort: fields cleared even though the vendor call failed.
             assertThat(currentConfig(1L).gitlabWebhookId()).isNull();
             assertThat(currentConfig(1L).gitlabGroupId()).isNull();
         }
@@ -539,8 +532,8 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             webhookService.deregisterActiveWebhook(1L);
 
             verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
-            // Critical: config is NOT cleared here — the disconnect txn holds the same row and
-            // saves it moments later; a rewrite would optimistic-lock-fail that save.
+            // Config is NOT cleared here — the disconnect txn holds the same row and saves it moments
+            // later; a rewrite would optimistic-lock-fail that save.
             assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
             assertThat(currentConfig(1L).gitlabGroupId()).isEqualTo(42L);
             verify(connectionService, never()).updateConfig(anyLong(), any(), any());
@@ -670,7 +663,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
             verify(webhookClient, never()).deregisterGroupWebhook(anyLong(), anyLong(), anyLong());
             verify(webhookClient, never()).registerGroupWebhook(anyLong(), anyLong(), any());
-            // Stored id is untouched.
             assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
         }
 

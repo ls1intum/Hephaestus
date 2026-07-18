@@ -133,8 +133,7 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             .exchange()
             .expectStatus()
             .isNotFound();
-        // The unified sync-observability endpoints 404 the same way once the connection row is gone —
-        // this is the absorbed replacement for the old /connections/outline/status and /sync checks.
+        // The unified sync-observability endpoints 404 the same way once the connection row is gone.
         webTestClient
             .get()
             .uri("/workspaces/{slug}/connections/{id}/sync", workspace.getWorkspaceSlug(), connectionId)
@@ -272,7 +271,7 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         assertThat(stored.getState()).isEqualTo(MirrorState.ENABLED);
         // After commit the kicked sync runs (empty catalog in this test) and reconverges the collection
         // to COMPLETE — proving the after-commit kick actually observes the ENABLED+PENDING row it is
-        // meant to sync, rather than racing the not-yet-committed transaction as the old in-tx kick did.
+        // meant to sync, rather than racing the not-yet-committed transaction.
         assertThat(stored.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
 
         patchState("no-such-collection", MirrorState.PAUSED).expectStatus().isNotFound();
@@ -419,7 +418,7 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
             "Outline /api/documents.export failed (HTTP 500)"
         );
 
-        // The manual trigger (the absorbed POST /connections/outline/sync) always answers 202.
+        // The manual trigger always answers 202.
         webTestClient
             .post()
             .uri("/workspaces/{slug}/connections/{id}/sync/jobs", workspace.getWorkspaceSlug(), connectionId)

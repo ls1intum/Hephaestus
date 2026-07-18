@@ -116,8 +116,7 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
             resourceState(collection),
             collection.getDocumentsSyncedAt(),
             itemCount,
-            // One class per collection, same as Slack — and the watermark genuinely is the documents'
-            // own, not a stand-in.
+            // One count class per collection; its watermark is the documents' own last-synced time.
             List.of(
                 new SyncResourceCount(
                     SyncResourceCount.KEY_DOCUMENTS,

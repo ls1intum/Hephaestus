@@ -198,8 +198,8 @@ describe("useSyncEvents", () => {
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
 		act(() => latestSource().onopen?.());
 
-		// First failure sits on the 1s rung → 750ms. A flat setTimeout(connect, 0) would already have
-		// reopened after any advance at all, so the "still one instance at 500ms" step catches that.
+		// First failure sits on the 1s rung → 750ms; the 500ms checkpoint proves the delay is a real
+		// backoff, not a flat setTimeout(connect, 0) that would reopen after any advance at all.
 		act(() => latestSource().fail());
 		act(() => vi.advanceTimersByTime(500));
 		expect(FakeEventSource.instances).toHaveLength(1);
@@ -376,7 +376,6 @@ describe("useSyncEvents", () => {
 		const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
 
-		// A non-JSON payload must be caught, not propagated out of the event listener.
 		act(() => latestSource().emitRaw("}{ not json"));
 		flushHintDebounce();
 

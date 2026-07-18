@@ -9,12 +9,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Repository for organization membership records.
- *
- * <p>All queries filter by Organization ID which inherently carries scope
- * through the Organization relationship.
- */
 @WorkspaceAgnostic(
     "Memberships scoped through organization_id; organization is global, membership filtered by workspace context"
 )

@@ -83,8 +83,7 @@ class ConnectionPurgeContributorTest extends BaseUnitTest {
 
         assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(connection.getCredentialsEncrypted()).isNull();
-        // Erasure is not preemptable: it goes through transition(), which never fences on an in-flight
-        // sync job — so an in-flight job cannot make this assertion's outcome differ.
+        // Erasure is not preemptable: transition() never fences on an in-flight sync job.
         verify(syncJobService, never()).requestCancelForTeardown(anyLong());
     }
 

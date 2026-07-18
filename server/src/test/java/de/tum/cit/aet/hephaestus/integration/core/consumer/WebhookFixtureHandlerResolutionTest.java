@@ -45,9 +45,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Unlike per-side unit tests (deriver-only, parser-only), and unlike {@link SubjectGrammarRoundTripTest}
  * (which only proves the publisher subject falls under the consumer's <em>subscription filter</em>), this
- * closes the last link: the parsed {@link EventTypeKey} actually resolves a handler bean. It would have
- * caught the {@code repository.team} dead branch (team↔repo permission events keyed to a tier with no
- * handler) and the GitLab group-event dead code.
+ * closes the last link: the parsed {@link EventTypeKey} actually resolves a handler bean. This is the seam
+ * that lets an event be handled on one tier yet dead on another — e.g. {@code repository.team} (permission
+ * events keyed to a tier with no handler) or GitLab group events.
  *
  * <p><b>Ground truth without a Spring context.</b> The set of registered keys is read straight from the
  * production handler classes: every concrete {@link IntegrationMessageHandler} under the kind's package
@@ -128,7 +128,7 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
         Set<EventTypeKey> registeredKeys = registeredKeys(GITHUB_HANDLER_PACKAGE);
 
         // Guard-health: if the registry came back empty the reflective scan silently broke and every
-        // assertion below would vacuously pass. Anchor on the two tiers this fix touches.
+        // assertion below would vacuously pass. Anchor on the two team tiers.
         assertThat(registeredKeys)
             .as("GitHub handler registry must be discoverable and non-empty")
             .isNotEmpty()
@@ -167,7 +167,7 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
             .as("GitLab handler registry must be discoverable and non-empty")
             .isNotEmpty()
             .contains(new EventTypeKey(IntegrationKind.GITLAB, "merge_request"))
-            // Anchors the group-tier routing fixed in 90f63f784 (project/subgroup/member were dead code).
+            // Anchors the group-tier routing (project/subgroup/member).
             .contains(new EventTypeKey(IntegrationKind.GITLAB, "project"))
             .contains(new EventTypeKey(IntegrationKind.GITLAB, "member"));
 
@@ -280,7 +280,7 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
                 continue;
             }
             if (registeredKeys.contains(key)) {
-                continue; // resolved a handler
+                continue;
             }
             String token = lastSegment(key.eventType());
             if (claimedEventTokens.contains(token)) {
@@ -438,8 +438,8 @@ class WebhookFixtureHandlerResolutionTest extends BaseUnitTest {
      *
      * <p>One exception: a handler may derive a second {@code REQUIRES_NEW} template in its body via
      * {@code transactionTemplate.getTransactionManager()} (e.g. {@code GitLabMemberMessageHandler}), which
-     * NPEs on a null template. We therefore hand any {@link TransactionTemplate} parameter a real (empty)
-     * instance — harmless for the handlers that merely stash it, and enough to survive the constructor.
+     * NPEs on a null template. Hand any {@link TransactionTemplate} parameter a real (empty) instance —
+     * harmless for the handlers that merely stash it, and enough to survive the constructor.
      */
     private static IntegrationMessageHandler instantiateForKey(Class<?> clazz) throws ReflectiveOperationException {
         Constructor<?> ctor = java.util.Arrays.stream(clazz.getDeclaredConstructors())

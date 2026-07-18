@@ -23,12 +23,11 @@ import org.springframework.stereotype.Component;
  * {@link InstallationCredential} for orchestrator persistence.
  *
  * <p>{@link #revoke} makes no vendor-side call — GitHub App uninstall happens on GitHub's side and
- * we observe {@code installation.deleted} via the lifecycle webhook — but it DOES erase this
- * workspace's mirrored SCM data through {@link ScmWorkspaceContentEraser}. That heals a real
- * asymmetry: a vendor-side uninstall already erased everything (via
- * {@code GitHubWorkspaceProvisioningAdapter#onInstallationDeleted}), while an admin disconnect
- * erased nothing, so mirrored issues/PRs/reviews/comments outlived the connection that justified
- * holding them. Slack and Outline erase on disconnect too; this brings GitHub in line.
+ * is observed via the {@code installation.deleted} lifecycle webhook, which erases mirrored data
+ * through {@code GitHubWorkspaceProvisioningAdapter#onInstallationDeleted}. An admin-initiated
+ * disconnect takes a different path and must erase the same data itself, via
+ * {@link ScmWorkspaceContentEraser}, so mirrored issues/PRs/reviews/comments don't outlive the
+ * connection that justified holding them.
  */
 @ConditionalOnServerRole
 @Component
@@ -106,14 +105,13 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
         if (ref == null) {
             return;
         }
-        // No vendor-side call: GitHub App uninstall is initiated on github.com (App settings UI);
-        // we observe installation.deleted via the lifecycle webhook and transition the Connection
-        // there. The caller drives the local state change via ConnectionService.disconnect().
+        // No vendor-side call: uninstall happens on github.com and is observed via the
+        // installation.deleted webhook, which transitions the Connection separately.
+        // ConnectionService.disconnect() drives the local state change; here we only erase.
         //
-        // The LOCAL erase, however, belongs here. This runs inside the fenced disconnect
-        // transaction (sync jobs already cancelled/refused), before the UNINSTALLED transition
-        // clears credentials. Hard-delete, orphan-guarded: repositories shared with another
-        // workspace survive — see ScmWorkspaceContentEraser.
+        // This runs inside the fenced disconnect transaction (sync jobs already cancelled/refused),
+        // before the UNINSTALLED transition clears credentials. Hard-delete, orphan-guarded:
+        // repositories shared with another workspace survive — see ScmWorkspaceContentEraser.
         log.info("GitHub revoke: erasing local SCM mirror (uninstall itself is webhook-driven), ref={}", ref);
         contentEraser.eraseWorkspaceScmMirror(ref.workspaceId());
     }

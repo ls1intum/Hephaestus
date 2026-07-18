@@ -90,10 +90,6 @@ public class OutlineApiClient {
     private final CircuitBreaker circuitBreaker;
     private final Retry retry;
 
-    /**
-     * The single constructor. Spring injects the qualified beans; unit tests call it directly with a
-     * stubbed {@link WebClient} (the qualifier annotations are inert on a direct call).
-     */
     @Autowired
     public OutlineApiClient(
         @Qualifier("outlineRestApiCircuitBreaker") CircuitBreaker circuitBreaker,

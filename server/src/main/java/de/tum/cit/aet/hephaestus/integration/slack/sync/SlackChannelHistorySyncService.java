@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
  * channel through the SAME consent-gated ingest stack the event path uses — Slack's Events API drops an event after
  * three failed retries within ~6 minutes, so an outage longer than that would otherwise lose messages permanently.
  *
- * <p><strong>Consent invariants, by construction:</strong>
+ * <p><strong>Consent invariants:</strong>
  * <ul>
  *   <li>The fetch floor is {@code max(consent_announced_at, retention cutoff, last watermark)} — pre-announcement
  *       history and content older than the retention window are never even requested. An ACTIVE channel with no

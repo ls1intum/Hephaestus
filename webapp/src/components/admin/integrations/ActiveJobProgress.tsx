@@ -9,15 +9,11 @@ export interface ActiveJobProgressProps {
 }
 
 /**
- * What the running job is doing right now.
- *
- * The narrative is deliberately two-layered, matching the server's progress contract: `itemsProcessed`
- * / `itemsTotal` are job-global and drive the bar, while `progress.currentStep` is the phase-local
- * sentence ("Backfilling ls1intum/Artemis — issues #4812 → #3200") and `progress.phase` is the chip.
- * A backfill now reports a real total aggregated from its watermarks, so the bar is determinate for
- * the long jobs that most needed one; `itemsTotal: null` still genuinely means "not yet known" (a
- * backfill has no high-water marks until its first batch lands), and that path stays a spinner rather
- * than inventing a denominator.
+ * What the running job is doing right now, in two layers matching the server's progress contract:
+ * `itemsProcessed`/`itemsTotal` are job-global and drive the bar, while `progress.currentStep` is the
+ * phase-local sentence ("Backfilling ls1intum/Artemis — issues #4812 → #3200") and `progress.phase`
+ * is the chip. `itemsTotal: null` means "not yet known" (a backfill has no high-water marks until its
+ * first batch lands), and that path stays a spinner rather than inventing a denominator.
  */
 export function ActiveJobProgress({ job }: ActiveJobProgressProps) {
 	if (!job) return null;
@@ -27,9 +23,8 @@ export function ActiveJobProgress({ job }: ActiveJobProgressProps) {
 	const { currentStep, phase } = jobProgress(job);
 	const isDeterminate = total != null && total > 0;
 
-	// The step is upstream-shaped and long by design (repo name plus an id range), so it gets its own
-	// line under the bar rather than competing with it for the row — sharing one line would truncate
-	// exactly the part that says what is happening.
+	// The step is long by design (repo name plus an id range), so it gets its own line under the bar;
+	// sharing the bar's row would truncate exactly the part that says what is happening.
 	return (
 		<div className="space-y-1.5 text-sm text-muted-foreground">
 			<div className="flex items-center gap-2">

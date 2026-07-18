@@ -9,9 +9,9 @@ import org.springframework.stereotype.Component;
  * Plugs into the existing {@code WorkspacePurgeContributor} SPI to cascade workspace
  * PURGE into Connection lifecycle transitions.
  *
- * <p>Per agent A2: {@code WorkspaceStatus.PURGED} is soft-delete, so {@code ON DELETE
- * CASCADE} on {@code connection.workspace_id} would NOT fire. We explicitly transition
- * every still-ACTIVE / SUSPENDED Connection to UNINSTALLED, preserving audit history.
+ * <p>{@code WorkspaceStatus.PURGED} is soft-delete, so {@code ON DELETE CASCADE} on
+ * {@code connection.workspace_id} would NOT fire. We explicitly transition every
+ * still-ACTIVE / SUSPENDED Connection to UNINSTALLED, preserving audit history.
  *
  * <p>Audit + transition idempotency means re-running purge against a PURGED workspace
  * (e.g. retry after a partial failure) is a no-op.

@@ -28,8 +28,8 @@ const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_CAP_MS = 30_000;
 
 /**
- * Consecutive failed connects before the surface admits live updates are gone. One is a blip — a
- * proxy restart reconnects inside a second — and announcing that would be noise.
+ * Consecutive failed connects before the surface reports live updates gone. One is a blip — a proxy
+ * restart reconnects within a second — so tolerate it silently.
  */
 const FAILURES_BEFORE_DEGRADED = 2;
 
@@ -103,10 +103,10 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 			queryClient.invalidateQueries({ queryKey });
 
 		/**
-		 * Catch-up after a gap in the stream: hints carry no ids, so the browser cannot replay them
-		 * with `Last-Event-ID` and everything missed while disconnected is simply lost. Marking this
-		 * section's queries stale is the substitute — scoped to the families we own, never the whole
-		 * workspace, because `invalidateQueries` cancels in-flight fetches by default.
+		 * Catch-up after a stream gap. Hints carry no ids, so the browser cannot replay them with
+		 * `Last-Event-ID`; anything missed while disconnected is lost, and marking this section's
+		 * queries stale is the substitute. Scoped to the families we own, never the whole workspace,
+		 * because `invalidateQueries` cancels in-flight fetches.
 		 */
 		const resyncIntegrationQueries = () => {
 			const familyIds = integrationQueryFamilyIds(workspaceSlug);
@@ -138,8 +138,8 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 						listConnectionSyncResourcesQueryKey({ path: { workspaceSlug, connectionId } }),
 					);
 					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
-					// Only the catalog belonging to *this* connection's integration changed. A GitHub
-					// repo-sync hint has nothing to say about Slack channels or Outline collections.
+					// Only the catalog for this connection's integration changed; a GitHub repo-sync
+					// hint says nothing about Slack channels or Outline collections.
 					const kind = connectionKindOf(queryClient, workspaceSlug, connectionId);
 					if (kind === "OUTLINE" || kind === undefined) {
 						invalidate(listOutlineCollectionsQueryKey({ path: { workspaceSlug } }));
@@ -151,7 +151,7 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 				}
 				case "connection":
 					// A connect/disconnect moves the catalog, the workspace record and the connection list
-					// together, so this is the one hint that legitimately touches the whole section.
+					// together, so this is the one hint that touches the whole section.
 					resyncIntegrationQueries();
 					break;
 				case "activity":
@@ -205,10 +205,9 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 				setLivePushUnavailable(false);
 
 				const now = Date.now();
-				// The first open races the page's own mount fetches, which are already loading exactly
-				// this data — resyncing here would cancel and restart every one of them. Record the
-				// timestamp anyway so an immediate re-open is throttled against the mount, not against
-				// nothing.
+				// The first open races the page's own mount fetches, which are already loading this
+				// data — resyncing here would cancel and restart them. Record the timestamp anyway so
+				// an immediate re-open is throttled against the mount.
 				const isFirstOpen = !hasEverOpened;
 				hasEverOpened = true;
 				if (isFirstOpen || now - lastResyncAt < RESYNC_THROTTLE_MS) {
@@ -222,11 +221,11 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 			current.addEventListener("sync", handleHint);
 
 			current.onerror = () => {
-				// CONNECTING means the browser is already retrying a network error on its own — per the
-				// HTML spec that path is automatic, so stay out of it. CLOSED means the connection was
-				// *failed*, which the spec reaches for any non-200 or a wrong Content-Type, and from
-				// which the browser never retries: one 502 from the proxy during a deploy, or one 401 on
-				// an expired session, ends live updates for the session unless we reconnect ourselves.
+				// Only act on CLOSED. CONNECTING means the browser is already auto-retrying a network
+				// error (the HTML spec makes that automatic), so stay out of it. CLOSED means the
+				// connection failed — the spec reaches it for any non-200 or wrong Content-Type — and
+				// the browser never retries that: one 502 during a deploy or one 401 on an expired
+				// session ends live updates for the session unless we reconnect ourselves.
 				if (current.readyState !== EventSource.CLOSED) return;
 
 				consecutiveFailures += 1;

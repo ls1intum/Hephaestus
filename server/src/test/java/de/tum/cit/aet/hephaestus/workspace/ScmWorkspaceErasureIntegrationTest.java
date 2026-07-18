@@ -41,23 +41,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Real-Postgres proof of the F2 SCM erase-on-disconnect/purge semantics, and above all of its
+ * Real-Postgres proof of SCM erase-on-disconnect/purge semantics, and above all of its
  * <b>cross-tenant safety</b>.
  *
  * <p>The SCM mirror is instance-global: {@code repository}, {@code issue}, {@code pull_request} and
  * their children carry no {@code workspace_id} and are genuinely shared between workspaces that
  * monitor the same source repository. An erase that simply deleted "the workspace's repositories"
- * would destroy another tenant's data. These tests fix that boundary: a repository two workspaces
- * monitor survives one of them disconnecting, together with its issues, while a repository only the
- * erased workspace monitored is cascade-deleted with everything hanging off it.
+ * would destroy another tenant's data. A repository two workspaces monitor must survive one of them
+ * disconnecting, together with its issues, while a repository only the erased workspace monitored is
+ * cascade-deleted with everything hanging off it.
  *
- * <p>Also pins idempotency (the erase is re-runnable), and the retention decisions: another
+ * <p>Also pins idempotency (the erase is re-runnable) and the retention decisions: another
  * integration's rows and the {@code sync_job} history are NOT erased.
- *
- * <p>Two further erasure defects are pinned here because both need real rows to show up at all:
- * a vendor-side GitHub uninstall must run the whole purge chain rather than write a {@code PURGED}
- * label over surviving data, and a disconnecting workspace must release its organization binding —
- * which is exclusive, one workspace per organization — instead of squatting it forever.
  */
 class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
@@ -158,7 +153,6 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     void erase_isCrossTenantSafe() {
         eraser.eraseWorkspaceScmMirror(tenantA.getId());
 
-        // The other tenant's lawful basis persists: the shared repository and its mirrored content survive.
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
         assertThat(issueRepository.findAll()).singleElement().extracting(Issue::getTitle).isEqualTo("shared issue");
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantB.getId()))
@@ -166,7 +160,6 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
             .extracting(RepositoryToMonitor::getNameWithOwner)
             .isEqualTo(SHARED_REPO);
 
-        // The erased tenant keeps no access path, and the repository only it monitored is gone with its cascade.
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
     }
@@ -220,14 +213,14 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         // Counted through JDBC: slack_thread is workspace-scoped, so an unscoped JPA count() would be
         // rejected by the tenancy statement inspector.
         assertThat(countRows("slack_thread")).isEqualTo(1);
-        // Deliberate retention: operational audit carries no mirrored third-party content.
+        // sync_job is retained: operational audit carries no mirrored third-party content.
         assertThat(countRows("sync_job")).isEqualTo(1);
     }
 
     @Test
     @DisplayName("both standard triggers reach the same choke point: purge adapter and GitHub/GitLab revoke")
     void bothTriggers_eraseTheSameRowSet() {
-        // Trigger B — workspace purge, via the adapter that replaced GitWorkspacePurgeAdapter.
+        // Trigger B — workspace purge via the adapter.
         assertThat(scmWorkspacePurgeAdapter.getOrder()).isEqualTo(-200);
         scmWorkspacePurgeAdapter.deleteWorkspaceData(tenantA.getId());
 
@@ -235,8 +228,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
 
-        // Trigger A — admin disconnect. GitHub's revoke was a no-op before F2; GitLab's was
-        // webhook-teardown only. Both must now erase, and the end state must match the purge above.
+        // Trigger A — admin disconnect must erase too, reaching the same end state as the purge above.
         githubConnectionStrategy.revoke(new IntegrationRef(IntegrationKind.GITHUB, tenantB.getId(), "5002"));
 
         assertThat(repositoryToMonitorRepository.count()).isZero();
@@ -256,18 +248,12 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Defect B: a disconnect erased the org-tier mirror but left the workspace's {@code organization}
-     * FK dangling at the now-empty {@link Organization}.
-     *
-     * <p>That binding is <b>exclusive</b>, not shared: {@code Workspace.organization} is a
-     * {@code @OneToOne} on a {@code unique = true} {@code organization_id} column, so an organization
-     * backs at most ONE workspace and the DB enforces it as {@code workspace_organization_id_key}.
-     * A disconnected workspace that kept the link therefore squatted the organization forever — the
-     * org could never be installed into any other workspace, because binding it would violate that
-     * unique constraint. Since a disconnect does not purge the workspace, the squat was permanent.
-     *
-     * <p>The eraser now releases the link as part of the erase, so the organization is free to be
-     * bound again — by this workspace on reconnect, or by a different one entirely.
+     * The {@code Workspace.organization} binding is <b>exclusive</b>, not shared: it is a
+     * {@code @OneToOne} on a {@code unique = true} {@code organization_id} column ({@code
+     * workspace_organization_id_key}), so an organization backs at most ONE workspace. If a disconnect
+     * erased the org-tier mirror but kept the FK, the workspace would squat the organization forever —
+     * no other workspace could ever install it without violating the unique constraint, and a disconnect
+     * does not purge the workspace. The erase must therefore release the link.
      */
     @Test
     @DisplayName("disconnect erases the org-tier mirror and releases the organization for re-binding")
@@ -279,25 +265,21 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
         eraser.eraseWorkspaceScmMirror(tenantA.getId());
 
-        // The org-tier mirror is gone: no lawful basis survives the only workspace that held it.
         assertThat(teamsFor(organization)).isEmpty();
         assertThat(organizationMembershipRepository.findByOrganizationId(organization.getId())).isEmpty();
 
-        // The link is released rather than left dangling at an org whose mirror no longer exists.
         // Read the FK column directly: Workspace.organization is LAZY, so asserting on the entity
         // getter outside a session reports a proxy-initialization error instead of the real diff.
         assertThat(organizationIdOf(tenantA)).isNull();
 
-        // The Organization identity row itself survives — it is a global identity row, never deleted.
+        // The Organization identity row itself is global and survives — never deleted.
         assertThat(organizationRepository.findById(organization.getId())).isPresent();
 
-        // And the released organization can be bound again. Before the fix this threw a
-        // duplicate-key violation on workspace_organization_id_key, because the disconnected
-        // workspace still occupied the organization's single binding slot.
+        // The released organization's single binding slot (workspace_organization_id_key) is now free
+        // to be bound again.
         bindOrganization(tenantB, organization);
         assertThat(organizationIdOf(tenantB)).isEqualTo(organization.getId());
 
-        // The unrelated tenant's own SCM mirror is untouched by tenant A's erase.
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantB.getId()))
             .singleElement()
             .extracting(RepositoryToMonitor::getNameWithOwner)
@@ -306,11 +288,10 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Defect A: {@code installation.deleted} used to remove monitors and then write
-     * {@code status=PURGED} directly, so none of the {@code WorkspacePurgeContributor} beans ran —
-     * the workspace was labelled purged while Slack/Outline content, org-tier rows and an ACTIVE
-     * Connection all survived. The vendor-side uninstall now runs the same purge chain an admin
-     * deletion runs.
+     * A vendor-side {@code installation.deleted} must run the same purge chain an admin deletion runs,
+     * not just write {@code status=PURGED}: writing the label directly skips every {@code
+     * WorkspacePurgeContributor} bean, leaving Slack/Outline content, org-tier rows and an ACTIVE
+     * Connection alive behind a "purged" label.
      */
     @Test
     @DisplayName("a vendor-side GitHub uninstall runs the full purge chain, not just a status write")

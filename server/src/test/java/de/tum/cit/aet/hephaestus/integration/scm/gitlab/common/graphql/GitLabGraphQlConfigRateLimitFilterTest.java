@@ -27,13 +27,11 @@ import reactor.core.publisher.Mono;
 /**
  * Unit tests for the rate-limit tracking exchange filter in {@link GitLabGraphQlConfig}.
  *
- * <p>Guards the load-bearing seam that {@code forScope} clients depend on: the filter must read the
- * per-request {@link GitLabGraphQlClientProvider#SCOPE_ID_ATTRIBUTE} and feed the response headers to
- * {@link GitLabRateLimitTracker#updateFromHeaders}. If this wiring regresses (e.g. the attribute is
- * dropped or the scopeId no longer propagates), the admin sync UI silently loses GitLab rate-limit
- * data on every instance — including ones that DO advertise rate limits for authenticated traffic.
- * The seam is exercised directly (stub {@code ExchangeFunction}) rather than via a live WebClient
- * round-trip so the test stays a fast, deterministic unit test.
+ * <p>The filter must read the per-request {@link GitLabGraphQlClientProvider#SCOPE_ID_ATTRIBUTE} and
+ * feed the response headers to {@link GitLabRateLimitTracker#updateFromHeaders}. If this wiring
+ * regresses (e.g. the attribute is dropped or the scopeId no longer propagates), the admin sync UI
+ * silently loses GitLab rate-limit data on every instance that advertises rate limits for
+ * authenticated traffic.
  */
 @Tag("unit")
 class GitLabGraphQlConfigRateLimitFilterTest extends BaseUnitTest {

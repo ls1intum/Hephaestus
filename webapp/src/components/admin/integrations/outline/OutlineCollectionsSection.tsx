@@ -44,7 +44,6 @@ export interface OutlineCollectionsSectionProps {
 	isLoading: boolean;
 	/** The collection-list query's error, if it failed — surfaced with a retry instead of the empty state. */
 	error?: unknown;
-	/** Re-run the failed collection list query. */
 	onRetry?: () => void;
 	/** Register a collection for mirroring (lands ENABLED + PENDING). Resolves on success,
 	 * rejects to keep the add dialog open. */

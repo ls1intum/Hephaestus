@@ -66,10 +66,10 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     @MethodSource("gitlabFixtures")
     void gitlabFixtureSubjectMatchesConsumerPrefix(Path fixture) throws IOException {
         JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
-        // Mirror the deriver's rootGroupToken path sources that actually carry a namespace: a project's
-        // path_with_namespace, then a subgroup's group.full_path / full_path. Without the full_path fallbacks
-        // subgroup.create (which has no path_with_namespace) fell through the '/' guard below and never
-        // reached the org-filter assertion — leaving its deriver↔organizationFilter agreement unproven.
+        // Mirror the deriver's rootGroupToken path sources that carry a namespace: a project's
+        // path_with_namespace, then a subgroup's group.full_path / full_path. The full_path fallbacks are
+        // what let subgroup.create (which has no path_with_namespace) reach the org-filter assertion instead
+        // of being skipped by the '/' guard below.
         String pathWithNamespace = payload.path("project").path("path_with_namespace").asString("");
         if (pathWithNamespace.isEmpty()) {
             pathWithNamespace = payload.path("path_with_namespace").asString("");
@@ -90,8 +90,7 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         // placeholder in the project slot and route via the workspace's organizationFilter
         // (gitlab.<rootGroup>.?.>), not the repo prefix. Bind the derived subject to that filter through a
         // real NATS token match so a drift in EITHER buildSubjectPrefix/organizationFilter or the deriver's
-        // group-tier subject format fails here — the exact regression 90f63f784 fixed. (Previously this
-        // branch was skipped, leaving group-tier routing unguarded end to end.)
+        // group-tier subject format fails here.
         String[] subjectParts = publisherSubject.split("\\.", -1);
         if (subjectParts.length >= 3 && "?".equals(subjectParts[2])) {
             String rootGroup = pathWithNamespace.substring(0, pathWithNamespace.indexOf('/'));
@@ -197,8 +196,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             assertThat(subjectMatchesFilter(subject, ConsumerSubjectMath.organizationFilter("github", owner)))
                 .as("%s must be routed by the workspace org filter, not a (stale) repo filter", name)
                 .isTrue();
-            // The whole point: the repo filter built from the OLD name cannot match, which is why the
-            // org tier is the only one that heals a rename in real time.
+            // The repo filter built from the OLD name cannot match — which is why only the org tier heals a
+            // rename in real time.
             assertThat(
                 subjectMatchesFilter(subject, ConsumerSubjectMath.repositoryFilter("github", owner + "/anything"))
             ).isFalse();

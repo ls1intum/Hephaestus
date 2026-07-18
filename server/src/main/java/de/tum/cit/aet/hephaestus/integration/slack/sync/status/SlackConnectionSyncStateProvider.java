@@ -112,11 +112,8 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             channel.getConsentState().name(),
             lastSyncedAt,
             itemCount,
-            // A channel mirrors exactly one entity class, so the breakdown is a single row and the UI
-            // renders it inline with no expander. Reported anyway rather than left empty: the same table
-            // serves all integrations, and "one class" is a fact about Slack worth stating once, not an
-            // absence of information. Its watermark is the channel's, because here they are the same
-            // thing — this is not a sibling's timestamp standing in for a missing one.
+            // A channel maps to exactly one entity class, so the breakdown is a single row rendered inline
+            // (no expander); its watermark is the channel's own, not a stand-in for a missing per-class one.
             List.of(new SyncResourceCount(SyncResourceCount.KEY_MESSAGES, "Messages", itemCount, lastSyncedAt)),
             null,
             null,

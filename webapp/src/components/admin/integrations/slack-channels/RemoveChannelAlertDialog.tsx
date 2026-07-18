@@ -45,8 +45,8 @@ export function RemoveChannelAlertDialog({
 	const nothingCollected = channel?.consentState === "PENDING";
 	const matches = nothingCollected || confirmText.trim() === channelId;
 
-	// Reset the form fields on close instead of remounting via a changing `key` (which killed
-	// the AlertDialog's exit animation). The next open always starts from a clean slate.
+	// Reset the fields on close rather than remounting via a changing `key`, which would break the
+	// AlertDialog's exit animation. The next open starts from a clean slate.
 	function handleOpenChange(next: boolean) {
 		if (!next) {
 			setConfirmText("");

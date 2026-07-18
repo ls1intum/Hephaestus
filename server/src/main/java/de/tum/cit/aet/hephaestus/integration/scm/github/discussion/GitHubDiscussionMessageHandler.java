@@ -18,10 +18,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub discussion webhook events.
- * <p>
- * Processes: created, edited, deleted, pinned, unpinned, locked, unlocked,
- * transferred, category_changed, answered, unanswered, labeled, unlabeled,
- * closed, reopened
  */
 @Slf4j
 @Component
@@ -91,9 +87,8 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
             // A transfer moves the discussion OUT of this repository, and the payload's discussion is
             // the source-side row. Upserting it here would re-create the very phantom the removal is
             // meant to retire. Unlike issues, discussions have no reconciliation sweep to heal it, so
-            // the phantom would be permanent. Mirror the issue handler and route the transfer to the
-            // removal path. Discussions hard-delete on removal (see processDeleted), matching how the
-            // DELETED action already behaves.
+            // the phantom would be permanent — route the transfer to the removal path instead, which
+            // hard-deletes the same as DELETED.
             case
                 GitHubEventAction.Discussion.DELETED,
                 GitHubEventAction.Discussion.TRANSFERRED -> discussionProcessor.processDeleted(discussionDto, context);

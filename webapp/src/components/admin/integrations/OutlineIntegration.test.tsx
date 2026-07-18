@@ -93,8 +93,8 @@ const engineering = {
 
 /**
  * The same collection as the sync API reports it: one Documents class with its own watermark. This is
- * now the ONLY place the document count and the freshness reading are rendered — the management row
- * deliberately prints neither, so the two surfaces cannot show different numbers for one fact.
+ * the only place the document count and freshness are rendered — the management row prints neither, so
+ * the two surfaces cannot show different numbers for one fact.
  */
 const engineeringResource = [
 	{
@@ -189,7 +189,6 @@ describe("Outline integration — connect happy path", () => {
 
 		renderContainer();
 
-		// The disconnected form is server URL + token only — no collection allow-list.
 		expect(await screen.findByLabelText(/api token/i)).toBeTruthy();
 		expect(screen.queryByLabelText(/allow-list/i)).toBeNull();
 		expect(screen.queryByLabelText(/collections/i)).toBeNull();
@@ -217,9 +216,8 @@ describe("Outline integration — connect happy path", () => {
 			},
 		});
 
-		// The invalidated connections query refetches → the card flips to connected. The identity line
-		// reads written copy ("Outline connected"), not a raw status token, and the shared connection
-		// header appears with the Sync control now that the connection is active.
+		// The invalidated connections query refetches → the card flips to connected, showing written
+		// copy ("Outline connected") and the Sync control, not a raw status token.
 		expect(await screen.findByText(/outline connected/i)).toBeTruthy();
 		expect(await screen.findByRole("button", { name: /sync now/i })).toBeTruthy();
 		expect(toast.success).toHaveBeenCalledWith("Outline connected");
@@ -272,7 +270,6 @@ describe("Outline integration — add-collection round trip", () => {
 
 		await waitFor(() => expect(registerBody).toEqual({ collectionId: "col-arch" }));
 
-		// Invalidation refetches the list → the new row lands in the table and the dialog closed.
 		expect(await screen.findByText("Architecture Decisions")).toBeTruthy();
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 	});
@@ -306,7 +303,6 @@ describe("Outline integration — pause / resume", () => {
 		await waitFor(() =>
 			expect(patchBodies).toContainEqual({ collectionId: "col-eng", state: "PAUSED" }),
 		);
-		// Invalidation refetches the list → the badge flips to Paused.
 		expect(await screen.findByText("Paused")).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: /actions for engineering/i }));
@@ -348,7 +344,6 @@ describe("Outline integration — remove with confirm", () => {
 		fireEvent.click(within(dialog).getByRole("button", { name: /remove & erase/i }));
 
 		await waitFor(() => expect(deletedId).toBe("col-eng"));
-		// Invalidation refetches the (now empty) list → empty state replaces the table.
 		expect(await screen.findByText(/no collections mirrored yet/i)).toBeTruthy();
 		expect(toast.success).toHaveBeenCalledWith(
 			"Collection removed and its mirrored documents erased",
@@ -447,12 +442,10 @@ describe("Outline integration — with live push down, polling keeps a running s
 		vi.useRealTimers();
 	});
 
-	// While the SSE stream is healthy a running job is refreshed by its hints, and the poll is only a
-	// slow 30s backstop against a dropped one. It is when the stream is *down* that polling becomes
-	// the freshness channel and has to be fast enough to be worth the banner's promise — so that is
-	// the mode this pins: the fast 5s poll clears a running job that has since settled. Polling does
-	// NOT stop when the job settles — it drops to the 60s idle cadence — so this asserts the running
-	// state clears, not that refetching halts. Fake timers keep it deterministic and off the wall clock.
+	// With the SSE stream down, polling is the freshness channel and must be fast: the 5s poll clears
+	// a running job that has since settled. Polling doesn't halt at settle — it drops to the 60s idle
+	// cadence — so this asserts the running state clears, not that refetching stops. Fake timers keep
+	// it deterministic and off the wall clock.
 	it("clears a settled job on the fast 5s poll while the live stream is down", async () => {
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
@@ -522,10 +515,9 @@ describe("Outline integration — Outline not enabled on this instance", () => {
 
 describe("Outline integration — per-collection sync ledger", () => {
 	/**
-	 * The route's observability half: the shared `SyncResourcesTable` beside the management card, both
-	 * driven by the one hook. Rendered on its own here because the two surfaces name the same
-	 * collection, which is exactly the point — the count and the freshness are printed once, by this
-	 * one, so they cannot disagree.
+	 * The shared `SyncResourcesTable`, driven by the one hook. Rendered on its own here because it and
+	 * the management card name the same collection — the count and freshness are printed once, by
+	 * this one, so they cannot disagree.
 	 */
 	function LedgerContainer() {
 		const outline = useOutlineIntegration("demo");

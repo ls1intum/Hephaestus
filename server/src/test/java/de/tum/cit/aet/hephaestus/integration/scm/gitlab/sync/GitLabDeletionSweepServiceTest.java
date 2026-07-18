@@ -49,10 +49,10 @@ import reactor.core.publisher.Mono;
 /**
  * Unit tests for {@link GitLabDeletionSweepService}.
  *
- * <p>The centre of gravity is {@link FailsClosed}. A phantom row is a visible, self-correcting
- * annoyance; a wrongly-deleted issue is invisible and takes its feedback with it. So the tests that
- * matter most assert that the sweep deletes <em>nothing</em> when it cannot prove it saw the whole
- * upstream set — one per way a GitLab listing can come up short.
+ * <p>The sweep fails closed: it deletes <em>nothing</em> unless it can prove it saw the whole upstream
+ * set. A phantom row is a visible, self-correcting annoyance; a wrongly-deleted issue is invisible and
+ * takes its feedback with it. {@link FailsClosed} covers one case per way a GitLab listing can come up
+ * short.
  */
 @Tag("unit")
 class GitLabDeletionSweepServiceTest extends BaseUnitTest {
@@ -471,7 +471,6 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             assertThat(outcome.issuesTombstoned()).isZero();
             assertThat(outcome.mergeRequestsTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isTrue();
-            // The incomplete issue listing tombstoned no issues; only the merge-request write ran.
             verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
             verify(issueRepository, times(1)).tombstonePullRequestsByRepositoryIdAndNumbers(
                 anyLong(),

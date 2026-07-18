@@ -298,9 +298,8 @@ public class OutlineRateLimitTracker {
 
     /**
      * Per-scope state; atomic fields for thread-safe concurrent updates from the exchange filter. Every
-     * observable field starts <b>null</b>. The previous {@code 0}/{@code 0} seeds were the inverse of
-     * GitHub's and GitLab's mistake: a partial header set rendered "0 remaining of N", claiming an
-     * exhaustion that had never been measured.
+     * observable field starts <b>null</b>, never {@code 0}: a partial header set seeded with {@code 0}
+     * renders "0 remaining of N", claiming an exhaustion that was never measured.
      */
     private static final class ScopeState {
 

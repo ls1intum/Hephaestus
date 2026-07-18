@@ -185,32 +185,27 @@ public class GithubDataSyncService {
         this.monitoringExecutor = monitoringExecutor;
     }
 
-    /**
-     * Syncs a sync target asynchronously using GraphQL.
-     *
-     * @param syncTarget the sync target to sync
-     */
+    /** Submits {@link #syncSyncTarget} to the monitoring executor. */
     public void syncSyncTargetAsync(SyncTarget syncTarget) {
         monitoringExecutor.submit(() -> syncSyncTarget(syncTarget));
     }
 
     /**
-     * Syncs a sync target using GraphQL API.
+     * Syncs a single repository's metadata, issues, PRs, and related data via GraphQL.
      *
-     * @param syncTarget the sync target to sync
+     * @return true if the sync succeeded or the target was legitimately removed (repository gone
+     *         upstream); false on a transient failure that should be retried next cycle
      */
     public boolean syncSyncTarget(SyncTarget syncTarget) {
         Long scopeId = syncTarget.scopeId();
         String nameWithOwner = syncTarget.repositoryNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
 
-        // Check if scope is active before attempting sync
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped sync: reason=scopeNotActive, scopeId={}, repoName={}", scopeId, safeNameWithOwner);
             return false;
         }
 
-        // Resolve the GitHub provider entity
         IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
             .orElseThrow(() ->
@@ -222,8 +217,8 @@ public class GithubDataSyncService {
             .orElse(null);
         boolean repositoryCreatedDuringSync = false;
 
-        // If repository doesn't exist locally, try to fetch and create it from GitHub
-        // This is needed for PAT workspaces where only RepositoryToMonitor entries exist initially
+        // PAT workspaces start with only a RepositoryToMonitor entry — fetch and create the
+        // repository from GitHub on first sync.
         if (repository == null) {
             log.debug(
                 "Repository not found locally, fetching from GitHub: scopeId={}, repoName={}",
@@ -234,11 +229,11 @@ public class GithubDataSyncService {
             try {
                 syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
             } catch (RepositoryNotFoundOnGitProviderException e) {
-                // A definitive name-404. If we hold the repository's stable native id, this is almost
-                // certainly a rename/transfer (the id still resolves upstream), NOT a deletion — and
-                // deleting the monitor on a rename is the confirmed data-loss cascade. Preserve the
-                // monitor and retry next cycle; genuine deletions are cleaned up by the
-                // repository.deleted webhook. Only legacy rows with no stable id fall back to removal.
+                // A definitive name-404. A repository with a stable native id almost certainly renamed
+                // or transferred (the id still resolves upstream) rather than being deleted — deleting
+                // the monitor here would lose data on every rename. Preserve the monitor and retry next
+                // cycle; a real deletion is caught by the repository.deleted webhook. Only legacy rows
+                // with no stable id fall back to removal.
                 if (syncTarget.nativeId() != null) {
                     log.warn(
                         "Preserving sync target despite name-404: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoName={}, nativeId={}",
@@ -258,7 +253,7 @@ public class GithubDataSyncService {
             }
             if (syncedRepository.isEmpty()) {
                 // Transient failure (auth, transport, rate limit, classification). Leave the
-                // RTM in place so the next cycle retries. See ADR-0012 / pass-14 incident.
+                // RTM in place so the next cycle retries. See ADR-0012.
                 log.debug(
                     "Skipped sync (transient): reason=syncReturnedEmpty, scopeId={}, repoName={}",
                     scopeId,
@@ -290,7 +285,6 @@ public class GithubDataSyncService {
         );
 
         try {
-            // Sync repository metadata (skip if we just created it above)
             if (!repositoryCreatedDuringSync) {
                 var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
                 if (syncedRepository.isPresent()) {
@@ -378,10 +372,10 @@ public class GithubDataSyncService {
                 );
             }
 
-            // Enrich unresolved commit authors via stored emails + GitHub GraphQL API.
-            // Runs AFTER collaborator/PR/issue sync so that users imported as side effects
-            // of those syncs are available for email → user_id resolution on the first cycle.
-            // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
+            // Enrich unresolved commit authors via stored emails + GitHub GraphQL API. Runs AFTER
+            // collaborator/PR/issue sync so that users imported as a side effect of those syncs are
+            // available for email → user_id resolution on the first cycle. Bounded by unique emails,
+            // not commit count.
             int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
 
             // Enrich commits with multi-author contributor data and associated PR links.
@@ -407,7 +401,6 @@ public class GithubDataSyncService {
                 );
             }
 
-            // Update discussion sync timestamp independently
             if (discussionResult.isCompleted()) {
                 syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.DISCUSSIONS, Instant.now());
             } else {
@@ -448,9 +441,9 @@ public class GithubDataSyncService {
                 case NOT_FOUND -> {
                     if (syncTarget.nativeId() != null) {
                         // Stable id present → treat a name-404 as a rename/transfer, not a deletion.
-                        // Preserve BOTH the repository and the monitor; a real deletion is handled by
-                        // the repository.deleted webhook. Deleting here on a rename is the confirmed
-                        // data-loss cascade. See the create-block handler above for the full rationale.
+                        // Preserve both the repository and the monitor; a real deletion is caught by the
+                        // repository.deleted webhook, and deleting here on a rename would lose data. See
+                        // the create-block handler above for the full rationale.
                         log.warn(
                             "Preserving repository and sync target despite NOT_FOUND: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoId={}, repoName={}, nativeId={}",
                             scopeId,
@@ -466,10 +459,9 @@ public class GithubDataSyncService {
                             safeNameWithOwner,
                             classification.message()
                         );
-                        // Clean up the orphaned repository to prevent permanent sync errors
-                        // The repository no longer exists on GitHub, so delete it locally
+                        // The repository no longer exists on GitHub; delete it locally so sync doesn't
+                        // fail indefinitely, and remove the sync target to stop perpetual retries.
                         cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
-                        // Also remove the sync target to stop perpetual retries
                         syncTargetProvider.removeSyncTarget(syncTarget.id());
                         removed = true;
                     }
@@ -487,7 +479,6 @@ public class GithubDataSyncService {
                         repositoryId,
                         classification.message()
                     );
-                    // Honor the rate limit - wait before continuing
                     Duration waitTime = classification.suggestedWait();
                     if (waitTime != null && !waitTime.isZero()) {
                         log.info(
@@ -553,7 +544,7 @@ public class GithubDataSyncService {
      *                (unchanged behavior — no cancellation checks, no progress reporting)
      */
     public void syncAllRepositories(Long scopeId, @Nullable SyncExecutionHandle handle) {
-        // Fail-fast for suspended installations - don't spawn ANY threads
+        // Fail fast for a suspended installation so no threads are spawned for it at all.
         Long installationId = tokenProvider.getInstallationId(scopeId).orElse(null);
         if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
             log.info(
@@ -564,7 +555,6 @@ public class GithubDataSyncService {
             return;
         }
 
-        // Check if scope is active before attempting sync
         if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
             log.debug("Skipped scope sync: reason=scopeNotActive, scopeId={}", scopeId);
             return;
@@ -595,17 +585,15 @@ public class GithubDataSyncService {
         log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
         try {
-            // Sync organization and memberships first (users need to exist for later syncs)
             syncOrganizationAndMemberships(scopeId);
 
-            // Sync issue types BEFORE repositories (issue types are organization-level
-            // and must exist before issues are synced so they can be linked immediately)
+            // Issue types are organization-level and must exist before issues are synced so they can
+            // be linked immediately.
             syncIssueTypes(scopeId);
 
-            // Sync projects BEFORE repositories so embedded project items can be linked
+            // Projects sync before repositories so embedded project items can be linked.
             syncProjects(scopeId);
 
-            // Sync each repository (creates repository records, issues, PRs)
             int reposProcessed = 0;
             for (SyncTarget target : syncTargets) {
                 // Cooperative cancel for the manual "reconcile now" sync-job path — best-effort,
@@ -681,10 +669,9 @@ public class GithubDataSyncService {
                 }
             }
 
-            // Sync teams AFTER repositories exist (team repo permissions need repos to exist)
+            // Teams sync after repositories exist (team repo permissions need repos to exist).
             syncTeams(scopeId);
 
-            // Sync scope-level relationships (after all issues/PRs are synced)
             syncScopeLevelRelationships(scopeId);
         } catch (InstallationNotFoundException e) {
             log.warn(
@@ -722,12 +709,10 @@ public class GithubDataSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         try {
-            // Sync organization and memberships
             var organization = organizationSyncService.syncOrganization(scopeId, organizationLogin);
             if (organization != null) {
                 log.debug("Synced organization: scopeId={}, orgLogin={}", scopeId, safeOrgLogin);
 
-                // Notify listener to sync scope members from organization members
                 organizationMembershipListener.onOrganizationMembershipsSynced(
                     new OrganizationSyncedEvent(organization.getId(), organizationLogin)
                 );
@@ -772,9 +757,8 @@ public class GithubDataSyncService {
      */
     private void syncIssueTypes(Long scopeId) {
         try {
-            // Sync issue types (has internal cooldown check)
-            // Wrapped with retry because the method is @Transactional and a deadlock
-            // would poison the transaction, requiring a fresh invocation.
+            // Wrapped with retry because the method is @Transactional and a deadlock would poison
+            // the transaction, requiring a fresh invocation.
             int issueTypesCount = retryOnTransientFailure(
                 () -> issueTypeSyncService.syncIssueTypesForScope(scopeId),
                 "issue type sync for scopeId=" + scopeId
@@ -957,7 +941,6 @@ public class GithubDataSyncService {
     private void syncProjectItems(Long scopeId, String organizationLogin) {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
-        // Find the organization to get its ID
         Organization organization = organizationRepository
             .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
             .orElse(null);
@@ -966,7 +949,6 @@ public class GithubDataSyncService {
             return;
         }
 
-        // Get projects needing item sync, ordered by staleness
         List<Project> projects = projectSyncService.getProjectsNeedingItemSync(organization.getId());
         if (projects.isEmpty()) {
             log.debug("Skipped project items sync: reason=noProjects, orgLogin={}", safeOrgLogin);
@@ -1044,7 +1026,6 @@ public class GithubDataSyncService {
         }
 
         try {
-            // Sync issue dependencies (has internal cooldown check)
             int dependenciesCount = issueDependencySyncService.syncDependenciesForScope(scopeId);
             if (dependenciesCount >= 0) {
                 log.debug("Synced issue dependencies: scopeId={}, dependencyCount={}", scopeId, dependenciesCount);
@@ -1065,7 +1046,6 @@ public class GithubDataSyncService {
         }
 
         try {
-            // Sync sub-issues (has internal cooldown check)
             int subIssuesCount = subIssueSyncService.syncSubIssuesForScope(scopeId);
             if (subIssuesCount >= 0) {
                 log.debug("Synced sub-issues: scopeId={}, subIssueCount={}", scopeId, subIssuesCount);
@@ -1114,7 +1094,6 @@ public class GithubDataSyncService {
             "collaborator sync for repoId=" + repositoryId
         );
 
-        // Update sync timestamp
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
 
         return count;

@@ -421,9 +421,7 @@ export const SeventyOneRepositories: Story = {
 		const canvas = within(canvasElement);
 
 		// Containment guard: the scroll container clips the tall fleet in place rather than growing the
-		// page (which is what made the footer float above ~614px of phantom scroll). Bounded to its
-		// max-h-[70vh] cap AND scrollable — the same regression the ScrollArea's ManyRepositories story
-		// pins for the manage-repos list, here for the sync table's own scroller.
+		// page, so the sticky footer stays pinned. Bounded to its max-h-[70vh] cap AND still scrollable.
 		const container = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
 		await expect(container).not.toBeNull();
 		if (container) {
@@ -497,11 +495,10 @@ export const RowHover: Story = {
 };
 
 /**
- * The Slack admin page's ledger, exactly as that route now mounts it: one Messages column, no dead
- * columns, and — the parity the page was missing entirely — a per-channel freshness reading judged
- * against the connection's cadence. `#design` is nearly seven cadences behind, so it is tinted and
- * floated above the fresh channel by the triage sort. The channel name and its id genuinely differ,
- * so both lines show; the duplicate-line fix is SCM-only.
+ * The Slack admin page's ledger: one Messages column, no dead columns, and a per-channel freshness
+ * reading judged against the connection's cadence. `#design` is nearly seven cadences behind, so it is
+ * tinted and floated above the fresh channel by the triage sort. A Slack channel's name (`#channel`)
+ * differs from its id, so both lines show.
  */
 export const SlackChannels: Story = {
 	args: {
@@ -529,13 +526,10 @@ export const SlackChannels: Story = {
 };
 
 /**
- * The Outline admin page's ledger, exactly as that route now mounts it: one Documents column, the
- * upstream coverage reading in the hover, and the read-only error peek on the collection whose token
- * was revoked — the one integration that populates `lastError`.
- *
- * This is the single home for a collection's document count and freshness. The management row in
- * `OutlineCollectionRow` deliberately no longer prints either, so the two surfaces cannot disagree and
- * the reading here is the only one — tinted, which the hand-rolled columns never were.
+ * The Outline admin page's ledger: one Documents column, the upstream coverage reading in the hover,
+ * and the read-only error peek on the collection whose token was revoked — Outline is the one
+ * integration that populates `lastError`. This is the single home for a collection's document count and
+ * freshness, so no other surface can disagree with the reading here.
  */
 export const OutlineCollections: Story = {
 	args: {

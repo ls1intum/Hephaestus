@@ -50,8 +50,8 @@ public class GithubSubjectParser implements SubjectParser {
         // parts[0] = "github", parts[1] = org, parts[2] = repo, parts[3..] = event (may carry suffixes).
         String org = parts[1];
         String repo = parts[2];
-        // Rejoin tail in case the event name itself contained dots (sanitized to ~ by the deriver,
-        // but defensive — split on the deriver's contract preserves all tail segments).
+        // Rejoin the tail in case the event segment itself contains dots; the deriver sanitizes dots to
+        // ~ so this should not trigger, but preserving all tail segments costs nothing.
         StringBuilder eventBuilder = new StringBuilder(parts[3]);
         for (int i = 4; i < parts.length; i++) {
             eventBuilder.append('.').append(parts[i]);

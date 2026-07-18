@@ -59,9 +59,9 @@ import reactor.core.publisher.Mono;
  * <p>
  * Focuses on PR conversation (top-level) comments. These are the same {@code IssueComment} entity
  * as issue comments, but GitHub's {@code repository.issues} connection — the issue sync's source —
- * excludes pull requests, so the PR sync is the only path that can observe them. Before this was
- * wired up, a PR conversation comment could only reach the mirror via the non-redeliverable
- * {@code issue_comment} webhook, making a dropped one permanently unrecoverable.
+ * excludes pull requests, so the PR sync is the only path that can observe them. Otherwise a PR
+ * conversation comment reaches the mirror only via the non-redeliverable {@code issue_comment}
+ * webhook, making a dropped one permanently unrecoverable.
  */
 class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
 
@@ -172,8 +172,6 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    // Helper methods
-
     private Repository createRepository() {
         Repository repository = new Repository();
         repository.setId(REPO_ID);
@@ -198,9 +196,6 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
         return comment;
     }
 
-    /**
-     * Builds the PR node's embedded conversation-comment connection.
-     */
     private GHIssueCommentConnection createCommentConnection(
         List<GHIssueComment> comments,
         int totalCount,
@@ -228,9 +223,6 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
         return pr;
     }
 
-    /**
-     * Wires a single-page PR connection carrying {@code prNode} as the GraphQL response.
-     */
     private void stubSinglePrPage(GHPullRequest prNode) {
         GHPullRequestConnection connection = new GHPullRequestConnection();
         connection.setNodes(List.of(prNode));
@@ -258,7 +250,6 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldPersistPullRequestConversationCommentsViaIssueCommentProcessor() {
-            // Arrange
             PullRequest entity = createPullRequest();
             when(pullRequestProcessor.process(any(), any())).thenReturn(entity);
             when(issueCommentProcessor.process(any(), eq(PR_NUMBER), any())).thenReturn(new IssueComment());
@@ -271,11 +262,10 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             );
             stubSinglePrPage(createGHPullRequest(comments));
 
-            // Act
             service.syncForRepository(SCOPE_ID, REPO_ID);
 
-            // Assert — routed through the same processor (and therefore the same issue_comment
-            // table) that issue comments use, keyed by the PR's number.
+            // Routed through the same processor (and therefore the same issue_comment table) that issue
+            // comments use, keyed by the PR's number.
             ArgumentCaptor<GitHubCommentDTO> captor = ArgumentCaptor.forClass(GitHubCommentDTO.class);
             verify(issueCommentProcessor, org.mockito.Mockito.times(2)).process(
                 captor.capture(),
@@ -290,7 +280,6 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldFetchRemainingCommentsWhenPullRequestHasMoreThanEmbeddedPage() {
-            // Arrange — embedded page reports more comments available
             PullRequest entity = createPullRequest();
             when(pullRequestProcessor.process(any(), any())).thenReturn(entity);
             when(issueCommentProcessor.process(any(), eq(PR_NUMBER), any())).thenReturn(new IssueComment());
@@ -304,17 +293,15 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             );
             stubSinglePrPage(createGHPullRequest(comments));
 
-            // Act
             service.syncForRepository(SCOPE_ID, REPO_ID);
 
-            // Assert — the tail is drained from the embedded page's cursor, reusing the
-            // issue-comment sync service rather than a parallel PR-only implementation.
+            // The tail is drained from the embedded page's cursor, reusing the issue-comment sync service
+            // rather than a parallel PR-only implementation.
             verify(issueCommentSyncService).syncRemainingComments(SCOPE_ID, entity, "cursor-page-1");
         }
 
         @Test
         void shouldNotPaginateWhenEmbeddedCommentsAreComplete() {
-            // Arrange
             PullRequest entity = createPullRequest();
             when(pullRequestProcessor.process(any(), any())).thenReturn(entity);
             when(issueCommentProcessor.process(any(), eq(PR_NUMBER), any())).thenReturn(new IssueComment());
@@ -327,24 +314,20 @@ class GitHubPullRequestSyncServiceTest extends BaseUnitTest {
             );
             stubSinglePrPage(createGHPullRequest(comments));
 
-            // Act
             service.syncForRepository(SCOPE_ID, REPO_ID);
 
-            // Assert
             verify(issueCommentSyncService, never()).syncRemainingComments(any(), any(), any());
         }
 
         @Test
         void shouldSyncPullRequestWhenItHasNoConversationComments() {
-            // Arrange — a PR with no comments must not break the sync
+            // A PR with no comments must not break the sync.
             PullRequest entity = createPullRequest();
             when(pullRequestProcessor.process(any(), any())).thenReturn(entity);
             stubSinglePrPage(createGHPullRequest(createCommentConnection(List.of(), 0, false, null)));
 
-            // Act
             service.syncForRepository(SCOPE_ID, REPO_ID);
 
-            // Assert
             verify(issueCommentProcessor, never()).process(any(), org.mockito.ArgumentMatchers.anyInt(), any());
             verify(issueCommentSyncService, never()).syncRemainingComments(any(), any(), any());
         }

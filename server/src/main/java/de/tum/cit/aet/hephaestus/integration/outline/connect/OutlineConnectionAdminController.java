@@ -15,10 +15,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Outline admin connection surface — now just the kind-specific credential concern (the token health
- * probe). The health snapshot ({@code GET /connections/outline/status}) and the manual full-reconcile
- * trigger ({@code POST /connections/outline/sync}) were absorbed into the unified sync-observability API
- * ({@code GET /connections/{id}/sync}, {@code POST /connections/{id}/sync/jobs}) — see
+ * Outline admin connection surface for the kind-specific credential concern (the token health probe).
+ * The health snapshot ({@code GET /connections/{id}/sync}) and the manual full-reconcile trigger
+ * ({@code POST /connections/{id}/sync/jobs}) live in the unified sync-observability API — see
  * {@code de.tum.cit.aet.hephaestus.integration.outline.status.OutlineConnectionSyncStateProvider} and
  * {@code OutlineIntegrationSyncRunner}.
  */

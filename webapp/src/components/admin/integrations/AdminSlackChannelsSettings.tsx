@@ -78,9 +78,8 @@ export interface AdminSlackChannelsSettingsProps {
 
 /**
  * Admin surface to allow-list Slack channels and drive their per-channel consent lifecycle
- * (PENDING → ACTIVE ⇄ PAUSED → REVOKED + erase). Self-contained section so promoting it to a
- * dedicated /admin/slack route later is a move, not a rewrite. Pure: all data + mutations
- * live in the route container.
+ * (PENDING → ACTIVE ⇄ PAUSED → REVOKED + erase). Pure: all data + mutations live in the route
+ * container.
  */
 export function AdminSlackChannelsSettings({
 	workspaceSlug,

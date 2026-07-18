@@ -103,8 +103,8 @@ function IntegrationOverviewCardContainer({
 			status={statusQuery.data}
 			isStatusLoading={statusQuery.isLoading}
 			isStatusError={statusQuery.isError}
-			// The card's alert can only name the failure and judge whether Retry helps if it is handed the
-			// error and a refetch — without these it rendered a title over a blank card and no way out.
+			// The card's alert needs the error and a refetch to name the failure and decide whether Retry
+			// helps; without them it can only show a title over a blank card.
 			statusError={statusQuery.error}
 			onRetryStatus={() => statusQuery.refetch()}
 			isTriggering={triggerSync.isPending}

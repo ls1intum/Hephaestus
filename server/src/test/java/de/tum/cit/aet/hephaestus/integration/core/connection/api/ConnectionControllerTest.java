@@ -362,8 +362,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
-        // The load-bearing assertion: the failure reached the service, which is the only layer that
-        // can absorb it without poisoning the lifecycle transaction.
+        // The failure must reach the service — the only layer that can absorb it without poisoning
+        // the lifecycle transaction.
         assertThat(escaped.get()).as("revoke failure must escape the controller callback").isNotNull();
         verify(connectionService, times(1)).disconnect(
             any(Connection.class),

@@ -118,7 +118,6 @@ export function ChannelHistorySheet({
 	);
 }
 
-/** One audit entry: the transition it recorded, when, and the reason the admin gave. */
 function HistoryEntry({ event }: { event: SlackChannelConsentEvent }) {
 	return (
 		<Item render={<li />} size="sm" className="items-start">

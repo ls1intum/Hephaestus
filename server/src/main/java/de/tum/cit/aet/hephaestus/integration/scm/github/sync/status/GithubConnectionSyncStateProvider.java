@@ -77,7 +77,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
 
         // App-installation workspaces have a vendor-managed webhook (registered at install time), so we
         // report TRUE. PAT connections have no webhook signal we track, so webhookRegistered stays null
-        // (the @Nullable "not applicable / unknown" value) rather than a claimed FALSE.
+        // (unknown) rather than a claimed FALSE.
         Boolean webhookRegistered = null;
         Long installationId = null;
         if (connection != null && connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig appConfig) {
@@ -113,7 +113,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             return List.of();
         }
 
-        // Batch-resolve nameWithOwner -> local Repository id (single query), then one fixed set of
+        // Batch-resolve nameWithOwner -> local Repository id in one query, then one fixed set of
         // grouped per-entity-class count queries — avoids an N+1 per monitored repository.
         Map<String, Long> repositoryIdByName = repositoryRepository
             .findAllByWorkspaceMonitors(workspaceId)
@@ -168,10 +168,9 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
             state,
             lastSyncedAt,
             itemCount,
-            // Per-class breakdown, each class carrying its own watermark where one is persisted. The
-            // two that are (issues, pull requests) are reported per class rather than collapsed into
-            // lastSyncedAt via latestNonNull above — collapsing is what hides "pull requests are fresh
-            // but issues stopped four days ago", since the newest sibling wins.
+            // Per-class breakdown (issues, pull requests), each carrying its own watermark, rather than
+            // collapsed into lastSyncedAt above — collapsing would hide "pull requests are fresh but
+            // issues stopped four days ago" since the newest sibling wins.
             counts == null
                 ? List.of()
                 : counts.toSyncResourceCounts(monitor.getIssuesSyncedAt(), monitor.getPullRequestsSyncedAt()),
@@ -198,7 +197,7 @@ public class GithubConnectionSyncStateProvider implements ConnectionSyncStatePro
         return latest;
     }
 
-    /** Projects a monitored-repository row into the vendor-neutral rollup input for {@link ScmBackfillRollup}. */
+    /** Projects a monitored-repository row into {@link ScmBackfillRollup}'s vendor-neutral input. */
     private static RepoBackfillProgress toBackfillProgress(RepositoryToMonitor monitor) {
         return new RepoBackfillProgress(
             monitor.isBackfillInitialized(),

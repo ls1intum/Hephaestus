@@ -14,19 +14,18 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Drives the connect-time initial sync for GitHub <b>PAT</b> connections off the committed
- * {@code Activated} boundary, closing the asymmetry where a PAT-connected GitHub workspace recorded and
- * ran no INITIAL sync at connect. Keying on the AFTER_COMMIT ACTIVE transition guarantees the sync
- * runs against a committed, ACTIVE Connection and is therefore recorded as an {@code INITIAL}/{@code
- * LIFECYCLE} {@code SyncJob} through {@code GitHubWorkspaceDataSyncTrigger}.
+ * {@code Activated} boundary: PAT connections have no installation webhook to trigger an initial sync,
+ * unlike App installs. Keying on the AFTER_COMMIT ACTIVE transition guarantees the sync runs against a
+ * committed, ACTIVE Connection and is therefore recorded as an {@code INITIAL}/{@code LIFECYCLE}
+ * {@code SyncJob} through {@code GitHubWorkspaceDataSyncTrigger}.
  *
  * <p><b>App installations are deliberately excluded.</b> GitHub App installs already drive their initial
  * sync from the installation webhook ({@code GitHubWorkspaceProvisioningAdapter.triggerInitialSync}),
  * which is ordered to run <em>after</em> the repository monitors are materialised from the installation
  * metadata. The {@code Activated} event, by contrast, fires at connection-upsert commit — before those
  * monitors exist — so syncing an App connection here would race an empty monitor set and would also
- * double-fire against the webhook-driven trigger (the one-active-job guard warns the finding calls out).
- * Restricting this listener to connections whose active config is a {@code GitHubPatConfig} keeps exactly
- * one initial sync per activation for each path.
+ * double-fire against the webhook-driven trigger. Restricting this listener to connections whose active
+ * config is a {@code GitHubPatConfig} keeps exactly one initial sync per activation for each path.
  *
  * <p>Best-effort: a failure here can only cost freshness (the periodic reconcile is the safety net) and is
  * never rethrown off the async thread.

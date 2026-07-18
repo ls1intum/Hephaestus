@@ -45,10 +45,6 @@ public record RateLimitSnapshot(
      * {@code null}. {@code limit} survives, because a ceiling is window-invariant — it is still the real
      * ceiling this instance reported, and {@code observedAt} says how old that reading is.
      *
-     * <p>This single rule replaces two per-vendor bugs at once: GitHub's "optimistic reset" (which mutated
-     * observed {@code remaining} up to {@code limit} and displayed the result as measured) and Outline's
-     * frozen exhaustion claim (a 429's {@code remaining ≈ 0} outliving its 60-second window).
-     *
      * <p>{@code throttledUntil} is passed through even when it lies in the past; the UI renders it only
      * while it is still in the future, which keeps the invariant here trivial.
      */

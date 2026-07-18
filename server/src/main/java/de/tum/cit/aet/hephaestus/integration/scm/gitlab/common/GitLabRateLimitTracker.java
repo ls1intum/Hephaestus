@@ -43,15 +43,14 @@ import org.springframework.stereotype.Component;
  *
  * <h2>Many GitLab instances report nothing at all</h2>
  * <p>GitLab's user/IP request throttles are <b>disabled by default on self-managed instances</b>, and an
- * instance with throttling off sends no {@code RateLimit-*} headers whatsoever. For such an instance the
- * only honest display is <em>nothing</em>: {@link #snapshot} stays {@code null} forever and the UI omits
- * the row. That is a correct steady state, not a degraded one. Any number rendered for such an instance
- * would be fabricated by definition.
+ * instance with throttling off sends no {@code RateLimit-*} headers whatsoever. For such an instance
+ * {@link #snapshot} stays {@code null} forever and the UI omits the row; any number rendered would be
+ * invented.
  *
- * <p>Note also that GitLab defines no GraphQL points-per-minute quota — its GraphQL limits are per-query
+ * <p>GitLab defines no GraphQL points-per-minute quota — its GraphQL limits are per-query
  * <em>complexity</em> caps, and request-rate limiting is the generic REST/web throttle (2,000 requests per
  * minute for authenticated API traffic on GitLab.com). {@code DEFAULT_RATE_LIMIT} is therefore a
- * deliberately conservative internal pacing floor, not a vendor fact — see {@link #getRemaining}.
+ * conservative internal pacing floor, not a vendor fact — see {@link #getRemaining}.
  *
  * <h2>Thread Safety</h2>
  * <p>This class is thread-safe. Uses {@link ConcurrentHashMap} for scope state
@@ -121,8 +120,8 @@ public class GitLabRateLimitTracker {
             ScopeRateLimitState state = getOrCreateState(scopeId);
 
             // Each field is written ONLY from its own header. A response carrying just one of the pair
-            // (a stripping proxy, partial middleware) must leave the other unknown — filling it from a
-            // constant is exactly the fabrication this tracker used to commit.
+            // (a stripping proxy, partial middleware) must leave the other unknown rather than fill it
+            // from a constant.
             if (parsedRemaining != null) {
                 state.remaining.set(parsedRemaining);
             }
@@ -172,13 +171,12 @@ public class GitLabRateLimitTracker {
     }
 
     /**
-     * The remaining points to <b>throttle against</b> — a decision API, never a reporting one.
+     * The remaining points to <b>throttle against</b> — a decision value, never a reported one.
      *
      * <p>Falls back to {@code DEFAULT_RATE_LIMIT} when GitLab has reported nothing. That constant is a
-     * deliberately conservative pacing floor, not a vendor guarantee: GitLab publishes no GraphQL
-     * points-per-minute quota at all, and GitLab.com's authenticated API throttle is 2,000 requests per
-     * minute. Because it is an assumption, it must never reach {@link #snapshot} — the honesty rule in
-     * {@link RateLimitSnapshot} depends on that separation.
+     * conservative pacing floor, not a vendor guarantee: GitLab publishes no GraphQL points-per-minute
+     * quota, and GitLab.com's authenticated API throttle is 2,000 requests per minute. Being an
+     * assumption, it must never reach {@link #snapshot}, which reports only observed values.
      */
     public int getRemaining(Long scopeId) {
         if (scopeId == null) {
@@ -201,9 +199,9 @@ public class GitLabRateLimitTracker {
     }
 
     /**
-     * Pure "optimistic reset": once the observed window has closed the measured remaining is not a fact
-     * about the current window, so decisions assume a full budget. Computed, never written back — the
-     * previous mutation turned this heuristic into a number the admin page displayed as measured.
+     * Optimistic reset: once the observed window has closed the measured remaining is not a fact about
+     * the current window, so decisions assume a full budget. Computed, never written back, so the
+     * heuristic never surfaces as a measured value on {@link #snapshot}.
      */
     private static int effectiveRemaining(ScopeRateLimitState state) {
         Integer observed = state.remaining.get();
@@ -268,9 +266,9 @@ public class GitLabRateLimitTracker {
         Duration waitTime = Duration.between(Instant.now(), reset);
 
         if (waitTime.isNegative() || waitTime.isZero()) {
-            // Observed window closed — nothing to wait for. Deliberately no write-back: effectiveRemaining()
-            // already treats a closed window as "assume full" for decisions, and the next response supplies
-            // the real number. Writing it back is what leaked an invented value onto the admin surface.
+            // Observed window closed — nothing to wait for. No write-back: effectiveRemaining() already
+            // treats a closed window as "assume full" for decisions, and the next response supplies the
+            // real number, so no invented value can reach the reporting snapshot.
             log.info("GitLab rate limit reset time passed, continuing: scopeId={}, resetAt={}", scopeId, reset);
             return false;
         }
@@ -481,9 +479,9 @@ public class GitLabRateLimitTracker {
 
     /**
      * Rate limit state for a single scope. All fields are atomic for thread-safe concurrent access, and
-     * every observable field starts <b>null</b>. The previous seeds (100/100 and {@code now()+60s}) were
-     * live fabrication: {@link #updateFromHeaders} creates state as soon as <em>either</em> count header is
-     * present, so a response carrying only one of them displayed the invented constant for the other.
+     * every observable field starts <b>null</b>: {@link #updateFromHeaders} creates state as soon as
+     * <em>either</em> count header is present, so seeding a constant would surface as an invented value
+     * for whichever header the response omits.
      */
     private static class ScopeRateLimitState {
 

@@ -116,9 +116,8 @@ class OutlineRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The frozen-exhaustion bug: a 429's {@code remaining: 0} is true for an instant, not forever.
-         * Once the window lapses it must stop being reported — while the configured ceiling, which is
-         * window-invariant, survives.
+         * A 429's {@code remaining: 0} is true for an instant, not forever. Once the window lapses it must
+         * stop being reported — while the configured ceiling, which is window-invariant, survives.
          */
         @Test
         void closedWindow_retiresRemainingButKeepsTheCeiling() {
@@ -132,7 +131,7 @@ class OutlineRateLimitTrackerTest extends BaseUnitTest {
             assertThat(snapshot.limit()).isEqualTo(1000);
         }
 
-        /** The old {@code 0/0} seed claimed an exhaustion nobody measured. It must be unreachable. */
+        /** A headerless scope must never render a {@code 0/0} exhaustion nobody measured. */
         @Test
         void headerlessScopeNeverRendersZeroOfZero() {
             tracker.updateFromHeaders(SCOPE, new HttpHeaders());
@@ -141,9 +140,9 @@ class OutlineRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The {@code 0/0} seed's live escape hatch: a throttle whose count headers were stripped (a proxy,
-         * a partial middleware) used to create state and then report "0 remaining of 0" — an exhaustion
-         * claim assembled entirely from constructor defaults. The back-off is a fact; the counts are not.
+         * A throttle whose count headers were stripped (a proxy, a partial middleware) must report the
+         * back-off but no counts: a "0 remaining of 0" would be an exhaustion claim assembled entirely from
+         * constructor defaults. The back-off is a fact; the counts are not.
          */
         @Test
         void throttleWithoutCountHeaders_reportsTheBackoffButNoCounts() {

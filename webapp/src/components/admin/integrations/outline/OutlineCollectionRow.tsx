@@ -44,13 +44,11 @@ export interface OutlineCollectionRowProps {
  * One mirrored Outline collection: name with its Outline color/icon, mirror-state badge, the last
  * pass's outcome, and a state-gated row action menu. Pure — every transition is delegated upward.
  *
- * <p>This row is the <em>management</em> plane and nothing else. The document count and the freshness
- * reading deliberately do NOT live here: they are the observability plane, owned by the shared
+ * <p>This is the management plane only. Document count and freshness live in the shared
  * `SyncResourcesTable` the Outline page mounts above this card — the same table SCM and Slack mount,
- * so all four integrations report freshness in one visual language, tinted against the connection's
- * cadence. Printing them twice from two independently-polled queries would let the same fact disagree
- * with itself on screen (`collections.list` vs `sync/resources` refresh on different cadences) and
- * would say it in two different languages, one of them unable to call a reading stale at all.
+ * so all four integrations report freshness in one language, tinted against the connection's cadence.
+ * Printing them here too, from a separately-polled `collections.list`, would let the same fact disagree
+ * with itself on screen and could not tint a reading stale against that cadence.
  *
  * <p>The sync error and the budget-skip detail hang off a {@link Popover}, not a tooltip: a tooltip
  * never opens on touch, and the sync error is the one string an admin has to be able to read, select

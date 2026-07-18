@@ -113,9 +113,9 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
                 }
                 int reposDoneSoFar = reposDone;
                 int reposTotal = pending.size();
-                // Report per vendor page rather than per batch. No self-throttling here: the handle owns
-                // the write budget, and under-calling it is what made a manual backfill look frozen for
-                // minutes and then finish all at once.
+                // Report per vendor page rather than per batch: the handle owns the write budget, and
+                // under-calling it would leave a manual backfill looking frozen for long stretches
+                // before jumping straight to done.
                 boolean didWork = backfillService.runBackfillBatch(
                     target,
                     batchSize,
@@ -184,9 +184,9 @@ public class GithubIntegrationSyncRunner implements IntegrationSyncRunner {
      * The one human sentence the UI renders for a backfill page, e.g.
      * {@code "Backfilling ls1intum/Artemis — issues #4812 → #3200"}.
      *
-     * <p>Reads as a countdown because that is what backfill is: it walks numbers down toward #1, so the
-     * high-water mark on the left and the live position on the right tell the operator both how far it
-     * has come and how far is left, in the repository's own numbering rather than an abstract percent.
+     * <p>Backfill walks issue/PR numbers down toward #1, so the range reads as a countdown: high-water
+     * mark on the left, live position on the right — the repository's own numbering rather than an
+     * abstract percent.
      */
     static String step(String repositoryName, SyncPhase phase, int lowestNumberSeen, @Nullable Integer highWaterMark) {
         String entity = phase == SyncPhase.ISSUES ? "issues" : "pull requests";

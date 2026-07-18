@@ -45,8 +45,8 @@ class SlackRateLimitTrackerTest extends BaseUnitTest {
     }
 
     /**
-     * The load-bearing assertion for Slack: no {@code remaining / limit} gauge may ever appear. Slack sends
-     * no budget headers and its tiers are published as floors, so any number here would be invented.
+     * No {@code remaining / limit} gauge may ever appear: Slack sends no budget headers and its tiers are
+     * published as floors, so any number here would be invented.
      */
     @Test
     void shouldNeverReportAQuotaGauge() {

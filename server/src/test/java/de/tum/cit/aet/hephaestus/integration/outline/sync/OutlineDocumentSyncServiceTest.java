@@ -50,7 +50,7 @@ import org.mockito.Mock;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit coverage for the sync paths a real-Postgres test cannot cheaply pin. The load-bearing invariant is
+ * Unit coverage for the sync paths a real-Postgres test cannot cheaply pin. The core invariant is
  * <em>no-wipe</em>: a pass that dies mid-way (429, revoked token) must leave already-mirrored documents
  * intact, because the alternative is silent, irreversible data loss.
  *
@@ -296,7 +296,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
         assertThat(collection.getDocumentsSyncedAt()).isNotNull();
-        // Clean-pass counters: full coverage, nothing skipped.
         assertThat(collection.getDocumentsUpstream()).isEqualTo(1);
         assertThat(collection.getExportsSkippedForBudget()).isZero();
         assertThat(staleRow.isDeleted()).isTrue();
@@ -334,8 +333,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
     @Test
     void reconciliationPass_withTheSameFixture_doesTombstoneTheVanishedDocument() {
-        // The paired half of the test above: same fixture, RECONCILIATION instead of INITIAL, and the
-        // tombstone lands. Proves the gate discriminates on job type alone.
+        // Same fixture as the INITIAL test but RECONCILIATION: the tombstone lands, proving the gate
+        // discriminates on job type alone.
         OutlineDocument staleRow = mirrored("doc-stale");
         staleRow.setBodyMarkdown("# old");
         staleRow.setCreatedBySubject("user-1");
@@ -416,7 +415,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).syncWorkspace(WORKSPACE);
 
         verify(outlineApiClient, never()).exportDocument(anyString(), anyString(), anyString());
-        // The metadata-only refresh landed: the title now matches upstream, the body is untouched.
         assertThat(renamed.getTitle()).isEqualTo("doc-1");
         assertThat(renamed.getBodyMarkdown()).isEqualTo("# body");
         verify(documentRepository).saveAndFlush(argThat(d -> "doc-1".equals(d.getDocumentId())));
@@ -457,7 +455,6 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         assertThat(docTwo.getCreatedBySubject()).isEqualTo("user-2");
         assertThat(docOne.isDeleted()).isFalse();
         assertThat(docOne.getBodyMarkdown()).isEqualTo("# one");
-        // Nothing was tombstoned — not one write carried a deletedAt.
         verify(documentRepository, never()).saveAndFlush(argThat(OutlineDocument::isDeleted));
     }
 
@@ -1114,9 +1111,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
     // --- cooperative cancellation: the job handle reaches the per-document loop, not just the collection loop ---
 
     /**
-     * Cancellation was only checked between collections, so a job cancelled while inside a single large
-     * collection kept exporting — up to the whole export budget of documents — after the admin pressed
-     * Cancel. The check now runs per document.
+     * Cancellation is checked per document, not just between collections, so a job cancelled while inside a
+     * single large collection stops promptly rather than exporting up to the whole export budget of
+     * documents after the admin pressed Cancel.
      */
     @Test
     void cancellationMidCollection_stopsExportingAtTheNextDocument() {

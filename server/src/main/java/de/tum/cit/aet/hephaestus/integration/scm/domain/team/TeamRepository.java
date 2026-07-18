@@ -7,12 +7,6 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for team entities.
- *
- * <p>Teams are scoped through their organization field which carries scope
- * through the Team.organization relationship.
- */
 @Repository
 @WorkspaceAgnostic("Teams scoped through workspace_id via organization chain")
 public interface TeamRepository extends JpaRepository<Team, Long> {

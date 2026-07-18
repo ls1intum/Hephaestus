@@ -260,9 +260,9 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The structural half of the fix: the optimistic reset must not <em>write</em>. The gauge reads the
-         * same observed field the snapshot does, so if a throttle decision ever mutates state back up to
-         * the limit, this gauge reports a budget nobody measured.
+         * The optimistic reset must not <em>write</em>. The gauge reads the same observed field the
+         * snapshot does, so if a throttle decision ever mutates state back up to the limit, this gauge
+         * reports a budget nobody measured.
          */
         @Test
         void throttleDecisionMustNotWriteBackIntoObservedState() {
@@ -270,7 +270,7 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             Instant pastReset = Instant.now().minusSeconds(30).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
             tracker.updateFromHeaders(scopeId, createHeaders(2, 100, pastReset, 98));
 
-            // Every decision API that used to perform the write-back.
+            // Every decision API that reads the throttle state.
             tracker.getRemaining(scopeId);
             tracker.isCritical(scopeId);
             tracker.isLow(scopeId);
@@ -350,10 +350,10 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
 
         /**
-         * The partial-header regression test. {@code updateFromHeaders} creates state as soon as EITHER
-         * count header is present (a stripping proxy or partial middleware makes that real), and the old
-         * constructor seeds meant the missing side silently displayed the invented {@code 100}. One
-         * measured header must produce exactly one measured field.
+         * A stripping proxy or partial middleware can deliver just one of the two count headers, and
+         * {@code updateFromHeaders} creates state as soon as EITHER is present. One measured header must
+         * produce exactly one measured field — the missing side must not fabricate the invented default
+         * {@code 100}.
          */
         @Test
         void remainingHeaderAlone_mustNotFabricateALimit() {
@@ -419,8 +419,6 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             assertThat(snapshot.limit()).isEqualTo(100);
         }
     }
-
-    // Helper Methods
 
     private HttpHeaders createHeaders(int remaining, int limit, Instant resetAt, int observed) {
         HttpHeaders headers = new HttpHeaders();

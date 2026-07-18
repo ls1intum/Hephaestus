@@ -181,9 +181,9 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * workspace is back under the cap, and re-queries for the next page if it is not — an evicted row drops
      * out of this result set, so the pages advance on their own.
      *
-     * <p>The {@code LIMIT} is load-bearing: {@link #evictBodies} binds one parameter per id, and Postgres
-     * caps a statement at 65 535 bind parameters (with the planner degrading long before that). An unbounded
-     * candidate list on a large over-cap mirror produced exactly that statement. Native for the
+     * <p>The {@code LIMIT} is a correctness bound, not a page size: {@link #evictBodies} binds one parameter
+     * per id, and Postgres caps a statement at 65 535 bind parameters (the planner degrades long before that),
+     * so an unbounded candidate list over a large over-cap mirror would exceed it. Native for the
      * {@code octet_length(...)} projection.
      */
     @Query(

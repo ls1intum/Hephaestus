@@ -51,9 +51,9 @@ export const Default: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// The active segment must be visibly raised. Base UI's ToggleGroupItem emits
-		// `data-pressed`, which the corrected `data-pressed:bg-background data-pressed:shadow-sm`
-		// classes style (the old `data-[state=on]` selector matched nothing).
+		// The active segment must be visibly raised. Base UI's ToggleGroupItem emits `data-pressed`, so
+		// the `data-pressed:bg-background data-pressed:shadow-sm` classes style it (a `data-[state=on]`
+		// selector would match nothing).
 		const tree = await canvas.findByRole("button", { name: "Tree view" });
 		await expect(tree).toHaveAttribute("data-pressed");
 		const list = canvas.getByRole("button", { name: "List view" });

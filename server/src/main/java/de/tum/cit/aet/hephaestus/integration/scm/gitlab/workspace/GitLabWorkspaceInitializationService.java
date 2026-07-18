@@ -303,10 +303,9 @@ public class GitLabWorkspaceInitializationService {
         }
 
         try {
-            // Pass workspace.serverUrl so per-instance repos get stamped with the matching
-            // git_provider row instead of falling back to the global default (which silently
-            // fuses cross-instance identities under gitlab.com). Live-run finding 2026-05-25.
-            // The server URL now lives on the GitLab Connection's config, not on Workspace.
+            // Pass the connection's server URL so per-instance repos get stamped with the matching
+            // git_provider row instead of falling back to the global default (which silently fuses
+            // cross-instance identities under gitlab.com).
             String serverUrl = connectionService
                 .findActiveGitLabConfig(workspace.getId())
                 .map(ConnectionConfig.GitLabConfig::serverUrl)
@@ -527,7 +526,7 @@ public class GitLabWorkspaceInitializationService {
 
             // Build a snapshot of commit→MR linker work to perform in a second pass, so a
             // commit whose SHA appears on an MR in a sibling repo can still be linked after
-            // all repos have finished syncing (Gap #1: cross-repo MR/commit relationships).
+            // all repos have finished syncing.
             List<Repository> commitLinkTargets = new ArrayList<>();
             syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets, cancelled);
 
@@ -768,10 +767,8 @@ public class GitLabWorkspaceInitializationService {
                 }
             }
 
-            // Record this repo for the second-pass commit→MR linker. Running the linker in a
-            // second pass lets commits whose SHAs appear on MRs in sibling repos be linked
-            // correctly — in the previous single-pass version those links were lost because
-            // the target MR repo had not yet synced its MRs.
+            // Record this repo for the second-pass commit→MR linker, which lets commits whose SHAs
+            // appear on MRs in sibling repos be linked once every repo has synced its MRs.
             commitLinkTargets.add(repo);
 
             boolean allDone = (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);

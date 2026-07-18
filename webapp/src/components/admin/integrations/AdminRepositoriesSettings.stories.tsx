@@ -4,10 +4,7 @@ import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 
 /**
  * Admin surface for the monitored-repositories plane. Presentational: the add/remove mutations and
- * their loading/error flags are supplied by the container, so these stories mock the callbacks with
- * `fn()`. The stories pin every state the container can drive — populated, loading, empty, load
- * error, add-validation error, remove-in-progress, and the GitHub App Installation read-only mode —
- * plus the interaction gates (the `owner/name` add gate and the destructive remove confirm).
+ * their loading/error flags come from the container, so these stories mock the callbacks with `fn()`.
  */
 const meta = {
 	component: AdminRepositoriesSettings,
@@ -56,8 +53,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default state with a list of monitored repositories. The play drives the add gate: a value without
- * a `/` keeps Add disabled, while an `owner/name` value enables it and submits through the callback.
+ * Default state with a list of monitored repositories. The add gate: a value without a `/` keeps Add
+ * disabled; an `owner/name` value enables it and submits.
  */
 export const Default: Story = {
 	play: async ({ args, canvasElement }) => {
@@ -65,12 +62,10 @@ export const Default: Story = {
 		const input = canvas.getByLabelText("Add a repository");
 		const addButton = canvas.getByRole("button", { name: /^add$/i });
 
-		// Empty and slash-less input keep Add disabled.
 		await expect(addButton).toBeDisabled();
 		await userEvent.type(input, "not-a-repo");
 		await expect(addButton).toBeDisabled();
 
-		// A valid owner/name enables Add and submits.
 		await userEvent.clear(input);
 		await userEvent.type(input, "owner/name");
 		await expect(addButton).toBeEnabled();
@@ -80,11 +75,10 @@ export const Default: Story = {
 };
 
 /**
- * A large fleet. The list is a compact pane that grows to content for a few repos but caps and scrolls
- * for many, so it never becomes a second full-height copy of the sync-state table nor overflows onto
- * the add form. The play asserts the real layout in browser mode: the Base UI ScrollArea viewport is
- * height-bounded (≤ the max-h-80 cap) and its content overflows it (scrollable) — the exact regression
- * that shipped when the viewport was left unbounded and every row rendered at full height.
+ * A large fleet. The list caps and scrolls rather than growing to full height and overflowing onto the
+ * add form. Asserts the real layout in browser mode: the Base UI ScrollArea viewport is height-bounded
+ * (≤ the max-h-80 cap) and its content overflows it (scrollable). If the viewport were left unbounded,
+ * every row would render at full height and push the page taller.
  */
 export const ManyRepositories: Story = {
 	args: {
@@ -99,12 +93,11 @@ export const ManyRepositories: Story = {
 		await expect(viewport).not.toBeNull();
 		if (!viewport) return;
 
-		// Bounded: clipped to the max-h-80 (20rem = 320px) cap, not grown to fit all 40 rows.
+		// Bounded to the max-h-80 (20rem = 320px) cap, not grown to fit all 40 rows.
 		await expect(viewport.clientHeight).toBeLessThanOrEqual(320);
-		// Scrollable: the 40 rows overflow the bounded viewport rather than pushing the page taller.
+		// Content overflows the bounded viewport rather than pushing the page taller.
 		await expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
 
-		// The add form still sits below the pane and is interactive — not overlapped by the list.
 		await expect(canvas.getByLabelText("Add a repository")).toBeVisible();
 	},
 };
@@ -125,7 +118,6 @@ export const RemoveConfirm: Story = {
 		await expect(
 			within(dialog).getByText(/permanently erases everything Hephaestus has mirrored/i),
 		).toBeInTheDocument();
-		// Names the provider and says the upstream repository survives and can be re-monitored.
 		await expect(
 			within(dialog).getByText(/repository on GitHub itself is not affected/i),
 		).toBeInTheDocument();
@@ -139,8 +131,7 @@ export const RemoveConfirm: Story = {
  *
  * The dialog is controlled and held open across the mutation: an uncontrolled `AlertDialogAction`
  * closes on click, unmounting the node that carries `disabled={isRemovingRepository}` before the flag
- * can flip. Holding it open gives the confirm somewhere to show "Stopping…" and gives a second click
- * something to bounce off.
+ * can flip. Holding it open gives the confirm somewhere to show "Stopping…".
  */
 export const RemoveInProgress: Story = {
 	args: {

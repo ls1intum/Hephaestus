@@ -36,12 +36,10 @@ export interface NavAdminProps {
 	scmProviderType?: "GITHUB" | "GITLAB";
 }
 
-// Workspace administration is one group. "Practices" is the domain — a workspace curates a catalog of
-// practices and the observations/feedback they produce. It owns several surfaces (the catalog, how
-// reviews run, and the run log), so it nests as a collapsible sub-tree. The model/agent/"AI" plumbing is
-// deliberately NOT the headline: "Models" is a separate workspace-infrastructure item (shared with the
-// mentor). Individual practices/areas are not sidebar entries — there are dozens; the catalog is their
-// home, and a practice drills down to its own detail page.
+// "Practices" nests as a collapsible sub-tree because it owns several surfaces (the catalog, review
+// settings, and the run log). "Models" is a separate item, shared with the mentor, rather than living
+// under Practices. Individual practices are not sidebar entries — there are dozens; the catalog is
+// their home and each drills down to its own detail page.
 export function NavAdmin({
 	workspaceSlug,
 	achievementsEnabled = true,

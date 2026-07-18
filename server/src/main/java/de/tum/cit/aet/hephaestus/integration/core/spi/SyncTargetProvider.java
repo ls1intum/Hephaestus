@@ -16,8 +16,6 @@ import java.util.List;
  * methods concurrently from multiple sync threads.
  */
 public interface SyncTargetProvider extends SyncTimestampProvider, BackfillStateProvider {
-    // CORE SYNC TARGET OPERATIONS
-
     /**
      * Gets all active sync targets across all scopes — targets in active-status scopes with
      * at least one configured repository. Never null (may be empty).
@@ -51,8 +49,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      */
     void removeSyncTarget(Long syncTargetId);
 
-    // SYNC SESSIONS
-
     /**
      * Gets sync sessions for batch synchronization, scoped to a single provider kind.
      * Each session contains all sync targets for a scope with its sync context.
@@ -69,8 +65,6 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     default SyncStatistics getSyncStatistics() {
         return new SyncStatistics(0, 0, 0, 0, false);
     }
-
-    // RECORDS
 
     /**
      * A batch of sync targets for a single scope, used for parallel processing.

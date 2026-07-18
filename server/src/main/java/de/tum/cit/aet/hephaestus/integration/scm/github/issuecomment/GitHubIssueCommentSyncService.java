@@ -177,7 +177,6 @@ public class GitHubIssueCommentSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
-                    // Check if this is a NOT_FOUND error (issue deleted from GitHub)
                     if (isNotFoundError(response, "repository.issue")) {
                         log.debug(
                             "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
@@ -214,10 +213,8 @@ public class GitHubIssueCommentSyncService {
                     break;
                 }
 
-                // Track rate limit from response
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
-                // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     if (
                         !graphQlSyncHelper.waitForRateLimitIfNeeded(
@@ -260,12 +257,10 @@ public class GitHubIssueCommentSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
             } catch (InstallationNotFoundException e) {
-                // Re-throw to abort the entire sync operation
                 throw e;
             } catch (FieldAccessException e) {
-                // Check if this is a NOT_FOUND error (issue deleted from GitHub)
                 if (isNotFoundError(e.getResponse(), "repository.issue")) {
-                    // Log at DEBUG - deleted issues are expected during sync, not actionable
+                    // Deleted issues are expected during sync; DEBUG rather than ERROR since it's not actionable.
                     log.debug(
                         "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
                         safeNameWithOwner,
@@ -466,10 +461,8 @@ public class GitHubIssueCommentSyncService {
                     break;
                 }
 
-                // Track rate limit from response
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
-                // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     if (
                         !graphQlSyncHelper.waitForRateLimitIfNeeded(

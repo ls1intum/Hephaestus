@@ -7,17 +7,8 @@ const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
 
 /**
  * A timestamp as "4 minutes ago", against a clock shared by every relative time on the page, with the
- * absolute instant one hover away.
- *
- * Both halves are the point. A relative time rendered once and never re-rendered is a lie with a
- * half-life — this surface exists to report freshness, so a "2 minutes ago" that has silently been on
- * screen for an hour is worse than no reading at all. And a relative time is useless for the task an
- * admin actually brings to a failed row, which is finding it in the server log, so the exact instant
- * is always available without leaving the row.
- *
- * The tick is one module-level `setInterval` behind `useSyncExternalStore`, the same external-store
- * pattern `SyncFreshnessBanner` uses for `onlineManager`: a hundred cells cost one timer, they all
- * advance in the same commit, and the timer stops existing when the last one unmounts.
+ * absolute instant one hover away. The relative phrase re-renders so a stale reading can't linger; the
+ * absolute time stays available for correlating a failed run against a server log.
  */
 const meta = {
 	component: RelativeTime,
@@ -58,7 +49,7 @@ export const Stale: Story = {
 	},
 };
 
-/** Long past explaining away — six cadences and counting. */
+/** Six cadences overdue — the most severe freshness tone. */
 export const VeryStale: Story = {
 	args: { value: minutesAgo(60 * 24 * 9), tone: "veryStale" },
 	play: async ({ canvasElement }) => {

@@ -125,14 +125,10 @@ public class Issue extends BaseGitServiceEntity {
      * surfaces do not filter this column: {@code LeaderboardReviewQueryRepository},
      * {@code ProfilePullRequestQueryRepository}, {@code WorkspaceContributionQueryRepository},
      * {@code ActivityEventRepository}, {@code MentorContextQueryRepository}, and the review /
-     * review-comment / thread repositories all surface tombstoned issues and pull requests.
-     *
-     * <p>That is a scope decision, not an oversight, and it is not a regression: before tombstoning
-     * existed those same rows were already visible on those same surfaces as phantoms that nothing
-     * could ever retire. The tombstone does not yet hide them — it makes them <em>identifiable</em>,
-     * and fixes the counts. Teaching the remaining read paths to filter is a separate change with a
-     * far wider blast radius (scoring, XP, profile history and mentor context would all shift), so
-     * it is intentionally not attempted here.
+     * review-comment / thread repositories all surface tombstoned issues and pull requests. The
+     * tombstone makes those rows <em>identifiable</em> and fixes the counts; it does not hide them.
+     * Teaching the remaining read paths to filter has a far wider blast radius (scoring, XP, profile
+     * history and mentor context would all shift) and is a separate change.
      */
     @Column(name = "deleted_at")
     private Instant deletedAt;

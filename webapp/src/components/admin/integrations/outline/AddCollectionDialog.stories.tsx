@@ -124,7 +124,6 @@ export const PopulatedSearchable: Story = {
 		);
 		await expect(within(dialog).getByText(/already mirrored/i)).toBeInTheDocument();
 
-		// Search filters the option list down to the match.
 		await userEvent.type(within(dialog).getByRole("combobox"), "design");
 		await expect(within(dialog).getByText("Design System")).toBeInTheDocument();
 		await expect(within(dialog).queryByText("Research Notes")).not.toBeInTheDocument();
@@ -210,7 +209,6 @@ export const KeyboardNavigation: Story = {
 		await expect(within(dialog).getByRole("checkbox", { name: /product/i })).toBeChecked();
 		await expect(args.onRegister).not.toHaveBeenCalled();
 
-		// And toggles it back off.
 		await userEvent.keyboard("{Enter}");
 		await waitFor(() => expect(product).toHaveAttribute("aria-selected", "false"));
 	},

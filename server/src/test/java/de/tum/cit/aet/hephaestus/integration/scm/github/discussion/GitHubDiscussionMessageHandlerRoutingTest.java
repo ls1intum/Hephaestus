@@ -22,14 +22,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Action-level routing guard for {@link GitHubDiscussionMessageHandler}. The dispatcher round-trip test
  * proves discussion events reach this handler; this proves the handler routes each action to the right
- * processor method. Two regressions are locked down here:
+ * processor method. Two behaviors are pinned here:
  *
  * <ul>
  *   <li><b>transferred → removal, not upsert.</b> A transfer moves the discussion out of the source
- *       repository. The old code shared the upsert branch, re-creating the very phantom the transfer
- *       should retire — permanently, since discussions have no reconciliation sweep.</li>
- *   <li><b>unknown action → skip, not upsert.</b> The old {@code default} branch fell through to an
- *       upsert, so a future action meaning "removed" would silently re-create a phantom.</li>
+ *       repository; routing it to upsert would re-create the very phantom the transfer should retire —
+ *       permanently, since discussions have no reconciliation sweep.</li>
+ *   <li><b>unknown action → skip, not upsert.</b> Falling through to an upsert on an unrecognized action
+ *       would let a future action meaning "removed" silently re-create a phantom.</li>
  * </ul>
  */
 class GitHubDiscussionMessageHandlerRoutingTest extends BaseUnitTest {

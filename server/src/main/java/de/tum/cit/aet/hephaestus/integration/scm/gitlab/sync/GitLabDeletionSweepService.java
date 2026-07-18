@@ -88,7 +88,7 @@ import org.springframework.stereotype.Service;
  * </ol>
  *
  * <p>The cost of both guards is bounded and known: a project whose issues really were all deleted keeps
- * its phantom rows until a human notices. That is the deliberately cheaper failure.
+ * its phantom rows until a human notices. That is the cheaper failure.
  *
  * <p>Tombstone rather than row deletion: see {@code Issue#deletedAt}. Because
  * {@code IssueRepository.upsertCore} / {@code PullRequestRepository.upsertCore} clear the tombstone
@@ -259,8 +259,8 @@ public class GitLabDeletionSweepService {
             try {
                 outcome = sweepRepository(scopeId, repository, handle);
             } catch (RuntimeException e) {
-                // Defensive: sweepRepository is written not to throw, but a sweep must never be the
-                // reason a reconciliation job fails — it is drift repair, not the sync itself.
+                // sweepRepository is written not to throw, but a sweep must never be the reason a
+                // reconciliation job fails — it is drift repair, not the sync itself.
                 log.warn(
                     "GitLab deletion sweep failed for project, continuing: projectPath={}, scopeId={}, message={}",
                     sanitizeForLog(repository.getNameWithOwner()),

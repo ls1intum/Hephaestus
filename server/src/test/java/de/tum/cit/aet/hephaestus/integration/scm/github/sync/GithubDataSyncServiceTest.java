@@ -58,17 +58,17 @@ import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit tests for {@link GithubDataSyncService#syncSyncTarget}, covering two data-loss
- * regressions in the incremental path:
+ * Unit tests for {@link GithubDataSyncService#syncSyncTarget}, guarding two data-loss hazards in the
+ * incremental path:
  *
  * <ol>
- *   <li>A {@code repoUnchanged} short-circuit used to skip every sub-sync when
- *       {@code repository.updatedAt} had not advanced. GitHub does not bump that field when an
- *       issue/PR is opened or commented on, so new PRs were silently never ingested.</li>
- *   <li>The incremental path used to read and write {@code issueSyncCursor} /
- *       {@code pullRequestSyncCursor}, which are owned by the CREATED_AT-ordered historical
- *       backfill. Resuming an UPDATED_AT-ordered query from a CREATED_AT cursor skips the newest
- *       items and clobbers backfill's checkpoint.</li>
+ *   <li>Sub-syncs must not be short-circuited when {@code repository.updatedAt} has not advanced.
+ *       GitHub does not bump that field when an issue/PR is opened or commented on, so keying off it
+ *       silently never ingests new PRs.</li>
+ *   <li>The incremental path must not read or write {@code issueSyncCursor} /
+ *       {@code pullRequestSyncCursor}, which are owned by the CREATED_AT-ordered historical backfill.
+ *       Resuming an UPDATED_AT-ordered query from a CREATED_AT cursor skips the newest items and
+ *       clobbers backfill's checkpoint.</li>
  * </ol>
  */
 class GithubDataSyncServiceTest extends BaseUnitTest {
@@ -79,7 +79,7 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
     private static final long PROVIDER_ID = 7L;
     private static final String REPO_NAME = "acme/widgets";
 
-    /** Frozen so "unchanged" means bit-identical, exactly as the removed short-circuit tested. */
+    /** Frozen so a re-synced repo reports a bit-identical "unchanged" updatedAt. */
     private static final Instant REPO_UPDATED_AT = Instant.parse("2026-07-01T00:00:00Z");
 
     @Mock
@@ -209,8 +209,8 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         repository.setId(REPOSITORY_ID);
         repository.setNameWithOwner(REPO_NAME);
         repository.setProvider(provider);
-        // The crux of bug A: GitHub leaves updatedAt untouched when a PR is opened, so a
-        // re-synced repository reports the very same timestamp we already had stored.
+        // GitHub leaves updatedAt untouched when a PR is opened, so a re-synced repository reports the
+        // very same timestamp already stored.
         repository.setUpdatedAt(REPO_UPDATED_AT);
 
         when(syncTargetProvider.isScopeActiveForSync(SCOPE_ID)).thenReturn(true);
@@ -288,9 +288,9 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
 
     @Test
     void shouldPreserveSyncTargetWhenRenamedRepoHasStableIdOnNotFound() {
-        // Arrange: the repo was renamed upstream. Its local row (found by the old name) still exists,
-        // so metadata re-sync is attempted and GitHub answers a definitive 404 for the old name. Because
-        // the monitor carries a stable native id, this is a rename — NOT a deletion.
+        // The repo was renamed upstream. Its local row (found by the old name) still exists, so metadata
+        // re-sync is attempted and GitHub answers a definitive 404 for the old name. Because the monitor
+        // carries a stable native id, this is a rename — NOT a deletion.
         SyncTarget target = syncTargetWithNativeId(NATIVE_ID);
         when(repositorySyncService.syncRepository(eq(SCOPE_ID), eq(REPO_NAME), any())).thenThrow(
             new RepositoryNotFoundOnGitProviderException(REPO_NAME)
@@ -300,11 +300,10 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         );
         lenient().when(repositoryRepository.findById(REPOSITORY_ID)).thenReturn(Optional.empty());
 
-        // Act
         boolean result = service.syncSyncTarget(target);
 
-        // Assert: neither the monitor nor the repository is deleted (the confirmed data-loss cascade),
-        // and the cycle reports not-completed so it retries.
+        // Neither the monitor nor the repository is deleted, and the cycle reports not-completed so it
+        // retries.
         verify(syncTargetProvider, never()).removeSyncTarget(any());
         verify(repositoryRepository, never()).delete(any());
         org.assertj.core.api.Assertions.assertThat(result).isFalse();
@@ -312,8 +311,8 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
 
     @Test
     void shouldRemoveSyncTargetWhenLegacyRowHasNoStableIdOnNotFound() {
-        // Arrange: a legacy monitor with no captured native id. A definitive 404 is treated as a real
-        // deletion (unchanged pre-fix behavior), so the orphan is cleaned up.
+        // A legacy monitor with no captured native id: a definitive 404 is treated as a real deletion, so
+        // the orphan is cleaned up.
         SyncTarget target = syncTargetWithNativeId(null);
         when(repositorySyncService.syncRepository(eq(SCOPE_ID), eq(REPO_NAME), any())).thenThrow(
             new RepositoryNotFoundOnGitProviderException(REPO_NAME)
@@ -323,10 +322,9 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         );
         lenient().when(repositoryRepository.findById(REPOSITORY_ID)).thenReturn(Optional.empty());
 
-        // Act
         boolean result = service.syncSyncTarget(target);
 
-        // Assert: the monitor is removed to stop perpetual retries for a genuinely deleted repository.
+        // The monitor is removed to stop perpetual retries for a genuinely deleted repository.
         verify(syncTargetProvider).removeSyncTarget(SYNC_TARGET_ID);
         org.assertj.core.api.Assertions.assertThat(result).isTrue();
     }
@@ -350,14 +348,13 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
 
     @Test
     void shouldSyncIssuesAndPullRequestsWhenRepositoryUpdatedAtUnchanged() {
-        // Arrange: a repo that has completed its initial sync and whose updatedAt has not moved —
-        // precisely the state in which the old short-circuit returned early and dropped PR #15.
+        // A repo that has completed its initial sync and whose updatedAt has not moved — the state in
+        // which a short-circuit on updatedAt would return early and drop new PRs.
         SyncTarget target = syncTarget(null, null);
 
-        // Act
         boolean result = service.syncSyncTarget(target);
 
-        // Assert: the sub-syncs still run rather than being skipped as "repoUnchanged".
+        // The sub-syncs still run rather than being skipped as "repoUnchanged".
         verify(issueSyncService).syncForRepository(eq(SCOPE_ID), eq(REPOSITORY_ID), isNull(), isNull(), any());
         verify(pullRequestSyncService).syncForRepository(eq(SCOPE_ID), eq(REPOSITORY_ID), isNull(), isNull(), any());
         org.assertj.core.api.Assertions.assertThat(result).isTrue();
@@ -365,29 +362,26 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
 
     @Test
     void shouldNotResumeIncrementalSyncFromBackfillCursor() {
-        // Arrange: mid-backfill state — the shared cursor columns hold CREATED_AT-ordered
-        // checkpoints belonging to GitHubHistoricalBackfillService.
+        // Mid-backfill state — the shared cursor columns hold CREATED_AT-ordered checkpoints belonging to
+        // GitHubHistoricalBackfillService.
         SyncTarget target = syncTarget("issue-cursor-created-at-desc", "pr-cursor-created-at-desc");
 
-        // Act
         service.syncSyncTarget(target);
 
-        // Assert: the UPDATED_AT-ordered incremental path starts fresh instead of resuming from a
-        // cursor produced by a different ordering (which would skip the newest items).
+        // The UPDATED_AT-ordered incremental path starts fresh instead of resuming from a cursor produced
+        // by a different ordering (which would skip the newest items).
         verify(issueSyncService).syncForRepository(eq(SCOPE_ID), eq(REPOSITORY_ID), isNull(), isNull(), any());
         verify(pullRequestSyncService).syncForRepository(eq(SCOPE_ID), eq(REPOSITORY_ID), isNull(), isNull(), any());
     }
 
     @Test
     void shouldNotClobberBackfillCursorWhenRunningIncrementalSync() {
-        // Arrange
         SyncTarget target = syncTarget("issue-cursor-created-at-desc", "pr-cursor-created-at-desc");
 
-        // Act
         service.syncSyncTarget(target);
 
-        // Assert: passing a null syncTargetId disables cursor persistence inside the sync
-        // services, so backfill's checkpoint survives an interleaved incremental run.
+        // Passing a null syncTargetId disables cursor persistence inside the sync services, so backfill's
+        // checkpoint survives an interleaved incremental run.
         verify(issueSyncService, never()).syncForRepository(any(), any(), eq(SYNC_TARGET_ID), any(), any());
         verify(pullRequestSyncService, never()).syncForRepository(any(), any(), eq(SYNC_TARGET_ID), any(), any());
     }

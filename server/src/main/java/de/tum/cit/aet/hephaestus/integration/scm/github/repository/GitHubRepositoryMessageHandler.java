@@ -24,16 +24,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles GitHub repository webhook events (deleted, archived, renamed, etc.).
- * <p>
- * This handler processes repository-level lifecycle events that affect the repository
- * entity itself, ensuring local state stays in sync with GitHub. Key actions:
- * <ul>
- *   <li><b>deleted</b>: Removes the repository and monitors, preventing orphan sync errors</li>
- *   <li><b>archived/unarchived</b>: Updates repository visibility state</li>
- *   <li><b>renamed/transferred</b>: Re-keys the mirrored repository AND every workspace's monitor by
- *       the provider-stable {@code repository.id}, then rebuilds the NATS consumer filters</li>
- * </ul>
+ * Handles GitHub repository webhook events: deletion, archive state, visibility, and
+ * rename/transfer. Renamed/transferred repositories are re-keyed — the mirrored repository AND
+ * every workspace's monitor — by the provider-stable {@code repository.id}, then the NATS
+ * consumer filters are rebuilt.
  *
  * <p><b>Subject tier.</b> Registered on the {@code organization.} tier: {@code GithubSubjectKeyDeriver}
  * emits {@code repository} lifecycle events as {@code github.<owner>.?.repository} because the repo-name
@@ -124,17 +118,14 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
     }
 
     /**
-     * Handles repository deletion by cleaning up local state.
-     * <p>
-     * Uses the ProvisioningListener SPI to remove monitors and delete orphaned repository
-     * entities, preventing future sync attempts from failing with NOT_FOUND errors.
+     * Cleans up local state on repository deletion, via the ProvisioningListener SPI, preventing
+     * future sync attempts from failing with NOT_FOUND errors.
      */
     private void handleRepositoryDeleted(GitHubRepositoryEventDTO event, String fullName, String safeFullName) {
         var installation = event.installation();
 
         if (installation == null || installation.id() == null) {
             log.warn("Cannot clean up deleted repository - missing installation ID: repoName={}", safeFullName);
-            // Still try to delete the repository directly if we can find it
             deleteRepositoryByName(fullName, safeFullName);
             return;
         }
@@ -143,8 +134,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         log.info("Processing repository deletion: repoName={}, installationId={}", safeFullName, installationId);
 
-        // Use the ProvisioningListener SPI to properly clean up monitors AND repository
-        // This triggers onRepositoriesRemoved which will remove monitors and orphaned repos
         provisioningListener.onRepositoriesRemoved(installationId, List.of(fullName));
 
         log.info("Completed repository deletion cleanup: repoName={}, installationId={}", safeFullName, installationId);
@@ -163,8 +152,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             .ifPresent(repository -> {
                 Long repoId = repository.getId();
 
-                // Cascade delete projects owned by this repository
-                // This must be done BEFORE deleting the repository to maintain referential integrity
                 int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
                 if (deletedProjects > 0) {
                     log.info(
@@ -180,9 +167,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             });
     }
 
-    /**
-     * Handles repository archive/unarchive by updating the archived flag.
-     */
     private void handleRepositoryArchived(String fullName, String safeFullName, boolean archived) {
         repositoryRepository
             .findByNameWithOwner(fullName)
@@ -217,7 +201,7 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
      * </ol>
      * <b>Residual:</b> a transfer to a <em>different</em> owner derives the new owner's subject and so
      * never reaches the old workspace's org filter; that case heals on the next reconcile pass, which
-     * resolves the monitor by {@code nativeId} (commit a163955b9).
+     * resolves the monitor by {@code nativeId}.
      */
     private void handleRepositoryMoved(GitHubRepositoryEventDTO event, String safeNewFullName) {
         String newFullName = event.repository().fullName();
@@ -290,9 +274,6 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             : repositoryRepository.findByNameWithOwner(previousNameWithOwner);
     }
 
-    /**
-     * Handles visibility changes (privatized/publicized).
-     */
     private void handleVisibilityChanged(String fullName, String safeFullName, boolean isPrivate) {
         repositoryRepository
             .findByNameWithOwner(fullName)

@@ -70,13 +70,11 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * Repository-wide list of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
      * subclass rows that share this table under single-table inheritance.
      *
-     * <p>This is not cosmetic: for GitLab, issue IIDs and merge-request IIDs occupy <em>separate</em>
+     * <p>Not cosmetic: for GitLab, issue IIDs and merge-request IIDs occupy <em>separate</em>
      * per-project namespaces (issue #5 and MR !5 routinely coexist), so a type-blind list keyed by IID
-     * would collide the two rows — mistaking a merge request for the issue of the same number. Every
-     * caller that keys issues by {@code getNumber()} (the IID) — sub-issue parenting, issue-dependency
-     * links — is an issue-domain concept a merge request has no part in, so they must never see the
-     * {@code PullRequest} rows. Mirrors the {@code TYPE(i) = Issue} discriminator every other query in
-     * this repository carries for the same reason.
+     * would collide the two — mistaking a merge request for the issue of the same number. Callers here
+     * key issues by {@code getNumber()} (the IID) for issue-only concepts (sub-issue parenting,
+     * issue-dependency links), so they must never see {@code PullRequest} rows.
      *
      * @param repositoryId the repository ID
      * @return every pure issue of the repository (pull/merge requests excluded)
@@ -145,13 +143,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     /**
      * Tombstones the given <em>issue</em> numbers of one repository in a single statement.
      *
-     * <p>{@code TYPE(i) = Issue} excludes the {@code PullRequest} subclass rows that share this table
-     * under single-table inheritance. This is not cosmetic: for GitLab, issue IIDs and merge-request
-     * IIDs occupy <em>separate</em> per-project namespaces (issue #5 and MR !5 routinely coexist), so a
-     * type-blind UPDATE keyed only on {@code (repository.id, number)} would tombstone a live merge
-     * request whenever an issue with the same number is swept — hiding it from counts, mentor and
-     * detection until the next reconciliation upsert revives it. Every other query in this repository
-     * carries the same discriminator for exactly this reason; the tombstone must too.
+     * <p>{@code TYPE(i) = Issue} excludes the {@code PullRequest} subclass rows sharing this table
+     * under single-table inheritance. Not cosmetic: for GitLab, issue and merge-request IIDs occupy
+     * <em>separate</em> per-project namespaces (issue #5 and MR !5 coexist), so a type-blind UPDATE
+     * keyed only on {@code (repository.id, number)} would tombstone a live merge request whenever an
+     * issue of the same number is swept — hiding it from counts, mentor and detection until the next
+     * reconciliation upsert revives it.
      *
      * <p>{@code deletedAt IS NULL} in the predicate makes this idempotent and preserves the
      * <em>first</em> observation time: a re-sweep of an already-tombstoned row must not push its

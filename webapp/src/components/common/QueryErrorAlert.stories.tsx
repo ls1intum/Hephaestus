@@ -5,15 +5,12 @@ import { QueryErrorAlert } from "./QueryErrorAlert";
 /**
  * The one failed-query surface, shared by every section that loads over the network.
  *
- * It used to render every failure identically — same destructive alert, same Retry button — because
- * the message extractor read `detail`/`title` and never looked at `status`. A 403 and a 503 are both
- * "an error", but only one of them gets better if you press a button, so a Retry on the 403 was a lie
- * about the way out. The status now decides three things: the severity, the guidance, and whether
- * Retry is offered at all.
+ * The HTTP status decides three things: the severity, the guidance, and whether Retry is offered at
+ * all — a 403 and a 503 are both errors, but only one gets better if you press a button.
  *
- * Composition is deliberate: the server's `detail` says *what happened* and is more specific than
- * anything we can infer, so it leads; the status-derived guidance says *what to do*, which the server
- * doesn't know. Callers keep supplying the title because only they know what the reader was doing.
+ * The server's `detail` says what happened and is more specific than anything we can infer, so it
+ * leads; the status-derived guidance says what to do and follows. Callers supply the title because
+ * only they know what the reader was doing.
  */
 const meta = {
 	component: QueryErrorAlert,

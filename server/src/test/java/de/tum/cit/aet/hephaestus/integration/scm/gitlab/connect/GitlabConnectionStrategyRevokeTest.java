@@ -14,12 +14,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 /**
- * Pins GitLab's F2 disconnect-erase wiring. Disconnect is GitLab's ONLY erase trigger (a PAT has no
+ * Pins GitLab's disconnect-erase wiring. Disconnect is GitLab's ONLY erase trigger (a PAT has no
  * vendor-side uninstall signal), so a regression here means GitLab-mirrored data becomes unerasable
  * short of manual SQL.
  *
- * <p>Order is load-bearing and asserted: the group webhook must be deregistered FIRST, while the PAT
- * is still live and the Connection still ACTIVE — that is the only window GitLab authorizes the hook
+ * <p>Order matters and is asserted: the group webhook must be deregistered FIRST, while the PAT is
+ * still live and the Connection still ACTIVE — that is the only window GitLab authorizes the hook
  * delete — and the local erase runs after.
  */
 class GitlabConnectionStrategyRevokeTest extends BaseUnitTest {

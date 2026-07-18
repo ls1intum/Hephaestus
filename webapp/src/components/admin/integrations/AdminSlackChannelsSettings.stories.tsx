@@ -6,10 +6,8 @@ import { AdminSlackChannelsSettings } from "./AdminSlackChannelsSettings";
 
 /**
  * Admin surface to allow-list Slack channels and drive their per-channel consent lifecycle.
- * Presentational: every mutation is delegated to the route container, so these stories mock
- * the callbacks with `fn()` and never touch the network. The history Sheet issues a lazy
- * query, so the component is wrapped in a fresh QueryClient (its query stays disabled while
- * the Sheet is closed).
+ * Mutations are mocked with `fn()`. The history Sheet issues a lazy query, so the component is
+ * wrapped in a fresh QueryClient (its query stays disabled while the Sheet is closed).
  */
 const meta = {
 	component: AdminSlackChannelsSettings,
@@ -205,7 +203,6 @@ export const RevokeTypeToConfirm: Story = {
 		await userEvent.type(within(dialog).getByLabelText(/to confirm/i), active.slackChannelId);
 		await expect(within(dialog).queryByText(/that does not match/i)).not.toBeInTheDocument();
 
-		// Once the ID matches, the erase goes through and carries the typed reason.
 		await userEvent.type(within(dialog).getByLabelText(/reason/i), "left the course");
 		await userEvent.click(confirm);
 		await expect(args.onRemoveChannel).toHaveBeenCalledWith({

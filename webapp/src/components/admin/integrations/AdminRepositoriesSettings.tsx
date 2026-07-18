@@ -42,10 +42,10 @@ interface RepositoryItem {
 /**
  * One repository row and its removal confirm.
  *
- * In this Base UI port `AlertDialogAction` is a plain button, not a Close, so confirming does not
- * dismiss the dialog. That is what lets it stay open across the mutation: the confirm can show
- * "Removing…", the row unmounts on success (taking the dialog with it), and a failure leaves the
- * dialog open with the confirm pressable again once `isRemoving` clears.
+ * Base UI's `AlertDialogAction` is a plain button, not a Close, so confirming does not dismiss the
+ * dialog. That keeps it open across the mutation: the confirm shows "Stopping…", the row unmounts on
+ * success (taking the dialog with it), and a failure leaves the dialog open with the confirm
+ * pressable again once `isRemoving` clears.
  */
 function RepositoryRow({
 	repo,
@@ -60,9 +60,6 @@ function RepositoryRow({
 }) {
 	const [open, setOpen] = useState(false);
 
-	// AlertDialogAction does not auto-close, so nothing here needs to close the dialog. The row
-	// unmounts on success; a failure leaves the row — and this dialog — mounted, which lets the flag
-	// fall back to false and the confirm become pressable again.
 	const handleRemove = () => {
 		onRemove(repo.nameWithOwner);
 	};
@@ -128,7 +125,7 @@ interface AdminRepositoriesSettingsProps {
 	isRemovingRepository: boolean;
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
-	/** Refetches the repository list. Without it a load failure is a dead end, unlike every sibling. */
+	/** Refetches the repository list; without it a load failure is a dead end. */
 	onRetry?: () => void;
 }
 
@@ -196,12 +193,10 @@ export function AdminRepositoriesSettings({
 							onRetry={onRetry}
 						/>
 					) : hasRepositories ? (
-						/* The sync-state table above is the canonical list of every repository; this is the
-						   add/remove surface for the same set — a compact pane that grows to content for a
-						   handful of repos and scrolls in place for a large fleet. The cap goes on the
-						   Viewport (see ScrollArea's viewportClassName): a max-h on the Root would never
-						   clip, because the Viewport is height:100% and there is no definite-height
-						   ancestor here to resolve against. */
+						/* A compact pane that grows to content for a handful of repos and scrolls in place
+						   for a large fleet. The cap goes on the Viewport (ScrollArea's viewportClassName):
+						   a max-h on the Root would never clip, because the Viewport is height:100% and there
+						   is no definite-height ancestor here to resolve against. */
 						<ScrollArea viewportClassName="max-h-80">
 							<ItemGroup className="pr-3">
 								{repositories.map((repo) => (

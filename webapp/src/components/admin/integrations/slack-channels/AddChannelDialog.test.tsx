@@ -39,8 +39,8 @@ describe("AddChannelDialog — form submit", () => {
 		fireEvent.change(input, { target: { value: "C0974LJBPBK" } });
 		expect(input.value).toBe("C0974LJBPBK");
 
-		// Cancel routes through the Dialog's own onOpenChange(false), which resets the fields
-		// synchronously — the same single component instance persists (no `key`-driven remount).
+		// Cancel routes through onOpenChange(false), which resets the fields synchronously on the
+		// same instance (no `key`-driven remount).
 		fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
 		expect(onOpenChange).toHaveBeenCalledWith(false);

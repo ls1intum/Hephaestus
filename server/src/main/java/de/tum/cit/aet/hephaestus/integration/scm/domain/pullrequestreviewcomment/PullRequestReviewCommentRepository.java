@@ -9,12 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/**
- * Repository for pull request review comment entities.
- *
- * <p>Comments are scoped through their thread which has scope through
- * the Thread -> PullRequest -> Repository -> Organization chain.
- */
 @WorkspaceAgnostic("Comments scoped through review_id -> repository.workspace_id")
 public interface PullRequestReviewCommentRepository extends JpaRepository<PullRequestReviewComment, Long> {
     Optional<PullRequestReviewComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);

@@ -40,9 +40,8 @@ public class ConnectionService {
     private final SyncJobService syncJobService;
 
     /**
-     * Runs the pre-transition revoke/erase callback in its OWN transaction — see
-     * {@link #runRevokeIsolated}. {@code REQUIRES_NEW} is the whole point: it is what keeps a
-     * failing erase from marking the lifecycle transaction rollback-only.
+     * Runs the pre-transition revoke/erase callback in its own {@code REQUIRES_NEW} transaction so a
+     * failing erase cannot mark the lifecycle transaction rollback-only — see {@link #runRevokeIsolated}.
      */
     private final TransactionTemplate revokeTransactionTemplate;
 
@@ -428,17 +427,16 @@ public class ConnectionService {
      * <p>{@code revoke} may kill vendor access or erase provider data, so it runs only after the fence
      * and the state-machine check have passed, while the row lock is still held.
      *
-     * <p>{@code revoke} is <b>best effort and owns no veto</b>: it runs in its own transaction and any
-     * {@code RuntimeException} it raises is logged and absorbed here, so the local {@code UNINSTALLED}
-     * transition still commits and the admin can always clear a stale row. {@link #runRevokeIsolated}
-     * explains why the isolation is load-bearing rather than decorative, and callers must NOT
-     * re-implement the swallow themselves — doing so inside the callback converts the failure into an
-     * {@code UnexpectedRollbackException} at the nested commit instead of suppressing it.
+     * <p>{@code revoke} is best effort: it runs in its own transaction and any {@code RuntimeException}
+     * it raises is logged and absorbed here, so the local {@code UNINSTALLED} transition still commits
+     * and the admin can always clear a stale row. Callers must NOT re-implement the swallow inside the
+     * callback — doing so converts the failure into an {@code UnexpectedRollbackException} at the nested
+     * commit instead of suppressing it (see {@link #runRevokeIsolated}).
      *
-     * <p><b>Stated limitation:</b> the connection's lifecycle row lock is held for the whole disconnect,
-     * vendor round-trips included. That fence is deliberate — it is what makes the sync-job check
-     * atomic with the state write — and the vendor calls are individually kept out of a transaction
-     * ({@code Propagation.NOT_SUPPORTED}) so they at least do not also pin a DB transaction.
+     * <p>The connection's lifecycle row lock is held for the whole disconnect, vendor round-trips
+     * included: that fence is what makes the sync-job check atomic with the state write. The vendor
+     * calls are individually kept out of a transaction ({@code Propagation.NOT_SUPPORTED}) so they do
+     * not also pin a DB transaction.
      *
      * @throws ConnectionBusyException 409 — a sync job still holds the connection; its cancellation has
      *                                 been requested, so retrying shortly will succeed
@@ -533,14 +531,12 @@ public class ConnectionService {
      *
      * <p><b>Why a nested transaction and not a plain try/catch.</b> The erasers
      * ({@code ScmWorkspaceContentEraser}, {@code SlackWorkspaceContentEraser}, the Outline
-     * {@code deleteByWorkspaceId} sweep) are {@code @Transactional} with the default {@code REQUIRED}
-     * propagation, so before this change they JOINED the lifecycle transaction. A
-     * {@code DataAccessException} from any of them — an FK surprise, a statement timeout on a large
-     * mirror delete — therefore marked the shared transaction rollback-only. Catching it changed
-     * nothing: the transition and the audit row were written, and the commit then failed with
-     * {@code UnexpectedRollbackException}. The admin got a 500, the connection was still ACTIVE, and
-     * the log claimed we had proceeded. Running the callback on its own transaction confines that
-     * poisoning to the callback, and catching OUTSIDE the template means we also absorb the
+     * {@code deleteByWorkspaceId} sweep) are {@code @Transactional} with default {@code REQUIRED}
+     * propagation, so joining the lifecycle transaction would let a {@code DataAccessException} from any
+     * of them — an FK surprise, a statement timeout on a large mirror delete — mark the shared
+     * transaction rollback-only, and the commit would then fail with {@code UnexpectedRollbackException}
+     * even though the transition and audit row were written. Running the callback on its own transaction
+     * confines that poisoning to the callback; catching OUTSIDE the template also absorbs the
      * {@code UnexpectedRollbackException} raised at the nested commit when a callback swallowed the
      * failure internally.
      *
@@ -548,21 +544,20 @@ public class ConnectionService {
      * on the {@code connection} row on the outer connection, and the nested transaction runs on a
      * second pooled connection — so it must never wait on that row. It does not: no revoke path writes
      * the {@code connection} row (both {@code OutlineWebhookRegistrar#deregister} and
-     * {@code GitLabWebhookService#deregisterActiveWebhook} already refuse to rewrite config there, for
-     * the neighbouring optimistic-locking reason), and the FK children they DO write are only ever
-     * deleted — {@code outline_document}, {@code outline_collection} and {@code outline_document_event}
-     * carry a {@code connection_id}, but PostgreSQL runs no parent-side referential check on a child
-     * DELETE, so no {@code FOR KEY SHARE} is taken on the locked row. Plain reads of {@code connection}
-     * from the nested transaction (e.g. {@code findActiveBearerToken}) are MVCC snapshots and never
-     * block on {@code FOR UPDATE}. Adding a write of {@code connection} — or an INSERT into any table
-     * keyed on it — to a revoke path would break this and self-deadlock.
+     * {@code GitLabWebhookService#deregisterActiveWebhook} refuse to rewrite config there), and the FK
+     * children they DO write are only ever deleted — {@code outline_document},
+     * {@code outline_collection} and {@code outline_document_event} carry a {@code connection_id}, but
+     * PostgreSQL runs no parent-side referential check on a child DELETE, so no {@code FOR KEY SHARE} is
+     * taken on the locked row. Plain reads of {@code connection} from the nested transaction (e.g.
+     * {@code findActiveBearerToken}) are MVCC snapshots and never block on {@code FOR UPDATE}. Adding a
+     * write of {@code connection} — or an INSERT into any table keyed on it — to a revoke path would
+     * break this and self-deadlock.
      *
-     * <p><b>Accepted consequence.</b> Erase and transition are no longer atomic. A revoke that erases
-     * successfully now commits even if the transition afterwards fails (duplicate-correlation
+     * <p><b>Accepted consequence.</b> Erase and transition are not atomic. A revoke that erases
+     * successfully still commits even if the transition afterwards fails (duplicate-correlation
      * short-circuit, illegal transition), leaving erased data behind an ACTIVE connection. Every erase
-     * path is documented idempotent and the next disconnect re-runs it, so this is recoverable — and it
-     * is the direction we want to fail in, because the reverse (the documented-unreachable case above)
-     * silently stranded the admin with a 500.
+     * path is idempotent and the next disconnect re-runs it, so this is recoverable — and it is the
+     * direction to fail in, since the reverse strands the admin with a 500 and an ACTIVE connection.
      */
     private void runRevokeIsolated(Connection connection, Runnable revoke) {
         try {

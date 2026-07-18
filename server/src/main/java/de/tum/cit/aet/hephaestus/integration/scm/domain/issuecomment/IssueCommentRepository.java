@@ -12,9 +12,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for IssueComment entities.
- */
 @Repository
 @WorkspaceAgnostic("Comments scoped through issue_id -> repository.workspace_id")
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
@@ -46,13 +43,8 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
     );
 
     /**
-     * Batch fetch comments by IDs with all related entities eagerly loaded.
-     *
-     * <p>Used by the profile module to hydrate ActivityEvent target entities.
-     * Fetches author, issue, and repository in one query to avoid N+1.
-     *
-     * @param ids the comment IDs to fetch
-     * @return comments with related entities eagerly loaded
+     * Batch fetch comments by id with author, issue and repository eagerly loaded (one query, no N+1).
+     * Used by the profile module to hydrate ActivityEvent target entities.
      */
     @Query(
         """

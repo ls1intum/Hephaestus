@@ -22,33 +22,26 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Proves the deletion sweep's listing documents actually decode into the model types the sweep asks
- * for, using the production Jackson configuration.
+ * Proves the deletion sweep's listing documents decode into the model types the sweep asks for, using
+ * the production Jackson configuration.
  *
- * <h2>Why this test exists</h2>
- *
- * {@code GetRepositoryPullRequestNumbers} shipped without selecting {@code __typename} and failed on
- * every repository with pull requests. {@link GHPullRequestConnection}'s nodes are
- * {@code GHPullRequest}, which implements {@code GHProjectV2ItemContent}, whose Jackson mixin
+ * <p>A pull-request node missing {@code __typename} is the hazard: {@link GHPullRequestConnection}'s
+ * nodes are {@code GHPullRequest}, which implements {@code GHProjectV2ItemContent}, whose Jackson mixin
  * declares {@code @JsonTypeInfo(use = NAME, property = "__typename", defaultImpl = GHIssue.class)}.
- * Jackson inherits that type resolver onto the concrete node type, so a node without
- * {@code __typename} resolves to the default {@code GHIssue} — not a {@code GHPullRequest} — and
- * throws {@code InvalidTypeIdException}. The sweep is fail-closed, so it swallowed this as
- * "cannot verify, delete nothing" and the pull-request half of the feature was silently dead.
+ * Jackson inherits that type resolver onto the concrete node type, so a node without {@code __typename}
+ * resolves to the default {@code GHIssue} — not a {@code GHPullRequest} — and throws
+ * {@code InvalidTypeIdException}. The sweep is fail-closed, so it swallows that as "cannot verify,
+ * delete nothing": a document that drops {@code __typename} silently disables the pull-request half.
  *
- * <p>The pre-existing {@code GitHubDeletionSweepServiceTest} could not catch it: it mocks
- * {@code ClientResponseField.toEntity} to hand back an already-built connection object, so no JSON is
- * ever decoded and the document's selection set is never exercised. The failure lives exactly in the
- * seam that mock replaces — between the committed document text and the mixin configuration.
+ * <p>A mock-based service test cannot catch this: mocking {@code ClientResponseField.toEntity} to hand
+ * back an already-built connection decodes no JSON, so the document's selection set is never exercised.
+ * The failure lives in exactly that seam — between the committed document text and the mixin config.
  *
- * <h2>Why it is not theatre</h2>
- *
- * The JSON is not a hand-written fixture that a developer would keep in sync with the document by
- * hand. It is <em>derived from the committed document's own node selection set</em>, and decoded with
- * {@link GitHubGraphQlConfig#gitHubGraphQlObjectMapper} — the same factory the production WebClient
- * uses. Delete {@code __typename} from either document and the derived JSON loses it too, and these
- * tests go red with the identical exception seen in production. The coupling runs document → JSON →
- * production mixins, with nothing restated by hand in between.
+ * <p>The JSON is not hand-maintained: it is derived from the committed document's own node selection
+ * set and decoded with {@link GitHubGraphQlConfig#gitHubGraphQlObjectMapper}, the same factory the
+ * production WebClient uses. Drop {@code __typename} from either document and the derived JSON loses it
+ * too, and these tests go red with the production exception — coupling runs document → JSON → mixins
+ * with nothing restated by hand.
  */
 class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
 
@@ -87,25 +80,19 @@ class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
 
     @Test
     void shouldDecodePullRequestNumbersDocumentSelectionIntoPullRequestConnection() {
-        // Arrange
         String json = responseJsonForDocument("GetRepositoryPullRequestNumbers", "PullRequest");
 
-        // Act
         GHPullRequestConnection connection = productionMapper().readValue(json, GHPullRequestConnection.class);
 
-        // Assert
         assertThat(connection.getNodes()).extracting("number").containsExactly(42);
     }
 
     @Test
     void shouldDecodeIssueNumbersDocumentSelectionIntoIssueConnection() {
-        // Arrange
         String json = responseJsonForDocument("GetRepositoryIssueNumbers", "Issue");
 
-        // Act
         GHIssueConnection connection = productionMapper().readValue(json, GHIssueConnection.class);
 
-        // Assert
         assertThat(connection.getNodes()).extracting("number").containsExactly(42);
     }
 
@@ -114,14 +101,10 @@ class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
         // The sweep refuses to delete unless node count equals the server's totalCount, so a document
         // whose connection drops totalCount on decode would disarm the sweep just as thoroughly as a
         // decode failure — silently, and while reporting success.
-
-        // Arrange
         String json = responseJsonForDocument("GetRepositoryPullRequestNumbers", "PullRequest");
 
-        // Act
         GHPullRequestConnection connection = productionMapper().readValue(json, GHPullRequestConnection.class);
 
-        // Assert
         assertThat(connection.getTotalCount()).isEqualTo(connection.getNodes().size());
         assertThat(connection.getPageInfo().getHasNextPage()).isFalse();
     }

@@ -37,8 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
 
-    // GOD CLASS DETECTION
-
     @Nested
     class GodClassTests {
 
@@ -53,7 +51,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          */
         @Test
         void servicesHaveLimitedConstructorParams() {
-            // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
                 "GithubDataSyncService", // Coordinates 15 entity-specific sync services
                 "GitHubHistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
@@ -111,8 +108,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
     }
-
-    // METHOD COMPLEXITY LIMITS
 
     @Nested
     class MethodComplexityTests {
@@ -184,11 +179,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     javaClass
                         .getMethods()
                         .stream()
-                        .filter(m -> m.getOwner().equals(javaClass)) // Only declared methods
-                        .filter(m -> !m.getName().startsWith("$")) // Exclude synthetic
-                        .filter(m -> !m.getName().equals("<init>")) // Exclude constructors
-                        .filter(m -> !m.getName().startsWith("lambda$")) // Exclude lambdas
-                        // Exclude @Recover methods (Spring Retry requires matching signatures)
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .filter(m -> !m.getName().startsWith("lambda$"))
+                        // @Recover methods must match the protected method's signature (Spring Retry)
                         .filter(m -> !m.isAnnotatedWith("org.springframework.retry.annotation.Recover"))
                         // Exclude static factory methods (common pattern for parameter objects)
                         .filter(m ->
@@ -197,9 +192,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                     m.getName().equals("of") ||
                                     m.getName().equals("from")))
                         )
-                        // Exclude allowed overloads with command-object alternatives
                         .filter(m -> !allowedOverloads.contains(javaClass.getSimpleName() + "." + m.getName()))
-                        // Exclude native SQL repository methods (require @Param per column, no param objects)
+                        // Native SQL methods require @Param per column and cannot use parameter objects
                         .filter(m ->
                             !nativeSqlRepositoryMethods.contains(javaClass.getSimpleName() + "." + m.getName())
                         )
@@ -290,8 +284,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // SECURITY PATTERNS
-
     @Nested
     @DisplayName("Security Patterns")
     class SecurityPatternTests {
@@ -347,8 +339,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
     }
-
-    // INTERFACE SEGREGATION PRINCIPLE
 
     @Nested
     class InterfaceSegregationTests {
@@ -477,8 +467,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // DEPENDENCY INVERSION
-
     @Nested
     class DependencyInversionTests {
 
@@ -542,8 +530,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
     }
-
-    // LISKOV SUBSTITUTION PRINCIPLE
 
     @Nested
     class LiskovSubstitutionTests {
@@ -624,7 +610,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         .filter(m -> !m.getName().startsWith("lambda$"))
                         .filter(m -> !m.getName().equals("<init>"))
                         .forEach(method -> {
-                            // Check if method instantiates UnsupportedOperationException
                             boolean throwsUnsupported = method
                                 .getConstructorCallsFromSelf()
                                 .stream()

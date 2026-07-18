@@ -23,8 +23,8 @@ import reactor.netty.http.client.HttpClient;
  * <h2>Why this exists</h2>
  * GitHub's GraphQL budget is not a universal 5,000 points/hour. A GitHub App installation with more than
  * 20 repositories earns another 50 points/hour per repository, capped at 12,500; Enterprise Cloud
- * installations get 10,000; an Actions {@code GITHUB_TOKEN} gets 1,000 per repository. The hardcoded 5,000
- * this replaces was therefore wrong for precisely the large installations where the number matters most.
+ * installations get 10,000; an Actions {@code GITHUB_TOKEN} gets 1,000 per repository. A flat 5,000
+ * assumption is therefore wrong for precisely the large installations where the number matters most.
  *
  * <h2>Why it is free</h2>
  * GitHub documents {@code GET /rate_limit} as not counting against the rate limit — "Accessing this

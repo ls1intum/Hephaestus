@@ -8,12 +8,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTar
 import java.util.Optional;
 
 /**
- * Factory class for creating SyncTarget instances from workspace and repository monitor entities.
+ * Factory for creating SyncTarget instances from workspace and repository monitor entities.
  *
- * <p>Integration metadata (installation id, PAT, auth mode) is now pulled from the
- * {@link ConnectionService} rather than the legacy {@code Workspace} columns. The factory
- * accepts the service so each call resolves the current Connection state within the
- * caller's transaction — there's no static cache that could go stale across a rotation.
+ * <p>Integration metadata (installation id, PAT, auth mode) comes from the {@link ConnectionService}:
+ * each call resolves the current Connection state within the caller's transaction, so there is no
+ * static cache that could go stale across a credential rotation.
  */
 public final class SyncTargetFactory {
 

@@ -83,7 +83,7 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @AfterEach
     void dropIndex() {
-        // Hygiene: this test owns the index; drop it so it can't leak into a context-sharing sibling.
+        // This test owns the index; drop it so it can't leak into a context-sharing sibling.
         jdbcTemplate.execute("DROP INDEX IF EXISTS ux_sync_job_active");
     }
 
@@ -288,9 +288,9 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     /**
      * The runner owns its outcome, enforced at the SQL layer: {@code completeActiveJob} must not filter
      * on {@code cancel_requested}, so a body that finished its work still records SUCCEEDED even though
-     * a cancel request committed (from another replica, or from shutdown) while it was finishing.
-     * Re-introducing a {@code AND j.cancelRequested = false} guard turns this row CANCELLED and hides a
-     * real success from {@code lastSuccessfulJob} — this test is what fails when that happens.
+     * a cancel request committed (from another replica, or from shutdown) while it was finishing. An
+     * {@code AND j.cancelRequested = false} guard would instead turn this row CANCELLED and hide a real
+     * success from {@code lastSuccessfulJob}.
      */
     @Test
     @Transactional
@@ -325,12 +325,11 @@ class SyncJobActiveIndexIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     /**
-     * The core compare-and-set invariant, isolated against real Postgres: once a row is terminal a
-     * stale/late completion — a second replica or a delayed executor firing its terminal write after the
-     * job already finished — must be a no-op, never an overwrite. {@code completeActiveJob}'s
-     * {@code status IN :activeStatuses} clause is what enforces this; deleting that clause makes the late
-     * {@code completeActiveJob} below return 1 and stamp FAILED over the SUCCEEDED row, so this test is
-     * exactly what fails when the clause regresses.
+     * The compare-and-set invariant, isolated against real Postgres: once a row is terminal a stale/late
+     * completion — a second replica or a delayed executor firing its terminal write after the job
+     * already finished — must be a no-op, never an overwrite. {@code completeActiveJob}'s
+     * {@code status IN :activeStatuses} clause enforces this; without it the late {@code completeActiveJob}
+     * below returns 1 and stamps FAILED over the SUCCEEDED row.
      */
     @Test
     @Transactional

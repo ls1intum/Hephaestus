@@ -24,9 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
  * that reappears upstream is revived by the ordinary upsert. The GitLab issue and merge-request
  * processors persist through the same shared {@code IssueRepository.upsertCore} /
  * {@code PullRequestRepository.upsertCore} that {@code GitLabDeletionSweepService} relies on, and both
- * clear {@code deleted_at}. Without this, a sweep that tombstoned on bad data would need an operator to
- * undo it; with it, the next ordinary sync heals the mistake, which is what makes acting on inference
- * tolerable at all.
+ * clear {@code deleted_at} — so the next ordinary sync heals a sweep that tombstoned on bad data,
+ * without operator intervention.
  */
 @Tag("integration")
 class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
@@ -102,7 +101,7 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         assertThat(tombstoned).isEqualTo(1);
         assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).isEmpty();
 
-        // Upstream handed the issue back — the same code path the sweep's reversibility promise rests on.
+        // Upstream hands the issue back through the ordinary upsert path.
         upsertIssue(number);
 
         assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(number);
@@ -132,15 +131,13 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * The P1 regression guard. GitLab keeps issue IIDs and merge-request IIDs in <em>separate</em>
-     * per-project namespaces, both starting at 1, so an issue #5 and an MR !5 routinely coexist — and
-     * both live in the single {@code issue} table under the discriminator. When the issue sweep proves
-     * its listing complete and tombstones a deleted issue #5, the write must not reach across the
-     * discriminator and hide the live merge request that happens to share the IID. A type-blind
-     * {@code UPDATE issue SET deleted_at ... WHERE repository_id = ? AND number IN (?)} tombstones both;
-     * the MR then reads as already-gone by the MR sweep and stays hidden until the next daily upsert
-     * revives it (~24h). This test fails against that type-blind query and passes with the
-     * {@code TYPE(i) = Issue} discriminator restored.
+     * GitLab keeps issue IIDs and merge-request IIDs in <em>separate</em> per-project namespaces, both
+     * starting at 1, so an issue #5 and an MR !5 routinely coexist — and both live in the single
+     * {@code issue} table under the discriminator. Tombstoning a deleted issue #5 must not reach across
+     * the discriminator and hide the live merge request that shares the IID: a type-blind
+     * {@code UPDATE issue SET deleted_at ... WHERE repository_id = ? AND number IN (?)} tombstones both,
+     * and the MR then stays hidden until the next daily upsert revives it (~24h). The tombstone query
+     * must scope on {@code TYPE(i) = Issue}.
      */
     @Test
     void tombstoningACollidingIssueIidDoesNotHideTheMergeRequestWithTheSameIid() {
@@ -158,9 +155,8 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         );
 
         assertThat(tombstoned).isEqualTo(1);
-        // Issue #5 is retired...
         assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).isEmpty();
-        // ...but the merge request in the other namespace must remain live.
+        // The merge request in the other namespace must remain live.
         assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(iid);
     }
 
@@ -183,11 +179,10 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Root-cause guard for the two GitLab sub-issue / dependency sync services, which key rows by IID.
-     * With issue #5 and MR !5 both present, the type-scoped {@code findAllIssuesByRepositoryId} must
-     * return only the issue — never the colliding merge request — so a caller building an IID map cannot
-     * mistake the merge request for the issue of the same number. The pre-fix polymorphic
-     * {@code findAllByRepository_Id} returned both.
+     * The GitLab sub-issue / dependency sync services key rows by IID. With issue #5 and MR !5 both
+     * present, the type-scoped {@code findAllIssuesByRepositoryId} must return only the issue — never
+     * the colliding merge request — so a caller building an IID map cannot mistake the merge request for
+     * the issue of the same number. (A polymorphic {@code findAllByRepository_Id} returns both.)
      */
     @Test
     void findAllIssuesByRepositoryIdExcludesACollidingMergeRequest() {

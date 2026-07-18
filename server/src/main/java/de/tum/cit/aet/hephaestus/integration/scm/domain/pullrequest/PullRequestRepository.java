@@ -40,14 +40,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         @Param("number") int number
     );
 
-    /**
-     * Finds a pull request by ID with assignees eagerly fetched.
-     * Useful when assignees need to be accessed outside the original transaction,
-     * avoiding LazyInitializationException after the Hibernate session is closed.
-     *
-     * @param id the pull request ID
-     * @return the pull request with assignees loaded, or empty if not found
-     */
+    /** Pull request by id with assignees eagerly fetched, for access after the Hibernate session closes. */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -57,14 +50,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithAssignees(@Param("id") Long id);
 
-    /**
-     * Finds a pull request by ID with assignees and repository eagerly fetched.
-     * Useful when the PR entity is accessed outside the original Hibernate session
-     * (e.g. async event listeners, scheduled tasks).
-     *
-     * @param id the pull request ID
-     * @return the pull request with assignees and repository loaded, or empty if not found
-     */
+    /** Pull request by id with assignees and repository eagerly fetched, for access outside the original session (async listeners, scheduled tasks). */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -75,16 +61,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithAssigneesAndRepository(@Param("id") Long id);
 
-    /**
-     * Finds a pull request by ID with repository eagerly fetched.
-     * Required for passing PRs across transaction boundaries where the repository
-     * relationship needs to be accessed (e.g., for logging nameWithOwner).
-     * Avoids LazyInitializationException when PR is fetched in one transaction
-     * and repository is accessed in another.
-     *
-     * @param id the pull request ID
-     * @return the pull request with repository loaded, or empty if not found
-     */
+    /** Pull request by id with repository eagerly fetched, for passing across transaction boundaries (e.g. logging nameWithOwner). */
     @Query(
         """
         SELECT p FROM PullRequest p
@@ -94,14 +71,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithRepository(@Param("id") Long id);
 
-    /**
-     * Finds a pull request by ID with author eagerly fetched.
-     * Used by the practice detection delivery pipeline where the PR author
-     * (contributor) is needed for finding attribution.
-     *
-     * @param id the pull request ID
-     * @return the pull request with author loaded, or empty if not found
-     */
+    /** Pull request by id with author eagerly fetched. Used by the practice-detection delivery pipeline (author = finding attribution). */
     @Query(
         """
         SELECT p FROM PullRequest p

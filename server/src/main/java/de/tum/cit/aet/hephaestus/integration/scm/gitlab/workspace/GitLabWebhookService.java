@@ -117,9 +117,9 @@ public class GitLabWebhookService {
             LocalDate newExpiry = LocalDate.now().plusDays(webhookProperties.tokenRotation().validityDays());
             var rotatedToken = rotationClient.rotateToken(workspace.getId(), newExpiry);
 
-            // Critical: persist new token immediately — old token is already revoked.
-            // The token lives on the GitLab Connection's credential blob; rotateBearerToken
-            // re-encrypts with the per-row AAD so cross-row substitution is prevented.
+            // Persist new token immediately — old token is already revoked. The token lives on the
+            // GitLab Connection's credential blob; rotateBearerToken re-encrypts with the per-row AAD
+            // so cross-row substitution is prevented.
             connectionService.rotateBearerToken(
                 workspace.getId(),
                 IntegrationKind.GITLAB,

@@ -173,7 +173,6 @@ public class GithubDataSyncScheduler {
             syncSchedulerProperties.backfill().intervalSeconds()
         );
 
-        // Log filter configuration if active
         var filters = syncSchedulerProperties.filters();
         if (!filters.allowedOrganizations().isEmpty() || !filters.allowedRepositories().isEmpty()) {
             log.info(
@@ -193,10 +192,9 @@ public class GithubDataSyncScheduler {
     public void syncDataCron() {
         log.info("Starting scheduled sync");
 
-        // Get statistics for logging
         SyncStatistics stats = syncTargetProvider.getSyncStatistics();
 
-        // Get sync sessions (already filtered by status and monitoring scope)
+        // Pre-filtered by status and monitoring scope.
         List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB);
 
         if (sessions.isEmpty()) {
@@ -225,19 +223,14 @@ public class GithubDataSyncScheduler {
             );
         }
 
-        // Process all workspaces in parallel - each has its own GitHub App installation
-        // with separate rate limits, so there's no reason to sync sequentially.
-        // Uses virtual threads (monitoringExecutor) for efficient I/O-bound operations.
+        // Each workspace has its own GitHub App installation with separate rate limits, so syncing
+        // them in parallel (virtual threads via monitoringExecutor) is safe, and whenComplete() below
+        // logs and counts each outcome independently so one workspace's failure can't block the rest.
         //
-        // Each future handles its own exceptions via exceptionally() so that:
-        // 1. One workspace failure doesn't prevent other workspaces from completing
-        // 2. All exceptions are logged with proper context
-        // 3. We can report accurate success/failure counts
-        //
-        // No global timeout: large repositories (10k+ issues) combined with rate limits
-        // can legitimately take many hours. Individual GraphQL calls have their own
-        // timeouts for transient failures. Spring's single-threaded scheduler prevents
-        // overlapping runs, and join() respects thread interruption for JVM shutdown.
+        // No global timeout: large repositories (10k+ issues) combined with rate limits can
+        // legitimately take many hours. Individual GraphQL calls have their own timeouts for transient
+        // failures. Spring's single-threaded scheduler prevents overlapping runs, and join() respects
+        // thread interruption for JVM shutdown.
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
@@ -257,7 +250,6 @@ public class GithubDataSyncScheduler {
             )
             .toArray(CompletableFuture[]::new);
 
-        // Wait for all workspace syncs to complete
         // Use get() instead of join() because get() throws InterruptedException,
         // allowing graceful shutdown when Ctrl+C is pressed.
         try {
@@ -350,7 +342,6 @@ public class GithubDataSyncScheduler {
      */
     private void runScopeSyncBody(SyncSession session, @Nullable SyncExecutionHandle handle, SyncJobType type) {
         try {
-            // Set context for logging and isolation
             syncContextProvider.setContext(session.syncContext());
 
             log.info(
@@ -360,7 +351,6 @@ public class GithubDataSyncScheduler {
                 sanitizeForLog(session.accountLogin())
             );
 
-            // Wrap sync operations with context propagation for async threads
             Runnable syncTask = syncContextProvider.wrapWithContext(() -> {
                 // Report every phase boundary, not just the repository loop. A reconcile spends real
                 // time in these org-level phases, and without a report the UI shows the previous phase's
@@ -368,13 +358,11 @@ public class GithubDataSyncScheduler {
                 int totalRepos = session.syncTargets().size();
                 reportPhase(handle, SyncPhase.ORGANIZATION, "Syncing organization issue types", 0, totalRepos);
 
-                // Sync issue types FIRST (before repository syncs) because they are
-                // organization-level entities that issues reference. This ensures
-                // issue types exist when issues are processed during repository sync.
+                // Issue types are organization-level entities that issues reference, so they must
+                // exist before repository sync processes issues.
                 syncIssueTypes(session, handle);
 
-                // Sync projects BEFORE repositories so embedded project items can be linked.
-                // Ensure the organization exists before attempting project sync.
+                // Projects sync before repositories so embedded project items can be linked.
                 if (syncSchedulerProperties.projects().enabled()) {
                     reportPhase(handle, SyncPhase.ORGANIZATION, "Syncing organization projects", 0, totalRepos);
                     syncProjects(session, handle);
@@ -469,9 +457,8 @@ public class GithubDataSyncScheduler {
                 reportPhase(handle, SyncPhase.TEAMS, "Syncing teams and memberships", reposProcessed, totalRepos);
                 syncTeams(session, handle);
 
-                // Sync sub-issues and issue dependencies via GraphQL
-                // These are scope-level relationships that require issues/PRs to exist first
-                // Skip if rate limit is critically low to avoid wasting API calls
+                // Sub-issues and dependencies are scope-level relationships that need issues/PRs to
+                // already exist; skip when rate limit is critically low to avoid wasting calls.
                 if (!rateLimitTracker.isCritical(session.scopeId())) {
                     reportPhase(
                         handle,
@@ -514,7 +501,6 @@ public class GithubDataSyncScheduler {
                 }
             });
 
-            // Execute synchronously in the scheduler thread
             syncTask.run();
 
             // A still-set cancel flag means the loop aborted on a checkpoint (not a normal finish);
@@ -635,9 +621,8 @@ public class GithubDataSyncScheduler {
     }
 
     private void syncIssueDependencies(SyncSession session, @Nullable SyncExecutionHandle handle) {
-        // NOTE (Dec 2025): issue_dependencies webhook is STILL NOT AVAILABLE
-        // (GitHub shipped UI without API/webhook - see Discussion #165749)
-        // GraphQL bulk sync is currently the ONLY way to get dependency data
+        // GitHub has no webhook for issue dependency changes (shipped the UI without an API/webhook
+        // — see GitHub Discussion #165749), so GraphQL bulk sync is the only way to get this data.
         try {
             log.debug("Starting issue dependencies sync: scopeId={}, scopeSlug={}", session.scopeId(), session.slug());
             issueDependencySyncService.syncDependenciesForScope(session.scopeId());

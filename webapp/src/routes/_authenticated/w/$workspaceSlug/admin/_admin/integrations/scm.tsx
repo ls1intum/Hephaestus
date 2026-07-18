@@ -161,9 +161,8 @@ function ScmIntegrationPage() {
 	const addRepository = useMutation({
 		...addRepositoryToMonitorMutation(),
 		onSuccess: onRepositorySetChanged,
-		// The inline FieldError says "invalid"; the toast says WHY (403 not an owner, 409 already
-		// monitored). Both siblings below toast on failure — a mutation that fails silently is the
-		// outlier, not the norm.
+		// The inline FieldError says "invalid"; the toast says why (403 not an owner, 409 already
+		// monitored).
 		onError: (e) => {
 			toast.error("Failed to add repository", { description: problemDetailOf(e) });
 		},
@@ -200,9 +199,8 @@ function ScmIntegrationPage() {
 
 	const activeJob = status?.activeJob;
 
-	// Sync and Backfill share one mutation, so `isPending` alone cannot say which button the admin
-	// pressed — spinning both is a lie about what is happening. The in-flight variables already carry
-	// the answer, so no extra state is needed to tell them apart.
+	// Sync and Backfill share one mutation, so `isPending` alone cannot say which button was pressed;
+	// the in-flight variables carry that, so no extra state is needed to tell them apart.
 	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables?.body?.type : undefined;
 	const triggeringType =
 		pendingTriggerType === "RECONCILIATION" || pendingTriggerType === "BACKFILL"
@@ -225,8 +223,8 @@ function ScmIntegrationPage() {
 				description={`Connection health, repositories and sync activity for this workspace's ${label} connection.`}
 			/>
 
-			{/* A suspended/uninstalled connection paints an otherwise normal-looking header; the shared
-			    notice is what says sync stopped and why — the same explanation Slack and Outline show. */}
+			{/* A suspended/uninstalled connection still paints a normal-looking header; this shared
+			    notice is what says sync stopped and why. */}
 			{hasConnection && !isConnectionActive && (
 				<ConnectionStateNotice connectionState={entry?.connectionState} displayName={label} />
 			)}
@@ -302,8 +300,8 @@ function ScmIntegrationPage() {
 							onRetry={() => refetchResources()}
 							resourceNoun="repository"
 							resourceNounPlural="repositories"
-							// Without the cadence the ledger prints every reading and judges none of them —
-							// the server sends it precisely so the client doesn't have to guess a schedule.
+							// The freshness cadence comes from the server so the client doesn't hard-code
+							// one; without it the ledger can't judge staleness.
 							syncIntervalSeconds={status?.syncIntervalSeconds}
 							expectedClassKeys={SCM_CLASS_KEYS}
 						/>

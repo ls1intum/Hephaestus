@@ -6,8 +6,7 @@ import java.io.Serial;
 /**
  * Thrown when a manual sync/backfill is requested for a kind with no registered
  * {@code IntegrationSyncRunner} (or, for {@code BACKFILL}, one that doesn't support it) — the
- * graceful-degradation path for providers/runners that haven't landed yet (this PR ships the core
- * substrate; per-kind wiring is a follow-up).
+ * graceful-degradation path for a kind whose runner is not wired.
  *
  * <p>Mapped to 409 by {@link SyncController}'s local exception handler — deliberately not
  * {@code @ResponseStatus} (see {@link de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateConflictException}

@@ -65,9 +65,9 @@ public class GithubSubjectKeyDeriver implements SubjectKeyDeriver {
         // mirroring GitlabSubjectKeyDeriver#isGroupTierEvent for `project`. The repo-name token is
         // UNSTABLE across rename/transfer: the payload carries the NEW name, so a repo-tier subject
         // built from it matches neither the monitored-repo filter `github.<owner>.<OLDrepo>.>` nor the
-        // org filter — the event (and every later event for that repo) is silently ACK-dropped and the
-        // repo's data freezes. Riding the workspace organization filter `github.<owner>.?.>`, keyed on
-        // the stable owner, is the only tier that can catch the rename in real time.
+        // org filter, and the event (and every later event for that repo) is silently ACK-dropped while
+        // the repo's data freezes. The workspace organization filter `github.<owner>.?.>`, keyed on the
+        // stable owner, is the only tier that catches the rename in real time.
         // Residual: a transfer to a DIFFERENT owner derives the NEW owner and so reaches no filter of
         // the old workspace — that case heals on the next reconcile via RepositoryToMonitor.nativeId.
         if (GitHubEventType.REPOSITORY.getValue().equals(eventSegment)) {

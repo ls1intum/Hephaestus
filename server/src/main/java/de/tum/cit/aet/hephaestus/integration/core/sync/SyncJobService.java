@@ -427,8 +427,7 @@ public class SyncJobService implements SmartLifecycle {
      *   <li>A runner the JVM exits from under leaves its row RUNNING. That row is honest — the work
      *       stopped in an unknown place — and {@link SyncJobZombieSweeper}'s startup sweep reaps it
      *       once the lease expires. Faking CANCELLED here would claim a clean abort we never observed,
-     *       and (before this was removed) fabricating it from the canceller could stamp CANCELLED over
-     *       a sync that had already finished successfully.
+     *       and could stamp CANCELLED over a sync that had already finished successfully.
      * </ul>
      *
      * <p>This returns without draining {@link #activeHandles}; the drain budget is
@@ -555,11 +554,11 @@ public class SyncJobService implements SmartLifecycle {
                         job.getKind(),
                         SyncStateChangedEvent.Scope.JOB
                     );
-                    // Resources too, not just at terminal. A running sync is writing rows the whole time
-                    // it runs; publishing RESOURCES only from completeJob is what made the counts pane
-                    // sit still and then teleport to its final numbers. The hub coalesces per-scope at
-                    // 1s and this write is already throttled, so the extra hint costs one refetch of a
-                    // small DTO per tick per watching admin.
+                    // Publish RESOURCES on every progress tick, not just at terminal: a running sync writes
+                    // rows the whole time it runs, so a counts pane fed only by completeJob would sit still
+                    // and then jump to its final numbers. The hub coalesces per-scope at 1s and this write is
+                    // already throttled, so the extra hint costs one refetch of a small DTO per tick per
+                    // watching admin.
                     publish(
                         job.getWorkspace().getId(),
                         job.getConnection().getId(),

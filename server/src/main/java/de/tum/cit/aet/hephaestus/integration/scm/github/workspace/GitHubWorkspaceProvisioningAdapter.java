@@ -53,7 +53,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Check organization filter BEFORE creating workspace
         if (!workspaceScopeFilter.isOrganizationAllowed(installation.accountLogin())) {
             log.debug(
                 "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
@@ -63,7 +62,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        RepositorySelection selection = RepositorySelection.SELECTED; // Default selection
+        RepositorySelection selection = RepositorySelection.SELECTED;
         Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
             installation.installationId(),
             installation.accountId(),
@@ -81,11 +80,9 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Add initial repositories from the installation event
-        // These are provided for "created" events with "selected" repository selection
-        // Create Repository entities AND monitors from the webhook metadata
+        // GitHub includes the initial repository list on "created" events with "selected" repository
+        // selection; materialise Repository entities and monitors for each from that webhook metadata.
         if (installation.repositories() != null && !installation.repositories().isEmpty()) {
-            // Filter repositories based on workspace scope configuration before creating entities
             List<RepositorySnapshot> allowedRepos = installation
                 .repositories()
                 .stream()
@@ -124,13 +121,12 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Run the real purge, not a status write. The bespoke stop-NATS / remove-monitors pair
-        // this used to do here is a strict subset of the purge chain (purgeWorkspace step 1 stops
-        // the consumer; ScmWorkspacePurgeAdapter at order -200 drops the monitors through the
-        // orphan-guarded cascade, which — unlike removeAllRepositoriesFromMonitor — will not delete
-        // a repository another workspace still monitors). What it MISSED was everything else:
-        // Slack/Outline content, org-tier teams and organization memberships, practices/activity
-        // derived rows, and the Connection teardown that clears stored credentials.
+        // Delegates to the full purge chain rather than a narrower stop-NATS/remove-monitors pair:
+        // purgeWorkspace first stops the NATS consumer, then ScmWorkspacePurgeAdapter (order -200) drops
+        // the monitors through an orphan-guarded cascade — unlike removeAllRepositoriesFromMonitor, it
+        // will not delete a repository another workspace still monitors. The chain also tears down
+        // Slack/Outline content, org-tier teams and organization memberships, derived practice/activity
+        // rows, and the Connection's stored credentials.
         githubLifecycleListener.purgeWorkspaceForInstallation(installationId);
 
         log.info("Completed installation cleanup: installationId={}", installationId);
@@ -147,7 +143,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Filter repositories based on workspace scope configuration before creating entities
         List<RepositorySnapshot> allowedRepos = repositories
             .stream()
             .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
@@ -216,7 +211,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Stop NATS consumer first to stop processing webhook events
         githubLifecycleListener.stopNatsForInstallation(installationId);
         githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
         log.info("Suspended installation: installationId={}", installationId);
@@ -229,7 +223,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Update status first
         githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
 
         // Sync after the outer transaction commits so RepositoryToMonitor rows are visible.
@@ -252,7 +245,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
                 }
             });
 
-        // Start NATS consumer to resume webhook processing
         githubLifecycleListener.startNatsForInstallation(installationId);
         log.info("Activated installation: installationId={}", installationId);
     }
@@ -303,10 +295,9 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     }
 
     /**
-     * Bridges the legacy {@link ProvisioningListener.AccountType} enum (GitHub-shaped, 2 values)
-     * to the framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, includes
-     * {@code TEAM_WORKSPACE} for Slack). The third value is unreachable from the GitHub
-     * SPI surface, hence the simple binary mapping.
+     * Bridges the GitHub-shaped {@link ProvisioningListener.AccountType} (2 values) to the
+     * framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, including
+     * {@code TEAM_WORKSPACE} for Slack) — the third value is unreachable from the GitHub SPI surface.
      */
     private static IntegrationLifecycleListener.AccountKind mapAccountKind(ProvisioningListener.AccountType type) {
         if (type == null) {

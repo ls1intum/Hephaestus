@@ -523,9 +523,8 @@ public class WorkspaceRepositoryMonitorService {
      * shared row only if the count fell to zero. Callers MUST flush the monitor removal before
      * calling (a pending orphanRemoval delete is invisible to this count query).
      *
-     * <p>Public (was private) so {@link ScmWorkspaceContentEraser} can route the disconnect and
-     * workspace-purge erase triggers through this exact cascade instead of hand-rolling a second,
-     * unguarded deleter.
+     * <p>Public so {@link ScmWorkspaceContentEraser} can route the disconnect and workspace-purge
+     * erase triggers through this exact cascade instead of a second, unguarded deleter.
      */
     public void deleteRepositoryIfOrphaned(String nameWithOwner) {
         if (StringUtils.isBlank(nameWithOwner)) {

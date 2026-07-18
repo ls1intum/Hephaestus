@@ -211,8 +211,7 @@ export const FRESHNESS_CLASS: Record<FreshnessTone, string> = {
 
 /**
  * "next run in about 4 hours" for the connection's `nextScheduledSyncAt`. A freshness reading is
- * uninterpretable without the schedule behind it, and this field has shipped on every status response
- * while being rendered nowhere.
+ * uninterpretable without the schedule behind it.
  */
 export function nextRunLabel(
 	nextScheduledSyncAt: Date | string | undefined | null,

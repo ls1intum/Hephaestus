@@ -14,12 +14,9 @@ const channel: SlackMonitoredChannel = {
 };
 
 /**
- * The affirmative-consent step before monitoring a Slack channel. A Dialog (not a silent Switch)
- * because activation has real consequences: it posts a public announcement, begins reading new
- * messages forward-only, and lets members opt out — all three are enumerated before the admin
- * confirms. A rejected confirm keeps the dialog open to retry.
- *
- * The dialog is portalled, so the plays query the document rather than the story canvas.
+ * Affirmative-consent step before monitoring a Slack channel: a Dialog, not a Switch, because
+ * activation posts a public announcement, begins reading messages forward-only, and lets members
+ * opt out. The dialog is portalled, so the plays query the document rather than the story canvas.
  */
 const meta = {
 	component: ActivateChannelDialog,

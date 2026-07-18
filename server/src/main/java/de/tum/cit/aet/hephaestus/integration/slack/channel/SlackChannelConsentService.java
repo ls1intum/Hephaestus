@@ -334,7 +334,7 @@ public class SlackChannelConsentService {
         );
     }
 
-    /** The mentoring-only transition guard. {@code from != target} is already handled (idempotent no-op) by callers. */
+    /** Transition guard. The same-state case ({@code from == target}) is already handled as an idempotent no-op by callers. */
     private static void requireAllowed(ConsentState from, ConsentState target, String slackChannelId) {
         boolean allowed = switch (from) {
             case PENDING -> target == ConsentState.ACTIVE || target == ConsentState.REVOKED;

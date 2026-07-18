@@ -88,8 +88,8 @@ function OutlineIntegrationPage() {
 						/>
 					)}
 
-					{/* A suspended/uninstalled connection paints an otherwise normal-looking header; the shared
-					    notice is what says sync stopped and why — the same explanation Slack and SCM show. */}
+					{/* A suspended/uninstalled connection still paints a normal-looking header; this shared
+					    notice is what says sync stopped and why. */}
 					{outline.hasConnection && !outline.isConnectionActive && (
 						<ConnectionStateNotice
 							connectionState={outline.connectionState}
@@ -97,8 +97,8 @@ function OutlineIntegrationPage() {
 						/>
 					)}
 
-					{/* The connection plane: health, freshness, diagnostics and the Sync/Cancel controls. Gated
-					    on the status being present, exactly as the Slack page gates its header. */}
+					{/* The connection plane: health, freshness, diagnostics and the Sync/Cancel controls.
+					    Gated on the unified status being present. */}
 					{outline.status && (
 						<SyncStatusHeader label="Outline" {...outline.syncStatusHeaderProps} />
 					)}

@@ -163,8 +163,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         // upsertUser is void — no stubbing needed
     }
 
-    // Confidential Filtering
-
     @Nested
     class ConfidentialFiltering {
 
@@ -284,8 +282,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
     }
 
-    // State Mapping
-
     @Nested
     class StateMapping {
 
@@ -397,8 +393,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
         }
     }
-
-    // Webhook Event Processing
 
     @Nested
     class WebhookProcessing {
@@ -546,8 +540,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueLabeled.class));
         }
     }
-
-    // GraphQL Sync Processing
 
     @Nested
     class SyncProcessing {
@@ -1231,8 +1223,6 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
         }
     }
-
-    // Helpers
 
     private ProcessingContext createContext() {
         return ProcessingContext.forWebhook(1L, testRepo, "open");

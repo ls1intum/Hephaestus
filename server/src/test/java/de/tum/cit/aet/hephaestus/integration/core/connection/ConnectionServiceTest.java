@@ -320,10 +320,10 @@ class ConnectionServiceTest extends BaseUnitTest {
     }
 
     /**
-     * The revoke callback must run on its OWN transaction. Running it on the lifecycle transaction is
-     * what made the documented "best effort, proceed locally" contract unreachable: the erasers join
-     * with REQUIRED propagation, so their DataAccessException marked the shared transaction
-     * rollback-only and the commit blew up with UnexpectedRollbackException after we had "proceeded".
+     * The revoke callback must run on its OWN (REQUIRES_NEW) transaction. On the lifecycle transaction
+     * the erasers join with REQUIRED propagation, so a DataAccessException marks the shared transaction
+     * rollback-only and the commit fails with UnexpectedRollbackException — defeating the "best effort,
+     * proceed locally" contract.
      */
     @Test
     void disconnect_runsRevokeOnItsOwnRequiresNewTransaction() {
@@ -357,8 +357,8 @@ class ConnectionServiceTest extends BaseUnitTest {
 
     /**
      * If a caller swallows the erase failure inside the callback, the nested transaction is already
-     * rollback-only and its commit raises UnexpectedRollbackException. That must be absorbed too —
-     * it is the exact exception that used to reach the admin as a 500.
+     * rollback-only and its commit raises UnexpectedRollbackException. That must be absorbed too, or it
+     * reaches the admin as a 500.
      */
     @Test
     void disconnect_revokeSwallowsFailureAndNestedCommitRollsBack_isStillAbsorbed() {
@@ -368,7 +368,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             .commit(any());
 
         Connection result = service.disconnect(connection, disconnectRequest(), () -> {
-            /* callback catches its own failure, as the old controller did */
+            /* callback catches its own failure */
         });
 
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
@@ -483,7 +483,7 @@ class ConnectionServiceTest extends BaseUnitTest {
             service.findOutlineSubscription("sub-b");
 
             verify(connectionRepository, times(1)).findOutlineSubscriptionsBySubscriptionId("sub-b");
-            // The 1+N amplifier this replaced: fleet enumeration + a per-workspace config fetch.
+            // Never the 1+N amplifier: fleet enumeration + a per-workspace config fetch.
             verify(connectionRepository, never()).findWorkspaceIdsByKindAndState(any(), any());
             verify(connectionRepository, never()).findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
                 anyLong(),

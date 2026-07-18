@@ -101,11 +101,10 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
     }
 
     // --- Group-tier live events (project / subgroup / member) ---
-    // Regression guard for the dead-code drop: these events register their handlers under the stable
-    // "project"/"subgroup"/"member" keys, but the deriver used to emit the raw event_name (e.g.
-    // "project_create") in the subject and a "?" namespace — a key no handler owns AND a subject no
-    // consumer filter matches, i.e. a silent drop. The deriver now normalizes the key and carries the
-    // root group token so the workspace organizationFilter (gitlab.<accountLogin>.?.>) matches.
+    // These events register their handlers under the stable "project"/"subgroup"/"member" keys. Emitting
+    // the raw event_name (e.g. "project_create") with a "?" namespace would produce a key no handler owns
+    // AND a subject no consumer filter matches — a silent drop. The deriver must normalize the key and
+    // carry the root group token so the workspace organizationFilter (gitlab.<accountLogin>.?.>) matches.
 
     @Test
     void projectEventFixtureNormalizesToProjectKeyAndOrgScope() throws Exception {
@@ -127,7 +126,7 @@ class GitlabSubjectKeyDeriverTest extends BaseUnitTest {
     void memberEventFixtureNormalizesToMemberKey() throws Exception {
         // Member payloads carry only the leaf group_path ("test-subgroup" here), so a subgroup-scoped
         // membership change can't resolve the workspace root — a documented limitation healed by the
-        // periodic member sync. The key normalization (the dead-code fix) still holds unconditionally.
+        // periodic member sync. Key normalization still holds unconditionally.
         String subject = deriver.deriveSubject(fixture("member.add.json"), Map.of());
         assertThat(subject).isEqualTo("gitlab.test-subgroup.?.member");
         assertThat(resolvedEventKey(subject)).isEqualTo(GitLabEventType.MEMBER.getValue());

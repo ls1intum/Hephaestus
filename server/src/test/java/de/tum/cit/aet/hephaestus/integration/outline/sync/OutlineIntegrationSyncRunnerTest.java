@@ -56,8 +56,8 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
 
     @Test
     void reconcile_forwardsTheJobTypeRatherThanDroppingIt() {
-        // The type is load-bearing for Outline: it gates tombstone-by-absence. Dropping it here is exactly
-        // the bug this test exists to prevent — an INITIAL run must not reach the sync path as a sweep.
+        // The type gates tombstone-by-absence for Outline: an INITIAL run must not reach the sync path as a
+        // RECONCILIATION sweep, or it would tombstone documents merely absent from a half-built mirror.
         IntegrationRef ref = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
 
         runner.reconcile(ref, handle, SyncJobType.INITIAL);

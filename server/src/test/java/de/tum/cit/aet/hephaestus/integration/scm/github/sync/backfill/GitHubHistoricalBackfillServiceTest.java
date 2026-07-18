@@ -149,8 +149,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             });
     }
 
-    // Test construction helpers
-
     private GitHubHistoricalBackfillService createService(SyncSchedulerProperties schedulerProps) {
         return new GitHubHistoricalBackfillService(
             syncTargetProvider,
@@ -170,9 +168,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Creates a SyncTarget with completed incremental sync and no backfill progress.
-     */
     private SyncTarget createTargetWithIncrementalComplete(Long id, String repoName) {
         // Incremental sync completed; backfill high-water marks left null (not initialized).
         return SyncTargetTestBuilder.syncTarget()
@@ -190,9 +185,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             .build();
     }
 
-    /**
-     * Creates a SyncTarget where incremental sync has NOT completed yet.
-     */
     private SyncTarget createTargetPendingIncrementalSync(Long id, String repoName) {
         // All sync timestamps null => incremental sync NOT completed.
         return SyncTargetTestBuilder.syncTarget()
@@ -204,9 +196,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             .build();
     }
 
-    /**
-     * Creates a SyncTarget where backfill is already complete.
-     */
     private SyncTarget createTargetWithBackfillComplete(Long id, String repoName) {
         // Checkpoints at 0 => backfill complete.
         return SyncTargetTestBuilder.syncTarget()
@@ -229,9 +218,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             .build();
     }
 
-    /**
-     * Creates a SyncTarget with backfill in progress (partially complete).
-     */
     private SyncTarget createTargetWithBackfillInProgress(Long id, String repoName) {
         // Checkpoints between 0 and high-water mark => backfill in progress.
         return SyncTargetTestBuilder.syncTarget()
@@ -269,8 +255,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    // isEnabled
-
     @Nested
     class IsEnabled {
 
@@ -288,8 +272,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             assertThat(service.isEnabled()).isFalse();
         }
     }
-
-    // runBackfillCycle - disabled / no work
 
     @Nested
     class RunBackfillCycle {
@@ -345,7 +327,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - only the incomplete target should be counted as pending
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
@@ -360,7 +341,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - no work, no pending (complete repos are silently skipped)
+            // Complete repos are silently skipped: no work, no pending.
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isZero();
         }
@@ -377,7 +358,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - repo is skipped per-repo because lastIssuesAndPullRequestsSyncedAt == null
+            // Skipped per-repo because lastIssuesAndPullRequestsSyncedAt == null.
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
@@ -398,8 +379,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - repoA: incremental done, attempted backfill but not in DB (not counted)
-            //          repoB: skipped per-repo due to pending incremental sync (counted as pending)
+            // repoA: incremental done, attempted backfill but not in DB (not counted).
+            // repoB: skipped per-repo due to pending incremental sync (counted as pending).
             assertThat(result.pendingRepositories()).isEqualTo(1);
             assertThat(result.repositoriesProcessed()).isZero();
         }
@@ -426,12 +407,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - repo B should be counted as pending due to rate limit break
             assertThat(result.pendingRepositories()).isEqualTo(1);
         }
     }
-
-    // backfillRepository (package-private)
 
     @Nested
     class BackfillRepository {
@@ -470,8 +448,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // BackfillCycleResult
-
     @Nested
     class BackfillCycleResultTests {
 
@@ -493,8 +469,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             assertThat(result.skipReason()).isEqualTo("rateLimitLow");
         }
     }
-
-    // BackfillProgress
 
     @Nested
     class BackfillProgressTests {
@@ -608,8 +582,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // SyncTarget convenience methods
-
     @Nested
     class SyncTargetBackfillState {
 
@@ -657,7 +629,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportZeroRemainingWhenHighWaterMarkIsZero() {
-            // Arrange - a repo with zero issues/PRs
             SyncTarget target = SyncTargetTestBuilder.syncTarget()
                 .id(SYNC_TARGET_ID_A)
                 .scopeId(SCOPE_ID)
@@ -682,7 +653,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportHighWaterMarkAsRemainingWhenCheckpointIsNull() {
-            // Arrange - initialized but checkpoint not yet set (first batch hasn't completed)
+            // Initialized but checkpoint not yet set (first batch hasn't completed).
             SyncTarget target = SyncTargetTestBuilder.syncTarget()
                 .id(SYNC_TARGET_ID_A)
                 .scopeId(SCOPE_ID)
@@ -696,14 +667,11 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 // checkpoints left null (not yet set)
                 .build();
 
-            // Assert - remaining should be the high water mark itself
             assertThat(target.getIssueBackfillRemaining()).isEqualTo(200);
             assertThat(target.getPullRequestBackfillRemaining()).isEqualTo(80);
             assertThat(target.getBackfillRemaining()).isEqualTo(280);
         }
     }
-
-    // getProgress
 
     @Nested
     class GetProgress {
@@ -775,8 +743,6 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // Multiple sessions
-
     @Nested
     class MultipleSessions {
 
@@ -815,14 +781,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert - both repos have pending incremental sync, so they are skipped per-repo
-            // and counted as pending
+            // Both repos have pending incremental sync, so they are skipped per-repo and counted
+            // as pending.
             assertThat(result.repositoriesProcessed()).isZero();
             assertThat(result.pendingRepositories()).isEqualTo(2);
         }
     }
-
-    // Mixed target states in single session
 
     @Nested
     class MixedTargetStates {
@@ -845,10 +809,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
             BackfillCycleResult result = service.runBackfillCycle();
 
-            // Assert:
-            //   completeRepo: backfill complete, silently skipped (not counted)
-            //   pendingRepo: incremental sync pending, skipped per-repo, counted as pending
-            //   eligibleRepo: attempted backfill but not in DB, returns false (not counted)
+            // completeRepo: backfill complete, silently skipped (not counted).
+            // pendingRepo: incremental sync pending, skipped per-repo, counted as pending.
+            // eligibleRepo: attempted backfill but not in DB, returns false (not counted).
             assertThat(result.pendingRepositories()).isEqualTo(1);
             assertThat(result.repositoriesProcessed()).isZero();
         }

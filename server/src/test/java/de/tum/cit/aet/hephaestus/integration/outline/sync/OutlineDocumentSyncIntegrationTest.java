@@ -182,7 +182,6 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
         assertThat(collection.getName()).isEqualTo("Design");
         assertThat(collection.getUrlId()).isEqualTo("col1");
         assertThat(collection.getDescription()).isEqualTo("Design docs");
-        // Coverage counters: everything upstream mirrored, nothing skipped.
         assertThat(collection.getDocumentsUpstream()).isEqualTo(2);
         assertThat(collection.getExportsSkippedForBudget()).isZero();
     }
@@ -239,7 +238,7 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         // doc-2 is archived upstream (soft, recoverable): it vanishes from documents.list/collections.documents
         // (Outline's default listing excludes archived docs) but is enumerated separately via
-        // listArchivedDocuments — the second call the reconcile now makes per collection.
+        // listArchivedDocuments — the second per-collection call the reconcile makes.
         stubCollection(List.of(DOC_ONE), T1, T1);
         Instant archivedAt = Instant.parse("2026-03-01T00:00:00Z");
         when(outlineApiClient.listArchivedDocuments(anyString(), anyString(), eq(COLLECTION_ID))).thenReturn(
