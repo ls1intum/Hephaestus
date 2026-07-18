@@ -1,0 +1,84 @@
+---
+id: compatibility-policy
+sidebar_position: 2
+title: Compatibility Policy
+description: What a Hephaestus version number promises — the public contract, upgrade guarantees, and support statement.
+---
+
+Hephaestus follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). This page defines what
+that version number promises to you as an operator: which surfaces are covered, what an upgrade commits you
+to, and which versions we support. Release contents are documented in the
+[CHANGELOG](https://github.com/ls1intum/Hephaestus/blob/main/CHANGELOG.md) and on
+[GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).
+
+## The public contract
+
+Semantic versioning applies to the surfaces an operator or API consumer depends on:
+
+| Surface | What is covered |
+| --- | --- |
+| **Database migration chain** | Each startup applies any not-yet-applied Liquibase changesets in changelog order, so a newer release builds on the previous release's schema. Migrations run automatically when the application server starts. |
+| **Runtime prerequisites** | The minimum PostgreSQL major version, the required outbound network destinations, and any required external services. Adding one is a breaking change. |
+| **Configuration keys** | Environment variables and `hephaestus.*` properties documented in the [Production Setup](./production-setup.mdx) guide. Renames and removals are breaking changes. |
+| **Docker Compose interface** | Service names, image names, the `IMAGE_TAG` convention, and required environment variables of the published compose files — the self-hosted stack (`docker/self-host/compose.yaml`, see the [Install guide](./install.mdx)) and the reference deployment (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`). |
+| **REST API** | The endpoints described by the published [OpenAPI specification](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml). |
+
+Everything else — Java and TypeScript internals, the database schema itself (as opposed to the migration
+chain), undocumented endpoints, UI layout — may change in any release without notice.
+
+## Version numbers
+
+| Bump | Meaning |
+| --- | --- |
+| **Major** (`X`.y.z) | You must act before or during the upgrade — a required new config key, a removed or renamed one, a manual or destructive migration, or a dropped API. The release notes say what to do; [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md) has the details. |
+| **Minor** (x.`Y`.z) | New functionality; upgrade needs no action. May include new *optional* config keys. |
+| **Patch** (x.y.`Z`) | Bug and security fixes; upgrade needs no action. |
+
+Any release may include database migrations that run automatically on startup — the release notes flag
+them with a "back up before upgrading" banner.
+
+:::caution Pre-1.0
+While the version is below 1.0.0 the **Minor** row above does not hold: there are no major releases yet, so
+breaking changes ride in minor releases (`0.x.0` → `0.y.0`), per
+[SemVer item 4](https://semver.org/#spec-item-4). A pre-1.0 minor may require action — the release notes say
+so when it does. Always read them and test in staging first. This caveat ends with the 1.0.0 release.
+:::
+
+## Upgrade guarantee
+
+**Any 1.x can be upgraded to any later 1.y**, and today **any 0.x to any later 0.y**, in a single step: take
+the release's Compose files and images, and on startup Liquibase applies every not-yet-applied changeset
+from the intervening releases in changelog order. You do not need to step through intermediate releases.
+
+This rests on the migration chain being append-only. CI enforces that mechanically — a released changelog
+can never be edited, renamed, or deleted, and `master.xml` only grows — and replays the whole chain against
+an empty database on every change. What CI does *not* prove is that a migration is safe against real
+existing data (an empty-database replay can't), so data-affecting migrations stay a review responsibility.
+Take a database backup before upgrading. Downgrades are not supported.
+
+## Deprecation policy
+
+Functionality slated for removal is announced in the release notes at least one minor release before it is
+removed, and keeps working until its removal release. After 1.0.0, removals only happen in major releases.
+
+## Support statement
+
+**We support the latest release only.** Fixes ship as new releases on top of the current version; there are
+no backport branches. If you hit a bug on an older version, upgrade to the latest release before reporting
+it. This mirrors comparable self-hosted products — for example, [Sentry](https://develop.sentry.dev/self-hosted/support/)
+provides no dedicated self-hosted support and expects operators to upgrade regularly.
+
+## Docker image tags
+
+All images (`webapp`, `application-server`, `agent-pi`, `release-pin-fetcher`, `postgres`) under
+`ghcr.io/ls1intum/hephaestus/` are published with:
+
+| Tag | Meaning | Stability |
+| --- | --- | --- |
+| `X.Y.Z` | Exact release | Immutable — pin this in production |
+| `X.Y` | Latest patch of a minor release | Moves on every patch release |
+| `latest` | Latest release | Moves on every release |
+| `main`, `<sha>` | Unreleased development builds | **Unsupported** — never deploy these |
+
+For the digest-pinned agent image shipped with every release, see
+[Agent image digests](./agent-image-digests.md).

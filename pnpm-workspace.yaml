@@ -1,4 +1,8 @@
 packages:
+  # The root `.` is a workspace package so changesets versions it as the single
+  # app version (see .changeset/config.json). No script uses `pnpm -r`, so root
+  # is never double-run; `--filter webapp|docs` stays explicit and unaffected.
+  - .
   - webapp
   - docs
 

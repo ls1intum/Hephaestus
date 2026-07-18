@@ -2,15 +2,26 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -36,6 +47,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +55,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -88,6 +101,9 @@ public class GitlabDataSyncScheduler {
     private final ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final Executor monitoringExecutor;
+    private final ConnectionRepository connectionRepository;
+    private final SyncJobService syncJobService;
+    private final GitLabDeletionSweepService deletionSweepService;
 
     public GitlabDataSyncScheduler(
         SyncTargetProvider syncTargetProvider,
@@ -97,7 +113,10 @@ public class GitlabDataSyncScheduler {
         ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
         ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
         SyncSchedulerProperties syncSchedulerProperties,
-        @Qualifier("monitoringExecutor") Executor monitoringExecutor
+        @Qualifier("monitoringExecutor") Executor monitoringExecutor,
+        ConnectionRepository connectionRepository,
+        SyncJobService syncJobService,
+        GitLabDeletionSweepService deletionSweepService
     ) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
@@ -107,6 +126,9 @@ public class GitlabDataSyncScheduler {
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.monitoringExecutor = monitoringExecutor;
+        this.connectionRepository = connectionRepository;
+        this.syncJobService = syncJobService;
+        this.deletionSweepService = deletionSweepService;
     }
 
     @PostConstruct
@@ -139,7 +161,7 @@ public class GitlabDataSyncScheduler {
         CompletableFuture<?>[] futures = sessions
             .stream()
             .map(session ->
-                CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor).whenComplete(
+                CompletableFuture.runAsync(() -> syncScopeWithJobRecording(session), monitoringExecutor).whenComplete(
                     (result, error) -> {
                         if (error != null) {
                             failureCount.incrementAndGet();
@@ -172,7 +194,83 @@ public class GitlabDataSyncScheduler {
         }
     }
 
+    /**
+     * Run the same warning-aware body used by the scheduled path for one manual job.
+     *
+     * <p>{@code type} is forwarded rather than dropped: it is what decides whether the body ends with a
+     * deletion sweep, and it is the only difference between an {@code INITIAL} and a
+     * {@code RECONCILIATION} run.
+     */
+    public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle, SyncJobType type) {
+        SyncSession session = syncTargetProvider
+            .getSyncSessions(IntegrationKind.GITLAB)
+            .stream()
+            .filter(candidate -> candidate.scopeId().equals(workspaceId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No active GitLab sync scope for workspace " + workspaceId));
+        syncScope(session, handle, type);
+    }
+
+    /**
+     * Wraps {@link #syncScope} in the {@code SyncJobService} template when the scope has an ACTIVE
+     * GitLab {@link Connection} — the cron's per-scope fan-out is the {@code SCHEDULED}/
+     * {@code RECONCILIATION} trigger path. A scope without an ACTIVE
+     * connection (e.g. a stale sync target left over from a disconnected workspace) still syncs,
+     * just without a job row — the sync-target enumeration and the connection registry aren't
+     * perfectly aligned today, and skipping the sync entirely would be a regression versus current
+     * behavior.
+     *
+     * <p>A {@link SyncJobConflictException} (this connection already has an active job — most
+     * plausibly a manual "Sync now" the admin triggered) skips this scope's cron run entirely rather
+     * than racing it; the manual job's own completion will bring watermarks current.
+     */
+    private void syncScopeWithJobRecording(SyncSession session) {
+        Optional<Connection> connection =
+            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                session.scopeId(),
+                IntegrationKind.GITLAB,
+                IntegrationState.ACTIVE
+            );
+        if (connection.isEmpty()) {
+            syncScope(session);
+            return;
+        }
+
+        try {
+            syncJobService.run(
+                new SyncJobRequest(
+                    session.scopeId(),
+                    connection.get().getId(),
+                    IntegrationKind.GITLAB,
+                    SyncJobType.RECONCILIATION,
+                    SyncJobTrigger.SCHEDULED,
+                    null
+                ),
+                handle -> syncScope(session, handle, SyncJobType.RECONCILIATION)
+            );
+        } catch (SyncJobConflictException e) {
+            log.info(
+                "Skipped scheduled GitLab sync, already an active sync job: scopeId={}, connectionId={}",
+                session.scopeId(),
+                connection.get().getId()
+            );
+        }
+    }
+
+    /** Unrecorded fallback (no ACTIVE connection to attach a job to): run to completion, no handle. */
     private void syncScope(SyncSession session) {
+        // The unrecorded cron fallback is still a reconciliation pass — sweep deletions like the recorded one.
+        syncScope(session, null, SyncJobType.RECONCILIATION);
+    }
+
+    /**
+     * Runs one workspace's full GitLab reconcile. When invoked through a {@link SyncJobService} job the
+     * caller threads the live {@link SyncExecutionHandle} so the per-repository phase reports coarse
+     * repos-done/repos-total progress and honors a cooperative cancel between repositories — parity with
+     * the SCM manual runner. A cancel observed during the repo phase skips the remaining post-repo/team
+     * phases. The unrecorded fallback passes {@code null} and simply runs to completion.
+     */
+    private void syncScope(SyncSession session, @Nullable SyncExecutionHandle handle, SyncJobType type) {
         Long scopeId = session.scopeId();
         String safeLogin = sanitizeForLog(session.accountLogin());
 
@@ -183,46 +281,87 @@ public class GitlabDataSyncScheduler {
             GitLabSyncServiceHolder services = syncServiceHolderProvider.getIfAvailable();
             if (services == null) {
                 log.warn("GitLab sync services unavailable, skipping: scopeId={}", scopeId);
+                reportWarning(handle);
                 return;
             }
 
             if (session.accountLogin() == null || session.accountLogin().isBlank()) {
                 log.warn("No accountLogin for GitLab workspace, skipping: scopeId={}", scopeId);
+                reportWarning(handle);
                 return;
             }
 
             // Phase 1: Sync group projects (discovers new repos, removes deleted ones)
-            syncGroupProjects(services, session);
+            syncGroupProjects(services, session, handle);
 
             // Phase 2: Sync group memberships
-            syncGroupMembers(services, session);
+            syncGroupMembers(services, session, handle);
 
             // Phase 2.5: Sync issue types (org-level, before per-repo sync)
-            syncIssueTypes(services, session);
+            syncIssueTypes(services, session, handle);
 
             // Phase 2.6: Sync group milestones (fan-out to every repo in the group).
             // Must run before the per-repo sync so the issue-sync phase can resolve
             // milestone references on issues by iid.
-            syncGroupMilestones(services, session);
+            syncGroupMilestones(services, session, handle);
 
-            // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators)
-            syncRepositories(services, session);
+            // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators) —
+            // the dominant-cost phase, where cancel/progress are threaded through the handle.
+            syncRepositories(services, session, handle);
 
-            // Phase 4: Post-repo sync (sub-issues, dependencies — needs issues to exist)
-            syncPostRepo(services, session);
+            // A cancel observed during the repo phase skips the remaining phases (cooperative best-effort).
+            if (handle == null || !handle.isCancellationRequested()) {
+                // Phase 4: Post-repo sync (sub-issues, dependencies — needs issues to exist)
+                syncPostRepo(services, session, handle);
 
-            // Phase 5: Sync teams (subgroups)
-            syncTeams(services, session);
+                // Phase 5: Sync teams (subgroups)
+                syncTeams(services, session, handle);
+
+                // Phase 6: Deletion sweep — RECONCILIATION only, and the one thing that makes
+                // RECONCILIATION different from INITIAL. Every phase above only ever upserts, so an
+                // issue or merge request deleted upstream would otherwise survive here forever and keep
+                // inflating the per-project counts — and GitLab emits no issue/MR-deletion webhook at
+                // all, so there is not even a missed event that could heal it.
+                //
+                // Not on INITIAL: a mirror still being populated has nothing stale in it, and every row
+                // not fetched yet would read as an upstream deletion to a set difference.
+                //
+                // Last, deliberately: the sweep's set difference is only meaningful against a mirror that
+                // has already had this run's upserts applied. Sweeping first would race the fetch and
+                // tombstone rows that were about to arrive.
+                if (type == SyncJobType.RECONCILIATION) {
+                    GitLabDeletionSweepService.SweepOutcome sweep = deletionSweepService.sweepScope(scopeId, handle);
+                    if (sweep.skipped()) {
+                        // At least one project's upstream listing could not be proven complete, so its
+                        // deletions are still outstanding. Surface it rather than reporting a clean
+                        // reconciliation that did not fully reconcile.
+                        reportWarning(handle);
+                    }
+                }
+            }
+
+            // A still-set cancel flag means the repo phase aborted on a checkpoint; declare it so the job
+            // finalizes CANCELLED rather than a false SUCCEEDED.
+            if (handle != null && handle.isCancellationRequested()) {
+                handle.reportCancelled();
+            }
 
             log.info("Completed GitLab workspace sync: scopeId={}, accountLogin={}", scopeId, safeLogin);
         } catch (Exception e) {
             log.error("Failed GitLab workspace sync: scopeId={}, accountLogin={}", scopeId, safeLogin, e);
+            if (handle != null) {
+                throw new IllegalStateException("Failed to sync GitLab scope " + scopeId, e);
+            }
         } finally {
             syncContextProvider.clearContext();
         }
     }
 
-    private void syncGroupProjects(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncGroupProjects(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabGroupSyncService groupSync = services.getGroupSyncService();
         if (groupSync == null) return;
 
@@ -243,9 +382,12 @@ public class GitlabDataSyncScheduler {
             // Stale repo cleanup: only when sync completed normally
             if (result.status() == GitLabSyncResult.Status.COMPLETED) {
                 removeStaleRepositories(session, result);
+            } else {
+                reportWarning(handle);
             }
         } catch (Exception e) {
             log.error("Failed GitLab group project sync: scopeId={}", session.scopeId(), e);
+            reportWarning(handle);
         }
     }
 
@@ -288,7 +430,52 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    private void syncGroupMembers(GitLabSyncServiceHolder services, SyncSession session) {
+    /**
+     * Heals monitors whose {@code name_with_owner} went stale after an upstream rename/transfer.
+     * <p>
+     * The group-project sync (which runs earlier in the cycle) upserts the domain {@link Repository}
+     * by its stable native id, so a renamed project's row already carries the new path while the
+     * {@code RepositoryToMonitor} still holds the old one — the name-keyed monitor join and the NATS
+     * subject filter both then miss it. For each sync target we resolve the domain repository by its
+     * native id (falling back to name for legacy rows that predate the id column, to capture it once)
+     * and hand the current identity to the SPI, which re-keys the monitor and refreshes the consumer.
+     * Best-effort: a per-target failure never aborts the sync.
+     */
+    private void reconcileMonitorIdentities(SyncSession session) {
+        Long providerId = getGitLabProviderId(session.accountLogin());
+        if (providerId == null) {
+            return;
+        }
+        for (SyncTarget target : session.syncTargets()) {
+            try {
+                Repository repo = null;
+                if (target.nativeId() != null) {
+                    repo = repositoryRepository.findByNativeIdAndProviderId(target.nativeId(), providerId).orElse(null);
+                }
+                if (repo == null) {
+                    // Legacy row with no captured id yet — resolve by (still-current) name to capture it.
+                    repo = repositoryRepository
+                        .findByNameWithOwnerAndProviderId(target.repositoryNameWithOwner(), providerId)
+                        .orElse(null);
+                }
+                if (repo != null && repo.getNativeId() != null) {
+                    syncTargetProvider.reconcileSyncTargetIdentity(
+                        target.id(),
+                        repo.getNativeId(),
+                        repo.getNameWithOwner()
+                    );
+                }
+            } catch (Exception e) {
+                log.debug("Skipped monitor identity reconcile: syncTargetId={}, error={}", target.id(), e.getMessage());
+            }
+        }
+    }
+
+    private void syncGroupMembers(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabGroupMemberSyncService memberSync = services.getGroupMemberSyncService();
         if (memberSync == null) return;
 
@@ -301,10 +488,15 @@ public class GitlabDataSyncScheduler {
                 });
         } catch (Exception e) {
             log.error("Failed GitLab membership sync: scopeId={}", session.scopeId(), e);
+            reportWarning(handle);
         }
     }
 
-    private void syncIssueTypes(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncIssueTypes(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabIssueTypeSyncService issueTypeSync = services.getIssueTypeSyncService();
         if (issueTypeSync == null) return;
 
@@ -313,6 +505,7 @@ public class GitlabDataSyncScheduler {
             log.info("GitLab issue type sync: scopeId={}, types={}", session.scopeId(), count);
         } catch (Exception e) {
             log.error("Failed GitLab issue type sync: scopeId={}", session.scopeId(), e);
+            reportWarning(handle);
         }
     }
 
@@ -322,7 +515,11 @@ public class GitlabDataSyncScheduler {
      * {@code project.milestones(includeAncestors: true)} did not reliably surface group
      * milestones, leaving the {@code milestone} table largely empty on fresh syncs.
      */
-    private void syncGroupMilestones(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncGroupMilestones(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         if (milestoneSync == null) return;
 
@@ -351,10 +548,15 @@ public class GitlabDataSyncScheduler {
                 sanitizeForLog(session.accountLogin()),
                 e
             );
+            reportWarning(handle);
         }
     }
 
-    private void syncRepositories(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncRepositories(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabLabelSyncService labelSync = services.getLabelSyncService();
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         GitLabIssueSyncService issueSync = services.getIssueSyncService();
@@ -363,6 +565,12 @@ public class GitlabDataSyncScheduler {
         GitLabCommitSyncService commitSync = services.getCommitSyncService();
         var commitBackfill = services.getCommitBackfillService();
         var commitMrLinker = services.getCommitMergeRequestLinker();
+
+        // Re-key any monitor whose name_with_owner went stale after an upstream rename/transfer BEFORE
+        // the name-keyed join below, so a renamed project re-enters the sync set and its NATS filter is
+        // rebuilt in the same cycle instead of silently dropping out. The domain Repository row was
+        // already healed to the new path by the group-project sync (keyed on the stable native id).
+        reconcileMonitorIdentities(session);
 
         // Find all repositories monitored by this workspace (via RepositoryToMonitor join,
         // which correctly includes subgroup repos — not just top-level group repos)
@@ -387,8 +595,22 @@ public class GitlabDataSyncScheduler {
             totalMRs = 0,
             totalCollaborators = 0,
             totalCommits = 0;
+        int reposProcessed = 0;
+        int totalRepos = repos.size();
 
         for (Repository repo : repos) {
+            // Cooperative cancel checkpoint between repositories (matches the manual runner): a cancelled
+            // job stops before the next repo rather than mid-repository.
+            if (handle != null && handle.isCancellationRequested()) {
+                log.info(
+                    "GitLab scheduled sync cancelled between repositories: scopeId={}, reposProcessed={}, reposRemaining={}",
+                    session.scopeId(),
+                    reposProcessed,
+                    totalRepos - reposProcessed
+                );
+                break;
+            }
+
             // Wait for rate limit if critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(session.scopeId())) {
                 log.info(
@@ -401,6 +623,7 @@ public class GitlabDataSyncScheduler {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.info("Rate limit wait interrupted, stopping repo sync: scopeId={}", session.scopeId());
+                    reportWarning(handle);
                     break;
                 }
             }
@@ -430,6 +653,7 @@ public class GitlabDataSyncScheduler {
                     }
                 } catch (Exception e) {
                     log.warn("Failed label sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
+                    reportWarning(handle);
                 }
             }
 
@@ -448,6 +672,7 @@ public class GitlabDataSyncScheduler {
                         repo.getNameWithOwner(),
                         e
                     );
+                    reportWarning(handle);
                 }
             }
 
@@ -457,11 +682,15 @@ public class GitlabDataSyncScheduler {
                     SyncResult r = issueSync.syncIssues(session.scopeId(), repo, updatedAfter);
                     totalIssues += r.count();
                     issuesDone = r.isCompleted();
+                    if (!issuesDone) {
+                        reportWarning(handle);
+                    }
                     if (rtmId != null && issuesDone) {
                         syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now());
                     }
                 } catch (Exception e) {
                     log.warn("Failed issue sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
+                    reportWarning(handle);
                 }
             }
 
@@ -471,11 +700,15 @@ public class GitlabDataSyncScheduler {
                     SyncResult r = mrSync.syncMergeRequests(session.scopeId(), repo, updatedAfter);
                     totalMRs += r.count();
                     mrsDone = r.isCompleted();
+                    if (!mrsDone) {
+                        reportWarning(handle);
+                    }
                     if (rtmId != null && mrsDone) {
                         syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.PULL_REQUESTS, Instant.now());
                     }
                 } catch (Exception e) {
                     log.warn("Failed MR sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
+                    reportWarning(handle);
                 }
             }
 
@@ -494,6 +727,7 @@ public class GitlabDataSyncScheduler {
                         repo.getNameWithOwner(),
                         e
                     );
+                    reportWarning(handle);
                 }
             }
 
@@ -510,6 +744,7 @@ public class GitlabDataSyncScheduler {
                         repo.getNameWithOwner(),
                         e
                     );
+                    reportWarning(handle);
                 }
             } else if (commitSync != null) {
                 try {
@@ -517,6 +752,7 @@ public class GitlabDataSyncScheduler {
                     totalCommits += r.count();
                 } catch (Exception e) {
                     log.warn("Failed commit sync: scopeId={}, repo={}", session.scopeId(), repo.getNameWithOwner(), e);
+                    reportWarning(handle);
                 }
             }
 
@@ -528,13 +764,29 @@ public class GitlabDataSyncScheduler {
                     syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
                 }
             }
+
+            reposProcessed++;
+            if (handle != null) {
+                handle.progress(
+                    reposProcessed,
+                    totalRepos,
+                    // Just the repository — "N of M" is already the progress bar's own reading
+                    // (unitsCompleted/unitsTotal travel on the same record).
+                    SyncProgress.ofResource(
+                        SyncPhase.REPOSITORIES,
+                        "Syncing " + repo.getNameWithOwner(),
+                        repo.getNameWithOwner(),
+                        reposProcessed,
+                        totalRepos
+                    )
+                );
+            }
         }
 
         // Second pass: link commits to MRs. Must run after every repo has finished syncing so
-        // a commit whose SHA appears on an MR in a sibling repo can still be linked. In the
-        // previous single-pass version such cross-repo links were lost because the target MR
-        // repo had not yet synced its MRs when the linker ran.
-        if (commitMrLinker != null) {
+        // a commit whose SHA appears on an MR in a sibling repo can still be linked (the target MR
+        // repo may not have synced its MRs when this repo's commits were fetched).
+        if (commitMrLinker != null && (handle == null || !handle.isCancellationRequested())) {
             for (Repository repo : repos) {
                 OffsetDateTime repoUpdatedAfter = null;
                 if (repo.getLastSyncAt() != null) {
@@ -550,6 +802,7 @@ public class GitlabDataSyncScheduler {
                         repo.getNameWithOwner(),
                         e
                     );
+                    reportWarning(handle);
                 }
             }
         }
@@ -567,7 +820,11 @@ public class GitlabDataSyncScheduler {
         );
     }
 
-    private void syncPostRepo(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncPostRepo(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabSubIssueSyncService subIssueSync = services.getSubIssueSyncService();
         GitLabIssueDependencySyncService depSync = services.getIssueDependencySyncService();
 
@@ -590,6 +847,7 @@ public class GitlabDataSyncScheduler {
                         repo.getNameWithOwner(),
                         e
                     );
+                    reportWarning(handle);
                 }
             }
             if (depSync != null) {
@@ -603,6 +861,7 @@ public class GitlabDataSyncScheduler {
                         repo.getNameWithOwner(),
                         e
                     );
+                    reportWarning(handle);
                 }
             }
         }
@@ -617,7 +876,11 @@ public class GitlabDataSyncScheduler {
         }
     }
 
-    private void syncTeams(GitLabSyncServiceHolder services, SyncSession session) {
+    private void syncTeams(
+        GitLabSyncServiceHolder services,
+        SyncSession session,
+        @Nullable SyncExecutionHandle handle
+    ) {
         GitLabTeamSyncService teamSync = services.getTeamSyncService();
         if (teamSync == null) return;
 
@@ -627,6 +890,13 @@ public class GitlabDataSyncScheduler {
             log.info("GitLab team sync: scopeId={}, teams={}", session.scopeId(), count);
         } catch (Exception e) {
             log.error("Failed GitLab team sync: scopeId={}", session.scopeId(), e);
+            reportWarning(handle);
+        }
+    }
+
+    private static void reportWarning(@Nullable SyncExecutionHandle handle) {
+        if (handle != null) {
+            handle.reportWarnings();
         }
     }
 

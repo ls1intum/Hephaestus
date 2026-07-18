@@ -22,7 +22,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiException;
-import de.tum.cit.aet.hephaestus.integration.outline.client.dto.OutlineWebhookSubscriptionListResponse;
+import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
+import de.tum.cit.aet.hephaestus.integration.outline.client.model.OutlineWebhookSubscription;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -125,8 +126,8 @@ class OutlineWebhookRegistrarTest extends BaseUnitTest {
         return new ConnectionConfig.OutlineConfig(SERVER_URL, subscriptionId, secret, Set.of());
     }
 
-    private static OutlineWebhookSubscriptionListResponse.Subscription upstream(String id, Boolean enabled) {
-        return new OutlineWebhookSubscriptionListResponse.Subscription(
+    private static OutlineWebhookSubscription upstream(String id, Boolean enabled) {
+        return OutlineClientModels.webhookSubscription(
             id,
             "Hephaestus",
             "https://x.example/webhooks/outline",

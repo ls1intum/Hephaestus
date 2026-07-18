@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.workspace;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -12,7 +11,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
@@ -29,8 +27,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final WorkspaceRepository workspaceRepository;
 
-    // Lazy-loaded to break circular reference with GithubDataSyncService
-    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
+    private final GitHubWorkspaceDataSyncTrigger dataSyncTrigger;
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubWorkspaceProvisioningAdapter(
@@ -38,20 +35,15 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         WorkspaceRepositoryMonitorService repositoryMonitorService,
         WorkspaceScopeFilter workspaceScopeFilter,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
+        GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.githubLifecycleListener = githubLifecycleListener;
         this.repositoryMonitorService = repositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.workspaceRepository = workspaceRepository;
-        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.dataSyncTrigger = dataSyncTrigger;
         this.monitoringExecutor = monitoringExecutor;
-    }
-
-    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
-    private GithubDataSyncService getGitHubDataSyncService() {
-        return gitHubDataSyncServiceProvider.getObject();
     }
 
     @Override
@@ -61,7 +53,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Check organization filter BEFORE creating workspace
         if (!workspaceScopeFilter.isOrganizationAllowed(installation.accountLogin())) {
             log.debug(
                 "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
@@ -71,7 +62,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        RepositorySelection selection = RepositorySelection.SELECTED; // Default selection
+        RepositorySelection selection = RepositorySelection.SELECTED;
         Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
             installation.installationId(),
             installation.accountId(),
@@ -89,11 +80,9 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Add initial repositories from the installation event
-        // These are provided for "created" events with "selected" repository selection
-        // Create Repository entities AND monitors from the webhook metadata
+        // GitHub includes the initial repository list on "created" events with "selected" repository
+        // selection; materialise Repository entities and monitors for each from that webhook metadata.
         if (installation.repositories() != null && !installation.repositories().isEmpty()) {
-            // Filter repositories based on workspace scope configuration before creating entities
             List<RepositorySnapshot> allowedRepos = installation
                 .repositories()
                 .stream()
@@ -132,15 +121,13 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // 1. Stop NATS consumer for the workspace first (before removing monitors)
-        githubLifecycleListener.stopNatsForInstallation(installationId);
-
-        // 2. Remove all repository monitors AND delete repositories for this installation
-        // When installation is deleted, we clean up all associated data
-        repositoryMonitorService.removeAllRepositoriesFromMonitor(installationId, true);
-
-        // 3. Mark workspace as PURGED (not SUSPENDED - deleted is permanent)
-        githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.PURGED);
+        // Delegates to the full purge chain rather than a narrower stop-NATS/remove-monitors pair:
+        // purgeWorkspace first stops the NATS consumer, then ScmWorkspacePurgeAdapter (order -200) drops
+        // the monitors through an orphan-guarded cascade — unlike removeAllRepositoriesFromMonitor, it
+        // will not delete a repository another workspace still monitors. The chain also tears down
+        // Slack/Outline content, org-tier teams and organization memberships, derived practice/activity
+        // rows, and the Connection's stored credentials.
+        githubLifecycleListener.purgeWorkspaceForInstallation(installationId);
 
         log.info("Completed installation cleanup: installationId={}", installationId);
     }
@@ -156,7 +143,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Filter repositories based on workspace scope configuration before creating entities
         List<RepositorySnapshot> allowedRepos = repositories
             .stream()
             .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
@@ -225,7 +211,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Stop NATS consumer first to stop processing webhook events
         githubLifecycleListener.stopNatsForInstallation(installationId);
         githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.SUSPENDED);
         log.info("Suspended installation: installationId={}", installationId);
@@ -238,7 +223,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // Update status first
         githubLifecycleListener.updateWorkspaceStatus(installationId, Workspace.WorkspaceStatus.ACTIVE);
 
         // Sync after the outer transaction commits so RepositoryToMonitor rows are visible.
@@ -261,7 +245,6 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
                 }
             });
 
-        // Start NATS consumer to resume webhook processing
         githubLifecycleListener.startNatsForInstallation(installationId);
         log.info("Activated installation: installationId={}", installationId);
     }
@@ -287,7 +270,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
 
         monitoringExecutor.execute(() -> {
             try {
-                getGitHubDataSyncService().syncAllRepositories(workspaceId);
+                dataSyncTrigger.syncAllRepositories(workspaceId);
                 log.info(
                     "Completed initial sync for activated installation: installationId={}, workspaceId={}",
                     installationId,
@@ -312,10 +295,9 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     }
 
     /**
-     * Bridges the legacy {@link ProvisioningListener.AccountType} enum (GitHub-shaped, 2 values)
-     * to the framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, includes
-     * {@code TEAM_WORKSPACE} for Slack). The third value is unreachable from the GitHub
-     * SPI surface, hence the simple binary mapping.
+     * Bridges the GitHub-shaped {@link ProvisioningListener.AccountType} (2 values) to the
+     * framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, including
+     * {@code TEAM_WORKSPACE} for Slack) — the third value is unreachable from the GitHub SPI surface.
      */
     private static IntegrationLifecycleListener.AccountKind mapAccountKind(ProvisioningListener.AccountType type) {
         if (type == null) {

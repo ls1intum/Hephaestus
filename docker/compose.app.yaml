@@ -75,10 +75,10 @@ services:
           "$$BASE/$$ASSET.sigstore.json"   -o "$$TMP/pin.sigstore.json"
         cosign verify-blob \
           --bundle "$$TMP/pin.sigstore.json" \
-          --certificate-identity-regexp '^https://github\.com/ls1intum/Hephaestus/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$$' \
+          --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
           --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
           "$$TMP/pin.yaml"
-        grep -Eq '^[[:space:]]+reference:[[:space:]]+[a-z0-9][a-z0-9.\-_/:]+@sha256:[a-f0-9]{64}$$' "$$TMP/pin.yaml" \
+        grep -Eq '^[[:space:]]+reference:[[:space:]]+[a-z0-9][a-z0-9._/:-]+@sha256:[a-f0-9]{64}$$' "$$TMP/pin.yaml" \
           || { echo "pin asset is missing a digest-pinned reference" >&2; exit 1; }
         install -m 0644 "$$TMP/pin.yaml" /pin/release-pin.yaml.new
         mv /pin/release-pin.yaml.new /pin/release-pin.yaml

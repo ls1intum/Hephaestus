@@ -36,31 +36,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Unified processor for GitHub issues.
+ * Unified processor for GitHub issues, converting GitHubIssueDTO to Issue entities and
+ * persisting them. Used by both the GraphQL sync service and webhook handlers.
  * <p>
- * This service handles the conversion of GitHubIssueDTO to Issue entities,
- * persists them, and publishes appropriate domain events. It's used by both
- * the GraphQL sync service and webhook handlers.
- * <p>
- * <b>Design Principles:</b>
- * <ul>
- * <li>Single processing path for all data sources (sync and webhooks)</li>
- * <li>Idempotent operations via upsert pattern</li>
- * <li>Domain events published for reactive feature development</li>
- * <li>Works exclusively with DTOs for complete field coverage</li>
- * </ul>
- * <p>
- * <b>Stub Issue Pattern:</b>
- * <p>
- * Some sync operations (dependency sync, sub-issue sync) need to create "stub"
- * issues for referential integrity - e.g., when a blocking issue exists in the
- * same org but hasn't been synced yet. Use {@link #processStub} for these cases.
- * Stub issues:
- * <ul>
- * <li>Are created with minimal data (may lack author, body, etc.)</li>
- * <li>Do NOT trigger domain events (they're not real "issue created" events)</li>
- * <li>Will be hydrated later by the full issue sync or webhook</li>
- * </ul>
+ * Some sync operations (dependency sync, sub-issue sync) need "stub" issues for referential
+ * integrity — e.g., a blocking issue that exists in the org but hasn't been synced yet. Use
+ * {@link #processStub} for these; stubs carry minimal data, don't trigger domain events, and
+ * are hydrated later by the full issue sync or webhook.
  */
 @Service
 public class GitHubIssueProcessor extends BaseGitHubProcessor {
@@ -103,22 +85,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a GitHub issue DTO as a "stub" entity for referential integrity.
-     * <p>
-     * <b>IMPORTANT:</b> This method does NOT publish domain events. Use it only
-     * for creating placeholder issues needed for relationships (blocking issues,
-     * parent issues, etc.) that will be hydrated later by the full sync.
-     * <p>
-     * Stub issues are created when:
-     * <ul>
-     * <li>Dependency sync finds a blocker issue not yet in the database</li>
-     * <li>Sub-issue sync finds a parent issue not yet in the database</li>
-     * <li>Comment webhooks arrive before the issue/PR webhook</li>
-     * </ul>
-     * <p>
-     * These stubs have incomplete data (often missing author, body, etc.) and
-     * should not trigger activity events. They will be "hydrated" with full data
-     * when the real issue webhook or scheduled sync runs.
+     * Process a GitHub issue DTO as a "stub" entity for referential integrity. Does NOT publish
+     * domain events. Used for placeholder issues needed for relationships (blocking issues,
+     * parent issues) or when comment webhooks arrive before the issue/PR webhook; the stub is
+     * later hydrated with full data by the real issue webhook or scheduled sync.
      *
      * @param dto     the issue DTO (may have incomplete data)
      * @param context the processing context
@@ -130,10 +100,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Internal method that handles both regular and stub issue processing.
-     * <p>
-     * Uses atomic upsert to prevent race conditions when concurrent threads
-     * (e.g., multiple NATS consumers or webhook handlers) process the same issue.
+     * Uses atomic upsert to prevent race conditions when concurrent threads (e.g., multiple NATS
+     * consumers or webhook handlers) process the same issue.
      *
      * @param dto           the issue DTO
      * @param context       the processing context
@@ -155,9 +123,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
         Repository repository = context.repository();
 
-        // Check if this is an update (for event publishing purposes)
-        // We check by natural key (repository_id, number) to handle the case where
-        // the same issue might have different IDs from different sources
+        // Compare by natural key (repository_id, number), not dbId — the same issue can arrive
+        // with different provider IDs from different sources.
         Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
         boolean isNew = existingOpt.isEmpty();
 
@@ -169,8 +136,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             issueType = findOrCreateIssueType(dto.issueType(), repository.getOrganization().getLogin());
         }
 
-        // Use atomic upsert to handle concurrent inserts
-        // This uses ON CONFLICT (repository_id, issue_type, number) DO UPDATE
+        // Atomic upsert prevents races between concurrent inserts; ON CONFLICT
+        // (repository_id, issue_type, number) DO UPDATE.
         Instant now = Instant.now();
         issueRepository.upsertCore(
             dbId,
@@ -197,7 +164,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             null // subIssuesPercentCompleted - populated by sub-issue sync, not from DTO
         );
 
-        // Fetch the issue to get a managed entity and handle relationships
+        // Re-fetch to get a JPA-managed entity for relationship handling below.
         Issue issue = issueRepository
             .findByRepositoryIdAndNumber(repository.getId(), dto.number())
             .orElseThrow(() ->
@@ -206,15 +173,13 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 )
             );
 
-        // Handle ManyToMany relationships (labels, assignees) - these can't be done in the upsert
+        // ManyToMany relationships (labels, assignees) can't be handled by the native upsert.
         boolean relationshipsChanged = updateRelationships(dto, issue, repository, context.providerId());
 
-        // Save relationship changes
         if (relationshipsChanged) {
             issue = issueRepository.save(issue);
         }
 
-        // Publish events
         if (publishEvents) {
             if (isNew) {
                 eventPublisher.publishEvent(
@@ -236,7 +201,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     log.debug("Emitted IssueClosed for already-closed issue: issueId={}", dbId);
                 }
             } else {
-                // For updates, we compute changed fields by comparing with what we know changed
                 Set<String> changedFields = computeChangedFields(existingOpt.get(), issue);
                 if (!changedFields.isEmpty() || relationshipsChanged) {
                     if (relationshipsChanged) {
@@ -270,9 +234,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return assigneesChanged || labelsChanged;
     }
 
-    /**
-     * Computes which fields changed between the old and new issue state.
-     */
     private Set<String> computeChangedFields(Issue oldIssue, Issue newIssue) {
         Set<String> changedFields = new HashSet<>();
 
@@ -307,9 +268,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return changedFields;
     }
 
-    /**
-     * Process a typed event (issue type assigned).
-     */
     @Transactional
     public Issue processTyped(
         GitHubIssueDTO issueDto,
@@ -338,9 +296,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process an untyped event (issue type removed).
-     */
     @Transactional
     public Issue processUntyped(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = process(issueDto, context);
@@ -362,9 +317,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process a closed event.
-     */
     @Transactional
     public Issue processClosed(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = processInternal(issueDto, context, true, false);
@@ -380,9 +332,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process a reopened event.
-     */
     @Transactional
     public Issue processReopened(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = process(issueDto, context);
@@ -393,9 +342,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process a labeled event.
-     */
     @Transactional
     public Issue processLabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
         Issue issue = process(issueDto, context);
@@ -413,9 +359,6 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process an unlabeled event.
-     */
     @Transactional
     public Issue processUnlabeled(GitHubIssueDTO issueDto, GitHubLabelDTO labelDto, ProcessingContext context) {
         Issue issue = process(issueDto, context);
@@ -434,9 +377,38 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a deleted event.
-     * Publishes IssueDeleted domain event.
+     * Process a {@code transferred} event: the issue has moved to another repository and no longer
+     * exists in this one.
+     *
+     * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is the
+     * source-side issue. Routing it to {@link #process} would re-upsert the issue into the repository
+     * it had just left, creating a permanent phantom instead of removing one. A transfer is not a
+     * delete event, but from this repository's perspective the outcome is identical: the issue is gone.
+     *
+     * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
+     * feedback/observation rows reference it by bare id with no FK, so removing the row would orphan
+     * them. The sweep would eventually catch this anyway (a transferred issue vanishes from the
+     * source repository's upstream listing); handling the event makes it immediate.
      */
+    @Transactional
+    public void processTransferred(GitHubIssueDTO issueDto, ProcessingContext context) {
+        issueRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .ifPresent(issue -> {
+                if (issue.getDeletedAt() != null) {
+                    return;
+                }
+                issue.setDeletedAt(Instant.now());
+                issueRepository.save(issue);
+                log.info(
+                    "Tombstoned transferred issue: issueId={}, number={}, repoId={}",
+                    issue.getId(),
+                    issueDto.number(),
+                    context.repository().getId()
+                );
+            });
+    }
+
     @Transactional
     public void processDeleted(GitHubIssueDTO issueDto, ProcessingContext context) {
         // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
@@ -452,8 +424,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Converts a GitHub API state string to Issue.State enum.
-     * Note: Issues cannot be MERGED - only PRs can. This only handles OPEN/CLOSED.
+     * Issues cannot be MERGED - only PRs can. This only handles OPEN/CLOSED.
      */
     private Issue.State convertState(String state) {
         if (state == null) {
@@ -466,8 +437,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Converts a GitHub API state reason string to Issue.StateReason enum.
-     * Returns UNKNOWN for unrecognized values to preserve data integrity.
+     * Returns UNKNOWN for unrecognized values, rather than null or throwing, to preserve data
+     * integrity.
      */
     private Issue.@Nullable StateReason convertStateReason(String stateReason) {
         if (stateReason == null) {

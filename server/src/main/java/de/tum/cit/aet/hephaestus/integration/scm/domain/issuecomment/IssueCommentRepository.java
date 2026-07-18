@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.RepositoryItemCountProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import java.time.Instant;
 import java.util.Collection;
@@ -11,22 +12,39 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for IssueComment entities.
- */
 @Repository
 @WorkspaceAgnostic("Comments scoped through issue_id -> repository.workspace_id")
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
     Optional<IssueComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     /**
-     * Batch fetch comments by IDs with all related entities eagerly loaded.
+     * Per-repository comment count for the sync-observability breakdown, batched over every repository
+     * of a connection in one grouped join. Counts comments on pull requests as well as on pure issues —
+     * both are {@code Issue} rows under single-table inheritance, and the sync path that fetches them is
+     * the same one, so splitting them here would imply a distinction the sync doesn't make.
      *
-     * <p>Used by the profile module to hydrate ActivityEvent target entities.
-     * Fetches author, issue, and repository in one query to avoid N+1.
+     * <p>Comments of a tombstoned parent ({@code c.issue.deletedAt IS NOT NULL}) are excluded, matching
+     * how the issue and pull-request counts already drop tombstoned rows. A comment has no tombstone of
+     * its own: it goes away with the issue it hangs off, so the parent's tombstone is the only signal
+     * there is. Counting them would reintroduce on the child row exactly the permanent inflation the
+     * deletion sweep removes from the parent — the admin would see an issue count fall while its
+     * comment count stayed put.
      *
-     * @param ids the comment IDs to fetch
-     * @return comments with related entities eagerly loaded
+     * <p>The predicate rides the {@code c.issue} join that the grouping already needs, so this stays one
+     * grouped query for the whole connection.
+     */
+    @Query(
+        "SELECT c.issue.repository.id AS repositoryId, COUNT(c) AS itemCount FROM IssueComment c " +
+            "WHERE c.issue.repository.id IN :repositoryIds AND c.issue.deletedAt IS NULL " +
+            "GROUP BY c.issue.repository.id"
+    )
+    List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
+        @Param("repositoryIds") Collection<Long> repositoryIds
+    );
+
+    /**
+     * Batch fetch comments by id with author, issue and repository eagerly loaded (one query, no N+1).
+     * Used by the profile module to hydrate ActivityEvent target entities.
      */
     @Query(
         """

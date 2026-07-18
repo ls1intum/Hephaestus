@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
@@ -58,6 +60,9 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
     private TeamRepository teamRepository;
 
     @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
     private RepositoryRepository repositoryRepository;
 
     @Autowired
@@ -91,9 +96,25 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             AccountType.ORG,
             owner
         );
+        linkSyncedOrganization("settings-org");
         team = createTeam("test-team", "settings-org");
         repository = createRepository("settings-org/test-repo");
         label = createLabel("feature", "0366d6", repository);
+    }
+
+    /**
+     * Links the synced {@link Organization} that install creates before any team is synced
+     * ({@code GithubLifecycleListener}). Team scoping resolves the workspace's provider through it, so
+     * without this the workspace has no resolvable team scope and correctly sees no teams.
+     */
+    private void linkSyncedOrganization(String login) {
+        Organization organization = new Organization();
+        organization.setNativeId(entityIdGenerator.incrementAndGet());
+        organization.setLogin(login);
+        organization.setHtmlUrl("https://github.com/" + login);
+        organization.setProvider(ensureGitHubProvider());
+        workspace.setOrganization(organizationRepository.save(organization));
+        workspace = workspaceRepository.save(workspace);
     }
 
     // Team Visibility Settings Tests

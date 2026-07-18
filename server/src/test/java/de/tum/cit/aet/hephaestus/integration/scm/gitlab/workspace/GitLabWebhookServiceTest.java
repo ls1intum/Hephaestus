@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -48,12 +49,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
- * Unit tests for {@link GitLabWebhookService}.
- *
- * <p>legacy {@code Workspace.gitlab*} setters are gone; the
- * service now reads/writes the {@code GitLabConfig} on the active GitLab Connection
- * via {@link ConnectionService}. Tests mirror the new flow via a small in-memory map
- * stand-in for the registry so we don't need an integration test container here.
+ * Unit tests for {@link GitLabWebhookService}. The service reads/writes the {@code GitLabConfig} on
+ * the active GitLab Connection via {@link ConnectionService}; these tests back that registry with a
+ * small in-memory map stand-in to avoid an integration test container.
  */
 @Tag("unit")
 class GitLabWebhookServiceTest extends BaseUnitTest {
@@ -132,9 +130,8 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         );
         gitLabBearerTokens.put(1L, new BearerToken("glpat-test-token", null));
 
-        // lenient() — each Nested test exercises a different code path, so a given
-        // stub may go unused per test. Mockito's strict-stub mode would otherwise reject
-        // the shared setUp.
+        // lenient() — each Nested test exercises a different code path, so a shared setUp stub may go
+        // unused per test, which strict-stub mode would otherwise reject.
         Mockito.lenient()
             .when(connectionService.findActiveProviderKind(anyLong()))
             .thenAnswer(inv -> {
@@ -354,7 +351,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(rotationClientProvider.getIfAvailable()).thenReturn(null);
 
             webhookService.rotateTokenIfNeeded(workspace);
-            // No exception, no rotation
         }
 
         @Test
@@ -398,7 +394,6 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(rotationClient.getTokenInfo(1L)).thenThrow(new IllegalStateException("Connection refused"));
 
-            // Should not throw
             webhookService.rotateTokenIfNeeded(workspace);
         }
     }
@@ -450,12 +445,11 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
             when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
 
-            // Simulate API error
             Mockito.doThrow(new RuntimeException("API error")).when(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
 
             webhookService.deregisterWebhook(workspace);
 
-            // Fields should still be cleared (best-effort)
+            // Best-effort: fields cleared even though the vendor call failed.
             assertThat(currentConfig(1L).gitlabWebhookId()).isNull();
             assertThat(currentConfig(1L).gitlabGroupId()).isNull();
         }
@@ -515,6 +509,198 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             webhookService.deregisterWebhookByWorkspaceId(999L);
 
             verify(webhookClientProvider, never()).getIfAvailable();
+        }
+    }
+
+    @Nested
+    class DeregisterActiveWebhook {
+
+        @Test
+        void deletesUpstreamButDoesNotRewriteConfig() {
+            bindGitLabConfig(
+                1L,
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+
+            webhookService.deregisterActiveWebhook(1L);
+
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            // Config is NOT cleared here — the disconnect txn holds the same row and saves it moments
+            // later; a rewrite would optimistic-lock-fail that save.
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
+            assertThat(currentConfig(1L).gitlabGroupId()).isEqualTo(42L);
+            verify(connectionService, never()).updateConfig(anyLong(), any(), any());
+        }
+
+        @Test
+        void skipsWhenNoWebhookStored() {
+            // Default config from setUp has null webhook/group ids.
+            webhookService.deregisterActiveWebhook(1L);
+
+            verify(webhookClientProvider, never()).getIfAvailable();
+        }
+
+        @Test
+        void bestEffortSwallowsClientError() {
+            bindGitLabConfig(
+                1L,
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            Mockito.doThrow(new IllegalStateException("scope not active"))
+                .when(webhookClient)
+                .deregisterGroupWebhook(1L, 42L, 99L);
+
+            assertThatCode(() -> webhookService.deregisterActiveWebhook(1L)).doesNotThrowAnyException();
+
+            // The swallow must be the ONLY effect: the vendor call was really attempted, and the failure
+            // left the stored ids intact for the disconnect txn that owns the row.
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
+            verify(connectionService, never()).updateConfig(anyLong(), any(), any());
+        }
+    }
+
+    @Nested
+    class DeregisterWebhookForConnection {
+
+        @Test
+        void deletesByConnectionIdRegardlessOfState() {
+            var connection = Mockito.mock(de.tum.cit.aet.hephaestus.integration.core.connection.Connection.class);
+            when(connection.getConfig()).thenReturn(
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.of(connection));
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+
+            webhookService.deregisterWebhookForConnection(1L, 7L);
+
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+        }
+
+        @Test
+        void bestEffortSwallowsAuthFailurePostPurge() {
+            var connection = Mockito.mock(de.tum.cit.aet.hephaestus.integration.core.connection.Connection.class);
+            when(connection.getConfig()).thenReturn(
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.of(connection));
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            Mockito.doThrow(new IllegalStateException("Scope 1 is not active"))
+                .when(webhookClient)
+                .deregisterGroupWebhook(1L, 42L, 99L);
+
+            // Swallowed by design: the connection's credentials are already gone post-purge, so the
+            // orphaned hook cannot be deleted here — it auto-disables upstream instead.
+            assertThatCode(() -> webhookService.deregisterWebhookForConnection(1L, 7L)).doesNotThrowAnyException();
+
+            // Distinguishes "attempted and swallowed" from "silently skipped the vendor call entirely".
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+        }
+
+        @Test
+        void skipsWhenConnectionMissing() {
+            when(connectionService.findInWorkspace(1L, 7L)).thenReturn(Optional.empty());
+
+            webhookService.deregisterWebhookForConnection(1L, 7L);
+
+            verify(webhookClientProvider, never()).getIfAvailable();
+        }
+    }
+
+    @Nested
+    class CheckWebhookHealth {
+
+        @BeforeEach
+        void bindActiveHookedWorkspace() {
+            // A workspace with a registered group hook (groupId=42, webhookId=99).
+            bindGitLabConfig(
+                1L,
+                new ConnectionConfig.GitLabConfig(
+                    "https://gitlab.com",
+                    42L,
+                    99L,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                )
+            );
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            when(workspaceRepository.findByStatus(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(List.of(workspace));
+        }
+
+        @Test
+        void leavesExecutableWebhookUntouched() {
+            when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(
+                Optional.of(new WebhookInfo(99L, EXTERNAL_URL + "/webhooks/gitlab", "executable"))
+            );
+
+            webhookService.checkWebhookHealth();
+
+            verify(webhookClient, never()).deregisterGroupWebhook(anyLong(), anyLong(), anyLong());
+            verify(webhookClient, never()).registerGroupWebhook(anyLong(), anyLong(), any());
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(99L);
+        }
+
+        @Test
+        void reRegistersAutoDisabledWebhook() {
+            // GitLab kept the hook row but flipped it to alert_status=disabled — an existence check
+            // alone would pass forever, so this is the invisible-failure the health check must heal.
+            when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(
+                Optional.of(new WebhookInfo(99L, EXTERNAL_URL + "/webhooks/gitlab", "disabled"))
+            );
+            when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
+            when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
+                new WebhookInfo(100L, EXTERNAL_URL + "/webhooks/gitlab", "executable")
+            );
+
+            webhookService.checkWebhookHealth();
+
+            // The disabled hook is deleted first so registerWebhook's adopt-by-URL step can't re-adopt it,
+            // then a fresh hook is registered and its id persisted.
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            verify(webhookClient).registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class));
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(100L);
+        }
+
+        @Test
+        void reRegistersExternallyDeletedWebhook() {
+            when(webhookClient.getGroupWebhook(1L, 42L, 99L)).thenReturn(Optional.empty());
+            when(webhookClient.listGroupWebhooks(1L, 42L)).thenReturn(List.of());
+            when(webhookClient.registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class))).thenReturn(
+                new WebhookInfo(100L, EXTERNAL_URL + "/webhooks/gitlab", "executable")
+            );
+
+            webhookService.checkWebhookHealth();
+
+            // Nothing to delete for a row that's already gone; a fresh hook is registered.
+            verify(webhookClient, never()).deregisterGroupWebhook(anyLong(), anyLong(), anyLong());
+            verify(webhookClient).registerGroupWebhook(eq(1L), eq(42L), any(WebhookConfig.class));
+            assertThat(currentConfig(1L).gitlabWebhookId()).isEqualTo(100L);
         }
     }
 }
