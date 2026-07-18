@@ -10,7 +10,7 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/achievements")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievements")({
 	component: AdminAchievementsContainer,
 });
 

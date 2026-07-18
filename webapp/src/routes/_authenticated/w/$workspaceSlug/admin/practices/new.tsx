@@ -11,11 +11,9 @@ import type { CreatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/new")(
-	{
-		component: CreatePracticeContainer,
-	},
-);
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
+	component: CreatePracticeContainer,
+});
 
 function CreatePracticeContainer() {
 	const navigate = useNavigate();

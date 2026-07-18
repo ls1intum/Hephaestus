@@ -12,7 +12,7 @@ import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/settings")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/settings")({
 	component: AdminSettings,
 });
 

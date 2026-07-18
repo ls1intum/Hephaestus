@@ -9,7 +9,7 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices")({
 	component: PracticesLayout,
 });
 

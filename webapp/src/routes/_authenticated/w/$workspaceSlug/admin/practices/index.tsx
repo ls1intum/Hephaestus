@@ -31,7 +31,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices/")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	component: RubricContainer,
 });
 

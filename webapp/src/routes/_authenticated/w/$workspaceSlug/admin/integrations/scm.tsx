@@ -36,9 +36,7 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/integrations/scm",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/integrations/scm")({
 	component: ScmIntegrationPage,
 });
 

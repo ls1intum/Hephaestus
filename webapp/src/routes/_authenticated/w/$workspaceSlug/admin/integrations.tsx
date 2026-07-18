@@ -6,7 +6,7 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useSyncEvents } from "@/hooks/use-sync-events";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/integrations")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/integrations")({
 	component: IntegrationsLayout,
 });
 

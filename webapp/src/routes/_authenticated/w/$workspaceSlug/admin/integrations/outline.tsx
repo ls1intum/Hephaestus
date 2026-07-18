@@ -19,11 +19,11 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/admin/_admin/integrations/outline",
-)({
-	component: OutlineIntegrationPage,
-});
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/integrations/outline")(
+	{
+		component: OutlineIntegrationPage,
+	},
+);
 
 const JOBS_PAGE_SIZE = 10;
 
