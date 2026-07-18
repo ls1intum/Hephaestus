@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackSyncProperties;
 import java.time.Instant;
 import java.util.List;
@@ -35,17 +36,20 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final SlackMessageRepository messageRepository;
     private final SlackSyncProperties properties;
+    private final SlackRateLimitTracker rateLimitTracker;
 
     public SlackConnectionSyncStateProvider(
         ConnectionRepository connectionRepository,
         SlackMonitoredChannelRepository monitoredChannelRepository,
         SlackMessageRepository messageRepository,
-        SlackSyncProperties properties
+        SlackSyncProperties properties,
+        SlackRateLimitTracker rateLimitTracker
     ) {
         this.connectionRepository = connectionRepository;
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.messageRepository = messageRepository;
         this.properties = properties;
+        this.rateLimitTracker = rateLimitTracker;
     }
 
     @Override
@@ -61,11 +65,18 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
             .map(state -> state == IntegrationState.ACTIVE ? Boolean.TRUE : null)
             .orElse(null);
 
+        // Slack reports no budget, ever — no remaining/limit headers exist, and its per-method tiers are
+        // published as floors ("50+ per minute"), not quotas. The only rate-limit fact Slack can state is
+        // "I threw a 429 and asked you to wait until T", so that is the only thing this snapshot carries;
+        // it is null until Slack has actually done so. Inventing a gauge from the tier tables would be a
+        // fabrication — see SlackRateLimitTracker.
+        RateLimitSnapshot rateLimit = rateLimitTracker.snapshot(ref.workspaceId());
+
         return new ConnectionSyncDetails(
             webhookRegistered,
             CronSchedules.nextRun(properties.cron()),
             CronSchedules.interval(properties.cron()),
-            null,
+            rateLimit,
             null,
             false
         );

@@ -93,7 +93,13 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
             .thenReturn(new ConnectionConfig.OutlineConfig(serverUrl, "sub-1", "secret", Set.of()));
         when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
 
-        RateLimitSnapshot snapshot = new RateLimitSnapshot(1000, 987, Instant.parse("2026-07-17T12:00:00Z"));
+        RateLimitSnapshot snapshot = new RateLimitSnapshot(
+            1000,
+            987,
+            Instant.parse("2026-07-17T12:00:00Z"),
+            Instant.parse("2026-07-17T11:59:00Z"),
+            null
+        );
         when(rateLimitTrackerProvider.getIfAvailable()).thenReturn(rateLimitTracker);
         // Keyed by the normalized server origin, exactly as the exchange filter records it.
         when(rateLimitTracker.snapshot(OutlineRateLimitTracker.scopeOf(serverUrl))).thenReturn(snapshot);

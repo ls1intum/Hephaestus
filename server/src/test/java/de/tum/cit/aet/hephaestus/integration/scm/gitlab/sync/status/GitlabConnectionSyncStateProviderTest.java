@@ -124,7 +124,13 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void shouldReportRateLimitSnapshotFromTracker() {
             when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
-            RateLimitSnapshot snapshot = new RateLimitSnapshot(100, 42, Instant.now().plusSeconds(30));
+            RateLimitSnapshot snapshot = new RateLimitSnapshot(
+                100,
+                42,
+                Instant.now().plusSeconds(30),
+                Instant.now(),
+                null
+            );
             when(rateLimitTracker.snapshot(WORKSPACE_ID)).thenReturn(snapshot);
 
             ConnectionSyncDetails details = provider.describe(ref, CONNECTION_ID);

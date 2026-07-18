@@ -23,7 +23,12 @@ const baseStatus: ConnectionSyncStatus = {
 	nextScheduledSyncAt: minutesFromNow(56),
 	lastEventProcessedAt: minutesAgo(1),
 	webhookRegistered: true,
-	rateLimit: { limit: 5000, remaining: 4812, resetAt: minutesFromNow(40) },
+	rateLimit: {
+		limit: 5000,
+		remaining: 4812,
+		resetAt: minutesFromNow(40),
+		observedAt: minutesAgo(2),
+	},
 };
 
 const runningJob: SyncJob = {
@@ -198,15 +203,20 @@ export const NoWebhookEventsYet: Story = {
 };
 
 /**
- * The rate limit is nearly spent — the only reading that earns colour, because it is the only one that
- * predicts a failure.
+ * The rate limit is nearly spent — the only gauge reading that earns colour, because it is the only one
+ * that predicts a failure.
  */
 export const RateLimitNearlyExhausted: Story = {
 	args: {
 		status: {
 			...baseStatus,
 			health: "DEGRADED",
-			rateLimit: { limit: 5000, remaining: 220, resetAt: minutesFromNow(12) },
+			rateLimit: {
+				limit: 5000,
+				remaining: 220,
+				resetAt: minutesFromNow(12),
+				observedAt: minutesAgo(1),
+			},
 		},
 	},
 	play: async ({ canvasElement }) => {
@@ -221,6 +231,72 @@ export const RateLimitResetTooltip: Story = {
 		const canvas = within(canvasElement);
 		await userEvent.hover(canvas.getByText("4,812"));
 		await expect(await screen.findByText(/resets in/i)).toBeInTheDocument();
+	},
+};
+
+/**
+ * The vendor told us to back off (a 429 with a `Retry-After`) — Slack's and a throttled Outline's only
+ * real signal. There is no budget to gauge at that instant, so the reading is the transient back-off
+ * state and nothing else, tinted because it is actively degrading the sync.
+ */
+export const RateLimitThrottled: Story = {
+	args: {
+		label: "Slack",
+		status: {
+			...baseStatus,
+			kind: "SLACK",
+			health: "DEGRADED",
+			backfillSupported: false,
+			rateLimit: { observedAt: minutesAgo(1), throttledUntil: minutesFromNow(1) },
+		},
+		onBackfill: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const reading = canvas.getByText(/throttled/i);
+		await expect(reading).toHaveClass("text-warning");
+		await expect(reading).toHaveTextContent(/retry in/i);
+		// No gauge is invented from a throttle — the "/ N" remainder span a gauge draws is absent.
+		await expect(canvas.queryByText(/^\/\s*[\d,]+$/)).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * Ceiling known, live remaining not reported — the window budget was observed (or REST-seeded) but the
+ * per-request remaining has since rolled over or was never sent. The ceiling is a real fact, so it
+ * shows; a fabricated `— / N` gauge would not. Muted, because it is not predicting a failure.
+ */
+export const RateLimitCeilingOnly: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			rateLimit: { limit: 5000, observedAt: minutesAgo(90) },
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/limit 5,000/i)).toBeInTheDocument();
+		// A ceiling is not a gauge — the "/ N" remainder span a gauge draws is absent.
+		await expect(canvas.queryByText(/^\/\s*[\d,]+$/)).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The snapshot exists — the vendor was observed — but nothing in it is renderable now: a throttle that
+ * has since lapsed, with no known ceiling. The honest display is the absence of the row, so the "Rate
+ * limit" diagnostic is dropped rather than shown with a blank or zeroed value.
+ */
+export const RateLimitNotReported: Story = {
+	args: {
+		status: {
+			...baseStatus,
+			rateLimit: { observedAt: minutesAgo(90), throttledUntil: minutesAgo(30) },
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.queryByText(/rate limit/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/throttled/i)).not.toBeInTheDocument();
 	},
 };
 

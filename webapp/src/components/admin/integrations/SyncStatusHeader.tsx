@@ -21,6 +21,7 @@ import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { RelativeTime } from "./RelativeTime";
 import { SyncNowButton } from "./SyncNowButton";
 import {
+	asDate,
 	freshnessTone,
 	nextRunLabel,
 	relativeTime,
@@ -59,30 +60,57 @@ function DiagnosticItem({
 }
 
 /**
- * The remaining API budget as a number.
+ * The rate-limit diagnostic, rendered from one observed snapshot in strict priority order. Every branch
+ * shows only measured fields — a value an admin reads here was reported by the vendor, never seeded or
+ * derived by optimistic bookkeeping. When nothing measured is renderable the reading is `null` and the
+ * caller drops the row entirely; the absence of the row *is* the "not reported by this instance" state.
  *
- * Rendered as a bare number rather than a bar: a "full = healthy" budget bar beside the job bar's
- * "full = done" would put two bars on one card filling for opposite reasons. The reset window moves
- * into a tooltip, and only a budget about to run out gets colour.
+ * The order is deliberate:
+ *  1. A live back-off (`throttledUntil` in the future) is the state an admin most needs to see — it is
+ *     Slack's and any 429'd vendor's only real signal — so it wins over a stale gauge. No bar: there is
+ *     no budget to show at that instant.
+ *  2. A full `remaining / limit` gauge, but only when both were measured and are still current. It is
+ *     rendered as a bare number rather than a bar: a "full = healthy" budget bar beside the job bar's
+ *     "full = done" would put two bars on one card filling for opposite reasons. Only a budget about to
+ *     run out earns colour, and the reset window lives one hover away.
+ *  3. Ceiling only: the window budget is a real observation but the live remaining is not (reported once
+ *     and since rolled over, or a vendor that never sends it). Show the ceiling — never a fabricated
+ *     remaining, and never `— / N` which reads as a gauge.
+ *  4. Nothing renderable → `null`.
  */
-function RateLimitValue({ rateLimit }: { rateLimit: RateLimitSnapshot }) {
-	const isLow =
-		rateLimit.limit > 0 && rateLimit.remaining / rateLimit.limit < RATE_LIMIT_WARNING_FRACTION;
-	const value = (
-		<span className={isLow ? "text-warning tabular-nums" : "tabular-nums"}>
-			{rateLimit.remaining.toLocaleString()}
-			<span className="text-muted-foreground"> / {rateLimit.limit.toLocaleString()}</span>
-		</span>
-	);
+function rateLimitReading(rateLimit: RateLimitSnapshot): ReactNode {
+	const throttledUntil = asDate(rateLimit.throttledUntil);
+	if (throttledUntil && throttledUntil.getTime() > Date.now()) {
+		return <span className="text-warning">Throttled · retry {relativeTime(throttledUntil)}</span>;
+	}
 
-	if (!rateLimit.resetAt) return value;
+	if (rateLimit.limit != null && rateLimit.remaining != null) {
+		const isLow =
+			rateLimit.limit > 0 && rateLimit.remaining / rateLimit.limit < RATE_LIMIT_WARNING_FRACTION;
+		const value = (
+			<span className={isLow ? "text-warning tabular-nums" : "tabular-nums"}>
+				{rateLimit.remaining.toLocaleString()}
+				<span className="text-muted-foreground"> / {rateLimit.limit.toLocaleString()}</span>
+			</span>
+		);
+		if (!rateLimit.resetAt) return value;
+		return (
+			<Tooltip>
+				<TooltipTrigger className="cursor-help">{value}</TooltipTrigger>
+				<TooltipContent>Resets {relativeTime(rateLimit.resetAt)}</TooltipContent>
+			</Tooltip>
+		);
+	}
 
-	return (
-		<Tooltip>
-			<TooltipTrigger className="cursor-help">{value}</TooltipTrigger>
-			<TooltipContent>Resets {relativeTime(rateLimit.resetAt)}</TooltipContent>
-		</Tooltip>
-	);
+	if (rateLimit.limit != null) {
+		return (
+			<span className="text-muted-foreground tabular-nums">
+				limit {rateLimit.limit.toLocaleString()}
+			</span>
+		);
+	}
+
+	return null;
 }
 
 function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
@@ -106,10 +134,14 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 		</DiagnosticItem>,
 	];
 
-	if (status.rateLimit) {
+	// A snapshot exists only when the vendor was observed, but an observed snapshot can still carry
+	// nothing renderable (a lapsed throttle with no known ceiling), so the row is gated on the reading
+	// itself — not merely on the snapshot's presence — to keep the "Rate limit" label from orphaning.
+	const rateLimit = status.rateLimit ? rateLimitReading(status.rateLimit) : null;
+	if (rateLimit) {
 		diagnostics.push(
 			<DiagnosticItem key="rateLimit" icon={<GaugeIcon />} label="Rate limit">
-				<RateLimitValue rateLimit={status.rateLimit} />
+				{rateLimit}
 			</DiagnosticItem>,
 		);
 	}

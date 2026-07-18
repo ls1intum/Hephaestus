@@ -161,7 +161,13 @@ class GithubConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void rateLimitSnapshot_passedThroughFromTracker() {
             when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(githubAppConnection()));
-            RateLimitSnapshot snapshot = new RateLimitSnapshot(5000, 4200, Instant.now().plusSeconds(1800));
+            RateLimitSnapshot snapshot = new RateLimitSnapshot(
+                5000,
+                4200,
+                Instant.now().plusSeconds(1800),
+                Instant.now(),
+                null
+            );
             when(rateLimitTracker.snapshot(WORKSPACE_ID)).thenReturn(snapshot);
 
             ConnectionSyncDetails details = provider(schedulerProperties(false)).describe(ref, CONNECTION_ID);

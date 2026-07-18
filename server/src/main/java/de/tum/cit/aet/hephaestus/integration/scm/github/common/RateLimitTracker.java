@@ -30,18 +30,22 @@ public interface RateLimitTracker {
     GHRateLimit updateFromResponse(Long scopeId, @Nullable ClientGraphQlResponse response);
 
     /**
-     * Gets the remaining rate limit points for a scope.
+     * Gets the remaining rate limit points to throttle against for a scope.
      *
-     * <p>Returns a default value (5000) if the scope has never been updated,
-     * which is safe for first-sync scenarios.
+     * <p>This is a <b>decision</b> API, not a reporting one. It falls back to a conservative assumed
+     * ceiling when the scope has never been observed, and treats a closed window as "assume full budget"
+     * so sync does not stall on stale data. Neither assumption may be displayed — see
+     * {@link de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot} for the honesty rule that
+     * governs the reporting path.
      *
      * @param scopeId the scope to check
-     * @return remaining points, or default if unknown
+     * @return remaining points, or the assumed value if unknown
      */
     int getRemaining(Long scopeId);
 
     /**
-     * Gets the total rate limit for a scope.
+     * Gets the total rate limit for a scope, falling back to the assumed ceiling when unobserved.
+     * A decision API — see {@link #getRemaining} on why its fallback must never be displayed.
      *
      * @param scopeId the scope to check
      * @return total limit points per hour

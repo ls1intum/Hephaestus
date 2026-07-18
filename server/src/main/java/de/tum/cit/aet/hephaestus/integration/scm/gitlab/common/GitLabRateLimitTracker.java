@@ -32,10 +32,6 @@ import org.springframework.stereotype.Component;
 /**
  * Per-scope rate limit tracker for GitLab API with Micrometer metrics.
  *
- * <p>GitLab rate limits are per-token (PAT) and use a 60-second sliding window
- * with 100 points per minute for GraphQL API. This is fundamentally different
- * from GitHub's 5000 points per hour budget.
- *
  * <p>Unlike GitHub (which exposes rate limit data in GraphQL response fields),
  * GitLab exposes rate limits exclusively through HTTP response headers:
  * <ul>
@@ -44,6 +40,18 @@ import org.springframework.stereotype.Component;
  *   <li>{@code RateLimit-Reset} — Unix timestamp when window resets</li>
  *   <li>{@code RateLimit-Observed} — points consumed by the current request</li>
  * </ul>
+ *
+ * <h2>Many GitLab instances report nothing at all</h2>
+ * <p>GitLab's user/IP request throttles are <b>disabled by default on self-managed instances</b>, and an
+ * instance with throttling off sends no {@code RateLimit-*} headers whatsoever. For such an instance the
+ * only honest display is <em>nothing</em>: {@link #snapshot} stays {@code null} forever and the UI omits
+ * the row. That is a correct steady state, not a degraded one. Any number rendered for such an instance
+ * would be fabricated by definition.
+ *
+ * <p>Note also that GitLab defines no GraphQL points-per-minute quota — its GraphQL limits are per-query
+ * <em>complexity</em> caps, and request-rate limiting is the generic REST/web throttle (2,000 requests per
+ * minute for authenticated API traffic on GitLab.com). {@code DEFAULT_RATE_LIMIT} is therefore a
+ * deliberately conservative internal pacing floor, not a vendor fact — see {@link #getRemaining}.
  *
  * <h2>Thread Safety</h2>
  * <p>This class is thread-safe. Uses {@link ConcurrentHashMap} for scope state
@@ -69,9 +77,6 @@ public class GitLabRateLimitTracker {
 
     /** Minimum wait to avoid busy-waiting. */
     private static final Duration MIN_WAIT_DURATION = Duration.ofSeconds(1);
-
-    /** Default reset window (60 seconds from now) for newly created state. */
-    private static final int DEFAULT_RESET_SECONDS = 60;
 
     /** Time after which inactive scope state is evicted (24 hours). */
     private static final Duration EVICTION_THRESHOLD = Duration.ofHours(24);
@@ -107,26 +112,41 @@ public class GitLabRateLimitTracker {
         }
 
         try {
+            // Parse before touching state so a garbled header cannot leave a half-written observation.
+            Integer parsedRemaining = remainingStr == null ? null : Integer.valueOf(remainingStr.trim());
+            Integer parsedLimit = limitStr == null ? null : Integer.valueOf(limitStr.trim());
+            Instant parsedReset = resetStr == null ? null : Instant.ofEpochSecond(Long.parseLong(resetStr.trim()));
+            Integer parsedObserved = observedStr == null ? null : Integer.valueOf(observedStr.trim());
+
             ScopeRateLimitState state = getOrCreateState(scopeId);
 
-            if (remainingStr != null) {
-                state.remaining.set(Integer.parseInt(remainingStr));
+            // Each field is written ONLY from its own header. A response carrying just one of the pair
+            // (a stripping proxy, partial middleware) must leave the other unknown — filling it from a
+            // constant is exactly the fabrication this tracker used to commit.
+            if (parsedRemaining != null) {
+                state.remaining.set(parsedRemaining);
             }
-            if (limitStr != null) {
-                state.limit.set(Integer.parseInt(limitStr));
+            if (parsedLimit != null) {
+                state.limit.set(parsedLimit);
             }
-            if (resetStr != null) {
-                state.resetAt.set(Instant.ofEpochSecond(Long.parseLong(resetStr)));
+            if (parsedReset != null) {
+                state.resetAt.set(parsedReset);
             }
-            if (observedStr != null) {
-                state.lastQueryCost.set(Integer.parseInt(observedStr));
+            if (parsedObserved != null) {
+                state.lastQueryCost.set(parsedObserved);
             }
 
-            // Calculate used points
-            int currentLimit = state.limit.get();
-            int currentRemaining = state.remaining.get();
-            state.used.set(currentLimit - currentRemaining);
+            Integer currentLimit = state.limit.get();
+            Integer currentRemaining = state.remaining.get();
+            // "Used" is only computable when both sides were actually reported.
+            if (currentLimit != null && currentRemaining != null) {
+                state.used.set(currentLimit - currentRemaining);
+            }
             state.lastUpdated.set(Instant.now());
+
+            if (currentRemaining == null) {
+                return; // nothing measured about the budget itself — nothing to judge severity on
+            }
 
             // Log based on severity
             if (currentRemaining < CRITICAL_REMAINING_THRESHOLD) {
@@ -152,8 +172,13 @@ public class GitLabRateLimitTracker {
     }
 
     /**
-     * Gets the remaining rate limit points for a scope.
-     * Returns the default limit if the scope has never been updated.
+     * The remaining points to <b>throttle against</b> — a decision API, never a reporting one.
+     *
+     * <p>Falls back to {@code DEFAULT_RATE_LIMIT} when GitLab has reported nothing. That constant is a
+     * deliberately conservative pacing floor, not a vendor guarantee: GitLab publishes no GraphQL
+     * points-per-minute quota at all, and GitLab.com's authenticated API throttle is 2,000 requests per
+     * minute. Because it is an assumption, it must never reach {@link #snapshot} — the honesty rule in
+     * {@link RateLimitSnapshot} depends on that separation.
      */
     public int getRemaining(Long scopeId) {
         if (scopeId == null) {
@@ -163,32 +188,40 @@ public class GitLabRateLimitTracker {
         if (state == null) {
             return DEFAULT_RATE_LIMIT;
         }
-        int remaining = state.remaining.get();
-        // Optimistic reset: if remaining is low and reset time has passed
-        if (remaining < LOW_REMAINING_THRESHOLD) {
-            Instant resetAt = state.resetAt.get();
-            if (resetAt != null && !Instant.now().isBefore(resetAt)) {
-                int fullLimit = state.limit.get();
-                state.remaining.set(fullLimit);
-                log.info(
-                    "GitLab rate limit reset time passed, optimistically reset: scopeId={}, oldRemaining={}, newRemaining={}",
-                    scopeId,
-                    remaining,
-                    fullLimit
-                );
-                return fullLimit;
-            }
-        }
-        return remaining;
+        return effectiveRemaining(state);
     }
 
-    /** Gets the total rate limit for a scope. */
+    /** Gets the total rate limit for a scope, falling back to the conservative pacing floor. */
     public int getLimit(Long scopeId) {
         if (scopeId == null) {
             return DEFAULT_RATE_LIMIT;
         }
         ScopeRateLimitState state = stateByScope.get(scopeId);
-        return state != null ? state.limit.get() : DEFAULT_RATE_LIMIT;
+        return state == null ? DEFAULT_RATE_LIMIT : limitOrDefault(state);
+    }
+
+    /**
+     * Pure "optimistic reset": once the observed window has closed the measured remaining is not a fact
+     * about the current window, so decisions assume a full budget. Computed, never written back — the
+     * previous mutation turned this heuristic into a number the admin page displayed as measured.
+     */
+    private static int effectiveRemaining(ScopeRateLimitState state) {
+        Integer observed = state.remaining.get();
+        if (observed == null) {
+            return limitOrDefault(state);
+        }
+        if (observed < LOW_REMAINING_THRESHOLD) {
+            Instant resetAt = state.resetAt.get();
+            if (resetAt != null && !Instant.now().isBefore(resetAt)) {
+                return limitOrDefault(state);
+            }
+        }
+        return observed;
+    }
+
+    private static int limitOrDefault(ScopeRateLimitState state) {
+        Integer limit = state.limit.get();
+        return limit == null ? DEFAULT_RATE_LIMIT : limit;
     }
 
     /** Checks if the rate limit is critically low. */
@@ -235,13 +268,10 @@ public class GitLabRateLimitTracker {
         Duration waitTime = Duration.between(Instant.now(), reset);
 
         if (waitTime.isNegative() || waitTime.isZero()) {
-            // Reset time has passed — optimistically reset
-            ScopeRateLimitState state = stateByScope.get(scopeId);
-            if (state != null) {
-                int fullLimit = state.limit.get();
-                state.remaining.set(fullLimit);
-                log.info("GitLab rate limit reset time passed, optimistically reset: scopeId={}", scopeId);
-            }
+            // Observed window closed — nothing to wait for. Deliberately no write-back: effectiveRemaining()
+            // already treats a closed window as "assume full" for decisions, and the next response supplies
+            // the real number. Writing it back is what leaked an invented value onto the admin surface.
+            log.info("GitLab rate limit reset time passed, continuing: scopeId={}, resetAt={}", scopeId, reset);
             return false;
         }
 
@@ -310,13 +340,16 @@ public class GitLabRateLimitTracker {
     }
 
     /**
-     * Point-in-time snapshot for the sync-observability provider — {@code null} if this scope has
-     * never had a real rate-limit header observed since the last restart (as opposed to the
-     * optimistic {@link #getRemaining}/{@link #getLimit} defaults, which exist to drive throttling
-     * decisions and would otherwise misrepresent "unknown" as "100/100 available"). State is created
-     * only from {@link #updateFromHeaders} after real headers are present, so {@code state == null}
-     * already means "never observed" — no separate flag needed (mirrors GitHub's {@code
-     * ScopedRateLimitTracker#snapshot}).
+     * Point-in-time snapshot for the sync-observability provider — {@code null} if this scope has never
+     * had a real rate-limit header observed since the last restart (as opposed to the
+     * {@link #getRemaining}/{@link #getLimit} pacing defaults, which drive throttling decisions and would
+     * otherwise misrepresent "unknown" as "100/100 available"). State is created only from
+     * {@link #updateFromHeaders} once at least one real header is present, so {@code state == null}
+     * already means "never observed" — no separate flag needed.
+     *
+     * <p>Each field is reported independently, so a partial header set surfaces as a partial fact rather
+     * than a whole invented one. The window-expiry rule is applied centrally by
+     * {@link RateLimitSnapshot#observed}.
      */
     @Nullable
     public RateLimitSnapshot snapshot(Long scopeId) {
@@ -327,7 +360,17 @@ public class GitLabRateLimitTracker {
         if (state == null) {
             return null;
         }
-        return new RateLimitSnapshot(state.limit.get(), state.remaining.get(), state.resetAt.get());
+        Instant observedAt = state.lastUpdated.get();
+        if (observedAt == null) {
+            return null;
+        }
+        return RateLimitSnapshot.observed(
+            state.limit.get(),
+            state.remaining.get(),
+            state.resetAt.get(),
+            observedAt,
+            null
+        );
     }
 
     /**
@@ -397,12 +440,13 @@ public class GitLabRateLimitTracker {
     private void registerMetrics(Long scopeId, ScopeRateLimitState state) {
         Tags tags = Tags.of("scope_id", String.valueOf(scopeId));
 
-        Gauge.builder(METRIC_PREFIX + ".points.remaining", state.remaining, AtomicInteger::get)
+        // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
+        Gauge.builder(METRIC_PREFIX + ".points.remaining", state, s -> asDouble(s.remaining.get()))
             .tags(tags)
             .description("GitLab GraphQL API rate limit points remaining")
             .register(meterRegistry);
 
-        Gauge.builder(METRIC_PREFIX + ".points.limit", state.limit, AtomicInteger::get)
+        Gauge.builder(METRIC_PREFIX + ".points.limit", state, s -> asDouble(s.limit.get()))
             .tags(tags)
             .description("GitLab GraphQL API rate limit total points per minute")
             .register(meterRegistry);
@@ -430,19 +474,24 @@ public class GitLabRateLimitTracker {
             .register(meterRegistry);
     }
 
+    /** Renders an unobserved value as NaN rather than a number that would be read as a measurement. */
+    private static double asDouble(@Nullable Integer value) {
+        return value == null ? Double.NaN : value.doubleValue();
+    }
+
     /**
-     * Encapsulates rate limit state for a single scope.
-     * All fields are atomic for thread-safe concurrent access.
+     * Rate limit state for a single scope. All fields are atomic for thread-safe concurrent access, and
+     * every observable field starts <b>null</b>. The previous seeds (100/100 and {@code now()+60s}) were
+     * live fabrication: {@link #updateFromHeaders} creates state as soon as <em>either</em> count header is
+     * present, so a response carrying only one of them displayed the invented constant for the other.
      */
     private static class ScopeRateLimitState {
 
-        final AtomicInteger remaining = new AtomicInteger(DEFAULT_RATE_LIMIT);
-        final AtomicInteger limit = new AtomicInteger(DEFAULT_RATE_LIMIT);
+        final AtomicReference<Integer> remaining = new AtomicReference<>();
+        final AtomicReference<Integer> limit = new AtomicReference<>();
         final AtomicInteger used = new AtomicInteger(0);
         final AtomicInteger lastQueryCost = new AtomicInteger(0);
-        final AtomicReference<Instant> resetAt = new AtomicReference<>(
-            Instant.now().plusSeconds(DEFAULT_RESET_SECONDS)
-        );
-        final AtomicReference<Instant> lastUpdated = new AtomicReference<>(Instant.now());
+        final AtomicReference<Instant> resetAt = new AtomicReference<>();
+        final AtomicReference<Instant> lastUpdated = new AtomicReference<>();
     }
 }

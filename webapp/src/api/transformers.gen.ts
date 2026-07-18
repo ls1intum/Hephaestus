@@ -232,8 +232,12 @@ const syncJobSchemaResponseTransformer = (data: any) => {
 };
 
 const rateLimitSnapshotSchemaResponseTransformer = (data: any) => {
+    data.observedAt = new Date(data.observedAt);
     if (data.resetAt) {
         data.resetAt = new Date(data.resetAt);
+    }
+    if (data.throttledUntil) {
+        data.throttledUntil = new Date(data.throttledUntil);
     }
     return data;
 };

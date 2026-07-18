@@ -16,8 +16,10 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
+import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.SlackSyncProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -45,6 +47,8 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     @Mock
     private SlackMessageRepository messageRepository;
 
+    private final SlackRateLimitTracker rateLimitTracker = new SlackRateLimitTracker(new SimpleMeterRegistry());
+
     private SlackConnectionSyncStateProvider provider;
 
     private SlackConnectionSyncStateProvider providerWith(String cron) {
@@ -52,7 +56,8 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
             connectionRepository,
             monitoredChannelRepository,
             messageRepository,
-            new SlackSyncProperties(cron, 10, 15, Duration.ZERO, true, 5, true)
+            new SlackSyncProperties(cron, 10, 15, Duration.ZERO, true, 5, true),
+            rateLimitTracker
         );
     }
 
@@ -73,6 +78,49 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         assertThat(details.rateLimit()).isNull();
         assertThat(details.backfill()).isNull();
         assertThat(details.vendorHealthDegraded()).isFalse();
+    }
+
+    /**
+     * A Slack workspace that has never been throttled has no rate-limit fact to state, so the row stays
+     * off the page. The previous hardcoded {@code null} produced the same output by accident; this pins it
+     * as a consequence of "nothing observed" rather than "nothing tracked".
+     */
+    @Test
+    void describe_neverThrottled_reportsNoRateLimit() {
+        setUpDefault();
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+
+        assertThat(provider.describe(REF, CONNECTION_ID).rateLimit()).isNull();
+    }
+
+    /**
+     * The state an admin currently cannot see: the non-Marketplace {@code conversations.history} clamp
+     * answers with {@code Retry-After: 60}, and that is now surfaced — as a back-off deadline, never as a
+     * quota, because Slack reports no quota.
+     */
+    @Test
+    void describe_afterObserved429_reportsThrottledUntilAndNoQuota() {
+        setUpDefault();
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+        rateLimitTracker.recordThrottle(WS, 60_000L);
+
+        var rateLimit = provider.describe(REF, CONNECTION_ID).rateLimit();
+
+        assertThat(rateLimit).isNotNull();
+        assertThat(rateLimit.throttledUntil()).isAfter(Instant.now().plusSeconds(50));
+        assertThat(rateLimit.observedAt()).isNotNull();
+        assertThat(rateLimit.limit()).isNull();
+        assertThat(rateLimit.remaining()).isNull();
+    }
+
+    /** A throttle on a different workspace must not leak into this one's status. */
+    @Test
+    void describe_throttleOnAnotherWorkspace_isNotReportedHere() {
+        setUpDefault();
+        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
+        rateLimitTracker.recordThrottle(WS + 1, 60_000L);
+
+        assertThat(provider.describe(REF, CONNECTION_ID).rateLimit()).isNull();
     }
 
     @Test

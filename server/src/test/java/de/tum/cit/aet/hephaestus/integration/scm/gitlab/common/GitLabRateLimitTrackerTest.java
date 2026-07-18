@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_REMAINING;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.HEADER_RATE_LIMIT_RESET;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -258,6 +259,29 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             ).isNotNull();
         }
 
+        /**
+         * The structural half of the fix: the optimistic reset must not <em>write</em>. The gauge reads the
+         * same observed field the snapshot does, so if a throttle decision ever mutates state back up to
+         * the limit, this gauge reports a budget nobody measured.
+         */
+        @Test
+        void throttleDecisionMustNotWriteBackIntoObservedState() {
+            Long scopeId = 1L;
+            Instant pastReset = Instant.now().minusSeconds(30).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            tracker.updateFromHeaders(scopeId, createHeaders(2, 100, pastReset, 98));
+
+            // Every decision API that used to perform the write-back.
+            tracker.getRemaining(scopeId);
+            tracker.isCritical(scopeId);
+            tracker.isLow(scopeId);
+            tracker.getRecommendedDelay(scopeId);
+            assertThatNoException().isThrownBy(() -> tracker.waitIfNeeded(scopeId));
+
+            assertThat(
+                meterRegistry.find("gitlab.graphql.ratelimit.points.remaining").tag("scope_id", "1").gauge().value()
+            ).isEqualTo(2.0);
+        }
+
         @Test
         void shouldReflectUpdatedValuesInGauges() {
             Long scopeId = 1L;
@@ -322,6 +346,77 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
             assertThat(snapshot.limit()).isEqualTo(100);
             assertThat(snapshot.remaining()).isEqualTo(80);
             assertThat(snapshot.resetAt()).isEqualTo(resetTime);
+            assertThat(snapshot.observedAt()).isNotNull();
+        }
+
+        /**
+         * The partial-header regression test. {@code updateFromHeaders} creates state as soon as EITHER
+         * count header is present (a stripping proxy or partial middleware makes that real), and the old
+         * constructor seeds meant the missing side silently displayed the invented {@code 100}. One
+         * measured header must produce exactly one measured field.
+         */
+        @Test
+        void remainingHeaderAlone_mustNotFabricateALimit() {
+            Long scopeId = 1L;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HEADER_RATE_LIMIT_REMAINING, "80");
+
+            tracker.updateFromHeaders(scopeId, headers);
+
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.remaining()).isEqualTo(80);
+            assertThat(snapshot.limit()).isNull();
+            assertThat(snapshot.resetAt()).isNull();
+        }
+
+        @Test
+        void limitHeaderAlone_mustNotFabricateARemaining() {
+            Long scopeId = 1L;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HEADER_RATE_LIMIT_LIMIT, "2000");
+
+            tracker.updateFromHeaders(scopeId, headers);
+
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.limit()).isEqualTo(2000);
+            assertThat(snapshot.remaining()).isNull();
+            assertThat(snapshot.resetAt()).isNull();
+        }
+
+        /**
+         * A self-managed GitLab has request throttling off by default and sends no {@code RateLimit-*}
+         * headers at all. The correct display for such an instance is nothing, forever.
+         */
+        @Test
+        void instanceThatSendsNoHeaders_reportsNothingForever() {
+            Long scopeId = 1L;
+
+            tracker.updateFromHeaders(scopeId, new HttpHeaders());
+
+            assertThat(tracker.snapshot(scopeId)).isNull();
+            assertThat(tracker.getTrackedScopeCount()).isZero();
+        }
+
+        /**
+         * The optimistic reset must move throttling decisions without ever being displayed as measured.
+         */
+        @Test
+        void closedWindow_retiresRemainingButKeepsTheObservedCeiling() {
+            Long scopeId = 1L;
+            Instant pastReset = Instant.now().minusSeconds(30).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            tracker.updateFromHeaders(scopeId, createHeaders(2, 100, pastReset, 98));
+
+            // Decision API assumes a full budget because the window rolled over...
+            assertThat(tracker.getRemaining(scopeId)).isEqualTo(100);
+
+            // ...and none of that assumption reaches the snapshot.
+            var snapshot = tracker.snapshot(scopeId);
+            assertThat(snapshot).isNotNull();
+            assertThat(snapshot.remaining()).isNull();
+            assertThat(snapshot.resetAt()).isNull();
+            assertThat(snapshot.limit()).isEqualTo(100);
         }
     }
 

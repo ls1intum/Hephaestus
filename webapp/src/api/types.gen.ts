@@ -1375,21 +1375,29 @@ export type Reaction = {
 };
 
 /**
- * Vendor API rate-limit budget snapshot, read from in-memory trackers (not persisted across restarts)
+ * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
  */
 export type RateLimitSnapshot = {
     /**
-     * Total budget for the window
+     * Window ceiling, if the vendor reported one. Survives window rollover — a ceiling is window-invariant.
      */
-    limit: number;
+    limit?: number;
     /**
-     * Remaining budget
+     * When the underlying vendor response was seen
      */
-    remaining: number;
+    observedAt: Date;
     /**
-     * When the window resets
+     * Remaining budget, if reported and still inside the observed window. Null once the window has rolled over.
+     */
+    remaining?: number;
+    /**
+     * When the observed window ends, if reported and still in the future
      */
     resetAt?: Date;
+    /**
+     * An observed 429's back-off deadline (observedAt + Retry-After); null if the vendor never told us to back off
+     */
+    throttledUntil?: Date;
 };
 
 /**

@@ -27,10 +27,13 @@ import tools.jackson.databind.json.JsonMapper;
  *       returns far more fields than we map, so the decoder disables {@code FAIL_ON_UNKNOWN_PROPERTIES}.
  *       Unknown-field tolerance is decoder configuration, not an annotation — pinned by
  *       {@code OutlineDeserializationToleranceTest}.</li>
- *   <li><b>Rate-limit capture.</b> An exchange filter reads Outline's {@code RateLimit-*} response headers
- *       into {@link OutlineRateLimitTracker}, keyed by server origin, so the admin page can surface an
- *       Outline rate-limit diagnostic. The {@code Retry-After} 429 handling stays in {@link OutlineApiClient}
- *       — this filter only observes.</li>
+ *   <li><b>Rate-limit capture.</b> An exchange filter reads Outline's {@code Retry-After} /
+ *       {@code RateLimit-*} response headers into {@link OutlineRateLimitTracker}, keyed by server origin,
+ *       so the admin page can surface an Outline rate-limit diagnostic. Outline emits those headers
+ *       <em>only on a 429</em>, so in practice this filter records throttle events and nothing else — the
+ *       tracker infers the throttle from their presence, which is why no status needs threading through
+ *       here. The {@code Retry-After}-honoring 429 retry stays in {@link OutlineApiClient}; this filter
+ *       only observes.</li>
  * </ul>
  *
  * Resilience (circuit breaker + bounded retry) lives in {@link OutlineResilienceConfig}; this bean carries no

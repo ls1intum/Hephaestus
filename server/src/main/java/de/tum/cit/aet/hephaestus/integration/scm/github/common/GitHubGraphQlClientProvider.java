@@ -65,19 +65,22 @@ public class GitHubGraphQlClientProvider {
     private final GitHubAppTokenService appTokens;
     private final CircuitBreaker circuitBreaker;
     private final RateLimitTracker rateLimitTracker;
+    private final GitHubRestRateLimitSeeder rateLimitSeeder;
 
     public GitHubGraphQlClientProvider(
         HttpGraphQlClient gitHubGraphQlClient,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService appTokens,
         @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
-        RateLimitTracker rateLimitTracker
+        RateLimitTracker rateLimitTracker,
+        GitHubRestRateLimitSeeder rateLimitSeeder
     ) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
         this.appTokens = appTokens;
         this.circuitBreaker = circuitBreaker;
         this.rateLimitTracker = rateLimitTracker;
+        this.rateLimitSeeder = rateLimitSeeder;
     }
 
     /**
@@ -154,6 +157,10 @@ public class GitHubGraphQlClientProvider {
      */
     public HttpGraphQlClient forScope(Long scopeId) {
         String token = getToken(scopeId);
+        // Learn this scope's real GraphQL ceiling from REST GET /rate_limit while it has nothing observed.
+        // Fire-and-forget and self-throttled, so it costs the sync neither latency nor quota (GitHub
+        // documents that endpoint as not counting against the limit) — see GitHubRestRateLimitSeeder.
+        rateLimitSeeder.seedIfUnobserved(scopeId, token);
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
