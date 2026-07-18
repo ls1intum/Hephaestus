@@ -244,7 +244,7 @@ const config: Config = {
           items: [
             {
               label: 'Admin Guide',
-              to: '/admin/production-setup',
+              to: '/admin/install',
             },
           ],
         },

@@ -4,6 +4,7 @@
 	"private": true,
 	"packageManager": "pnpm@11.1.2",
 	"scripts": {
+		"changeset:version": "changeset version && node scripts/sync-selfhost-version.mjs",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
 		"generate:api:application-server:specs": "cd server && sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then ./mvnw verify -DskipTests=true -Dapp.profiles=specs; else SPRING_DOCKER_COMPOSE_ENABLED=false ./mvnw verify -DskipTests=true -Dapp.profiles=specs; fi'",
 		"generate:api:application-server:client": "pnpm run generate:api:application-server:clean && pnpm --filter webapp run openapi-ts",

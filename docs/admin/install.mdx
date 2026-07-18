@@ -1,0 +1,198 @@
+---
+id: install
+sidebar_position: 0
+title: Install (Self-Hosted)
+description: The one supported way to run your own Hephaestus — Docker Compose on a single host.
+---
+
+This is the **only supported install path**: the Docker Compose stack in
+[`docker/self-host/`](https://github.com/ls1intum/Hephaestus/tree/main/docker/self-host)
+on one Linux host. Other setups (own reverse proxy, external database, Kubernetes, Podman)
+can work but are unsupported.
+
+The stack you get:
+
+| Service | What it is |
+| --- | --- |
+| `reverse-proxy` | Traefik — TLS via Let's Encrypt, routes `/`, `/api`, `/webhooks` |
+| `webapp` | React SPA served by nginx |
+| `application-server` | Spring Boot API + in-process job worker |
+| `webhook-server` | Same image, webhook profile — keeps receiving events while the app restarts |
+| `postgres` | PostgreSQL 17 + pg_partman (custom image — vanilla `postgres:17` is **not** a drop-in) |
+| `nats-server` | NATS JetStream event buffer |
+| `release-pin-fetcher` | One-shot init container verifying the release's signed agent-image digests |
+
+## Requirements
+
+- **4 vCPUs, 8 GB RAM, 40 GB SSD** recommended. Absolute floor: 2 vCPUs / 4 GB RAM —
+  the stack runs **two JVMs** plus Postgres and NATS, so 4 GB means swap and slow starts.
+- **AI practice review adds real memory**: each concurrent review sandbox may use up to
+  4 GiB. The default caps it at 1 concurrent sandbox; raise
+  `SANDBOX_MAX_CONCURRENT` only with RAM to match.
+- 64-bit Linux with **Docker Engine ≥ 24** and **Docker Compose ≥ 2.24.4** (`docker compose version`), plus `git`.
+- A **DNS A record** for your hostname pointing at the host, with ports **80 and 443**
+  reachable from the internet (Let's Encrypt HTTP-01, OAuth callbacks, webhooks).
+- Outbound HTTPS to `ghcr.io` (images), `github.com` (release pin) and `api.github.com`.
+
+## 1. Get the files
+
+Check out the newest version from the
+[releases page](https://github.com/ls1intum/Hephaestus/releases):
+
+```bash
+VERSION=0.73.2   # the release you are installing, without the leading "v"
+sudo git clone --depth 1 --branch "v$VERSION" \
+  https://github.com/ls1intum/Hephaestus.git /opt/hephaestus
+sudo chown -R "$USER" /opt/hephaestus
+cd /opt/hephaestus/docker/self-host
+cp .env.example .env
+```
+
+Everything below runs from `/opt/hephaestus/docker/self-host`. Inspect the effective
+configuration at any time with `docker compose config`.
+
+## 2. Configure `.env`
+
+Open `.env` and fill in every **REQUIRED** value. The short version:
+
+| Variable | What / how |
+| --- | --- |
+| `APP_HOSTNAME` | Your public hostname, e.g. `hephaestus.example.com` |
+| `IMAGE_TAG` | The same `$VERSION` you fetched above — an exact release, never `latest` |
+| `ACME_EMAIL` | Let's Encrypt expiry notices |
+| `POSTGRES_PASSWORD` | `openssl rand -hex 16` |
+| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | `openssl rand -base64 24 \| cut -c1-32` — exactly 32 chars (see the warning below) |
+| `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | `openssl rand -base64 32` |
+| `WEBHOOK_SECRET` | `openssl rand -hex 32` — you'll enter the same value on GitHub later |
+| `GH_OAUTH_CLIENT_ID` / `_SECRET` | From step 3 |
+| `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` | From step 4 — set it **before** first boot |
+
+:::danger Back up the encryption key
+`HEPHAESTUS_SECURITY_ENCRYPTION_KEY` encrypts every stored provider token and seals the JWT
+signing key. If you lose or change it, those tokens become unreadable and all sessions
+invalidate. Store it as carefully as the database itself, and never change it after first boot.
+:::
+
+## 3. Create the GitHub OAuth App (login — mandatory)
+
+Without a login provider the instance boots but shows **no sign-in button**. GitHub login
+needs a plain **OAuth App** (this is *not* the same thing as the GitHub App used for data
+access — see [GitHub integration](./github-integration)):
+
+1. [github.com/settings/developers](https://github.com/settings/developers) →
+   **New OAuth App** (or under your org's settings).
+2. **Homepage URL:** `https://<APP_HOSTNAME>`
+3. **Authorization callback URL:** `https://<APP_HOSTNAME>/api/login/oauth2/code/github`
+   — exact string, including `/api`, no trailing slash.
+4. Create a client secret; put both values into `.env` as
+   `GH_OAUTH_CLIENT_ID` / `GH_OAUTH_CLIENT_SECRET`.
+
+GitLab login works the same way and can be used instead of (or next to) GitHub — see the
+[GitLab section in Production Setup](./production-setup#gitlab-rollout-bundle).
+
+## 4. First admin — before first boot
+
+The admin UI is admin-gated, so the **first instance admin must come from operator
+config**, not the UI. Set in `.env`:
+
+```bash
+HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=github:@your-github-username
+```
+
+- Format: comma-separated `<provider>:@<username>` or `<provider>:<numeric-id>`.
+- On public github.com prefer the numeric id (`github:1234567`, from
+  `https://api.github.com/users/<login>`) — abandoned handles can be reclaimed by others.
+- Promotion happens **on sign-in**, is idempotent, and never demotes. If you forgot to set
+  it, add it and restart — no reinstall needed. There is also a break-glass
+  `HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN`; details in the
+  [auth runbook](https://github.com/ls1intum/Hephaestus/blob/main/docs/runbooks/auth-cutover.md#first-instance-admin-bootstrap).
+
+## 5. First boot
+
+```bash
+docker compose up -d
+docker compose logs -f application-server   # watch Liquibase migrations finish
+```
+
+First start pulls ~2 GB of images and runs all database migrations; expect a few minutes.
+Then:
+
+1. Open `https://<APP_HOSTNAME>` — the login page should offer **Sign in with GitHub**.
+2. Sign in as the bootstrap admin. You should see instance-admin navigation.
+3. Create your first workspace and connect it to GitHub.
+
+## 6. Connect GitHub data
+
+Login alone syncs nothing. Two things make data flow, both covered step-by-step in
+[GitHub integration](./github-integration):
+
+1. **Repository access** — either a **PAT** pasted into the workspace UI (simplest) or a
+   **GitHub App** (needed for AI-review feedback posted back to GitHub, better rate limits).
+2. **Webhooks** — Hephaestus does **not** auto-register GitHub webhooks (unlike GitLab).
+   Configure the webhook on your GitHub App **or** create an org/repo webhook manually,
+   pointing at `https://<APP_HOSTNAME>/webhooks/github` with your `WEBHOOK_SECRET`. Without
+   it the instance only sees changes on the hourly sync poll, and nothing warns you.
+
+## 7. Optional integrations
+
+All off by default. The compose file already passes their variables through — enable them
+in `.env` and `docker compose up -d`. Each is documented in
+[Production Setup](./production-setup), which doubles as the variable reference:
+
+| Add-on | What it gives you | Where |
+| --- | --- | --- |
+| GitLab | GitLab login, workspaces, and sync (webhooks auto-register here) | [GitLab bundle](./production-setup#gitlab-rollout-bundle) |
+| Slack | Mentor in Slack, channel ingestion, digests | [Slack app setup](./production-setup#slack-app-configuration) |
+| Outline | Wiki as a content source for reviews | [Outline integration](./production-setup#outline-integration) |
+| AI practice review | Automated PR feedback from the coding agent | [Practice review bundle](./production-setup#practice-review-rollout-bundle) |
+
+**AI practice review needs two things, not one:** the environment bundle above
+(`AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, `PRACTICE_REVIEW_FOR_ALL` — set together, plus
+an `LLM_PROXY_*` upstream), **and** a model with an API key configured per workspace in the
+UI under **Workspace settings → AI**. With the flags on but no workspace model, nothing is
+reviewed and no error explains why.
+
+## 8. Legal pages (public instances)
+
+:::caution Public instances need legal pages
+`/imprint` and `/privacy` serve a red "not configured" fallback until you provide your own.
+For operators in Germany that is a § 5 DDG / Art. 13 GDPR obligation **before** opening the
+instance to users. See [Legal Pages](./legal-pages).
+:::
+
+## Upgrades
+
+Any release upgrades directly to any later one — no intermediate steps. Support window and
+what a version number promises: [Compatibility Policy](./compatibility-policy).
+
+```bash
+# 1. Back up first — see Backup & Restore.
+VERSION=<new version>
+cd /opt/hephaestus
+sudo git fetch --depth 1 origin tag "v$VERSION" && sudo git checkout "v$VERSION"
+# 2. Set IMAGE_TAG=$VERSION in docker/self-host/.env, then:
+cd docker/self-host && docker compose pull && docker compose up -d
+```
+
+Compare your `.env` against the new release's `.env.example` for added variables. A release
+that changes the bundled PostgreSQL major version needs a dump and restore, not an in-place
+upgrade — such releases say so in their notes.
+
+:::warning Downgrades are not supported
+Never point an older `IMAGE_TAG` at a database a newer release has already migrated — restore
+a backup instead. Set up [Backup & Restore](./backup-restore) **before** you have data worth losing.
+:::
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| `application-server` exits: *ProxyTrustGuard* | `HEPHAESTUS_TRUSTED_PROXIES` is blank. The compose default is non-blank, so this means you overrode it to empty — unset your override, or set it to match `reverse-proxy`'s IP if you changed the network. |
+| Exits: encryption-key length error | `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` must be exactly 32 characters — regenerate with the command above. |
+| Login page has no sign-in button | No login provider configured: both `GH_OAUTH_CLIENT_ID` **and** `_SECRET` must be non-empty (a half-filled pair is skipped and logged at ERROR). |
+| OAuth redirect loop / cookie never sticks | A proxy in front of Traefik is injecting a `Domain=` attribute on cookies, which browsers reject for `__Host-` cookies. Serve the stack directly on ports 80/443. |
+| Signed in but not admin | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` didn't match. On the account's **first** login the server logs (INFO) the exact `provider subject username` it saw — copy that into the allowlist and restart. (For an account that already existed, check that log line from its first sign-in, or use the numeric id.) |
+| GitHub webhook deliveries show `401` | `WEBHOOK_SECRET` on GitHub differs from `.env` — must be byte-identical. |
+| Data appears only ~hourly | No GitHub webhook configured (see step 6). |
+| `release-pin-fetcher` fails | `IMAGE_TAG` is not a published release (no signed pin asset), or the host can't reach `github.com`. Use a real release tag and check outbound HTTPS. |
+| `docker compose down`/`logs` aborts with "variable is missing" | Required `.env` values are validated for every subcommand. Fill them (dummy values are fine) before teardown. |

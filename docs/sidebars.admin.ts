@@ -2,6 +2,9 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   adminSidebar: [
+    {type: 'doc', id: 'install', label: 'Install (Self-Hosted)'},
+    {type: 'doc', id: 'github-integration', label: 'GitHub Integration'},
+    {type: 'doc', id: 'backup-restore', label: 'Backup & Restore'},
     {type: 'doc', id: 'production-setup', label: 'Production Setup'},
     {type: 'doc', id: 'compatibility-policy', label: 'Compatibility Policy'},
     {type: 'doc', id: 'runtime-roles', label: 'Runtime Roles'},
