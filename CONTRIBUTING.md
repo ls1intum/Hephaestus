@@ -2,6 +2,10 @@
 
 Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
 
+## Maintenance Status
+
+Hephaestus is a research project at TUM, actively developed but maintained primarily by one person. Issues and pull requests are triaged on a best-effort basis. Security reports are the exception and get priority — see [SECURITY.md](SECURITY.md) for how to report vulnerabilities privately.
+
 ## Identity and Transparency
 
 To ensure a transparent and trustworthy environment, we have established different guidelines for members of our organization and external contributors.
@@ -45,28 +49,29 @@ We use **Semantic Release** to automatically version and release our application
 
 **❌ Will NOT Trigger Release** (Scope Overrides):
 
-| Pattern | Example | Why |
-|---------|---------|-----|
-| `*(ci):` | `fix(ci): update workflow` | CI/GitHub Actions only |
-| `*(config):` | `chore(config): update renovate.json` | **TOOLING only** (see warning below) |
-| `*(deps-dev):` | `chore(deps-dev): update test lib` | Dev dependencies only |
-| `*(scripts):` | `fix(scripts): fix build script` | Build/dev scripts only |
-| `*(no-release):`| `feat(no-release): internal feature` | Explicit opt-out |
+| Pattern          | Example                               | Why                                  |
+| ---------------- | ------------------------------------- | ------------------------------------ |
+| `*(ci):`         | `fix(ci): update workflow`            | CI/GitHub Actions only               |
+| `*(config):`     | `chore(config): update renovate.json` | **TOOLING only** (see warning below) |
+| `*(deps-dev):`   | `chore(deps-dev): update test lib`    | Dev dependencies only                |
+| `*(scripts):`    | `fix(scripts): fix build script`      | Build/dev scripts only               |
+| `*(no-release):` | `feat(no-release): internal feature`  | Explicit opt-out                     |
 
 > ⚠️ **`config` scope warning:** Only use for tooling config files like `.prettierrc`, `renovate.json`, `eslint.config.js`. Do NOT use for:
+>
 > - Runtime config (`application.yml`) → use `server`
 > - Dockerfiles → use service scope (`webapp`, `server`, etc.)
 > - Production compose files → use `docker`
 
 **✅ WILL Trigger Release**:
 
-| Type | Version | Example |
-|------|---------|---------|
-| `feat:` | **Minor** | `feat(webapp): add dark mode` |
-| `fix:` | **Patch** | `fix(api): handle null response` |
-| `perf:` | **Patch** | `perf: optimize query` |
-| `revert:` | **Patch** | `revert: undo change` |
-| `!:` | **Major** | `feat!: new api structure` |
+| Type      | Version   | Example                          |
+| --------- | --------- | -------------------------------- |
+| `feat:`   | **Minor** | `feat(webapp): add dark mode`    |
+| `fix:`    | **Patch** | `fix(api): handle null response` |
+| `perf:`   | **Patch** | `perf: optimize query`           |
+| `revert:` | **Patch** | `revert: undo change`            |
+| `!:`      | **Major** | `feat!: new api structure`       |
 
 **❌ Will NOT Trigger Release** (Type-Based):
 `docs:`, `style:`, `refactor:`, `test:`, `build:`, `chore:`, `ci:`
