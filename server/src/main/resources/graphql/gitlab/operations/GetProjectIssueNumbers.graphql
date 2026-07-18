@@ -23,8 +23,17 @@
 # how a sweep deletes live data. Confidential issues the token can see are enumerated too; they are a
 # superset of what the mirror stores (the mirror skips confidential), so their presence upstream can
 # only protect a local row, never delete one.
+# `issuesEnabled` is the other load-bearing scalar here, and it exists for a failure the `count`
+# cross-check provably cannot catch. GitLab's IssuesFinder scopes its query with
+# `.merge(Project.with_issues_enabled)`: a project whose Issues feature is switched off is filtered
+# out of the finder entirely, so this query returns `count: 0` and zero nodes — a syntactically
+# perfect, fully paginated, "complete" empty listing. `0 == 0` passes the count check, and the sweep
+# would tombstone every mirrored issue of a project whose issues are merely hidden, not deleted.
+# The sweep refuses the listing when this flag is explicitly false. It is nullable in the schema; a
+# null is treated as "unknown" and left to the sweep's empty-listing guard.
 query GetProjectIssueNumbers($fullPath: ID!, $first: Int!, $after: String) {
     project(fullPath: $fullPath) {
+        issuesEnabled
         issues(first: $first, after: $after, sort: CREATED_ASC) {
             count
             pageInfo {

@@ -10,8 +10,14 @@
 # the same append-only stability GetProjectIssueNumbers relies on. No `state:` filter, so MERGED and
 # CLOSED merge requests are enumerated too — filtering here would make every filtered-out MR look
 # deleted.
+# `mergeRequestsEnabled` mirrors GetProjectIssueNumbers' `issuesEnabled`, for the same reason: a
+# project with the Merge Requests feature switched off is scoped out of the finder and answers with
+# `count: 0` and zero nodes rather than an error — a "complete" empty listing that would authorize
+# tombstoning every mirrored MR of a project whose MRs are hidden, not deleted. The sweep refuses the
+# listing when this flag is explicitly false; a null is treated as unknown.
 query GetProjectMergeRequestNumbers($fullPath: ID!, $first: Int!, $after: String) {
     project(fullPath: $fullPath) {
+        mergeRequestsEnabled
         mergeRequests(first: $first, after: $after, sort: CREATED_ASC) {
             count
             pageInfo {

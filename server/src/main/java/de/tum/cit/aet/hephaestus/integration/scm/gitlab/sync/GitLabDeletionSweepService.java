@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 
@@ -60,6 +61,34 @@ import org.springframework.stereotype.Service;
  * that {@code count}. Any doubt — including a doubt this code did not anticipate, since the flag
  * starts {@code false} and is set only on the one clean exit — skips the entity class entirely and
  * deletes nothing. A partial listing is never merged with a previous one.
+ *
+ * <h3>An empty listing is not evidence of an empty project</h3>
+ *
+ * The completeness proof above is a proof about <em>pagination</em>, and pagination is trivially
+ * "complete" for a listing that returned nothing: {@code 0 == 0} satisfies the count cross-check
+ * exactly as well as {@code 4000 == 4000} does. That is the one shape where the strongest check in
+ * this class has no discriminating power at all, and it authorizes tombstoning the entire project.
+ * Two further guards close it, both fail-closed:
+ *
+ * <ol>
+ *   <li><b>{@code featureDisabled}</b> — GitLab's {@code IssuesFinder} silently scopes out projects
+ *       whose Issues feature is switched off ({@code .merge(Project.with_issues_enabled)}), and the
+ *       merge-request finder behaves the same way. Turning the feature off therefore does not raise an
+ *       error; it renders as a perfectly well-formed, perfectly "complete" listing of zero items.
+ *       The sweep now selects {@code project.issuesEnabled} / {@code project.mergeRequestsEnabled}
+ *       alongside the connection and refuses the listing whenever the relevant flag is explicitly
+ *       {@code false}. A toggled-off feature hides upstream data; it does not delete it.
+ *   <li><b>{@code emptyUpstreamWithLiveMirror}</b> — independently of any flag, a provably-complete but
+ *       <em>empty</em> upstream listing is refused whenever the mirror still holds live rows of that
+ *       class. The two readings of that combination are "every issue in the project was deleted since
+ *       the last sync" and "something about this listing is wrong (permission scope-out, a feature flag
+ *       GitLab has not told us about, a vendor bug)". The first is rare and self-heals on the next
+ *       sync; the second is not, and being wrong costs the whole project. So the sweep declines and
+ *       reports degraded rather than deleting on the least trustworthy evidence it can receive.
+ * </ol>
+ *
+ * <p>The cost of both guards is bounded and known: a project whose issues really were all deleted keeps
+ * its phantom rows until a human notices. That is the deliberately cheaper failure.
  *
  * <p>Tombstone rather than row deletion: see {@code Issue#deletedAt}. Because
  * {@code IssueRepository.upsertCore} / {@code PullRequestRepository.upsertCore} clear the tombstone
@@ -107,17 +136,30 @@ public class GitLabDeletionSweepService {
 
     /** Which of the two entity classes a listing/diff pass is operating on. */
     private enum SweptEntity {
-        ISSUE("issues", ISSUE_QUERY_DOCUMENT, "project.issues"),
-        MERGE_REQUEST("merge requests", MERGE_REQUEST_QUERY_DOCUMENT, "project.mergeRequests");
+        ISSUE("issues", ISSUE_QUERY_DOCUMENT, "project.issues", "project.issuesEnabled"),
+        MERGE_REQUEST(
+            "merge requests",
+            MERGE_REQUEST_QUERY_DOCUMENT,
+            "project.mergeRequests",
+            "project.mergeRequestsEnabled"
+        );
 
         private final String plural;
         private final String document;
         private final String field;
 
-        SweptEntity(String plural, String document, String field) {
+        /**
+         * Path of the project-level flag that says whether this entity class exists upstream at all.
+         * When it is off, GitLab's finder scopes the project out and returns an empty connection rather
+         * than an error — the listing would otherwise look complete and authorize deleting everything.
+         */
+        private final String featureFlagPath;
+
+        SweptEntity(String plural, String document, String field, String featureFlagPath) {
             this.plural = plural;
             this.document = document;
             this.field = field;
+            this.featureFlagPath = featureFlagPath;
         }
 
         String countPath() {
@@ -315,6 +357,15 @@ public class GitLabDeletionSweepService {
             List<Integer> localBeforeListing = localLiveNumbers(repository.getId(), entity);
 
             UpstreamListing listing = listUpstreamNumbers(scopeId, fullPath, entity, safeProjectPath, handle);
+            // The count cross-check inside the listing cannot see this one: an empty listing reconciles
+            // with an upstream count of zero perfectly, so "complete" is earned without proving anything.
+            // Wiping a whole project on that evidence is not a trade worth making, so demote it to the
+            // same incomplete/degraded path every other doubt takes. `localBeforeListing` is read through
+            // a TYPE()-discriminated query, so an empty issue mirror is not masked by live merge requests
+            // sharing the single `issue` table (and vice versa).
+            if (listing.complete() && listing.numbers().isEmpty() && !localBeforeListing.isEmpty()) {
+                listing = UpstreamListing.incomplete("emptyUpstreamWithLiveMirror");
+            }
             if (!listing.complete()) {
                 skipped = true;
                 log.warn(
@@ -490,6 +541,20 @@ public class GitLabDeletionSweepService {
             }
             graphQlClientProvider.recordSuccess();
 
+            // Interrogate the feature flag before believing a single node. A project with Issues (or
+            // Merge Requests) switched off is scoped out by GitLab's finder, so the connection comes back
+            // empty and well-formed — the exact shape of "this project has nothing", which would tombstone
+            // the entire mirrored set. Only an explicit `false` aborts: a null (older GitLab, restricted
+            // field) leaves the decision to the emptiness guard rather than blocking every sweep.
+            if (Boolean.FALSE.equals(readBooleanField(response, entity.featureFlagPath))) {
+                log.warn(
+                    "GitLab deletion sweep listing refused, feature disabled upstream: context={}, flag={}",
+                    context,
+                    entity.featureFlagPath
+                );
+                return UpstreamListing.incomplete("featureDisabled");
+            }
+
             int pageCount;
             List<Integer> pageNumbers;
             GitLabPageInfo pageInfo;
@@ -576,6 +641,22 @@ public class GitLabDeletionSweepService {
         }
 
         return UpstreamListing.complete(numbers);
+    }
+
+    /**
+     * Reads a boolean scalar out of a response without letting a missing or undecodable field become an
+     * exception. Returns {@code null} for "not answered" so callers can distinguish it from {@code false}
+     * — the distinction matters, because only an explicit {@code false} is evidence of anything.
+     */
+    @Nullable
+    private static Boolean readBooleanField(ClientGraphQlResponse response, String path) {
+        try {
+            ClientResponseField field = response.field(path);
+            Object value = field == null ? null : field.getValue();
+            return value instanceof Boolean bool ? bool : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     @Nullable

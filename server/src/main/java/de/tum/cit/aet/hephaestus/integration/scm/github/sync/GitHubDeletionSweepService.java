@@ -33,6 +33,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
@@ -66,6 +67,33 @@ import reactor.util.retry.Retry;
  * with the server's own {@code totalCount}. Any doubt — including any doubt this code did not
  * anticipate, since the flag starts {@code false} and is set only on the one clean exit — skips the
  * repository entirely and deletes nothing. A partial listing is never merged with a previous one.
+ *
+ * <h3>An empty listing is not evidence of an empty repository</h3>
+ *
+ * The completeness proof above is a proof about <em>pagination</em>, and pagination is trivially
+ * "complete" for a listing that returned nothing: {@code 0 == 0} satisfies the {@code totalCount}
+ * cross-check exactly as well as {@code 4000 == 4000} does. That is the one shape where the strongest
+ * check in this class has no discriminating power at all, and it authorizes tombstoning the whole
+ * repository. Two further guards close it, both fail-closed:
+ *
+ * <ol>
+ *   <li><b>{@code featureDisabled}</b> — a repository whose Issues feature is switched off still answers
+ *       the {@code issues} connection, with zero nodes and {@code totalCount: 0}. That is indexing
+ *       state, not deletion: turning Issues back on returns every issue. The sweep selects
+ *       {@code repository.hasIssuesEnabled} alongside the connection and refuses the listing when it is
+ *       explicitly {@code false}. Pull requests have no equivalent toggle in GitHub's schema, so only
+ *       the issue half carries a flag.
+ *   <li><b>{@code emptyUpstreamWithLiveMirror}</b> — independently of any flag, a provably-complete but
+ *       <em>empty</em> upstream listing is refused whenever the mirror still holds live rows of that
+ *       class. The two readings of that combination are "every issue in the repository was deleted since
+ *       the last sync" and "something about this listing is wrong (a narrowed token, an unannounced
+ *       feature toggle, a vendor bug)". The first is rare and self-heals on the next sync; the second is
+ *       not, and being wrong costs the whole repository. So the sweep declines and reports degraded
+ *       rather than deleting on the least trustworthy evidence it can receive.
+ * </ol>
+ *
+ * <p>The cost of both guards is bounded and known: a repository whose issues really were all deleted
+ * keeps its phantom rows until a human notices. That is the deliberately cheaper failure.
  *
  * <p>Tombstone rather than row deletion: see {@code Issue#deletedAt}. Because
  * {@code IssueRepository.upsertCore} clears the tombstone, a repository wrongly swept heals itself on
@@ -110,17 +138,28 @@ public class GitHubDeletionSweepService {
 
     /** Which of the two entity classes a listing/diff pass is operating on. */
     private enum SweptEntity {
-        ISSUE("issues", ISSUE_QUERY_DOCUMENT, "repository.issues"),
-        PULL_REQUEST("pull requests", PULL_REQUEST_QUERY_DOCUMENT, "repository.pullRequests");
+        ISSUE("issues", ISSUE_QUERY_DOCUMENT, "repository.issues", "repository.hasIssuesEnabled"),
+        // GitHub has no repository-level toggle for pull requests — they cannot be switched off — so
+        // there is no flag to interrogate here. The emptiness guard still covers this class.
+        PULL_REQUEST("pull requests", PULL_REQUEST_QUERY_DOCUMENT, "repository.pullRequests", null);
 
         private final String plural;
         private final String document;
         private final String field;
 
-        SweptEntity(String plural, String document, String field) {
+        /**
+         * Path of the repository-level flag that says whether this entity class is switched on upstream,
+         * or {@code null} when the vendor has no such toggle. A disabled feature answers the connection
+         * with zero nodes rather than an error, which would otherwise read as a complete empty listing.
+         */
+        @Nullable
+        private final String featureFlagPath;
+
+        SweptEntity(String plural, String document, String field, @Nullable String featureFlagPath) {
             this.plural = plural;
             this.document = document;
             this.field = field;
+            this.featureFlagPath = featureFlagPath;
         }
     }
 
@@ -309,6 +348,15 @@ public class GitHubDeletionSweepService {
             List<Integer> localBeforeListing = localLiveNumbers(repository.getId(), entity);
 
             UpstreamListing listing = listUpstreamNumbers(scopeId, parsed.get(), entity, safeNameWithOwner, handle);
+            // The totalCount cross-check inside the listing cannot see this one: an empty listing
+            // reconciles with a totalCount of zero perfectly, so "complete" is earned without proving
+            // anything. Wiping a whole repository on that evidence is not a trade worth making, so demote
+            // it to the same incomplete/degraded path every other doubt takes. `localBeforeListing` is
+            // read through a TYPE()-discriminated query, so an empty issue mirror is not masked by live
+            // pull requests sharing the single `issue` table (and vice versa).
+            if (listing.complete() && listing.numbers().isEmpty() && !localBeforeListing.isEmpty()) {
+                listing = UpstreamListing.incomplete("emptyUpstreamWithLiveMirror");
+            }
             if (!listing.complete()) {
                 skipped = true;
                 log.warn(
@@ -486,6 +534,24 @@ public class GitHubDeletionSweepService {
 
             graphQlClientProvider.trackRateLimit(scopeId, response);
 
+            // Interrogate the feature flag before believing a single node. A repository with Issues
+            // switched off still answers the connection — with nothing in it — which is indistinguishable
+            // from "this repository has no issues" and would tombstone the entire mirrored set. Only an
+            // explicit `false` aborts: a null (field unselected, restricted, or undecodable) leaves the
+            // decision to the emptiness guard rather than blocking every sweep.
+            if (
+                entity.featureFlagPath != null &&
+                Boolean.FALSE.equals(readBooleanField(response, entity.featureFlagPath))
+            ) {
+                log.warn(
+                    "Deletion sweep listing refused, feature disabled upstream: entity={}, repoName={}, flag={}",
+                    entity.plural,
+                    safeNameWithOwner,
+                    entity.featureFlagPath
+                );
+                return UpstreamListing.incomplete("featureDisabled");
+            }
+
             GHPageInfo pageInfo;
             List<Integer> pageNumbers;
             int pageTotalCount;
@@ -573,6 +639,22 @@ public class GitHubDeletionSweepService {
         }
 
         return UpstreamListing.complete(numbers);
+    }
+
+    /**
+     * Reads a boolean scalar out of a response without letting a missing or undecodable field become an
+     * exception. Returns {@code null} for "not answered" so callers can distinguish it from {@code false}
+     * — the distinction matters, because only an explicit {@code false} is evidence of anything.
+     */
+    @Nullable
+    private static Boolean readBooleanField(ClientGraphQlResponse response, String path) {
+        try {
+            ClientResponseField field = response.field(path);
+            Object value = field == null ? null : field.getValue();
+            return value instanceof Boolean bool ? bool : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static boolean isCancelled(@Nullable SyncExecutionHandle handle) {

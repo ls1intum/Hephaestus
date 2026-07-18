@@ -163,6 +163,37 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
         return response;
     }
 
+    /**
+     * Stubs a project-level feature flag onto an already-built page mock.
+     *
+     * <p>Left unstubbed by {@link #page}, the flag reads as {@code null} — "unknown" — which is what an
+     * older GitLab or a restricted field looks like and which the sweep deliberately does not treat as
+     * evidence. Tests that care about the flag say so explicitly.
+     */
+    private static ClientGraphQlResponse withFlag(ClientGraphQlResponse response, String path, Boolean value) {
+        ClientResponseField field = mock(ClientResponseField.class);
+        lenient().when(field.getValue()).thenReturn(value);
+        lenient().when(response.field(path)).thenReturn(field);
+        return response;
+    }
+
+    private ClientGraphQlResponse issuePage(List<Integer> iids, boolean hasNextPage, int count, Boolean issuesEnabled) {
+        return withFlag(issuePage(iids, hasNextPage, count), "project.issuesEnabled", issuesEnabled);
+    }
+
+    private ClientGraphQlResponse mergeRequestPage(
+        List<Integer> iids,
+        boolean hasNextPage,
+        int count,
+        Boolean mergeRequestsEnabled
+    ) {
+        return withFlag(
+            mergeRequestPage(iids, hasNextPage, count),
+            "project.mergeRequestsEnabled",
+            mergeRequestsEnabled
+        );
+    }
+
     /** Both entity classes report an empty, provably-complete upstream — the inert default. */
     private void scriptEmptyUpstream() {
         scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0)));
@@ -459,6 +490,130 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
             verifyNothingTombstoned();
             assertThat(outcome.total()).isZero();
+        }
+    }
+
+    /**
+     * The blind spot the completeness proof cannot cover. Every check in {@link FailsClosed} is a check
+     * about pagination, and pagination is trivially complete for a listing that returned nothing:
+     * {@code count: 0} reconciles with zero received IIDs perfectly. These tests pin the two guards that
+     * stop that degenerate agreement from authorizing the deletion of an entire project.
+     */
+    @Nested
+    class RefusesUnprovableEmptiness {
+
+        @Test
+        void shouldRefuseTheIssueListingWhenIssuesAreDisabledUpstream() {
+            // The isolating case for the flag guard: the mirror is empty, so the emptiness guard cannot
+            // fire and the ONLY thing that can mark this degraded is reading issuesEnabled. Without the
+            // flag, GitLab's finder scopes the project out and this reads as a clean, complete no-op.
+            scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0, false)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
+            stubLocalNumbers(List.of(), List.of());
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verifyNothingTombstoned();
+            assertThat(outcome.skipped()).isTrue();
+        }
+
+        @Test
+        void shouldTombstoneNothingWhenIssuesAreDisabledUpstreamButTheMirrorHasLiveIssues() {
+            // The consequential case: switching Issues off hides the project's issues from the finder. It
+            // does not delete them, and switching the feature back on returns every one.
+            scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0, false)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
+            stubLocalNumbers(List.of(1, 2, 3), List.of());
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verifyNothingTombstoned();
+            assertThat(outcome.issuesTombstoned()).isZero();
+            assertThat(outcome.skipped()).isTrue();
+        }
+
+        @Test
+        void shouldRefuseTheMergeRequestListingWhenMergeRequestsAreDisabledUpstream() {
+            // The merge-request half has its own project-level toggle and its own finder scope. The mirror
+            // is empty so the emptiness guard cannot fire — reading mergeRequestsEnabled is the only thing
+            // that can mark this degraded.
+            scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0, true)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, false)));
+            stubLocalNumbers(List.of(), List.of());
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verifyNothingTombstoned();
+            assertThat(outcome.mergeRequestsTombstoned()).isZero();
+            assertThat(outcome.skipped()).isTrue();
+        }
+
+        @Test
+        void shouldDeleteNothingWhenUpstreamIssuesAreEmptyButTheMirrorStillHasLiveOnes() {
+            // Both flags say the features are ON, so the flag guard is deliberately inert and only the
+            // emptiness guard can save these three issues. "Every issue in the project was deleted since
+            // the last sync" is a far worse bet than "this listing is wrong".
+            scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0, true)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
+            stubLocalNumbers(List.of(1, 2, 3), List.of());
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verifyNothingTombstoned();
+            assertThat(outcome.issuesTombstoned()).isZero();
+            assertThat(outcome.skipped()).isTrue();
+        }
+
+        @Test
+        void shouldDeleteNothingWhenUpstreamMergeRequestsAreEmptyButTheMirrorStillHasLiveOnes() {
+            scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0, true)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
+            stubLocalNumbers(List.of(), List.of(10, 11));
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verifyNothingTombstoned();
+            assertThat(outcome.mergeRequestsTombstoned()).isZero();
+            assertThat(outcome.skipped()).isTrue();
+        }
+
+        @Test
+        void shouldStayACleanNoOpWhenUpstreamAndMirrorAreBothEmpty() {
+            // The guard must not turn every genuinely empty project into a permanent warning: with nothing
+            // local at risk there is nothing to protect, so this stays a non-degraded no-op.
+            scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0, true)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
+            stubLocalNumbers(List.of(), List.of());
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            verifyNothingTombstoned();
+            assertThat(outcome.total()).isZero();
+            assertThat(outcome.skipped()).isFalse();
+        }
+
+        @Test
+        void shouldStillTombstoneAGenuinelyAbsentIssueWhenUpstreamIsNotEmpty() {
+            // The guards are scoped to the empty listing and nothing else — an ordinary sweep with a
+            // non-empty, feature-enabled upstream must still retire the row that upstream really lost.
+            scriptedResponses.add(Mono.just(issuePage(List.of(1, 3), false, 2, true)));
+            scriptedResponses.add(Mono.just(mergeRequestPage(List.of(), false, 0, true)));
+            stubLocalNumbers(List.of(1, 2, 3), List.of());
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
+                1
+            );
+
+            var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
+
+            ArgumentCaptor<Collection<Integer>> captor = ArgumentCaptor.captor();
+            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
+                eq(REPO_ID),
+                captor.capture(),
+                any(Instant.class)
+            );
+            assertThat(captor.getValue()).containsExactly(2);
+            assertThat(outcome.issuesTombstoned()).isEqualTo(1);
+            assertThat(outcome.skipped()).isFalse();
         }
     }
 

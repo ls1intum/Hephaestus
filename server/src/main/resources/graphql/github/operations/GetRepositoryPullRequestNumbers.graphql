@@ -18,6 +18,10 @@
 # back to the default impl GHIssue — which is not a GHPullRequest — and throws
 # `InvalidTypeIdException: missing type id property '__typename'`. Every other document that decodes
 # into GHIssue/GHPullRequest selects it for the same reason. It is a meta field: it costs nothing.
+# No feature-flag selection, unlike GetRepositoryIssueNumbers' `hasIssuesEnabled`: GitHub has no
+# repository-level toggle for pull requests — they cannot be switched off — so there is nothing to
+# interrogate. The sweep's empty-listing guard (refuse a complete-but-empty upstream while the mirror
+# still holds live rows) still covers this connection.
 query GetRepositoryPullRequestNumbers($owner: String!, $name: String!, $first: Int!, $after: String) {
     rateLimit {
         cost
