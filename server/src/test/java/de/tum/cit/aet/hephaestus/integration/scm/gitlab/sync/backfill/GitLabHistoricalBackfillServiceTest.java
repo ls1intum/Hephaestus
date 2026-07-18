@@ -110,8 +110,24 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void secondPassIsGatedByTheCooldownOfTheFirst() {
+    void scheduledPassAfterAProductiveOneIsGatedByTheSuccessCooldown() {
         // One page of issues with more to come: the repository is nowhere near backfilled.
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
+            new BackfillBatchResult(25, 100, 124, "cursor-2", false, false)
+        );
+
+        // No handle: this is the 60s scheduler tick, which the success cooldown exists to space out.
+        int firstPass = service.runBackfillPass(SCOPE_ID, null);
+        int secondPass = service.runBackfillPass(SCOPE_ID, null);
+
+        assertThat(firstPass).isEqualTo(1);
+        assertThat(secondPass).isZero();
+        verify(issueSyncService, times(1)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
+    }
+
+    @Test
+    void jobDrivenPassIgnoresTheSuccessCooldownSoAManualBackfillDrains() {
+        // Same repository, same "more history remains" answer — but an administrator is driving.
         when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
             new BackfillBatchResult(25, 100, 124, "cursor-2", false, false)
         );
@@ -119,10 +135,23 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
         int firstPass = service.runBackfillPass(SCOPE_ID, handle);
         int secondPass = service.runBackfillPass(SCOPE_ID, handle);
 
-        // The first pass advanced the repository and parked it for five minutes; the second pass finds
-        // it on cooldown and does nothing — even though history plainly remains (hasMore/cursor-2).
+        // The success cooldown is tick-spacing for the scheduler, not a limit on a job the admin
+        // asked for; otherwise "Run backfill" would stop after one page on GitLab and drain on GitHub.
         assertThat(firstPass).isEqualTo(1);
-        assertThat(secondPass).isZero();
+        assertThat(secondPass).isEqualTo(1);
+        verify(issueSyncService, times(2)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
+    }
+
+    @Test
+    void errorBackoffGatesTheJobDrivenPassToo() {
+        // A vendor that just failed is backed off for everybody — an admin click cannot hammer it.
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
+            new BackfillBatchResult(0, 0, 0, null, false, true)
+        );
+
+        assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
+        assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
+
         verify(issueSyncService, times(1)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
     }
 

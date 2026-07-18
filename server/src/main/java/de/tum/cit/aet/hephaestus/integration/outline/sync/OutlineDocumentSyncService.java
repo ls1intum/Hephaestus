@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -53,6 +54,11 @@ import org.springframework.stereotype.Service;
  *
  * <p>The diff runs on {@link OutlineDocumentSnapshot}s, never entities — bodies are unbounded {@code text}
  * and the diff needs only timestamps, hashes and body presence. Only rows actually written are loaded whole.
+ *
+ * <p>This class only ever enumerates and upserts. Everything that <em>removes</em> mirrored content —
+ * tombstoning, the deletion-by-absence sweep, and the body-size eviction — lives in
+ * {@link OutlineMirrorRetentionService}; this class decides <em>whether</em> those may run, and the rules
+ * below are exactly that decision.
  *
  * <p><b>Invariants.</b> Tombstone-by-absence needs BOTH guards to hold. It runs only on a clean pass (full
  * enumeration, nothing skipped for budget): losing visibility of a collection, a truncated enumeration
@@ -79,12 +85,6 @@ public class OutlineDocumentSyncService {
     /** Matches {@code outline_collection.description}'s column width. */
     private static final int MAX_DESCRIPTION_LENGTH = 2048;
 
-    /** Postgres caps a statement at 65 535 bind parameters, so eviction pages its id list at this width. */
-    static final int EVICTION_BATCH_SIZE = 1000;
-
-    /** The eviction loop terminates on its own; this only bounds a pathological no-op {@code UPDATE}. */
-    private static final int MAX_EVICTION_ROUNDS = 100;
-
     private final ConnectionService connectionService;
     private final OutlineApiClient outlineApiClient;
     private final OutlineDocumentRepository documentRepository;
@@ -92,6 +92,7 @@ public class OutlineDocumentSyncService {
     private final OutlineWebhookRegistrar webhookRegistrar;
     private final OutlineProperties properties;
     private final OutlineMirrorWriter mirrorWriter;
+    private final OutlineMirrorRetentionService retention;
 
     public OutlineDocumentSyncService(
         ConnectionService connectionService,
@@ -100,7 +101,8 @@ public class OutlineDocumentSyncService {
         OutlineCollectionRepository collectionRepository,
         OutlineWebhookRegistrar webhookRegistrar,
         OutlineProperties properties,
-        OutlineMirrorWriter mirrorWriter
+        OutlineMirrorWriter mirrorWriter,
+        OutlineMirrorRetentionService retention
     ) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
@@ -109,6 +111,7 @@ public class OutlineDocumentSyncService {
         this.webhookRegistrar = webhookRegistrar;
         this.properties = properties;
         this.mirrorWriter = mirrorWriter;
+        this.retention = retention;
     }
 
     /**
@@ -136,6 +139,7 @@ public class OutlineDocumentSyncService {
             return;
         }
         Instant now = Instant.now();
+        BooleanSupplier cancelled = cancellationOf(handle);
         try {
             Map<String, OutlineCollectionModel> live = refreshCatalog(ctx);
             List<OutlineCollection> collections = collectionRepository.findForSync(
@@ -160,7 +164,7 @@ public class OutlineDocumentSyncService {
                     reportCollectionDone(handle, done, total, collection.getName());
                     continue;
                 }
-                if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now, type)) {
+                if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now, type, cancelled)) {
                     synced++;
                 } else {
                     reportWarning(handle);
@@ -171,7 +175,7 @@ public class OutlineDocumentSyncService {
             // Self-heal the change-notification subscription each reconcile (Outline auto-disables a
             // subscription after repeated delivery failures); best-effort, never throws.
             webhookRegistrar.ensureSubscription(workspaceId);
-            enforceSizeCap(workspaceId);
+            retention.enforceSizeCap(workspaceId);
             long stale = mirrorWriter.dropStaleTombstones(workspaceId, now.minus(properties.staleness()));
             log.info(
                 "outline.sync: workspaceId={} collections={} synced={} budgetLeft={} staleDropped={}",
@@ -216,6 +220,7 @@ public class OutlineDocumentSyncService {
             return;
         }
         Instant now = Instant.now();
+        BooleanSupplier cancelled = cancellationOf(handle);
         ExportBudget budget = new ExportBudget(properties.sync().exportBudget());
         Map<String, OutlineDocumentSnapshot> existing = loadExisting(ctx);
         int total = pending.size();
@@ -228,7 +233,15 @@ public class OutlineDocumentSyncService {
                 // The catch-up tick resumes a collection left PENDING by a budget-exhausted reconcile; it is
                 // itself a RECONCILIATION job, so a clean pass here may sweep.
                 if (
-                    !syncOneCollectionRecordingError(ctx, collection, existing, budget, now, SyncJobType.RECONCILIATION)
+                    !syncOneCollectionRecordingError(
+                        ctx,
+                        collection,
+                        existing,
+                        budget,
+                        now,
+                        SyncJobType.RECONCILIATION,
+                        cancelled
+                    )
                 ) {
                     reportWarning(handle);
                 }
@@ -241,7 +254,15 @@ public class OutlineDocumentSyncService {
         }
         // The catch-up tick exports bodies too, so it must also enforce the cap — including after a
         // rate-limited abort, since bodies exported before the pause still count against it.
-        enforceSizeCap(workspaceId);
+        retention.enforceSizeCap(workspaceId);
+    }
+
+    /**
+     * The cooperative-cancellation port for the document-level loops, derived from the enclosing job's
+     * handle. The unhandled (scheduled / webhook / targeted-kick) paths get a supplier that never trips.
+     */
+    private static BooleanSupplier cancellationOf(@Nullable SyncExecutionHandle handle) {
+        return handle == null ? () -> false : handle::isCancellationRequested;
     }
 
     /** Marks the enclosing job partially successful; no-op on the unhandled (scheduled/webhook) paths. */
@@ -298,7 +319,10 @@ public class OutlineDocumentSyncService {
                 Instant.now(),
                 // A targeted single-collection pass is a full enumeration of that collection — reconciling
                 // it, not populating a fresh mirror.
-                SyncJobType.RECONCILIATION
+                SyncJobType.RECONCILIATION,
+                // No job owns the targeted kick (fire-and-forget off the admin request thread), so there is
+                // nothing to cancel it from.
+                cancellationOf(null)
             );
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
@@ -339,7 +363,11 @@ public class OutlineDocumentSyncService {
             documentId
         );
         if (TOMBSTONE_EVENTS.contains(eventName)) {
-            mirrored.filter(d -> !d.isDeleted()).ifPresent(d -> tombstone(ctx, documentId, Instant.now(), null));
+            mirrored
+                .filter(d -> !d.isDeleted())
+                .ifPresent(d ->
+                    retention.tombstone(ctx.workspaceId(), ctx.connectionId(), documentId, Instant.now(), null)
+                );
             return;
         }
         if (ARCHIVE_EVENT.equals(eventName)) {
@@ -366,7 +394,9 @@ public class OutlineDocumentSyncService {
                 if (info.isEmpty()) {
                     mirrored
                         .filter(d -> !d.isDeleted())
-                        .ifPresent(d -> tombstone(ctx, documentId, Instant.now(), null));
+                        .ifPresent(d ->
+                            retention.tombstone(ctx.workspaceId(), ctx.connectionId(), documentId, Instant.now(), null)
+                        );
                     return;
                 }
                 meta = info.get();
@@ -415,7 +445,7 @@ public class OutlineDocumentSyncService {
                         collection.getCollectionId()
                     )) {
                         if (!doc.isDeleted()) {
-                            tombstone(ctx, doc.documentId(), now, null);
+                            retention.tombstone(ctx.workspaceId(), ctx.connectionId(), doc.documentId(), now, null);
                         }
                     }
                     recordCollectionError(ctx, collection, "Collection was deleted in Outline");
@@ -471,10 +501,11 @@ public class OutlineDocumentSyncService {
         Map<String, OutlineDocumentSnapshot> existing,
         ExportBudget budget,
         Instant now,
-        SyncJobType type
+        SyncJobType type,
+        BooleanSupplier cancelled
     ) {
         try {
-            syncOneCollection(ctx, collection, existing, budget, now, type);
+            syncOneCollection(ctx, collection, existing, budget, now, type, cancelled);
             return true;
         } catch (OutlineRateLimitedException e) {
             throw e;
@@ -497,6 +528,13 @@ public class OutlineDocumentSyncService {
      * no export skipped for budget) marks the row COMPLETE, and — on a {@code RECONCILIATION} pass —
      * tombstones this collection's vanished rows; a budget-exhausted pass leaves the row PENDING so nothing
      * is ever skipped silently.
+     *
+     * <p>{@code cancelled} is polled per document, not just per collection. A single collection may hold
+     * hundreds of documents and each export is its own round trip, so a cancel checked only between
+     * collections could leave a job hammering Outline for the whole export budget after the admin asked it
+     * to stop. A cancelled pass takes the same exit as a budget-exhausted one: leave the row PENDING and
+     * write nothing derived from the partial enumeration — in particular never the COMPLETE stamp and never
+     * the tombstone sweep, whose {@code seen} set is the one thing an aborted enumeration renders unsafe.
      */
     private void syncOneCollection(
         SyncContext ctx,
@@ -504,7 +542,8 @@ public class OutlineDocumentSyncService {
         Map<String, OutlineDocumentSnapshot> existing,
         ExportBudget budget,
         Instant now,
-        SyncJobType type
+        SyncJobType type,
+        BooleanSupplier cancelled
     ) {
         String collectionId = collection.getCollectionId();
         // documents.list is newest-first, so the budget is spent on the most recently edited documents.
@@ -524,6 +563,10 @@ public class OutlineDocumentSyncService {
         Set<String> seen = new HashSet<>();
         int skippedForBudget = 0;
         for (OutlineDocumentModel meta : metas) {
+            if (cancelled.getAsBoolean()) {
+                abortIncomplete(ctx, collection, collectionId);
+                return;
+            }
             if (meta.getId() == null) {
                 continue;
             }
@@ -538,6 +581,10 @@ public class OutlineDocumentSyncService {
         // Tree-only nodes (present in the structure but absent from documents.list) still count as seen
         // so a clean pass does not tombstone them.
         for (OutlineSyncMapping.FlatNode node : flat) {
+            if (cancelled.getAsBoolean()) {
+                abortIncomplete(ctx, collection, collectionId);
+                return;
+            }
             if (!seen.add(node.id())) {
                 continue;
             }
@@ -546,7 +593,13 @@ public class OutlineDocumentSyncService {
             }
         }
 
-        skippedForBudget += syncArchivedDocuments(ctx, collection, existing, seen, budget, now);
+        skippedForBudget += syncArchivedDocuments(ctx, collection, existing, seen, budget, now, cancelled);
+        if (cancelled.getAsBoolean()) {
+            // The archived pass may have stopped part-way, so `seen` is short by an unknown number of
+            // archived documents — exactly the rows the sweep must never touch.
+            abortIncomplete(ctx, collection, collectionId);
+            return;
+        }
 
         // Coverage counters are written on EVERY full enumeration (clean or budget-exhausted): the seen
         // set is complete either way — only exports were skipped, never the enumeration itself.
@@ -566,7 +619,9 @@ public class OutlineDocumentSyncService {
         // it is only half-way through building. The budget-exhausted return above is the other, independent
         // guard: an incomplete enumeration deletes nothing regardless of job type.
         int tombstoned =
-            type == SyncJobType.RECONCILIATION ? tombstoneVanished(ctx, existing, collectionId, seen, now) : 0;
+            type == SyncJobType.RECONCILIATION
+                ? retention.tombstoneVanished(ctx.workspaceId(), ctx.connectionId(), collectionId, existing, seen, now)
+                : 0;
         if (tombstoned > 0) {
             log.info(
                 "outline.sync: tombstoned {} vanished document(s) in collection {} (workspaceId={})",
@@ -582,6 +637,22 @@ public class OutlineDocumentSyncService {
             target.setSyncStatus(SyncStatus.COMPLETE);
             target.setLastSyncError(null);
         });
+    }
+
+    /**
+     * The exit an aborted enumeration takes: mark the collection PENDING and write nothing else.
+     *
+     * <p>Deliberately writes no coverage counters and no {@code documentsSyncedAt} — both describe a complete
+     * enumeration, and this one is not. PENDING is what makes the catch-up tick pick the collection back up,
+     * so a cancelled job leaves the mirror converging rather than frozen mid-collection.
+     */
+    private void abortIncomplete(SyncContext ctx, OutlineCollection collection, String collectionId) {
+        log.info(
+            "outline.sync: collection sync cancelled for workspaceId={}, collectionId={} — left PENDING",
+            ctx.workspaceId(),
+            collectionId
+        );
+        writeCollection(ctx, collection, target -> target.setSyncStatus(SyncStatus.PENDING));
     }
 
     /**
@@ -689,6 +760,10 @@ public class OutlineDocumentSyncService {
      * Enumerates a collection's archived documents (Outline's default listing excludes them) and adds each to
      * {@code seen}, so the tombstone-by-absence sweep never touches them — archive is recoverable, not a delete.
      *
+     * <p>Stops early when {@code cancelled} trips — each archived document may cost its own export, so this
+     * loop is as interruptible as the live one. The caller detects the short {@code seen} set and suppresses
+     * the sweep.
+     *
      * @return exports skipped for budget among the archived documents enumerated this pass
      */
     private int syncArchivedDocuments(
@@ -697,7 +772,8 @@ public class OutlineDocumentSyncService {
         Map<String, OutlineDocumentSnapshot> existing,
         Set<String> seen,
         ExportBudget budget,
-        Instant now
+        Instant now,
+        BooleanSupplier cancelled
     ) {
         int skipped = 0;
         for (OutlineDocumentModel meta : outlineApiClient.listArchivedDocuments(
@@ -705,6 +781,9 @@ public class OutlineDocumentSyncService {
             ctx.token(),
             collection.getCollectionId()
         )) {
+            if (cancelled.getAsBoolean()) {
+                return skipped;
+            }
             if (meta.getId() == null) {
                 continue;
             }
@@ -768,104 +847,6 @@ public class OutlineDocumentSyncService {
             existing.put(documentId, written);
         }
         return true;
-    }
-
-    /** Tombstone this collection's mirrored rows that were not seen in a clean RECONCILIATION pass. */
-    private int tombstoneVanished(
-        SyncContext ctx,
-        Map<String, OutlineDocumentSnapshot> existing,
-        String collectionId,
-        Set<String> seen,
-        Instant now
-    ) {
-        int count = 0;
-        for (OutlineDocumentSnapshot doc : List.copyOf(existing.values())) {
-            if (!collectionId.equals(doc.collectionId()) || seen.contains(doc.documentId()) || doc.isDeleted()) {
-                continue;
-            }
-            tombstone(ctx, doc.documentId(), now, existing);
-            count++;
-        }
-        return count;
-    }
-
-    /**
-     * Drop everything person- or content-bearing: the body, its hash, and the author/collaborator
-     * fields share the same PII posture — a document that no longer exists upstream keeps only its
-     * structural marker. The event log ({@code outline_document_event}) is deliberately untouched:
-     * it is the audit trail and erases with the workspace/connection, not with a document.
-     */
-    private void tombstone(
-        SyncContext ctx,
-        String documentId,
-        Instant now,
-        @Nullable Map<String, OutlineDocumentSnapshot> existing
-    ) {
-        OutlineDocumentSnapshot written = mirrorWriter.updateDocument(
-            ctx.workspaceId(),
-            ctx.connectionId(),
-            documentId,
-            doc -> {
-                doc.setDeletedAt(now);
-                doc.setBodyMarkdown(null);
-                // unlike an eviction, a tombstone drops the hash too (enforced by ck_outline_document_tombstone)
-                doc.setContentHash(null);
-                doc.setCreatedBySubject(null);
-                doc.setCreatedByName(null);
-                doc.setUpdatedBySubject(null);
-                doc.setUpdatedByName(null);
-                doc.setCollaboratorSubjects(null);
-            }
-        );
-        if (existing != null && written != null) {
-            existing.put(documentId, written);
-        }
-    }
-
-    /**
-     * Enforce the per-workspace body-size cap by nulling the least-recently-materialized bodies until the
-     * mirror is back under the cap. Size is measured in bytes ({@code octet_length}) against the byte cap,
-     * so multibyte content counts at its true on-disk weight rather than its character count.
-     *
-     * <p>Candidates are paged and evicted in batches of {@link #EVICTION_BATCH_SIZE}: an evicted row drops
-     * out of the candidate query, so each round makes progress. One unbounded {@code IN (:ids)} over a
-     * large over-cap mirror would blow past Postgres's 65 535 bind-parameter ceiling long before the
-     * planner gave up on it.
-     */
-    private void enforceSizeCap(long workspaceId) {
-        long capBytes = (long) properties.cache().maxSizeMb() * 1024L * 1024L;
-        long remaining = documentRepository.sumBodySizeByWorkspaceId(workspaceId);
-        if (remaining <= capBytes) {
-            return;
-        }
-        int evicted = 0;
-        for (int round = 0; round < MAX_EVICTION_ROUNDS && remaining > capBytes; round++) {
-            List<Object[]> candidates = documentRepository.findEvictionCandidates(workspaceId, EVICTION_BATCH_SIZE);
-            if (candidates.isEmpty()) {
-                break;
-            }
-            List<Long> batch = new ArrayList<>();
-            for (Object[] row : candidates) {
-                if (remaining <= capBytes) {
-                    break;
-                }
-                batch.add(((Number) row[0]).longValue());
-                remaining -= ((Number) row[1]).longValue();
-            }
-            if (batch.isEmpty()) {
-                break;
-            }
-            documentRepository.evictBodies(workspaceId, batch);
-            evicted += batch.size();
-        }
-        if (evicted > 0) {
-            log.info(
-                "outline.sync: evicted {} body(ies) for workspaceId={} to honor {}MB cap",
-                evicted,
-                workspaceId,
-                properties.cache().maxSizeMb()
-            );
-        }
     }
 
     /** Resolve the ACTIVE Outline connection, its server URL, and a decrypted token — or empty (logged). */

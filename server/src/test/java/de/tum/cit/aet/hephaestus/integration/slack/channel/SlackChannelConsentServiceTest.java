@@ -42,6 +42,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -93,9 +94,17 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
             connectionService,
             userRepository,
             uiLinks,
-            inlineTransactionTemplate()
+            inlineTransactionTemplate(),
+            eventPublisher
         );
     }
+
+    /** Captures what the service publishes; the AFTER_COMMIT hop itself is Spring's, not ours, to test. */
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    private static final SlackChannelConsentService.SlackChannelActivatedEvent ACTIVATION_KICK =
+        new SlackChannelConsentService.SlackChannelActivatedEvent(WS, CHANNEL);
 
     /** A TransactionTemplate over a no-op manager: callbacks run inline so unit tests need no real tx. */
     private static TransactionTemplate inlineTransactionTemplate() {
@@ -167,6 +176,54 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         assertThat(event.getToState()).isEqualTo(ConsentState.ACTIVE);
         assertThat(event.getActorUserId()).isEqualTo(5L);
         assertThat(event.getReason()).isEqualTo("pilot go");
+    }
+
+    /**
+     * Consent must kick the channel's history sync, not leave it waiting for the {@code 0 0 4 * * *} tick —
+     * the asymmetry every other integration already avoids (Outline kicks on collection registration,
+     * GitHub/GitLab on provision and repo-added). Published rather than called so it runs after this
+     * transaction commits and off the admin's request thread; {@code SlackDataSyncScheduler} consumes it.
+     */
+    @Test
+    void pendingToActive_publishesTheInitialHistorySyncKick() {
+        stubChannel(channel(ConsentState.PENDING, null));
+        stubActor(5L);
+
+        service().transition(WS, CHANNEL, ConsentState.ACTIVE, null);
+
+        verify(eventPublisher).publishEvent(ACTIVATION_KICK);
+    }
+
+    /** Every edge into ACTIVE kicks, including a resume — the sync is idempotent and watermark-paced. */
+    @Test
+    void pausedToActive_alsoPublishesTheKick() {
+        stubChannel(channel(ConsentState.PAUSED, Instant.parse("2020-01-01T00:00:00Z")));
+        stubActor(5L);
+
+        service().transition(WS, CHANNEL, ConsentState.ACTIVE, null);
+
+        verify(eventPublisher).publishEvent(ACTIVATION_KICK);
+    }
+
+    /** No transition into ACTIVE, no kick: pausing must not schedule work against a channel it just stopped. */
+    @Test
+    void transitionAwayFromActive_publishesNoKick() {
+        stubChannel(channel(ConsentState.ACTIVE, Instant.parse("2020-01-01T00:00:00Z")));
+        stubActor(5L);
+
+        service().transition(WS, CHANNEL, ConsentState.PAUSED, null);
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    /** A same-state PATCH is an idempotent no-op — it must not re-fire the kick on every admin double-click. */
+    @Test
+    void redundantActivation_publishesNoKick() {
+        stubChannel(channel(ConsentState.ACTIVE, Instant.parse("2020-01-01T00:00:00Z")));
+
+        service().transition(WS, CHANNEL, ConsentState.ACTIVE, null);
+
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test

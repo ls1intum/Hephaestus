@@ -95,6 +95,9 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             new OutlineProperties.Cache(200),
             Duration.ofDays(30)
         );
+        OutlineMirrorWriter mirrorWriter = new OutlineMirrorWriter(
+            new OutlineMirrorTransactions(documentRepository, collectionRepository)
+        );
         return new OutlineDocumentSyncService(
             connectionService,
             outlineApiClient,
@@ -102,7 +105,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
             collectionRepository,
             webhookRegistrar,
             properties,
-            new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository))
+            mirrorWriter,
+            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties)
         );
     }
 

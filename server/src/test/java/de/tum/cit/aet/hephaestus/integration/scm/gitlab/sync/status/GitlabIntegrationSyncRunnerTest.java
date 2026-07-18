@@ -77,41 +77,61 @@ class GitlabIntegrationSyncRunnerTest extends BaseUnitTest {
             assertThat(runner.supportsBackfill()).isTrue();
         }
 
+        /**
+         * The asymmetry this closes: GitHub's "Run backfill" drives to completion while GitLab's ran a
+         * single batch per click, behind identical-looking buttons. The runner now loops until a pass
+         * advances nothing, exactly like {@code GithubIntegrationSyncRunner#backfill}.
+         */
         @Test
-        void runsExactlyOnePassEvenWhenRepositoriesAdvanced() {
-            when(backfillService.runBackfillPass(eq(WORKSPACE_ID), eq(handle))).thenReturn(2);
+        void keepsRunningPassesWhileRepositoriesAdvance_andStopsOnTheFirstUnproductiveOne() {
+            when(backfillService.runBackfillPass(eq(WORKSPACE_ID), eq(handle))).thenReturn(2, 1, 0);
 
             runner.backfill(ref, handle);
 
-            // One batch per repository, then return. A second pass could only skip what this one just
-            // advanced — every repository that did work is on a five-minute cooldown (proven by
-            // GitLabHistoricalBackfillServiceTest#secondPassIsGatedByTheCooldownOfTheFirst). Passing the
-            // handle is what makes progress and cancellation observable to the service.
-            verify(backfillService, times(1)).runBackfillPass(WORKSPACE_ID, handle);
+            verify(backfillService, times(3)).runBackfillPass(WORKSPACE_ID, handle);
             verify(handle, never()).reportCancelled();
+            // Three repositories advanced across the job — the pass that ended the loop is the loop's
+            // termination condition, not a failure, so this is a clean success. (In production the second
+            // pass is already gated by GitLabHistoricalBackfillService's five-minute COOLDOWN_NORMAL, which
+            // is why one click still drains only one batch per repository today.)
             verify(handle, never()).reportWarnings();
         }
 
         @Test
-        void passThatAdvancedNothing_reportsWarningsSoTheJobDoesNotLookLikeACleanSuccess() {
+        void jobThatAdvancedNothingAtAll_reportsWarningsSoItDoesNotLookLikeACleanSuccess() {
             when(backfillService.runBackfillPass(eq(WORKSPACE_ID), eq(handle))).thenReturn(0);
 
             runner.backfill(ref, handle);
 
+            verify(backfillService, times(1)).runBackfillPass(WORKSPACE_ID, handle);
             verify(handle).reportWarnings();
             verify(handle, never()).reportCancelled();
         }
 
+        /** The loop must re-poll cancellation every iteration, not just before the first pass. */
         @Test
-        void cancellationObservedDuringThePass_reportsCancelledAndNotWarnings() {
-            when(handle.isCancellationRequested()).thenReturn(true);
-            // The pass returns early on its own cancel checkpoint, having advanced nothing.
-            when(backfillService.runBackfillPass(anyLong(), any())).thenReturn(0);
+        void cancellationRequestedBetweenPasses_stopsLoopingAndReportsCancelled() {
+            when(handle.isCancellationRequested()).thenReturn(false, false, true);
+            when(backfillService.runBackfillPass(eq(WORKSPACE_ID), eq(handle))).thenReturn(3);
 
             runner.backfill(ref, handle);
 
+            // Two productive passes, then the cancel checkpoint ends the loop — without the per-iteration
+            // check this would spin on a service that keeps reporting progress.
+            verify(backfillService, times(2)).runBackfillPass(WORKSPACE_ID, handle);
             verify(handle).reportCancelled();
             // An abort is not a warning — the job must finalize CANCELLED, not SUCCEEDED_WITH_WARNINGS.
+            verify(handle, never()).reportWarnings();
+        }
+
+        @Test
+        void cancellationRequestedBeforeTheFirstPass_neverTouchesTheVendor() {
+            when(handle.isCancellationRequested()).thenReturn(true);
+
+            runner.backfill(ref, handle);
+
+            verify(backfillService, never()).runBackfillPass(anyLong(), any());
+            verify(handle).reportCancelled();
             verify(handle, never()).reportWarnings();
         }
     }

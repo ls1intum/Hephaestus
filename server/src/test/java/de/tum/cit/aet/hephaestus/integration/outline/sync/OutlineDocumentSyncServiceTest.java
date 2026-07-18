@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
@@ -40,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -51,10 +54,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * <em>no-wipe</em>: a pass that dies mid-way (429, revoked token) must leave already-mirrored documents
  * intact, because the alternative is silent, irreversible data loss.
  *
- * <p>{@link OutlineMirrorWriter} and {@link OutlineMirrorTransactions} are the real production objects over
- * mocked repositories, so the load-or-create + mutate + save + retry-in-a-fresh-transaction shape is under
- * test rather than stubbed. The {@code @Transactional} boundaries themselves need a container and are pinned
- * by {@code OutlineDocumentSyncIntegrationTest}.
+ * <p>{@link OutlineMirrorWriter}, {@link OutlineMirrorTransactions} and {@link OutlineMirrorRetentionService}
+ * are the real production objects over mocked repositories, so the load-or-create + mutate + save +
+ * retry-in-a-fresh-transaction shape is under test rather than stubbed — and so the tombstone, sweep and
+ * eviction assertions below still run through the erasure code that ships, not a stub of it. The
+ * {@code @Transactional} boundaries themselves need a container and are pinned by
+ * {@code OutlineDocumentSyncIntegrationTest}.
  */
 class OutlineDocumentSyncServiceTest extends BaseUnitTest {
 
@@ -96,6 +101,9 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             new OutlineProperties.Cache(cacheMaxSizeMb),
             Duration.ofDays(30)
         );
+        OutlineMirrorWriter mirrorWriter = new OutlineMirrorWriter(
+            new OutlineMirrorTransactions(documentRepository, collectionRepository)
+        );
         return new OutlineDocumentSyncService(
             connectionService,
             outlineApiClient,
@@ -103,7 +111,8 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             collectionRepository,
             webhookRegistrar,
             properties,
-            new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository))
+            mirrorWriter,
+            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties)
         );
     }
 
@@ -1099,6 +1108,83 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
         service(10).syncWorkspace(WORKSPACE);
 
         // The catalog write lost its race and was replayed; the pass still completes the collection.
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
+    }
+
+    // --- cooperative cancellation: the job handle reaches the per-document loop, not just the collection loop ---
+
+    /**
+     * Cancellation was only checked between collections, so a job cancelled while inside a single large
+     * collection kept exporting — up to the whole export budget of documents — after the admin pressed
+     * Cancel. The check now runs per document.
+     */
+    @Test
+    void cancellationMidCollection_stopsExportingAtTheNextDocument() {
+        SyncExecutionHandle handle = mock(SyncExecutionHandle.class);
+        AtomicInteger polls = new AtomicInteger();
+        // false for the collection-loop check and for doc-1, true from doc-2 onwards.
+        when(handle.isCancellationRequested()).thenAnswer(inv -> polls.getAndIncrement() >= 2);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T1), meta("doc-2", T1), meta("doc-3", T1), meta("doc-4", T1))
+        );
+        when(outlineApiClient.exportDocument(anyString(), anyString(), anyString())).thenReturn("# body");
+
+        service(500).syncWorkspace(WORKSPACE, handle, SyncJobType.RECONCILIATION);
+
+        verify(outlineApiClient, times(1)).exportDocument(SERVER_URL, "token", "doc-1");
+        verify(outlineApiClient, never()).exportDocument(SERVER_URL, "token", "doc-2");
+        verify(outlineApiClient, never()).exportDocument(SERVER_URL, "token", "doc-3");
+    }
+
+    /**
+     * An aborted enumeration is an incomplete one, so it must take the same exit a budget-exhausted pass
+     * takes: PENDING (so the catch-up tick resumes it), never COMPLETE, and above all never the
+     * tombstone-by-absence sweep — its {@code seen} set is short by every document it did not reach.
+     */
+    @Test
+    void cancellationMidCollection_leavesThePassPending_andTombstonesNothing() {
+        // Start from COMPLETE so PENDING has to be written by the abort rather than merely left in place.
+        collection.setSyncStatus(SyncStatus.COMPLETE);
+        OutlineDocument reached = mirrored("doc-1");
+        reached.setBodyMarkdown("# one");
+        reached.setContentHash("hash-1");
+        reached.setOutlineUpdatedAt(T1);
+        // Mirrored, upstream, but never enumerated because the cancel landed first. A pass that wrongly
+        // counted as clean would read it as vanished and tombstone it.
+        OutlineDocument unreached = mirrored("doc-4");
+        unreached.setBodyMarkdown("# four");
+        unreached.setContentHash("hash-4");
+        unreached.setOutlineUpdatedAt(T1);
+        inMirror(reached, unreached);
+
+        SyncExecutionHandle handle = mock(SyncExecutionHandle.class);
+        AtomicInteger polls = new AtomicInteger();
+        when(handle.isCancellationRequested()).thenAnswer(inv -> polls.getAndIncrement() >= 2);
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T2), meta("doc-4", T2))
+        );
+        when(outlineApiClient.exportDocument(anyString(), anyString(), anyString())).thenReturn("# body");
+
+        service(500).syncWorkspace(WORKSPACE, handle, SyncJobType.RECONCILIATION);
+
+        assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.PENDING);
+        assertThat(collection.getDocumentsSyncedAt()).isNull();
+        assertThat(unreached.isDeleted()).isFalse();
+        assertThat(unreached.getBodyMarkdown()).isEqualTo("# four");
+        verify(documentRepository, never()).saveAndFlush(argThat(OutlineDocument::isDeleted));
+    }
+
+    /** Without a handle (scheduled tick, webhook, targeted kick) nothing is interruptible and the pass completes. */
+    @Test
+    void withoutAHandle_everyDocumentIsStillExported() {
+        when(outlineApiClient.listDocuments(SERVER_URL, "token", COLLECTION_ID)).thenReturn(
+            List.of(meta("doc-1", T1), meta("doc-2", T1), meta("doc-3", T1))
+        );
+        when(outlineApiClient.exportDocument(anyString(), anyString(), anyString())).thenReturn("# body");
+
+        service(500).syncWorkspace(WORKSPACE);
+
+        verify(outlineApiClient, times(3)).exportDocument(anyString(), anyString(), anyString());
         assertThat(collection.getSyncStatus()).isEqualTo(SyncStatus.COMPLETE);
     }
 }

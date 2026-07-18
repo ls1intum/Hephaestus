@@ -11,18 +11,24 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
+import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.status.SlackIntegrationSyncRunner;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Nightly Slack reconciliation, the Slack counterpart of the SCM data-sync schedulers: refresh channel metadata
@@ -49,6 +55,7 @@ public class SlackDataSyncScheduler {
     private final ConnectionService connectionService;
     private final SyncJobService syncJobService;
     private final SlackSyncProperties properties;
+    private final AsyncTaskExecutor taskExecutor;
 
     public SlackDataSyncScheduler(
         SlackMonitoredChannelRepository monitoredChannelRepository,
@@ -56,7 +63,8 @@ public class SlackDataSyncScheduler {
         SlackChannelHistorySyncService historySyncService,
         ConnectionService connectionService,
         SyncJobService syncJobService,
-        SlackSyncProperties properties
+        SlackSyncProperties properties,
+        @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor
     ) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.metadataRefresher = metadataRefresher;
@@ -64,6 +72,7 @@ public class SlackDataSyncScheduler {
         this.connectionService = connectionService;
         this.syncJobService = syncJobService;
         this.properties = properties;
+        this.taskExecutor = taskExecutor;
     }
 
     @Scheduled(cron = "${hephaestus.sync.slack.cron}")
@@ -136,6 +145,68 @@ public class SlackDataSyncScheduler {
     }
 
     /**
+     * Kicks the newly consented channel's first history sync once {@link SlackChannelConsentService}'s
+     * transaction has committed — the Slack counterpart of Outline's add-resource kick, and the reason a
+     * freshly consented channel no longer waits up to 24h for the {@code 0 0 4 * * *} tick to notice it.
+     *
+     * <p>After commit, and off the request thread, for the same two reasons Outline's is: the async pass must
+     * be guaranteed to read the ACTIVE row it is meant to converge (called inline it would still see the
+     * pre-transition state and no-op), and the admin's PATCH must not block on Slack round trips.
+     *
+     * <p>Unguarded against pile-up, like Outline's: {@link SlackChannelConsentService#transition} is
+     * state-gated (a second PATCH to the same state is an idempotent no-op that publishes nothing), so there
+     * is no double-click path that fires two kicks for one channel. A kick that fails is logged and dropped —
+     * the transition itself already succeeded, and the nightly pass is the retry net.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    void onChannelConsentActivated(SlackChannelConsentService.SlackChannelActivatedEvent event) {
+        taskExecutor.execute(() -> {
+            try {
+                syncChannelNow(event.workspaceId(), event.slackChannelId());
+            } catch (RuntimeException e) {
+                log.warn(
+                    "slack.sync: initial history sync kick failed for workspaceId={} channelId={}: {}",
+                    event.workspaceId(),
+                    event.slackChannelId(),
+                    e.toString()
+                );
+            }
+        });
+    }
+
+    /**
+     * Targeted single-channel history sync. Exists as a pass-through on this {@link WorkspaceAgnostic} class
+     * so the executor thread — which carries no request tenancy scope — crosses the bypass hop, the same
+     * routing {@code OutlineDocumentSyncScheduler#syncCollectionNow} exists for.
+     *
+     * <p>Skips silently when the workspace has no ACTIVE Slack connection, for the reason
+     * {@link #syncWorkspaceNow} documents: every call would fail on token resolution and spend the pacing
+     * budget doing it.
+     */
+    public SlackChannelHistorySyncService.WorkspaceSyncSummary syncChannelNow(long workspaceId, String channelId) {
+        if (connectionService.findActive(workspaceId, IntegrationKind.SLACK).isEmpty()) {
+            log.debug(
+                "slack.sync: workspaceId={} has no ACTIVE Slack connection — skipping initial channel sync",
+                workspaceId
+            );
+            return SlackChannelHistorySyncService.WorkspaceSyncSummary.notConnected();
+        }
+        SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncChannel(
+            workspaceId,
+            channelId
+        );
+        log.info(
+            "slack.sync: initial channel sync workspaceId={} channelId={} synced={} ingested={} requests={}",
+            workspaceId,
+            channelId,
+            summary.synced(),
+            summary.ingested(),
+            summary.requestsUsed()
+        );
+        return summary;
+    }
+
+    /**
      * Run one workspace's reconciliation immediately (tests and operational replays).
      *
      * <p>Returns an empty summary without touching Slack when the workspace has no ACTIVE Slack connection: every
@@ -158,12 +229,16 @@ public class SlackDataSyncScheduler {
             );
             return SlackChannelHistorySyncService.WorkspaceSyncSummary.notConnected();
         }
+        // One BooleanSupplier for both halves of the pass: the metadata refresh runs first and is itself
+        // one Slack round trip per channel, so a handle that only reached the history sync left Cancel
+        // looking inert for the whole first half.
+        BooleanSupplier cancelled = handle == null ? () -> false : handle::isCancellationRequested;
         if (properties.metadataEnabled()) {
-            metadataRefresher.refreshWorkspace(workspaceId);
+            metadataRefresher.refreshWorkspace(workspaceId, cancelled);
         }
         SlackChannelHistorySyncService.WorkspaceSyncSummary summary = historySyncService.syncWorkspace(
             workspaceId,
-            handle == null ? () -> false : handle::isCancellationRequested
+            cancelled
         );
         log.info(
             "slack.sync: workspaceId={} channels={} synced={} skipped={} failed={} ingested={} requests={} budgetExhausted={}",

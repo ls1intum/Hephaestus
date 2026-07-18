@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
+import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
@@ -35,6 +36,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 @Tag("unit")
 class SlackDataSyncSchedulerTest extends BaseUnitTest {
@@ -69,8 +72,23 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
             historySyncService,
             connectionService,
             syncJobService,
-            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true)
+            new SlackSyncProperties("0 0 4 * * *", 10, 15, Duration.ZERO, true, 5, true),
+            inlineExecutor()
         );
+    }
+
+    /**
+     * Runs submitted tasks on the calling thread. The activation kick's async hop exists to keep the admin's
+     * PATCH off Slack round trips, not as behaviour under test — running it inline makes the assertions
+     * deterministic without a latch.
+     */
+    private static AsyncTaskExecutor inlineExecutor() {
+        return new SimpleAsyncTaskExecutor() {
+            @Override
+            public void execute(Runnable task) {
+                task.run();
+            }
+        };
     }
 
     @Test
@@ -81,7 +99,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
         assertThat(summary.requestsUsed()).isZero();
         assertThat(summary.channels()).isZero();
-        verify(metadataRefresher, never()).refreshWorkspace(anyLong());
+        verify(metadataRefresher, never()).refreshWorkspace(anyLong(), any(BooleanSupplier.class));
         verify(historySyncService, never()).syncWorkspace(anyLong(), any());
     }
 
@@ -94,7 +112,7 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
 
         var summary = scheduler.syncWorkspaceNow(WS);
 
-        verify(metadataRefresher).refreshWorkspace(WS);
+        verify(metadataRefresher).refreshWorkspace(eq(WS), any(BooleanSupplier.class));
         verify(historySyncService).syncWorkspace(eq(WS), any(BooleanSupplier.class));
         assertThat(summary.ingested()).isEqualTo(5L);
     }
@@ -181,5 +199,48 @@ class SlackDataSyncSchedulerTest extends BaseUnitTest {
         assertThat(requestCaptor.getAllValues())
             .extracting(SyncJobRequest::workspaceId)
             .containsExactlyInAnyOrder(WS, OTHER_WS);
+    }
+
+    /**
+     * Consent activation must reach a channel-scoped history sync, not a workspace-wide one: consenting one
+     * channel may not spend the workspace's whole request budget replaying every other channel that happens
+     * to be behind.
+     */
+    @Test
+    void channelActivation_kicksThatChannelsHistorySync_notTheWholeWorkspace() {
+        when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
+        when(historySyncService.syncChannel(WS, "C1")).thenReturn(
+            new SlackChannelHistorySyncService.WorkspaceSyncSummary(1, 1, 0, 12L, 2, false, 0)
+        );
+
+        scheduler.onChannelConsentActivated(new SlackChannelConsentService.SlackChannelActivatedEvent(WS, "C1"));
+
+        verify(historySyncService).syncChannel(WS, "C1");
+        verify(historySyncService, never()).syncWorkspace(anyLong(), any());
+        verify(metadataRefresher, never()).refreshWorkspace(anyLong(), any(BooleanSupplier.class));
+    }
+
+    /** A disconnected workspace spends no budget on the kick — the same guard the nightly path applies. */
+    @Test
+    void channelActivation_withoutAnActiveConnection_touchesSlackNotAtAll() {
+        when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.empty());
+
+        scheduler.onChannelConsentActivated(new SlackChannelConsentService.SlackChannelActivatedEvent(WS, "C1"));
+
+        verify(historySyncService, never()).syncChannel(anyLong(), any());
+    }
+
+    /**
+     * The transition already committed when the kick runs, so a failing kick must not escape and must not be
+     * retried inline — the nightly pass is the retry net.
+     */
+    @Test
+    void channelActivation_swallowsAFailingKick() {
+        when(connectionService.findActive(WS, IntegrationKind.SLACK)).thenReturn(Optional.of(mock(Connection.class)));
+        when(historySyncService.syncChannel(WS, "C1")).thenThrow(new IllegalStateException("slack down"));
+
+        assertThatCode(() ->
+            scheduler.onChannelConsentActivated(new SlackChannelConsentService.SlackChannelActivatedEvent(WS, "C1"))
+        ).doesNotThrowAnyException();
     }
 }

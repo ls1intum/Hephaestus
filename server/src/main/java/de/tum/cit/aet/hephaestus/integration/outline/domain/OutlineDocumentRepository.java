@@ -201,8 +201,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * re-evicted) on every pass; the body comes back only when upstream changes or a targeted refresh
      * asks for it. Returns rows affected.
      *
-     * <p>Callers must chunk {@code ids} (the sync service does, at
-     * {@code OutlineDocumentSyncService#EVICTION_BATCH_SIZE}): every id is one bind parameter in the
+     * <p>Callers must chunk {@code ids} (the retention service does, at
+     * {@code OutlineMirrorRetentionService#EVICTION_BATCH_SIZE}): every id is one bind parameter in the
      * {@code IN} list.
      */
     @Modifying

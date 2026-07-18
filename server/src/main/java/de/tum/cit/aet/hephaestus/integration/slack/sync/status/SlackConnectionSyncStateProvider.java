@@ -1,14 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceCount;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
@@ -32,20 +29,17 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProvider {
 
-    private final ConnectionRepository connectionRepository;
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final SlackMessageRepository messageRepository;
     private final SlackSyncProperties properties;
     private final SlackRateLimitTracker rateLimitTracker;
 
     public SlackConnectionSyncStateProvider(
-        ConnectionRepository connectionRepository,
         SlackMonitoredChannelRepository monitoredChannelRepository,
         SlackMessageRepository messageRepository,
         SlackSyncProperties properties,
         SlackRateLimitTracker rateLimitTracker
     ) {
-        this.connectionRepository = connectionRepository;
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.messageRepository = messageRepository;
         this.properties = properties;
@@ -59,11 +53,15 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
 
     @Override
     public ConnectionSyncDetails describe(IntegrationRef ref, long connectionId) {
-        Boolean webhookRegistered = connectionRepository
-            .findByIdAndWorkspaceId(connectionId, ref.workspaceId())
-            .map(Connection::getState)
-            .map(state -> state == IntegrationState.ACTIVE ? Boolean.TRUE : null)
-            .orElse(null);
+        // webhookRegistered is null — "not tracked" — and not a derived TRUE. Every other integration
+        // reports an observation: GitHub the App installation (null for a PAT, which has no webhook of
+        // ours), GitLab the stored `gitlabWebhookId`, Outline the stored subscription id. Slack has no
+        // equivalent fact to report: Events API subscriptions are declared once in the app manifest at
+        // the *app* level, not created per installation, so no per-connection subscription id exists —
+        // `SlackConfig` stores none, and there is no per-workspace API to ask. Reading TRUE off the
+        // connection merely being ACTIVE restated "the install exists" in a column the admin reads as
+        // "deliveries are wired up", which is a different claim and one we cannot make.
+        Boolean webhookRegistered = null;
 
         // Slack reports no budget, ever — no remaining/limit headers exist, and its per-method tiers are
         // published as floors ("50+ per minute"), not quotas. The only rate-limit fact Slack can state is

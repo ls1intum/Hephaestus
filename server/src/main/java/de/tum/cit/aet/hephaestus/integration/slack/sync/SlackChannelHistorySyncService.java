@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -84,6 +85,30 @@ public class SlackChannelHistorySyncService {
     }
 
     public WorkspaceSyncSummary syncWorkspace(long workspaceId, BooleanSupplier cancelled) {
+        return sync(workspaceId, cancelled, null);
+    }
+
+    /**
+     * Reconcile a single ACTIVE channel — the consent-activation kick's entry point, the Slack counterpart of
+     * {@code OutlineDocumentSyncService#syncCollection}.
+     *
+     * <p>Scoped to one channel rather than reusing the workspace pass so consenting one channel cannot spend
+     * the workspace's whole request budget replaying every other channel that happens to be behind. Idempotent
+     * and safe to fire repeatedly: {@code lastHistorySyncedTs} is the floor and {@link SlackSyncBudget} the
+     * pacing, exactly as on the nightly path, so a kick with nothing to fetch makes zero API calls.
+     *
+     * <p>Not cancellable — no job owns it (it is fired and forgotten off the admin request thread), and it is
+     * bounded to one channel.
+     */
+    public WorkspaceSyncSummary syncChannel(long workspaceId, String slackChannelId) {
+        return sync(workspaceId, () -> false, slackChannelId);
+    }
+
+    private WorkspaceSyncSummary sync(
+        long workspaceId,
+        BooleanSupplier cancelled,
+        @Nullable String onlySlackChannelId
+    ) {
         SlackSyncBudget historyBudget = new SlackSyncBudget(
             properties.historyRequestBudget(),
             properties.historyRequestInterval()
@@ -94,10 +119,11 @@ public class SlackChannelHistorySyncService {
         );
         Instant now = Instant.now();
         String retentionFloor = SlackTs.ofInstant(now.minus(Duration.ofDays(retentionWindowDays(workspaceId))));
-        List<SlackMonitoredChannel> channels = monitoredChannelRepository.findForHistorySync(
-            workspaceId,
-            ConsentState.ACTIVE
-        );
+        List<SlackMonitoredChannel> channels = monitoredChannelRepository
+            .findForHistorySync(workspaceId, ConsentState.ACTIVE)
+            .stream()
+            .filter(c -> onlySlackChannelId == null || onlySlackChannelId.equals(c.getSlackChannelId()))
+            .toList();
 
         int synced = 0;
         int skipped = 0;

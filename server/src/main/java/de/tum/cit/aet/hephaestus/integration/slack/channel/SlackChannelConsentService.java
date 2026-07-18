@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -67,6 +68,14 @@ public class SlackChannelConsentService {
     private final UserRepository userRepository;
     private final SlackHephaestusUiLinks uiLinks;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
+
+    /**
+     * A channel just reached {@code ACTIVE}. Signals that its history sync may now run — every other
+     * integration kicks a sync when a resource is added, and without this Slack's would wait for the nightly
+     * cron. Delivered {@code AFTER_COMMIT} so the consumer reads the ACTIVE row rather than the old one.
+     */
+    public record SlackChannelActivatedEvent(long workspaceId, String slackChannelId) {}
 
     public SlackChannelConsentService(
         SlackMonitoredChannelRepository monitoredChannelRepository,
@@ -77,7 +86,8 @@ public class SlackChannelConsentService {
         ConnectionService connectionService,
         UserRepository userRepository,
         SlackHephaestusUiLinks uiLinks,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.consentEventRepository = consentEventRepository;
@@ -88,6 +98,7 @@ public class SlackChannelConsentService {
         this.userRepository = userRepository;
         this.uiLinks = uiLinks;
         this.transactionTemplate = transactionTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     /** All allow-listed channels for the workspace with their consent state + the workspace-wide opt-out count. */
@@ -252,6 +263,10 @@ public class SlackChannelConsentService {
                     }
                     channel.setConsentState(ConsentState.ACTIVE);
                     monitoredChannelRepository.save(channel);
+                    // Published, not called: the kick's async pass must read the committed ACTIVE row, and
+                    // the admin's PATCH must not block on Slack round trips. Consumed after commit by
+                    // SlackDataSyncScheduler#onChannelConsentActivated.
+                    eventPublisher.publishEvent(new SlackChannelActivatedEvent(workspaceId, slackChannelId));
                 }
                 case PAUSED -> {
                     channel.setConsentState(ConsentState.PAUSED);

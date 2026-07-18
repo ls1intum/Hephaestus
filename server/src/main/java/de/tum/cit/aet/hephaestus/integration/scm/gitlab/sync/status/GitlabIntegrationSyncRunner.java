@@ -68,34 +68,51 @@ public class GitlabIntegrationSyncRunner implements IntegrationSyncRunner {
     }
 
     /**
-     * Runs one backfill batch per pending repository in this workspace, then returns — the same
-     * per-repository step (cooldown and initial-sync gates included) the 60s scheduler tick performs,
-     * but scoped to one connection and under this job's own progress reporting and cooperative
-     * cancellation.
+     * Drives historical backfill pass-by-pass across the workspace until no pass advances a repository or
+     * cancellation is requested — the same drive-to-completion shape {@link
+     * de.tum.cit.aet.hephaestus.integration.scm.github.sync.status.GithubIntegrationSyncRunner#backfill}
+     * has, so the two identical-looking "Run backfill" buttons mean the same thing. Each pass is the same
+     * per-repository step (cooldown and initial-sync gates included) the 60s scheduler tick performs, but
+     * scoped to one connection and under this job's own progress reporting and cooperative cancellation.
      *
-     * <p>Deliberately one pass and no more. {@link GitLabHistoricalBackfillService} puts every
-     * repository that did work on a five-minute cooldown and skips cooled-down repositories, so a
-     * second pass here could only skip exactly what the first pass advanced. The remaining history is
-     * drained by the scheduled cycle at that cadence; one click is one batch per repository.
+     * <p>The loop drains because {@link GitLabHistoricalBackfillService} applies its five-minute success
+     * cooldown only to the scheduler's 60s tick, not to a pass a job owns: that cooldown is tick-spacing,
+     * and the administrator who clicked the button is the pacing signal. Error backoff still applies to
+     * everybody, and rate limiting is enforced inside the sync services regardless of caller, so a manual
+     * run cannot outrun the vendor.
+     *
+     * <p>The no-progress warning is therefore raised only when <em>nothing</em> advanced across the whole
+     * job, not merely on the pass that ends the loop: a backfill that moved two repositories and then hit
+     * the cooldown is a clean success, and reporting it as SUCCEEDED_WITH_WARNINGS would be the same
+     * misreading in the opposite direction.
      */
     @Override
     public void backfill(IntegrationRef ref, SyncExecutionHandle handle) {
         long workspaceId = ref.workspaceId();
+        int totalProcessed = 0;
 
-        int processed = backfillService.runBackfillPass(workspaceId, handle);
-
-        if (handle.isCancellationRequested()) {
-            // The pass returns early on a cancel checkpoint between repositories; declare it so the job
-            // finalizes CANCELLED rather than SUCCEEDED.
-            handle.reportCancelled();
-            return;
+        while (!handle.isCancellationRequested()) {
+            int processed = backfillService.runBackfillPass(workspaceId, handle);
+            totalProcessed += processed;
+            if (processed == 0) {
+                // Nothing advanced this pass: backfill is complete, or every pending repository is gated
+                // (cooldown / rate limit). Indistinguishable from here — and either way another pass could
+                // only repeat the skip, so stop rather than spin.
+                if (totalProcessed == 0) {
+                    // The whole job moved nothing. Surface it as a warning rather than a clean success —
+                    // matching GithubIntegrationSyncRunner.
+                    handle.reportWarnings();
+                    log.info("Manual GitLab backfill advanced no repository: workspaceId={}", workspaceId);
+                }
+                break;
+            }
         }
-        if (processed == 0) {
-            // No repository advanced: backfill is complete, or every pending one is gated (cooldown /
-            // rate limit). Indistinguishable from here, so surface it as a warning rather than a clean
-            // success — matching GithubIntegrationSyncRunner.
-            handle.reportWarnings();
-            log.info("Manual GitLab backfill advanced no repository: workspaceId={}", workspaceId);
+
+        // The loop exits with the flag still set only when it aborted on a cancel checkpoint (the
+        // no-progress break leaves it clear); declare it so the job finalizes CANCELLED rather than
+        // SUCCEEDED. runBackfillPass itself returns early on its own between-repository checkpoint.
+        if (handle.isCancellationRequested()) {
+            handle.reportCancelled();
         }
     }
 }

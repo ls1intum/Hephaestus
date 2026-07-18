@@ -61,7 +61,7 @@ public class GitLabHistoricalBackfillService {
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     // Per-repository cooldown tracking for error backoff
-    private final Map<Long, Instant> repositoryCooldowns = new ConcurrentHashMap<>();
+    private final Map<Long, Cooldown> repositoryCooldowns = new ConcurrentHashMap<>();
 
     public GitLabHistoricalBackfillService(
         SyncTargetProvider syncTargetProvider,
@@ -144,7 +144,7 @@ public class GitLabHistoricalBackfillService {
                     return processed.get();
                 }
                 if (target.isBackfillComplete()) continue;
-                if (isOnCooldown(target.id())) continue;
+                if (isOnCooldown(target.id(), handle != null)) continue;
 
                 // Only backfill repos that have completed initial sync
                 if (target.lastIssuesSyncedAt() == null && target.lastPullRequestsSyncedAt() == null) {
@@ -215,7 +215,7 @@ public class GitLabHistoricalBackfillService {
                 );
 
                 if (result.aborted()) {
-                    repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
+                    repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                     return false;
                 }
 
@@ -230,7 +230,7 @@ public class GitLabHistoricalBackfillService {
                 }
             } catch (Exception e) {
                 log.warn("Issue backfill failed: repo={}", safeName, e);
-                repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
+                repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                 return didWork;
             }
         }
@@ -246,7 +246,7 @@ public class GitLabHistoricalBackfillService {
                 );
 
                 if (result.aborted()) {
-                    repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
+                    repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                     return didWork;
                 }
 
@@ -260,14 +260,14 @@ public class GitLabHistoricalBackfillService {
                 }
             } catch (Exception e) {
                 log.warn("MR backfill failed: repo={}", safeName, e);
-                repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
+                repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                 return didWork;
             }
         }
 
         if (didWork) {
             syncTargetProvider.updateIssueBackfillState(target.id(), null, null, Instant.now());
-            repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_NORMAL));
+            repositoryCooldowns.put(target.id(), Cooldown.afterProgress(COOLDOWN_NORMAL));
         }
 
         return didWork;
@@ -313,9 +313,35 @@ public class GitLabHistoricalBackfillService {
         syncTargetProvider.updateSyncCursor(target.id(), SyncCursorKind.PULL_REQUEST, cursor);
     }
 
-    private boolean isOnCooldown(Long syncTargetId) {
-        Instant cooldownUntil = repositoryCooldowns.get(syncTargetId);
-        return cooldownUntil != null && Instant.now().isBefore(cooldownUntil);
+    /**
+     * Whether this repository is gated right now.
+     *
+     * <p>The two cooldowns answer different questions, so a job-driven pass treats them differently.
+     * {@code COOLDOWN_ERROR} is backoff against a vendor that just failed and applies to everybody.
+     * {@code COOLDOWN_NORMAL} is only tick-spacing: it stops the 60s scheduler from spending every tick
+     * on the same repository. An administrator who clicked "Run backfill" is the pacing signal, and
+     * honoring the success cooldown there would end their run after a single productive pass — the two
+     * identical-looking buttons would then mean different things on GitHub and GitLab. Rate limiting is
+     * enforced inside the sync services regardless of caller, so dropping the spacing cannot outrun the
+     * vendor.
+     *
+     * @param jobDriven {@code true} when a {@link SyncExecutionHandle} owns this pass
+     */
+    private boolean isOnCooldown(Long syncTargetId, boolean jobDriven) {
+        Cooldown cooldown = repositoryCooldowns.get(syncTargetId);
+        if (cooldown == null || !Instant.now().isBefore(cooldown.until())) return false;
+        return cooldown.afterError() || !jobDriven;
+    }
+
+    /** A repository's cooldown, tagged with why it was applied. */
+    private record Cooldown(Instant until, boolean afterError) {
+        static Cooldown afterError(Duration duration) {
+            return new Cooldown(Instant.now().plus(duration), true);
+        }
+
+        static Cooldown afterProgress(Duration duration) {
+            return new Cooldown(Instant.now().plus(duration), false);
+        }
     }
 
     /**

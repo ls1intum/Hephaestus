@@ -1,15 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -26,7 +22,6 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -37,9 +32,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     private static final long WS = 11L;
     private static final long CONNECTION_ID = 3L;
     private static final IntegrationRef REF = new IntegrationRef(IntegrationKind.SLACK, WS, "T123");
-
-    @Mock
-    private ConnectionRepository connectionRepository;
 
     @Mock
     private SlackMonitoredChannelRepository monitoredChannelRepository;
@@ -53,7 +45,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
 
     private SlackConnectionSyncStateProvider providerWith(String cron) {
         return new SlackConnectionSyncStateProvider(
-            connectionRepository,
             monitoredChannelRepository,
             messageRepository,
             new SlackSyncProperties(cron, 10, 15, Duration.ZERO, true, 5, true),
@@ -65,16 +56,20 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
         provider = providerWith("0 0 4 * * *");
     }
 
+    /**
+     * Slack must report {@code webhookRegistered = null} — "not tracked" — and never a TRUE derived from the
+     * connection being ACTIVE. Slack's Events API subscription is declared once in the app manifest at the
+     * app level, so no per-installation subscription id exists to observe (contrast GitHub's App install,
+     * GitLab's stored webhook id, Outline's stored subscription id). Reading TRUE off an ACTIVE connection
+     * restated "the install exists" in a column the admin reads as "deliveries are wired up".
+     */
     @Test
-    void describe_activeConnection_reportsWebhookRegisteredTrue() {
+    void describe_webhookRegisteredIsNull_becauseSlackSubscriptionStateIsNotObservable() {
         setUpDefault();
-        Connection connection = mock(Connection.class);
-        when(connection.getState()).thenReturn(IntegrationState.ACTIVE);
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.of(connection));
 
         ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
 
-        assertThat(details.webhookRegistered()).isTrue();
+        assertThat(details.webhookRegistered()).isNull();
         assertThat(details.rateLimit()).isNull();
         assertThat(details.backfill()).isNull();
         assertThat(details.vendorHealthDegraded()).isFalse();
@@ -88,7 +83,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_neverThrottled_reportsNoRateLimit() {
         setUpDefault();
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
 
         assertThat(provider.describe(REF, CONNECTION_ID).rateLimit()).isNull();
     }
@@ -101,7 +95,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_afterObserved429_reportsThrottledUntilAndNoQuota() {
         setUpDefault();
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
         rateLimitTracker.recordThrottle(WS, 60_000L);
 
         var rateLimit = provider.describe(REF, CONNECTION_ID).rateLimit();
@@ -117,38 +110,14 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_throttleOnAnotherWorkspace_isNotReportedHere() {
         setUpDefault();
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
         rateLimitTracker.recordThrottle(WS + 1, 60_000L);
 
         assertThat(provider.describe(REF, CONNECTION_ID).rateLimit()).isNull();
     }
 
     @Test
-    void describe_nonActiveConnection_webhookRegisteredIsNull() {
-        setUpDefault();
-        Connection connection = mock(Connection.class);
-        when(connection.getState()).thenReturn(IntegrationState.SUSPENDED);
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.of(connection));
-
-        ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
-
-        assertThat(details.webhookRegistered()).isNull();
-    }
-
-    @Test
-    void describe_missingConnectionRow_webhookRegisteredIsNull() {
-        setUpDefault();
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
-
-        ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
-
-        assertThat(details.webhookRegistered()).isNull();
-    }
-
-    @Test
     void describe_nextScheduledSyncAt_isComputedFromTheCronExpression() {
         provider = providerWith("0 0 4 * * *");
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
         Instant before = Instant.now();
 
         ConnectionSyncDetails details = provider.describe(REF, CONNECTION_ID);
@@ -167,7 +136,6 @@ class SlackConnectionSyncStateProviderTest extends BaseUnitTest {
     @Test
     void describe_invalidCron_yieldsNullNextScheduledSyncAt() {
         provider = providerWith("not a cron");
-        when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WS)).thenReturn(Optional.empty());
 
         assertThat(provider.describe(REF, CONNECTION_ID).nextScheduledSyncAt()).isNull();
     }
