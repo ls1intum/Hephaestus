@@ -57,10 +57,7 @@ class ConfigAuditRecorderTest {
 
     @Test
     void refusesToRecordInsideAReadOnlyTransaction() {
-        // MANDATORY is satisfied here and an @Transactional-presence check would pass, but Hibernate
-        // sets FlushMode.MANUAL under readOnly, so the INSERT would never flush: green build, no row.
-        // AiSettingsService declares @Transactional(readOnly = true) at class level, so this is one
-        // missing method-level override away from happening.
+        // readOnly satisfies MANDATORY but never flushes, so the INSERT would silently not happen.
         inTransaction(true);
         assertThatThrownBy(() -> recorder.record(entry(new Snap(30), new Snap(10))))
             .isInstanceOf(IllegalStateException.class)

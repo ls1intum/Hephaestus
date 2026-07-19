@@ -16,21 +16,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the Java constants to the changelog they are duplicated in.
- *
- * <p>Necessary because the test tier runs {@code ddl-auto: create} with Liquibase disabled, so no test
- * ever executes this changelog — a value that drifts from its SQL counterpart would otherwise surface
- * only in production. {@code auth_event} already lived through this: its CHECK constraint fell behind
- * its enum and needed changeset {@code 1782980500800-15} to catch up.
- *
- * <p>Both duplications fail silently, which is why they are pinned rather than documented:
- *
- * <ul>
- *   <li>An enum value missing from its CHECK lands an INSERT that raises at runtime; an extra one
- *       lets a value into a row that is append-only and therefore unrepairable.</li>
- *   <li>A retention window shorter in Java than in the trigger makes every sweep raise, so retention
- *       dies unnoticed; longer, and rows over-retain while the docs still claim the window.</li>
- * </ul>
+ * Pins the Java constants to the changelog that duplicates them. Necessary because the test tier runs
+ * {@code ddl-auto: create} with Liquibase disabled, so no test executes this changelog and a value that
+ * drifts from its SQL counterpart surfaces only in production — {@code auth_event} already lived
+ * through exactly that.
  */
 @Tag("unit")
 class ConfigAuditChangelogParityTest {

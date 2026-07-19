@@ -18,11 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The retention sweep is the only sanctioned way a row ever leaves this table, and the one place a sign
- * error is catastrophic in both directions: {@code >} instead of {@code <} deletes the live trail and
- * keeps the dead one. The changelog parity test pins the retention <em>constant</em>; only this pins the
- * <em>behaviour</em>, against a real Postgres where {@code make_interval} and the DB-side {@code now()}
- * actually evaluate.
+ * The retention sweep is the only sanctioned way a row leaves this table, and a sign error is
+ * catastrophic in both directions. The parity test pins the constant; this pins the behaviour against
+ * a real Postgres.
  */
 class ConfigAuditRetentionJobIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -47,9 +45,8 @@ class ConfigAuditRetentionJobIntegrationTest extends AbstractWorkspaceIntegratio
         backdate(stale, ConfigAuditRetentionJob.RETENTION_DAYS + 1);
         backdate(fresh, ConfigAuditRetentionJob.RETENTION_DAYS - 1);
 
-        // The sweep's SQL, not sweep() itself: @SchedulerLock needs the Liquibase-created `shedlock`
-        // table, which the ddl-auto test tier does not have. This is where the logic lives — the job is a
-        // two-line delegate, and ConfigAuditRetentionJobTest pins that it passes RETENTION_DAYS through.
+        // The sweep's SQL, not sweep(): @SchedulerLock needs the Liquibase `shedlock` table, absent in
+        // the ddl-auto tier. ConfigAuditRetentionJobTest pins that the job passes RETENTION_DAYS through.
         int deleted = repository.deleteOlderThan(ConfigAuditRetentionJob.RETENTION_DAYS);
         entityManager.clear();
 

@@ -15,18 +15,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 
 /**
- * Audit-by-default: every administrative mutation endpoint must declare whether it is audited.
- *
- * <p>The failure this prevents is the one that makes an audit trail worse than none — an admin reads a
- * "complete" history, sees no entry for an action, and concludes it never happened, when in truth the
- * action was simply never wired to the trail. Coverage decided per-feature drifts silently as new admin
- * surfaces land; coverage decided by the build cannot.
- *
- * <p>So each admin-gated {@code POST/PUT/PATCH/DELETE} handler carries exactly one of
- * {@link Audited} (recorded, and where) or {@link AuditExempt} (deliberately not, and why). A new
- * administrative action fails this test until someone makes that call — the decision is forced at
- * review time, and every known gap stays greppable. This mirrors GitLab's explicit audit-event
- * registry, where an event type must be declared before it can be emitted.
+ * Every admin mutation endpoint must declare whether it is audited: {@link Audited} names the ledger
+ * the change lands in, {@link AuditExempt} says why it deliberately lands in none. An endpoint that
+ * declares neither is how a trail develops a hole nobody chose. The reasoning that matters is in the
+ * failure message below, where a reader actually meets it.
  */
 class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
@@ -57,7 +49,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
             .isEmpty();
     }
 
-    private static boolean isController(JavaClass clazz) {
+    static boolean isController(JavaClass clazz) {
         // Meta-annotated too: @WorkspaceScopedController composes @RestController, and every
         // workspace-admin surface uses it.
         return (
@@ -66,7 +58,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
         );
     }
 
-    private static boolean isMutation(JavaMethod method) {
+    static boolean isMutation(JavaMethod method) {
         return (
             method.isAnnotatedWith(PostMapping.class) ||
             method.isAnnotatedWith(PutMapping.class) ||
@@ -80,7 +72,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
      * controller. Checking only the method misses the seven controllers that declare the gate once at
      * class level, which silently exempted ten endpoints.
      */
-    private static boolean isAdminGated(JavaMethod method) {
+    static boolean isAdminGated(JavaMethod method) {
         return (
             hasWorkspaceAdminGate(method) ||
             hasWorkspaceAdminGate(method.getOwner()) ||

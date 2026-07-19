@@ -24,13 +24,15 @@ const ACTION_OPTIONS = Object.entries(ACTION_LABELS).map(([value, label]) => ({ 
 function ToolbarHarness({
 	initialEntityTypes = [],
 	initialActions = [],
+	initialRange,
 }: {
 	initialEntityTypes?: string[];
 	initialActions?: string[];
+	initialRange?: Parameters<typeof AuditDateFacet>[0]["value"];
 }) {
 	const [entityTypes, setEntityTypes] = useState(initialEntityTypes);
 	const [actions, setActions] = useState(initialActions);
-	const [range, setRange] = useState<Parameters<typeof AuditDateFacet>[0]["value"]>(undefined);
+	const [range, setRange] = useState(initialRange);
 
 	const hasFilter = entityTypes.length > 0 || actions.length > 0 || range?.from !== undefined;
 
@@ -169,5 +171,25 @@ export const SelectionIsAnnounced: Story = {
 				name: `Setting: ${ENTITY_TYPE_LABELS.WORKSPACE_FEATURES}`,
 			}),
 		).toBeInTheDocument();
+	},
+};
+
+/** A closed range and an open-ended one — the date trigger's two label shapes. */
+export const DateRangeSelected: Story = {
+	args: {
+		initialRange: { from: new Date("2026-07-01"), to: new Date("2026-07-08") },
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Jul 1 – Jul 8, 2026")).toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: /reset/i })).toBeInTheDocument();
+	},
+};
+
+export const DateRangeOpenEnded: Story = {
+	args: { initialRange: { from: new Date("2026-07-01"), to: undefined } },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("From Jul 1, 2026")).toBeInTheDocument();
 	},
 };

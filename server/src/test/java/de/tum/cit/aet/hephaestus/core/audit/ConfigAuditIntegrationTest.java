@@ -240,25 +240,41 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .isForbidden();
     }
 
-    @Test
+    /**
+     * Each predicate in FILTER_PREDICATES, matching and not matching. Every dimension carries both
+     * directions because a predicate transposed so that it matches NOTHING passes every zero case on
+     * its own — and a failure has to name which predicate broke, which one fat test cannot.
+     */
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> filterCases() {
+        String future = Instant.now().plusSeconds(60).toString();
+        String past = Instant.now().minusSeconds(60).toString();
+        return java.util.stream.Stream.of(
+            org.junit.jupiter.params.provider.Arguments.of("entityType matches", "entityType", "AGENT_CONFIG", 1),
+            org.junit.jupiter.params.provider.Arguments.of(
+                "entityType matches the other kind",
+                "entityType",
+                "PRACTICE_REVIEW_SETTINGS",
+                1
+            ),
+            org.junit.jupiter.params.provider.Arguments.of("action matches", "action", "CREATED", 1),
+            org.junit.jupiter.params.provider.Arguments.of("action excludes", "action", "DELETED", 0),
+            org.junit.jupiter.params.provider.Arguments.of("actorId excludes", "actorId", "999999", 0),
+            org.junit.jupiter.params.provider.Arguments.of("from excludes the past", "from", future, 0),
+            org.junit.jupiter.params.provider.Arguments.of("from includes the past", "from", past, 2),
+            org.junit.jupiter.params.provider.Arguments.of("to excludes the present", "to", past, 0),
+            org.junit.jupiter.params.provider.Arguments.of("to includes the present", "to", future, 2)
+        );
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
+    @org.junit.jupiter.params.provider.MethodSource("filterCases")
     @WithAdminUser
-    void filtersNarrowIndependently() {
-        // Exercises the entityType / action / actorId / from-to predicates, none of which any other
-        // test executes — a transposed column name in FILTER_PREDICATES would otherwise ship.
+    void eachFilterPredicateNarrowsIndependently(String name, String param, String value, int expected) {
         Workspace workspace = setupWorkspace("audit-matrix");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         createConfig(workspace, "primary");
 
-        assertFilterYields(workspace, uri -> uri.queryParam("entityType", "AGENT_CONFIG"), 1);
-        assertFilterYields(workspace, uri -> uri.queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"), 1);
-        assertFilterYields(workspace, uri -> uri.queryParam("action", "CREATED"), 1);
-        assertFilterYields(workspace, uri -> uri.queryParam("action", "DELETED"), 0);
-        assertFilterYields(workspace, uri -> uri.queryParam("actorId", 999_999), 0);
-        assertFilterYields(workspace, uri -> uri.queryParam("from", Instant.now().plusSeconds(60).toString()), 0);
-        assertFilterYields(workspace, uri -> uri.queryParam("to", Instant.now().minusSeconds(60).toString()), 0);
-        // Positive counterparts: a predicate transposed so it matches NOTHING passes every zero case.
-        assertFilterYields(workspace, uri -> uri.queryParam("from", Instant.now().minusSeconds(60).toString()), 2);
-        assertFilterYields(workspace, uri -> uri.queryParam("to", Instant.now().plusSeconds(60).toString()), 2);
+        assertFilterYields(workspace, uri -> uri.queryParam(param, value), expected);
     }
 
     @Test
@@ -327,10 +343,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Transactional
     void anUnscopedReadOfTheAuditTableIsCaughtByTenancyEnforcement() {
         // Pins that the table is registered as workspace-scoped (absent from GLOBAL_TABLES) and that the
-        // inspector is armed for it under the test profile's enforcement=throw. It does NOT prove reads
-        // are safe: the inspector only checks that the literal `workspace_id` appears somewhere in the
-        // statement. Isolation is carried by @RequireAtLeastWorkspaceAdmin plus findForWorkspace's
-        // required predicate — this is a backstop against a query that drops the column entirely.
+        // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate and
+        // by findForWorkspace, which the two tests above cover.
         assertThatThrownBy(() ->
             entityManager.createNativeQuery("SELECT * FROM config_audit_event", ConfigAuditEvent.class).getResultList()
         )

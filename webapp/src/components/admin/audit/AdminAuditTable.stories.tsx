@@ -108,6 +108,16 @@ export const RowDetail: Story = {
 	},
 };
 
+/** Nothing recorded yet — distinct from "your filter matched nothing", and it says what will appear. */
+export const EmptyInitial: Story = {
+	args: { events: [], hasFilter: false },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("No audit events yet.")).toBeInTheDocument();
+		await expect(canvas.getByText(/Sign-ins, impersonation, role changes/i)).toBeInTheDocument();
+	},
+};
+
 /** A failed/loaded state with no rows under an active filter. */
 export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
@@ -126,7 +136,11 @@ export const ErrorState: Story = {
 	},
 };
 
-/** Loading skeleton (spinner) before the first page resolves. */
+/** Skeleton rows under the real header, so the column box is reserved and nothing shifts on resolve. */
 export const Loading: Story = {
 	args: { events: [], isLoading: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+	},
 };

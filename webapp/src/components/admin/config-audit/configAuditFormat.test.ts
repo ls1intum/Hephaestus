@@ -23,7 +23,7 @@ function entry(over: Partial<ConfigAuditEntryView>): ConfigAuditEntryView {
 	};
 }
 
-describe("entityTypeLabel / actionLabel", () => {
+describe("label mapping", () => {
 	it("maps known types and actions to human labels", () => {
 		expect(entityTypeLabel("AGENT_CONFIG")).toBe("Agent config");
 		expect(actionLabel("CREATED")).toBe("Created");
@@ -227,5 +227,22 @@ describe("actorDisplay", () => {
 			actingAs: "Ada",
 			filterId: 7,
 		});
+	});
+});
+
+describe("degrading on unusable data", () => {
+	it("treats an unparseable snapshot as absent rather than blanking the row", () => {
+		// oldValue/newValue are JSONB written by an append-only table: if one is ever unreadable the row
+		// still has to say what kind of change it was, not render empty.
+		const broken = entry({ action: "UPDATED", oldValue: "{not json", newValue: "{also not json" });
+		expect(fieldChanges(broken)).toEqual([]);
+		expect(changeSummary(broken)).toBe("No field changes");
+	});
+
+	it("falls back to the raw enum for an entity type the client does not know yet", () => {
+		// A server enum added ahead of the client should still name the thing that changed; only a
+		// genuinely absent value has nothing to show.
+		expect(entityTypeLabel("SOMETHING_NEW")).toBe("SOMETHING_NEW");
+		expect(entityTypeLabel(undefined)).toBe("Unknown");
 	});
 });

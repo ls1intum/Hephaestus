@@ -284,8 +284,25 @@ public class WorkspaceMembershipService {
                 member.setLeaguePoints(POINTS_DEFAULT);
                 toCreate.add(member);
             } else if (existing.getRole() != desiredRole) {
+                var beforeSync = new WorkspaceAuditSnapshots.RoleSnapshot(
+                    existing.getRole() == null ? null : existing.getRole().name(),
+                    existing.isHidden()
+                );
                 existing.setRole(desiredRole);
                 toUpdate.add(existing);
+                // Recorded with a SYSTEM actor: a role can change without an admin ever touching this
+                // instance, and "when did X become ADMIN" must not answer confidently from the
+                // admin-initiated rows alone. Creates and deletions are deliberately not recorded —
+                // see ConfigAuditEntityType.WORKSPACE_ROLE for that boundary.
+                configAudit.record(
+                    ConfigAuditEntry.updated(
+                        ConfigAuditEntityType.WORKSPACE_ROLE,
+                        userId,
+                        workspace.getId(),
+                        beforeSync,
+                        new WorkspaceAuditSnapshots.RoleSnapshot(desiredRole.name(), existing.isHidden())
+                    )
+                );
             }
         }
 

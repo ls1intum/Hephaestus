@@ -82,7 +82,7 @@ export function ConfigAuditDetailSheet({
 									{actionLabel(entry.action)}
 								</Badge>
 							</DetailRow>
-							<DetailRow label="Resource">
+							<DetailRow label="Setting">
 								<span>{entityTypeLabel(entry.entityType)}</span>
 								{entry.entityId && (
 									<span className="ml-2 font-mono text-xs text-muted-foreground">

@@ -14,7 +14,12 @@ public enum ConfigAuditEntityType {
     AI_CONFIG_BINDING,
     /** An agent config aggregate (model, endpoint, credential mode). */
     AGENT_CONFIG,
-    /** A member's role in a workspace (OWNER / ADMIN / MEMBER) — the highest-value privilege change. */
+    /**
+     * A member's role or roster visibility. Covers admin-initiated grants, changes and removals, and
+     * role changes applied by org sync (actor {@code SYSTEM}). Deliberately excludes memberships
+     * created or removed by org sync itself: that is roster churn driven by the upstream provider, at
+     * a volume that would bury the admin-initiated rows this trail exists to surface.
+     */
     WORKSPACE_ROLE,
     /** Workspace feature flags (practices, mentor, achievements, …) enabled/disabled. */
     WORKSPACE_FEATURES,

@@ -9,6 +9,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -55,15 +56,19 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
 
     @Test
     void snapshotsExposeNoSecretLikeComponent() {
-        classes()
+        secretLikeComponentRule().check(classes);
+    }
+
+    /** Exposed so {@code ConfigAuditSnapshotSecretDetectionTest} can run it against fixtures. */
+    static com.tngtech.archunit.lang.ArchRule secretLikeComponentRule() {
+        return classes()
             .that()
             .implement(ConfigAuditSnapshot.class)
             .should(haveNoSecretLikeField())
             .because(
                 "config_audit_event is append-only: a leaked credential or address cannot be edited out. " +
                     "Snapshot a presence flag (e.g. llmApiKeySet) instead, or add a justified exemption"
-            )
-            .check(classes);
+            );
     }
 
     private static ArchCondition<JavaClass> beRecords() {
@@ -81,20 +86,43 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
         return new ArchCondition<>("expose no secret-like component") {
             @Override
             public void check(JavaClass clazz, ConditionEvents events) {
-                for (JavaField field : clazz.getFields()) {
-                    if (field.getModifiers().contains(JavaModifier.STATIC) || ALLOWED.contains(field.getName())) {
-                        continue;
-                    }
-                    if (SECRET_LIKE.matcher(field.getName().toLowerCase(Locale.ROOT)).find()) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                clazz,
-                                clazz.getName() + "." + field.getName() + " looks like secret or contact material"
-                            )
-                        );
-                    }
-                }
+                checkRecursively(clazz, clazz, "", new HashSet<>(), events);
             }
         };
+    }
+
+    /**
+     * Walks nested record components too. A snapshot is serialized whole, so a secret one level down
+     * lands in the row exactly as a top-level one would — and a check that only looked at the outer
+     * record would pass it. Cycles are possible in principle, hence the visited set.
+     */
+    private static void checkRecursively(
+        JavaClass root,
+        JavaClass clazz,
+        String path,
+        Set<String> visited,
+        ConditionEvents events
+    ) {
+        if (!visited.add(clazz.getName())) {
+            return;
+        }
+        for (JavaField field : clazz.getFields()) {
+            if (field.getModifiers().contains(JavaModifier.STATIC) || ALLOWED.contains(field.getName())) {
+                continue;
+            }
+            String fieldPath = path + "." + field.getName();
+            if (SECRET_LIKE.matcher(field.getName().toLowerCase(Locale.ROOT)).find()) {
+                events.add(
+                    SimpleConditionEvent.violated(
+                        root,
+                        root.getName() + fieldPath + " looks like secret or contact material"
+                    )
+                );
+            }
+            JavaClass type = field.getRawType();
+            if (type.isRecord()) {
+                checkRecursively(root, type, fieldPath, visited, events);
+            }
+        }
     }
 }

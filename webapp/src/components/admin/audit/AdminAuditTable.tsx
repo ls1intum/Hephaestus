@@ -169,6 +169,11 @@ export function AdminAuditTable({
 													className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
 													aria-hidden
 												/>
+												{severity === "warning" && (
+													// Hue alone is the only marker of a high-risk event on this row; a failure
+													// at least also carries the destructive Result badge.
+													<span className="sr-only">High-risk event: </span>
+												)}
 												<span className="text-sm">{eventLabel(e.eventType)}</span>
 											</span>
 										</TableCell>
