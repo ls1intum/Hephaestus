@@ -294,6 +294,11 @@ paths:
           - PRACTICE_REVIEW_SETTINGS
           - AI_CONFIG_BINDING
           - AGENT_CONFIG
+          - WORKSPACE_ROLE
+          - WORKSPACE_FEATURES
+          - WORKSPACE_STATUS
+          - WORKSPACE_TOKEN
+          - WORKSPACE_VISIBILITY
       - in: query
         name: entityId
         required: false
@@ -1425,6 +1430,11 @@ paths:
           - PRACTICE_REVIEW_SETTINGS
           - AI_CONFIG_BINDING
           - AGENT_CONFIG
+          - WORKSPACE_ROLE
+          - WORKSPACE_FEATURES
+          - WORKSPACE_STATUS
+          - WORKSPACE_TOKEN
+          - WORKSPACE_VISIBILITY
       - in: query
         name: entityId
         required: false
@@ -5072,6 +5082,11 @@ components:
           - PRACTICE_REVIEW_SETTINGS
           - AI_CONFIG_BINDING
           - AGENT_CONFIG
+          - WORKSPACE_ROLE
+          - WORKSPACE_FEATURES
+          - WORKSPACE_STATUS
+          - WORKSPACE_TOKEN
+          - WORKSPACE_VISIBILITY
         id:
           type: integer
           format: int64

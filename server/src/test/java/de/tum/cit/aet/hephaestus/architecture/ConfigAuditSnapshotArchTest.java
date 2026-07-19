@@ -35,7 +35,9 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
         // boolean: whether a key exists, never the key
         "llmApiKeySet",
         // enum: PROXY | API_KEY — how credentials are supplied, not what they are
-        "credentialMode"
+        "credentialMode",
+        // boolean: whether a workspace SCM token is present, never the token itself
+        "tokenSet"
     );
 
     @Test

@@ -65,6 +65,34 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
+    void togglingAFeatureFlagIsRecorded() {
+        // Workspace-administration coverage the trail gained: enabling/disabling a feature is an admin
+        // action with accountability value, now recorded alongside AI config.
+        Workspace workspace = setupWorkspace("audit-features");
+
+        webTestClient
+            .patch()
+            .uri("/workspaces/{slug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("mentorEnabled", true))
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        ConfigAuditEvent row = configAuditEventRepository
+            .findAll()
+            .stream()
+            .filter(e -> e.getEntityType() == ConfigAuditEntityType.WORKSPACE_FEATURES)
+            .findFirst()
+            .orElseThrow();
+        assertThat(row.getWorkspaceId()).isEqualTo(workspace.getId());
+        assertThat(row.changedKeyList()).contains("mentorEnabled");
+        assertThat(row.getNewValue()).contains("\"mentorEnabled\":true");
+    }
+
+    @Test
+    @WithAdminUser
     void anIdempotentRepeatOfTheSamePatchAddsNoSecondRow() {
         // Otherwise a settings page that re-submits its whole form buries real changes in noise.
         Workspace workspace = setupWorkspace("audit-noop");

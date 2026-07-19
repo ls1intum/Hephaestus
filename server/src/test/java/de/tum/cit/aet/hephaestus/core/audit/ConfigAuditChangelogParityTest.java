@@ -68,14 +68,24 @@ class ConfigAuditChangelogParityTest {
     }
 
     private static List<String> checkConstraintValues(String constraintName) {
+        // A constraint may be defined once and later widened (DROP+ADD in a follow-up changeSet). The
+        // EFFECTIVE value set is the WIDEST match: the forward definition always has at least as many
+        // values as any rollback that re-adds the narrower original.
         Matcher m = Pattern.compile(
             Pattern.quote(constraintName) + "\\s*\\n?\\s*CHECK \\([a-z_]+ IN \\(([^)]*)\\)\\)"
         ).matcher(changelog());
-        assertThat(m.find()).as("CHECK constraint %s present in the changelog", constraintName).isTrue();
-        return Arrays.stream(m.group(1).split(","))
-            .map(v -> v.trim().replace("'", ""))
-            .filter(v -> !v.isEmpty())
-            .toList();
+        List<String> widest = List.of();
+        while (m.find()) {
+            List<String> values = Arrays.stream(m.group(1).split(","))
+                .map(v -> v.trim().replace("'", ""))
+                .filter(v -> !v.isEmpty())
+                .toList();
+            if (values.size() > widest.size()) {
+                widest = values;
+            }
+        }
+        assertThat(widest).as("CHECK constraint %s present in the changelog", constraintName).isNotEmpty();
+        return widest;
     }
 
     private static List<String> names(Enum<?>[] values) {

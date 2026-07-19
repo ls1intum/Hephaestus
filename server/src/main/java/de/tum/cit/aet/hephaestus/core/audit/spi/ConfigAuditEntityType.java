@@ -14,4 +14,14 @@ public enum ConfigAuditEntityType {
     AI_CONFIG_BINDING,
     /** An agent config aggregate (model, endpoint, credential mode). */
     AGENT_CONFIG,
+    /** A member's role in a workspace (OWNER / ADMIN / MEMBER) — the highest-value privilege change. */
+    WORKSPACE_ROLE,
+    /** Workspace feature flags (practices, mentor, achievements, …) enabled/disabled. */
+    WORKSPACE_FEATURES,
+    /** Workspace lifecycle status (active / paused / purged). */
+    WORKSPACE_STATUS,
+    /** The workspace's stored SCM access token (rotation only — the value is never recorded). */
+    WORKSPACE_TOKEN,
+    /** Whether the workspace is publicly viewable. */
+    WORKSPACE_VISIBILITY,
 }

@@ -2,7 +2,22 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
 
+/**
+ * Service for managing workspace memberships.
+ * <p>
+ * Handles CRUD operations for workspace memberships, including:
+ * <ul>
+ * <li>Creating and removing memberships</li>
+ * <li>Updating member roles</li>
+ * <li>Syncing GitHub organization members with workspace memberships</li>
+ * <li>Managing league points snapshots</li>
+ * </ul>
+ */
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.workspace.audit.WorkspaceAuditSnapshots;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -24,17 +39,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Service for managing workspace memberships.
- * <p>
- * Handles CRUD operations for workspace memberships, including:
- * <ul>
- * <li>Creating and removing memberships</li>
- * <li>Updating member roles</li>
- * <li>Syncing GitHub organization members with workspace memberships</li>
- * <li>Managing league points snapshots</li>
- * </ul>
- */
 @Service
 public class WorkspaceMembershipService {
 
@@ -46,12 +50,16 @@ public class WorkspaceMembershipService {
     @PersistenceContext
     private EntityManager entityManager;
 
+    private final ConfigAuditPort configAudit;
+
     public WorkspaceMembershipService(
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceRepository workspaceRepository
+        WorkspaceRepository workspaceRepository,
+        ConfigAuditPort configAudit
     ) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceRepository = workspaceRepository;
+        this.configAudit = configAudit;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -371,7 +379,19 @@ public class WorkspaceMembershipService {
         if (membershipOpt.isPresent()) {
             // Update existing membership
             WorkspaceMembership membership = membershipOpt.get();
+            var beforeRole = new WorkspaceAuditSnapshots.RoleSnapshot(
+                membership.getRole() == null ? null : membership.getRole().name()
+            );
             membership.setRole(role);
+            configAudit.record(
+                ConfigAuditEntry.updated(
+                    ConfigAuditEntityType.WORKSPACE_ROLE,
+                    userId,
+                    workspaceId,
+                    beforeRole,
+                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name())
+                )
+            );
             log.info("Updated membership role: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         } else {
@@ -383,6 +403,14 @@ public class WorkspaceMembershipService {
 
             WorkspaceMembership membership = createMembershipInternal(workspace, user, role);
             membership.setLeaguePoints(POINTS_DEFAULT);
+            configAudit.record(
+                ConfigAuditEntry.created(
+                    ConfigAuditEntityType.WORKSPACE_ROLE,
+                    userId,
+                    workspaceId,
+                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name())
+                )
+            );
             log.info("Created membership: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         }

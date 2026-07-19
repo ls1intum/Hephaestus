@@ -1,10 +1,25 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+/**
+ * Service for workspace configuration and settings management.
+ *
+ * <p>Handles:
+ * <ul>
+ *   <li>Leaderboard schedule configuration</li>
+ *   <li>Notification settings (Slack integration)</li>
+ *   <li>Token/credential management</li>
+ *   <li>Visibility settings</li>
+ * </ul>
+ */
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.workspace.audit.WorkspaceAuditSnapshots;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceScheduleChangedEvent;
 import java.time.LocalTime;
@@ -21,17 +36,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Service for workspace configuration and settings management.
- *
- * <p>Handles:
- * <ul>
- *   <li>Leaderboard schedule configuration</li>
- *   <li>Notification settings (Slack integration)</li>
- *   <li>Token/credential management</li>
- *   <li>Visibility settings</li>
- * </ul>
- */
 @Service
 @RequiredArgsConstructor
 public class WorkspaceSettingsService {
@@ -40,6 +44,7 @@ public class WorkspaceSettingsService {
     private static final Pattern SLACK_CHANNEL_ID_PATTERN = Pattern.compile("^[CG][A-Z0-9]{8,}$");
 
     private final WorkspaceRepository workspaceRepository;
+    private final ConfigAuditPort configAudit;
     private final ConnectionService connectionService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -166,7 +171,17 @@ public class WorkspaceSettingsService {
                         ": no active GitHub or GitLab Connection. Bind a provider first."
                 )
             );
+        boolean hadToken = connectionService.findActiveProviderKind(workspaceId).isPresent();
         connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_TOKEN,
+                workspaceId,
+                workspaceId,
+                new WorkspaceAuditSnapshots.TokenSnapshot(hadToken, kind.name()),
+                new WorkspaceAuditSnapshots.TokenSnapshot(true, kind.name())
+            )
+        );
         log.info("Updated workspace PAT: workspaceId={}, kind={}", workspaceId, kind);
         return workspace;
     }
@@ -181,7 +196,17 @@ public class WorkspaceSettingsService {
     @Transactional
     public Workspace updatePublicVisibility(Long workspaceId, Boolean isPubliclyViewable) {
         Workspace workspace = requireWorkspace(workspaceId);
+        var beforeVis = new WorkspaceAuditSnapshots.VisibilitySnapshot(workspace.getIsPubliclyViewable());
         workspace.setIsPubliclyViewable(isPubliclyViewable);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_VISIBILITY,
+                workspaceId,
+                workspaceId,
+                beforeVis,
+                new WorkspaceAuditSnapshots.VisibilitySnapshot(isPubliclyViewable)
+            )
+        );
         log.info("Updated workspace visibility: workspaceId={}, isPublic={}", workspaceId, isPubliclyViewable);
         return workspaceRepository.save(workspace);
     }
@@ -197,7 +222,17 @@ public class WorkspaceSettingsService {
     @Transactional
     public Workspace updateFeatures(Long workspaceId, UpdateWorkspaceFeaturesRequestDTO request) {
         Workspace workspace = requireWorkspace(workspaceId);
+        var before = WorkspaceAuditSnapshots.FeaturesSnapshot.of(workspace.getFeatures());
         workspace.getFeatures().applyPatch(request);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_FEATURES,
+                workspaceId,
+                workspaceId,
+                before,
+                WorkspaceAuditSnapshots.FeaturesSnapshot.of(workspace.getFeatures())
+            )
+        );
 
         log.info(
             "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}, leagues={}",
