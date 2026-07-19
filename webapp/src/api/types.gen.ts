@@ -3388,8 +3388,8 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED';
-        result?: 'SUCCESS' | 'FAILURE';
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED'>;
+        result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
     };
@@ -3411,8 +3411,8 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED';
-        result?: 'SUCCESS' | 'FAILURE';
+        eventType?: Array<'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED' | 'RESEARCH_CONSENT_REVOKED'>;
+        result?: Array<'SUCCESS' | 'FAILURE'>;
         from?: Date;
         to?: Date;
     };
@@ -3435,10 +3435,10 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY';
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY'>;
         entityId?: string;
         changedKey?: string;
-        action?: 'CREATED' | 'UPDATED' | 'DELETED';
+        action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
         actorId?: number;
         from?: Date;
         to?: Date;
@@ -4472,10 +4472,10 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY';
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AI_CONFIG_BINDING' | 'AGENT_CONFIG' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY'>;
         entityId?: string;
         changedKey?: string;
-        action?: 'CREATED' | 'UPDATED' | 'DELETED';
+        action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
         actorId?: number;
         from?: Date;
         to?: Date;

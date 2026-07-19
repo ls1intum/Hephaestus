@@ -1,0 +1,9 @@
+---
+"hephaestus": minor
+---
+
+The instance-admin console now has a single "Audit log" with two tabs — "Sign-ins & accounts" and
+"Settings changes" — instead of two separate pages, so there is one place to answer "who did this,
+and when". Both tabs share the same filter bar: filters accept several values at once (for example
+feature-flag *and* role changes in one view) and the whole selection now lives in the address bar, so
+a filtered view can be pasted into a ticket or a chat and reopens exactly as it was.

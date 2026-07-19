@@ -26,7 +26,6 @@ import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin.workspaces'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminLoginProvidersRouteImport } from './routes/_authenticated/admin.login-providers'
-import { Route as AuthenticatedAdminConfigAuditRouteImport } from './routes/_authenticated/admin.config-audit'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_authenticated/workspaces/new/index'
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
@@ -44,7 +43,7 @@ import { Route as AuthenticatedWWorkspaceSlugAdminPracticesRouteImport } from '.
 import { Route as AuthenticatedWWorkspaceSlugAdminModelsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/models'
 import { Route as AuthenticatedWWorkspaceSlugAdminMembersRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/members'
 import { Route as AuthenticatedWWorkspaceSlugAdminIntegrationsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/integrations'
-import { Route as AuthenticatedWWorkspaceSlugAdminConfigAuditRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/config-audit'
+import { Route as AuthenticatedWWorkspaceSlugAdminAuditRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/audit'
 import { Route as AuthenticatedWWorkspaceSlugAdminAchievementsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/achievements'
 import { Route as AuthenticatedWWorkspaceSlugAdminAchievementDesignerRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/achievement-designer'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/index'
@@ -149,12 +148,6 @@ const AuthenticatedAdminLoginProvidersRoute =
     path: '/login-providers',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminConfigAuditRoute =
-  AuthenticatedAdminConfigAuditRouteImport.update({
-    id: '/config-audit',
-    path: '/config-audit',
-    getParentRoute: () => AuthenticatedAdminRoute,
-  } as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -256,10 +249,10 @@ const AuthenticatedWWorkspaceSlugAdminIntegrationsRoute =
     path: '/integrations',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminRouteRoute,
   } as any)
-const AuthenticatedWWorkspaceSlugAdminConfigAuditRoute =
-  AuthenticatedWWorkspaceSlugAdminConfigAuditRouteImport.update({
-    id: '/config-audit',
-    path: '/config-audit',
+const AuthenticatedWWorkspaceSlugAdminAuditRoute =
+  AuthenticatedWWorkspaceSlugAdminAuditRouteImport.update({
+    id: '/audit',
+    path: '/audit',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminRouteRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugAdminAchievementsRoute =
@@ -366,7 +359,6 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
-  '/admin/config-audit': typeof AuthenticatedAdminConfigAuditRoute
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
@@ -381,7 +373,7 @@ export interface FileRoutesByFullPath {
   '/workspaces/new/': typeof AuthenticatedWorkspacesNewIndexRoute
   '/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   '/w/$workspaceSlug/admin/achievements': typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
-  '/w/$workspaceSlug/admin/config-audit': typeof AuthenticatedWWorkspaceSlugAdminConfigAuditRoute
+  '/w/$workspaceSlug/admin/audit': typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
   '/w/$workspaceSlug/admin/integrations': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsRouteWithChildren
   '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminMembersRoute
   '/w/$workspaceSlug/admin/models': typeof AuthenticatedWWorkspaceSlugAdminModelsRoute
@@ -418,7 +410,6 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
-  '/admin/config-audit': typeof AuthenticatedAdminConfigAuditRoute
   '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
@@ -432,7 +423,7 @@ export interface FileRoutesByTo {
   '/workspaces/new': typeof AuthenticatedWorkspacesNewIndexRoute
   '/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   '/w/$workspaceSlug/admin/achievements': typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
-  '/w/$workspaceSlug/admin/config-audit': typeof AuthenticatedWWorkspaceSlugAdminConfigAuditRoute
+  '/w/$workspaceSlug/admin/audit': typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
   '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminMembersRoute
   '/w/$workspaceSlug/admin/models': typeof AuthenticatedWWorkspaceSlugAdminModelsRoute
   '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminSettingsRoute
@@ -469,7 +460,6 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
-  '/_authenticated/admin/config-audit': typeof AuthenticatedAdminConfigAuditRoute
   '/_authenticated/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
@@ -484,7 +474,7 @@ export interface FileRoutesById {
   '/_authenticated/workspaces/new/': typeof AuthenticatedWorkspacesNewIndexRoute
   '/_authenticated/w/$workspaceSlug/admin/achievement-designer': typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   '/_authenticated/w/$workspaceSlug/admin/achievements': typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
-  '/_authenticated/w/$workspaceSlug/admin/config-audit': typeof AuthenticatedWWorkspaceSlugAdminConfigAuditRoute
+  '/_authenticated/w/$workspaceSlug/admin/audit': typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
   '/_authenticated/w/$workspaceSlug/admin/integrations': typeof AuthenticatedWWorkspaceSlugAdminIntegrationsRouteWithChildren
   '/_authenticated/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminMembersRoute
   '/_authenticated/w/$workspaceSlug/admin/models': typeof AuthenticatedWWorkspaceSlugAdminModelsRoute
@@ -523,7 +513,6 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
-    | '/admin/config-audit'
     | '/admin/login-providers'
     | '/admin/users'
     | '/admin/workspaces'
@@ -538,7 +527,7 @@ export interface FileRouteTypes {
     | '/workspaces/new/'
     | '/w/$workspaceSlug/admin/achievement-designer'
     | '/w/$workspaceSlug/admin/achievements'
-    | '/w/$workspaceSlug/admin/config-audit'
+    | '/w/$workspaceSlug/admin/audit'
     | '/w/$workspaceSlug/admin/integrations'
     | '/w/$workspaceSlug/admin/members'
     | '/w/$workspaceSlug/admin/models'
@@ -575,7 +564,6 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
-    | '/admin/config-audit'
     | '/admin/login-providers'
     | '/admin/users'
     | '/admin/workspaces'
@@ -589,7 +577,7 @@ export interface FileRouteTypes {
     | '/workspaces/new'
     | '/w/$workspaceSlug/admin/achievement-designer'
     | '/w/$workspaceSlug/admin/achievements'
-    | '/w/$workspaceSlug/admin/config-audit'
+    | '/w/$workspaceSlug/admin/audit'
     | '/w/$workspaceSlug/admin/members'
     | '/w/$workspaceSlug/admin/models'
     | '/w/$workspaceSlug/admin/settings'
@@ -625,7 +613,6 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/_authenticated/admin/audit'
-    | '/_authenticated/admin/config-audit'
     | '/_authenticated/admin/login-providers'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
@@ -640,7 +627,7 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces/new/'
     | '/_authenticated/w/$workspaceSlug/admin/achievement-designer'
     | '/_authenticated/w/$workspaceSlug/admin/achievements'
-    | '/_authenticated/w/$workspaceSlug/admin/config-audit'
+    | '/_authenticated/w/$workspaceSlug/admin/audit'
     | '/_authenticated/w/$workspaceSlug/admin/integrations'
     | '/_authenticated/w/$workspaceSlug/admin/members'
     | '/_authenticated/w/$workspaceSlug/admin/models'
@@ -799,13 +786,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLoginProvidersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/config-audit': {
-      id: '/_authenticated/admin/config-audit'
-      path: '/config-audit'
-      fullPath: '/admin/config-audit'
-      preLoaderRoute: typeof AuthenticatedAdminConfigAuditRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/audit': {
       id: '/_authenticated/admin/audit'
       path: '/audit'
@@ -925,11 +905,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminIntegrationsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteRoute
     }
-    '/_authenticated/w/$workspaceSlug/admin/config-audit': {
-      id: '/_authenticated/w/$workspaceSlug/admin/config-audit'
-      path: '/config-audit'
-      fullPath: '/w/$workspaceSlug/admin/config-audit'
-      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminConfigAuditRouteImport
+    '/_authenticated/w/$workspaceSlug/admin/audit': {
+      id: '/_authenticated/w/$workspaceSlug/admin/audit'
+      path: '/audit'
+      fullPath: '/w/$workspaceSlug/admin/audit'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminAuditRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteRoute
     }
     '/_authenticated/w/$workspaceSlug/admin/achievements': {
@@ -1042,7 +1022,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
-  AuthenticatedAdminConfigAuditRoute: typeof AuthenticatedAdminConfigAuditRoute
   AuthenticatedAdminLoginProvidersRoute: typeof AuthenticatedAdminLoginProvidersRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute
@@ -1050,7 +1029,6 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
-  AuthenticatedAdminConfigAuditRoute: AuthenticatedAdminConfigAuditRoute,
   AuthenticatedAdminLoginProvidersRoute: AuthenticatedAdminLoginProvidersRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWorkspacesRoute: AuthenticatedAdminWorkspacesRoute,
@@ -1113,7 +1091,7 @@ const AuthenticatedWWorkspaceSlugAdminPracticesRouteWithChildren =
 interface AuthenticatedWWorkspaceSlugAdminRouteRouteChildren {
   AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute: typeof AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute
   AuthenticatedWWorkspaceSlugAdminAchievementsRoute: typeof AuthenticatedWWorkspaceSlugAdminAchievementsRoute
-  AuthenticatedWWorkspaceSlugAdminConfigAuditRoute: typeof AuthenticatedWWorkspaceSlugAdminConfigAuditRoute
+  AuthenticatedWWorkspaceSlugAdminAuditRoute: typeof AuthenticatedWWorkspaceSlugAdminAuditRoute
   AuthenticatedWWorkspaceSlugAdminIntegrationsRoute: typeof AuthenticatedWWorkspaceSlugAdminIntegrationsRouteWithChildren
   AuthenticatedWWorkspaceSlugAdminMembersRoute: typeof AuthenticatedWWorkspaceSlugAdminMembersRoute
   AuthenticatedWWorkspaceSlugAdminModelsRoute: typeof AuthenticatedWWorkspaceSlugAdminModelsRoute
@@ -1130,8 +1108,8 @@ const AuthenticatedWWorkspaceSlugAdminRouteRouteChildren: AuthenticatedWWorkspac
       AuthenticatedWWorkspaceSlugAdminAchievementDesignerRoute,
     AuthenticatedWWorkspaceSlugAdminAchievementsRoute:
       AuthenticatedWWorkspaceSlugAdminAchievementsRoute,
-    AuthenticatedWWorkspaceSlugAdminConfigAuditRoute:
-      AuthenticatedWWorkspaceSlugAdminConfigAuditRoute,
+    AuthenticatedWWorkspaceSlugAdminAuditRoute:
+      AuthenticatedWWorkspaceSlugAdminAuditRoute,
     AuthenticatedWWorkspaceSlugAdminIntegrationsRoute:
       AuthenticatedWWorkspaceSlugAdminIntegrationsRouteWithChildren,
     AuthenticatedWWorkspaceSlugAdminMembersRoute:

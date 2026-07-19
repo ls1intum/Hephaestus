@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
@@ -101,6 +102,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
     public ResponseEntity<PracticeAreaDTO> createArea(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeAreaRequestDTO request
@@ -136,6 +138,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
     public ResponseEntity<PracticeAreaDTO> updateArea(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
@@ -179,6 +182,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalogue display order; changes no behaviour")
     public ResponseEntity<List<PracticeAreaDTO>> reorderAreas(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody ReorderPracticeAreasRequestDTO request
@@ -204,6 +208,7 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "catalogue grouping; changes no behaviour")
     public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
         areaService.deleteArea(workspaceContext, areaSlug);
         return ResponseEntity.noContent().build();

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -116,6 +117,7 @@ public class WorkspaceTeamSettingsController {
         content = @Content(schema = @Schema(implementation = WorkspaceTeamSettingsDTO.class))
     )
     @ApiResponse(responseCode = "404", description = "Team not found in workspace")
+    @AuditExempt(reason = "team reporting scope; grants no access")
     public ResponseEntity<WorkspaceTeamSettingsDTO> updateTeamSettings(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -201,6 +203,7 @@ public class WorkspaceTeamSettingsController {
         content = @Content(schema = @Schema(implementation = WorkspaceTeamRepositorySettingsDTO.class))
     )
     @ApiResponse(responseCode = "404", description = "Team or repository not found")
+    @AuditExempt(reason = "team reporting scope; grants no access")
     public ResponseEntity<WorkspaceTeamRepositorySettingsDTO> updateRepositorySettings(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -272,6 +275,7 @@ public class WorkspaceTeamSettingsController {
     @Operation(summary = "Add label filter", description = "Adds a label as a filter for a team in the workspace")
     @ApiResponse(responseCode = "201", description = "Label filter added")
     @ApiResponse(responseCode = "404", description = "Team or label not found")
+    @AuditExempt(reason = "team label filter is a reporting view, not configuration that gates delivery")
     public ResponseEntity<Void> addLabelFilter(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -305,6 +309,7 @@ public class WorkspaceTeamSettingsController {
     @Operation(summary = "Remove label filter", description = "Removes a label filter from a team in the workspace")
     @ApiResponse(responseCode = "204", description = "Label filter removed")
     @ApiResponse(responseCode = "404", description = "Label filter not found")
+    @AuditExempt(reason = "team label filter is a reporting view, not configuration that gates delivery")
     public ResponseEntity<Void> removeLabelFilter(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,

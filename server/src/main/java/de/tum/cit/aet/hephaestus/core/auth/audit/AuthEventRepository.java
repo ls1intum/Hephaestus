@@ -49,8 +49,8 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
             SELECT e FROM AuthEvent e
             WHERE (:accountId IS NULL OR e.accountId = :accountId)
               AND (:actingAccountId IS NULL OR e.actingAccountId = :actingAccountId)
-              AND (:eventType IS NULL OR e.eventType = :eventType)
-              AND (:result IS NULL OR e.result = :result)
+              AND (:eventTypes IS NULL OR e.eventType IN :eventTypes)
+              AND (:results IS NULL OR e.result IN :results)
               AND (CAST(:from AS Instant) IS NULL OR e.id.occurredAt >= :from)
               AND (CAST(:to AS Instant) IS NULL OR e.id.occurredAt < :to)
             ORDER BY e.id.occurredAt DESC, e.id.id DESC
@@ -59,8 +59,8 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
     Page<AuthEvent> findForAdmin(
         @Param("accountId") @Nullable Long accountId,
         @Param("actingAccountId") @Nullable Long actingAccountId,
-        @Param("eventType") AuthEvent.@Nullable EventType eventType,
-        @Param("result") AuthEvent.@Nullable Result result,
+        @Param("eventTypes") @Nullable List<AuthEvent.EventType> eventTypes,
+        @Param("results") @Nullable List<AuthEvent.Result> results,
         @Param("from") @Nullable Instant from,
         @Param("to") @Nullable Instant to,
         Pageable pageable

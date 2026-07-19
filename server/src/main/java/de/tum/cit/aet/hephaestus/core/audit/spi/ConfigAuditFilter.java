@@ -1,33 +1,46 @@
 package de.tum.cit.aet.hephaestus.core.audit.spi;
 
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Optional constraints on an audit query; a null field means "no constraint on that dimension".
- * The workspace is deliberately <em>not</em> here — it is the tenancy boundary on the workspace-scoped
- * read, not a filter, so it cannot be collapsed to "all" by omitting it.
+ * Optional constraints on an audit query; a null/empty field means "no constraint on that dimension".
+ * The workspace is deliberately not here — it is the tenancy boundary on the workspace-scoped read, not
+ * a filter, so it cannot be collapsed to "all" by omitting it.
  *
- * @param entityId   only meaningful together with {@code entityType}; id spaces are per-type and would
- *                   otherwise collide
- * @param changedKey a dot-path from {@code changedKeys} — the per-control history filter (#1357)
- * @param to         exclusive upper bound
+ * <p>{@code entityTypes} and {@code actions} are multi-valued because audit triage is union-shaped
+ * ("everything destructive" = CREATED ∪ DELETED). They reach SQL as a comma-joined string that
+ * {@code string_to_array} expands — enum names contain no commas, and this keeps the optional-filter
+ * shape identical to the scalar dimensions.
  */
 public record ConfigAuditFilter(
-    @Nullable ConfigAuditEntityType entityType,
+    @Nullable List<ConfigAuditEntityType> entityTypes,
     @Nullable String entityId,
     @Nullable String changedKey,
-    @Nullable ConfigAuditAction action,
+    @Nullable List<ConfigAuditAction> actions,
     @Nullable Long actorId,
     @Nullable Instant from,
     @Nullable Instant to
 ) {
-    /** Enum name for SQL binding, or null when the dimension is unconstrained. */
-    public @Nullable String entityTypeName() {
-        return entityType == null ? null : entityType.name();
+    /** Comma-joined entity-type names for SQL binding, or null when unconstrained. */
+    public @Nullable String entityTypesCsv() {
+        return csv(entityTypes);
     }
 
-    public @Nullable String actionName() {
-        return action == null ? null : action.name();
+    /** Comma-joined action names for SQL binding, or null when unconstrained. */
+    public @Nullable String actionsCsv() {
+        return csv(actions);
+    }
+
+    private static @Nullable String csv(@Nullable List<? extends Enum<?>> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values
+            .stream()
+            .map(Enum::name)
+            .reduce((a, b) -> a + "," + b)
+            .orElse(null);
     }
 }

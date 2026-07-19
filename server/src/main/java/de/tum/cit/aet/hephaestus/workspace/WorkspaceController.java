@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.audit.spi.Audited;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
@@ -64,6 +66,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("WORKSPACE_STATUS")
     public ResponseEntity<WorkspaceDTO> updateStatus(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request
@@ -76,6 +79,7 @@ public class WorkspaceController {
     @Operation(summary = "Purge (soft delete) a workspace")
     @ApiResponse(responseCode = "204", description = "Workspace purged")
     @RequireWorkspaceOwner
+    @Audited("WORKSPACE_STATUS")
     public ResponseEntity<Void> purgeWorkspace(WorkspaceContext workspaceContext) {
         workspaceLifecycleService.purgeWorkspace(workspaceContext);
         return ResponseEntity.noContent().build();
@@ -89,6 +93,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "leaderboard delivery preference; changes no access or AI behaviour")
     public ResponseEntity<WorkspaceDTO> updateSchedule(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
@@ -105,6 +110,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "notification delivery preference; changes no access or AI behaviour")
     public ResponseEntity<WorkspaceDTO> updateNotifications(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceNotificationsRequestDTO request
@@ -126,6 +132,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "digest delivery preference; changes no access or AI behaviour")
     public ResponseEntity<WorkspaceDTO> updateLeaderboardDigest(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateLeaderboardDigestRequestDTO request
@@ -149,6 +156,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("WORKSPACE_TOKEN")
     public ResponseEntity<WorkspaceDTO> updateToken(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
@@ -165,6 +173,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("WORKSPACE_VISIBILITY")
     public ResponseEntity<WorkspaceDTO> updatePublicVisibility(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
@@ -181,6 +190,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireAtLeastWorkspaceAdmin
+    @Audited("WORKSPACE_FEATURES")
     public ResponseEntity<WorkspaceDTO> updateFeatures(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request
@@ -197,6 +207,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireWorkspaceOwner
+    @AuditExempt(reason = "slug history is its own ledger (workspace_slug_history)")
     public ResponseEntity<WorkspaceDTO> renameSlug(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody RenameWorkspaceSlugRequestDTO request
@@ -225,6 +236,7 @@ public class WorkspaceController {
     @PostMapping("/repositories")
     @Operation(summary = "Add a repository to a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "sync scope; the resulting connection state is recorded in connection_audit")
     public ResponseEntity<Void> addRepositoryToMonitor(
         WorkspaceContext workspaceContext,
         @RequestParam String nameWithOwner
@@ -237,6 +249,7 @@ public class WorkspaceController {
     @DeleteMapping("/repositories")
     @Operation(summary = "Remove a repository from a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "sync scope; the resulting connection state is recorded in connection_audit")
     public ResponseEntity<Void> removeRepositoryToMonitor(
         WorkspaceContext workspaceContext,
         @RequestParam String nameWithOwner
@@ -255,6 +268,7 @@ public class WorkspaceController {
     @PostMapping("/teams/{teamId}/labels/{repositoryId}/{label}")
     @Operation(summary = "Add a repository label to a team")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "team label filter is a reporting view, not configuration that gates delivery")
     public ResponseEntity<TeamInfoDTO> addLabelToTeam(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -270,6 +284,7 @@ public class WorkspaceController {
     @DeleteMapping("/teams/{teamId}/labels/{labelId}")
     @Operation(summary = "Remove a repository label from a team")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "team label filter is a reporting view, not configuration that gates delivery")
     public ResponseEntity<TeamInfoDTO> removeLabelFromTeam(
         WorkspaceContext workspaceContext,
         @PathVariable Long teamId,
@@ -284,6 +299,7 @@ public class WorkspaceController {
     @PutMapping("/league/reset")
     @Operation(summary = "Reset and recalculate workspace leagues")
     @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "recomputes a derived read model; stores no configuration")
     public ResponseEntity<Void> resetAndRecalculateLeagues(WorkspaceContext workspaceContext) {
         workspaceService.resetAndRecalculateLeagues(workspaceContext);
         return ResponseEntity.ok().build();

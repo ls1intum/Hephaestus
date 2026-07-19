@@ -428,7 +428,13 @@ public class WorkspaceMembershipService {
             .findByWorkspace_IdAndUser_Id(workspaceId, userId)
             .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
 
+        var beforeRole = new WorkspaceAuditSnapshots.RoleSnapshot(
+            membership.getRole() == null ? null : membership.getRole().name()
+        );
         workspaceMembershipRepository.delete(membership);
+        configAudit.record(
+            ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_ROLE, userId, workspaceId, beforeRole)
+        );
         log.info("Removed membership: userId={}, workspaceId={}", userId, workspaceId);
     }
 
