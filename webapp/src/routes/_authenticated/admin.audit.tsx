@@ -45,6 +45,7 @@ function AdminAuditPage() {
 			</header>
 
 			<Tabs
+				className="gap-4"
 				value={search.tab}
 				onValueChange={(value) =>
 					// The two tabs filter different dimensions; carrying one tab's selection into the other
@@ -59,12 +60,12 @@ function AdminAuditPage() {
 					})
 				}
 			>
-				<TabsList className="h-10 w-full p-1">
+				<TabsList className="h-10 w-full p-1 sm:w-fit">
 					<TabsTrigger value="signins">Access</TabsTrigger>
 					<TabsTrigger value="settings">Settings</TabsTrigger>
 				</TabsList>
 
-				<TabsContent value="signins" className="pt-4">
+				<TabsContent value="signins">
 					<AuthAuditPanel
 						search={search}
 						onSearchChange={patchSearch}
@@ -72,7 +73,7 @@ function AdminAuditPage() {
 					/>
 				</TabsContent>
 
-				<TabsContent value="settings" className="pt-4">
+				<TabsContent value="settings">
 					<AdminConfigAuditPanel
 						search={search}
 						onSearchChange={patchSearch}

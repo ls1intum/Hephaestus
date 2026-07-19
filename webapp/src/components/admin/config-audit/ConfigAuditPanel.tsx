@@ -180,12 +180,19 @@ function ConfigAuditView({
 				)}
 			</AuditToolbar>
 
-			{/* Mounted unconditionally and announced — see AuthAuditPanel. */}
-			<p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+			{/* A persistent live region announces the count; the visible line is conditional, because an
+			    empty <p> still collects the stack's margins and leaves a gap under the toolbar. */}
+			<span role="status" aria-live="polite" className="sr-only">
 				{total === undefined
 					? ""
-					: `${total.toLocaleString()} ${total === 1 ? "change" : "changes"}${hasFilter ? " match the current filters" : ""}.`}
-			</p>
+					: `${total.toLocaleString()} ${total === 1 ? "change" : "changes"}${hasFilter ? " match your filters" : ""}.`}
+			</span>
+			{total !== undefined && (
+				<p className="text-sm text-muted-foreground" aria-hidden>
+					{total.toLocaleString()} {total === 1 ? "change" : "changes"}
+					{hasFilter ? " match your filters" : ""}.
+				</p>
+			)}
 
 			<ConfigAuditTable
 				entries={entries}

@@ -175,13 +175,19 @@ export function AuthAuditPanel({
 				)}
 			</AuditToolbar>
 
-			{/* Mounted unconditionally and announced: filtering otherwise changes the table silently for a
-			    screen-reader user, and the zero-match case is exactly when the count matters most. */}
-			<p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+			{/* A persistent live region announces the count; the visible line is conditional, because an
+			    empty <p> still collects the stack's margins and leaves a gap under the toolbar. */}
+			<span role="status" aria-live="polite" className="sr-only">
 				{total === undefined
 					? ""
-					: `${total.toLocaleString()} ${total === 1 ? "event" : "events"}${hasFilter ? " match the current filters" : ""}.`}
-			</p>
+					: `${total.toLocaleString()} ${total === 1 ? "event" : "events"}${hasFilter ? " match your filters" : ""}.`}
+			</span>
+			{total !== undefined && (
+				<p className="text-sm text-muted-foreground" aria-hidden>
+					{total.toLocaleString()} {total === 1 ? "event" : "events"}
+					{hasFilter ? " match your filters" : ""}.
+				</p>
+			)}
 
 			<AdminAuditTable
 				events={events}
