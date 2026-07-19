@@ -1,4 +1,4 @@
-import type { AccountRef, AuthEventView } from "@/api/types.gen";
+import type { AccountRef } from "@/api/types.gen";
 
 /**
  * Severity of an audit event, derived from its outcome + type. Drives the row's visual emphasis so a
@@ -38,53 +38,9 @@ export function accountLabel(ref: AccountRef | undefined, id: number | undefined
 	return null;
 }
 
-export interface FormattedTimestamp {
-	/** Absolute time in the viewer's locale + timezone (forensic precision). */
-	local: string;
-	/** The canonical ISO-8601 UTC instant, for the hover tooltip and copy/paste. */
-	isoUtc: string;
-}
-
-/**
- * Audit timestamps need precision, so the row shows the absolute local time; the exact ISO-8601 **UTC**
- * instant is kept in the tooltip so events stay comparable across timezones (the convention CloudTrail,
- * Tailscale and GitHub follow: store/serve UTC, render local).
- */
-export function formatTimestamp(value: AuthEventView["occurredAt"]): FormattedTimestamp {
-	// The generated client types this `Date`, but the response transformers aren't wired into the SDK
-	// calls, so it arrives as an ISO string at runtime — coerce defensively (same pattern as elsewhere).
-	const date = value instanceof Date ? value : new Date(value);
-	// Medium date + medium time (incl. seconds) — audit rows need second precision, and the explicit
-	// styles render consistently across locales rather than the browser default's variable shape.
-	const local = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
-	return { local, isoUtc: date.toISOString() };
-}
-
-const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
-	["year", 31_536_000_000],
-	["month", 2_592_000_000],
-	["day", 86_400_000],
-	["hour", 3_600_000],
-	["minute", 60_000],
-];
-
-/**
- * A compact relative time ("2 hours ago") for the row, paired with the absolute value on hover — the
- * convention GitHub/Datadog/Tailscale use for log rows (scannable recency + precision on demand).
- */
-export function relativeTime(value: AuthEventView["occurredAt"]): string {
-	const date = value instanceof Date ? value : new Date(value);
-	// Audit events are always in the past; clamp so minor clock skew (or a sub-minute-old event) reads
-	// "just now" instead of a nonsensical "in N seconds".
-	const diffMs = Math.min(date.getTime() - Date.now(), 0);
-	const abs = Math.abs(diffMs);
-	if (abs < 60_000) return "just now";
-	const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-	for (const [unit, ms] of RELATIVE_UNITS) {
-		if (abs >= ms) return rtf.format(Math.round(diffMs / ms), unit);
-	}
-	return "just now";
-}
+export type { FormattedTimestamp } from "../audit-shared/timeFormat";
+// Timestamp formatting is shared with the config-audit surface — see audit-shared/timeFormat.
+export { formatTimestamp, relativeTime } from "../audit-shared/timeFormat";
 
 /**
  * Turn the JSONB `details` blob into a human sentence where we can — `{"from":"USER","to":"APP_ADMIN"}`

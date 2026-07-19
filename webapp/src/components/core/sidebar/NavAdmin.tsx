@@ -4,6 +4,7 @@ import {
 	Bot,
 	ChevronRight,
 	ClipboardCheck,
+	History,
 	LayoutGridIcon,
 	ListChecks,
 	Map as MapIcon,
@@ -277,6 +278,15 @@ export function NavAdmin({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="Setting change history"
+						render={<Link to="/w/$workspaceSlug/admin/config-audit" params={{ workspaceSlug }} />}
+					>
+						<History />
+						<span>Configuration changes</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			</SidebarMenu>
 		</SidebarGroup>
 	);
