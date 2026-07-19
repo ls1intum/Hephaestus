@@ -541,7 +541,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
             ConfigAuditEntry entry = captor.getValue();
             assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.AGENT_CONFIG);
             assertThat(entry.entityId()).isEqualTo("7");
-            assertThat(entry.before()).hasToString(entry.before().toString());
             assertThat(String.valueOf(entry.before())).contains("old-model");
             assertThat(String.valueOf(entry.after())).contains("new-model");
         }

@@ -24,4 +24,7 @@ public enum ConfigAuditEntityType {
     WORKSPACE_TOKEN,
     /** Whether the workspace is publicly viewable. */
     WORKSPACE_VISIBILITY,
+
+    /** A practice being activated or deactivated, which gates whether it is reviewed at all. */
+    PRACTICE_ACTIVE,
 }

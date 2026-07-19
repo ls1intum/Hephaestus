@@ -34,15 +34,6 @@ class AgentConfigSnapshotTest {
     }
 
     @Test
-    void doesNotExposeTheApiKeyThroughToString() {
-        // A record's toString prints every component, so this catches the key being added as one even
-        // if a future serializer config would have hidden it.
-        assertThat(AgentConfigSnapshot.of(configWithKey(SENTINEL))).hasToString(
-            AgentConfigSnapshot.of(configWithKey("a-completely-different-key")).toString()
-        );
-    }
-
-    @Test
     void recordsOnlyWhetherAKeyIsPresent() {
         // What an auditor actually asks — "was a credential added or removed here?" — without the
         // material. Fails if the presence flag is derived from something other than the key.

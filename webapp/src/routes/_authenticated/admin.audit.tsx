@@ -17,8 +17,9 @@ function AdminAuditPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	// Every filter change is a navigation, so the current view is always the thing in the address bar
-	// and always shareable. `replace` keeps a long filtering session from burying the previous page
-	// under dozens of history entries.
+	// and always shareable. Filter churn uses `replace` so a long session does not bury the previous
+	// page under dozens of entries; the tab switch below deliberately does not, because it discards
+	// the other tab's selection and Back is the only way to undo that.
 	const patchSearch = (patch: Partial<AuditSearch>) =>
 		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
@@ -39,8 +40,8 @@ function AdminAuditPage() {
 				</div>
 				<p className="text-sm text-muted-foreground">
 					Read-only record of who did what, and when, across the instance. Append-only — entries
-					can't be edited or removed. Times are shown in your local timezone (hover for the exact
-					UTC instant).
+					can't be edited or removed. Times are shown in your local timezone; open a row for the
+					exact UTC instant.
 				</p>
 			</header>
 
@@ -56,7 +57,6 @@ function AdminAuditPage() {
 							from: prev.from,
 							to: prev.to,
 						}),
-						replace: true,
 					})
 				}
 			>

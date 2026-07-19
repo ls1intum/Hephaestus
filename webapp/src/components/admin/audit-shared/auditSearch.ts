@@ -5,30 +5,47 @@ import { z } from "zod";
 /**
  * URL state for the audit surfaces. An audit trail exists to be cited — "here is the change that
  * broke it" has to survive a paste into a ticket — so the whole filter selection lives in the query
- * string rather than in component state, and the browser's back button steps through it.
+ * string rather than in component state.
  *
- * Values stay untyped-but-validated strings (rather than the generated enum unions) so that an
- * enum value added server-side does not turn every previously-shared link into a validation error.
+ * Every field is `.catch()`-ed rather than merely optional. `validateSearch` turning a link into an
+ * error screen is the one failure this page cannot afford: a stale link from a months-old ticket
+ * carrying a since-renamed enum, or a hand-typed `?accountId=abc`, must still open the audit log —
+ * just less narrowly filtered. Values stay loose strings for the same reason, and are narrowed to
+ * the API's enums at the call site by `narrowToEnum`.
  */
 export const auditSearchSchema = z.object({
-	tab: z.enum(["signins", "settings"]).default("signins"),
+	tab: z.enum(["signins", "settings"]).catch("signins"),
 	// Sign-ins tab
-	eventType: z.array(z.string()).optional(),
-	outcome: z.array(z.string()).optional(),
-	accountId: z.number().optional(),
+	eventType: z.array(z.string()).optional().catch(undefined),
+	outcome: z.array(z.string()).optional().catch(undefined),
+	accountId: z.number().optional().catch(undefined),
 	// Settings tab
-	entityType: z.array(z.string()).optional(),
-	action: z.array(z.string()).optional(),
-	entityId: z.string().optional(),
+	entityType: z.array(z.string()).optional().catch(undefined),
+	action: z.array(z.string()).optional().catch(undefined),
 	// Both
-	actorId: z.number().optional(),
-	/** Inclusive local day bounds, `yyyy-MM-dd`. Kept as calendar days, not instants, so a shared
-	 *  link means the same day to the reader as to the sharer. */
-	from: z.string().optional(),
-	to: z.string().optional(),
+	actorId: z.number().optional().catch(undefined),
+	/** Local calendar days, `yyyy-MM-dd`, so a shared link means the same day to the reader as to the
+	 *  sharer. Both bounds are inclusive; `toDayParam`/`dayEndIso` turn `to` into the exclusive
+	 *  instant the server's `occurred_at < :to` predicate wants. */
+	from: z.string().optional().catch(undefined),
+	to: z.string().optional().catch(undefined),
 });
 
 export type AuditSearch = z.infer<typeof auditSearchSchema>;
+
+/**
+ * The workspace surface has no tabs and no sign-in trail, so it accepts only the settings-trail
+ * dimensions — otherwise `?tab=signins` would be a valid, meaningless param on a page without tabs.
+ */
+export const workspaceAuditSearchSchema = auditSearchSchema.omit({
+	tab: true,
+	eventType: true,
+	outcome: true,
+	accountId: true,
+});
+
+/** The settings-trail dimensions, shared by the instance tab and the workspace page. */
+export type ConfigAuditSearch = z.infer<typeof workspaceAuditSearchSchema>;
 
 const DAY = "yyyy-MM-dd";
 

@@ -2,17 +2,6 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
 
-/**
- * Service for managing workspace memberships.
- * <p>
- * Handles CRUD operations for workspace memberships, including:
- * <ul>
- * <li>Creating and removing memberships</li>
- * <li>Updating member roles</li>
- * <li>Syncing GitHub organization members with workspace memberships</li>
- * <li>Managing league points snapshots</li>
- * </ul>
- */
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
@@ -39,6 +28,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for managing workspace memberships.
+ * <p>
+ * Handles CRUD operations for workspace memberships, including:
+ * <ul>
+ * <li>Creating and removing memberships</li>
+ * <li>Updating member roles</li>
+ * <li>Syncing GitHub organization members with workspace memberships</li>
+ * <li>Managing league points snapshots</li>
+ * </ul>
+ */
 @Service
 public class WorkspaceMembershipService {
 
@@ -380,7 +380,8 @@ public class WorkspaceMembershipService {
             // Update existing membership
             WorkspaceMembership membership = membershipOpt.get();
             var beforeRole = new WorkspaceAuditSnapshots.RoleSnapshot(
-                membership.getRole() == null ? null : membership.getRole().name()
+                membership.getRole() == null ? null : membership.getRole().name(),
+                membership.isHidden()
             );
             membership.setRole(role);
             configAudit.record(
@@ -389,7 +390,7 @@ public class WorkspaceMembershipService {
                     userId,
                     workspaceId,
                     beforeRole,
-                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name())
+                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name(), membership.isHidden())
                 )
             );
             log.info("Updated membership role: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
@@ -408,7 +409,7 @@ public class WorkspaceMembershipService {
                     ConfigAuditEntityType.WORKSPACE_ROLE,
                     userId,
                     workspaceId,
-                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name())
+                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name(), membership.isHidden())
                 )
             );
             log.info("Created membership: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
@@ -429,7 +430,8 @@ public class WorkspaceMembershipService {
             .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
 
         var beforeRole = new WorkspaceAuditSnapshots.RoleSnapshot(
-            membership.getRole() == null ? null : membership.getRole().name()
+            membership.getRole() == null ? null : membership.getRole().name(),
+            membership.isHidden()
         );
         workspaceMembershipRepository.delete(membership);
         configAudit.record(
@@ -470,7 +472,25 @@ public class WorkspaceMembershipService {
         WorkspaceMembership membership = workspaceMembershipRepository
             .findByWorkspace_IdAndUser_Id(workspaceId, userId)
             .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+        var before = new WorkspaceAuditSnapshots.RoleSnapshot(
+            membership.getRole() == null ? null : membership.getRole().name(),
+            membership.isHidden()
+        );
         membership.setHidden(hidden);
+        // Not cosmetic: syncWorkspaceMembers deliberately preserves hidden memberships, so this flag
+        // decides whether a member keeps workspace access after leaving the upstream org.
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.WORKSPACE_ROLE,
+                userId,
+                workspaceId,
+                before,
+                new WorkspaceAuditSnapshots.RoleSnapshot(
+                    membership.getRole() == null ? null : membership.getRole().name(),
+                    hidden
+                )
+            )
+        );
         return workspaceMembershipRepository.save(membership);
     }
 

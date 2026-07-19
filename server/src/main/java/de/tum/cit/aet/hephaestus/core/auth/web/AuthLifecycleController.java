@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
-import de.tum.cit.aet.hephaestus.core.audit.spi.Audited;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.auth.AuthSessionService;
 import de.tum.cit.aet.hephaestus.core.auth.impersonation.ImpersonationService;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;

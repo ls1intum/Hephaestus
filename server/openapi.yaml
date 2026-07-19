@@ -309,6 +309,7 @@ paths:
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
+            - PRACTICE_ACTIVE
       - in: query
         name: entityId
         required: false
@@ -1449,6 +1450,7 @@ paths:
             - WORKSPACE_STATUS
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
+            - PRACTICE_ACTIVE
       - in: query
         name: entityId
         required: false
@@ -5103,6 +5105,7 @@ components:
           - WORKSPACE_STATUS
           - WORKSPACE_TOKEN
           - WORKSPACE_VISIBILITY
+          - PRACTICE_ACTIVE
         id:
           type: integer
           format: int64

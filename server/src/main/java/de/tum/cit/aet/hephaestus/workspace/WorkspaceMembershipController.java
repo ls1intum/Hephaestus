@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
-import de.tum.cit.aet.hephaestus.core.audit.spi.Audited;
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
@@ -139,7 +139,7 @@ public class WorkspaceMembershipController {
      */
     @PatchMapping("/{userId}/hidden")
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "roster display toggle; grants and revokes no access")
+    @Audited("WORKSPACE_ROLE")
     public ResponseEntity<WorkspaceMembershipDTO> updateMemberVisibility(
         WorkspaceContext context,
         @PathVariable Long userId,

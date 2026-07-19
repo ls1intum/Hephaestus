@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.audit;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
+import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 /** Audit snapshots for workspace-administration changes. Records carry no secrets — a token rotation
@@ -40,10 +41,14 @@ public final class WorkspaceAuditSnapshots {
     public record VisibilitySnapshot(@Nullable Boolean publiclyViewable) implements ConfigAuditSnapshot {}
 
     /** Presence of a stored SCM token — never the token itself. */
-    public record TokenSnapshot(boolean tokenSet, @Nullable String providerKind) implements ConfigAuditSnapshot {}
+    public record TokenSnapshot(
+        boolean tokenSet,
+        @Nullable String providerKind,
+        @Nullable Instant rotatedAt
+    ) implements ConfigAuditSnapshot {}
 
     /** A member's role in the workspace. */
-    public record RoleSnapshot(@Nullable String role) implements ConfigAuditSnapshot {}
+    public record RoleSnapshot(@Nullable String role, boolean hidden) implements ConfigAuditSnapshot {}
 
     /** The workspace lifecycle status. */
     public record StatusSnapshot(@Nullable String status) implements ConfigAuditSnapshot {

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
-import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;

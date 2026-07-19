@@ -81,6 +81,19 @@ class ConfigAuditDiffTest {
         assertThat(changedKeys("{\"b\":1,\"a\":1}", "{\"b\":2,\"a\":2}")).containsExactly("a", "b");
     }
 
+    @Test
+    void rotatingAnAlreadySetCredentialStillCountsAsAChange() {
+        // ConfigAuditRecorder drops an UPDATE whose diff is empty, so a credential snapshot built only
+        // from presence flags records nothing on the common path — rotating a token that was already
+        // set. The rotation instant is what keeps the row from being suppressed.
+        assertThat(
+            changedKeys(
+                "{\"tokenSet\":true,\"providerKind\":\"GITHUB\",\"rotatedAt\":null}",
+                "{\"tokenSet\":true,\"providerKind\":\"GITHUB\",\"rotatedAt\":\"2026-07-19T10:00:00Z\"}"
+            )
+        ).containsExactly("rotatedAt");
+    }
+
     private static List<String> changedKeys(String before, String after) {
         return ConfigAuditDiff.changedKeys(node(before), node(after));
     }

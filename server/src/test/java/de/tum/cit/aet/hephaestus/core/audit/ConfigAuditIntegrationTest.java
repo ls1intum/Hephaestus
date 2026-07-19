@@ -55,7 +55,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(row.changedKeyList()).containsExactly("cooldownMinutes");
         assertThat(row.getNewValue()).contains("45");
         // Untouched fields must survive into the snapshot, or the "from what to what" is a lie.
-        assertThat(row.getNewValue()).contains("skipDrafts");
+        // Present AND null, not absent: null is "inherit the fleet default", so a serializer that
+        // dropped null keys would make clearing an override indistinguishable from never setting one.
+        assertThat(row.getNewValue()).contains("\"skipDrafts\":null").contains("\"cooldownMinutes\":45");
         // Attribution through the real filter chain — the JWT -> CurrentAccount -> actor seam the
         // recorder's unit test can only simulate. USER, not SYSTEM: a signed-in admin did this. (The
         // id stays null here because the test harness mints a non-numeric subject; production subjects
@@ -254,6 +256,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertFilterYields(workspace, uri -> uri.queryParam("actorId", 999_999), 0);
         assertFilterYields(workspace, uri -> uri.queryParam("from", Instant.now().plusSeconds(60).toString()), 0);
         assertFilterYields(workspace, uri -> uri.queryParam("to", Instant.now().minusSeconds(60).toString()), 0);
+        // Positive counterparts: a predicate transposed so it matches NOTHING passes every zero case.
+        assertFilterYields(workspace, uri -> uri.queryParam("from", Instant.now().minusSeconds(60).toString()), 2);
+        assertFilterYields(workspace, uri -> uri.queryParam("to", Instant.now().plusSeconds(60).toString()), 2);
     }
 
     @Test

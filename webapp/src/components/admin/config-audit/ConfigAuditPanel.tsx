@@ -1,4 +1,8 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+	type InfiniteData,
+	type UseInfiniteQueryResult,
+	useInfiniteQuery,
+} from "@tanstack/react-query";
 import {
 	adminListConfigAuditEventsInfiniteOptions,
 	listWorkspaceConfigAuditEventsInfiniteOptions,
@@ -9,24 +13,31 @@ import {
 	AuditFacetFilter,
 	type AuditFacetOption,
 } from "@/components/admin/audit-shared/AuditFacetFilter";
+import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
-	type AuditSearch,
+	type ConfigAuditSearch,
 	fromDateRange,
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
 } from "@/components/admin/audit-shared/auditSearch";
 import { dayEndIso, dayStartIso } from "@/components/admin/audit-shared/dateFilter";
+import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
 import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import {
 	ACTION_LABELS,
 	ENTITY_TYPE_LABELS,
 } from "@/components/admin/config-audit/configAuditFormat";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 50;
+
+/** The endpoint returns a Spring Page; advance by page number until the last one. */
+const PAGE_PARAMS = {
+	initialPageParam: 0,
+	getNextPageParam: (lastPage: PageConfigAuditEntryView) =>
+		lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
+};
 
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
@@ -44,13 +55,12 @@ const ENTITY_TYPES = Object.keys(ENTITY_TYPE_LABELS) as EntityType[];
 const ACTIONS = Object.keys(ACTION_LABELS) as Action[];
 
 /** The wire filter both scopes share, built from URL state. */
-function toQuery(search: AuditSearch) {
+function toQuery(search: ConfigAuditSearch) {
 	const dateRange = toDateRange(search);
 	return {
 		size: PAGE_SIZE,
 		entityType: narrowToEnum(search.entityType, ENTITY_TYPES),
 		action: narrowToEnum(search.action, ACTIONS),
-		entityId: search.entityId,
 		actorId: search.actorId,
 		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
 		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
@@ -58,8 +68,8 @@ function toQuery(search: AuditSearch) {
 }
 
 export interface ConfigAuditPanelProps {
-	search: AuditSearch;
-	onSearchChange: (patch: Partial<AuditSearch>) => void;
+	search: ConfigAuditSearch;
+	onSearchChange: (patch: Partial<ConfigAuditSearch>) => void;
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
@@ -71,9 +81,7 @@ export function AdminConfigAuditPanel({
 }: ConfigAuditPanelProps) {
 	const listQuery = useInfiniteQuery({
 		...adminListConfigAuditEventsInfiniteOptions({ query: toQuery(search) }),
-		initialPageParam: 0,
-		getNextPageParam: (lastPage: PageConfigAuditEntryView) =>
-			lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
+		...PAGE_PARAMS,
 	});
 
 	return (
@@ -98,24 +106,23 @@ export function WorkspaceConfigAuditPanel({
 			path: { workspaceSlug },
 			query: toQuery(search),
 		}),
-		initialPageParam: 0,
-		getNextPageParam: (lastPage: PageConfigAuditEntryView) =>
-			lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
+		...PAGE_PARAMS,
 	});
 
 	return <ConfigAuditView search={search} onSearchChange={onSearchChange} listQuery={listQuery} />;
 }
 
-/** The shape both scopes' queries expose to the view — everything the toolbar and table consume. */
-interface ConfigAuditListQuery {
-	data?: { pages: PageConfigAuditEntryView[] };
-	isLoading: boolean;
-	isError: boolean;
-	hasNextPage: boolean;
-	isFetchingNextPage: boolean;
-	fetchNextPage: () => void;
-	refetch: () => void;
+/** The display name for an actor id, taken from the rows already on screen. */
+function nameForActor(entries: ConfigAuditEntryView[], id: number): string | undefined {
+	for (const entry of entries) {
+		if (entry.actor?.id === id) return entry.actor.displayName ?? undefined;
+		if (entry.actingActor?.id === id) return entry.actingActor.displayName ?? undefined;
+	}
+	return undefined;
 }
+
+/** What both scopes' queries return; the library's own type, so the two cannot silently diverge. */
+type ConfigAuditListQuery = UseInfiniteQueryResult<InfiniteData<PageConfigAuditEntryView>, Error>;
 
 /**
  * Toolbar plus table for the settings-change trail. Shared verbatim by the instance-admin "Settings
@@ -133,22 +140,25 @@ function ConfigAuditView({
 	showWorkspace?: boolean;
 }) {
 	const dateRange = toDateRange(search);
-	const entries: ConfigAuditEntryView[] =
-		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [];
+	// Deduped by id: pages are offsets over a DESC ordering, so a row written between two fetches
+	// shifts everything down and page N+1 re-serves rows already rendered — duplicate React keys on
+	// exactly the surface whose own subject matter is being written while you read it.
+	const entries: ConfigAuditEntryView[] = dedupeById(
+		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
+	);
 	const total = listQuery.data?.pages[0]?.totalElements;
+	// Derived from the NARROWED query, not from raw search state: a stale link whose enum values no
+	// longer exist filters nothing, so offering "Reset" and claiming rows "match the current filters"
+	// would both be lies.
+	const query = toQuery(search);
 	const hasFilter = Boolean(
-		search.entityType?.length ||
-			search.action?.length ||
-			search.entityId ||
-			search.actorId !== undefined ||
-			search.from,
+		query.entityType || query.action || query.actorId !== undefined || query.from,
 	);
 
 	const reset = () =>
 		onSearchChange({
 			entityType: undefined,
 			action: undefined,
-			entityId: undefined,
 			actorId: undefined,
 			from: undefined,
 			to: undefined,
@@ -158,19 +168,13 @@ function ConfigAuditView({
 		<div className="space-y-4">
 			<AuditToolbar hasFilter={hasFilter} onReset={reset}>
 				<AuditFacetFilter
-					title="What changed"
+					title="Setting"
 					options={ENTITY_TYPE_OPTIONS}
 					selected={search.entityType ?? []}
-					onChange={(values) =>
-						onSearchChange({
-							entityType: nonEmpty(values),
-							// entityId only means something within a chosen kind; the server rejects it alone.
-							entityId: values.length > 0 ? search.entityId : undefined,
-						})
-					}
+					onChange={(values) => onSearchChange({ entityType: nonEmpty(values) })}
 				/>
 				<AuditFacetFilter
-					title="Change"
+					title="Action"
 					options={ACTION_OPTIONS}
 					selected={search.action ?? []}
 					onChange={(values) => onSearchChange({ action: nonEmpty(values) })}
@@ -180,26 +184,21 @@ function ConfigAuditView({
 					onChange={(range) => onSearchChange(fromDateRange(range))}
 				/>
 				{search.actorId !== undefined && (
-					<Button
-						variant="secondary"
-						size="sm"
-						className="h-8"
-						onClick={() => onSearchChange({ actorId: undefined })}
-					>
-						Actor #{search.actorId}
-						<Badge variant="outline" className="rounded-sm px-1 font-normal">
-							Clear
-						</Badge>
-					</Button>
+					<AuditRefFilterPill
+						label="Actor"
+						id={search.actorId}
+						name={nameForActor(entries, search.actorId)}
+						onClear={() => onSearchChange({ actorId: undefined })}
+					/>
 				)}
 			</AuditToolbar>
 
-			{total !== undefined && total > 0 && (
-				<p className="text-xs text-muted-foreground">
-					{total.toLocaleString()} change{total === 1 ? "" : "s"}
-					{hasFilter ? " match the current filters" : ""}.
-				</p>
-			)}
+			{/* Mounted unconditionally and announced — see AuthAuditPanel. */}
+			<p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+				{total === undefined
+					? ""
+					: `${total.toLocaleString()} ${total === 1 ? "change" : "changes"}${hasFilter ? " match the current filters" : ""}.`}
+			</p>
 
 			<ConfigAuditTable
 				entries={entries}

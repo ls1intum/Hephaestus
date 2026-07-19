@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
-import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
-import de.tum.cit.aet.hephaestus.core.audit.spi.Audited;
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -75,13 +75,24 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
         );
     }
 
-    /** Admin-gated = a workspace admin/owner gate on the method, or the instance-admin authority. */
+    /**
+     * Admin-gated = a workspace admin/owner gate or the instance-admin authority, on the method OR its
+     * controller. Checking only the method misses the seven controllers that declare the gate once at
+     * class level, which silently exempted ten endpoints.
+     */
     private static boolean isAdminGated(JavaMethod method) {
-        return hasWorkspaceAdminGate(method) || isInstanceAdminGated(method) || isInstanceAdminGated(method.getOwner());
+        return (
+            hasWorkspaceAdminGate(method) ||
+            hasWorkspaceAdminGate(method.getOwner()) ||
+            isInstanceAdminGated(method) ||
+            isInstanceAdminGated(method.getOwner())
+        );
     }
 
-    private static boolean hasWorkspaceAdminGate(JavaMethod method) {
-        return method
+    private static boolean hasWorkspaceAdminGate(
+        com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element
+    ) {
+        return element
             .getAnnotations()
             .stream()
             .map(a -> a.getRawType().getSimpleName())

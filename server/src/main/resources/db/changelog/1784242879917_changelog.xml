@@ -6,23 +6,12 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-        Admin configuration audit trail (#1359): who changed which control, when, from what to what.
-        Append-only, workspace-scoped, plain (unpartitioned) table.
-
-        Why not partitioned like auth_event: at ~10^4 rows/year this sits ~3 orders of magnitude below
-        the size where Postgres says partitioning pays, and no read pattern here leads with occurred_at,
-        so partitions would prune nothing and MergeAppend across all of them on every page. auth_event
-        partitions because DROP TABLE is DDL and therefore slips past its DELETE-blocking trigger; this
-        table instead lets the trigger permit DELETE past the retention window (changeset -2), which is
-        the same lawful-erasure outcome without the machinery.
-
-        Why scalar FKs (sfk_*): no JPA @ManyToOne on the entity, so they are excluded from the
-        JPA-vs-DB drift gate.
-
-        workspace_id is NOT NULL because every producer today is workspace-scoped. #1356 introduces
-        instance-scoped controls (silent mode, channel force-off) and will DROP NOT NULL, add a scope
-        discriminator, and move the table into GLOBAL_TABLES — a metadata-only migration. Pre-building
-        that column now would be machinery nothing writes.
+        Admin configuration audit trail (#1359): append-only, workspace-scoped, unpartitioned
+        (~10^4 rows/year, and no read pattern leads with occurred_at, so partitions would prune
+        nothing). Retention is a trigger-permitted DELETE past the window (changeset -2) rather than
+        auth_event's DROP PARTITION. Scalar FKs (sfk_*) — no JPA @ManyToOne, so they are excluded
+        from the JPA-vs-DB drift gate. workspace_id is NOT NULL: every producer today is
+        workspace-scoped; #1356 adds the scope discriminator instance-scoped controls will need.
     -->
     <changeSet author="FelixTJDietrich" id="1784242879917-1-config-audit-event">
         <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event already present">
@@ -53,23 +42,15 @@
                     CHECK (action IN ('CREATED', 'UPDATED', 'DELETED')),
                 CONSTRAINT ck_config_audit_event_entity_type
                     CHECK (entity_type IN ('PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG'))
-                -- Deliberately NO "old_value IS NOT NULL OR new_value IS NOT NULL" constraint. It reads
-                -- like a useful invariant (a row with neither describes nothing) but it would forbid the
-                -- one UPDATE changeset -2 exists to permit: erasure NULLs both snapshots, so the check
-                -- would make the table architecturally incapable of honouring GDPR Art. 17 — and no test
-                -- would catch it, since context="prod" means the suite never loads either object. The
-                -- invariant belongs at the write path instead, where it can be enforced without
-                -- outlawing erasure: ConfigAuditEntry's constructor rejects an entry with neither side.
+                -- No "old_value OR new_value IS NOT NULL" check: it would forbid the erasure UPDATE that
+                -- changeset -2 exists to permit (erasure NULLs both). Enforced at the write path instead,
+                -- in ConfigAuditEntry's constructor.
             );
 
-            -- workspace_id FK is deliberately NO ACTION, not CASCADE: CASCADE would hand anyone with
-            -- delete rights a one-click audit eraser, and the cascaded DELETE would hit the changeset -2
-            -- trigger and abort the workspace deletion in prod only (FK referential actions fire
-            -- triggers — PG 37.1). Moot in practice: WorkspaceLifecycleService soft-deletes to PURGED.
-            -- The account FKs are ON DELETE SET NULL, and changeset -2's per-column erasure carve-out
-            -- permits exactly that single-column nulling, so the FK action and the trigger agree instead
-            -- of deadlocking. Moot today regardless: AccountPurger tombstones rather than deleting, and
-            -- the tombstone is what de-identifies actor_account_id.
+            -- workspace_id: NO ACTION, not CASCADE — CASCADE would be a one-click audit eraser, and the
+            -- cascaded DELETE would trip the changeset -2 trigger (FK referential actions fire triggers,
+            -- PG 37.1). The account FKs are ON DELETE SET NULL, which is exactly what that trigger's
+            -- per-column erasure carve-out permits, so the two agree rather than deadlock.
 
             -- Per-resource and per-control history (#1357): the settings pages filter by entity, then
             -- by changed key.
@@ -88,20 +69,10 @@
     </changeSet>
 
     <!--
-        Immutability at the storage layer (prod only). context="prod" because the ddl-auto test tier and
-        the empty-context Liquibase proof test do fixture UPDATE/DELETE.
-
-        Honest scope: the REVOKE is a guardrail, not a proof — and today it is inert, because the app
-        connects as the Postgres image's bootstrap superuser (POSTGRES_USER=root; no CREATE ROLE exists
-        anywhere in docker/), and a superuser skips privilege checks entirely. It is kept so the control
-        starts binding the day a dedicated non-superuser app role exists. The triggers are the binding
-        control, and they bind against the threat model we actually have — application bugs and
-        misconfigured grants — not against an operator who can DISABLE TRIGGER, since the operator is
-        the DBA.
-
-        Unlike auth_event, a BEFORE TRUNCATE statement trigger is included: row-level triggers never fire
-        on TRUNCATE (it may only be trapped at statement level — PG trigger docs), so without this a
-        single TRUNCATE erases the whole trail with nothing to stop it.
+        Immutability at the storage layer. context="prod" because the test tier's fixtures do UPDATE and
+        DELETE. The REVOKE is inert until a non-superuser app role exists (the app connects as the image's
+        bootstrap superuser, which skips privilege checks); the triggers are the binding control. TRUNCATE
+        needs a statement-level trigger — row triggers never fire on it.
     -->
     <changeSet author="FelixTJDietrich" id="1784242879917-2-config-audit-event-immutability" context="prod">
         <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event immutability trigger already present">
@@ -124,23 +95,10 @@
                     END IF;
                     RETURN OLD;
                 END IF;
-                -- Permit ONLY erasure, per column: each redactable column may stay as it is or go to
-                -- NULL, and nothing else about the row may change. Comparing the whole row MINUS the
-                -- redactable columns (to_jsonb - keys) is column-addition-proof — a future column is
-                -- automatically protected with no edit here.
-                --
-                -- Per-column rather than all-four-at-once, which is what this originally demanded. That
-                -- version was wrong twice over: (a) an FK's ON DELETE SET NULL updates only ITS OWN
-                -- column (PG CREATE TABLE), so a hard account delete would null actor_account_id, leave
-                -- the snapshots populated, trip this branch and abort the delete — the FK/trigger
-                -- deadlock this carve-out exists to avoid; and (b) redacting a toxic snapshot would have
-                -- forced nulling the actor refs too, destroying the attribution that is the one thing
-                -- GDPR does not ask us to erase and the whole reason this table exists.
-                --
-                -- Nulling only the actor is therefore reachable. That is not a weakening: under the
-                -- stated threat model (application bugs and misconfigured grants — not the operator, who
-                -- is the DBA and can DISABLE TRIGGER anyway) anything that can reach UPDATE could
-                -- previously null EVERYTHING, which destroys strictly more.
+                -- Permit ONLY erasure, per column: each redactable column may stay or go to NULL. Per-column
+            -- (not all-at-once) so an FK's ON DELETE SET NULL, which touches one column, does not trip
+            -- this. Comparing to_jsonb(NEW) minus the redactable keys covers future columns with no edit here.
+
                 IF (NEW.actor_account_id IS NULL OR NEW.actor_account_id = OLD.actor_account_id)
                    AND (NEW.acting_account_id IS NULL OR NEW.acting_account_id = OLD.acting_account_id)
                    AND (NEW.old_value IS NULL OR NEW.old_value = OLD.old_value)
@@ -208,6 +166,36 @@
                 ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
                 ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
                     CHECK (entity_type IN ('PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1784242879917-4-config-audit-event-practice-active">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event entity_type CHECK already covers PRACTICE_ACTIVE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_config_audit_event_entity_type'
+                  AND pg_get_constraintdef(oid) LIKE '%PRACTICE_ACTIVE%'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+            ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                CHECK (entity_type IN (
+                    'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                    'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                    'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY', 'PRACTICE_ACTIVE'
+                ));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
+                ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type
+                    CHECK (entity_type IN (
+                        'PRACTICE_REVIEW_SETTINGS', 'AI_CONFIG_BINDING', 'AGENT_CONFIG',
+                        'WORKSPACE_ROLE', 'WORKSPACE_FEATURES', 'WORKSPACE_STATUS',
+                        'WORKSPACE_TOKEN', 'WORKSPACE_VISIBILITY'
+                    ));
             ]]></sql>
         </rollback>
     </changeSet>

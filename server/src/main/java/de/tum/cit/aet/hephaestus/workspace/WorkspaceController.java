@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
-import de.tum.cit.aet.hephaestus.core.audit.spi.Audited;
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
@@ -236,7 +236,9 @@ public class WorkspaceController {
     @PostMapping("/repositories")
     @Operation(summary = "Add a repository to a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "sync scope; the resulting connection state is recorded in connection_audit")
+    @AuditExempt(
+        reason = "which repositories are synced is ingestion scope, not a control that gates delivery; not recorded"
+    )
     public ResponseEntity<Void> addRepositoryToMonitor(
         WorkspaceContext workspaceContext,
         @RequestParam String nameWithOwner
@@ -249,7 +251,9 @@ public class WorkspaceController {
     @DeleteMapping("/repositories")
     @Operation(summary = "Remove a repository from a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "sync scope; the resulting connection state is recorded in connection_audit")
+    @AuditExempt(
+        reason = "which repositories are synced is ingestion scope, not a control that gates delivery; not recorded"
+    )
     public ResponseEntity<Void> removeRepositoryToMonitor(
         WorkspaceContext workspaceContext,
         @RequestParam String nameWithOwner

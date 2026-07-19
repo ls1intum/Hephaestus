@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.core.audit.spi;
+package de.tum.cit.aet.hephaestus.core;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

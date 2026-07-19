@@ -2,6 +2,7 @@ import { Bot, History, UserCog } from "lucide-react";
 import { useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { RelativeTime } from "@/components/admin/integrations/RelativeTime";
+import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,15 +90,7 @@ export function ConfigAuditTable({
 		);
 	}
 
-	if (isLoading) {
-		return (
-			<div className="flex items-center justify-center py-12">
-				<Spinner />
-			</div>
-		);
-	}
-
-	if (entries.length === 0) {
+	if (entries.length === 0 && !isLoading) {
 		return (
 			<Empty className="border border-dashed">
 				<EmptyHeader>
@@ -105,11 +98,12 @@ export function ConfigAuditTable({
 						<History />
 					</EmptyMedia>
 					<EmptyTitle>
-						{hasFilter ? "No changes match the current filters." : "No configuration changes yet."}
+						{hasFilter ? "No changes match the current filters." : "No settings changes yet."}
 					</EmptyTitle>
 					{!hasFilter && (
 						<EmptyDescription>
-							Changes to review settings, AI bindings, and agent configurations will appear here.
+							Changes to workspace settings, member roles, feature flags, and AI configuration will
+							appear here.
 						</EmptyDescription>
 					)}
 				</EmptyHeader>
@@ -121,74 +115,96 @@ export function ConfigAuditTable({
 		<div className="space-y-4">
 			<div className="rounded-md border">
 				<Table>
-					<TableCaption className="sr-only">Configuration changes, newest first</TableCaption>
+					<TableCaption className="sr-only">Settings changes, newest first</TableCaption>
 					<TableHeader>
 						<TableRow>
 							<TableHead scope="col">Time</TableHead>
 							<TableHead scope="col">Action</TableHead>
 							<TableHead scope="col">Subject</TableHead>
-							{showWorkspace && <TableHead scope="col">Workspace</TableHead>}
+							{showWorkspace && (
+								<TableHead scope="col" className="hidden md:table-cell">
+									Workspace
+								</TableHead>
+							)}
 							<TableHead scope="col">Actor</TableHead>
-							<TableHead scope="col">Changes</TableHead>
+							<TableHead scope="col" className="hidden lg:table-cell">
+								Changes
+							</TableHead>
 							<TableHead scope="col">
 								<span className="sr-only">Details</span>
 							</TableHead>
 						</TableRow>
 					</TableHeader>
-					<TableBody>
-						{entries.map((entry) => {
-							const actor = actorDisplay(entry);
-							const subject = subjectLabel(entry);
-							const summary = changeSummary(entry);
-							const workspaceName =
-								entry.workspaceId != null ? resolveWorkspaceName?.(entry.workspaceId) : undefined;
-							return (
-								<TableRow key={entry.id}>
-									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-										<RelativeTime value={entry.occurredAt} />
-									</TableCell>
-									<TableCell>
-										<Badge variant={ACTION_BADGE[entry.action ?? "UPDATED"]}>
-											{actionLabel(entry.action)}
-										</Badge>
-									</TableCell>
-									<TableCell
-										className="max-w-[14rem] truncate"
-										title={subject.hint ?? subject.label}
-									>
-										{subject.label}
-									</TableCell>
-									{showWorkspace && (
-										<TableCell className="max-w-[10rem] truncate text-sm text-muted-foreground">
-											{entry.workspaceId != null ? (workspaceName ?? `#${entry.workspaceId}`) : "—"}
+					{isLoading ? (
+						<TableRowsSkeleton
+							columns={
+								showWorkspace
+									? ["w-24", "w-16", "w-32", "w-24", "w-24", "w-28", null]
+									: ["w-24", "w-16", "w-32", "w-24", "w-28", null]
+							}
+							rows={8}
+						/>
+					) : (
+						<TableBody>
+							{entries.map((entry) => {
+								const actor = actorDisplay(entry);
+								const subject = subjectLabel(entry);
+								const summary = changeSummary(entry);
+								const workspaceName =
+									entry.workspaceId != null ? resolveWorkspaceName?.(entry.workspaceId) : undefined;
+								return (
+									<TableRow key={entry.id}>
+										<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+											<RelativeTime value={entry.occurredAt} />
 										</TableCell>
-									)}
-									<TableCell className="max-w-[14rem] truncate">
-										<ActorCell actor={actor} onFilterActor={onFilterActor} />
-									</TableCell>
-									<TableCell className="max-w-xs">
-										<span className="block truncate text-xs text-muted-foreground" title={summary}>
-											{summary}
-										</span>
-									</TableCell>
-									<TableCell className="text-right">
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											aria-label={`View details of ${subject.label} change`}
-											onClick={() => {
-												setDetail(entry);
-												setDetailOpen(true);
-											}}
+										<TableCell>
+											<Badge variant={ACTION_BADGE[entry.action ?? "UPDATED"]}>
+												{actionLabel(entry.action)}
+											</Badge>
+										</TableCell>
+										<TableCell
+											className="max-w-[14rem] truncate"
+											title={subject.hint ?? subject.label}
 										>
-											Details
-										</Button>
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
+											{subject.label}
+										</TableCell>
+										{showWorkspace && (
+											<TableCell className="max-w-[10rem] truncate text-sm text-muted-foreground">
+												{entry.workspaceId != null
+													? (workspaceName ?? `#${entry.workspaceId}`)
+													: "—"}
+											</TableCell>
+										)}
+										<TableCell className="max-w-[14rem] truncate">
+											<ActorCell actor={actor} onFilterActor={onFilterActor} />
+										</TableCell>
+										<TableCell className="max-w-xs">
+											<span
+												className="block truncate text-xs text-muted-foreground"
+												title={summary}
+											>
+												{summary}
+											</span>
+										</TableCell>
+										<TableCell className="text-right">
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												aria-label={`View details of ${subject.label} change`}
+												onClick={() => {
+													setDetail(entry);
+													setDetailOpen(true);
+												}}
+											>
+												Details
+											</Button>
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					)}
 				</Table>
 			</div>
 

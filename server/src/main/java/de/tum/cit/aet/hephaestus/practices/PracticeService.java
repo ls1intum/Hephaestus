@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
@@ -36,6 +39,7 @@ public class PracticeService {
     private static final Logger log = LoggerFactory.getLogger(PracticeService.class);
 
     private final PracticeRepository practiceRepository;
+    private final ConfigAuditPort configAudit;
     private final PracticeRevisionRepository practiceRevisionRepository;
     private final WorkspaceRepository workspaceRepository;
 
@@ -280,6 +284,15 @@ public class PracticeService {
 
         practice.setActive(active);
         practice = practiceRepository.save(practice);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_ACTIVE,
+                practice.getId(),
+                ctx.id(),
+                new PracticeActiveSnapshot(!active),
+                new PracticeActiveSnapshot(active)
+            )
+        );
         log.info("Set practice '{}' (slug={}) active={} in workspace {}", practice.getName(), slug, active, ctx.slug());
         return practice;
     }

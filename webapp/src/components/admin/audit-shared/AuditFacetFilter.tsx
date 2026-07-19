@@ -1,4 +1,4 @@
-import { PlusCircleIcon } from "lucide-react";
+import { CheckIcon, PlusCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,13 +6,14 @@ import {
 	ComboboxContent,
 	ComboboxEmpty,
 	ComboboxItem,
-	ComboboxItemIndicator,
 	ComboboxList,
 	ComboboxSearchInput,
+	ComboboxSeparator,
 	ComboboxTrigger,
 	useComboboxFilter,
 } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 export interface AuditFacetOption {
 	/** Wire value sent to the API — an enum name, not a label. */
@@ -57,10 +58,15 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 			filter={(option, query) => contains(option, query, (o) => o.label)}
 			itemToStringLabel={(option) => option.label}
 		>
-			{/* The trigger's visible text is a summary (title + chips), which Base UI does not expose as
-			    the control's accessible name — without this the facet announces as an unnamed combobox. */}
+			{/* Base UI exposes no accessible name for this trigger (its visible text is a summary, not a
+			    label), so the name is built here — and it carries the selection, because otherwise a
+			    screen-reader user is told the facet's title and never what it is currently filtering by. */}
 			<ComboboxTrigger
-				aria-label={title}
+				aria-label={
+					selectedOptions.length === 0
+						? title
+						: `${title}: ${selectedOptions.map((option) => option.label).join(", ")}`
+				}
 				render={
 					<Button variant="outline" size="sm" className="h-8 border-dashed font-normal">
 						<PlusCircleIcon aria-hidden />
@@ -93,16 +99,46 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 			/>
 
 			<ComboboxContent align="start" className="min-w-56">
-				<ComboboxSearchInput placeholder={`Search ${title.toLowerCase()}…`} aria-label={title} />
+				<ComboboxSearchInput
+					placeholder={`Search ${title.toLowerCase()}…`}
+					aria-label={`Search ${title.toLowerCase()}`}
+				/>
 				<ComboboxEmpty>No matches.</ComboboxEmpty>
 				<ComboboxList>
 					{(option: AuditFacetOption) => (
-						<ComboboxItem key={option.value} value={option}>
+						<ComboboxItem key={option.value} value={option} className="pr-1.5">
+							{/* A persistent box, empty when unselected: the check-only indicator reads as
+							    "this is the one you picked", which is the single-select idiom. */}
+							<span
+								className={cn(
+									"mr-2 flex size-4 shrink-0 items-center justify-center rounded-[4px] border",
+									selected.includes(option.value)
+										? "border-primary bg-primary text-primary-foreground"
+										: "border-input [&_svg]:invisible",
+								)}
+								aria-hidden
+							>
+								<CheckIcon className="size-3.5" />
+							</span>
 							<span className="truncate">{option.label}</span>
-							<ComboboxItemIndicator />
 						</ComboboxItem>
 					)}
 				</ComboboxList>
+				{selectedOptions.length > 0 && (
+					<>
+						<ComboboxSeparator />
+						{/* Without this the only way to widen a facet is Reset, which clears every other
+						    facet and the date range with it. */}
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-full justify-center font-normal"
+							onClick={() => onChange([])}
+						>
+							Clear {title.toLowerCase()}
+						</Button>
+					</>
+				)}
 			</ComboboxContent>
 		</Combobox>
 	);

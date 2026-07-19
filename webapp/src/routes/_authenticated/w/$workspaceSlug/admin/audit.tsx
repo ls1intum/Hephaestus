@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ScrollTextIcon } from "lucide-react";
-import { type AuditSearch, auditSearchSchema } from "@/components/admin/audit-shared/auditSearch";
+import {
+	type ConfigAuditSearch,
+	workspaceAuditSearchSchema,
+} from "@/components/admin/audit-shared/auditSearch";
 import { WorkspaceConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/audit")({
 	component: WorkspaceAuditPage,
-	validateSearch: auditSearchSchema,
+	validateSearch: workspaceAuditSearchSchema,
 });
 
 /**
@@ -19,7 +22,7 @@ function WorkspaceAuditPage() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	const patchSearch = (patch: Partial<AuditSearch>) =>
+	const patchSearch = (patch: Partial<ConfigAuditSearch>) =>
 		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
 	return (
@@ -31,8 +34,8 @@ function WorkspaceAuditPage() {
 				</div>
 				<p className="text-sm text-muted-foreground">
 					Who changed which setting in this workspace, and when. Append-only — entries can't be
-					edited or removed. Times are shown in your local timezone (hover for the exact UTC
-					instant).
+					edited or removed. Times are shown in your local timezone; open a row for the exact UTC
+					instant.
 				</p>
 			</header>
 

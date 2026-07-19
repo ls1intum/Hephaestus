@@ -158,7 +158,7 @@ export const EmptyInitial: Story = {
 	args: { entries: [] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No configuration changes yet.")).toBeInTheDocument();
+		await expect(canvas.getByText("No settings changes yet.")).toBeInTheDocument();
 	},
 };
 

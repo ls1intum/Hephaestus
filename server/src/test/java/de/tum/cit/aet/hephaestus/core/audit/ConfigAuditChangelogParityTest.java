@@ -68,25 +68,27 @@ class ConfigAuditChangelogParityTest {
     }
 
     private static List<String> checkConstraintValues(String constraintName) {
-        // A constraint may be defined once and later widened (DROP+ADD in a follow-up changeSet). The
-        // EFFECTIVE value set is the WIDEST match: the forward definition always has at least as many
-        // values as any rollback that re-adds the narrower original.
-        Matcher m = Pattern.compile(
-            Pattern.quote(constraintName) + "\\s*\\n?\\s*CHECK \\([a-z_]+ IN \\(([^)]*)\\)\\)"
-        ).matcher(changelog());
-        List<String> widest = List.of();
+        // A constraint may be defined once and later redefined (DROP+ADD in a follow-up changeSet), so
+        // the effective value set is the LAST forward definition. Deliberately not "the widest": that
+        // cannot see a NARROWING, which is the drift that breaks production — Java keeps emitting a
+        // value the CHECK no longer accepts. <rollback> bodies are skipped; they re-add older, narrower
+        // definitions that never run forward.
+        String forwardOnly = ROLLBACK.matcher(changelog()).replaceAll("");
+        Matcher m = Pattern.compile(Pattern.quote(constraintName) + "\\s*CHECK \\([a-z_]+ IN \\(([^)]*)\\)\\)").matcher(
+            forwardOnly
+        );
+        List<String> latest = List.of();
         while (m.find()) {
-            List<String> values = Arrays.stream(m.group(1).split(","))
+            latest = Arrays.stream(m.group(1).split(","))
                 .map(v -> v.trim().replace("'", ""))
                 .filter(v -> !v.isEmpty())
                 .toList();
-            if (values.size() > widest.size()) {
-                widest = values;
-            }
         }
-        assertThat(widest).as("CHECK constraint %s present in the changelog", constraintName).isNotEmpty();
-        return widest;
+        assertThat(latest).as("CHECK constraint %s present in the changelog", constraintName).isNotEmpty();
+        return latest;
     }
+
+    private static final Pattern ROLLBACK = Pattern.compile("<rollback>.*?</rollback>", Pattern.DOTALL);
 
     private static List<String> names(Enum<?>[] values) {
         return Arrays.stream(values).map(Enum::name).toList();

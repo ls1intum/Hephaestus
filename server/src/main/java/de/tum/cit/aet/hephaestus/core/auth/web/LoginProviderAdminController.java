@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
-import de.tum.cit.aet.hephaestus.core.audit.spi.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;

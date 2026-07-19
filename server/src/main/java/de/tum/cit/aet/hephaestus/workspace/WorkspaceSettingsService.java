@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.audit.WorkspaceAuditSnapshots;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceScheduleChangedEvent;
+import java.time.Clock;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -47,6 +48,7 @@ public class WorkspaceSettingsService {
     private final ConfigAuditPort configAudit;
     private final ConnectionService connectionService;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     /**
      * Update the leaderboard schedule for a workspace.
@@ -171,15 +173,18 @@ public class WorkspaceSettingsService {
                         ": no active GitHub or GitLab Connection. Bind a provider first."
                 )
             );
-        boolean hadToken = connectionService.findActiveProviderKind(workspaceId).isPresent();
+        boolean hadToken = connectionService.findActiveBearerToken(workspaceId, kind).isPresent();
         connectionService.rotateBearerToken(workspaceId, kind, new BearerToken(token, null));
+        // rotatedAt is what makes this row exist at all: rotating an already-set token leaves every
+        // other component identical, and ConfigAuditRecorder drops an UPDATE whose diff is empty — so
+        // a presence-only snapshot would silently record nothing for the most sensitive change here.
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_TOKEN,
                 workspaceId,
                 workspaceId,
-                new WorkspaceAuditSnapshots.TokenSnapshot(hadToken, kind.name()),
-                new WorkspaceAuditSnapshots.TokenSnapshot(true, kind.name())
+                new WorkspaceAuditSnapshots.TokenSnapshot(hadToken, kind.name(), null),
+                new WorkspaceAuditSnapshots.TokenSnapshot(true, kind.name(), clock.instant())
             )
         );
         log.info("Updated workspace PAT: workspaceId={}, kind={}", workspaceId, kind);

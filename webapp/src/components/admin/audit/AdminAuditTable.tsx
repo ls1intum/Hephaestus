@@ -2,9 +2,17 @@ import { ScrollText } from "lucide-react";
 import { useState } from "react";
 import type { AuthEventView } from "@/api/types.gen";
 import { RelativeTime } from "@/components/admin/integrations/RelativeTime";
+import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
@@ -23,6 +31,7 @@ import {
 	eventLabel,
 	eventSeverity,
 	humanizeDetails,
+	resultLabel,
 } from "./auditFormat";
 
 export interface AdminAuditTableProps {
@@ -89,15 +98,7 @@ export function AdminAuditTable({
 		);
 	}
 
-	if (isLoading) {
-		return (
-			<div className="flex items-center justify-center py-12">
-				<Spinner />
-			</div>
-		);
-	}
-
-	if (events.length === 0) {
+	if (events.length === 0 && !isLoading) {
 		return (
 			<Empty className="border border-dashed">
 				<EmptyHeader>
@@ -105,8 +106,13 @@ export function AdminAuditTable({
 						<ScrollText />
 					</EmptyMedia>
 					<EmptyTitle>
-						{hasFilter ? "No matching audit events." : "No audit events yet."}
+						{hasFilter ? "No events match the current filters." : "No audit events yet."}
 					</EmptyTitle>
+					{!hasFilter && (
+						<EmptyDescription>
+							Sign-ins, impersonation, role changes and account deletions will appear here.
+						</EmptyDescription>
+					)}
 				</EmptyHeader>
 			</Empty>
 		);
@@ -126,109 +132,120 @@ export function AdminAuditTable({
 							<TableHead scope="col">Result</TableHead>
 							<TableHead scope="col">Account</TableHead>
 							<TableHead scope="col">Actor</TableHead>
-							<TableHead scope="col">IP</TableHead>
-							<TableHead scope="col">Summary</TableHead>
+							<TableHead scope="col" className="hidden md:table-cell">
+								IP
+							</TableHead>
+							<TableHead scope="col" className="hidden lg:table-cell">
+								Summary
+							</TableHead>
 							<TableHead scope="col">
 								<span className="sr-only">Details</span>
 							</TableHead>
 						</TableRow>
 					</TableHeader>
-					<TableBody>
-						{events.map((e) => {
-							const severity = eventSeverity(e.eventType, e.result);
-							const account = accountLabel(e.account, e.accountId);
-							const actor = accountLabel(e.actor, e.actingAccountId);
-							const summary =
-								e.result === "FAILURE" && e.failureReason
-									? e.failureReason
-									: humanizeDetails(e.details);
-							return (
-								<TableRow key={e.id}>
-									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-										<RelativeTime value={e.occurredAt} />
-									</TableCell>
-									<TableCell>
-										<span className="flex items-center gap-2" title={e.eventType}>
-											<span
-												className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
-												aria-hidden
-											/>
-											<span className="text-sm">{eventLabel(e.eventType)}</span>
-										</span>
-									</TableCell>
-									<TableCell>
-										<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
-											{e.result}
-										</Badge>
-									</TableCell>
-									<TableCell className="max-w-[12rem] truncate">
-										{account ? (
-											onFilterAccount && e.accountId != null ? (
-												<FilterLink
-													label={account}
-													title={e.account?.email ?? `Filter by ${account}`}
-													onSelect={() => onFilterAccount(e.accountId as number)}
+					{isLoading ? (
+						<TableRowsSkeleton
+							columns={["w-24", "w-28", "w-16", "w-24", "w-24", "w-20", "w-32", null]}
+							rows={8}
+						/>
+					) : (
+						<TableBody>
+							{events.map((e) => {
+								const severity = eventSeverity(e.eventType, e.result);
+								const account = accountLabel(e.account, e.accountId);
+								const actor = accountLabel(e.actor, e.actingAccountId);
+								const summary =
+									e.result === "FAILURE" && e.failureReason
+										? e.failureReason
+										: humanizeDetails(e.details);
+								return (
+									<TableRow key={e.id}>
+										<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+											<RelativeTime value={e.occurredAt} />
+										</TableCell>
+										<TableCell>
+											<span className="flex items-center gap-2" title={e.eventType}>
+												<span
+													className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
+													aria-hidden
 												/>
-											) : (
-												<span title={e.account?.email ?? undefined}>{account}</span>
-											)
-										) : (
-											"—"
-										)}
-									</TableCell>
-									<TableCell className="max-w-[12rem] truncate">
-										{actor ? (
-											<span className="text-muted-foreground">
-												via{" "}
-												{onFilterActor && e.actingAccountId != null ? (
+												<span className="text-sm">{eventLabel(e.eventType)}</span>
+											</span>
+										</TableCell>
+										<TableCell>
+											<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
+												{resultLabel(e.result)}
+											</Badge>
+										</TableCell>
+										<TableCell className="max-w-[12rem] truncate">
+											{account ? (
+												onFilterAccount && e.accountId != null ? (
 													<FilterLink
-														label={actor}
-														title={e.actor?.email ?? `Filter by ${actor}`}
-														onSelect={() => onFilterActor(e.actingAccountId as number)}
+														label={account}
+														title={e.account?.email ?? `Filter by ${account}`}
+														onSelect={() => onFilterAccount(e.accountId as number)}
 													/>
 												) : (
-													actor
-												)}
-											</span>
-										) : (
-											"—"
-										)}
-									</TableCell>
-									<TableCell className="font-mono text-xs text-muted-foreground">
-										{e.ipAddress ?? "—"}
-									</TableCell>
-									<TableCell className="max-w-xs">
-										{summary ? (
-											<span
-												className={`block truncate text-xs ${
-													e.result === "FAILURE" ? "text-destructive" : "text-muted-foreground"
-												}`}
-												title={summary}
+													<span title={e.account?.email ?? undefined}>{account}</span>
+												)
+											) : (
+												"—"
+											)}
+										</TableCell>
+										<TableCell className="max-w-[12rem] truncate">
+											{actor ? (
+												<span className="text-muted-foreground">
+													via{" "}
+													{onFilterActor && e.actingAccountId != null ? (
+														<FilterLink
+															label={actor}
+															title={e.actor?.email ?? `Filter by ${actor}`}
+															onSelect={() => onFilterActor(e.actingAccountId as number)}
+														/>
+													) : (
+														actor
+													)}
+												</span>
+											) : (
+												"—"
+											)}
+										</TableCell>
+										<TableCell className="font-mono text-xs text-muted-foreground">
+											{e.ipAddress ?? "—"}
+										</TableCell>
+										<TableCell className="max-w-xs">
+											{summary ? (
+												<span
+													className={`block truncate text-xs ${
+														e.result === "FAILURE" ? "text-destructive" : "text-muted-foreground"
+													}`}
+													title={summary}
+												>
+													{summary}
+												</span>
+											) : (
+												"—"
+											)}
+										</TableCell>
+										<TableCell className="text-right">
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												aria-label={`View details of ${eventLabel(e.eventType)} event`}
+												onClick={() => {
+													setDetail(e);
+													setDetailOpen(true);
+												}}
 											>
-												{summary}
-											</span>
-										) : (
-											"—"
-										)}
-									</TableCell>
-									<TableCell className="text-right">
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											aria-label={`View details of ${eventLabel(e.eventType)} event`}
-											onClick={() => {
-												setDetail(e);
-												setDetailOpen(true);
-											}}
-										>
-											Details
-										</Button>
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
+												Details
+											</Button>
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					)}
 				</Table>
 			</div>
 

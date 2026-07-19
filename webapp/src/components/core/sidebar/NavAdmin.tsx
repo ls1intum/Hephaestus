@@ -283,7 +283,9 @@ export function NavAdmin({
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Setting change history"
-						render={<Link to="/w/$workspaceSlug/admin/audit" params={{ workspaceSlug }} />}
+						render={
+							<Link to="/w/$workspaceSlug/admin/audit" params={{ workspaceSlug }} search={{}} />
+						}
 					>
 						<ScrollText />
 						<span>Audit log</span>

@@ -72,7 +72,7 @@ export const Default: Story = {
 		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
 		// A failure shows its reason (not just a red badge), plus the destructive result badge.
 		await expect(canvas.getByText("Email not verified on the GitLab account")).toBeInTheDocument();
-		await expect(canvas.getByText("FAILURE")).toBeInTheDocument();
+		await expect(canvas.getByText("Failure")).toBeInTheDocument();
 	},
 };
 
@@ -113,7 +113,7 @@ export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No matching audit events.")).toBeInTheDocument();
+		await expect(canvas.getByText("No events match the current filters.")).toBeInTheDocument();
 	},
 };
 

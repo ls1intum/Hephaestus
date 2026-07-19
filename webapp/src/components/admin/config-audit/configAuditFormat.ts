@@ -20,6 +20,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_STATUS: "Workspace status",
 	WORKSPACE_TOKEN: "Access token",
 	WORKSPACE_VISIBILITY: "Visibility",
+	PRACTICE_ACTIVE: "Practice active",
 };
 
 export const ACTION_LABELS: Record<Action, string> = {

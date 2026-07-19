@@ -198,7 +198,7 @@ describe("actorDisplay", () => {
 			actorDisplay(
 				entry({ actorKind: "USER", actorAccountId: 7, actor: { id: 7, displayName: "Grace" } }),
 			),
-		).toMatchObject({ kind: "USER", primary: "Grace" });
+		).toEqual({ kind: "USER", primary: "Grace", primaryEmail: undefined, filterId: 7 });
 	});
 	it("labels a background actor 'System'", () => {
 		expect(actorDisplay(entry({ actorKind: "SYSTEM", actor: undefined }))).toEqual({
@@ -217,6 +217,15 @@ describe("actorDisplay", () => {
 					actingActor: { id: 7, displayName: "Grace" },
 				}),
 			),
-		).toMatchObject({ kind: "IMPERSONATED", primary: "Grace", actingAs: "Ada" });
+			// filterId asserted, not just the names: it drives "show everything this actor did", and pointing
+			// it at the impersonated account instead of the operator would attribute the operator's changes
+			// to their victim — the one misattribution this whole field exists to prevent.
+		).toEqual({
+			kind: "IMPERSONATED",
+			primary: "Grace",
+			primaryEmail: undefined,
+			actingAs: "Ada",
+			filterId: 7,
+		});
 	});
 });

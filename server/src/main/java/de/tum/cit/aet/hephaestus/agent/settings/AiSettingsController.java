@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.settings;
 
-import de.tum.cit.aet.hephaestus.core.audit.spi.Audited;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;

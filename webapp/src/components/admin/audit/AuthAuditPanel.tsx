@@ -6,8 +6,10 @@ import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.
 import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView, PageAuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
+import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/auditFormat";
 import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
 import { AuditFacetFilter } from "@/components/admin/audit-shared/AuditFacetFilter";
+import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilterPill";
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
 	type AuditSearch,
@@ -17,37 +19,33 @@ import {
 	toDateRange,
 } from "@/components/admin/audit-shared/auditSearch";
 import { dayEndIso, dayStartIso } from "@/components/admin/audit-shared/dateFilter";
-import { Badge } from "@/components/ui/badge";
+import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 50;
 
-// Mirrors AuthEvent.EventType server-side. Labelled rather than raw so the facet reads as English;
-// the value is still the wire enum.
-const EVENT_TYPE_OPTIONS = [
-	{ value: "LOGIN", label: "Sign-in" },
-	{ value: "LOGIN_FAILED", label: "Failed sign-in" },
-	{ value: "LOGOUT", label: "Sign-out" },
-	{ value: "TOKEN_REFRESH", label: "Token refresh" },
-	{ value: "JWT_REVOKED", label: "Sessions revoked" },
-	{ value: "IDENTITY_LINKED", label: "Identity linked" },
-	{ value: "IDENTITY_UNLINKED", label: "Identity unlinked" },
-	{ value: "IMPERSONATION_BEGIN", label: "Impersonation started" },
-	{ value: "IMPERSONATION_END", label: "Impersonation ended" },
-	{ value: "ACCOUNT_DELETED", label: "Account deleted" },
-	{ value: "EXPORT_REQUESTED", label: "Data export requested" },
-	{ value: "APP_ROLE_CHANGED", label: "Instance role changed" },
-	{ value: "RESEARCH_CONSENT_REVOKED", label: "Research consent revoked" },
-] as const;
+const EVENT_TYPE_OPTIONS = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
+	value,
+	label,
+}));
 
 const OUTCOME_OPTIONS = [
 	{ value: "SUCCESS", label: "Success" },
 	{ value: "FAILURE", label: "Failure" },
-] as const;
+];
 
-const EVENT_TYPES = EVENT_TYPE_OPTIONS.map((o) => o.value);
-const OUTCOMES = OUTCOME_OPTIONS.map((o) => o.value);
+const EVENT_TYPES = Object.keys(EVENT_TYPE_LABELS) as AuthEventType[];
+const OUTCOMES: ("SUCCESS" | "FAILURE")[] = ["SUCCESS", "FAILURE"];
+
+/** The display name for an account id, taken from the rows already on screen. */
+function nameForAccount(events: AuthEventView[], id: number): string | undefined {
+	for (const event of events) {
+		if (event.account?.id === id) return event.account.displayName ?? undefined;
+		if (event.actor?.id === id) return event.actor.displayName ?? undefined;
+	}
+	return undefined;
+}
 
 export interface AuthAuditPanelProps {
 	search: AuditSearch;
@@ -85,14 +83,19 @@ export function AuthAuditPanel({
 			lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
 	});
 
-	const events: AuthEventView[] = listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [];
+	// Deduped: offset pages over an append-only log re-serve rows written between fetches.
+	const events: AuthEventView[] = dedupeById(
+		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
+	);
 	const total = listQuery.data?.pages[0]?.totalElements;
+	// From the NARROWED filter, not raw search: a stale link whose enum values no longer exist filters
+	// nothing, so "Reset" and "match the current filters" would both be lying.
 	const hasFilter = Boolean(
-		search.eventType?.length ||
-			search.outcome?.length ||
-			search.accountId !== undefined ||
-			search.actorId !== undefined ||
-			search.from,
+		filters.eventType ||
+			filters.result ||
+			filters.accountId !== undefined ||
+			filters.actingAccountId !== undefined ||
+			filters.from,
 	);
 
 	const reset = () =>
@@ -148,13 +151,13 @@ export function AuthAuditPanel({
 			>
 				<AuditFacetFilter
 					title="Event"
-					options={[...EVENT_TYPE_OPTIONS]}
+					options={EVENT_TYPE_OPTIONS}
 					selected={search.eventType ?? []}
 					onChange={(values) => onSearchChange({ eventType: nonEmpty(values) })}
 				/>
 				<AuditFacetFilter
 					title="Outcome"
-					options={[...OUTCOME_OPTIONS]}
+					options={OUTCOME_OPTIONS}
 					selected={search.outcome ?? []}
 					onChange={(values) => onSearchChange({ outcome: nonEmpty(values) })}
 				/>
@@ -163,39 +166,30 @@ export function AuthAuditPanel({
 					onChange={(range) => onSearchChange(fromDateRange(range))}
 				/>
 				{search.accountId !== undefined && (
-					<Button
-						variant="secondary"
-						size="sm"
-						className="h-8"
-						onClick={() => onSearchChange({ accountId: undefined })}
-					>
-						Account #{search.accountId}
-						<Badge variant="outline" className="rounded-sm px-1 font-normal">
-							Clear
-						</Badge>
-					</Button>
+					<AuditRefFilterPill
+						label="Account"
+						id={search.accountId}
+						name={nameForAccount(events, search.accountId)}
+						onClear={() => onSearchChange({ accountId: undefined })}
+					/>
 				)}
 				{search.actorId !== undefined && (
-					<Button
-						variant="secondary"
-						size="sm"
-						className="h-8"
-						onClick={() => onSearchChange({ actorId: undefined })}
-					>
-						Actor #{search.actorId}
-						<Badge variant="outline" className="rounded-sm px-1 font-normal">
-							Clear
-						</Badge>
-					</Button>
+					<AuditRefFilterPill
+						label="Actor"
+						id={search.actorId}
+						name={nameForAccount(events, search.actorId)}
+						onClear={() => onSearchChange({ actorId: undefined })}
+					/>
 				)}
 			</AuditToolbar>
 
-			{total !== undefined && total > 0 && (
-				<p className="text-xs text-muted-foreground">
-					{total.toLocaleString()} event{total === 1 ? "" : "s"}
-					{hasFilter ? " match the current filters" : ""}.
-				</p>
-			)}
+			{/* Mounted unconditionally and announced: filtering otherwise changes the table silently for a
+			    screen-reader user, and the zero-match case is exactly when the count matters most. */}
+			<p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+				{total === undefined
+					? ""
+					: `${total.toLocaleString()} ${total === 1 ? "event" : "events"}${hasFilter ? " match the current filters" : ""}.`}
+			</p>
 
 			<AdminAuditTable
 				events={events}
