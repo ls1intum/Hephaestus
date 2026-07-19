@@ -10,9 +10,9 @@ import org.jspecify.annotations.Nullable;
  * a filter, so it cannot be collapsed to "all" by omitting it.
  *
  * <p>{@code entityTypes} and {@code actions} are multi-valued because audit triage is union-shaped
- * ("everything destructive" = CREATED ∪ DELETED). They reach SQL as a comma-joined string that
- * {@code string_to_array} expands — enum names contain no commas, and this keeps the optional-filter
- * shape identical to the scalar dimensions.
+ * ("everything destructive" = CREATED ∪ DELETED). They bind as {@code text[]} for Postgres'
+ * {@code = ANY(...)}; an empty selection is the same as no selection and collapses to null, which
+ * Hibernate can bind where an empty array or {@code IN ()} could not.
  */
 public record ConfigAuditFilter(
     @Nullable List<ConfigAuditEntityType> entityTypes,
@@ -23,24 +23,20 @@ public record ConfigAuditFilter(
     @Nullable Instant from,
     @Nullable Instant to
 ) {
-    /** Comma-joined entity-type names for SQL binding, or null when unconstrained. */
-    public @Nullable String entityTypesCsv() {
-        return csv(entityTypes);
+    /** Entity-type names as a bindable {@code text[]}, or null when unconstrained. */
+    public String@Nullable [] entityTypeNames() {
+        return names(entityTypes);
     }
 
-    /** Comma-joined action names for SQL binding, or null when unconstrained. */
-    public @Nullable String actionsCsv() {
-        return csv(actions);
+    /** Action names as a bindable {@code text[]}, or null when unconstrained. */
+    public String@Nullable [] actionNames() {
+        return names(actions);
     }
 
-    private static @Nullable String csv(@Nullable List<? extends Enum<?>> values) {
+    private static String@Nullable [] names(@Nullable List<? extends Enum<?>> values) {
         if (values == null || values.isEmpty()) {
             return null;
         }
-        return values
-            .stream()
-            .map(Enum::name)
-            .reduce((a, b) -> a + "," + b)
-            .orElse(null);
+        return values.stream().map(Enum::name).toArray(String[]::new);
     }
 }

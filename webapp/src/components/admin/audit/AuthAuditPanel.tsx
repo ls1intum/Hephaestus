@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
 import { adminExportAuthEvents } from "@/api/sdk.gen";
-import type { AuthEventView, PageAuthEventView } from "@/api/types.gen";
+import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/auditFormat";
 import { AuditDateFacet } from "@/components/admin/audit-shared/AuditDateFacet";
@@ -13,13 +13,16 @@ import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilt
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
 	type AuditSearch,
+	dayEndIso,
+	dayStartIso,
 	fromDateRange,
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
 } from "@/components/admin/audit-shared/auditSearch";
-import { dayEndIso, dayStartIso } from "@/components/admin/audit-shared/dateFilter";
 import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
+import { nameForRef } from "@/components/admin/audit-shared/nameForRef";
+import { springPageParams } from "@/components/admin/audit-shared/springPage";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -37,15 +40,6 @@ const OUTCOME_OPTIONS = [
 
 const EVENT_TYPES = Object.keys(EVENT_TYPE_LABELS) as AuthEventType[];
 const OUTCOMES: ("SUCCESS" | "FAILURE")[] = ["SUCCESS", "FAILURE"];
-
-/** The display name for an account id, taken from the rows already on screen. */
-function nameForAccount(events: AuthEventView[], id: number): string | undefined {
-	for (const event of events) {
-		if (event.account?.id === id) return event.account.displayName ?? undefined;
-		if (event.actor?.id === id) return event.actor.displayName ?? undefined;
-	}
-	return undefined;
-}
 
 export interface AuthAuditPanelProps {
 	search: AuditSearch;
@@ -78,9 +72,7 @@ export function AuthAuditPanel({
 
 	const listQuery = useInfiniteQuery({
 		...adminListAuthEventsInfiniteOptions({ query: { size: PAGE_SIZE, ...filters } }),
-		initialPageParam: 0,
-		getNextPageParam: (lastPage: PageAuthEventView) =>
-			lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
+		...springPageParams,
 	});
 
 	// Deduped: offset pages over an append-only log re-serve rows written between fetches.
@@ -169,7 +161,7 @@ export function AuthAuditPanel({
 					<AuditRefFilterPill
 						label="Account"
 						id={search.accountId}
-						name={nameForAccount(events, search.accountId)}
+						name={nameForRef(events, search.accountId)}
 						onClear={() => onSearchChange({ accountId: undefined })}
 					/>
 				)}
@@ -177,7 +169,7 @@ export function AuthAuditPanel({
 					<AuditRefFilterPill
 						label="Actor"
 						id={search.actorId}
-						name={nameForAccount(events, search.actorId)}
+						name={nameForRef(events, search.actorId)}
 						onClear={() => onSearchChange({ actorId: undefined })}
 					/>
 				)}

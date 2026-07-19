@@ -1,11 +1,13 @@
-import { CheckIcon, PlusCircleIcon } from "lucide-react";
+import { PlusCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Combobox,
+	ComboboxClear,
 	ComboboxContent,
 	ComboboxEmpty,
 	ComboboxItem,
+	ComboboxItemIndicator,
 	ComboboxList,
 	ComboboxSearchInput,
 	ComboboxSeparator,
@@ -13,7 +15,6 @@ import {
 	useComboboxFilter,
 } from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 
 export interface AuditFacetOption {
 	/** Wire value sent to the API — an enum name, not a label. */
@@ -33,20 +34,17 @@ export interface AuditFacetFilterProps {
 const MAX_INLINE_CHIPS = 2;
 
 /**
- * One facet of the audit toolbar: a dashed-outline trigger that opens a searchable, multi-select
- * list and summarises the selection back on the trigger. This is the shadcn faceted-filter pattern
- * (the data-table "tasks" example), rebuilt on the Base UI Combobox this repo's registry ships —
- * so search, the roving highlight and the selected marks come from the primitive rather than from
- * hand-rolled keyboard handling.
+ * One facet of the audit toolbar: a dashed trigger opening a searchable multi-select list that
+ * summarises the selection back onto itself. The shadcn faceted-filter pattern, on the Base UI
+ * Combobox this registry ships.
  *
- * Multi-select rather than a `<Select>` per field because the question an audit trail is opened to
- * answer is usually disjunctive: "did anyone touch feature flags *or* roles last Tuesday".
+ * Multi-select because the question an audit trail is opened for is usually disjunctive: "did anyone
+ * touch feature flags *or* roles last Tuesday".
  */
 export function AuditFacetFilter({ title, options, selected, onChange }: AuditFacetFilterProps) {
 	const { contains } = useComboboxFilter({ sensitivity: "base" });
 
-	// Derived from `options` rather than rebuilt, so the primitive compares option identities and
-	// marks the right rows.
+	// Derived from `options`, not rebuilt: the primitive compares option identities.
 	const selectedOptions = options.filter((option) => selected.includes(option.value));
 
 	return (
@@ -58,9 +56,8 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 			filter={(option, query) => contains(option, query, (o) => o.label)}
 			itemToStringLabel={(option) => option.label}
 		>
-			{/* Base UI exposes no accessible name for this trigger (its visible text is a summary, not a
-			    label), so the name is built here — and it carries the selection, because otherwise a
-			    screen-reader user is told the facet's title and never what it is currently filtering by. */}
+			{/* Base UI gives this trigger no accessible name, and the name has to carry the selection —
+			    otherwise a screen-reader user hears the facet's title and never what it is filtering by. */}
 			<ComboboxTrigger
 				aria-label={
 					selectedOptions.length === 0
@@ -107,38 +104,23 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 				<ComboboxList>
 					{(option: AuditFacetOption) => (
 						<ComboboxItem key={option.value} value={option} className="pr-1.5">
-							{/* A persistent box, empty when unselected: the check-only indicator reads as
-							    "this is the one you picked", which is the single-select idiom. */}
-							<span
-								className={cn(
-									"mr-2 flex size-4 shrink-0 items-center justify-center rounded-[4px] border",
-									selected.includes(option.value)
-										? "border-primary bg-primary text-primary-foreground"
-										: "border-input [&_svg]:invisible",
-								)}
-								aria-hidden
-							>
-								<CheckIcon className="size-3.5" />
-							</span>
+							{/* keepMounted turns the indicator into a checkbox: a box that is present but empty
+							    when unselected. Without it only the selected row shows a mark, which reads as
+							    "this is the one you picked" — the single-select idiom. */}
+							<ComboboxItemIndicator
+								keepMounted
+								className="relative right-auto mr-2 size-4 shrink-0 rounded-[4px] border border-input data-selected:border-primary data-selected:bg-primary data-selected:text-primary-foreground [&:not([data-selected])_svg]:invisible"
+							/>
 							<span className="truncate">{option.label}</span>
 						</ComboboxItem>
 					)}
 				</ComboboxList>
-				{selectedOptions.length > 0 && (
-					<>
-						<ComboboxSeparator />
-						{/* Without this the only way to widen a facet is Reset, which clears every other
-						    facet and the date range with it. */}
-						<Button
-							variant="ghost"
-							size="sm"
-							className="h-8 w-full justify-center font-normal"
-							onClick={() => onChange([])}
-						>
-							Clear {title.toLowerCase()}
-						</Button>
-					</>
-				)}
+				{/* Without this the only way to widen one facet is Reset, which clears the others with it.
+				    ComboboxClear unmounts itself when nothing is selected, so it needs no guard. */}
+				<ComboboxSeparator />
+				<ComboboxClear render={<Button variant="ghost" size="sm" className="h-8 font-normal" />}>
+					Clear {title.toLowerCase()}
+				</ComboboxClear>
 			</ComboboxContent>
 		</Combobox>
 	);

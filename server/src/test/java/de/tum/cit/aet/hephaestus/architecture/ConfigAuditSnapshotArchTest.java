@@ -46,7 +46,8 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
         classes()
             .that()
             .implement(ConfigAuditSnapshot.class)
-            .should(beRecords())
+            .should()
+            .beRecords()
             .because(
                 "Jackson serializes record components in declaration order; a Map's iteration order is " +
                     "not contractual, and the change diff and no-op suppression both depend on determinism"
@@ -69,17 +70,6 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
                 "config_audit_event is append-only: a leaked credential or address cannot be edited out. " +
                     "Snapshot a presence flag (e.g. llmApiKeySet) instead, or add a justified exemption"
             );
-    }
-
-    private static ArchCondition<JavaClass> beRecords() {
-        return new ArchCondition<>("be records") {
-            @Override
-            public void check(JavaClass clazz, ConditionEvents events) {
-                if (!clazz.isRecord()) {
-                    events.add(SimpleConditionEvent.violated(clazz, clazz.getName() + " is not a record"));
-                }
-            }
-        };
     }
 
     private static ArchCondition<JavaClass> haveNoSecretLikeField() {

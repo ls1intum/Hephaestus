@@ -22,13 +22,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * One test per producer wired on this branch, asserting a row actually lands.
- *
- * <p>Not redundant with the endpoint tests: {@code ConfigAuditRecorder} throws when it runs outside a
- * writable transaction, so a producer wired into a read-only or non-transactional path takes its
- * endpoint down with a 500 rather than merely failing to record. Only executing each path proves it.
- * The recorder also drops an UPDATE whose diff is empty — correct for a no-op, and silent when the
- * snapshot was built so that it never differs, which is exactly how the token producer shipped broken.
+ * One test per producer wired on this branch. {@code ConfigAuditRecorder} throws outside a writable
+ * transaction, so an unexercised producer is a latent 500 rather than merely a missing row — and it
+ * drops an UPDATE whose diff is empty, which is silent when a snapshot is built so it never differs.
  */
 class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -84,7 +80,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         membershipService.updateMemberVisibility(workspace.getId(), member.getId(), true);
 
         assertThat(snapshotsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
-            .as("the hidden flag decides whether access survives leaving the org, so it must be legible")
+            .as("hidden decides whether access survives leaving the org")
             .anyMatch(newValue -> newValue.contains("\"hidden\":true"));
     }
 
@@ -100,9 +96,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
             Map.of(member.getId(), WorkspaceMembership.WorkspaceRole.ADMIN)
         );
 
-        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
-            .as("'when did X become ADMIN' must not answer from admin-initiated rows alone")
-            .contains(ConfigAuditAction.UPDATED);
+        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE)).contains(ConfigAuditAction.UPDATED);
     }
 
     @Test
@@ -126,7 +120,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         settingsService.updatePublicVisibility(workspace.getId(), true);
 
         assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_VISIBILITY))
-            .as("re-submitting a settings form unchanged should not add a row that says nothing")
+            .as("re-submitting a form unchanged must not add a row that says nothing")
             .containsExactly(ConfigAuditAction.UPDATED);
     }
 
@@ -153,11 +147,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .toList();
     }
 
-    /**
-     * Read through the workspace-scoped query the application itself uses. {@code findAll()} returns
-     * nothing here: the table is registered workspace-scoped, so the tenancy filter empties an
-     * unscoped read when no workspace context is bound — which reads as "the producer wrote nothing".
-     */
+    /** Not {@code findAll()}: the tenancy filter empties an unscoped read when no workspace is bound. */
     private List<ConfigAuditEvent> rowsFor(Workspace workspace, ConfigAuditEntityType entityType) {
         entityManager.flush();
         var filter = new ConfigAuditFilter(List.of(entityType), null, null, null, null, null, null);

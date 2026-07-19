@@ -1,17 +1,15 @@
-import { format, parse } from "date-fns";
+import { addDays, format, formatISO, parse, startOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { z } from "zod";
 
 /**
- * URL state for the audit surfaces. An audit trail exists to be cited — "here is the change that
- * broke it" has to survive a paste into a ticket — so the whole filter selection lives in the query
- * string rather than in component state.
+ * URL state for the audit surfaces: the whole filter selection lives in the query string, because an
+ * audit view exists to be cited.
  *
- * Every field is `.catch()`-ed rather than merely optional. `validateSearch` turning a link into an
- * error screen is the one failure this page cannot afford: a stale link from a months-old ticket
- * carrying a since-renamed enum, or a hand-typed `?accountId=abc`, must still open the audit log —
- * just less narrowly filtered. Values stay loose strings for the same reason, and are narrowed to
- * the API's enums at the call site by `narrowToEnum`.
+ * Every field is `.catch()`-ed rather than merely optional. A stale link from a months-old ticket, or
+ * a hand-typed `?accountId=abc`, must still open the log — just less narrowly filtered — instead of
+ * hitting `validateSearch` and rendering an error page. Values stay loose strings for the same reason
+ * and are narrowed to the API's enums at the call site.
  */
 export const auditSearchSchema = z.object({
 	tab: z.enum(["signins", "settings"]).catch("signins"),
@@ -24,9 +22,7 @@ export const auditSearchSchema = z.object({
 	action: z.array(z.string()).optional().catch(undefined),
 	// Both
 	actorId: z.number().optional().catch(undefined),
-	/** Local calendar days, `yyyy-MM-dd`, so a shared link means the same day to the reader as to the
-	 *  sharer. Both bounds are inclusive; `toDayParam`/`dayEndIso` turn `to` into the exclusive
-	 *  instant the server's `occurred_at < :to` predicate wants. */
+	/** Inclusive local calendar days, `yyyy-MM-dd`, so a shared link means the same day to everyone. */
 	from: z.string().optional().catch(undefined),
 	to: z.string().optional().catch(undefined),
 });
@@ -76,13 +72,7 @@ export function nonEmpty(values: string[]): string[] | undefined {
 	return values.length > 0 ? values : undefined;
 }
 
-/**
- * Narrows loose URL strings to the enum the API accepts, dropping anything unrecognised.
- *
- * This is the payoff for keeping the schema as `string[]`: a link shared before an enum value was
- * renamed degrades to a slightly wider result set instead of a validation error on a page whose
- * whole purpose is to be linked to.
- */
+/** Narrows loose URL strings to the enums the API accepts, dropping anything unrecognised. */
 export function narrowToEnum<T extends string>(
 	values: string[] | undefined,
 	allowed: readonly T[],
@@ -90,4 +80,21 @@ export function narrowToEnum<T extends string>(
 	if (!values?.length) return undefined;
 	const kept = values.filter((value): value is T => (allowed as readonly string[]).includes(value));
 	return kept.length > 0 ? kept : undefined;
+}
+
+/**
+ * The wire bounds for a picked day range. The generated client types these as `Date`, but its query
+ * serializer explodes a real Date into a deepObject, so we build the ISO instant the server wants and
+ * cast. `formatISO` carries the user's local offset, matching the picked day.
+ *
+ * `dayEndIso` is the NEXT midnight, not `endOfDay`: `formatISO` emits no fractional seconds, so
+ * end-of-day becomes `23:59:59` and the server's `occurred_at < :to` silently drops the range's last
+ * second — a row that exists while the page says it does not.
+ */
+export function dayStartIso(date: Date): Date {
+	return formatISO(startOfDay(date)) as unknown as Date;
+}
+
+export function dayEndIso(date: Date): Date {
+	return formatISO(startOfDay(addDays(date, 1))) as unknown as Date;
 }

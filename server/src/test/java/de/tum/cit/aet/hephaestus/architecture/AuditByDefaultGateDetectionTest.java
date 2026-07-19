@@ -13,13 +13,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Fixtures for {@link AuditByDefaultArchTest}'s endpoint detection.
- *
- * <p>The rule is only worth its cost while it sees every admin mutation, and it can fail to see one
- * silently — a missed endpoint looks exactly like a compliant one. It has already happened twice:
- * once when the controller check ignored meta-annotations ({@code @WorkspaceScopedController} composes
- * {@code @RestController}), and once when the gate check looked at the method but not its class, which
- * exempted ten endpoints across seven class-gated controllers while the build stayed green.
+ * Fixtures for {@link AuditByDefaultArchTest}'s endpoint detection, which can fail silently — an
+ * endpoint the rule cannot see looks exactly like a compliant one. The class-gated case is the one
+ * that matters: seven controllers declare the gate once at class level rather than per method.
  */
 @Tag("architecture")
 class AuditByDefaultGateDetectionTest {
@@ -72,9 +68,7 @@ class AuditByDefaultGateDetectionTest {
 
     @Test
     void seesAGateDeclaredOnTheControllerRatherThanTheMethod() {
-        assertThat(isAdminMutation(ClassGatedController.class, "create"))
-            .as("seven real controllers declare the gate once at class level")
-            .isTrue();
+        assertThat(isAdminMutation(ClassGatedController.class, "create")).isTrue();
     }
 
     @Test

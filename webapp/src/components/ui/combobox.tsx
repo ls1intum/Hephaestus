@@ -221,6 +221,17 @@ function ComboboxItemIndicator({ className, ...props }: ComboboxPrimitive.ItemIn
 	);
 }
 
+/** Clears the selection and unmounts itself when there is nothing to clear. */
+function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
+	return (
+		<ComboboxPrimitive.Clear
+			data-slot="combobox-clear"
+			className={cn("w-full justify-center", className)}
+			{...props}
+		/>
+	);
+}
+
 function ComboboxSeparator({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
@@ -234,6 +245,7 @@ function ComboboxSeparator({ className, ...props }: React.ComponentProps<"div">)
 
 export {
 	Combobox,
+	ComboboxClear,
 	ComboboxCollection,
 	ComboboxContent,
 	ComboboxEmpty,

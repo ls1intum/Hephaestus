@@ -17,13 +17,16 @@ import { AuditRefFilterPill } from "@/components/admin/audit-shared/AuditRefFilt
 import { AuditToolbar } from "@/components/admin/audit-shared/AuditToolbar";
 import {
 	type ConfigAuditSearch,
+	dayEndIso,
+	dayStartIso,
 	fromDateRange,
 	narrowToEnum,
 	nonEmpty,
 	toDateRange,
 } from "@/components/admin/audit-shared/auditSearch";
-import { dayEndIso, dayStartIso } from "@/components/admin/audit-shared/dateFilter";
 import { dedupeById } from "@/components/admin/audit-shared/dedupeById";
+import { nameForRef } from "@/components/admin/audit-shared/nameForRef";
+import { springPageParams } from "@/components/admin/audit-shared/springPage";
 import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import {
 	ACTION_LABELS,
@@ -31,13 +34,6 @@ import {
 } from "@/components/admin/config-audit/configAuditFormat";
 
 const PAGE_SIZE = 50;
-
-/** The endpoint returns a Spring Page; advance by page number until the last one. */
-const PAGE_PARAMS = {
-	initialPageParam: 0,
-	getNextPageParam: (lastPage: PageConfigAuditEntryView) =>
-		lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
-};
 
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
@@ -81,7 +77,7 @@ export function AdminConfigAuditPanel({
 }: ConfigAuditPanelProps) {
 	const listQuery = useInfiniteQuery({
 		...adminListConfigAuditEventsInfiniteOptions({ query: toQuery(search) }),
-		...PAGE_PARAMS,
+		...springPageParams,
 	});
 
 	return (
@@ -106,19 +102,10 @@ export function WorkspaceConfigAuditPanel({
 			path: { workspaceSlug },
 			query: toQuery(search),
 		}),
-		...PAGE_PARAMS,
+		...springPageParams,
 	});
 
 	return <ConfigAuditView search={search} onSearchChange={onSearchChange} listQuery={listQuery} />;
-}
-
-/** The display name for an actor id, taken from the rows already on screen. */
-function nameForActor(entries: ConfigAuditEntryView[], id: number): string | undefined {
-	for (const entry of entries) {
-		if (entry.actor?.id === id) return entry.actor.displayName ?? undefined;
-		if (entry.actingActor?.id === id) return entry.actingActor.displayName ?? undefined;
-	}
-	return undefined;
 }
 
 /** What both scopes' queries return; the library's own type, so the two cannot silently diverge. */
@@ -187,7 +174,7 @@ function ConfigAuditView({
 					<AuditRefFilterPill
 						label="Actor"
 						id={search.actorId}
-						name={nameForActor(entries, search.actorId)}
+						name={nameForRef(entries, search.actorId)}
 						onClear={() => onSearchChange({ actorId: undefined })}
 					/>
 				)}
