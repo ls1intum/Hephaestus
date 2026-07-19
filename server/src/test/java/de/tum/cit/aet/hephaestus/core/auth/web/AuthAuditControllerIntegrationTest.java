@@ -145,6 +145,34 @@ class AuthAuditControllerIntegrationTest {
     }
 
     @Test
+    void eventTypeFilterAcceptsSeveralValuesAtOnce() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+        seed(2L, AuthEvent.EventType.LOGOUT, Instant.parse("2026-06-02T10:00:00Z"), admin.getId(), null);
+        seed(3L, AuthEvent.EventType.APP_ROLE_CHANGED, Instant.parse("2026-06-03T10:00:00Z"), admin.getId(), null);
+
+        // Two values on one dimension is a disjunction, not a last-one-wins overwrite. The unfiltered
+        // case pins the other half of the predicate: a null list must not degrade into `IN ()`, which
+        // Hibernate cannot bind — a break no single-value test would surface.
+        webTestClient
+            .get()
+            .uri(builder ->
+                builder.path("/admin/audit").queryParam("eventType", "LOGIN").queryParam("eventType", "LOGOUT").build()
+            )
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.totalElements")
+            .isEqualTo(2)
+            .jsonPath("$.content[0].eventType")
+            .isEqualTo("LOGOUT")
+            .jsonPath("$.content[1].eventType")
+            .isEqualTo("LOGIN");
+    }
+
+    @Test
     void resolvesAccountAndActorToHumanIdentities() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
         Account target = persist("Target User", Account.AppRole.USER);

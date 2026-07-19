@@ -258,6 +258,24 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
+    void repeatingAFilterParameterWidensItRatherThanReplacingIt() {
+        // The question a change trail is opened for is usually disjunctive ("did anyone touch either of
+        // these?"), so repeated values must union. The CSV the predicate builds from them is split by
+        // string_to_array in SQL, which a single-value test cannot distinguish from plain equality.
+        Workspace workspace = setupWorkspace("audit-multi");
+        patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
+        createConfig(workspace, "primary");
+
+        assertFilterYields(
+            workspace,
+            uri -> uri.queryParam("entityType", "AGENT_CONFIG").queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
+            2
+        );
+        assertFilterYields(workspace, uri -> uri.queryParam("action", "CREATED").queryParam("action", "DELETED"), 1);
+    }
+
+    @Test
+    @WithAdminUser
     void newestRowsComeFirstEvenWhenTwoShareAnInstant() {
         // A settings form submitting twice in one second is the normal case, so the id tie-break in
         // ORDER BY occurred_at DESC, id DESC is what makes paging deterministic at all.
