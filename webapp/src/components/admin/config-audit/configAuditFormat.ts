@@ -15,7 +15,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	PRACTICE_REVIEW_SETTINGS: "Review settings",
 	AI_CONFIG_BINDING: "AI binding",
 	AGENT_CONFIG: "Agent config",
-	WORKSPACE_ROLE: "Member role",
+	WORKSPACE_ROLE: "Workspace role",
 	WORKSPACE_FEATURES: "Feature flags",
 	WORKSPACE_STATUS: "Workspace status",
 	WORKSPACE_TOKEN: "Access token",
