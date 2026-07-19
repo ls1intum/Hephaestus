@@ -207,7 +207,7 @@ public class WorkspaceController {
         content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
     )
     @RequireWorkspaceOwner
-    @AuditExempt(reason = "slug history is its own ledger (workspace_slug_history)")
+    @AuditExempt(reason = "renames are unattributed: workspace_slug_history keeps old slugs redirecting, with no actor")
     public ResponseEntity<WorkspaceDTO> renameSlug(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody RenameWorkspaceSlugRequestDTO request

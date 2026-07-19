@@ -26,7 +26,7 @@ public interface ConfigAuditPort {
      * <p>No-op updates are dropped: if {@code before} and {@code after} serialize identically, an
      * idempotent PATCH leaves no row rather than polluting the resource's history.
      *
-     * @throws IllegalStateException if there is no active, writable transaction
+     * @throws ConfigAuditUnavailableException if there is no active, writable transaction
      */
     void record(ConfigAuditEntry entry);
 }

@@ -40,6 +40,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @Test
     @WithAdminUser
     void practiceReviewPatchWritesExactlyOneRowNamingTheFieldThatChanged() {
@@ -228,6 +231,31 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithMentorUser
+    void aWorkspaceAdminIsRefusedAnotherWorkspacesTrail() {
+        // Deliberately not @WithAdminUser: app_admin carries cross-workspace elevation, so that user
+        // reads any workspace by design. The sibling test also administers both workspaces, so it
+        // survives removing the gate. Only a caller who administers neither proves the gate binds.
+        Workspace theirs = createWorkspace(
+            "audit-gate-theirs",
+            "Other Workspace",
+            "audit-gate-theirs-org",
+            AccountType.ORG,
+            persistUser("audit-gate-theirs-owner")
+        );
+
+        // 401, not 403: a non-member resolves no workspace context at all, so the request is refused
+        // before the admin gate is consulted. Either way the trail is not served.
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/config-audit", theirs.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
+    }
+
+    @Test
+    @WithMentorUser
     void aNonInstanceAdminIsRefusedTheCrossWorkspaceView() {
         // The one endpoint in this feature that spans tenants; app_admin is the only thing between a
         // signed-in user and every workspace's configuration history.
@@ -321,11 +349,17 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void newestRowsComeFirstEvenWhenTwoShareAnInstant() {
-        // A settings form submitting twice in one second is the normal case, so the id tie-break in
-        // ORDER BY occurred_at DESC, id DESC is what makes paging deterministic at all.
+        // The rows are forced onto one instant: the recorder's clock has microsecond precision, so two
+        // ordinary writes never tie and the id tie-break in ORDER BY occurred_at DESC, id DESC — the
+        // thing that makes paging deterministic — would go unexercised.
         Workspace workspace = setupWorkspace("audit-order");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 46));
+        jdbcTemplate.update(
+            "UPDATE config_audit_event SET occurred_at = ? WHERE workspace_id = ?",
+            java.sql.Timestamp.from(java.time.Instant.parse("2026-07-01T00:00:00Z")),
+            workspace.getId()
+        );
 
         webTestClient
             .get()

@@ -57,8 +57,9 @@ class ConfigAuditImmutabilityIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.liquibase.enabled", () -> "true");
         registry.add("spring.liquibase.change-log", () -> "classpath:db/master.xml");
-        // dev,prod: dev carries the structural changesets, prod adds the immutability triggers that
-        // are the subject of this test.
+        // The structural changesets carry no context and run regardless; `prod` is what adds the
+        // immutability triggers this test attacks. Listing `dev` too matches how a dev instance boots,
+        // so the schema under test is the one a developer actually gets.
         registry.add("spring.liquibase.contexts", () -> "dev,prod");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
@@ -102,6 +103,11 @@ class ConfigAuditImmutabilityIntegrationTest {
         ).hasMessageContaining("append-only");
     }
 
+    /**
+     * Covers the database's half of Art. 17: the carve-out permits nulling an actor reference. That
+     * {@code AccountPurger} issues this statement is not covered here — its account fixtures need the
+     * auth module, which does not run Liquibase, so the trigger would be absent there.
+     */
     @Test
     void erasingAnActorIsPermittedAndLeavesTheChangeItself() {
         assertThatCode(() -> jdbc.update("UPDATE config_audit_event SET actor_account_id = NULL WHERE id = ?", rowId))
@@ -222,7 +228,6 @@ class ConfigAuditImmutabilityIntegrationTest {
             String.class,
             constraintName
         );
-        assertThat(definition).as("constraint %s exists on the migrated schema", constraintName).isNotNull();
         return Arrays.stream(definition.split("'"))
             .filter(part -> part.matches("[A-Z_]{2,}"))
             .distinct()

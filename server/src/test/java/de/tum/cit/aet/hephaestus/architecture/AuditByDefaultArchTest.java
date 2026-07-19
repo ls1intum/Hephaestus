@@ -106,7 +106,9 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
     /** Depth-bounded so a cyclic service graph terminates; audit writes sit shallow behind a handler. */
     private static boolean reachesRecorder(JavaMethod method, Set<String> seen, int depth) {
-        if (depth > MAX_CALL_DEPTH || !seen.add(method.getFullName())) {
+        // Keyed on (method, depth): a method first reached at the depth limit must not cache a `false`
+        // that short-circuits a shallower path to a real recorder.
+        if (depth > MAX_CALL_DEPTH || !seen.add(method.getFullName() + "@" + depth)) {
             return false;
         }
         for (JavaMethodCall call : method.getMethodCallsFromSelf()) {
@@ -170,8 +172,17 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     }
 
     private static boolean isInstanceAdminGated(com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element) {
+        // Meta-annotated too, matching isController: a composed @InstanceAdmin annotation would
+        // otherwise take its endpoints out of the rule entirely.
         return element
             .tryGetAnnotationOfType(PreAuthorize.class)
+            .or(() ->
+                element
+                    .getAnnotations()
+                    .stream()
+                    .flatMap(a -> a.getRawType().tryGetAnnotationOfType(PreAuthorize.class).stream())
+                    .findFirst()
+            )
             .map(a -> a.value().contains(INSTANCE_ADMIN_AUTHORITY))
             .orElse(false);
     }

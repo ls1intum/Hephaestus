@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Queries are native for two reasons: the {@code changedKey} filter needs Postgres'
- * {@code = ANY(text[])}, which JPQL cannot express, and the {@code workspace_id} predicate must be
+ * array containment operator, which JPQL cannot express and which the GIN index can serve, and the {@code workspace_id} predicate must be
  * literal in the emitted SQL for {@code WorkspaceStatementInspector} to see it.
  *
  * <p>Filter dimensions bind through {@link ConfigAuditFilter} via SpEL rather than one parameter
@@ -25,7 +25,7 @@ public interface ConfigAuditEventRepository extends JpaRepository<ConfigAuditEve
     String FILTER_PREDICATES = """
           AND (CAST(:#{#f.entityTypeNames()} AS text[]) IS NULL OR e.entity_type = ANY(CAST(:#{#f.entityTypeNames()} AS text[])))
           AND (CAST(:#{#f.entityId()} AS text) IS NULL OR e.entity_id = CAST(:#{#f.entityId()} AS text))
-          AND (CAST(:#{#f.changedKey()} AS text) IS NULL OR CAST(:#{#f.changedKey()} AS text) = ANY(e.changed_keys))
+          AND (CAST(:#{#f.changedKey()} AS text) IS NULL OR e.changed_keys @> ARRAY[CAST(:#{#f.changedKey()} AS text)])
           AND (CAST(:#{#f.actionNames()} AS text[]) IS NULL OR e.action = ANY(CAST(:#{#f.actionNames()} AS text[])))
           AND (CAST(:#{#f.actorId()} AS bigint) IS NULL OR e.actor_account_id = CAST(:#{#f.actorId()} AS bigint))
           AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR e.occurred_at >= CAST(:#{#f.from()} AS timestamptz))
