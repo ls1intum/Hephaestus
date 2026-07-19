@@ -1,7 +1,7 @@
-import { useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
 	Sheet,
 	SheetContent,
@@ -9,13 +9,15 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
+import { DetailRow } from "../audit-shared/DetailRow";
+import { prettyJson } from "../audit-shared/prettyJson";
 import { formatTimestamp } from "../audit-shared/timeFormat";
 import {
+	ACTION_BADGE,
 	actionLabel,
 	actorDisplay,
 	entityTypeLabel,
 	fieldChanges,
-	prettySnapshot,
 	subjectLabel,
 } from "./configAuditFormat";
 
@@ -27,25 +29,9 @@ interface ConfigAuditDetailSheetProps {
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-const ACTION_BADGE: Record<string, "default" | "secondary" | "outline"> = {
-	CREATED: "default",
-	UPDATED: "secondary",
-	DELETED: "outline",
-};
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-	return (
-		<div className="grid grid-cols-[8rem_1fr] gap-2 py-1.5 text-sm">
-			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="min-w-0 break-words">{children}</dd>
-		</div>
-	);
-}
-
 /**
- * Full record of one configuration change: the field-by-field before/after diff first (the reason this
- * surface exists), then the raw snapshots behind a disclosure for forensics. A right-hand Sheet keeps
- * the change list visible behind it — the "inspect a row" model Datadog and Tailscale use for audit logs.
+ * Full record of one configuration change: the field-by-field before/after first, then the raw
+ * snapshots behind a disclosure. A right-hand Sheet keeps the change list visible behind it.
  */
 export function ConfigAuditDetailSheet({
 	entry,
@@ -53,15 +39,20 @@ export function ConfigAuditDetailSheet({
 	onOpenChange,
 	resolveWorkspaceName,
 }: ConfigAuditDetailSheetProps) {
-	const [showRaw, setShowRaw] = useState(false);
 	const ts = entry ? formatTimestamp(entry.occurredAt) : null;
 	const changes = entry ? fieldChanges(entry) : [];
 	const actor = entry ? actorDisplay(entry) : null;
 	const subject = entry ? subjectLabel(entry) : null;
 	const workspaceName =
 		entry?.workspaceId != null ? resolveWorkspaceName?.(entry.workspaceId) : undefined;
-	const oldRaw = prettySnapshot(entry?.oldValue);
-	const newRaw = prettySnapshot(entry?.newValue);
+	const oldRaw = prettyJson(entry?.oldValue);
+	const newRaw = prettyJson(entry?.newValue);
+	const valuesHeading =
+		entry?.action === "CREATED"
+			? "Initial values"
+			: entry?.action === "DELETED"
+				? "Final values"
+				: "Changes";
 
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange}>
@@ -73,19 +64,33 @@ export function ConfigAuditDetailSheet({
 					</SheetDescription>
 				</SheetHeader>
 
-				{entry && ts && actor && (
+				{entry && actor && (
 					<div className="space-y-4 px-4 pb-4">
 						<dl className="divide-y">
-							<Row label="Time">
-								<span>{ts.local}</span>
-								<span className="ml-2 text-xs text-muted-foreground">({ts.isoUtc})</span>
-							</Row>
-							<Row label="Action">
+							<DetailRow label="Time">
+								{ts ? (
+									<>
+										<span>{ts.local}</span>
+										<span className="ml-2 text-xs text-muted-foreground">({ts.isoUtc})</span>
+									</>
+								) : (
+									"—"
+								)}
+							</DetailRow>
+							<DetailRow label="Action">
 								<Badge variant={ACTION_BADGE[entry.action ?? "UPDATED"]}>
 									{actionLabel(entry.action)}
 								</Badge>
-							</Row>
-							<Row label="Actor">
+							</DetailRow>
+							<DetailRow label="Resource">
+								<span>{entityTypeLabel(entry.entityType)}</span>
+								{entry.entityId && (
+									<span className="ml-2 font-mono text-xs text-muted-foreground">
+										{entry.entityId}
+									</span>
+								)}
+							</DetailRow>
+							<DetailRow label="Actor">
 								{actor.kind === "SYSTEM" ? (
 									<span className="text-muted-foreground">System</span>
 								) : (
@@ -98,27 +103,19 @@ export function ConfigAuditDetailSheet({
 										)}
 									</span>
 								)}
-							</Row>
-							{actor.actingAs && <Row label="Impersonating">{actor.actingAs}</Row>}
-							{workspaceName !== undefined || entry.workspaceId != null ? (
-								<Row label="Workspace">
-									{entry.workspaceId != null
-										? workspaceName
-											? `${workspaceName} (#${entry.workspaceId})`
-											: `#${entry.workspaceId}`
-										: "—"}
-								</Row>
-							) : null}
+							</DetailRow>
+							{actor.actingAs && <DetailRow label="Impersonating">{actor.actingAs}</DetailRow>}
+							{entry.workspaceId != null && (
+								<DetailRow label="Workspace">
+									{workspaceName
+										? `${workspaceName} (#${entry.workspaceId})`
+										: `#${entry.workspaceId}`}
+								</DetailRow>
+							)}
 						</dl>
 
 						<div>
-							<h3 className="mb-2 text-sm font-medium">
-								{entry.action === "CREATED"
-									? "Initial values"
-									: entry.action === "DELETED"
-										? "Final values"
-										: "Changes"}
-							</h3>
+							<h3 className="mb-2 text-sm font-medium">{valuesHeading}</h3>
 							{changes.length === 0 ? (
 								<p className="text-sm text-muted-foreground">No field-level changes recorded.</p>
 							) : (
@@ -138,12 +135,14 @@ export function ConfigAuditDetailSheet({
 													<span>{change.before ?? "—"}</span>
 												) : (
 													<span>
+														<span className="sr-only">changed from </span>
 														<span className="text-muted-foreground line-through decoration-muted-foreground/50">
 															{change.before ?? "—"}
 														</span>
 														<span aria-hidden className="mx-1.5 text-muted-foreground">
 															→
 														</span>
+														<span className="sr-only"> to </span>
 														<span className="font-medium">{change.after ?? "—"}</span>
 													</span>
 												)}
@@ -155,38 +154,38 @@ export function ConfigAuditDetailSheet({
 						</div>
 
 						{(oldRaw || newRaw) && (
-							<div>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									className="px-0 text-xs text-muted-foreground"
-									aria-expanded={showRaw}
-									onClick={() => setShowRaw((v) => !v)}
+							<Collapsible key={entry.id}>
+								<CollapsibleTrigger
+									render={
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="px-0 text-xs text-muted-foreground"
+										/>
+									}
 								>
-									{showRaw ? "Hide" : "Show"} raw snapshots
-								</Button>
-								{showRaw && (
-									<div className="mt-2 space-y-2">
-										{oldRaw && (
-											<div>
-												<p className="mb-1 text-xs text-muted-foreground">Before</p>
-												<pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
-													{oldRaw}
-												</pre>
-											</div>
-										)}
-										{newRaw && (
-											<div>
-												<p className="mb-1 text-xs text-muted-foreground">After</p>
-												<pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
-													{newRaw}
-												</pre>
-											</div>
-										)}
-									</div>
-								)}
-							</div>
+									Show raw snapshots
+								</CollapsibleTrigger>
+								<CollapsibleContent className="mt-2 space-y-2">
+									{oldRaw && (
+										<div>
+											<p className="mb-1 text-xs text-muted-foreground">Before</p>
+											<pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
+												{oldRaw}
+											</pre>
+										</div>
+									)}
+									{newRaw && (
+										<div>
+											<p className="mb-1 text-xs text-muted-foreground">After</p>
+											<pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs">
+												{newRaw}
+											</pre>
+										</div>
+									)}
+								</CollapsibleContent>
+							</Collapsible>
 						)}
 					</div>
 				)}

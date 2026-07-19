@@ -278,6 +278,8 @@ export function NavAdmin({
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
+				{/* Deliberately not feature-gated: a change history must stay reachable after a feature is
+				    turned off, since the record of past changes still exists. */}
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Setting change history"

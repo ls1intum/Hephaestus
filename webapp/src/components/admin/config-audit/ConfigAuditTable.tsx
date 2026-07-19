@@ -1,20 +1,36 @@
 import { Bot, History, UserCog } from "lucide-react";
 import { useState } from "react";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { RelativeTime } from "@/components/admin/integrations/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
 	TableBody,
+	TableCaption,
 	TableCell,
 	TableHead,
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { formatTimestamp, relativeTime } from "../audit-shared/timeFormat";
+import { FilterLink } from "../audit-shared/FilterLink";
 import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
-import { actionLabel, actorDisplay, changeSummary, subjectLabel } from "./configAuditFormat";
+import {
+	ACTION_BADGE,
+	actionLabel,
+	actorDisplay,
+	changeSummary,
+	subjectLabel,
+} from "./configAuditFormat";
 
 export interface ConfigAuditTableProps {
 	entries: ConfigAuditEntryView[];
@@ -33,16 +49,9 @@ export interface ConfigAuditTableProps {
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-const ACTION_BADGE: Record<string, "default" | "secondary" | "outline"> = {
-	CREATED: "default",
-	UPDATED: "secondary",
-	DELETED: "outline",
-};
-
 /**
- * Read-only table of configuration changes (newest first). Each row answers *who changed which setting,
- * when, and from what to what*: the Changes column renders the field-level diff the server computed, the
- * Actor column attributes impersonated changes to the operator. Open a row for the full before/after.
+ * Read-only table of configuration changes (newest first): who changed which setting, when, and — via
+ * the field-level diff the server computed — from what to what. Open a row for the full before/after.
  */
 export function ConfigAuditTable({
 	entries,
@@ -58,17 +67,25 @@ export function ConfigAuditTable({
 	resolveWorkspaceName,
 }: ConfigAuditTableProps) {
 	const [detail, setDetail] = useState<ConfigAuditEntryView | null>(null);
+	const [detailOpen, setDetailOpen] = useState(false);
 
 	if (isError) {
 		return (
-			<div className="flex flex-col items-center gap-3 py-8 text-center">
-				<p className="text-sm text-destructive">Failed to load configuration changes.</p>
+			<Empty className="border border-dashed">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<History />
+					</EmptyMedia>
+					<EmptyTitle>Failed to load configuration changes.</EmptyTitle>
+				</EmptyHeader>
 				{onRetry && (
-					<Button variant="outline" size="sm" onClick={onRetry}>
-						Try again
-					</Button>
+					<EmptyContent>
+						<Button variant="outline" size="sm" onClick={onRetry}>
+							Try again
+						</Button>
+					</EmptyContent>
 				)}
-			</div>
+			</Empty>
 		);
 	}
 
@@ -82,19 +99,21 @@ export function ConfigAuditTable({
 
 	if (entries.length === 0) {
 		return (
-			<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-				<History className="size-8" aria-hidden />
-				{hasFilter ? (
-					<p className="text-sm">No changes match the current filters.</p>
-				) : (
-					<div className="space-y-1">
-						<p className="text-sm">No configuration changes yet.</p>
-						<p className="text-xs">
+			<Empty className="border border-dashed">
+				<EmptyHeader>
+					<EmptyMedia variant="icon">
+						<History />
+					</EmptyMedia>
+					<EmptyTitle>
+						{hasFilter ? "No changes match the current filters." : "No configuration changes yet."}
+					</EmptyTitle>
+					{!hasFilter && (
+						<EmptyDescription>
 							Changes to review settings, AI bindings, and agent configurations will appear here.
-						</p>
-					</div>
-				)}
-			</div>
+						</EmptyDescription>
+					)}
+				</EmptyHeader>
+			</Empty>
 		);
 	}
 
@@ -102,6 +121,7 @@ export function ConfigAuditTable({
 		<div className="space-y-4">
 			<div className="rounded-md border">
 				<Table>
+					<TableCaption className="sr-only">Configuration changes, newest first</TableCaption>
 					<TableHeader>
 						<TableRow>
 							<TableHead scope="col">Time</TableHead>
@@ -117,7 +137,6 @@ export function ConfigAuditTable({
 					</TableHeader>
 					<TableBody>
 						{entries.map((entry) => {
-							const ts = formatTimestamp(entry.occurredAt);
 							const actor = actorDisplay(entry);
 							const subject = subjectLabel(entry);
 							const summary = changeSummary(entry);
@@ -125,11 +144,8 @@ export function ConfigAuditTable({
 								entry.workspaceId != null ? resolveWorkspaceName?.(entry.workspaceId) : undefined;
 							return (
 								<TableRow key={entry.id}>
-									<TableCell
-										className="whitespace-nowrap text-sm text-muted-foreground"
-										title={`${ts.local} (${ts.isoUtc})`}
-									>
-										{relativeTime(entry.occurredAt)}
+									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+										<RelativeTime value={entry.occurredAt} />
 									</TableCell>
 									<TableCell>
 										<Badge variant={ACTION_BADGE[entry.action ?? "UPDATED"]}>
@@ -148,7 +164,7 @@ export function ConfigAuditTable({
 										</TableCell>
 									)}
 									<TableCell className="max-w-[14rem] truncate">
-										<ActorCell actor={actor} entry={entry} onFilterActor={onFilterActor} />
+										<ActorCell actor={actor} onFilterActor={onFilterActor} />
 									</TableCell>
 									<TableCell className="max-w-xs">
 										<span className="block truncate text-xs text-muted-foreground" title={summary}>
@@ -161,7 +177,10 @@ export function ConfigAuditTable({
 											variant="ghost"
 											size="sm"
 											aria-label={`View details of ${subject.label} change`}
-											onClick={() => setDetail(entry)}
+											onClick={() => {
+												setDetail(entry);
+												setDetailOpen(true);
+											}}
 										>
 											Details
 										</Button>
@@ -184,8 +203,8 @@ export function ConfigAuditTable({
 
 			<ConfigAuditDetailSheet
 				entry={detail}
-				open={detail !== null}
-				onOpenChange={(open) => !open && setDetail(null)}
+				open={detailOpen}
+				onOpenChange={setDetailOpen}
 				resolveWorkspaceName={resolveWorkspaceName}
 			/>
 		</div>
@@ -194,11 +213,9 @@ export function ConfigAuditTable({
 
 function ActorCell({
 	actor,
-	entry,
 	onFilterActor,
 }: {
 	actor: ReturnType<typeof actorDisplay>;
-	entry: ConfigAuditEntryView;
 	onFilterActor?: (id: number) => void;
 }) {
 	if (actor.kind === "SYSTEM") {
@@ -209,25 +226,20 @@ function ActorCell({
 			</span>
 		);
 	}
-	// The responsible party is the signed-in user, or the operator for an impersonated change.
-	const filterId = actor.kind === "IMPERSONATED" ? entry.actingAccountId : entry.actorAccountId;
-	const name =
-		onFilterActor && filterId != null ? (
-			<button
-				type="button"
-				className="truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-				title={actor.primaryEmail ?? `Filter by ${actor.primary}`}
-				onClick={() => onFilterActor(filterId)}
-			>
-				{actor.primary}
-			</button>
-		) : (
-			<span title={actor.primaryEmail ?? undefined}>{actor.primary}</span>
-		);
 	return (
 		<span className="flex items-center gap-1.5">
 			{actor.kind === "IMPERSONATED" && <UserCog className="size-3.5 shrink-0" aria-hidden />}
-			{name}
+			{onFilterActor && actor.filterId != null ? (
+				<FilterLink
+					label={actor.primary}
+					title={actor.primaryEmail ?? `Filter by ${actor.primary}`}
+					onSelect={() => onFilterActor(actor.filterId as number)}
+				/>
+			) : (
+				<span className="truncate" title={actor.primaryEmail ?? undefined}>
+					{actor.primary}
+				</span>
+			)}
 			{actor.actingAs && (
 				<span className="truncate text-xs text-muted-foreground">acting as {actor.actingAs}</span>
 			)}

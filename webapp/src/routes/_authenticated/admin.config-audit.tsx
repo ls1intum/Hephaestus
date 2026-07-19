@@ -1,79 +1,36 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { endOfDay, format, formatISO, startOfDay } from "date-fns";
-import { CalendarIcon, History, X } from "lucide-react";
+import { History, X } from "lucide-react";
 import { useState } from "react";
-import type { DateRange } from "react-day-picker";
 import {
 	adminListConfigAuditEventsInfiniteOptions,
 	adminListWorkspacesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { ConfigAuditEntryView, PageConfigAuditEntryView } from "@/api/types.gen";
+import { dayEndIso, dayStartIso } from "@/components/admin/audit-shared/dateFilter";
+import {
+	type ConfigAuditFilterState,
+	ConfigAuditFilters,
+} from "@/components/admin/config-audit/ConfigAuditFilters";
 import { ConfigAuditTable } from "@/components/admin/config-audit/ConfigAuditTable";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
-const ALL = "ALL";
-
-// Mirror the server ConfigAuditEntityType / ConfigAuditAction enums so the filters stay a typed union.
-const ENTITY_TYPES = [
-	{ value: "PRACTICE_REVIEW_SETTINGS", label: "Review settings" },
-	{ value: "AI_CONFIG_BINDING", label: "AI binding" },
-	{ value: "AGENT_CONFIG", label: "Agent config" },
-] as const;
-const ACTIONS = [
-	{ value: "CREATED", label: "Created" },
-	{ value: "UPDATED", label: "Updated" },
-	{ value: "DELETED", label: "Deleted" },
-] as const;
-
-type EntityTypeFilter = (typeof ENTITY_TYPES)[number]["value"];
-type ActionFilter = (typeof ACTIONS)[number]["value"];
 
 export const Route = createFileRoute("/_authenticated/admin/config-audit")({
 	component: AdminConfigAuditPage,
 });
 
-// The generated client types `from`/`to` as `Date`, but its serializer mangles a real Date; the server
-// expects an ISO-8601 instant. Build the instant the server wants (local-day bounds, `to` end-of-day so
-// the picked day is inclusive against the `occurred_at < :to` predicate) and cast to satisfy the type.
-function dayStartIso(date: Date): Date {
-	return formatISO(startOfDay(date)) as unknown as Date;
-}
-function dayEndIso(date: Date): Date {
-	return formatISO(endOfDay(date)) as unknown as Date;
-}
-
-function formatRangeLabel(range: DateRange | undefined): string {
-	if (!range?.from) return "Any date";
-	if (!range.to) return `From ${format(range.from, "MMM d, yyyy")}`;
-	return `${format(range.from, "MMM d, yyyy")} – ${format(range.to, "MMM d, yyyy")}`;
-}
-
 function AdminConfigAuditPage() {
-	const [entityType, setEntityType] = useState<EntityTypeFilter | undefined>(undefined);
-	const [action, setAction] = useState<ActionFilter | undefined>(undefined);
-	const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+	const [filter, setFilter] = useState<ConfigAuditFilterState>({});
 	const [actorId, setActorId] = useState<number | undefined>(undefined);
 
-	const filters = {
-		entityType,
-		action,
+	const query = {
+		entityType: filter.entityType,
+		action: filter.action,
 		actorId,
-		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
-		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
+		from: filter.dateRange?.from ? dayStartIso(filter.dateRange.from) : undefined,
+		to: filter.dateRange?.to ? dayEndIso(filter.dateRange.to) : undefined,
 	};
 
 	const workspacesQuery = useQuery(adminListWorkspacesOptions());
@@ -82,7 +39,7 @@ function AdminConfigAuditPage() {
 	);
 
 	const listQuery = useInfiniteQuery({
-		...adminListConfigAuditEventsInfiniteOptions({ query: { size: PAGE_SIZE, ...filters } }),
+		...adminListConfigAuditEventsInfiniteOptions({ query: { size: PAGE_SIZE, ...query } }),
 		initialPageParam: 0,
 		getNextPageParam: (lastPage: PageConfigAuditEntryView) =>
 			lastPage.last ? undefined : (lastPage.number ?? 0) + 1,
@@ -92,15 +49,13 @@ function AdminConfigAuditPage() {
 		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [];
 	const total = listQuery.data?.pages[0]?.totalElements;
 	const hasFilter =
-		entityType !== undefined ||
-		action !== undefined ||
-		dateRange?.from !== undefined ||
+		filter.entityType !== undefined ||
+		filter.action !== undefined ||
+		filter.dateRange?.from !== undefined ||
 		actorId !== undefined;
 
 	const clearAll = () => {
-		setEntityType(undefined);
-		setAction(undefined);
-		setDateRange(undefined);
+		setFilter({});
 		setActorId(undefined);
 	};
 
@@ -118,109 +73,26 @@ function AdminConfigAuditPage() {
 				</p>
 			</header>
 
-			<div className="flex flex-wrap items-end gap-3">
-				<div className="flex w-full flex-col gap-1.5 sm:w-48">
-					<Label htmlFor="config-audit-entity-type" className="text-sm">
-						Resource
-					</Label>
-					<Select
-						value={entityType ?? ALL}
-						onValueChange={(value) =>
-							setEntityType(value === ALL ? undefined : (value as EntityTypeFilter))
-						}
-					>
-						<SelectTrigger id="config-audit-entity-type">
-							<SelectValue placeholder="All resources" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={ALL}>All resources</SelectItem>
-							{ENTITY_TYPES.map((t) => (
-								<SelectItem key={t.value} value={t.value}>
-									{t.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-
-				<div className="flex w-full flex-col gap-1.5 sm:w-40">
-					<Label htmlFor="config-audit-action" className="text-sm">
-						Action
-					</Label>
-					<Select
-						value={action ?? ALL}
-						onValueChange={(value) =>
-							setAction(value === ALL ? undefined : (value as ActionFilter))
-						}
-					>
-						<SelectTrigger id="config-audit-action">
-							<SelectValue placeholder="All actions" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={ALL}>All actions</SelectItem>
-							{ACTIONS.map((a) => (
-								<SelectItem key={a.value} value={a.value}>
-									{a.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="config-audit-date-range" className="text-sm">
-						Date range
-					</Label>
-					<Popover>
-						<PopoverTrigger
-							render={
-								<Button
-									id="config-audit-date-range"
-									variant="outline"
-									className={cn(
-										"w-64 justify-start text-left font-normal",
-										!dateRange?.from && "text-muted-foreground",
-									)}
-								>
-									<CalendarIcon className="mr-2 size-4" aria-hidden />
-									{formatRangeLabel(dateRange)}
-								</Button>
-							}
-						/>
-						<PopoverContent className="w-auto p-0" align="start">
-							<Calendar
-								autoFocus
-								mode="range"
-								defaultMonth={dateRange?.from}
-								selected={dateRange}
-								onSelect={setDateRange}
-								numberOfMonths={2}
-							/>
-						</PopoverContent>
-					</Popover>
-				</div>
-
-				{hasFilter && (
-					<Button variant="ghost" onClick={clearAll} className="mb-0.5">
-						Clear filters
-					</Button>
-				)}
-			</div>
+			<ConfigAuditFilters
+				idPrefix="config-audit"
+				value={filter}
+				onChange={setFilter}
+				onClear={clearAll}
+				hasFilter={hasFilter}
+			/>
 
 			{actorId !== undefined && (
-				<div className="flex flex-wrap items-center gap-2">
-					<Badge variant="secondary" className="gap-1">
-						Actor #{actorId}
-						<button
-							type="button"
-							aria-label="Clear actor filter"
-							onClick={() => setActorId(undefined)}
-							className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<X className="size-3" aria-hidden />
-						</button>
-					</Badge>
-				</div>
+				<Badge variant="secondary" className="gap-1">
+					Actor #{actorId}
+					<button
+						type="button"
+						aria-label="Clear actor filter"
+						onClick={() => setActorId(undefined)}
+						className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						<X className="size-3" aria-hidden />
+					</button>
+				</Badge>
 			)}
 
 			{total !== undefined && total > 0 && (

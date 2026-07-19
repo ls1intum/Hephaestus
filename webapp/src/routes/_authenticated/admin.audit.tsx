@@ -310,6 +310,7 @@ function AdminAuditPage() {
 				hasNextPage={Boolean(listQuery.hasNextPage)}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}
+				onRetry={() => listQuery.refetch()}
 				onFilterAccount={setAccountId}
 				onFilterActor={setActingAccountId}
 				resolveWorkspaceName={(id) => workspaceNames.get(id)}

@@ -71,7 +71,7 @@ const meta = {
 		hasFilter: false,
 		hasNextPage: false,
 		isFetchingNextPage: false,
-		onLoadMore: () => {},
+		onLoadMore: fn(),
 		onRetry: fn(),
 		onFilterActor: fn(),
 	},
@@ -91,11 +91,17 @@ export const Default: Story = {
 	},
 };
 
-/** Impersonation is attributed to the operator, with the assumed identity shown as "acting as …". */
+/**
+ * Impersonation is attributed to the operator with the assumed identity shown as "acting as …", and a
+ * credential change renders masked (never the raw boolean).
+ */
 export const Impersonation: Story = {
+	args: { entries: [entries[1]] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText(/acting as Ada Lovelace/)).toBeInTheDocument();
+		// llmApiKeySet: false → true must render as a mask, not "false → true".
+		await expect(canvas.getByText(/not set → ••••••/)).toBeInTheDocument();
 	},
 };
 
@@ -129,11 +135,12 @@ export const RowDetail: Story = {
 		const canvas = within(canvasElement);
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
-		// The sheet portals → query the document. "Changes" is also a column header, so assert on the
-		// sheet's field-level diff content instead: the changed key and its before/after values.
-		await expect(await screen.findByText("cooldownMinutes")).toBeInTheDocument();
-		await expect(screen.getByText("30")).toBeInTheDocument();
-		await expect(screen.getByText("10")).toBeInTheDocument();
+		// The sheet portals → scope to the dialog. "Changes" is also a column header, so assert on the
+		// field-level diff content: the changed key and its before/after values.
+		const dialog = within(await screen.findByRole("dialog"));
+		await expect(dialog.getByText("cooldownMinutes")).toBeInTheDocument();
+		await expect(dialog.getByText("30")).toBeInTheDocument();
+		await expect(dialog.getByText("10")).toBeInTheDocument();
 	},
 };
 
@@ -168,4 +175,13 @@ export const ErrorState: Story = {
 /** Loading spinner before the first page resolves. */
 export const Loading: Story = {
 	args: { entries: [], isLoading: true },
+};
+
+/** More pages available — the Load more control appears and disables while fetching. */
+export const LoadMore: Story = {
+	args: { hasNextPage: true, isFetchingNextPage: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByRole("button", { name: /Load more/i })).toBeDisabled();
+	},
 };

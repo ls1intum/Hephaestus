@@ -1,9 +1,6 @@
-import type { AccountRef } from "@/api/types.gen";
-
 /**
  * Severity of an audit event, derived from its outcome + type. Drives the row's visual emphasis so a
- * failed login or a privilege change stands out from routine traffic — the pattern Okta (INFO vs WARN),
- * Datadog and Auth0 (Error/Warn/Success) all use for audit/security logs.
+ * failed login or a privilege change stands out from routine traffic.
  */
 export type AuditSeverity = "error" | "warning" | "info";
 
@@ -27,26 +24,14 @@ export function eventLabel(eventType: string): string {
 	return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
-/**
- * Render an account reference as a human label, falling back to `#id` when the account no longer exists
- * (audit rows outlive accounts — deletion, GDPR redaction). `id` is the raw subject/actor id when no
- * resolved ref is available.
- */
-export function accountLabel(ref: AccountRef | undefined, id: number | undefined): string | null {
-	if (ref) return ref.displayName || ref.email || `#${ref.id}`;
-	if (id != null) return `#${id}`;
-	return null;
-}
+export { refLabel as accountLabel } from "../audit-shared/refLabel";
 
-export type { FormattedTimestamp } from "../audit-shared/timeFormat";
-// Timestamp formatting is shared with the config-audit surface — see audit-shared/timeFormat.
-export { formatTimestamp, relativeTime } from "../audit-shared/timeFormat";
+export { formatTimestamp } from "../audit-shared/timeFormat";
 
 /**
  * Turn the JSONB `details` blob into a human sentence where we can — `{"from":"USER","to":"APP_ADMIN"}`
  * → `USER → APP_ADMIN`, other objects → `key: value` pairs — and fall back to the raw string when it is
- * not parseable JSON. Tailscale / Datadog / Vercel all render structured changes as old→new diffs rather
- * than raw JSON; this is the lightweight version of that.
+ * not parseable JSON.
  */
 export function humanizeDetails(details: string | undefined): string | null {
 	if (!details) return null;
@@ -72,12 +57,4 @@ function stringify(value: unknown): string {
 	return String(value);
 }
 
-/** Pretty-print the raw `details` JSON for the detail panel; returns the raw string if not JSON. */
-export function prettyDetails(details: string | undefined): string | null {
-	if (!details) return null;
-	try {
-		return JSON.stringify(JSON.parse(details), null, 2);
-	} catch {
-		return details;
-	}
-}
+export { prettyJson as prettyDetails } from "../audit-shared/prettyJson";

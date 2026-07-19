@@ -69,10 +69,35 @@ describe("fieldChanges", () => {
 		expect(change).toEqual({ path: "volumeCaps.perPullRequest", before: "5", after: "3" });
 	});
 
+	it("masks a credential boolean end-to-end through fieldChanges, not just in formatLeaf isolation", () => {
+		// Pins the real bug: fieldChanges must pass the key path to formatLeaf, or llmApiKeySet renders
+		// "false → true". A false-positive guard rides along: publicKey must NOT be masked.
+		expect(
+			fieldChanges(
+				entry({
+					entityType: "AGENT_CONFIG",
+					changedKeys: ["llmApiKeySet"],
+					oldValue: '{"llmApiKeySet":false}',
+					newValue: '{"llmApiKeySet":true}',
+				}),
+			),
+		).toEqual([{ path: "llmApiKeySet", before: "not set", after: "••••••" }]);
+		expect(
+			fieldChanges(
+				entry({
+					changedKeys: ["publicKey"],
+					oldValue: '{"publicKey":false}',
+					newValue: '{"publicKey":true}',
+				}),
+			),
+		).toEqual([{ path: "publicKey", before: "false", after: "true" }]);
+	});
+
 	it("has no before side for a CREATED row", () => {
 		const changes = fieldChanges(
 			entry({
 				action: "CREATED",
+				changedKeys: ["name", "enabled"],
 				oldValue: undefined,
 				newValue: '{"name":"Primary","enabled":true}',
 			}),
@@ -83,7 +108,12 @@ describe("fieldChanges", () => {
 
 	it("has no after side for a DELETED row", () => {
 		const changes = fieldChanges(
-			entry({ action: "DELETED", oldValue: '{"name":"Primary"}', newValue: undefined }),
+			entry({
+				action: "DELETED",
+				changedKeys: ["name"],
+				oldValue: '{"name":"Primary"}',
+				newValue: undefined,
+			}),
 		);
 		expect(changes.every((c) => c.after === null)).toBe(true);
 	});
@@ -144,7 +174,7 @@ describe("subjectLabel", () => {
 					newValue: '{"name":"GPT-5 reviewer"}',
 				}),
 			),
-		).toEqual({ label: 'Agent config "GPT-5 reviewer"', hint: "AGENT_CONFIG #42" });
+		).toEqual({ label: 'Agent config "GPT-5 reviewer"', hint: "Agent config #42" });
 	});
 	it("falls back to type + identifier without inventing a name", () => {
 		expect(
