@@ -134,28 +134,18 @@ export const ResetClearsEverything: Story = {
 	},
 };
 
-/** The popup itself: checkbox affordances, and the per-facet clear that Reset used to be the only
- *  substitute for. */
-export const OpenPopup: Story = {
-	args: { initialEntityTypes: ["WORKSPACE_FEATURES"] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
-
-		await expect(await screen.findByRole("listbox")).toBeInTheDocument();
-		await expect(
-			await screen.findByRole("button", { name: /clear selection/i }),
-		).toBeInTheDocument();
-	},
-};
-
-/** Clearing one facet must leave the others standing — the reason Reset alone was not enough. */
+/** Clearing one facet leaves the others standing, and the control is reachable by keyboard. */
 export const ClearsOneFacetOnly: Story = {
 	args: { initialEntityTypes: ["WORKSPACE_FEATURES"], initialActions: ["UPDATED"] },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /^Setting/i }));
-		await userEvent.click(await screen.findByRole("button", { name: /clear selection/i }));
+		// Tabbed to, not clicked: Base UI's own Combobox.Clear carries tabIndex -1, so a mouse-only
+		// story passed while the control was unreachable for keyboard users.
+		const clear = await screen.findByRole("button", { name: /clear selection/i });
+		await userEvent.tab();
+		await expect(clear).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
 		await userEvent.keyboard("{Escape}");
 
 		await expect(canvas.queryByText(ENTITY_TYPE_LABELS.WORKSPACE_FEATURES)).not.toBeInTheDocument();

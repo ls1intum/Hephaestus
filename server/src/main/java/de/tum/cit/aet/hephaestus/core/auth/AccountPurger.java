@@ -60,7 +60,7 @@ public class AccountPurger {
     }
 
     /**
-     * GDPR Art. 17 erasure for the retained audit trail. The {@code auth_event} rows are kept under the
+     * GDPR Art. 17 erasure for the retained audit trails. The {@code auth_event} rows are kept under the
      * Art. 30 / Art. 17(3)(b) records-of-processing carve-out, but the personal data they carry has no
      * retention basis once the subject is erased: the raw {@code ip_inet}, the {@code user_agent}
      * fingerprint, and — for {@code IMPERSONATION_*} rows — the operator-supplied free-text {@code reason}
@@ -78,6 +78,23 @@ public class AccountPurger {
         );
         if (redacted > 0) {
             log.info("auth.account: anonymized {} auth_event row(s) for erased accountId={}", redacted, accountId);
+        }
+
+        // config_audit_event carries no free-text or network identifiers, so only the account references
+        // need clearing. The append-only trigger permits exactly this per-column nulling; the change
+        // itself stays, which is what the Art. 17(3)(b) basis retains.
+        int unlinked = jdbcTemplate.update(
+            "UPDATE config_audit_event SET actor_account_id = NULL, acting_account_id = NULL " +
+                "WHERE actor_account_id = ? OR acting_account_id = ?",
+            accountId,
+            accountId
+        );
+        if (unlinked > 0) {
+            log.info(
+                "auth.account: unlinked {} config_audit_event row(s) for erased accountId={}",
+                unlinked,
+                accountId
+            );
         }
     }
 }

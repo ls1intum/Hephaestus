@@ -4,9 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,8 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 /**
  * Every admin mutation endpoint must declare whether it is audited: {@link Audited} names the ledger
  * the change lands in, {@link AuditExempt} says why it deliberately lands in none. An endpoint that
- * declares neither is how a trail develops a hole nobody chose. The reasoning that matters is in the
- * failure message below, where a reader actually meets it.
+ * declares neither is how a trail develops a hole nobody chose.
  */
 class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
@@ -49,6 +55,79 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
             .isEmpty();
     }
 
+    /**
+     * An {@code @Audited} endpoint that reaches no recorder is a promise nothing keeps; an
+     * {@code @AuditExempt} one that records anyway invites the next reader to delete a working audit
+     * call. Both of those shipped here before the build checked them.
+     *
+     * <p>Only {@code @Audited("<ENTITY_TYPE>")} is checked — a value naming another ledger
+     * ({@code connection_audit}, {@code auth_event}) points outside this port and cannot be resolved
+     * from the call graph.
+     */
+    @Test
+    void auditDeclarationsMatchTheCallGraph() {
+        List<String> contradictions = classes
+            .stream()
+            .filter(AuditByDefaultArchTest::isController)
+            .flatMap(c -> c.getMethods().stream())
+            .map(AuditByDefaultArchTest::contradiction)
+            .flatMap(Optional::stream)
+            .sorted()
+            .toList();
+
+        assertThat(contradictions)
+            .as(
+                """
+                These endpoints' audit declarations contradict what they actually do. Either wire the \
+                producer, or change the declaration to say what is true."""
+            )
+            .isEmpty();
+    }
+
+    private static Optional<String> contradiction(JavaMethod method) {
+        String name = method.getOwner().getSimpleName() + "." + method.getName();
+        boolean records = reachesRecorder(method, new HashSet<>(), 0);
+        if (method.isAnnotatedWith(AuditExempt.class) && records) {
+            return Optional.of(name + " is @AuditExempt but reaches ConfigAuditPort.record");
+        }
+        boolean namesEntityType = method
+            .tryGetAnnotationOfType(Audited.class)
+            .map(a -> ENTITY_TYPES.contains(a.value()))
+            .orElse(false);
+        if (namesEntityType && !records) {
+            return Optional.of(name + " is @Audited but reaches no recorder");
+        }
+        return Optional.empty();
+    }
+
+    private static final Set<String> ENTITY_TYPES = Arrays.stream(ConfigAuditEntityType.values())
+        .map(Enum::name)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+
+    /** Depth-bounded so a cyclic service graph terminates; audit writes sit shallow behind a handler. */
+    private static boolean reachesRecorder(JavaMethod method, Set<String> seen, int depth) {
+        if (depth > MAX_CALL_DEPTH || !seen.add(method.getFullName())) {
+            return false;
+        }
+        for (JavaMethodCall call : method.getMethodCallsFromSelf()) {
+            JavaClass target = call.getTargetOwner();
+            if (target.getName().equals(ConfigAuditPort.class.getName()) && call.getName().equals("record")) {
+                return true;
+            }
+            if (!target.getPackageName().startsWith("de.tum.cit.aet.hephaestus")) {
+                continue;
+            }
+            for (JavaMethod resolved : call.getTarget().resolveMember().stream().toList()) {
+                if (reachesRecorder(resolved, seen, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static final int MAX_CALL_DEPTH = 6;
+
     static boolean isController(JavaClass clazz) {
         // Meta-annotated too: @WorkspaceScopedController composes @RestController, and every
         // workspace-admin surface uses it.
@@ -69,8 +148,7 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
     /**
      * Admin-gated = a workspace admin/owner gate or the instance-admin authority, on the method OR its
-     * controller. Checking only the method misses the seven controllers that declare the gate once at
-     * class level, which silently exempted ten endpoints.
+     * controller. Class-level gates count: seven controllers declare the gate once on the class.
      */
     static boolean isAdminGated(JavaMethod method) {
         return (

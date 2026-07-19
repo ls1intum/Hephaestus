@@ -28,6 +28,18 @@ class AgentConfigSnapshotTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Test
+    void stripsAGatewayKeyFromTheBaseUrlQueryString() throws Exception {
+        // Where the major gateways actually carry it: ?key= (Gemini), ?subscription-key= (Azure).
+        AgentConfig config = configWithKey(SENTINEL);
+        config.setLlmBaseUrl("https://gateway.internal/v1?key=" + SENTINEL);
+
+        AgentConfigSnapshot snapshot = AgentConfigSnapshot.of(config);
+
+        assertThat(snapshot.llmBaseUrl()).isEqualTo("https://gateway.internal/v1");
+        assertThat(MAPPER.writeValueAsString(snapshot)).doesNotContain(SENTINEL);
+    }
+
+    @Test
     void doesNotSerializeTheApiKey() throws Exception {
         // Serialized form is what actually lands in old_value/new_value.
         assertThat(MAPPER.writeValueAsString(AgentConfigSnapshot.of(configWithKey(SENTINEL)))).doesNotContain(SENTINEL);
@@ -51,7 +63,7 @@ class AgentConfigSnapshotTest {
         config.setLlmBaseUrl("https://svc:" + SENTINEL + "@gateway.internal:8443/v1?x=1");
         AgentConfigSnapshot snapshot = AgentConfigSnapshot.of(config);
 
-        assertThat(snapshot.llmBaseUrl()).isEqualTo("https://gateway.internal:8443/v1?x=1");
+        assertThat(snapshot.llmBaseUrl()).isEqualTo("https://gateway.internal:8443/v1");
         assertThat(MAPPER.writeValueAsString(snapshot)).doesNotContain(SENTINEL);
     }
 

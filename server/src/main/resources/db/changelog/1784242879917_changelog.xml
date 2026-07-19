@@ -200,4 +200,33 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="FelixTJDietrich" id="1784242879917-5-config-audit-event-read-paths">
+        <preConditions onFail="MARK_RAN" onFailMessage="config_audit_event read-path indexes already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_config_audit_event_occurred'
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            -- The instance-admin view spans workspaces, so neither workspace-leading index serves it.
+            CREATE INDEX ix_config_audit_event_occurred
+                ON config_audit_event (occurred_at DESC, id DESC);
+
+            -- "What did this administrator change" is the first question of an access review.
+            CREATE INDEX ix_config_audit_event_actor
+                ON config_audit_event (actor_account_id, occurred_at DESC)
+                WHERE actor_account_id IS NOT NULL;
+
+            -- changed_keys is persisted rather than derived precisely so it can be filtered on.
+            CREATE INDEX ix_config_audit_event_changed_keys
+                ON config_audit_event USING GIN (changed_keys);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP INDEX IF EXISTS ix_config_audit_event_occurred;
+                DROP INDEX IF EXISTS ix_config_audit_event_actor;
+                DROP INDEX IF EXISTS ix_config_audit_event_changed_keys;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

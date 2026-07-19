@@ -303,7 +303,19 @@ public class PracticeService {
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
+        Long practiceId = practice.getId();
+        boolean wasActive = practice.isActive();
         practiceRepository.delete(practice);
+        // practice_revision is CASCADE-deleted with the practice, so the lineage that records edits
+        // cannot record the deletion itself.
+        configAudit.record(
+            ConfigAuditEntry.deleted(
+                ConfigAuditEntityType.PRACTICE_ACTIVE,
+                practiceId,
+                ctx.id(),
+                new PracticeActiveSnapshot(wasActive)
+            )
+        );
         log.info("Deleted practice '{}' (slug={}) from workspace {}", practice.getName(), slug, ctx.slug());
     }
 }

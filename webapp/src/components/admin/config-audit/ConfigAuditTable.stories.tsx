@@ -172,11 +172,6 @@ export const ErrorState: Story = {
 	},
 };
 
-/** Loading spinner before the first page resolves. */
-export const Loading: Story = {
-	args: { entries: [], isLoading: true },
-};
-
 /** More pages available — the Load more control appears and disables while fetching. */
 export const LoadMore: Story = {
 	args: { hasNextPage: true, isFetchingNextPage: true },

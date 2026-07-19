@@ -71,8 +71,6 @@ export const Default: Story = {
 		// Impersonated actions attribute the operator ("via Grace Hopper").
 		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
 		// A failure shows its reason (not just a red badge), plus the destructive result badge.
-		// the failure reason lives in the detail sheet now; the row shows the Failure badge
-		await expect(canvas.getAllByText("Failure").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Failure")).toBeInTheDocument();
 	},
 };

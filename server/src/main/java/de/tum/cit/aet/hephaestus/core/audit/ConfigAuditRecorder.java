@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditUnavailableException;
 import java.time.Clock;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -70,13 +71,13 @@ class ConfigAuditRecorder implements ConfigAuditPort {
      */
     private static void requireWritableTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException(
+            throw new ConfigAuditUnavailableException(
                 "config audit must be recorded inside the transaction that performs the change, " +
                     "otherwise the change can commit without its audit row"
             );
         }
         if (TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
-            throw new IllegalStateException(
+            throw new ConfigAuditUnavailableException(
                 "config audit was called inside a read-only transaction; the insert would never be " +
                     "flushed (FlushMode.MANUAL) and the change would commit with no audit row"
             );

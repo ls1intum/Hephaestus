@@ -4,7 +4,8 @@ package de.tum.cit.aet.hephaestus.core.audit.spi;
  * The kind of admin-configurable resource a {@code config_audit_event} row describes.
  *
  * <p>Mirrored by the {@code ck_config_audit_event_entity_type} CHECK constraint;
- * {@code ConfigAuditEnumParityTest} fails if the two drift. Widening is a changeset that drops and
+ * {@code ConfigAuditImmutabilityIntegrationTest} reads {@code pg_constraint} on the migrated schema and
+ * fails if the two drift. Widening is a changeset that drops and
  * re-adds the constraint (the shape {@code 1782980500800-15} uses for {@code auth_event}).
  */
 public enum ConfigAuditEntityType {

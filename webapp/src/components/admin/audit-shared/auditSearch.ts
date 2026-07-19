@@ -11,15 +11,25 @@ import { z } from "zod";
  * hitting `validateSearch` and rendering an error page. Values stay loose strings for the same reason
  * and are narrowed to the API's enums at the call site.
  */
+/**
+ * A repeated filter value. Accepts the single-value form too, because that is what the API takes
+ * (`?action=CREATED&action=DELETED`) and therefore what someone hand-writing a URL will try —
+ * discarding it would filter nothing while showing no active filter.
+ */
+const multiValue = z
+	.union([z.string().transform((value) => [value]), z.array(z.string())])
+	.optional()
+	.catch(undefined);
+
 export const auditSearchSchema = z.object({
 	tab: z.enum(["signins", "settings"]).catch("signins"),
 	// Sign-ins tab
-	eventType: z.array(z.string()).optional().catch(undefined),
-	outcome: z.array(z.string()).optional().catch(undefined),
+	eventType: multiValue,
+	outcome: multiValue,
 	accountId: z.number().optional().catch(undefined),
 	// Settings tab
-	entityType: z.array(z.string()).optional().catch(undefined),
-	action: z.array(z.string()).optional().catch(undefined),
+	entityType: multiValue,
+	action: multiValue,
 	// Both
 	actorId: z.number().optional().catch(undefined),
 	/** Inclusive local calendar days, `yyyy-MM-dd`, so a shared link means the same day to everyone. */

@@ -241,9 +241,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * Each predicate in FILTER_PREDICATES, matching and not matching. Every dimension carries both
-     * directions because a predicate transposed so that it matches NOTHING passes every zero case on
-     * its own — and a failure has to name which predicate broke, which one fat test cannot.
+     * One case per filter dimension this matrix covers. Each carries both directions, because a
+     * predicate transposed to match NOTHING passes every zero case on its own — and a failure has to
+     * name which predicate broke, which one fat test cannot.
      */
     static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> filterCases() {
         String future = Instant.now().plusSeconds(60).toString();
@@ -279,10 +279,33 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
+    void narrowingToOneResourceIsWhatMakesAPerResourceHistoryPossible() {
+        // The entity_id predicate is otherwise unexercised: transposed to `<>` the suite stays green,
+        // while the per-resource history the column exists to serve returns everything but the resource.
+        Workspace workspace = setupWorkspace("audit-entity");
+        patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
+
+        assertFilterYields(
+            workspace,
+            uri ->
+                uri
+                    .queryParam("entityType", "PRACTICE_REVIEW_SETTINGS")
+                    .queryParam("entityId", String.valueOf(workspace.getId())),
+            1
+        );
+        assertFilterYields(
+            workspace,
+            uri -> uri.queryParam("entityType", "PRACTICE_REVIEW_SETTINGS").queryParam("entityId", "999999"),
+            0
+        );
+    }
+
+    @Test
+    @WithAdminUser
     void repeatingAFilterParameterWidensItRatherThanReplacingIt() {
         // The question a change trail is opened for is usually disjunctive ("did anyone touch either of
-        // these?"), so repeated values must union. The CSV the predicate builds from them is split by
-        // string_to_array in SQL, which a single-value test cannot distinguish from plain equality.
+        // these?"), so repeated values must union. The values bind as a text[] matched with = ANY(...), which a
+        // single-value test cannot distinguish from plain equality.
         Workspace workspace = setupWorkspace("audit-multi");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         createConfig(workspace, "primary");
@@ -342,7 +365,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     @Transactional
     void anUnscopedReadOfTheAuditTableIsCaughtByTenancyEnforcement() {
-        // Pins that the table is registered as workspace-scoped (absent from GLOBAL_TABLES) and that the
         // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate and
         // by findForWorkspace, which the two tests above cover.
         assertThatThrownBy(() ->

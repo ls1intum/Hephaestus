@@ -72,6 +72,9 @@ class ConfigAuditImmutabilityIntegrationTest {
     @Autowired
     private WorkspaceRepository workspaceRepository;
 
+    @Autowired
+    private ConfigAuditRetentionJob retentionJob;
+
     private long workspaceId;
     private long rowId;
 
@@ -148,6 +151,24 @@ class ConfigAuditImmutabilityIntegrationTest {
     }
 
     @Test
+    void theSweepRemovesOnlyRowsPastTheWindow() {
+        // sweep(), not the repository method: @SchedulerLock needs the Liquibase `shedlock` table, which
+        // only exists on a migrated schema — so this is the one tier that can run the real entry point.
+        // A row aged exactly RETENTION_DAYS is deliberately not asserted: the seed and the sweep each
+        // call now() in their own transaction, so it is older than the cutoff by microseconds and the
+        // case is a race, not a boundary.
+        long stale = insertRow(ConfigAuditRetentionJob.RETENTION_DAYS + 1);
+        long inside = insertRow(ConfigAuditRetentionJob.RETENTION_DAYS - 1);
+        long fresh = insertRow(0);
+
+        retentionJob.sweep();
+
+        assertThat(rowExists(stale)).as("a row past the window ages out").isFalse();
+        assertThat(rowExists(inside)).as("a row inside the window survives").isTrue();
+        assertThat(rowExists(fresh)).as("a recent row survives").isTrue();
+    }
+
+    @Test
     void theEntityTypeConstraintAcceptsEveryValueTheApplicationCanEmit() {
         // From the applied schema, not the changelog text: a CHECK narrowed by a later changeset is
         // invisible to anything that greps XML, and rejects an INSERT for a value Java still emits.
@@ -171,6 +192,11 @@ class ConfigAuditImmutabilityIntegrationTest {
     }
 
     private static final String SLUG = "audit-immutability";
+
+    private boolean rowExists(long id) {
+        Integer count = jdbc.queryForObject("SELECT count(*) FROM config_audit_event WHERE id = ?", Integer.class, id);
+        return count != null && count > 0;
+    }
 
     private long insertRow(int ageInDays) {
         return jdbc.queryForObject(

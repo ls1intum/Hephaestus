@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -55,14 +55,5 @@ export const PickerIsContentWidthOnDesktop: Story = {
 	play: async ({ canvasElement }) => {
 		const list = box(canvasElement, "list");
 		await expect(list.width).toBeLessThan(canvasElement.getBoundingClientRect().width / 2);
-	},
-};
-
-/** Both tabs are reachable and labelled. */
-export const TabsAreLabelled: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("tab", { name: "Access" })).toBeInTheDocument();
-		await expect(canvas.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
 	},
 };

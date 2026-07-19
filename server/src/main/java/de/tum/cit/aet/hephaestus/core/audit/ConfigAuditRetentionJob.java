@@ -15,10 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
  * table, since the immutability trigger blocks DELETE inside the window.
  *
  * <p>{@link #RETENTION_DAYS} is passed into the DELETE, but the trigger's carve-out has to hardcode
- * the same interval — SQL cannot read a Java constant. {@code ConfigAuditChangelogParityTest} pins the
- * two together, because drift is silent in both directions: a shorter window here makes every sweep
- * raise against the trigger and retention dies unnoticed; a longer one over-retains while the docs
- * still claim the window.
+ * the same interval — SQL cannot read a Java constant. {@code ConfigAuditImmutabilityIntegrationTest} runs this sweep against the migrated schema, so a
+ * trigger window longer than this constant — the direction that kills the sweep — fails the build.
  */
 @ConditionalOnServerRole
 @Component

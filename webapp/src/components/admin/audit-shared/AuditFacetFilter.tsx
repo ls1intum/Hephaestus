@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Combobox,
-	ComboboxClear,
 	ComboboxContent,
 	ComboboxEmpty,
 	ComboboxItem,
@@ -56,8 +55,8 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 			filter={(option, query) => contains(option, query, (o) => o.label)}
 			itemToStringLabel={(option) => option.label}
 		>
-			{/* Base UI gives this trigger no accessible name, and the name has to carry the selection —
-			    otherwise a screen-reader user hears the facet's title and never what it is filtering by. */}
+			{/* The name carries the selection: the trigger's own text does too, but collapses to
+			    "3 selected" past two, which tells a screen-reader user nothing about what is filtered. */}
 			<ComboboxTrigger
 				aria-label={
 					selectedOptions.length === 0
@@ -116,11 +115,21 @@ export function AuditFacetFilter({ title, options, selected, onChange }: AuditFa
 					)}
 				</ComboboxList>
 				{/* Without this the only way to widen one facet is Reset, which clears the others with it.
-				    ComboboxClear unmounts itself when nothing is selected, so it needs no guard. */}
-				<ComboboxSeparator />
-				<ComboboxClear render={<Button variant="ghost" size="sm" className="h-8 font-normal" />}>
-					Clear selection
-				</ComboboxClear>
+				    Not Combobox.Clear: Base UI hard-codes tabIndex -1 on it (it is an input adornment, not
+				    a list action), so it would be reachable by mouse only. */}
+				{selectedOptions.length > 0 && (
+					<>
+						<ComboboxSeparator />
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-full font-normal"
+							onClick={() => onChange([])}
+						>
+							Clear selection
+						</Button>
+					</>
+				)}
 			</ComboboxContent>
 		</Combobox>
 	);

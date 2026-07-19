@@ -96,7 +96,7 @@ export function WorkspaceConfigAuditPanel({
 	workspaceSlug,
 	search,
 	onSearchChange,
-}: ConfigAuditPanelProps & { workspaceSlug: string }) {
+}: Omit<ConfigAuditPanelProps, "resolveWorkspaceName"> & { workspaceSlug: string }) {
 	const listQuery = useInfiniteQuery({
 		...listWorkspaceConfigAuditEventsInfiniteOptions({
 			path: { workspaceSlug },

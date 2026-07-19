@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
@@ -189,7 +190,9 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "practice content is versioned in practice_revision (SCD-2 lineage)")
+    @AuditExempt(
+        reason = "criteria edits append a practice_revision; other fields are catalogue content that gates nothing"
+    )
     public ResponseEntity<PracticeDTO> updatePractice(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -212,9 +215,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(
-        reason = "per-practice delivery state moves to the resolver in #1356, which records its own decision chain"
-    )
+    @Audited("PRACTICE_ACTIVE")
     public ResponseEntity<PracticeDTO> setActive(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
@@ -259,7 +260,7 @@ public class PracticeCatalogController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "practice content is versioned in practice_revision (SCD-2 lineage)")
+    @Audited("PRACTICE_ACTIVE")
     public ResponseEntity<Void> deletePractice(WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
         practiceService.deletePractice(workspaceContext, practiceSlug);
         return ResponseEntity.noContent().build();

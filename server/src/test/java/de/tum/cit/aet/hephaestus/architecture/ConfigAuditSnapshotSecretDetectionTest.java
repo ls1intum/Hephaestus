@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
  * Fixtures for {@link ConfigAuditSnapshotArchTest}'s secret detection.
  *
  * <p>The rule guards an append-only table, so a secret it fails to catch cannot be edited out
- * afterwards. These pin what it must catch — including a secret one level down, which the original
- * field-only walk would have let through, since a snapshot is serialized whole.
+ * afterwards. These pin what it must catch — including a secret one level down: a snapshot is
+ * serialized whole.
  */
 @Tag("architecture")
 class ConfigAuditSnapshotSecretDetectionTest {

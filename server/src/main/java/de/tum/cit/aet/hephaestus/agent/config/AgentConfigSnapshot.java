@@ -46,7 +46,7 @@ record AgentConfigSnapshot(
             c.getLlmProvider(),
             c.getModelName(),
             c.getModelVersion(),
-            withoutUserInfo(c.getLlmBaseUrl()),
+            credentialFreeBaseUrl(c.getLlmBaseUrl()),
             c.getCredentialMode(),
             c.getLlmApiKey() != null && !c.getLlmApiKey().isBlank(),
             c.getTimeoutSeconds(),
@@ -56,27 +56,21 @@ record AgentConfigSnapshot(
     }
 
     /**
-     * Drops any {@code user:password@} from a URL. Unparseable input collapses to a marker rather than
-     * being passed through, so a malformed value can never smuggle a credential past this.
+     * Reduces a base URL to scheme, host, port and path. Both places a credential rides in a URL are
+     * dropped: {@code user:password@}, and the query string — which is where the major LLM gateways put
+     * their key ({@code ?key=}, {@code ?subscription-key=}). Unparseable input collapses to a marker
+     * rather than being passed through, so a malformed value cannot smuggle one past either.
      */
-    private static @Nullable String withoutUserInfo(@Nullable String url) {
+    private static @Nullable String credentialFreeBaseUrl(@Nullable String url) {
         if (url == null) {
             return null;
         }
         try {
             URI uri = new URI(url);
-            if (uri.getUserInfo() == null) {
+            if (uri.getUserInfo() == null && uri.getQuery() == null && uri.getFragment() == null) {
                 return url;
             }
-            return new URI(
-                uri.getScheme(),
-                null,
-                uri.getHost(),
-                uri.getPort(),
-                uri.getPath(),
-                uri.getQuery(),
-                null
-            ).toString();
+            return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), uri.getPath(), null, null).toString();
         } catch (URISyntaxException e) {
             return "<unparseable>";
         }

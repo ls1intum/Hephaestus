@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditUnavailableException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -50,7 +51,7 @@ class ConfigAuditRecorderTest {
         // Without this, a producer that forgot @Transactional would commit its change and silently
         // leave no audit row — the failure this port exists to prevent.
         assertThatThrownBy(() -> recorder.record(entry(new Snap(30), new Snap(10))))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(ConfigAuditUnavailableException.class)
             .hasMessageContaining("inside the transaction");
         verify(repository, never()).save(any());
     }
@@ -60,7 +61,7 @@ class ConfigAuditRecorderTest {
         // readOnly satisfies MANDATORY but never flushes, so the INSERT would silently not happen.
         inTransaction(true);
         assertThatThrownBy(() -> recorder.record(entry(new Snap(30), new Snap(10))))
-            .isInstanceOf(IllegalStateException.class)
+            .isInstanceOf(ConfigAuditUnavailableException.class)
             .hasMessageContaining("read-only");
         verify(repository, never()).save(any());
     }
